@@ -1,5 +1,5 @@
 {
-    // Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+    // Copyright (c) 2015 Battlehouse Inc. All rights reserved.
     // Use of this source code is governed by an MIT-style license that can be
     // found in the LICENSE file.
 
@@ -76,6 +76,8 @@
     "INVALID_LOGIN_SIGNATURE_FAIL": { "ui_name": "Login problem: failed signature check" },
     "INVALID_LOGIN_EXPIRED_TOKEN": { "ui_name": "Login problem: Facebook token is expired" },
     "FACEBOOK_PROFILE_API_ERROR": { "ui_name": "Error retrieving user profile from Facebook API" },
+    "FACEBOOK_PERMISSION_REQUIRED_USER_FRIENDS": { "ui_title": "Friend List Access Required",
+                                                   "ui_name": "To send invites or gifts, %game needs access to your friends list.\n\nTo allow access, open your Facebook Settings (\"triangle\" button at top-right of screen), click \"Apps\", then \"%game\", then click \"Remove App\". Finally, log back in to the game." },
 
     "LOAD_AI_BASE_ERROR": { "ui_title": "Failed to load AI base", "ui_name": "Server returned error:\n%s" },
     "SAVE_AI_BASE_ERROR": { "ui_title": "Failed to save AI base", "ui_name": "Server returned error:\n%s" },
@@ -92,6 +94,7 @@
     "CANNOT_SPY_MAP_BOTH": { "ui_title": "Cannot scout this player", "ui_name": "You may only spy on bases next to your deployed battalions, and the home bases of your social-network friends and alliancemates." },
 
     "CANNOT_SPY_BASE_NOT_FOUND": { "ui_title": "Target Not Found", "ui_name": "The base or battalion you were attempting to spy on (ID %d) was not found.\n\nIt may have moved, expired, or been destroyed by another player." },
+    "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY": { "ui_title": "Uncollected Loot", "ui_name": "You must store or abandon your loot before leaving home base or starting another battle." },
     "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN" : { "ui_name": "Cannot attack this base because the player is currently at home" },
     "CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK" : { "ui_name": "Cannot attack this home base because the player is currently under attack" },
     "CANNOT_ATTACK_BASE_WHILE_ALREADY_UNDER_ATTACK" : { "ui_title": "Target evaded you!", "ui_name": "Cannot start attack because another player just arrived here." },
@@ -192,13 +195,13 @@
     "ORDER_PROCESSING": { "ui_name": "Paid order processing error" },
     "INVALID_CHAT_CHANNEL": { "ui_name": "You do not have access to this chat channel" },
     "CHAT_THROTTLED": { "ui_name": "Chat spam detected, please wait %d seconds before sending another message." },
+    "CHAT_UGLY": { "ui_name": "Invalid character(s) detected, cannot send this message." },
 
     "NO_GIFTABLE_FRIENDS": { "ui_title": "Send more gifts", "ui_name": "You may send a gift to each friend once per day.\n\nInvite new friends to send more gifts.", "ui_button_invite": "Invite" },
     "CANNOT_REQUEST_UNIT_DONATION_NO_SPACE": { "ui_name": "No space for more reinforcements. Use your existing reinforcements first." },
     "CANNOT_DONATE_UNITS_NO_SPACE": { "ui_name": "Recipient has no space for more reinforcements.\n\nAnother player may have donated units ahead of you, or this request may be too old.\n\nYou have not donated any units." },
     "CANNOT_CREATE_SQUAD_LIMIT_REACHED": { "ui_name": "Maximum number of battalions already created." },
     "CANNOT_CREATE_SQUAD_MAX_LIMIT_REACHED": { "ui_name": "No more battalions can be created." },
-    "CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED": { "ui_title": "Not Enough Space", "ui_name": "Battalion does not have enough space for this unit. Upgrade Reserves Bay to raise limit." },
     "CANNOT_ALTER_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be edited while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be deployed while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Reserves Bay cannot support more deployed battalions. Upgrade Reserves Bay to raise limit." },
@@ -223,7 +226,9 @@
     "HARMLESS_RACE_CONDITION": { "ui_name": "Action failed due to network lag, please try again" },
     "SQUAD_RACE_CONDITION": { "ui_title": "Battalion Out of Sync", "ui_name": "Battalion movement failed due to network lag, please try again.\n\nIf this error happens again, try refreshing the Regional Map, or log into the game again." },
     "DISALLOWED_IN_SECURE_MODE": { "ui_name": "This function is not allowed when game is running in secure mode" },
-    "UNKNOWN_SESSION": { "ui_name": "Session expired, please reload the game!" },
+    "MAINT_KICK": { "ui_title": "Server Maintenance", "ui_name": "The game server needs to restart for upgrades. Please reconnect now.", "ui_button": "Reconnect" },
+    "IDLE_KICK": { "ui_title": "Commander, are you there?", "ui_name": "I await your orders.", "ui_button": "I'm back" },
+    "UNKNOWN_SESSION": { "ui_title": "Momentary Disconnect", "ui_name": "Commander, we lost your signal!\nPlease reconnect now.", "ui_button": "Reconnect" },
     "CLIENT_NETWORK_FAILURE": { "ui_name": "Client-side internet connection failure",
                                 "ui_title": "Momentary Disconnect",
                                 "ui_description": "\nCommander, we lost your signal!\n\nOur forces await your return.\n\nCode: %d",

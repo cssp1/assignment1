@@ -1,9 +1,7 @@
 #!/bin/sh
 
-. ./setup-there-common.sh
-
-YUMPACKAGES="s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt php-pecl-apc"
-YUMPACKAGES+=" python-twisted python-simplejson emacs strace"
+YUMPACKAGES="git s3cmd xfsprogs httpd mod_ssl telnet mysql-server php php-mysql subversion MySQL-python php-mbstring php-mcrypt php-pecl-apc"
+YUMPACKAGES+=" python-boto python-twisted python-simplejson emacs strace"
 YUMPACKAGES+=" python-imaging python-imaging-devel numpy"
 YUMPACKAGES+=" libxml2 libxml2-devel"
 YUMPACKAGES+=" sendmail-cf patch screen"
@@ -16,14 +14,9 @@ sudo chkconfig httpd on
 
 echo "SETUP(remote): Adjusting users, groups, and permissions..."
 
-sudo groupadd -g 1013 -f iantien
-sudo useradd -g 1013 -u 1013 iantien
-echo ianISawesome | sudo passwd --stdin iantien
-
 # WEB
 sudo groupadd -g 1502 -f httpwrite
 sudo usermod -a -G httpwrite ec2-user
-sudo usermod -a -G httpwrite iantien
 sudo chmod 775 /var/www /var/www/html
 sudo chgrp -R httpwrite /var/www/html
 sudo chmod +s /var/www/html
@@ -63,10 +56,10 @@ echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
 echo "SETUP(remote): www setup done!"
-
+echo "MISSING: /etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
+echo "MISSING: adjust /etc/cron.daily/ backup script parameters"
 echo "MISSING: /home/ec2-user/.ssh/www-mysql-root-password for backups."
-echo "MISSING: /home/ec2-user/.ssh/www-awssecret for backups."
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
 echo "MISSING: /usr/bin/mysql_secure_installation, set MySQL passwords on root and wordpress_user accounts, and create spinpunch_wordpress database"
-echo "MISSING: ensure public IP is added to SPF record for spinpunch.com"
+echo "MISSING: ensure public IP is added to SPF record for spinpunch.com (if this server is going to send any email)"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"

@@ -24,8 +24,10 @@ goog.provide('goog.ui.GraphicsRoundedPanel');
 goog.provide('goog.ui.RoundedPanel');
 goog.provide('goog.ui.RoundedPanel.Corner');
 
+goog.require('goog.asserts');
 goog.require('goog.dom');
-goog.require('goog.dom.classes');
+goog.require('goog.dom.TagName');
+goog.require('goog.dom.classlist');
 goog.require('goog.graphics');
 goog.require('goog.graphics.Path');
 goog.require('goog.graphics.SolidFill');
@@ -48,8 +50,10 @@ goog.require('goog.userAgent');
  *     to all square corners if not specified.
  * @param {goog.dom.DomHelper=} opt_domHelper The DOM helper object for the
  *     document we want to render in.
- * @return {goog.ui.BaseRoundedPanel} An instance of a
+ * @return {!goog.ui.BaseRoundedPanel} An instance of a
  *     goog.ui.BaseRoundedPanel subclass.
+ * TODO(user): deprecate this class, which has <5 usages and only really
+ *            matters for IE8, and then only stylistically.
  */
 goog.ui.RoundedPanel.create = function(radius,
                                        borderWidth,
@@ -59,9 +63,11 @@ goog.ui.RoundedPanel.create = function(radius,
                                        opt_domHelper) {
   // This variable checks for the presence of Safari 3.0+ or Gecko 1.9+,
   // which can leverage special CSS styles to create rounded corners.
-  var isCssReady = goog.userAgent.WEBKIT &&
-      goog.userAgent.isVersionOrHigher('500') ||
-      goog.userAgent.GECKO && goog.userAgent.isVersionOrHigher('1.9a');
+  var isCssReady =
+      (goog.userAgent.WEBKIT &&
+          goog.userAgent.isVersionOrHigher('500')) ||
+      (goog.userAgent.GECKO && goog.userAgent.isVersionOrHigher('1.9a')) ||
+      goog.userAgent.EDGE;
 
   if (isCssReady) {
     // Safari 3.0+ and Firefox 3.0+ support this instance.
@@ -182,6 +188,7 @@ goog.ui.BaseRoundedPanel = function(radius,
   this.corners_ = opt_corners || goog.ui.RoundedPanel.Corner.NONE;
 };
 goog.inherits(goog.ui.BaseRoundedPanel, goog.ui.Component);
+goog.tagUnsealableClass(goog.ui.BaseRoundedPanel);
 
 
 /**
@@ -209,10 +216,12 @@ goog.ui.BaseRoundedPanel.prototype.contentElement_;
  */
 goog.ui.BaseRoundedPanel.prototype.decorateInternal = function(element) {
   goog.ui.BaseRoundedPanel.superClass_.decorateInternal.call(this, element);
-  goog.dom.classes.add(this.getElement(), goog.ui.RoundedPanel.Classes_.PANEL);
+  goog.dom.classlist.add(goog.asserts.assert(this.getElement()),
+      goog.ui.RoundedPanel.Classes_.PANEL);
 
   // Create backgroundElement_, and add it to the DOM.
-  this.backgroundElement_ = this.getDomHelper().createElement('div');
+  this.backgroundElement_ = this.getDomHelper().createElement(
+      goog.dom.TagName.DIV);
   this.backgroundElement_.className = goog.ui.RoundedPanel.Classes_.BACKGROUND;
   this.getElement().appendChild(this.backgroundElement_);
 
@@ -221,7 +230,7 @@ goog.ui.BaseRoundedPanel.prototype.decorateInternal = function(element) {
   this.contentElement_ = goog.dom.getElementsByTagNameAndClass(
       null, goog.ui.RoundedPanel.Classes_.CONTENT, this.getElement())[0];
   if (!this.contentElement_) {
-    this.contentElement_ = this.getDomHelper().createDom('div');
+    this.contentElement_ = this.getDomHelper().createDom(goog.dom.TagName.DIV);
     this.contentElement_.className = goog.ui.RoundedPanel.Classes_.CONTENT;
     this.getElement().appendChild(this.contentElement_);
   }
@@ -265,6 +274,7 @@ goog.ui.BaseRoundedPanel.prototype.getContentElement = function() {
  *     document we want to render in.
  * @extends {goog.ui.BaseRoundedPanel}
  * @constructor
+ * @final
  */
 goog.ui.CssRoundedPanel = function(radius,
                                    borderWidth,
@@ -390,6 +400,7 @@ goog.ui.CssRoundedPanel.prototype.getStyle_ = function(corner) {
  *     document we want to render in.
  * @extends {goog.ui.BaseRoundedPanel}
  * @constructor
+ * @final
  */
 goog.ui.GraphicsRoundedPanel = function(radius,
                                         borderWidth,
@@ -411,7 +422,7 @@ goog.inherits(goog.ui.GraphicsRoundedPanel, goog.ui.BaseRoundedPanel);
 /**
  * A 4-element array containing the circle centers for the arcs in the
  * bottom-left, top-left, top-right, and bottom-right corners, respectively.
- * @type {Array.<goog.math.Coordinate>}
+ * @type {Array<goog.math.Coordinate>}
  * @private
  */
 goog.ui.GraphicsRoundedPanel.prototype.arcCenters_;
@@ -421,7 +432,7 @@ goog.ui.GraphicsRoundedPanel.prototype.arcCenters_;
  * A 4-element array containing the start coordinates for rendering the arcs
  * in the bottom-left, top-left, top-right, and bottom-right corners,
  * respectively.
- * @type {Array.<goog.math.Coordinate>}
+ * @type {Array<goog.math.Coordinate>}
  * @private
  */
 goog.ui.GraphicsRoundedPanel.prototype.cornerStarts_;
@@ -430,7 +441,7 @@ goog.ui.GraphicsRoundedPanel.prototype.cornerStarts_;
 /**
  * A 4-element array containing the arc end angles for the bottom-left,
  * top-left, top-right, and bottom-right corners, respectively.
- * @type {Array.<number>}
+ * @type {Array<number>}
  * @private
  */
 goog.ui.GraphicsRoundedPanel.prototype.endAngles_;
@@ -447,7 +458,7 @@ goog.ui.GraphicsRoundedPanel.prototype.graphics_;
 /**
  * A 4-element array containing the rounded corner radii for the bottom-left,
  * top-left, top-right, and bottom-right corners, respectively.
- * @type {Array.<number>}
+ * @type {Array<number>}
  * @private
  */
 goog.ui.GraphicsRoundedPanel.prototype.radii_;
@@ -456,7 +467,7 @@ goog.ui.GraphicsRoundedPanel.prototype.radii_;
 /**
  * A 4-element array containing the arc start angles for the bottom-left,
  * top-left, top-right, and bottom-right corners, respectively.
- * @type {Array.<number>}
+ * @type {Array<number>}
  * @private
  */
 goog.ui.GraphicsRoundedPanel.prototype.startAngles_;

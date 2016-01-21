@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -25,7 +25,7 @@ class IdleCheck(object):
         ui_question = '%d + %d = ?' % (a, b)
         return (ui_question, ui_answer)
 
-    def __init__(self, config, state):
+    def __init__(self, config, state, cur_time):
         self.config = config
 
         # state that persists across logins
@@ -35,9 +35,8 @@ class IdleCheck(object):
         self.tries = 0 # number of questions sent this check
         self.timeouts = 0 # number of timeouts this check
         self.inflight = {} # mapping from tag -> answer for outstanding questions
-        self.fails = 0 # count of fails
-        self.successes = 0 # count of successes
-        self.last_fail_time = -1 # clock time of last fail
+
+        self.history = [] # time-ordered list of results {"time": UNIX_TIMESTAMP, "result": "fail"/"success"}
 
         if state:
             self.last_end_playtime = state.get('last_end_playtime', self.last_end_playtime)
@@ -46,9 +45,9 @@ class IdleCheck(object):
             self.tries = state.get('tries', self.tries)
             self.timeouts = state.get('timeouts', self.timeouts)
             # note: inflight state is not preserved across logins
-            self.fails = state.get('fails', self.fails)
-            self.successes = state.get('successes', self.successes)
-            self.last_fail_time = state.get('last_fail_time', self.last_fail_time)
+            self.history = state.get('history', self.history)
+
+        self.prune_history(cur_time)
 
     def serialize(self):
         return {'last_end_playtime': self.last_end_playtime,
@@ -57,9 +56,24 @@ class IdleCheck(object):
                 'tries': self.tries,
                 'timeouts': self.timeouts,
                 # note: inflight state is not preserved 'inflight': self.inflight,
-                'fails': self.fails,
-                'successes': self.successes,
-                'last_fail_time': self.last_fail_time}
+                'history': self.history}
+
+    def reset_state(self):
+        # This isn't a full reset, but it just marks existing history
+        # entries as "seen" so that we don't take action on them again.
+        for entry in self.history:
+            entry['seen'] = 1
+
+    def prune_history(self, cur_time):
+        limit = self.config.get('keep_history_for', 604800)
+        self.history = filter(lambda x: cur_time - x['time'] < limit, self.history)
+
+    def count_fails(self): return sum((1 for x in self.history if not x.get('seen',0) and x['result'] == 'fail'), 0)
+    def last_fail_time(self):
+        for i in xrange(len(self.history)-1, -1, -1):
+            if not self.history[i].get('seen',0) and self.history[i]['result'] == 'fail':
+                return self.history[i]['time']
+        return -1
 
     def forced_check_needed(self): return self.last_end_playtime < 0
 
@@ -86,11 +100,7 @@ class IdleCheck(object):
         self.inflight = {}
         self.tries = 0
         self.timeouts = 0
-        if is_success:
-            self.successes += 1
-        else:
-            self.fails += 1
-            self.last_fail_time = cur_time
+        self.history.append({'time': cur_time, 'result': 'success' if is_success else 'fail'})
 
     # return a status code
     def timeout(self, login_time, cur_time, playtime):

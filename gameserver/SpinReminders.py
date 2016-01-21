@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 # utility for sending out reminders via email or hipchat, used by dev_reminders.py and report_slow_mysql.py
 
-import smtplib, urllib2, getpass, os
+import smtplib, urllib, urllib2, getpass, os, time
 from email.mime.text import MIMEText
 from email.header import Header
 import SpinJSON
@@ -48,6 +48,36 @@ def send_reminder_slack(sender_name, channel, ats, subject, body):
     req.add_data(req_body)
     urllib2.urlopen(req).read()
 
+def send_reminder_mattermost(sender_name, channel, ats, subject, body):
+    webhook_url = os.getenv('MATTERMOST_WEBHOOK_URL') or SpinConfig.config.get('mattermost_webhook_url','') or open(os.path.join(os.getenv('HOME'), '.ssh', 'mattermost-webhook-url')).read().strip()
+    assert webhook_url.startswith('https://')
+    MAXLEN = 2500
+    ellipsis = '\n... (and more)' if len(body) > MAXLEN else ''
+    req_json = {'text':', '.join(ats) + ' ' + subject + ': ' + body[:MAXLEN] + ellipsis}
+    if channel:
+        req_json['channel'] = channel
+    req_body = SpinJSON.dumps(req_json)
+    req = urllib2.Request(webhook_url)
+    #req.add_header('Content-Type', 'application/json')
+    req.add_data(urllib.urlencode({'payload':req_body}))
+    urllib2.urlopen(req).read()
+
+def send_reminder_amazon_sns(region, topic_arn, subject, body):
+    if not region:
+        #import boto.utils
+        #region = boto.utils.get_instance_metadata()['placement']['availability-zone'][0:-1]
+        region = topic_arn.split(':')[3] # is this consistently the region?
+    import boto.sns
+    con = boto.sns.connect_to_region(region)
+    con.publish(topic = topic_arn, message = body, subject = subject)
+
+def send_reminder_file(filename, subject, body):
+    fd = open(filename, 'a+')
+    ui_time = time.strftime('%Y-%m-%dZ%H:%M:%S', time.gmtime())
+    fd.write('Time: %s\nSubject: %s\n%s\n---\n' % (ui_time, subject, body))
+    fd.flush()
+    fd.close()
+
 def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
     if dry_run:
         print 'body is:', body
@@ -58,4 +88,29 @@ def send_reminders(sender_name, recip_list, subject, body, dry_run = False):
         elif recip['type'] == 'hipchat':
             send_reminder_hipchat(recip['room'], recip['ats'], subject, body)
         elif recip['type'] == 'slack':
-            send_reminder_slack(sender_name, recip['channel'], recip['ats'], subject, body)
+            send_reminder_slack(sender_name, recip['channel'], recip.get('ats',[]), subject, body)
+        elif recip['type'] == 'mattermost':
+            send_reminder_mattermost(sender_name, recip.get('channel'), recip.get('ats',[]), subject, body)
+        elif recip['type'] == 'amazon_sns':
+            send_reminder_amazon_sns(recip.get('region'), recip['topic_arn'], subject, body)
+        elif recip['type'] == 'file':
+            send_reminder_file(recip['filename'], subject, body)
+
+if __name__=='__main__':
+    import getopt, sys
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','from=','subject=','body=','body-from=','recipient=','recipients='])
+    dry_run = False
+    subject = 'SpinReminders Subject'
+    body = 'SpinReminders Body'
+    sender_name = 'SpinReminders'
+    recipients = []
+    for key, val in opts:
+        if key == '--dry-run': dry_run = True
+        elif key == '--from': sender_name = val
+        elif key == '--subject': subject = val
+        elif key == '--body': body = val
+        elif key == '--body-from': body = open(val).read().strip()
+        elif key == '--recipient': recipients.append(SpinJSON.loads(val))
+        elif key == '--recipients': recipients += SpinJSON.loads(val)
+
+    send_reminders(sender_name, recipients, subject, body, dry_run=dry_run)

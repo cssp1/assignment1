@@ -24,6 +24,7 @@ goog.provide('goog.ui.PopupDatePicker');
 goog.require('goog.events.EventType');
 goog.require('goog.positioning.AnchoredPosition');
 goog.require('goog.positioning.Corner');
+goog.require('goog.positioning.Overflow');
 goog.require('goog.style');
 goog.require('goog.ui.Component');
 goog.require('goog.ui.DatePicker');
@@ -48,6 +49,7 @@ goog.ui.PopupDatePicker = function(opt_datePicker, opt_domHelper) {
   this.datePicker_ = opt_datePicker || new goog.ui.DatePicker();
 };
 goog.inherits(goog.ui.PopupDatePicker, goog.ui.Component);
+goog.tagUnsealableClass(goog.ui.PopupDatePicker);
 
 
 /**
@@ -222,17 +224,25 @@ goog.ui.PopupDatePicker.prototype.getAllowAutoFocus = function() {
  * Show the popup at the bottom-left corner of the specified element.
  * @param {Element} element Reference element for displaying the popup -- popup
  *     will appear at the bottom-left corner of this element.
+ * @param {boolean=} opt_keepDate Whether to keep the date picker's current
+ *     date. If false, the date is set to null. Defaults to false.
  */
-goog.ui.PopupDatePicker.prototype.showPopup = function(element) {
+goog.ui.PopupDatePicker.prototype.showPopup = function(element, opt_keepDate) {
   this.lastTarget_ = element;
   this.popup_.setPosition(new goog.positioning.AnchoredPosition(
-      element, goog.positioning.Corner.BOTTOM_START));
+      element,
+      goog.positioning.Corner.BOTTOM_START,
+      (goog.positioning.Overflow.ADJUST_X_EXCEPT_OFFSCREEN |
+      goog.positioning.Overflow.ADJUST_Y_EXCEPT_OFFSCREEN)));
 
   // Don't listen to date changes while we're setting up the popup so we don't
   // have to worry about change events when we call setDate().
   this.getHandler().unlisten(this.datePicker_, goog.ui.DatePicker.Events.CHANGE,
                              this.onDateChanged_);
-  this.datePicker_.setDate(null);
+  var keepDate = !!opt_keepDate;
+  if (!keepDate) {
+    this.datePicker_.setDate(null);
+  }
 
   // Forward the change event onto our listeners.  Done before we start
   // listening to date changes again, so that listeners can change the date

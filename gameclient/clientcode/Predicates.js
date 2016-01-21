@@ -1,6 +1,6 @@
 goog.provide('Predicates');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -91,9 +91,16 @@ Predicate.prototype.ui_help = function(player) {
     return ret;
 };
 
-// for GUI purposes, return the UNIX timestamp at which this predicate will turn false
-// (only applies to predicates that have some sort of time dependency)
-Predicate.prototype.ui_expire_time = function(player) { throw Error('ui_expire_time not implemented for this predicate: '+this.kind); }
+/** for GUI purposes, return the UNIX timestamp at which this predicate will turn false
+    (only applies to predicates that have some sort of time dependency)
+    @final
+    @return {number} */
+Predicate.prototype.ui_expire_time = function(player) { return this.ui_time_range(player)[1]; };
+
+/** for GUI purposes, return the [start,end] UNIX timestamps at which this predicate will be true
+    (only applies to predicates that have some sort of time dependency)
+    @return {!Array<number>} */
+Predicate.prototype.ui_time_range = function(player) { throw Error('ui_time_range not implemented for this predicate: '+this.kind); }
 
 // return a user-readable string explaining progress towards goal (e.g. "4/5 Bear Asses Collected")
 // null if description is unavailable (not all predicates have these)
@@ -109,6 +116,8 @@ Predicate.prototype.ui_difficulty = function() { return 0; }
 function AlwaysTruePredicate(data) { goog.base(this, data); }
 goog.inherits(AlwaysTruePredicate, Predicate);
 AlwaysTruePredicate.prototype.is_satisfied = function(player, qdata) { return true; };
+/** @override */
+AlwaysTruePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -169,14 +178,16 @@ AndPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
-AndPredicate.prototype.ui_expire_time = function(player) {
-    var etime = -1;
+/** @override */
+AndPredicate.prototype.ui_time_range = function(player) {
+    var range = [-1, -1];
     for(var i = 0; i < this.subpredicates.length; i++) {
-        // return the min expire time out of all subpredicates
-        var t = this.subpredicates[i].ui_expire_time(player);
-        etime = (etime > 0 ? Math.min(etime, t) : t);
+        // return the most restrictive time range out of all subpredicates
+        var r = this.subpredicates[i].ui_time_range(player);
+        if(r[0] > 0) { range[0] = (range[0] > 0 ? Math.max(range[0], r[0]) : r[0]); }
+        if(r[1] > 0) { range[1] = (range[1] > 0 ? Math.min(range[1], r[1]) : r[1]); }
     }
-    return etime;
+    return range;
 };
 
 /** @override */
@@ -223,16 +234,18 @@ OrPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
-OrPredicate.prototype.ui_expire_time = function(player) {
-    var etime = -1;
+/** @override */
+OrPredicate.prototype.ui_time_range = function(player) {
+    var range = [-1,-1];
     for(var i = 0; i < this.subpredicates.length; i++) {
-        // return the max expire time out of all TRUE subpredicates
+        // return the most liberal expire time out of all TRUE subpredicates
         if(this.subpredicates[i].is_satisfied(player, null)) {
-            var t = this.subpredicates[i].ui_expire_time(player);
-            etime = (etime > 0 ? Math.max(etime, t) : t);
+            var r = this.subpredicates[i].ui_time_range(player);
+            if(r[0] > 0) { range[0] = (range[0] > 0 ? Math.min(range[0], r[0]) : r[0]); }
+            if(r[1] > 0) { range[1] = (range[1] > 0 ? Math.max(range[1], r[1]) : r[1]); }
         }
     }
-    return etime;
+    return range;
 };
 
 /** @override */
@@ -257,7 +270,8 @@ NotPredicate.prototype.do_ui_describe = function(player) {
     var sub = this.subpredicates[0].ui_describe_detail(player);
     return new PredicateUIDescription('NOT '+ (sub ? sub.descr : 'unknown'), (sub ? sub.options : {}));
 };
-NotPredicate.prototype.ui_expire_time = function(player) { return -1; }; // not sure on this one
+/** @override */
+NotPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; }; // not sure on this one
 
 /** @constructor
   * @extends Predicate */
@@ -538,6 +552,8 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
+/** @override */
+BuildingLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -644,6 +660,7 @@ TechLevelPredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
+TechLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @type {(Object.<string,boolean>|null)} special cache just for QuestCompletedPredicate to avoid O(N^2) behavior */
 var quest_completed_predicate_cache = null;
@@ -693,7 +710,8 @@ QuestCompletedPredicate.prototype.do_ui_describe = function(player) {
     ret = ret.replace('%s', this.quest['ui_name']);
     return new PredicateUIDescription(ret);
 };
-QuestCompletedPredicate.prototype.ui_expire_time = function(player) { return -1; }
+/** @override */
+QuestCompletedPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -704,26 +722,42 @@ function AuraActivePredicate(data) {
     this.match_data = data['match_data'] || null;
 }
 goog.inherits(AuraActivePredicate, Predicate);
-AuraActivePredicate.prototype.is_satisfied = function(player, qdata) {
+/** @private
+    @return {Object|null} */
+AuraActivePredicate.prototype.find_aura = function(player, qdata) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             if(this.match_data !== null) {
                 var theirs = aura['data'] || null;
+                var is_matched = true;
                 for(var k in this.match_data) {
                     if(!theirs || theirs[k] !== this.match_data[k]) {
-                        return false;
+                        is_matched = false;
+                        break;
                     }
                 }
+                if(!is_matched) { continue; }
             }
-            return true;
+            return aura;
         }
     }
-    return false;
+    return null;
 };
+
+AuraActivePredicate.prototype.is_satisfied = function(player, qdata) { return this.find_aura(player, qdata) !== null; };
 AuraActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['auras'][this.aura_name]['ui_name']));
+};
+/** @override */
+AuraActivePredicate.prototype.ui_time_range = function(player) {
+    var aura = this.find_aura(player, null);
+    if(aura) {
+        return [('start_time' in aura) && (aura['start_time'] > 0) ? aura['start_time'] : -1,
+                ('end_time' in aura) && (aura['end_time'] > 0) ? aura['end_time'] : -1];
+    }
+    return [-1,-1];
 };
 
 /** @constructor
@@ -769,6 +803,15 @@ CooldownActivePredicate.prototype.is_satisfied = function(player, qdata) {
 CooldownActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', this.name));
 };
+CooldownActivePredicate.prototype.ui_time_range = function(player) {
+    var cd = player.cooldown_find(this.name, this.match_data);
+    if(cd) {
+        // XXX when used to determine AI base "freshness", don't base this on cooldown start time?
+        // return [-1, cd['end']];
+        return [cd['start'], cd['end']];
+    }
+    return [-1,-1];
+}
 
 /** @constructor
   * @extends Predicate */
@@ -781,6 +824,57 @@ CooldownInactivePredicate.prototype.is_satisfied = function(player, qdata) { ret
 CooldownInactivePredicate.prototype.do_ui_describe = function(player) {
     var template = ('ui_cooldown_name' in this.data ? this.data['ui_cooldown_name'] : gamedata['strings']['predicates'][this.kind]['ui_name']);
     return new PredicateUIDescription(template.replace('%s', this.act_pred.name).replace('%togo', pretty_print_time(player.cooldown_togo(this.act_pred.name))));
+};
+/** @override */
+CooldownInactivePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+
+/** @constructor
+  * @extends Predicate */
+function GamedataVarPredicate(data, name, value, method) {
+    goog.base(this, data);
+    this.name = name;
+    this.value = value;
+    this.method = method || '==';
+}
+goog.inherits(GamedataVarPredicate, Predicate);
+/** Perform lookup of a gamedata variable. May return a cond chain.
+    @private */
+GamedataVarPredicate.prototype.get_value = function(player, varname) {
+    var path = varname.split('.');
+    var v = gamedata;
+    for(var i = 0; i < path.length; i++) {
+        if(!(path[i] in v)) { throw Error('lookup of undefined var "'+varname+'"'); }
+        v = v[path[i]];
+    }
+    return v;
+};
+GamedataVarPredicate.prototype.is_satisfied = function(player, qdata) {
+    var v = this.get_value(player, this.name);
+    var test_value = eval_cond_or_literal(v, player, null);
+    if(this.method == '==') {
+        return test_value == this.value;
+    } else if(this.method == 'in') {
+        return goog.array.contains(this.value, test_value);
+    } else {
+        throw Error('unknown method '+this.method);
+    }
+};
+/** @override */
+GamedataVarPredicate.prototype.ui_time_range = function(player) {
+    var range = [-1,-1];
+    var v = this.get_value(player, this.name);
+    if(is_cond_chain(v)) {
+        var chain = v;
+        // return expire time of the first true predicate
+        for(var i = 0; i < chain.length; i++) {
+            var pred = read_predicate(chain[i][0]);
+            if(pred.is_satisfied(player, null)) {
+                return pred.ui_time_range(player);
+            }
+        }
+    }
+    return range;
 };
 
 /** @constructor
@@ -845,7 +939,8 @@ PlayerHistoryPredicate.prototype.ui_progress = function(player, qdata) {
     ret = ret.replace('%d2', pretty_print_number(this.minvalue));
     return ret;
 };
-PlayerHistoryPredicate.prototype.ui_expire_time = function(player) { return -1; };
+/** @override */
+PlayerHistoryPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @override */
 PlayerHistoryPredicate.prototype.ui_difficulty = function() {
@@ -929,6 +1024,8 @@ AnyABTestPredicate.prototype.is_satisfied = function(player, qdata) {
     var cur_value = player.get_any_abtest_value(this.key, this.def);
     return cur_value == this.value;
 };
+/** @override */
+AnyABTestPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -949,8 +1046,9 @@ LibraryPredicate.prototype.is_satisfied = function(player, qdata) {
 LibraryPredicate.prototype.do_ui_help = function(player) {
     return this.pred.ui_help(player);
 };
-LibraryPredicate.prototype.ui_expire_time = function(player) {
-    return this.pred.ui_expire_time(player);
+/** @override */
+LibraryPredicate.prototype.ui_time_range = function(player) {
+    return this.pred.ui_time_range(player);
 };
 
 /** @constructor
@@ -1011,15 +1109,15 @@ AIBaseShownPredicate.prototype.do_ui_describe = function(player) {
 function UserIDPredicate(data) {
     goog.base(this, data);
     this.allow = data['allow'];
+    this.mod = ('mod' in data ? data['mod'] : 0);
 }
 goog.inherits(UserIDPredicate, Predicate);
 UserIDPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var i = 0; i < this.allow.length; i++) {
-        if(session.user_id === this.allow[i]) {
-            return true;
-        }
+    var test_id = session.user_id;
+    if(this.mod > 0) {
+        test_id = test_id % this.mod;
     }
-    return false;
+    return goog.array.contains(this.allow, test_id);
 };
 
 
@@ -1055,6 +1153,22 @@ goog.inherits(CountryPredicate, Predicate);
 CountryPredicate.prototype.is_satisfied = function(player, qdata) {
     return goog.array.contains(this.countries, player.country);
 };
+/** @override */
+CountryPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor
+  * @extends Predicate */
+function PurchasedRecentlyPredicate(data) {
+    goog.base(this, data);
+    this.seconds_ago = data['seconds_ago'];
+}
+goog.inherits(PurchasedRecentlyPredicate, Predicate);
+PurchasedRecentlyPredicate.prototype.is_satisfied = function(player, qdata) {
+    var now = player.get_absolute_time();
+    return ('last_purchase_time' in player.history) && (player.history['last_purchase_time'] >= (now - this.seconds_ago));
+};
+/** @override */
+PurchasedRecentlyPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -1077,13 +1191,17 @@ EventTimePredicate.prototype.is_satisfied = function(player, qdata) {
         return !!et;
     }
 };
-EventTimePredicate.prototype.ui_expire_time = function(player) {
-    var ref_time = player.get_absolute_time() + this.t_offset;
-    var event_data = player.get_event(this.kind, this.name, ref_time, this.ignore_activation);
-    if(!event_data) {
+/** @override */
+EventTimePredicate.prototype.ui_time_range = function(player) {
+    var neg_time_left = player.get_event_time(this.kind, this.name, 'end', this.ignore_activation, this.t_offset);
+    if(neg_time_left === null) {
         throw Error('event '+this.name+' is not active');
     }
-    return event_data['end_time'];
+    var time_since_start = player.get_event_time(this.kind, this.name, 'start', this.ignore_activation, this.t_offset);
+    var ref_time = player.get_absolute_time() + this.t_offset;
+    var start_time = ref_time - time_since_start;
+    var end_time = ref_time - neg_time_left;
+    return [start_time, end_time];
 };
 
 /** @constructor
@@ -1093,6 +1211,7 @@ function AbsoluteTimePredicate(data) {
     this.range = data['range'];
     this.mod = ('mod' in data ? data['mod'] : -1);
     this.shift = data['shift'] || 0;
+    this.repeat_interval = data['repeat_interval'] || null;
 }
 goog.inherits(AbsoluteTimePredicate, Predicate);
 AbsoluteTimePredicate.prototype.is_satisfied = function(player, qdata) {
@@ -1102,16 +1221,38 @@ AbsoluteTimePredicate.prototype.is_satisfied = function(player, qdata) {
     if(this.mod > 0) {
         et = et % this.mod;
     }
+    // before range start?
     if(this.range[0] >= 0 && et < this.range[0]) { return false; }
-    if(this.range[1] >= 0 && et >= this.range[1]) { return false; }
+    // after range end?
+    if(this.range[1] >= 0) {
+        if(this.repeat_interval) {
+            var delta = (et - this.range[0]) % this.repeat_interval;
+            if(delta >= (this.range[1] - this.range[0])) { return false; }
+        } else {
+            if(et >= this.range[1]) { return false; }
+        }
+    }
     return true;
 };
 AbsoluteTimePredicate.prototype.do_ui_describe = function(player) {
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
     return new PredicateUIDescription(s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString()));
 };
-AbsoluteTimePredicate.prototype.ui_expire_time = function(player) {
-    return this.range[1];
+/** @override */
+AbsoluteTimePredicate.prototype.ui_time_range = function(player) {
+    if(this.repeat_interval) {
+        var et = player.get_absolute_time();
+        et += this.shift;
+        if(this.mod > 0) {
+            et = et % this.mod;
+        }
+        var delta = (et - this.range[0]) % this.repeat_interval;
+        var start_time = et - delta;
+        var end_time = et + (this.range[1] - this.range[0]) - delta;
+        return [start_time, end_time];
+    } else {
+        return [this.range[0], this.range[1]];
+    }
 };
 
 
@@ -1119,20 +1260,29 @@ AbsoluteTimePredicate.prototype.ui_expire_time = function(player) {
   * @extends Predicate */
 function AccountCreationTimePredicate(data) {
     goog.base(this, data);
-    this.range = data['range'];
+    this.range = data['range'] || null;
+    this.age_range = data['age_range'] || null;
 }
 goog.inherits(AccountCreationTimePredicate, Predicate);
 AccountCreationTimePredicate.prototype.is_satisfied = function(player, qdata) {
     var creat = player.creation_time;
-    if(this.range[0] >= 0 && creat < this.range[0]) { return false; }
-    if(this.range[1] >= 0 && creat >= this.range[1]) { return false; }
+    if(this.range) {
+        if(this.range[0] >= 0 && creat < this.range[0]) { return false; }
+        if(this.range[1] >= 0 && creat >= this.range[1]) { return false; }
+    }
+    if(this.age_range) {
+        var age = player.get_absolute_time() - creat;
+        if(this.age_range[0] >= 0 && age < this.age_range[0]) { return false; }
+        if(this.age_range[1] >= 0 && age > this.age_range[1]) { return false; }
+    }
     return true;
 };
 AccountCreationTimePredicate.prototype.do_ui_describe = function(player) {
     var s = gamedata['strings']['predicates'][this.kind]['ui_name'];
     return new PredicateUIDescription(s.replace('%d1', this.range[0].toString()).replace('%d2',this.range[1].toString()));
 };
-AccountCreationTimePredicate.prototype.ui_expire_time = function(player) { return -1; };
+/** @override */
+AccountCreationTimePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -1200,6 +1350,8 @@ goog.inherits(FramePlatformPredicate, Predicate);
 FramePlatformPredicate.prototype.is_satisfied = function(player, qdata) {
     return spin_frame_platform == this.platform;
 };
+/** @override */
+FramePlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor
   * @extends Predicate */
@@ -1512,12 +1664,13 @@ function HasItemPredicate(data) {
     this.item_name = data['item_name'];
     this.min_count = data['min_count'] || 1;
     this.level = data['level'] || null;
+    this.min_level = data['min_level'] || null;
     this.check_mail = data['check_mail'] || false;
     this.check_crafting = data['check_crafting'] || false;
 }
 goog.inherits(HasItemPredicate, Predicate);
 HasItemPredicate.prototype.is_satisfied = function(player, qdata) {
-    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level);
+    return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level, this.min_level);
 };
 HasItemPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
@@ -1525,7 +1678,8 @@ HasItemPredicate.prototype.ui_progress = function(player, qdata) {
     ret = ret.replace('%d2', this.min_count.toString());
     return ret;
 };
-HasItemPredicate.prototype.ui_expire_time = function(player) { return -1; }; // not sure on this one
+/** @override */
+HasItemPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; }; // not sure on this one
 
 /** @constructor
   * @extends Predicate */
@@ -1734,6 +1888,7 @@ function read_predicate(data) {
     else if(kind === 'AI_BASE_ACTIVE') { return new AIBaseActivePredicate(data); }
     else if(kind === 'AI_BASE_SHOWN') { return new AIBaseShownPredicate(data); }
     else if(kind === 'PLAYER_HISTORY') { return new PlayerHistoryPredicate(data, data['key'], data['value'], data['key'], data['value'].toString(), data['method']); }
+    else if(kind === 'GAMEDATA_VAR') { return new GamedataVarPredicate(data, data['name'], data['value'], ('method' in data ? data['method'] : null)); }
     else if(kind === 'ATTACKS_LAUNCHED') { return new PlayerHistoryPredicate(data, 'attacks_launched', data['number'], '', data['number'].toString(), '>='); }
     else if(kind === 'ATTACKS_VICTORY') { return new PlayerHistoryPredicate(data, 'attacks_victory', data['number'], '', data['number'].toString(), '>='); }
     else if(kind === 'CONQUESTS') { return new PlayerHistoryPredicate(data, data['key'], data['value'], data['key'], data['value'].toString(), data['method']); }
@@ -1764,6 +1919,8 @@ function read_predicate(data) {
         return new UserIDPredicate(data);
     } else if(kind === 'COUNTRY') {
         return new CountryPredicate(data);
+    } else if(kind === 'PURCHASED_RECENTLY') {
+        return new PurchasedRecentlyPredicate(data);
     } else if(kind === 'EVENT_TIME') {
         return new EventTimePredicate(data);
     } else if(kind === 'ABSOLUTE_TIME') {
@@ -1849,8 +2006,21 @@ function eval_cond(chain, player, qdata) {
     return null;
 }
 
-// evaluate a "cond" expression that might also be a literal value
 /** @param {?} qty
+    @return {boolean} */
+function is_cond_chain(qty) {
+    if((typeof qty) == 'undefined') {
+        throw Error('is_cond_chain of undefined');
+    }
+    // if it's a list, treat it as a cond chain, otherwise assume it's a literal
+    return (qty && (typeof qty === 'object') && (qty instanceof Array) &&
+        // exception: if it's a list and the first element is not itself a list, treat it as a literal
+        // (this happens with e.g. ai_ambush_progression_showcase with "progression_reward_items"
+            !(qty.length > 0 && !(qty[0] instanceof Array)));
+}
+
+/** Evaluate a "cond" expression that might also be a literal value
+    @param {?} qty
     @param {Object} player
     @param {Object=} qdata */
 function eval_cond_or_literal(qty, player, qdata) {
@@ -1858,15 +2028,9 @@ function eval_cond_or_literal(qty, player, qdata) {
         throw Error('eval_cond_or_literal of undefined');
     }
 
-    // if it's a list, treat it as a cond chain, otherwise assume it's a literal
-    if(qty && (typeof qty === 'object') && (qty instanceof Array)) {
-
-        // exception: if it's a list and the first element is not itself a list, treat it as a literal
-        // (this happens with e.g. ai_ambush_progression_showcase with "progression_reward_items"
-        if(qty.length > 0 && !(qty[0] instanceof Array)) {
-            return qty;
-        }
+    if(is_cond_chain(qty)) {
         return eval_cond(qty, player, qdata);
+    } else {
+        return qty;
     }
-    return qty;
 }

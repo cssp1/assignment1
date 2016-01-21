@@ -1,8 +1,6 @@
-diff --git a/gameclient/google/closure/bin/build/closurebuilder.py b/gameclient/google/closure/bin/build/closurebuilder.py
-index b66a3e3..4201b55 100755
---- a/gameclient/google/closure/bin/build/closurebuilder.py
-+++ b/gameclient/google/closure/bin/build/closurebuilder.py
-@@ -183,7 +183,7 @@ class _PathSource(source.Source):
+--- closure/bin/build/closurebuilder.py.orig	2015-11-12 11:25:11.000000000 +0100
++++ closure/bin/build/closurebuilder.py	2015-11-12 11:25:21.000000000 +0100
+@@ -195,7 +195,7 @@
  
  def main():
    logging.basicConfig(format=(sys.argv[0] + ': %(message)s'),

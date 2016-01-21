@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -23,8 +23,9 @@ if sys.platform == 'linux2':
     from twisted.internet import epollreactor
     epollreactor.install()
 
-from twisted.python import log
+from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
+import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
 
@@ -66,6 +67,7 @@ import SpinSignature
 import SpinNoSQLId
 import SpinNoSQL
 import SpinNoSQLLog
+import SpinSQLBattles
 import Scores2
 import CustomerSupport
 import ActivityClassifier
@@ -94,6 +96,10 @@ except: has_lz4 = False
 def soft_assert(x):
     if not x:
         gamesite.exception_log.event(server_time, 'soft assert fail: '+string.join(traceback.format_stack(), ''))
+
+def make_deferred(latency_tag): return TwistedLatency.InstrumentedDeferred(latency_tag)
+def deferred_is_finished(d):
+    return d.called and hasattr(d, 'result') and not isinstance(d.result, defer.Deferred)
 
 # increment value of d[key], assuming that the current amount is zero
 # if d[key] doesn't exist
@@ -148,6 +154,19 @@ def get_grid_bounds(xy, gridsize):
     return [[xy[0]-half[0], xy[0]+half[0]+extra[0]],
             [xy[1]-half[1], xy[1]+half[1]+extra[1]]]
 
+def weighted_random_choice(groups, weights, r):
+    """Given parallel arrays of groups and relative weights, and 0 <= r < 1, return a random
+    element of groups chosen according to the weights."""
+    breakpoints = []
+    bp = 0.0
+    for w in weights:
+        bp += w
+        breakpoints.append(bp)
+
+    r = r * breakpoints[-1]
+    return groups[min(bisect.bisect(breakpoints, r), len(breakpoints)-1)]
+
+
 # valid characters in alliance string fields
 name_chars_simple = map(chr, xrange(ord('a'),ord('z')+1)) + \
                     map(chr, xrange(ord('A'),ord('Z')+1))
@@ -190,43 +209,15 @@ def is_valid_alias(name):
     if len(name) < 4 or len(name) > 15: return False
     for c in name:
         if c in alias_disallowed_chars: return False
-        # disallow some Unicode special characters
-        # see https://en.wikipedia.org/wiki/Unicode_block
-        codepoint = ord(c)
-        if codepoint >= 0x2100 and codepoint <= 0x2bff:
-            return False
     if chat_filter.is_bad(name): return False
+    if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
     return True
 
-# decorate the name of a history key with a suffix for the current PvP season
-def seasonal_name(key, season_num): return key + '_s%d' % season_num
-
-# same for current PvP week
-def weekly_name(key, week_num): return key + '_wk%d' % week_num
-
-weekly_score_re = re.compile('(.+)_wk([0-9]+)$')
-season_score_re = re.compile('(.+)_s([0-9]+)$')
-score_time_series_re = re.compile('^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
-
-# inverse of the above functions -
-# turn a string field name like quarry_resources_meridiani256_wk23 into a field, frequency, period tuple
-# for interfacing with the SQL score database e.g. ('quarry_resources_meridiani256', SpinSQL.SQLClient.SCORE_FREQ_WEEKLY, 23)
-def parse_score_field_for_sql(field_name):
-    if not gamesite.sql_client: raise Exception('SQL connection not active')
-
-    match = weekly_score_re.match(field_name)
-    if match:
-        gr = match.groups()
-        return (gr[0], gamesite.sql_client.SCORE_FREQ_WEEKLY, int(gr[1]))
-    match = season_score_re.match(field_name)
-    if match:
-        gr = match.groups()
-        return (gr[0], gamesite.sql_client.SCORE_FREQ_SEASON, int(gr[1]))
-    raise Exception('could not parse field_name = ' + field_name)
+# recognize obsolete time-series history fields for deletion
+obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$|^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
 
 # leaderboard score fields
-# history_prefix: element in player.history (that will be decorated with seasonal_name()/weekly_name() above)
 
 SCORE_FIELDS = {
     'xp': {'history_prefix': 'score_xp'},
@@ -244,39 +235,12 @@ SCORE_FIELDS = {
     'tokens_looted': {'history_prefix': 'tokens_looted'},
     'achievement_points': {'history_prefix': 'achievement_points'},
     }
-SCORE_PERIODS = ['week', 'season']
-
-# the client uses generic names like 'xp' and 'conquests' for scoreboard entries
-# map those into the weekly or seasonal specific names
-def score_field_name(player, client_name, period, force_global = False):
-    entry = SCORE_FIELDS[client_name]
-    name = entry['history_prefix']
-    if (not force_global) and player.home_region and entry.get('region_specific', False):
-        name += '_'+player.home_region
-
-    if period == 'week':
-        return weekly_name(name, SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], player.get_absolute_time()))
-    elif period == 'season':
-        return seasonal_name(name, SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], player.get_absolute_time()))
-    else:
-        raise Exception('unhandled period '+period)
 
 SCORES2_MIGRATION_VERSION = 9
 
-# return complete list of all player.history fields used for leaderboard rankings
-def score_field_names(player):
-    # note this includes trophy counts, for which the primary cache is in SQL. We are putting trophy counts into the dbserver player
-    # cache as well, but ONLY for GUI/backup/redundancy purposes.
-    return [score_field_name(player, name, period) for name in SCORE_FIELDS.iterkeys() for period in SCORE_PERIODS]
-
-# list of player.history fields used for alliance rankings, stored in SQL
-def trophy_field_names(player):
-    return [score_field_name(player, name, period) for name in SCORE_FIELDS.iterkeys() for period in SCORE_PERIODS \
-            if name.startswith('trophies_')]
-
 def conceal_protection_time(x):
     if gamedata['server']['conceal_protection_time']:
-        if x >= server_time:
+        if x > server_time:
             return 1
         else:
             return -1
@@ -351,8 +315,47 @@ def pretty_print_session(id):
 gamesite = None
 spin_server_name = None
 
+# decorator to trap all exceptions underneath a main entry point
+def catch_all(name):
+    def _apply_catch_decorator(func):
+        def _catch_decorator(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception: %s' % (name, traceback.format_exc().strip())) # OK
+        return functools.wraps(func)(_catch_decorator)
+    return _apply_catch_decorator
+
 # table mapping sessions (big strings) to live Player objects
 session_table = {}
+
+def get_session_by_session_id(session_id, include_logout_in_progress = False):
+    s = session_table.get(session_id, None)
+    if s and s.logout_in_progress and not include_logout_in_progress: s = None
+    return s
+def get_session_by_user_id(user_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.user_id == user_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+def get_session_by_facebook_id(facebook_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.facebook_id == facebook_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+def get_session_by_xsolla_id(xs_id, include_logout_in_progress = False):
+    for s in session_table.itervalues():
+        if s.user.get_xsolla_id() == xs_id:
+            if s.logout_in_progress and not include_logout_in_progress: return None
+            return s
+    return None
+
+def iter_sessions(include_logout_in_progress = False):
+    for session in session_table.itervalues():
+        if session.logout_in_progress: continue
+        yield session
 
 invalid_sessions = {} # set of session IDs invalidated via CONTROLAPI (sid->count)
 invalid_sessions_by_time = collections.deque() # (time,sid) for session invalidations
@@ -417,7 +420,7 @@ def reload_gamedata():
 
     except:
         writefunc = (lambda x: gamesite.exception_log.event(server_time, x)) if gamesite else (lambda x: sys.stderr.write(x+'\n'))
-        writefunc('error (re)loading gamedata: '+traceback.format_exc())
+        writefunc('error (re)loading gamedata: '+traceback.format_exc().strip()) # OK
         pass
 
 reload_gamedata()
@@ -442,6 +445,270 @@ def update_server_time():
     gamesite.nosql_id_generator.set_time(server_time)
     if gamesite.nosql_client: gamesite.nosql_client.set_time(server_time)
     return server_time_high
+
+# utilities for inserting into Deferred callback chains
+def _report_deferred_failure(fail, session):
+    gamesite.exception_log.event(server_time, 'async exception on player %d: %s' % \
+                                 (session.user.user_id, fail.getTraceback().strip()))
+def report_and_reraise_deferred_failure(fail, session):
+    _report_deferred_failure(fail, session)
+    return fail
+def report_and_absorb_deferred_failure(fail, session, retval = None):
+    _report_deferred_failure(fail, session)
+    return retval
+
+
+# live server administration interface
+class AdminStats:
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.start_time = server_time
+        self.developer_revenue = 0.0
+        self.revenue = 0.0
+        self.users_seen = set()
+        self.paying_users_seen = set()
+        self.new_users_seen = set()
+        self.last_payments = collections.deque([], 10)
+        self.last_gamebucks = collections.deque([], 10)
+        self.campaigns = {}
+        self.econ = {}
+        self.latency = {}
+        self.quarry_cache_misses = 0
+        self.quarry_cache_hits = 0
+
+    def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
+        # eventually need to separate third resource out
+        total = sum(res.itervalues(),0)
+        if total == 0: return # we assume that entries are either all positive or all negative
+        if category not in self.econ:
+            self.econ[category] = {}
+        self.econ[category][reason] = self.econ[category].get(reason,0) + total
+
+        if gamedata['server'].get('log_econ_res', False) and gamesite.nosql_client:
+            props = {'user_id':player.user_id, 'res':res, 'cat':category, 'sub': reason}
+            if spec is not None:
+                props['spec'] = spec
+            if level is not None:
+                props['level'] = level
+            props.update(player.get_denormalized_summary_props('brief'))
+            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow_res')
+
+    def record_latency(self, name, elapsed):
+        if name not in self.latency:
+            self.latency[name] = {'N':0.0, 'total':0.0, 'max': 0.0}
+        self.latency[name]['N'] += 1
+        self.latency[name]['total'] += elapsed
+        self.latency[name]['max'] = max(self.latency[name]['max'], elapsed)
+
+    # decorator for timing a function
+    def measure_latency(self, name):
+        def _apply_latency_decorator(func):
+            def _latency_decorator(*args, **kwargs):
+                start_time = time.time()
+                ret = func(*args, **kwargs)
+                end_time = time.time()
+                self.record_latency(name, end_time - start_time)
+                return ret
+            return functools.wraps(func)(_latency_decorator)
+        return _apply_latency_decorator
+
+    # context object for timing a block
+    class MeasureLatency(object):
+        def __init__(self, parent, name):
+            self.parent = parent
+            self.name = name
+        def __enter__(self):
+            self.start_time = time.time()
+        def __exit__(self, type, value, traceback):
+            end_time = time.time()
+            self.parent.record_latency(self.name, end_time - self.start_time)
+    def latency_measurer(self, name): return self.MeasureLatency(self, name)
+
+    def add_visit(self, user_id, is_new, is_paying):
+        self.users_seen.add(user_id)
+        if is_paying:
+            self.paying_users_seen.add(user_id)
+        if is_new:
+            self.new_users_seen.add(user_id)
+
+    def add_revenue(self, user_id, dollar_amount, descr):
+        self.revenue += dollar_amount
+        # add here in case this is the user's first payment
+        self.paying_users_seen.add(user_id)
+        self.last_payments.append({'user_id':user_id,
+                                   'time':server_time,
+                                   'dollar_amount':dollar_amount,
+                                   'description':descr})
+
+    def add_gamebucks_spend(self, user_id, bucks, descr):
+        self.last_gamebucks.append({'user_id':user_id,
+                                    'time':server_time,
+                                    'gamebucks_amount':bucks,
+                                    'description':descr})
+
+    def add_logout(self, user_id, campaign, length):
+        # only track FIRST visits
+        if user_id not in self.new_users_seen:
+            return
+
+        if campaign not in self.campaigns:
+            self.campaigns[campaign] = {'lengths': collections.deque([], 5), 'num': 0}
+        self.campaigns[campaign]['lengths'].append(length)
+        self.campaigns[campaign]['num'] += 1
+
+    def get_active_sessions(self):
+        # also count valid in-flight asynchronous logins here
+        return len(session_table) + sum((1 for async in gamesite.gameapi.AsyncLogin.in_progress_by_user_id.itervalues() if (not async.cancel_reason)),0)
+
+    def get_server_status_json(self):
+        return {'server_time': server_time,
+                'launch_time': spin_server_launch_time,
+                'type': SpinConfig.game(),
+                'state': gamesite.server_state,
+                'hostname': gamesite.config.game_host,
+                'pid': os.getpid(),
+                'game_listen_host': gamesite.config.game_listen_host,
+                'game_http_port': gamesite.config.game_http_port,
+                'game_ssl_port': gamesite.config.game_ssl_port,
+                'game_ws_port': gamesite.config.game_ws_port,
+                'game_wss_port': gamesite.config.game_wss_port,
+                'affinities': gamesite.config.affinities,
+                'scm_version': SERVER_VERSION,
+                'gamedata_build': gamedata['gamedata_build_info']['date'],
+                'gameclient_build': gameclient_build_date,
+                'uptime': server_time - self.start_time,
+                'load_unhalted': self.get_load(),
+                'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
+                'active_sessions': self.get_active_sessions(),
+                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
+                'active_protocol_clients': len(gamesite.active_clients),
+                'active_protocol_requests': len(gamesite.active_requests),
+                }
+
+    def get_stats(self):
+        props = {}
+        up_hours = float(server_time - self.start_time)/3600.0
+        up_days = up_hours/24.0
+        props['uptime hours'] = up_hours
+        props['revenue'] = self.revenue
+        props['revenue/day (projected)'] = self.revenue / up_days
+        props['revenue (developers)'] = self.developer_revenue
+        props['unique users'] = len(self.users_seen)
+        props['unique paying users'] = len(self.paying_users_seen)
+        props['unique new users'] = len(self.new_users_seen)
+        DAU = len(self.users_seen) / up_days
+        PDAU = len(self.paying_users_seen) / up_days
+        props['DAU (projected)'] = DAU
+        props['PDAU (projected)'] = PDAU
+        props['ARPDAU (projected)'] = self.revenue / (DAU+0.0001)
+        props['ARPPDAU (paying, projected)'] = self.revenue / (PDAU+0.0001)
+        return props
+
+    def get_campaigns(self):
+        ret = ''
+        ret += '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Name</td><td>Last Session Lengths (new users only)</td><td>Average</td><td># Acquisitions</td></tr>'
+        for name in sorted(self.campaigns.iterkeys()):
+            data = self.campaigns[name]
+            lengths = data['lengths']
+            num = data['num']
+            if len(lengths) > 0:
+                str_average = SpinConfig.pretty_print_time(sum(lengths)/len(lengths))
+            else:
+                str_average = '-'
+            str_lengths = string.join(map(SpinConfig.pretty_print_time, lengths), ', ')
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%d</td></tr>' % (name, str_lengths, str_average, num)
+        ret += '</table>'
+        return ret
+
+    def get_payments(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
+        for props in reversed(self.last_payments):
+            elapsed = server_time - props['time']
+            ret += '<tr><td>%s</td><td>%d</td><td>$%0.2f</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
+                                                                       props['user_id'],
+                                                                       props['dollar_amount'],
+                                                                       props['description'])
+        ret += '</table>'
+        return ret
+
+    def get_gamebucks(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
+        for props in reversed(self.last_gamebucks):
+            elapsed = server_time - props['time']
+            ret += '<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
+                                                                       props['user_id'],
+                                                                       props['gamebucks_amount'],
+                                                                       props['description'])
+        ret += '</table>'
+        return ret
+
+    def get_load(self):
+        if 'ALL' in self.latency:
+            return self.latency['ALL']['total'] / max(1, float(server_time - self.start_time))
+        else:
+            return -1
+
+    def get_latency(self):
+        ret = ''
+
+        if 'ALL' in self.latency:
+            ret += 'Approximate unhalted load: <b>%.1f%%</b><br>' % (100.0*self.get_load())
+            ret += 'Average request latency: <b>%.1f ms</b><p>' % ((1000.0*self.latency['ALL']['total'])/self.latency['ALL']['N'])
+
+        def sort_by_max(kv): return -kv[1]['max']
+        def sort_by_average(kv): return -kv[1]['total']/kv[1]['N']
+        def sort_by_total(kv): return -kv[1]['total']
+
+        grand_total = sum([data['total'] for name, data in self.latency.iteritems() if name != 'ALL'])
+
+        for sort_name, sort_func in {'Max': sort_by_max, 'Avg': sort_by_average, 'Total': sort_by_total}.iteritems():
+            ret += '<p>Sort by %s<br>' % sort_name
+            ret += '<table border="1" cellspacing="1">'
+            ret += '<tr><td>Request</td><td>Average</td><td>Max</td><td>Total</td><td>Total %</td><td>#Calls</td></tr>'
+            ls = self.latency.items()
+            ls.sort(key = sort_func)
+            for name, data in ls[0:25]:
+                ret += '<tr><td>%s</td><td>%.1f ms</td><td>%.1f ms</td><td>%.1f s</td><td>%.1f%%</td><td>%d</td></tr>' % \
+                       (name, 1000.0*data['total']/data['N'],
+                        1000.0*data['max'],
+                        data['total'],
+                        (100.0*data['total']/grand_total) if grand_total != 0 else 0,
+                        int(data['N'])
+                        )
+            ret += '</table>'
+
+        quarry_total = self.quarry_cache_misses + self.quarry_cache_hits
+        if quarry_total > 0:
+            ret += '<p>Quarry cache hit rate: <b>%.1f%%</b><br>' % (100*self.quarry_cache_hits/float(quarry_total))
+        return ret
+
+    def get_econ(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Category</td><td>Reason</td><td>Amount</td><td>%</td></tr>'
+        cat_totals = {}
+        cat_totals = dict([(category, sum(self.econ[category].itervalues())) for category in self.econ.iterkeys()])
+        grand_total = sum(cat_totals.itervalues())
+        abs_total = sum([abs(x) for x in cat_totals.itervalues()])
+
+        def big_number(x):
+            return '%.3fM' % (x/1000000.0)
+
+        for cat, data in sorted(self.econ.items()):
+            cat_ratio = cat_totals[cat]/float(abs_total) if (abs_total != 0) else 0
+            ret += '<tr><td><b>%s</b></td><td>%s</td><td><b>%s</b></td><td><b>%.1f%%</b></td></tr>' % (cat, '', big_number(cat_totals[cat]), 100.0*cat_ratio)
+            for reason, amount in sorted(data.items()):
+                ratio = amount/float(cat_totals[cat]) if (cat_totals[cat] != 0) else 0
+                ret += '<tr><td></td><td>%s</td><td>%s</td><td>%.1f%%</td></tr>' % (reason, big_number(amount), 100.0*ratio)
+
+        ret += '<tr><td><b>TOTAL</b></td><td></td><td>%s</td><td>-</td></tr>' % big_number(grand_total)
+        ret += '</table>'
+        return ret
+
+admin_stats = AdminStats()
 
 # userdb/playerdb/aistate file I/O backend
 class IOSystem (object):
@@ -489,7 +756,6 @@ class IOSystem (object):
 
         if reason:
             start_time = time.time()
-        #admin_stats.record_latency('ASYNC TIME', start_time-request_time)
         ret = cb(*args)
         if reason:
             end_time = time.time()
@@ -525,6 +791,9 @@ class IOSystem (object):
         max_time = gamedata['ai_base_persistence_time'][1]
         SpinUserDB.driver.collect_aistate_garbage(server_time - max_time)
 
+    def shutdown(self):
+        # override if necessary
+        return defer.succeed(True)
 
 class FileIOSystem (IOSystem):
     def __init__(self, config):
@@ -535,15 +804,15 @@ class FileIOSystem (IOSystem):
             buf = open(filename).read()
         except:
             buf = 'NOTFOUND'
-        reactor.callLater(0.01, success_cb, buf)
+        reactor.callLater(0, success_cb, buf)
     def do_async_write(self, filename, buf, success_cb, fsync, procnum):
         atom = AtomicFileWrite.AtomicFileWrite(filename, 'w')
         atom.fd.write(buf)
         atom.complete(fsync = fsync)
-        reactor.callLater(0.01, success_cb)
+        reactor.callLater(0, success_cb)
     def do_async_delete(self, filename, success_cb, procnum):
         safe_unlink(filename)
-        reactor.callLater(0.01, success_cb)
+        reactor.callLater(0, success_cb)
 
 class IOSlaveIOSystem (IOSystem):
     def __init__(self, config):
@@ -559,7 +828,7 @@ class IOSlaveIOSystem (IOSystem):
             raise Exception('number of ioslaves (%d) does not match optimum for SpinUserDB (%d)' % (num_slaves, optimal_num))
     def start(self):
         for port in xrange(self.port_range[0], self.port_range[1]+1):
-            client = ioslave.IOClient(port, self.secret, log_exception_func = lambda x: gamesite.exception_log.event(server_time, x))
+            client = ioslave.IOClient(port, self.secret, log_exception_func = gamesite.log_exception_func)
             self.clients.append(client)
             gamesite.exception_log.event(server_time, repr(client) + ' started')
     def overloaded(self):
@@ -578,41 +847,66 @@ class IOSlaveIOSystem (IOSystem):
         self.clients[procnum].async_write(filename, buf, server_time, success_cb, self.async_write_error, fsync = True)
     def do_async_delete(self, filename, success_cb, procnum):
         self.clients[procnum].async_delete(filename, server_time, success_cb, self.async_write_error)
+    def shutdown(self):
+        return defer.DeferredList([client.defer_until_all_complete() for client in self.clients])
 
 class S3IOSystem (IOSystem):
     def __init__(self, config):
         IOSystem.__init__(self, config)
         assert isinstance(SpinUserDB.driver, SpinUserDB.S3Driver)
         self.s3 = SpinUserDB.driver.s3con # SpinS3.S3(SpinUserDB.driver.key_file)
-        data = gamedata['server']['AsyncHTTP_S3']
+
+        config = gamedata['server'].get('AsyncHTTP_S3', {})
+        request_timeout = config.get('request_timeout', 15)
+        max_tries = config.get('max_tries', 3) # was: 20 (high is better against S3 errors but worse against server flood attacks)
+        retry_delay = config.get('retry_delay', 3)
+
+        # Wait this many seconds after the actual HTTP response before returning success from an async write.
+        # This is necessary to deal with S3's "eventual consistency" model, so that player files don't get
+        # over-written with old data when being attacked immediately after logging out
+        # Need to keep it as low as possible, because it adds directly to post-attack latency.
+        self.post_write_delay = config.get('post_write_delay', 2)
+
         # hard-code max request count to infinite, since we can't drop them (but can throttle logins instead)
-        self.s3_req = AsyncHTTP.AsyncHTTPRequester(-1, -1, data['request_timeout'], 0,
+        self.s3_req = AsyncHTTP.AsyncHTTPRequester(-1, -1, request_timeout, 0,
                                                    lambda x: gamesite.exception_log.event(server_time, x),
-                                                   error_on_404 = False, max_tries = data['max_tries'], retry_delay = data['retry_delay'])
+                                                   error_on_404 = False, max_tries = max_tries, retry_delay = retry_delay)
     def overloaded(self):
         limit = gamedata['server']['io_backends']['s3'].get('max_in_flight', 50)
         current = self.s3_req.num_on_wire()
         return (current >= limit)
     def get_stats(self):
         return self.s3_req.get_stats_html(server_time)
+
+    # "preflight" callbacks update the request URL/headers to bump timestamps in case of retry problems
+    def preflight_get_request(self, bucket, objname, request):
+        request.url, request.headers = self.s3.get_request(bucket, objname)
+    def preflight_put_request(self, bucket, objname, length, request):
+        request.url, request.headers = self.s3.put_request(bucket, objname, length)
+    def preflight_delete_request(self, bucket, objname, request):
+        request.url, request.headers = self.s3.delete_request(bucket, objname)
+
     def do_async_read(self, path, success_cb, error_cb, procnum):
         bucket, objname = path
         url, headers = self.s3.get_request(bucket, objname)
         self.s3_req.queue_request(server_time, url, success_cb,
-                                  error_callback = error_cb, method = 'GET', headers = headers)
+                                  error_callback = error_cb,
+                                  preflight_callback = functools.partial(self.preflight_get_request, bucket, objname),
+                                  method = 'GET', headers = headers)
     def do_async_write(self, path, buf, success_cb, fsync, procnum):
         bucket, objname = path
         url, headers = self.s3.put_request(bucket, objname, len(buf))
-        delay = gamedata['server']['AsyncHTTP_S3']['post_write_delay']
-        self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 0, success_cb, delay),
-                                  error_callback = self.async_write_error, method = 'PUT', headers = headers,
-                                  postdata = buf)
+        self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 0, success_cb, self.post_write_delay),
+                                  error_callback = self.async_write_error,
+                                  preflight_callback = functools.partial(self.preflight_put_request, bucket, objname, len(buf)),
+                                  method = 'PUT', headers = headers, postdata = buf)
     def do_async_delete(self, path, success_cb, procnum):
         bucket, objname = path
         url, headers = self.s3.delete_request(bucket, objname)
         self.s3_req.queue_request(server_time, url, functools.partial(self.async_write_helper, 1, success_cb, 0),
-                                  error_callback = self.async_write_error, method = 'DELETE', headers = headers)
-
+                                  error_callback = self.async_write_error,
+                                  preflight_callback = functools.partial(self.preflight_delete_request, bucket, objname),
+                                  method = 'DELETE', headers = headers)
 
 IO_SYSTEMS = { 'file': FileIOSystem, 'ioslave': IOSlaveIOSystem, 's3': S3IOSystem }
 io_system = None
@@ -625,9 +919,9 @@ ASYNC_DEBUG = True
 def ascdebug(msg):
     if gamedata['server'].get('log_async_io',False):
         print msg
-        gamesite.exception_log.event(server_time, 'ASC: '+msg)
+        gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
-# mapping of SpinPunch user IDs to User objects
+# mapping of game user IDs to User objects
 class UserTable:
     # note: these are updated from the login code, so don't read them from the file
     WRITE_ONLY_FIELDS = [('user_id', int), # for reference/recovery only, not used as database key
@@ -697,7 +991,7 @@ class UserTable:
               ('devicePixelRatio', None),
               ('age_group', None),
               ('preferences', None),
-              ('chat_gagged', int),
+              ('chat_gagged', int), # read-only for legacy data
               ('chat_mod', None),
               ('developer', None),
               ]
@@ -705,8 +999,7 @@ class UserTable:
     def __init__(self):
         pass
 
-    def unparse(self, user):
-        start_time = time.time()
+    def jsonize(self, user):
         jsonobj = {}
         for name, coerce in (self.WRITE_ONLY_FIELDS + self.FIELDS):
             val = getattr(user, name)
@@ -718,57 +1011,52 @@ class UserTable:
         # store unrecognized data
         for name, val in user.foreign_data.iteritems():
             jsonobj[name] = val
+        return jsonobj
 
-        end_time = time.time()
-        admin_stats.record_latency('user_table:unparse', end_time-start_time)
-        start_time = end_time
+    def unparse(self, user):
+        with admin_stats.latency_measurer('user_table:jsonize'):
+            jsonobj = self.jsonize(user)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('user_table:serialize', end_time-start_time)
+        with admin_stats.latency_measurer('user_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
         return ret
 
     def parse(self, buf, user_id):
         jsonobj = None
 
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('user_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('user_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
         if not jsonobj:
             return None
 
-        start_time = end_time
+        with admin_stats.latency_measurer('user_table:parse'):
 
-        ret = User(user_id)
+            ret = User(user_id)
 
-        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-                print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
+            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+                    print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
 
-        for name, coerce in self.WRITE_ONLY_FIELDS:
-            if jsonobj.has_key(name):
-                del jsonobj[name]
+            for name, coerce in self.WRITE_ONLY_FIELDS:
+                if jsonobj.has_key(name):
+                    del jsonobj[name]
 
-        # parse recognized fields
-        for name, coerce in self.FIELDS:
-            if jsonobj.has_key(name):
-                val = jsonobj[name]
-                if coerce:
-                    val = coerce(val)
-                setattr(ret, name, val)
-                del jsonobj[name]
+            # parse recognized fields
+            for name, coerce in self.FIELDS:
+                if jsonobj.has_key(name):
+                    val = jsonobj[name]
+                    if coerce:
+                        val = coerce(val)
+                    setattr(ret, name, val)
+                    del jsonobj[name]
 
-        # store unrecognized fields
-        for name, val in jsonobj.iteritems():
-            print 'unrecogized User data', name, ':', val
-            ret.foreign_data[name] = val
-        end_time = time.time()
-        admin_stats.record_latency('user_table:parse', end_time-start_time)
+            # store unrecognized fields
+            for name, val in jsonobj.iteritems():
+                print 'unrecogized User data', name, ':', val
+                ret.foreign_data[name] = val
 
         return ret
 
@@ -834,6 +1122,7 @@ class User:
     def __init__(self, user_id):
         self.user_id = user_id
         self.fb_hit_time = -1 # server_time at which the user's Facebook data was downloaded
+        self.fb_retrieve_semaphore = None # set of outstanding profile/friends/likes requests (by string name) to keep track of what's in progress
         self.account_creation_time = -1 # server_time at which account was originally created
         self.last_login_time = -1 # last time at which user played a game
         self.last_login_ip = '' # last IP address from which this user logged in
@@ -878,7 +1167,7 @@ class User:
         self.facebook_likes = None
         self.facebook_currency = None
         self.facebook_third_party_id = None
-        self.fb_is_eligible_promo = None
+
         self.fb_gamer_status = -1
         self.fb_credit_balance = -1
         self.credit_info_request_outstanding = False
@@ -937,6 +1226,7 @@ class User:
 
         # note: None or False or < 1 is "not gagged"
         # True or 1 is "permanently (and silently) gagged"
+        # OBSOLETE - read-only for legacy data. Replaced by chat_gagged player aura.
         self.chat_gagged = None
 
         # 1 if player can moderate (gag) chat
@@ -1006,7 +1296,6 @@ class User:
 
     def chat_can_interact(self):
         if not self.active_session: return False
-        if self.chat_gagged: return False
         return True
 
     def is_friends_with(self, social_id):
@@ -1196,11 +1485,8 @@ class User:
         if len(self.acquisition_data) > 0:
             self.acquisition_campaign = self.acquisition_data[0]['type']
 
-    def repopulate_ai_list(self, retmsg):
+    def repopulate_ai_list(self, session):
         # add AI opponents to friends list
-
-        player = self.active_session.player
-        assert player
 
         ai_list = set()
 
@@ -1209,8 +1495,8 @@ class User:
             if 'activation' not in base: continue
 
             pred = Predicates.read_predicate(base['activation'])
-            if not pred.is_satisfied(player, None):
-                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied(player, None):
+            if not pred.is_satisfied(session.player, None):
+                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied(session.player, None):
                     # still show it
                     pass
                 else:
@@ -1221,7 +1507,7 @@ class User:
 
         # first remove AIs that are no longer valid from the client
         for id in self.client_ai_friends.difference(ai_list):
-            retmsg.append(["REM_FRIEND", id])
+            session.send([["REM_FRIEND", id]])
             self.client_ai_friends.remove(id)
             self.client_friends.remove(id)
 
@@ -1233,35 +1519,22 @@ class User:
             friend_name = base['ui_name']
             friend_level = base['resources']['player_level']
 
-            retmsg.append(["ADD_FRIEND", id, -1, # AI
-                           friend_name,
-                           friend_level,
-                           player.get_battle_data_for_client(id),
-                           False, False, -1, [{'user_id': id,
-                                               'social_id': 'ai',
-                                               'ui_name': friend_name,
-                                               'player_level': friend_level
-                }]])
+            session.send([["ADD_FRIEND", id, False,
+                           [{'user_id': id,
+                             'social_id': 'ai',
+                             'ui_name': friend_name,
+                             'player_level': friend_level
+                }]]])
 
 
+    def populate_friends_who_play(self, session):
 
-    def populate_friends_who_play(self, retmsg):
-        if retmsg is None:
-            retmsg = self.active_session.deferred_messages
-            assert retmsg is not None
-
-        assert self.active_session
-
-        # peek at our own player data for battle and giftability info
-        self_player = self.active_session.player
-        assert self_player
-
-        self.repopulate_ai_list(retmsg)
+        self.repopulate_ai_list(session)
 
         if (self.facebook_friends is None) and (self.kg_friend_ids is None) and (self.ag_friend_ids is None):
             return # probably still waiting on the API
 
-        # batch query for SpinPunch IDs
+        # batch query for game player IDs
         social_id_list = []
         if self.facebook_friends:
             social_id_list += ['fb'+str(friend['id']) for friend in self.facebook_friends]
@@ -1277,7 +1550,7 @@ class User:
 
         if friend_id_list:
             # query the player cache
-            add_props = gamesite.gameapi.do_query_player_cache(self.active_session, friend_id_list, reason = 'populate_friends_who_play')
+            add_props = gamesite.gameapi.do_query_player_cache(session, friend_id_list, reason = 'populate_friends_who_play')
 
         for i in xrange(len(friend_id_list)):
             friend_id = friend_id_list[i]
@@ -1286,7 +1559,7 @@ class User:
             self.client_friends.add(friend_id)
 
             if not friend_props:
-                # the friend has a SpinPunch ID but never created any game state. This is probably because the friend
+                # the friend has a player ID but never created any game state. This is probably because the friend
                 # hit our site but was blocked by country or had an unsupported browser, so they never entered the game.
                 # print 'warning: no PlayerCache entry for friend player %d' % friend_id
                 continue
@@ -1297,20 +1570,15 @@ class User:
 
             self.client_social_friends.add(friend_id)
 
-            msg = ["ADD_FRIEND", friend_id, friend_props.get('facebook_id',None), pcache_get_ui_name(friend_props), # human
-                   friend_props.get('player_level',1),
-                   self_player.get_battle_data_for_client(friend_id),
-                   not self_player.cooldown_active('send_gift:'+str(friend_id)),
-                   True, # is a real Facebook friend (not a stranger)
-                   conceal_protection_time(friend_props.get('protection_end_time',-1)),
-                   [friend_props]
-                   ]
-            retmsg.append(msg)
+            session.send([["ADD_FRIEND", friend_id,
+                           True, # is a real Facebook friend (not a stranger)
+                           [friend_props]
+                           ]])
 
-        if not self_player.history.has_key('initial_friends_in_game'):
-            self_player.history['initial_friends_in_game'] = len(self.client_social_friends)
+        if not session.player.history.has_key('initial_friends_in_game'):
+            session.player.history['initial_friends_in_game'] = len(self.client_social_friends)
 
-        self.active_session.setmax_player_metric('friends_in_game', len(self.client_social_friends), bucket = True, bucket_size=60*60)
+        session.setmax_player_metric('friends_in_game', len(self.client_social_friends), bucket = True, bucket_size=60*60)
 
     def retrieve_kg_info(self, session, retmsg):
         if (None not in (self.kg_username, self.kg_avatar_url, self.kg_friend_ids)) and \
@@ -1324,7 +1592,7 @@ class User:
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({"friends":[],"muted_users":[],"friend_ids":[12345],"muted_user_ids":[],"user_id":12345,"username":"example1","private":False,"page_num":1,"num_pages":1,"success":True,"user_vars":{"username":"example1","level":1,"points":15,"avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/50x50/assets/avatars/defaults/frog.png","chat_avatar_url":"http://cdn4.kongcdn.com/assets/resize-image/16x16/assets/avatars/defaults/frog.png","developer":False,"moderator":False,"admin":False,"gender":None,"age":32,"game_title":"Test Game","game_url":"http://www.kongregate.com/games/example1/test-game"}})
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_kg_info_complete(_session, None, test_response)) # delay to expose timing bugs
 
     def retrieve_kg_info_start(self, session):
         gamesite.AsyncHTTP_Kongregate.queue_request(server_time,
@@ -1346,9 +1614,9 @@ class User:
 
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     def retrieve_ag_info(self, session, retmsg):
@@ -1372,7 +1640,7 @@ class User:
                 'birthday': "0000-00-00",
                 'gender':"Male",
                 'created_on': "1335466318" } })
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_info_complete(_session, None, test_response)) # delay to expose timing bugs
             friends_response = SpinJSON.dumps({'version': 1, 'code': 200, 'message': "OK", 'payload': [
                 {
                 'uid':"example2" if self.ag_id == "example1" else "example1",
@@ -1383,7 +1651,7 @@ class User:
                 'gender': "Female",
                 'created_on': "1198082452",
                 'plays_game': "1"}]})
-            reactor.callLater(0.01, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response))
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_ag_friends_complete(_session, None, friends_response)) # delay to expose timing bugs
 
     def retrieve_ag_info_start(self, session):
         gamesite.AsyncHTTP_ArmorGames.queue_request(server_time,
@@ -1407,9 +1675,9 @@ class User:
 
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player)]])
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     def retrieve_ag_friends_start(self, session, offset = 0, previous_results = None):
@@ -1435,56 +1703,16 @@ class User:
         self.ag_friend_ids = [str(friend['uid']) for friend in previous_results if int(friend['plays_game'])]
         if retmsg is None:
             if self.active_session:
-                retmsg = self.active_session.deferred_messages
+                retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
-            self.populate_friends_who_play(retmsg)
-
-    # try to obtain the user's Facebook profile, friends and likes
-    # this is cached in user_table; if the cache is empty or stale,
-    # send asynchronous HTTP requests to Facebook to get the data
-
-    def retrieve_facebook_info(self, retmsg):
-        if (self.facebook_profile != None) and type(self.facebook_profile) == dict and len(self.facebook_profile) > 0 and \
-           (self.facebook_friends != None) and \
-           (self.facebook_likes != None) and \
-           (self.facebook_currency != None) and \
-           (self.facebook_first_name != None) and \
-           (self.active_session.player.facebook_permissions is not None) and \
-           ((server_time - self.fb_hit_time) < gamedata['server'].get('facebook_cache_lifetime', 14400)):
-            # data is present in cache and fresh enough to use
-            #log.msg('Users\'s Facebook profile data is cached and fresh.')
-            return
-
-        # keep old profile in case Facebook gives us a malformed response
-        if self.facebook_profile is not None:
-            self.facebook_profile_backup = self.facebook_profile
-        else:
-            # cannot be None, because the callback uses "is None" to check for completion
-            self.facebook_profile_backup = {}
-
-        # delete old cache entries
-        self.facebook_profile = None
-        self.facebook_friends = None
-        self.facebook_likes = None
-        self.facebook_currency = None
-
-        self.fb_hit_time = server_time
-        if SpinConfig.config['enable_facebook']:
-            log.msg('Retrieving users\'s profile from Facebook...')
-            self.retrieve_facebook_info_start(retmsg)
-        else:
-            log.msg('Facebook API disabled, using fake test profile')
-            self.facebook_profile  = SpinJSON.load(open("test-facebook-profile.txt"))
-            self.facebook_friends  = SpinJSON.load(open("test-facebook-friends.txt"))['data']
-            self.facebook_likes    = SpinJSON.load(open("test-facebook-likes.txt"))['data']
-            self.retrieve_facebook_info_complete(retmsg)
+            self.populate_friends_who_play(session)
 
     def ping_fbpayments(self, session, retmsg, request_ids):
         # batch this?
         for request_id in request_ids:
-            self.ping_fbpayment(None, session, retmsg, request_id)
+            self.ping_fbpayment(session, retmsg, request_id)
 
-    def ping_fbpayment(self, request, session, retmsg, request_id, signed_request = None):
+    def ping_fbpayment(self, session, retmsg, request_id, signed_request = None):
         # try to finalize the status of one inflight payment
         payment_data = session.player.fbpayments_inflight.get(request_id, None)
         if not payment_data: return
@@ -1528,8 +1756,9 @@ class User:
         if gamedata['server']['log_fbpayments'] >= 2:
             gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s SEND %s' % (session.player.user_id, request_id, url))
 
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, request, session, retmsg, request_id), max_tries = 4)
-        return True # hold request async until the poll completes
+        d = make_deferred('ping_fbpayment_complete') # OK - installed into session by caller
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, functools.partial(self.ping_fbpayment_complete, d, session, retmsg, request_id), max_tries = 4)
+        return d # hold request async until the poll completes
 
     # return the spellname, spellarg that corresponds to an FB payment on the Open Graph object "url" with quantity "item_quantity"
     def parse_fbpayment_product_url(self, url, item_quantity):
@@ -1569,7 +1798,7 @@ class User:
                spell.get('price_formula') == 'constant':
                 match = True
                 for PRED in ('show_if','requires'):
-                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                         match = False; break
                 if not match: continue
 
@@ -1682,7 +1911,7 @@ class User:
                                               paid_amount, tax_amount, paid_currency, refund_amount, refund_currency, repr(gift_order)))
 
             except:
-                gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error:\n' % (session.user.user_id, str(payment_id)))+traceback.format_exc())
+                gamesite.exception_log.event(server_time, ('ping_fbpayment_post_complete player %d payment_id %s error: ' % (session.user.user_id, str(payment_id)))+traceback.format_exc().strip()) # OK
                 pass
         return new_mail
 
@@ -1718,7 +1947,7 @@ class User:
                                                                                       '%TIME': time.strftime('%H:%S', time_struct)}))
         if retmsg is not None: session.player.send_mailbox_update(retmsg)
 
-    def ping_fbpayment_complete(self, async_request, session, retmsg, request_id, result):
+    def ping_fbpayment_complete(self, d, session, retmsg, request_id, result):
         # note: payment may have been completed asynchronously, look up the request again here and exit if not found in in-flight
         payment_data = session.player.fbpayments_inflight.get(request_id, None)
         if payment_data:
@@ -1772,7 +2001,7 @@ class User:
                         # XXX is tax_amount taken before or after the 30% cut?
                         usd_equivalent = 0.01*int(100*float(payment['payout_foreign_exchange_rate']) * (paid_amount * 0.7 - tax_amount) + 0.5)
                         price_description, detail_props = \
-                                           Store.execute_order(gamesite.gameapi, None, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
+                                           Store.execute_order(gamesite.gameapi, session, retmsg, 'fbpayments:'+paid_currency, user_facing_amount,
                                                                payment_data['unit_id'],
                                                                payment_data['spellname'],
                                                                payment_data['spellarg'],
@@ -1788,6 +2017,9 @@ class User:
                         metric_event_coded(session.user.user_id, '1000_billed', {'Billing Amount': usd_equivalent,
                                                                                  'Billing Description': descr,
                                                                                  'country_tier': session.player.country_tier,
+                                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                                  'currency': paid_currency,
                                                                                  'currency_amount': user_facing_amount,
                                                                                  'tax_amount': tax_amount,
@@ -1806,6 +2038,9 @@ class User:
                                                                  'Billing Description': descr,
                                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'currency': paid_currency,
                                                                  'currency_amount': user_facing_amount,
                                                                  'tax_amount': tax_amount,
@@ -1832,6 +2067,7 @@ class User:
                         # new-style player metrics (redundant with old style above)
                         session.increment_player_metric('money_spent', usd_equivalent)
                         session.increment_player_metric('num_purchases', 1)
+                        session.setmax_player_metric('largest_purchase', usd_equivalent)
 
                         if 'money_purchase_history' not in session.player.history:
                             session.player.history['money_purchase_history'] = []
@@ -1859,8 +2095,8 @@ class User:
                         session.player.send_history_update(retmsg)
 
 
-                    except Exception:
-                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception:\n'+''.join(traceback.format_stack()[-5:-1])+traceback.format_exc())
+                    except:
+                        gamesite.exception_log.event(server_time, 'FBPAYMENT_ORDER Exception:\n'+''.join(traceback.format_stack()[-5:-1])+traceback.format_exc().strip()) # OK
                         retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
                         # write the bad fbpayment data to a file for debugging
@@ -1872,9 +2108,10 @@ class User:
                         # XXX refund?
 
                     # note: send AFTER executing spell, so that player state is already updated
-                    if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag']])
-        if async_request:
-            gamesite.gameapi.complete_deferred_request(async_request, session, retmsg)
+                    if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag'], True])
+
+        # fire deferred completion
+        if d: d.callback(True)
 
     def retrieve_facebook_credit_info_start(self):
         if self.credit_info_request_outstanding:
@@ -1899,17 +2136,15 @@ class User:
         self.credit_info_request_outstanding = True
 
         def on_success(result):
-            start_time = time.time()
             self.credit_info_request_outstanding = False
             self.retrieve_facebook_credit_info_complete(result)
-            end_time = time.time()
-            admin_stats.record_latency('AsyncHTTP(facebook_credit_info)', end_time-start_time)
 
         def on_error(reason):
             self.credit_info_request_outstanding = False
 
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, on_success, error_callback = on_error)
 
+    @admin_stats.measure_latency('retrieve_facebook_credit_info_complete')
     def retrieve_facebook_credit_info_complete(self, result):
         dom = xml.dom.minidom.parseString(result)
         try:
@@ -1926,7 +2161,8 @@ class User:
             # update the credit balance for any active sessions
             if self.active_session:
                 self.active_session.player.resources.facebook_credits = self.fb_credit_balance
-                self.active_session.send_deferred_message([["PLAYER_STATE_UPDATE", self.active_session.player.resources.calc_snapshot().serialize()]])
+                self.active_session.deferred_player_state_update = True
+                self.active_session.queue_flush_outgoing_messages()
 
         #print 'obtained gamer_status',self.fb_gamer_status,'credit_balance',self.fb_credit_balance,'for user',self.user_id,'fbid',self.facebook_id
 
@@ -1934,7 +2170,6 @@ class User:
     def retrieve_facebook_requests_start(self):
         if not SpinConfig.config['enable_facebook']:
             return
-        assert self.fb_oauth_token
         ver = SpinFacebook.api_version_number('apprequests')
         if ver >= 2.0:
             self.retrieve_facebook_requests_start_v2() # new /apprequests method
@@ -1942,14 +2177,15 @@ class User:
             self.retrieve_facebook_requests_start_v1() # old fql method
 
     def retrieve_facebook_requests_start_v1(self):
+        assert self.fb_oauth_token
         query = 'SELECT recipient_uid, request_id, app_id, sender_uid, message, data, created_time'
         query += ' FROM apprequest WHERE recipient_uid = me() AND app_id = '+SpinConfig.config['facebook_app_id']
         query_tok = urllib.urlencode(dict(query = query, access_token = self.fb_oauth_token)) # SpinConfig.config['facebook_app_access_token'] ?
         request_url = 'https://api.facebook.com/method/fql.query?'+query_tok
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_complete_v1(result))
 
+    @admin_stats.measure_latency('AsyncHTTP(facebook_apprequests_v1)')
     def retrieve_facebook_requests_complete_v1(self, result):
-        start_time = time.time()
 
         dom = xml.dom.minidom.parseString(result)
 
@@ -1995,13 +2231,9 @@ class User:
             delete_url = SpinFacebook.versioned_graph_endpoint('apprequest', str(request_id))+'?'+urllib.urlencode(dict(access_token=self.fb_oauth_token, method='delete')) # SpinConfig.config['facebook_app_access_token']?
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
 
-        end_time = time.time()
-        admin_stats.record_latency('AsyncHTTP(facebook_apprequests_v1)', end_time-start_time)
-
-
     def retrieve_facebook_requests_start_v2(self):
-        request_url = SpinFacebook.versioned_graph_endpoint('apprequests', 'me/apprequests') + \
-                                                 '?'+ urllib.urlencode(dict(access_token = self.fb_oauth_token))
+        request_url = SpinFacebook.versioned_graph_endpoint('apprequests', '%s/apprequests' % self.facebook_id) + \
+                                                 '?'+ urllib.urlencode(dict(access_token = SpinConfig.config['facebook_app_access_token']))
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_paged_v2(result))
 
     def retrieve_facebook_requests_paged_v2(self, result, buffer = None):
@@ -2060,9 +2292,12 @@ class User:
                 gamesite.exception_log.event(server_time, 'player %s deleting %d FB apprequests' % (self.user_id, len(to_delete)))
 
             batch = [{'method':'DELETE', 'relative_url': str(id)} for id in to_delete]
-            delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
-                         '?' + urllib.urlencode(dict(access_token=self.fb_oauth_token, batch=SpinJSON.dumps(batch)))
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
+            limit = 50 # facebook limits batches to 50
+            batches = [batch[i:i+limit] for i in xrange(0, len(batch), limit)]
+            for this_batch in batches:
+                delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
+                             '?' + urllib.urlencode(dict(access_token=SpinConfig.config['facebook_app_access_token'], batch=SpinJSON.dumps(this_batch)))
+                gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
     def create_fb_open_graph_action(self, action, params):
         if not SpinConfig.config['enable_facebook']:
@@ -2102,8 +2337,25 @@ class User:
                                                                                                                                     'spec': spec_name})
                                                               })
 
+    # try to obtain the user's Facebook profile, friends and likes
+    # this is cached in user_table; if the cache is empty or stale,
+    # send asynchronous HTTP requests to Facebook to get the data
+
+    def retrieve_facebook_info(self, session):
+        if (self.facebook_profile is not None) and type(self.facebook_profile) == dict and len(self.facebook_profile) > 0 and \
+           (self.facebook_friends is not None) and \
+           (self.facebook_likes is not None) and \
+           (self.facebook_currency is not None) and \
+           (self.facebook_first_name is not None) and \
+           (self.active_session.player.facebook_permissions is not None) and \
+           ((server_time - self.fb_hit_time) < gamedata['server'].get('facebook_cache_lifetime', 14400)):
+            # data is present in cache and fresh enough to use
+            return
+
+        self.retrieve_facebook_info_start(session)
+
     # launch the asynchronous HTTP requests to Facebook's servers
-    def retrieve_facebook_info_start(self, retmsg):
+    def retrieve_facebook_info_start(self, session):
         assert self.fb_oauth_token
         session_tok = self.fb_oauth_token
         session_tok_qs = urllib.urlencode(dict(access_token=session_tok))
@@ -2120,57 +2372,34 @@ class User:
         # this is a bad hack just for Thunder Run while it's not whitelisted in the U.S. - we use the app token rather than the session token
         tok_qs = app_tok_qs if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok_qs
 
-        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no currency/promo data
+        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no is_eligible_promo data
         friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
         likes_url = SpinFacebook.versioned_graph_endpoint('like', endpoint+'/likes')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
 
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, lambda raw: self.retrieve_facebook_info_receive('profile', raw))
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, lambda raw: self.retrieve_facebook_info_receive_paged('friends', raw))
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, lambda raw: self.retrieve_facebook_info_receive_paged('likes', raw))
+        # keep track of outstanding requests
+        self.fb_retrieve_semaphore = set(['profile', 'friends', 'likes'])
 
-    def retrieve_facebook_info_receive_paged(self, dest, raw_result, buffer = None):
+        if not SpinConfig.config['enable_facebook']: # mock path
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive, session, 'profile', open("test-facebook-profile.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', [], open("test-facebook-friends.txt").read())) # delay to expose timing bugs
+            reactor.callLater(2, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', [], open("test-facebook-likes.txt").read())) # delay to expose timing bugs
+        else:
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, functools.partial(self.retrieve_facebook_info_receive, session, 'profile'))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', []))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', []))
+
+    def retrieve_facebook_info_receive_paged(self, session, dest, buffer, raw_result):
         result = SpinJSON.loads(raw_result)
 
-        if buffer is None:
-            buffer = []
         buffer += result['data']
 
         if ('paging' in result) and ('next' in result['paging']) and \
            (('count' not in result) or (len(buffer) < int(result['count']))):
             # fetch next page
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'],
-                                                      lambda raw: self.retrieve_facebook_info_receive_paged(dest, raw, buffer = buffer))
+            gamesite.AsyncHTTP_Facebook.queue_request(server_time, result['paging']['next'], functools.partial(self.retrieve_facebook_info_receive_paged, session, dest, buffer))
         else:
             # it's complete now
-            self.retrieve_facebook_info_receive(dest, None, result = buffer)
-
-    # this callback is called for each URL downloaded asynchronously
-    def retrieve_facebook_info_receive(self, dest, raw_result, result = None):
-        start_time = time.time()
-
-        if result is not None:
-            pass # caller supplied pre-parsed result
-        else:
-            result = SpinJSON.loads(raw_result)
-
-        if dest == 'profile':
-            if type(result) == dict and len(result) > 0:
-                self.facebook_profile = result
-            else:
-                gamesite.exception_log.event(server_time, ('Facebook sent bad profile data for user %d: ' % self.user_id)+repr(raw_result))
-                self.facebook_profile = self.facebook_profile_backup
-        elif dest == 'friends':
-            self.facebook_friends = result
-        elif dest == 'likes':
-            self.facebook_likes = result
-            if self.active_session:
-                self.active_session.player.user_facebook_likes = self.facebook_likes
-
-        if (self.facebook_profile != None) and (self.facebook_friends != None) and (self.facebook_likes != None):
-            self.retrieve_facebook_info_complete(None)
-
-        end_time = time.time()
-        admin_stats.record_latency('AsyncHTTP(facebook_profile/friends/likes)', end_time-start_time)
+            self.retrieve_facebook_info_receive(session, dest, None, result = buffer)
 
     def facebook_permissions_ok(self, wanted):
         if self.active_session.player.facebook_permissions is None: return False
@@ -2179,95 +2408,105 @@ class User:
                 return False
         return True
 
-    # call this function after profile, friends, and likes are all downloaded
-    def retrieve_facebook_info_complete(self, retmsg):
-        #log.msg(('User %d\'s Facebook profile: ' % self.user_id)+repr(self.facebook_profile))
-        #log.msg(('User %d\'s Facebook friends: ' % self.user_id)+repr(self.facebook_friends))
-        #log.msg(('User %d\'s Facebook likes: ' % self.user_id)+repr(self.facebook_likes))
+    # this callback is called for each URL downloaded asynchronously
+    @admin_stats.measure_latency('AsyncHTTP(facebook_profile/friends/likes)')
+    def retrieve_facebook_info_receive(self, session, dest, raw_result, result = None):
 
-        # set safe defaults in case of failure
-        self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
-        self.fb_is_eligible_promo = False
-        if self.active_session:
-            self.active_session.player.facebook_permissions = []
+        self.fb_retrieve_semaphore.remove(dest)
+        if len(self.fb_retrieve_semaphore) == 0:
+            # all complete (set this before any possible parsing errors to avoid getting "stuck")
+            self.fb_hit_time = server_time
 
-        # pull vital fields out of the cached facebook_profile
-        if self.facebook_profile:
-            if 'name' in self.facebook_profile:
-                self.facebook_name = self.facebook_profile['name']
-            if 'first_name' in self.facebook_profile:
-                self.facebook_first_name = self.facebook_profile['first_name']
-            else:
-                self.facebook_first_name = self.facebook_name.split(' ')[0]
-
-            if 'currency' in self.facebook_profile:
-                self.facebook_currency = self.facebook_profile['currency']
-            if 'third_party_id' in self.facebook_profile:
-                self.facebook_third_party_id = self.facebook_profile['third_party_id']
-            if 'is_eligible_promo' in self.facebook_profile:
-                self.fb_is_eligible_promo = bool(self.facebook_profile['is_eligible_promo'])
-            if 'permissions' in self.facebook_profile and self.active_session:
-                self.active_session.player.facebook_permissions = self.facebook_profile['permissions']['data'][0].keys()
+        if result is not None:
+            pass # caller supplied pre-parsed result
         else:
-            self.facebook_name = '(Facebook API error)'
-            self.facebook_first_name = 'Unknown(fbapierr)'
+            result = SpinJSON.loads(raw_result)
 
-        if retmsg is None:
-            if self.active_session:
-                retmsg = self.active_session.deferred_messages
+        if dest == 'friends':
+            self.facebook_friends = result
+            self.populate_friends_who_play(session)
 
-        if retmsg is not None:
-            retmsg.append(["FACEBOOK_NAME_UPDATE", self.facebook_name])
-            if self.active_session:
-                retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(self.active_session.player)])
+        elif dest == 'likes':
+            self.facebook_likes = result
+            session.player.user_facebook_likes = self.facebook_likes
 
-            self.populate_friends_who_play(retmsg)
+        elif dest == 'profile':
+            if type(result) == dict and len(result) > 0:
+                self.facebook_profile = result
 
-            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency])
+                # only check for promo on non-cached result
+                if ('is_eligible_promo' in result) and bool(result['is_eligible_promo']) and \
+                   session.player.get_any_abtest_value('enable_payer_promo', gamedata['enable_payer_promo']) and \
+                   session.player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' and \
+                   (server_time - session.player.last_payer_promo) >= gamedata['payer_promo_interval'] and \
+                   session.player.tutorial_state == "COMPLETE" and \
+                   session.player.history.get('logged_in_times',0) >= gamedata['payer_promo_min_logins']:
+                    self.offer_payer_promo(session)
 
-            if self.facebook_third_party_id:
-                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", self.facebook_third_party_id])
+            else:
+                gamesite.exception_log.event(server_time, ('Facebook sent bad profile data for user %d: ' % self.user_id)+repr(raw_result))
+                # note: continue to use previous profile data
 
-            if self.active_session:
-                player = self.active_session.player
+            # set safe defaults in case of failure
+            self.facebook_currency = {'user_currency': 'Facebook Credits', 'currency_exchange': 1, 'currency_exchange_inverse': 1, 'currency_offset': 1}
+            session.player.facebook_permissions = []
+
+            # pull vital fields out of the cached facebook_profile
+            if self.facebook_profile:
+                if 'name' in self.facebook_profile:
+                    self.facebook_name = self.facebook_profile['name']
+                if 'first_name' in self.facebook_profile:
+                    self.facebook_first_name = self.facebook_profile['first_name']
+                else:
+                    self.facebook_first_name = self.facebook_name.split(' ')[0]
 
                 if 'birthday' in self.facebook_profile:
                     try:
                         m, d, y = map(int, self.facebook_profile['birthday'].split('/'))
                         self.birthday = SpinConfig.cal_to_unix((y,m,d))
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'could not parse player %d FB facebook_profile birthday "%s"' % (player.user_id, self.facebook_profile['birthday']))
+                        gamesite.exception_log.event(server_time, 'could not parse player %d FB facebook_profile birthday "%s"' % (self.user_id, self.facebook_profile['birthday']))
                         pass
+                if 'currency' in self.facebook_profile:
+                    self.facebook_currency = self.facebook_profile['currency']
+                if 'third_party_id' in self.facebook_profile:
+                    self.facebook_third_party_id = self.facebook_profile['third_party_id']
+                if ('permissions' in self.facebook_profile) and self.active_session and ('data' in self.facebook_profile['permissions']) and (len(self.facebook_profile['permissions']['data']) > 0):
+                    def parse_facebook_permissions(data_list):
+                        if 'permission' in data_list[0]: # current API
+                            return [x['permission'] for x in data_list if x.get('status',None) == 'granted']
+                        else: # legacy data
+                            return [k for k,v in data_list[0].iteritems() if v]
+                    session.player.facebook_permissions = parse_facebook_permissions(self.facebook_profile['permissions']['data'])
+            else:
+                self.facebook_name = '(Facebook API error)'
+                self.facebook_first_name = 'Unknown(fbapierr)'
 
-                # see if we need to ask for more permissions
-                want_permissions = SpinConfig.config.get('facebook_auth_scope', 'email')
-                if gamedata['server'].get('gameserver_check_auth_scope', False) and \
-                   (not self.facebook_permissions_ok(want_permissions)) and \
-                   (server_time - player.last_permissions_request) >= gamedata['permissions_request_interval']:
-                    player.last_permissions_request = server_time
-                    metric_event_coded(self.user_id, '0035_request_permission_add_scope', {'scope': want_permissions, 'method': 'gameserver'})
-                    retmsg.append(["INVOKE_FACEBOOK_AUTH", want_permissions,
-                                   'Permission Requested',
-                                   'Commander, to show your scores on Facebook we need additional authorization.'])
+            session.send([["FACEBOOK_NAME_UPDATE", self.facebook_name]])
+            session.send([["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)]])
+            session.send([["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency]])
 
-                elif self.fb_is_eligible_promo and \
-                   player.get_any_abtest_value('enable_payer_promo', gamedata['enable_payer_promo']) and \
-                   player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' and \
-                   (server_time - player.last_payer_promo) >= gamedata['payer_promo_interval'] and \
-                   player.tutorial_state == "COMPLETE" and \
-                   player.history.get('logged_in_times',0) >= gamedata['payer_promo_min_logins']:
-                    self.offer_payer_promo(self.active_session, retmsg)
+            if self.facebook_third_party_id:
+                session.send([["FACEBOOK_THIRD_PARTY_ID_UPDATE", self.facebook_third_party_id]])
 
-        # note: userdb entry is stored on logout only now, to cut down on I/O
+            # see if we need to ask for more permissions
+            want_permissions = SpinConfig.config.get('facebook_auth_scope', 'email')
+            if gamedata['server'].get('gameserver_check_auth_scope', False) and \
+               (not self.facebook_permissions_ok(want_permissions)) and \
+               (server_time - session.player.last_permissions_request) >= gamedata['permissions_request_interval']:
+                session.player.last_permissions_request = server_time
+                metric_event_coded(self.user_id, '0035_request_permission_add_scope', {'scope': want_permissions, 'method': 'gameserver'})
+                session.send([["INVOKE_FACEBOOK_AUTH", want_permissions,
+                               'Permission Requested',
+                               'Commander, to show your scores on Facebook we need additional authorization.']])
 
 
-
-    def offer_payer_promo(self, session, retmsg):
+    def offer_payer_promo(self, session):
         session.player.last_payer_promo = server_time
         currency_url = OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})
         session.increment_player_metric('payer_promo_offered', 1)
         metric_event_coded(session.user.user_id, '4500_payer_promo_offered', {'currency_url':currency_url})
-        retmsg.append(["OFFER_PAYER_PROMO", currency_url])
+        session.send([["OFFER_PAYER_PROMO", currency_url]])
 
     def log_adnetwork_event(self, api, props):
         props['account_creation_time'] = self.account_creation_time
@@ -2280,7 +2519,7 @@ class User:
         gamesite.do_log_adnetwork_event(api, props)
 
 
-# mapping of (SpinPunch user ID, game_id) tuples to Player objects
+# mapping of (player ID, game_id) tuples to Player objects
 
 def write_json_field(pyobj, jsonobj, field):
     name, coerce_write, coerce_read = field
@@ -2342,9 +2581,10 @@ class PlayerTable:
               ('history', None, None),
               ('cooldowns', None, None),
               ('scores2', lambda s: s.serialize(), lambda player, observer, data: Scores2.CurScores(data)),
-              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data)),
+              ('idle_check', lambda s: s.serialize(), lambda player, observer, data: IdleCheck.IdleCheck(gamedata['server']['idle_check'], data, server_time)),
               ('creation_time', None, None),
               ('lottery_slate', None, None),
+              ('lottery_slate_weights', None, None),
               ('ladder_match', None, None),
               ('ladder_match_history', None, None),
 
@@ -2467,7 +2707,7 @@ class PlayerTable:
                 try:
                     ret = self.parent.parse(buf, self.observer, self.user_id, self.live)
                 except:
-                    gamesite.exception_log.event(server_time, 'Error reading playerdb for user %d:\n' % self.user_id + traceback.format_exc())
+                    gamesite.exception_log.event(server_time, 'Error reading playerdb for user %d: %s' % (self.user_id, traceback.format_exc().strip())) # OK
                     ret = None
                     success = False
             for cb in self.cblist: cb(success, ret)
@@ -2479,8 +2719,7 @@ class PlayerTable:
         self.current_loads[user_id].append(aread)
         io_system.async_read_player(user_id, aread.success, aread.fail)
 
-    def unparse(self, player):
-        start_time = time.time()
+    def jsonize(self, player):
         jsonobj = {}
         for name, val in player.foreign_data.iteritems():
             jsonobj[name] = val
@@ -2493,70 +2732,64 @@ class PlayerTable:
 #                player.my_home.nosql_pluck('PlayerTable:unparse(XXXunnecessary)') # should be done from drop_object()
 #                player.my_home.nosql_plant('PlayerTable:unparse(XXXunnecessary)')
             write_json_field(player.my_home, jsonobj, field)
+        return jsonobj
 
-        end_time = time.time()
-        admin_stats.record_latency('player_table:unparse', end_time-start_time)
-        start_time = end_time
+    def unparse(self, player):
+        with admin_stats.latency_measurer('player_table:jsonize'):
+            jsonobj = self.jsonize(player)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('player_table:serialize', end_time-start_time)
+        with admin_stats.latency_measurer('player_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return ret
 
     def parse(self, buf, observer, user_id, live):
         jsonobj = None
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('player_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('player_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
         if not jsonobj:
             return None
 
-        start_time = end_time
+        with admin_stats.latency_measurer('player_table:parse'):
 
-        if live:
-            player = LivePlayer(user_id)
-        else:
-            player = ProxyPlayer(user_id)
+            if live:
+                player = LivePlayer(user_id)
+            else:
+                player = ProxyPlayer(user_id)
 
-        if observer is None: observer = player
+            if observer is None: observer = player
 
-        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-            gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
+            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+                gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
 
-        for field in self.PLAYER_RW_FIELDS:
-            read_json_field(jsonobj, player, field, player = player, observer = observer)
-        for field in self.BASE_RW_FIELDS:
-            read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
+            for field in self.PLAYER_RW_FIELDS:
+                read_json_field(jsonobj, player, field, player = player, observer = observer)
+            for field in self.BASE_RW_FIELDS:
+                read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
 
-#            if field[0] == 'my_base':
-#                old_base = player.my_home.my_base
-#                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
-#                if new_base is not None:
-#                    # verify that contents are identical
-#                    if len(old_base) != len(new_base):
-#                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
-#                                                     (user_id, len(new_base), len(old_base)))
-#                    #player.my_home.my_base = new_base
+    #            if field[0] == 'my_base':
+    #                old_base = player.my_home.my_base
+    #                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
+    #                if new_base is not None:
+    #                    # verify that contents are identical
+    #                    if len(old_base) != len(new_base):
+    #                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
+    #                                                     (user_id, len(new_base), len(old_base)))
+    #                    #player.my_home.my_base = new_base
 
 
-        # save all unrecognized data as foreign_data
-        for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
-            if jsonobj.has_key(name): del jsonobj[name]
+            # save all unrecognized data as foreign_data
+            for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
+                if jsonobj.has_key(name): del jsonobj[name]
 
-        for name, val in jsonobj.iteritems():
-            if name in self.PLAYER_DELETE_FIELDS: continue
-            if gamedata['server'].get('log_foreign_data', False):
-                gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
-            player.foreign_data[name] = val
-
-        end_time = time.time()
-        admin_stats.record_latency('player_table:parse', end_time-start_time)
+            for name, val in jsonobj.iteritems():
+                if name in self.PLAYER_DELETE_FIELDS: continue
+                if gamedata['server'].get('log_foreign_data', False):
+                    gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
+                player.foreign_data[name] = val
 
         # init stattab AGAIN so that stuff that depends on home base contents (e.g. repair speed) gets updated properly
         player.recalc_stattab(observer)
@@ -2579,13 +2812,12 @@ class AIInstanceTable:
     def delete_async(self, user_id, ai_id, cb):
         io_system.async_delete_aistate(user_id, game_id, ai_id, cb)
 
+    @admin_stats.measure_latency('ai_instance_table:parse')
     def parse(self, buf, observer, ai_id):
         jsonobj = None
+
         try:
-            start_time = time.time()
             jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('ai_instance_table:deserialize', end_time-start_time)
         except:
             pass
 
@@ -2595,8 +2827,6 @@ class AIInstanceTable:
         # has it expired?
         if server_time >= jsonobj['expiration_time']:
             return None, True
-
-        start_time = end_time
 
         player = ProxyPlayer(ai_id)
         player.expiration_time = jsonobj['expiration_time']
@@ -2623,8 +2853,6 @@ class AIInstanceTable:
         player.read_only = True # never write into the "real" PlayerTable
         player.my_home.init_production(player)
 
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:parse', end_time-start_time)
         return player, False
 
     class AsyncRead:
@@ -2653,13 +2881,12 @@ class AIInstanceTable:
         # special case - never store Lion Stone state to avoid bloating aistate storage
         # (client is only allowed to visit once during the tutorial)
         if ai_id == LION_STONE_ID:
-            reactor.callLater(0.01, cb)
+            reactor.callLater(0, cb)
             return
         buf = self.unparse(ai_id, player)
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
 
     def unparse(self, ai_id, player):
-        start_time = time.time()
         player.ai_generation += 1
         jsonobj = { 'expiration_time': player.expiration_time,
                     'ai_generation': player.ai_generation,
@@ -2676,12 +2903,10 @@ class AIInstanceTable:
                     'base_times_attacked': player.my_home.base_times_attacked,
                     'user_id': ai_id }
         if player.my_home.base_resource_loot: jsonobj['base_resource_loot'] = player.my_home.base_resource_loot
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:unparse', end_time-start_time)
-        start_time = end_time
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-        end_time = time.time()
-        admin_stats.record_latency('ai_instance_table:serialize', end_time-start_time)
+
+        with admin_stats.latency_measurer('ai_instance_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
+
         return ret
 
     def collect_garbage(self):
@@ -2708,7 +2933,7 @@ class BaseTable:
     def delete_async(self, region_id, base_id, cb):
         if gamesite.nosql_client:
             gamesite.nosql_client.drop_all_objects_by_base(region_id, base_id, reason='BaseTable.delete_async')
-        reactor.callLater(0.01, cb)
+        reactor.callLater(0, cb)
 
     # note: deserialization is broken into two parts, preparse() and
     # parse(), because the base must first tell us who the landlord
@@ -2721,10 +2946,8 @@ class BaseTable:
     def preparse(self, buf, region_id, base_id):
         jsonobj = None
         try:
-            start_time = time.time()
-            jsonobj = SpinJSON.loads(buf)
-            end_time = time.time()
-            admin_stats.record_latency('base_table:deserialize', end_time-start_time)
+            with admin_stats.latency_measurer('base_table:deserialize'):
+                jsonobj = SpinJSON.loads(buf)
         except:
             pass
 
@@ -2742,6 +2965,7 @@ class BaseTable:
 
         return jsonobj, False, jsonobj['base_landlord_id']
 
+    @admin_stats.measure_latency('base_table:parse')
     def parse(self, region_id, base_id, jsonobj, landlord, observer, reason=''):
         # NOTE! SUBTLE!
         # in the NoSQL case, jsonobj is just the 'feature' from MapCache
@@ -2750,7 +2974,6 @@ class BaseTable:
         assert jsonobj['base_landlord_id'] == landlord.user_id
 
         base = Base(region_id, base_id, landlord.user_id, jsonobj.get('base_type','hive'))
-        start_time = time.time()
 
         # NOTE! read_json_field magically works because the MapCache 'feature' has the same format as BaseTable entries
         for field in PlayerTable.BASE_RW_FIELDS:
@@ -2766,13 +2989,12 @@ class BaseTable:
             base.base_richness = gamedata['hives']['templates'][base.base_template].get('base_richness', base.base_richness)
 
         base.init_production(landlord)
-        end_time = time.time()
-        admin_stats.record_latency('base_table:parse', end_time-start_time)
+
         return base
 
     def lookup_async(self, region_id, base_id, feature, cb, reason):
         if not gamesite.nosql_client:
-            reactor.callLater(0.01, functools.partial(cb, False, None, None))
+            reactor.callLater(0, functools.partial(cb, False, None, None))
             return
 
         if not feature:
@@ -2780,36 +3002,31 @@ class BaseTable:
             if ('base_landlord_id' not in feature):
                 gamesite.exception_log.event(server_time, 'BaseTable.lookup_async(%s): bad feature for region %s base %s: %s' % \
                                              (reason, region_id, base_id, repr(feature)))
-                reactor.callLater(0.01, functools.partial(cb, False, None, None))
+                reactor.callLater(0, functools.partial(cb, False, None, None))
                 return
 
         assert 'base_landlord_id' in feature
 
         # simulate preparse success - note, we send 'feature' as the preparse result
-        reactor.callLater(0.01, functools.partial(cb, True, feature, feature['base_landlord_id']))
+        reactor.callLater(0, functools.partial(cb, True, feature, feature['base_landlord_id']))
 
     def store_async(self, base, cb, fsync, reason):
         base.base_generation += 1
         # ideally, if all server code correctly updates objects as they mutate, no I/O should be necessary here
         base.nosql_pluck('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
         base.nosql_plant('BaseTable:unparse(XXXunnecessary:%s)' % str(reason))
-        if cb: reactor.callLater(0.01, cb)
+        if cb: reactor.callLater(0, cb)
 
     def unparse(self, base):
-        start_time = time.time()
         jsonobj = {}
 
-        for field in PlayerTable.BASE_RW_FIELDS:
-            write_json_field(base, jsonobj, field)
+        with admin_stats.latency_measurer('base_table:unparse'):
+            for field in PlayerTable.BASE_RW_FIELDS:
+                write_json_field(base, jsonobj, field)
 
-        end_time = time.time()
-        admin_stats.record_latency('base_table:unparse', end_time-start_time)
-        start_time = end_time
+        with admin_stats.latency_measurer('base_table:serialize'):
+            ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
 
-        ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
-
-        end_time = time.time()
-        admin_stats.record_latency('base_table:serialize', end_time-start_time)
         return ret
 
 base_table = BaseTable()
@@ -2962,7 +3179,7 @@ class Session(object):
     class AsyncLogout:
         def __init__(self, parent):
             self.parent = parent
-            self.cbs = []
+            self.d = make_deferred('AsyncLogout')
             self.wrote_user = False
             self.wrote_player = False
         def user_cb(self):
@@ -2973,12 +3190,9 @@ class Session(object):
             self.try_finish()
         def try_finish(self):
             if (self.wrote_user) and (self.wrote_player):
-                cblist = self.cbs
-                self.cbs = []
-                if cblist:
-                    for cb in cblist:
-                        cb()
-
+                d, self.d = self.d, None
+                if d:
+                    d.callback(True)
 
     def __init__(self, session_id, user, player, login_time):
         assert user.active_session is None
@@ -3000,31 +3214,43 @@ class Session(object):
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
         # list of incoming bundles of game messages ([serial, messsages])
-        # being held because earlier messages haven't been received yet
-        self.message_buffer = []
+        # being held because earlier messages haven't been received or completely handled yet
+        self.message_buffer = [] # XXXXXX rename to incoming_messages
         self.lagged_out = False
 
-        # flag indicating we have an async HTTP request in progress
-        self.is_async = False
+        # Maintain a list of Deferreds we are waiting on during async message handling.
+        self.async_ds = []
+        self.async_ds_watchdog = None # IDelayedCall to detect async_ds getting "stuck"
+        self.async_ds_watchdog_fired = False
+        self.after_async = [] # list of Deferreds to fire once we finish async message handling.
+
+        # park current synchronous HTTP requests here. They will be completed as soon as the session is no longer async.
+        self.sync_requests = []
 
         # park the longpoll HTTP request here
         self.longpoll_request = None
         self.longpoll_request_time = -1 # note! if longpoll_request is not None, and this is <0, that means "reuse the same longpoll_request after flush" (for websockets)
 
         # list of outgoing game messages to deliver to the client's browser next time it contacts the server
-        self.deferred_messages = []
+        self.outgoing_messages = []
+
+        # IDelayedCall for immediately pending flush_outgoing_messages
+        self.pending_flush_outgoing_messages = None
 
         # flags that we need to perform a recaculation and send the results to the client on next transmission
         self.deferred_ping_squads = False
         self.deferred_ladder_point_decay_check = False
         self.deferred_stattab_update = False
         self.deferred_history_update = False
+        self.deferred_mailbox_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
+        self.deferred_player_auras_update = False
         self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
         self.deferred_player_name_update = False
+        self.deferred_player_trophies_update = False
 
         # prevent overlapping SPROBE_RUN requests
         self.sprobe_in_progress = False
@@ -3035,12 +3261,17 @@ class Session(object):
         # for debugging, keep track of how many SESSION_CHANGE messages we've sent the client this login
         self.debug_session_change_count = 0
 
+        # keep track of last few actions applied to this session for debugging
+        self.debug_action_log = collections.deque([], 16)
+
         # same for complete_attack
         self.complete_attack_in_progress = False
-        self.complete_attack_cbs = None
+        self.complete_attack_d = None
 
-        # prevents overlapping logouts and maintains callback list
+        # maintains state of asynchronous logout
         self.logout_in_progress = None
+        # fired when completely logged out
+        self.logout_d = None
 
         # these are reset each time the connected user views a different base
         self.home_base = True
@@ -3052,6 +3283,7 @@ class Session(object):
         self.attack_log = None
         self.damage_log = None
 
+        self.protection_eligible = None # False/True flag set at start of combat
         self.attack_finish_time = -1 # server_time when attack must conclude (due to attack timer)
 
         self.incoming_attack_time = -1 # server_time when AI units will be spawned in your base
@@ -3120,7 +3352,86 @@ class Session(object):
         gamesite.chat_mgr.join(self, 'BROADCAST')
         if self.player.is_developer():
             gamesite.chat_mgr.join(self, 'DEVELOPER')
-            self.do_chat_catchup('DEVELOPER', self.deferred_messages)
+            self.do_chat_catchup('DEVELOPER', self.outgoing_messages)
+
+    # transition the session to async waiting on the given Deferred
+    # this should be called by any internal function that wants to prevent further message handling
+    # on the session until the Deferred completes.
+    def start_async_request(self, d):
+        if d in self.async_ds: return d # duplicate
+
+        self.async_ds.append(d)
+        # ensure we communicate back to the client as soon as async processing finishes
+        d.addBoth(self.complete_async_request, d) # OK
+
+        timeout = gamedata['server'].get('async_d_watchdog_timeout',120.0)
+        if self.async_ds_watchdog:
+            if timeout > 0:
+                self.async_ds_watchdog.reset(timeout)
+            else:
+                self.async_ds_watchdog.cancel()
+                self.async_ds_watchdog = None
+        elif not self.logout_in_progress and not self.async_ds_watchdog_fired and timeout > 0:
+            self.async_ds_watchdog = reactor.callLater(timeout, self.async_ds_timeout)
+
+        return d # for syntactic convenience only
+
+    def async_ds_timeout(self):
+        self.async_ds_watchdog = None
+
+        if not self.async_ds: return # it got cleared up asynchronously (? XXXXXX not sure why this happens - post-logout?)
+
+        self.async_ds_watchdog_fired = True
+        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout at %f async_ds %r after_async %r' % (self.user.user_id, time.time(), self.async_ds, self.after_async))
+
+        # not sure what to do here...
+
+        gamesite.gameapi.log_out_async(self, 'async_ds_timeout', force = True)
+#        d_list, self.async_ds = self.async_ds, []
+#        for d in d_list:
+#            d.errback(failure.Failure(Exception('async_ds watchdog timeout')))
+
+    # exception to pass to after_async_request callbacks that fire after logout has begun
+    class AlreadyLoggedOut(Exception): pass
+
+    def complete_async_request(self, result_or_failure, d):
+        # note: this is called BY an async_d firing, so don't fire it again!
+
+        if d not in self.async_ds:
+            gamesite.exception_log.event(server_time, 'complete_async_request in unexpected state: sync_requests %r async_ds %r %s' % (self.sync_requests, self.async_ds, ''.join(traceback.format_stack())))
+        else:
+            self.async_ds.remove(d)
+
+        if not self.async_ds: # totally drained - flush now
+            if self.async_ds_watchdog:
+                self.async_ds_watchdog.cancel()
+                self.async_ds_watchdog = None
+
+            d_list, self.after_async = self.after_async, []
+            for d in d_list:
+                if self.logout_in_progress:
+                    # fail the call, since we've started logging out
+                    reactor.callLater(0, d.errback, failure.Failure(self.AlreadyLoggedOut('player %d logged out' % self.user.user_id)))
+                else:
+                    reactor.callLater(0, d.callback, True)
+
+            # and finally respond to the client. If one of the above cbs makes us async again, this will do nothing.
+            self.queue_flush_outgoing_messages()
+
+        return result_or_failure # pass along callback chain
+
+    # fire this deferred after we come out of async wait (or immediately if not waiting)
+    def after_async_request(self, d):
+        if self.async_ds:
+            if d in self.async_ds:
+                gamesite.exception_log.event(server_time, 'after_async_request deadlock on %r' % (d,))
+                reactor.callLater(0, d.errback, failure.Failure(Exception('after_async_request deadlock')))
+            self.after_async.append(d)
+        else:
+            reactor.callLater(0, d.callback, True)
+        return d # for syntactic convenience only
+
+    def is_async(self): return bool(self.async_ds)
 
     def record_activity_sample(self, force = False):
         interval = gamedata['server'].get('activity_classifier_interval',300)
@@ -3149,13 +3460,33 @@ class Session(object):
         return (len(deployable_squads) != 1 or (deployable_squads.values()[0]['squad_id'] != SQUAD_IDS.BASE_DEFENDERS))
 
     # this is exposed so that MetricEventConsequent can call it without depending on the global function from server.py
-    def metric_event_coded(self, player, event_name, props):
-        metric_event_coded(player.user_id, event_name, props)
+    def metric_event_coded(self, player, event_name, val):
+        if val:
+            assert type(val) is dict
+            if val.get('attack_event', False):
+                # write to attack log instead of main metrics log
+                self.attack_event(player.user_id, event_name, val)
+                return
+            elif val.get('purchase_ui_event', False):
+                # write to purchase_ui log instead of main metrics log
+                val['user_id'] = player.user_id
+                val['event_name'] = event_name
+                assert ('alloy' not in val['event_name']) # don't record previous-generation events
+                val['code'] = int(event_name[0:4])
+                del val['purchase_ui_event']
+                gamesite.purchase_ui_log.event(server_time, val)
+                return
+        metric_event_coded(player.user_id, event_name, val)
+
+    def debug_log_action(self, reason):
+        self.debug_action_log.append({'time':server_time, 'reason': reason, 'session': self.debug_session_change_count})
 
     # just return a string describing the current session state, for exception logging only
     def dump_exception_state(self):
-        return 'player %d viewing %d at %s, is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r' % \
-               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.is_async, bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock)
+        ui_action_log = '\n'.join('%d %d %s' % (x['time'], x['session'], x['reason']) for x in self.debug_action_log)
+        ui_action_log += '\n%d %d %s' % (server_time, self.debug_session_change_count, 'NOW')
+        return 'player %d viewing %d at %s (session change count %d), is_async %r complete_attack_in_progress %r visit_base_in_progress %r logout_in_progress %r has_attacked %r viewing_base_lock %r action_log\n%s' % \
+               (self.player.user_id, self.viewing_player.user_id, self.viewing_base.base_id, self.debug_session_change_count, self.is_async(), bool(self.complete_attack_in_progress), bool(self.visit_base_in_progress), bool(self.logout_in_progress), self.has_attacked, self.viewing_base_lock, ui_action_log)
 
     # return current seconds of cumulative play time
     def cur_playtime(self):
@@ -3186,7 +3517,7 @@ class Session(object):
 
     def do_chat_catchup(self, true_channel, retmsg):
         for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory']):
-            self.chat_recv(true_channel, x['sender'], x.get('text',''), retmsg = retmsg)
+            self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:
@@ -3203,7 +3534,7 @@ class Session(object):
             txt = alliance_info.get('chat_motd', None)
             if not txt:
                 txt = "Welcome to \"%s\" chat!" % alliance_info.get('ui_name', 'unknown')
-            self.chat_recv(self.alliance_chat_channel,
+            self.chat_recv(self.alliance_chat_channel, None,
                            {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'welcome',
                             'time': server_time, 'facebook_id':'-1', 'user_id':-1},
                            txt, retmsg = retmsg)
@@ -3223,7 +3554,7 @@ class Session(object):
             self.global_chat_channel += '_'+divert
 
         # put welcome message into chat
-        self.chat_recv(self.global_chat_channel,
+        self.chat_recv(self.global_chat_channel, None,
                        {'chat_name': 'Global', 'type':'welcome', 'time': server_time, 'facebook_id': '-1', 'user_id': -1},
                        'Welcome to Global chat! Please be respectful. Offensive behavior is not tolerated.',
                        retmsg = retmsg)
@@ -3240,7 +3571,7 @@ class Session(object):
         self.region_chat_channel = 'r:'+str(new_region)
 
         ui_name = gamedata['regions'][new_region]['ui_name']
-        self.chat_recv(self.region_chat_channel,
+        self.chat_recv(self.region_chat_channel, None,
                        {'chat_name':'Region', 'type':'welcome', 'time': server_time, 'facebook_id':'-1', 'user_id':-1},
                        "Welcome to %s region chat! Please be respectful. Offensive behavior is not tolerated." % ui_name,
                        retmsg = retmsg)
@@ -3264,6 +3595,21 @@ class Session(object):
         assert self.viewing_base_lock is None
         assert self.viewing_squad_locks is None
         self.release_pre_locks()
+
+        if self.async_ds_watchdog:
+            self.async_ds_watchdog.cancel()
+            self.async_ds_watchdog = None
+
+        if self.longpoll_request:
+            request, self.longpoll_request = self.longpoll_request, None
+            gamesite.gameapi.complete_longpoll(request, self)
+            if isinstance(request, WSFakeRequest): # XXXXXX nasty hack
+                # shut down the connection here so that it won't stick around until the full timeout
+                request.close_connection_aggressively()
+
+        # unlock the player's personal state
+        self.player.lock_state = Player.LockState.open
+        self.player.lock_time = 0
 
     def release_pre_locks(self):
         # give up any temporarily held locks
@@ -3371,11 +3717,11 @@ class Session(object):
         if self.viewing_squad_locks and (lock_id in self.viewing_squad_locks):
             self.viewing_squad_locks[lock_id] = -2 # special tombstone marker that means "we had a lock, but the squad map feature has been dropped"
 
-    def release_base(self, viewing_base = None, extra_base_props = None):
+    def release_base(self, viewing_base = None):
         if viewing_base is None: viewing_base = self.viewing_base
 
         if self.viewing_base_lock is not None:
-            gamesite.nosql_client.map_feature_lock_release(viewing_base.base_region, viewing_base.base_id, self.player.user_id, generation=viewing_base.base_generation + 1, extra_props = extra_base_props, reason='release_base')
+            gamesite.nosql_client.map_feature_lock_release(viewing_base.base_region, viewing_base.base_id, self.player.user_id, generation=viewing_base.base_generation + 1, reason='release_base')
             self.viewing_base_lock = None
 
         if self.viewing_squad_locks is not None:
@@ -3390,8 +3736,9 @@ class Session(object):
             # give feedback to the sender that the report was sent
             for chan in (self.global_chat_channel, self.region_chat_channel):
                 if chan:
-                    self.chat_recv(chan, {'chat_name':'System', 'time':server_time,
-                                          'type': 'you_sent_chat_report', 'target_user_id':target_uid, 'target_chat_name':target_chat_name},
+                    self.chat_recv(chan, None,
+                                   {'chat_name':'System', 'time':server_time,
+                                    'type': 'you_sent_chat_report', 'target_user_id':target_uid, 'target_chat_name':target_chat_name},
                                    '', force = True, retmsg = retmsg)
 
         # check cooldown
@@ -3412,6 +3759,63 @@ class Session(object):
                 self.do_chat_send('DEVELOPER', '(%s) WARNED user %d x%d' % (self.user.country, target_uid, report_stack))
         else:
             self.do_chat_send('DEVELOPER', '(%s) REPORTED user %d' % (self.user.country, target_uid))
+
+    def do_chat_report2(self, target_uid, channel, context_time, target_message_id):
+        # ignore chat reports in prison region channels
+        if channel.startswith('r:prison'): return
+
+        # check cooldown
+        if not self.player.is_developer():
+            cdname = 'chat_report:%d' % target_uid
+            if self.player.cooldown_active(cdname): return
+            self.player.cooldown_trigger(cdname, gamedata['chat_report_cooldown'])
+
+        # don't let gagged players make reports
+        if (not self.user.chat_can_interact()) or self.player.stattab.get_player_stat('chat_gagged'): return
+
+        # retrieve context
+        context_list = gamesite.nosql_client.chat_get_context(channel, target_uid, context_time,
+                                                              gamedata.get('chat_report_context_time', 120),
+                                                              gamedata.get('chat_report_context_limit', 2), reason = 'do_chat_report2')
+
+        ui_context_list = []
+        target_chat_name = 'unknown'
+
+        # target_message_id is untrusted client input, so don't pass it along in the report unless it matches something in the context
+        found_message_id = None
+
+        for x in context_list:
+            if not x.get('text'): continue # system message or non-default template
+            if 'chat_name' in x['sender']:
+                target_chat_name = x['sender']['chat_name']
+            if x['time'] == context_time or (target_message_id and x.get('id',None) == target_message_id):
+                ui_text = '*** '+x['text']+' ***'
+            else:
+                ui_text = x['text']
+            ui_context_list.append(ui_text)
+
+            if target_message_id and x.get('id',None) == target_message_id:
+                found_message_id = target_message_id
+
+        # no messages found, or bogus message_id
+        if (not ui_context_list) or \
+           (target_message_id and (not found_message_id)):
+            gamesite.exception_log.event(server_time, 'rejecting invalid chat report: message id %r channel %r context_time %r target_uid %r' % \
+                                         (target_message_id, channel, context_time, target_uid))
+            return
+
+        ui_context = '\n'.join(ui_context_list)
+        gamesite.nosql_client.chat_report(channel, self.user.user_id, self.user.get_chat_name(self.player),
+                                          target_uid, target_chat_name, server_time, context_time, found_message_id, ui_context,
+                                          source = 'player', reason = 'do_chat_report2')
+        if 'chat_report_recipients' in SpinConfig.config:
+            d = twisted.internet.utils.getProcessValue('./SpinReminders.py',
+                                                       args = ['--from', '%s server' % SpinConfig.game_id_long(),
+                                                               '--subject', '%s Player Chat Report (see [PCHECK](https://%sprod.spinpunch.com/PCHECK) )' % (SpinConfig.game_id_long().upper(), SpinConfig.game()),
+                                                               '--body', ui_context.encode('utf-8'),
+                                                               '--recipients', SpinJSON.dumps(SpinConfig.config['chat_report_recipients'])],
+                                                       env = os.environ)
+            d.addErrback(report_and_absorb_deferred_failure, self)
 
     def do_chat_send(self, channel, text, retmsg = None, bypass_gag = False, props = None):
         assert channel
@@ -3442,10 +3846,12 @@ class Session(object):
         if self.player.home_region:
             sender_info['home_region'] = self.player.home_region
 
+        id = gamesite.nosql_id_generator.generate()
+
         if gamesite.chat_log:
-            gamesite.nosql_client.chat_record(channel, sender_info, text, reason='do_chat_send(local)')
+            gamesite.nosql_client.chat_record(channel, id, sender_info, text, reason='do_chat_send(local)')
             gamesite.chat_log.event(server_time, {'chat_name': sender_info['chat_name'],
-                                                  'channel': channel,
+                                                  'id': id, 'channel': channel,
                                                   'user_id': self.user.user_id,
                                                   'player_level': self.player.resources.player_level,
                                                   'facebook_id': self.user.facebook_id,
@@ -3455,49 +3861,69 @@ class Session(object):
             if self.player.stattab.get_player_stat('chat_gagged'):
                 # new-style gag - let the player know
                 sender_info['type'] = 'you_are_gagged'
-                self.chat_recv(channel, sender_info, '', force = True)
+                self.chat_recv(channel, id, sender_info, '', force = True)
             else:
                 # old-style gag - simulate a chat broadcast, but it only goes to the sender.
-                self.chat_recv(channel, sender_info, text, force = True)
+                self.chat_recv(channel, id, sender_info, text, force = True)
 
             # privately send to developers
-            # gamesite.chat_mgr.send('DEVELOPER', sender_info, '(MUTED) '+text)
+            # gamesite.chat_mgr.send('DEVELOPER', None, sender_info, '(MUTED) '+text)
 
         else:
-            gamesite.chat_mgr.send(channel, sender_info, text, exclude_listener = self)
-            self.chat_recv(channel, sender_info, text, retmsg = retmsg)
+            gamesite.chat_mgr.send(channel, id, sender_info, text, exclude_listener = self)
+            self.chat_recv(channel, id, sender_info, text, retmsg = retmsg)
 
         if (not props) or (props.get('type','default') in ('default','turf_winner',)):
             # only increment chat_messages_sent for genuine player-input messages
             # do not increment for automated messages like alliance join/kick/achieve/etc
             dict_increment(self.player.history, 'chat_messages_sent', 1)
 
-    def send_deferred_message(self, msglist, flush_now = False, sync = False):
-        self.deferred_messages += msglist
+    def send(self, msglist, flush_now = False):
+        # rudimentary typo-checking
+        assert isinstance(msglist, list)
+        if len(msglist) > 0:
+            assert isinstance(msglist[0], list)
+            self.outgoing_messages += msglist
         if flush_now or gamedata['server'].get('deferred_message_coalesce_time',1) < 0:
-            return self.flush_deferred_messages(sync = sync)
+            self.queue_flush_outgoing_messages()
         else:
             gamesite.gameapi.add_deferred_session(self)
-        return None
 
-    def flush_deferred_messages(self, sync = False):
+    def queue_flush_outgoing_messages(self):
+        if self.pending_flush_outgoing_messages: return
+        self.pending_flush_outgoing_messages = reactor.callLater(0, self.do_flush_outgoing_messages)
+
+    def do_flush_outgoing_messages(self):
+        self.pending_flush_outgoing_messages = None
+
+        gamesite.gameapi.handle_message_buffer(self, self.outgoing_messages)
+        if self.is_async():
+            # we're in the middle of further async processing - don't respond yet
+            return
+
+        if not self.logout_in_progress:
+            gamesite.gameapi.run_deferred_actions(self, self.outgoing_messages, reason = 'flush_outgoing_messages')
+
+        # send outgoing messages with current sync request(s)
+        if self.sync_requests:
+            while self.sync_requests:
+                req = self.sync_requests[0]
+                del self.sync_requests[0]
+                gamesite.gameapi.complete_deferred_request(req, self, []) # OK - this is the "true" call
+            return
+
+        # send outgoing messages via longpoll
         if self.longpoll_request:
-            if self.deferred_ping_squads:
-                self.deferred_ping_squads = False
-                if (not self.logout_in_progress):
-                    self.player.ping_squads_and_send_update(self, self.deferred_messages, originator = self.player.user_id, reason='deferred_ping_squads(longpoll)')
-
-            if len(self.deferred_messages) > 0 or self.logout_in_progress:
+            if len(self.outgoing_messages) > 0 or self.logout_in_progress:
                 request = self.longpoll_request
                 if (not self.logout_in_progress) and self.longpoll_request_time < 0:
                     pass # reuse the same request again!
                 else:
                     self.longpoll_request = None
-                return gamesite.gameapi.complete_longpoll(request, self, sync = sync)
-        return None
+                gamesite.gameapi.complete_longpoll(request, self)
 
     # function for sending chat messages to the client
-    def chat_recv(self, channel, sender_info, text, force = False, retmsg = None):
+    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None):
         if (not force) and (not self.user.chat_can_interact()):
             return
         # map channel
@@ -3510,11 +3936,11 @@ class Session(object):
 
         # hide sender fields that clients should not know about (_sum table dimensions)
         sender_info_clean = dict((k,v) for k,v in sender_info.iteritems() if not k.startswith('_'))
-        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text)]
+        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id]
         if retmsg is not None:
             retmsg.append(msg)
         else:
-            self.send_deferred_message([msg], flush_now = False) # coalesce to avoid ping storms
+            self.send([msg], flush_now = False) # coalesce to avoid ping storms
 
     # "pending" means the client has been notified and the clock is already ticking
     def incoming_attack_pending(self): return (self.incoming_attack_time > 0)
@@ -3713,8 +4139,8 @@ class Session(object):
     def spawn_new_units_for_player(self, player, retmsg, units, temporary = False,
                                    limit_break = False,
                                    limit_reduce_qty = False,
-                                   xyloc = None, xyscatter = None):
-        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player)
+                                   xyloc = None, xyscatter = None, persist = False):
+        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -3756,7 +4182,7 @@ class Session(object):
 
         return taken_objects
 
-    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread):
+    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -3766,7 +4192,7 @@ class Session(object):
             if spread < 0: spread = 1
             scatter = [spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[0]//2,
                        spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[1]//2]
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -3825,7 +4251,28 @@ class Session(object):
         else:
             gamesite.exception_log.event(server_time, 'tech completion for non-session.player! %d' % player.user_id)
 
-    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, rand_func = random.random, duration_ref_time = None):
+    # check for forced expirations of an inventory item by spec
+    def get_item_spec_forced_expiration(self, spec, prev_expire_time = -1, ref_time = None):
+        expire_time = prev_expire_time
+        if ref_time is None: ref_time = self.player.get_absolute_time()
+        if 'force_duration' in spec:
+            force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], self, self.player)
+            if force_duration > 0: expire_time = min(force_duration+ref_time, expire_time) if (expire_time > 0) else force_duration+ref_time
+        if 'force_expire_by' in spec:
+            expire_by_data = Predicates.eval_cond_or_literal(spec['force_expire_by'], self, self.player)
+            if isinstance(expire_by_data, dict): # event-driven
+                neg_time_to_end = self.player.get_event_time(expire_by_data.get('event_kind','current_event'), expire_by_data.get('event_name',None), 'end', ignore_activation = True, t_offset = ref_time - self.player.get_absolute_time())
+                if neg_time_to_end is None: # event not active!
+                    expire_by = -1
+                else:
+                    expire_by = ref_time + (-neg_time_to_end)
+            else: # literal int
+                assert isinstance(expire_by_data, int)
+                expire_by = expire_by_data
+            if expire_by > 0: expire_time = min(expire_by, expire_time) if (expire_time > 0) else expire_by
+        return expire_time
+
+    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, duration_ref_time = None):
         assert player is self.player
 
         absolute_time = player.get_absolute_time()
@@ -3833,7 +4280,7 @@ class Session(object):
             duration_ref_time = absolute_time
 
         loot = LootTable.get_loot(gamedata['loot_tables'], loot_table,
-                                  rand_func = rand_func,
+                                  rand_func = player.random_source.random,
                                   cond_resolver = lambda pred: Predicates.read_predicate(pred).is_satisfied(player,None))
         if item_expire_at > 0:
             expire_time = item_expire_at
@@ -3862,12 +4309,7 @@ class Session(object):
                 del item['item_duration']
 
             # allow items.json entry to force expiration
-            if 'force_duration' in spec:
-                force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], self, player)
-                if force_duration > 0: item_expire_time = min(force_duration+duration_ref_time, item_expire_time) if (item_expire_time > 0) else force_duration+duration_ref_time
-            if 'force_expire_by' in spec:
-                expire_by = Predicates.eval_cond_or_literal(spec['force_expire_by'], self, player)
-                if expire_by > 0: item_expire_time = min(item_expire_time, expire_by) if (item_expire_time > 0) else expire_by
+            item_expire_time = self.get_item_spec_forced_expiration(spec, prev_expire_time = item_expire_time, ref_time = duration_ref_time)
 
             if item_expire_time > 0:
                 if item_expire_time < absolute_time: # item already expired
@@ -3875,14 +4317,20 @@ class Session(object):
                     continue
                 item['expire_time'] = item_expire_time
 
+            # special case: token quantity boost
+            if item['spec'] == 'token':
+                stack_mult = player.stattab.get_player_stat('loot_factor_tokens')
+                if stack_mult != 1:
+                    item['stack'] = int(item.get('stack',1) * stack_mult + 0.5)
+
         for item in to_remove:
             loot.remove(item)
         return loot
 
     def give_loot(self, player, retmsg, loot_table, reason, mail_template = None, item_duration = -1, item_expire_at = -1, reason_id = None,
-                  force_send_by_mail = False):
+                  force_send_by_mail = False, show_items_discovered = False):
         loot = self.get_loot_items(player, loot_table, item_duration, item_expire_at)
-        if not loot: return
+        if not loot: return []
 
         if reason == 'ai_base':
             str_reason = 'AI %d (%s L%d)' % (self.viewing_player.user_id, self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level)
@@ -3900,19 +4348,24 @@ class Session(object):
             str_reason = 'promo_code:'+reason_id
         else:
             gamesite.exception_log.event(server_time, 'unknown give_loot reason %s!' % reason)
-            return
+            return []
+
+        discovered_where = None
 
         # send modally?
         if (reason not in ('quest','level_up')) and (not force_send_by_mail) and \
            player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
            player.find_object_by_type(gamedata['inventory_building']):
+            discovered_where = 'loot_buffer'
             player.loot_buffer += loot
             for item in loot:
                 player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=reason)
         elif reason == 'ai_base':
+            discovered_where = 'messages'
             player.send_loot_mail(self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level,
                                   loot, retmsg, mail_template = mail_template)
         elif reason == 'ai_attack':
+            discovered_where = 'messages'
             ai_id = self.incoming_attack_id
             if str(ai_id) in gamedata['ai_bases']['bases']:
                 base = gamedata['ai_bases']['bases'][str(ai_id)]
@@ -3920,22 +4373,25 @@ class Session(object):
                                       loot, retmsg, mail_template = mail_template)
             else:
                 gamesite.exception_log.event(server_time, 'unknown give_loot ai_attack %s!' % repr(ai_id))
-                return
+                return []
         elif reason == 'quest':
+            discovered_where = 'messages'
             player.send_loot_mail(gamedata['quests'][reason_id]['ui_name'], 0, loot, retmsg, mail_template = mail_template or gamedata['strings']['quest_reward_mail'])
         elif reason == 'level_up':
+            discovered_where = 'messages'
             player.send_loot_mail(str(player.resources.player_level), 0, loot, retmsg, mail_template = gamedata['strings']['level_up_reward_mail'])
 
         elif reason in ('special','refund','promo_code'):
+            discovered_where = 'messages'
             if mail_template is None:
                 gamesite.exception_log.event(server_time, 'give_loot with %s reason must include a mail_template!' % reason)
-                return
+                return []
             player.send_loot_mail('', 0, loot, retmsg, mail_template = mail_template)
 
         self.increment_player_metric('items_looted', len(loot), time_series = False)
 
         if gamedata['server']['log_item_loot'] >= 1:
-            metric_event_coded(self.player.user_id, '3870_loot_given', {'items':loot,
+            metric_event_coded(self.player.user_id, '3870_loot_given', {'items':copy.deepcopy(loot),
                                                                         'where':self.viewing_base.base_id if self.viewing_base else 'unknown',
                                                                         'reason':str_reason})
             if gamedata['server']['log_item_loot'] >= 2:
@@ -3948,7 +4404,12 @@ class Session(object):
         if add_to_session_loot and loot:
             if 'items' not in self.loot:
                 self.loot['items'] = []
-            self.loot['items'] += loot
+            self.loot['items'] += copy.deepcopy(loot)
+
+        if show_items_discovered and discovered_where and loot:
+            retmsg.append(["ITEMS_DISCOVERED", copy.deepcopy(loot), -1, discovered_where])
+
+        return copy.deepcopy(loot)
 
     def give_trophies(self, player, kind, amount):
         assert self.has_attacked
@@ -3994,7 +4455,7 @@ class Session(object):
                     gamesite.nosql_client.heal_mobile_object_by_id(self.player.home_region, state['obj_id'], reason='heal_all_units')
                     if 'hp_ratio' in state: del state['hp_ratio']
                     if 'hp' in state: del state['hp']
-            retmsg.append(["PLAYER_ARMY_UPDATE", [self.player.strip_fields_for_army_update(state) for state in states]])
+            retmsg.append(["PLAYER_ARMY_UPDATE", filter(lambda x: x is not None, [self.player.strip_fields_for_army_update(state) for state in states])])
 
             self.player.unit_repair_send(retmsg)
 
@@ -4063,7 +4524,7 @@ class Session(object):
                                              (api, self.user.user_id, self.player.generation, name, history_key))
             return
 
-        if not Predicates.read_predicate(data['predicate']).is_satisfied(self.player, None): return
+        if not Predicates.read_predicate(data['predicate']).is_satisfied2(self, self.player, None): return
 
         if gamedata['server'].get('log_'+api,1) and 0:
             gamesite.exception_log.event(server_time, '%s API for user %d gen %d: event %s (%s) status %s' % \
@@ -4200,7 +4661,7 @@ class Session(object):
         try:
             Consequents.read_consequent(cons).execute(self, player, retmsg, context=context)
         except Exception:
-            gamesite.exception_log.event(server_time, 'Consequent exception player %d from %s:\n%s\n%s' % (player.user_id, reason, repr(cons), traceback.format_exc()))
+            gamesite.exception_log.event(server_time, 'Consequent exception player %d from %s:\n%s\n%s' % (player.user_id, reason, repr(cons), traceback.format_exc().strip())) # OK
             if rethrow:
                 raise
 
@@ -4212,7 +4673,7 @@ class Session(object):
 
     def start_ai_attack(self, retmsg, attack_type, override_protection = False, verbose = False):
         if (not self.home_base) or self.has_attacked or self.incoming_attack_pending(): return
-        if (not override_protection) and (self.player.resources.protection_end_time >= server_time): return
+        if (not override_protection) and self.player.has_damage_protection(): return
 
         if attack_type == 'daily':
             pass # see below
@@ -4284,21 +4745,30 @@ class Session(object):
         if attack_warning_time <= 0:
             self.deploy_ai_attack(retmsg)
 
-    def deploy_ai_attack(self, retmsg):
+    def deploy_ai_attack(self, retmsg, force = False):
         assert self.home_base
         if not self.incoming_attack_pending():
             return
 
         # dump loot buffer
         if self.player.loot_buffer:
-            self.player.loot_buffer_release('deploy_ai_attack')
-            retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            if force:
+                self.player.loot_buffer_release('deploy_ai_attack')
+                retmsg.append(["LOOT_BUFFER_UPDATE", self.player.loot_buffer, False])
+            else:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                return
 
         if gamedata['server']['log_ai_attacks'] and (self.incoming_attack_type != 'tutorial'):
             gamesite.exception_log.event(server_time, 'AI attack on player %d: %s' % \
                                          (self.player.user_id, str(self.incoming_attack_type)))
 
+        if not self.res_looter:
+            gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
+            self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
+
         self.has_attacked = True
+        self.debug_log_action('deploy_ai_attack')
 
         # add "weak zombie" debuff to player units
         if self.player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff']):
@@ -4464,23 +4934,18 @@ class Session(object):
             gamesite.gameapi.send_player_cache_update(self, 'change_title')
         return True
 
-# This holds the state of an ongoing asynchronous session change request
-# NOTE: session changes back to player's home base bypass this and just use
-# the session.user/session.player already in memory.
-
 class SessionChange(object):
-    def __init__(self, api, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack):
-        self.api = api
+    # This holds the state of an ongoing asynchronous session change request
+    # begin() returns a Deferred that will later fire with a list of arguments
+    # to pass to change_session_complete()
+
+    def __init__(self, session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack):
+        self.d = make_deferred('SessionChange') # deferred to fire upon completion
         self.session = session
-        self.request = request
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
         self.dest_base_id = dest_base_id
-        self.dest_feature = dest_feature
-        self.is_ai = is_ai
         self.new_ladder_state = new_ladder_state
-        self.new_deployable_squads = new_deployable_squads
-        self.new_defending_squads = new_defending_squads
         self.delay = delay
         self.pre_attack = pre_attack
 
@@ -4488,7 +4953,7 @@ class SessionChange(object):
         delay = self.delay
 
         cooldown = self.session.player.get_any_abtest_value('attack_spam_cooldown', gamedata['server']['attack_spam_cooldown'])
-        if (cooldown > 0) and (self.session.player.attack_cooldown_start > 0) and (server_time < (self.session.player.attack_cooldown_start + cooldown)):
+        if self.dest_user_id != self.session.user.user_id and (cooldown > 0) and (self.session.player.attack_cooldown_start > 0) and (server_time < (self.session.player.attack_cooldown_start + cooldown)):
             # delay the actual start until the cooldown passes
             spam_delay = gamedata['server']['attack_spam_delay']
             if spam_delay < 0:
@@ -4499,13 +4964,39 @@ class SessionChange(object):
                     gamesite.exception_log.event(server_time, 'user %d: attack spam, delaying visit_base (%s) by %d sec' % (self.session.user.user_id, descr, spam_delay))
             delay += spam_delay
 
-        if delay > 0:
-            reactor.callLater(delay, self.really_begin)
-        else:
-            self.really_begin()
+        reactor.callLater(max(delay, 0), self.really_begin)
+        return self.d
 
+    # note: these queries may be called before instantiation to check for existence
+    # before we start the full async session change
 
-class SessionChangeOld(SessionChange): # legacy path
+    @classmethod
+    def default_deployable_squads(cls, player):
+        deployable_feature = {'base_id': player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
+                              'base_landlord_id': player.user_id,
+                              'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+        return {deployable_feature['base_id']: deployable_feature}
+
+    @classmethod
+    def default_defending_squads(cls, dest_user_id):
+        defending_feature = {'base_id': 's%d_%d' % (dest_user_id, SQUAD_IDS.BASE_DEFENDERS),
+                             'base_landlord_id': dest_user_id,
+                             'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+        return {defending_feature['base_id']: defending_feature}
+
+class SessionChangeHome(SessionChange): # simple case for going back to your own home
+    def __init__(self, *args):
+        SessionChange.__init__(self, *args)
+        assert self.dest_user_id == self.session.user.user_id
+
+    def really_begin(self):
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.session.user, self.session.player,
+                         None, None, self.new_ladder_state,
+                         self.default_deployable_squads(self.session.player),
+                         self.default_defending_squads(self.dest_user_id),
+                         self.pre_attack])
+
+class SessionChangeOld(SessionChange): # non-map path
     def __init__(self, *args):
         SessionChange.__init__(self, *args)
         assert self.dest_user_id
@@ -4514,7 +5005,7 @@ class SessionChangeOld(SessionChange): # legacy path
         self.dest_user = None
         self.got_player = False
         self.got_user = False
-
+        self.is_ai = is_ai_user_id_range(self.dest_user_id)
     def really_begin(self):
         if self.is_ai:
             # check for AI instances first, then fall back to regular player_table
@@ -4561,14 +5052,16 @@ class SessionChangeOld(SessionChange): # legacy path
                 self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
-            self.api.complete_deferred_request(self.request, self.session, self.retmsg)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
+                         None, None, self.new_ladder_state,
+                         self.default_deployable_squads(self.session.player),
+                         self.default_defending_squads(self.dest_user_id),
+                         self.pre_attack])
 
 class SessionChangeNew(SessionChange): # new basedb path
     def __init__(self, *args):
         SessionChange.__init__(self, *args)
         assert not self.dest_user_id
-        assert not self.is_ai
         assert self.dest_base_id
         self.dest_base_pre = None
         self.dest_base = None
@@ -4577,7 +5070,135 @@ class SessionChangeNew(SessionChange): # new basedb path
         self.got_base = False
         self.got_player = False
         self.got_user = False
+        self.new_defending_squads = None
+        self.new_deployable_squads = None
+
+    @classmethod
+    def query_dest_feature(cls, player, dest_base_id):
+        assert gamesite.nosql_client and player.home_region # map path
+        dest_feature = gamesite.nosql_client.get_map_feature_by_base_id(player.home_region, dest_base_id, reason='change_session(query_dest_feature)')
+        if (not dest_feature) or \
+           (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
+           (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
+           (dest_feature['base_type'] == 'squad' and not player.squad_combat_enabled()) or \
+           (dest_feature['base_type'] == 'home' and not player.map_home_combat_enabled()):
+            return None
+        return dest_feature
+
+    @classmethod
+    def query_deployable_squads(cls, player, dest_feature):
+        assert gamesite.nosql_client and player.home_region and dest_feature # map path
+        new_deployable_squads = {}
+
+        if dest_feature['base_landlord_id'] != player.user_id:
+            squad_features = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(player.home_region, player.user_id, 'squad', reason='change_session(query_deployable_squads)'))
+
+            for squad_feature in squad_features:
+                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
+                if squad_feature.get('LOCK_STATE',0) > 0 and \
+                   squad_feature.get('LOCK_OWNER',-1) != player.user_id:
+#                           ((not session.viewing_squad_locks) or (SpinDB.base_lock_id(player.home_region, player.squad_base_id(squad_id)) not in session.viewing_squad_locks)):
+                    continue # squad is already locked
+                if hex_distance(squad_feature['base_map_loc'], dest_feature['base_map_loc']) == 1: # note: don't take squads on top of the target
+                    squad_id = squad_feature['squad_id'] = int(squad_feature['base_id'].split('_')[1])
+                    if str(squad_id) in player.squads:
+                        new_deployable_squads[squad_feature['base_id']] = squad_feature
+
+            if hex_distance(dest_feature['base_map_loc'], player.my_home.base_map_loc) == 1:
+                # battle is taking place next to home base - allow deployment of squads that are at home
+                for squad_data in player.squads.itervalues():
+                    if ((SQUAD_IDS.is_mobile_squad_id(squad_data['id']) or gamedata['territory']['base_defenders_can_attack_neighbors']) and \
+                        (not player.squad_is_deployed(squad_data['id']))):
+                        squad_feature = {'base_id': player.squad_base_id(squad_data['id']),
+                                         'base_landlord_id': player.user_id, 'squad_id': squad_data['id']}
+                        new_deployable_squads[squad_feature['base_id']] = squad_feature
+
+        return new_deployable_squads
+
+    @classmethod
+    def query_defending_squads(cls, player, dest_feature, dest_user_id):
+        assert gamesite.nosql_client and player.home_region and dest_feature # map path
+
+        if dest_feature['base_type'] == 'home':
+            defending_feature = {'base_id': 's%d_%d' % (dest_feature['base_landlord_id'], SQUAD_IDS.BASE_DEFENDERS),
+                                 'base_landlord_id': dest_feature['base_landlord_id'],
+                                 'squad_id': SQUAD_IDS.BASE_DEFENDERS}
+            new_defending_squads = {defending_feature['base_id']: defending_feature}
+        elif dest_feature['base_type'] == 'squad':
+            new_defending_squads = {dest_feature['base_id']: {'base_id': dest_feature['base_id'],
+                                                              'base_landlord_id': dest_feature['base_landlord_id'],
+                                                              'squad_id': int(dest_feature['base_id'].split('_')[1])}}
+        elif dest_feature['base_type'] == 'quarry':
+            # find guard squad(s)
+            new_defending_squads = {}
+            defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(player.home_region, dest_feature['base_map_loc'], reason='change_session(guards)') if x.get('base_type',None)=='squad']
+
+            for squad_feature in defense_features:
+                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
+                    continue # squad has not arrived at its destination yet
+                if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
+                    # "defending" squad, but it's owned by someone other than the quarry owner
+                    # this can happen via race condition where the old quarry owner had a squad on the way to the quarry (or left over due to undeployable units hanging around),
+                    # but then it got attacked and taken over before it arrives
+                    gamesite.exception_log.event(server_time, 'quarry %s (owner %d) has foreign squad %s (owner %d) at same location - recalling it back to base' % \
+                                                 (dest_feature['base_id'], dest_feature['base_landlord_id'], squad_feature['base_id'], squad_feature['base_landlord_id']))
+                    gamesite.nosql_client.drop_map_feature(player.home_region, squad_feature['base_id'], originator = player.user_id, reason='visit_quarry_guard_race_cleanup')
+                    continue
+                squad_id = int(squad_feature['base_id'].split('_')[1])
+                squad_feature['squad_id'] = squad_id
+                new_defending_squads[squad_feature['base_id']] = squad_feature
+        else:
+            new_defending_squads = {} # hive
+
+        return new_defending_squads
+
     def really_begin(self):
+
+        # query for target feature (to verify type and location)
+        dest_feature = self.query_dest_feature(self.session.player, self.dest_base_id)
+        if not dest_feature:
+            if gamedata['server'].get('log_nosql',0) < 2 and self.dest_base_id[0]=='s':
+                pass # do not bother logging failed attempts to spy on squads that have moved
+            else:
+                gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (self.session.player.user_id, self.dest_base_id, repr(dest_feature)))
+            self.retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", self.dest_base_id, 'change_session'])
+            self.d.callback(None) # fail now
+            return
+
+
+        # query for attacker's deployable squads
+        self.new_deployable_squads = self.query_deployable_squads(self.session.player, dest_feature)
+        if dest_feature and len(self.new_deployable_squads) < 1 and dest_feature['base_landlord_id'] != self.session.player.user_id and \
+           hex_distance(dest_feature['base_map_loc'], self.session.player.my_home.base_map_loc) != 1:
+            # no squads in range, cannot spy on hostile base
+            self.retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
+            self.d.callback(None) # fail now
+            return
+
+        # check for defending squads
+        self.new_defending_squads = self.query_defending_squads(self.session.player, dest_feature, self.dest_user_id)
+
+        if self.pre_attack and dest_feature and dest_feature['base_type'] == 'squad' and \
+           (dest_feature['base_landlord_id'] != self.session.player.user_id):
+            # attempt to lock the destination squad immediately,
+            # to reduce the time window for the defender to manipulate it before the player can attack
+            state = gamesite.nosql_client.map_feature_lock_acquire(self.session.player.home_region, self.dest_base_id, self.session.player.user_id, reason='VISIT_BASE2_pre_attack')
+            if state != Player.LockState.being_attacked:
+                # try to figure out more specifically why we didn't get the lock
+                if dest_feature.get('LOCK_OWNER',-1) == dest_feature['base_landlord_id']:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE"
+                elif dest_feature.get('LOCK_OWNER',-1) > 0:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE"
+                else:
+                    err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
+                self.retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
+                self.d.callback(None) # abort the spy attempt
+                return
+
+            # record the fact that we're now holding the lock
+            # note that we MUST proceed with the attack after spying completes (or fails), or else this could open exploits where you hold a lock on a hostile squad forever
+            self.session.pre_locks.add(SpinDB.base_lock_id(self.session.player.home_region, self.dest_base_id))
+
         if self.dest_base_id[0] == 'h':
             # handle home bases specially, using an ordinary playerdb lookup
             self.dest_user_id = int(self.dest_base_id[1:])
@@ -4591,12 +5212,12 @@ class SessionChangeNew(SessionChange): # new basedb path
             # in this case, there IS no destination base, need to create a virtual one on the fly to hold the defending squad
             self.got_base = True
             self.dest_base = Base(self.session.player.home_region, self.dest_base_id, self.dest_user_id, 'squad')
-            if self.dest_feature:
-                if 'base_map_loc' in self.dest_feature:
-                    self.dest_base.base_map_loc = self.dest_feature['base_map_loc']
+            if dest_feature:
+                if 'base_map_loc' in dest_feature:
+                    self.dest_base.base_map_loc = dest_feature['base_map_loc']
                     self.dest_base.base_climate = Region(gamedata, self.session.player.home_region).read_climate_name(self.dest_base.base_map_loc)
                 # apply correct generation count to the virtual base
-                self.dest_base.base_generation = self.dest_feature.get('LOCK_GENERATION',-1)
+                self.dest_base.base_generation = dest_feature.get('LOCK_GENERATION',-1)
 
             self.dest_base.spawn_scenery(self.session.player, self.session.player.user_id + self.dest_squad_id)
 
@@ -4605,13 +5226,13 @@ class SessionChangeNew(SessionChange): # new basedb path
                 self.got_player = True
                 self.dest_user = self.session.user
                 self.got_user = True
-                reactor.callLater(0.01, self.try_finish)
+                reactor.callLater(0, self.try_finish)
             else:
                 player_table.lookup_async(self.session.player, self.dest_user_id, False, self.player_cb, 'change_session')
                 user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
 
         else:
-            base_table.lookup_async(self.session.player.home_region, self.dest_base_id, None, # do NOT send self.dest_feature, it's obsoleted by complete_attack!
+            base_table.lookup_async(self.session.player.home_region, self.dest_base_id, None, # do NOT send dest_feature, it's obsoleted by complete_attack!
                                     self.base_cb, 'change_session')
     def base_cb(self, success, base, landlord_id):
         self.got_base = True
@@ -4666,8 +5287,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
 
         # note: this actually calls back into the "old" player.my_home path!
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads):
-            self.api.complete_deferred_request(self.request, self.session, self.retmsg)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
     def try_finish_remote(self):
         if (not self.got_base) or (not self.got_player) or (not self.got_user): return
@@ -4686,8 +5306,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if self.dest_base_pre and self.dest_player:
             # complete parsing of the base using the landlord Player
             self.dest_base = base_table.parse(self.session.player.home_region, self.dest_base_id, self.dest_base_pre, self.dest_player, self.session.player, reason='visit')
-        if not self.api.change_session_complete(self.request, self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_feature, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, pre_attack = self.pre_attack):
-            self.api.complete_deferred_request(self.request, self.session, self.retmsg)
+        self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
 # A collection of game objects indexed by ID
 class ObjectCollection:
@@ -4828,6 +5447,7 @@ class GameObjectSpec(Spec):
     fields = [
         ["kind", "REQUIRED"],
         ["max_hp", "REQUIRED"],
+        ["armor", 0],
         ["maxvel", 0],
         ["travel_speed", 0],
         ["gridsize", [0,0]],
@@ -5049,7 +5669,7 @@ for name, data in gamedata["inert"].iteritems():
 for name, data in gamedata["tech"].iteritems():
     TechSpec(name, data)
 
-def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None):
+def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None):
     if observer:
         # create a fresh GameObject for this player, taking into account A/B tests and tech auras
         # subtle distinction: "observer" is the person playing the game, "owner" is the player/AI who owns it
@@ -5070,7 +5690,7 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
     if spec.kind == 'building':
         obj = Building(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
     elif spec.kind == 'mobile':
-        obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras)
+        obj = Mobile(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, temporary = temporary)
     elif spec.kind == 'inert':
         obj = Inert(obj_id, spec, owner, x, y, -1, level, build_finish_time, auras, metadata = metadata)
     return obj
@@ -5348,13 +5968,14 @@ class GameObject:
         return self.cost_to_repair(player)['time']
 
 class Mobile(GameObject):
-    def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras):
+    def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, temporary = None):
         GameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
         self.squad_id = None
         self.orders = None
         self.patrol = None
+        self.temporary = temporary # indicates a "temporary" unit like a security team
     def serialize_state(self, fake_xy = None, update_hp = True):
-        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol]
+        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol, self.temporary]
     def persist_state(self, **args):
         ret = GameObject.persist_state(self, **args)
         if self.squad_id is not None:
@@ -5363,6 +5984,8 @@ class Mobile(GameObject):
             ret['orders'] = self.orders
         if self.patrol:
             ret['patrol'] = self.patrol
+        if self.temporary:
+            ret['temporary'] = self.temporary
         return ret
     def unpersist_state(self, state):
         GameObject.unpersist_state(self, state)
@@ -5374,6 +5997,9 @@ class Mobile(GameObject):
                 gamesite.exception_log.event(server_time, 'Mobile orders that are not a list: %s' % repr(orders))
         self.patrol = int(not (not state.get('patrol', None)))
         self.squad_id = state.get('squad_id', None)
+        self.temporary = state.get('temporary', None)
+
+    def is_temporary(self): return bool(self.temporary)
 
     # reposition in middle of map, used for deploying squad units that don't have positions yet
     def ensure_mobile_position(self, base_ncells):
@@ -5835,6 +6461,28 @@ class Building(GameObject):
                 return True
         return False
 
+    def is_minefield(self):
+        return self.spec.equip_slots and ('mine' in self.spec.equip_slots)
+    def is_minefield_armed(self):
+        return Equipment.equip_has(self.equipment, ('mine',0))
+    def minefield_item(self): # note: returns spec name
+        item = Equipment.equip_get(self.equipment, ('mine',0))
+        if item: return item['spec']
+        if this.config and this.config['mine'] and len(this.config['mine']) > 0:
+            if isinstance(this.config['mine'], basestring):
+                return this.config['mine']
+            elif isinstance(this.config['mine'][0], basestring):
+                return this.config['mine'][0]
+            else:
+                return this.config['mine'][0]['spec']
+        return None
+    def is_emplacement(self):
+        return self.spec.equip_slots and ('turret_head' in self.spec.equip_slots)
+    def turret_head_item(self): # note: returns spec name
+        item = Equipment.equip_get(self.equipment, ('turret_head',0))
+        if item: return item['spec']
+        return None
+
     def is_repairing(self):
         return (self.repair_finish_time > 0)
 
@@ -5985,7 +6633,7 @@ class ResourceState:
         self.facebook_credits = -1
         self.player_level = 1
         self.xp = gamedata['starting_conditions']['xp']
-        self.protection_end_time = 0
+        self.protection_end_time = -1
 
         # base_size used to be stored in playerdb but now it is
         # base-specific so it must be migrated to basedb
@@ -6073,7 +6721,7 @@ class ResourceState:
         self.gamebucks = int(state.get('gamebucks', 0))
         self.player_level = int(state.get('player_level', 1))
         self.xp = int(state.get('xp', 0))
-        self.protection_end_time = int(state.get('protection_end_time', 0))
+        self.protection_end_time = int(state.get('protection_end_time', -1))
         self.OLD_base_size = state.get('base_size', 0)
 
     @classmethod
@@ -6652,12 +7300,7 @@ class Base(object):
         ret = []
         for state in list(gamesite.nosql_client.get_fixed_objects_by_base(self.base_region, self.base_id, reason=reason)) + \
             list(gamesite.nosql_client.get_mobile_objects_by_base(self.base_region, self.base_id, reason=reason)):
-            try:
-                obj = reconstitute_object(observer, player, state, context = 'Base %s (landlord %d observer %d):nosql_read' % (self.base_id, self.base_landlord_id, observer.user_id))
-            except:
-                gamesite.exception_log.event(server_time, 'nosql_read %s reason %s exception:\n%s' % (self.base_id, reason, traceback.format_exc()))
-                obj = None
-
+            obj = reconstitute_object(observer, player, state, context = 'Base %s (landlord %d observer %d):nosql_read' % (self.base_id, self.base_landlord_id, observer.user_id))
             if obj:
                 # for now, just return what the new my_base array would be, instead of actually replacing it
                 #self.adopt_object(obj)
@@ -6685,7 +7328,6 @@ class Base(object):
         for obj in to_remove:
             self.drop_object(obj)
 
-        random.seed(seed+1)
         num_to_spawn = gamedata['map']['random_scenery_spawn']
         ncells = self.ncells()
         mid = self.midcell()
@@ -6698,9 +7340,11 @@ class Base(object):
                                                                                      (my_climate in data.get('base_climates',[])))]
         if not speclist: return to_remove, []
 
+        randgen = random.Random(seed+1) # deterministic from the seed
+
         to_add = []
         for i in range(num_to_spawn):
-            index = int(random.random()*len(speclist))
+            index = int(randgen.random()*len(speclist))
             specname = speclist[index]
             spec = GameObjectSpec.lookup(specname)
             rad = gamedata['map'].get('random_scenery_spawn_radius', ncells[0]//2)
@@ -6711,8 +7355,8 @@ class Base(object):
             xrange = [xbound[0]+int(spec.gridsize[0]/2), xbound[1]-int(spec.gridsize[0]/2)-1]
             yrange = [ybound[0]+int(spec.gridsize[1]/2), ybound[1]-int(spec.gridsize[1]/2)-1]
 
-            x = int(xrange[0] + random.random()*(xrange[1]-xrange[0]))
-            y = int(yrange[0] + random.random()*(yrange[1]-yrange[0]))
+            x = int(xrange[0] + randgen.random()*(xrange[1]-xrange[0]))
+            y = int(yrange[0] + randgen.random()*(yrange[1]-yrange[0]))
             x = max(0, min(x, ncells[0]-1))
             y = max(0, min(y, ncells[1]-1))
             newobj = instantiate_object_for_player(observer, EnvironmentOwner, specname, x=x, y=y)
@@ -6747,12 +7391,13 @@ def get_spawn_location_for_unit(specname, base):
 def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
-                xyloc = None, xyscatter = None, observer = None):
+                xyloc = None, xyscatter = None, observer = None, persist = False):
     if not observer: observer = owner
     if temporary: assert xyloc
 
     new_objects = []
     ncells = base.ncells()
+    cur_space_usage = None
 
     for name, data in units.iteritems():
         if (name not in gamedata['units']): continue
@@ -6780,6 +7425,9 @@ def spawn_units(owner, base, units, temporary = False,
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         for i in range(qty):
+            if (not temporary) and cur_space_usage is None:
+                cur_space_usage = owner.get_army_space_usage_by_squad() # OK - expensive query
+
             newobj_x = x
             newobj_y = y
             if xyscatter:
@@ -6800,15 +7448,15 @@ def spawn_units(owner, base, units, temporary = False,
                             gamesite.exception_log.event(server_time, 'player %d not allowed to spawn unit of spec %s due to count limit' % (owner.user_id, spec.name))
                             break # skip adding the unit, and log message
 
-                cur = owner.get_army_space_usage_by_squad() # wow, this goes to the database for every unit...
-                if (cur['ALL'] + space > owner.stattab.total_space):
+
+                if (cur_space_usage['ALL'] + space > owner.stattab.total_space):
                     if limit_reduce_qty:
                         break # skip adding the unit
                     else:
                         gamesite.exception_log.event(server_time, 'player %d (CC%d) spawned unit into oversize army! (unit %s space %d limit %d army %s)' % \
-                                                     (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.total_space, repr(cur)))
+                                                     (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.total_space, repr(cur_space_usage)))
 
-                if (cur[str(SQUAD_IDS.BASE_DEFENDERS)] + space > owner.stattab.main_squad_space):
+                if (cur_space_usage[str(SQUAD_IDS.BASE_DEFENDERS)] + space > owner.stattab.main_squad_space):
                     if limit_reduce_qty:
                         break # skip adding the unit
                     else:
@@ -6816,11 +7464,10 @@ def spawn_units(owner, base, units, temporary = False,
                             destination_squad = SQUAD_IDS.RESERVES
                         else:
                             gamesite.exception_log.event(server_time, 'player %d (CC%d) spawned unit into oversize base defenders! (unit %s space %d limit %d army %s)' % \
-                                                         (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur)))
+                                                         (owner.user_id, owner.get_townhall_level(), name, space, owner.stattab.main_squad_space, repr(cur_space_usage)))
 
             newobj_id = gamesite.nosql_id_generator.generate()
-            if temporary: newobj_id = 'TEMP-'+newobj_id # give temporary objects bogus obj_ids to deliberately cause errors if they are accidentally attempted to be written to NoSQL
-            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id)
+            newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary)
             newobj.squad_id = destination_squad
             if temporary:
                 # put object into aggressive state
@@ -6828,8 +7475,23 @@ def spawn_units(owner, base, units, temporary = False,
 
             if not temporary:
                 assert base is owner.my_home
+                cur_space_usage['ALL'] += space
+                cur_space_usage[str(destination_squad)] += space
+
+            # global setting, can be over-ridden by parameter
+            persist_temporary_units = persist or gamedata.get('persist_temporary_units', False)
+
+            # per-base setting
+            if base.base_type == 'hive':
+                template = gamedata['hives']['templates'].get(base.base_template, None)
+                if template and template.get('persist_temporary_units', False):
+                    persist_temporary_units = True
+
+            if (not temporary) or \
+               (persist_temporary_units and base.base_landlord_id == owner.user_id): # don't adopt security teams into foreign bases!
                 base.adopt_object(newobj)
             new_objects.append(newobj)
+
     return new_objects
 
 
@@ -6911,6 +7573,9 @@ class Player(AbstractPlayer):
         self.ladder_rival_override = None
         self.travel_override = None
         self.leaderboard_override = None
+
+        # reseed random source on load
+        self.random_source = random.Random(server_time)
 
         # These fields are DUPLICATES of the corresponding User
         # fields, set during the login process. This is necessary for
@@ -7042,6 +7707,8 @@ class Player(AbstractPlayer):
         else:
             pass # carry over tests across developer restarts
 
+        # in-playerdb battle history
+        # obsolete now - replaced by SpinNoSQL battles table (and optionally cold SQL storage)
         self.battle_history = {} # dictionary { "1112": { "count": xx, "victory": yy, "defeat": zz } }
 
         # how many attacks occurred against this player since the last expiration of his protection timer
@@ -7053,12 +7720,13 @@ class Player(AbstractPlayer):
         # time player last deployed units in an attack - used for throttling max attack rate
         self.attack_cooldown_start = -1
 
-        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None)
+        self.idle_check = IdleCheck.IdleCheck(gamedata['server']['idle_check'], None, server_time)
 
         # available items in the lottery slate
         # dictionary {"slot0": {"spec":"foo"}, "slot1": ... }
         # must NOT be alterable by user action unless 1) scan is conducted or 2) reseed cooldown time passes
         self.lottery_slate = None
+        self.lottery_slate_weights = None
 
         # PvP ladder rival, must not be alterable unless 1) attack is made or 2) time passes or 3) player pays (and waits) to switch
         self.ladder_match = None
@@ -7105,12 +7773,9 @@ class Player(AbstractPlayer):
         # start post-tutorial attack protection timer
         prot_time = Predicates.eval_cond_or_literal(self.get_any_abtest_value('starting_protection_time', gamedata['starting_conditions']['protection_time']), None, self)
         if prot_time > 0:
-            self.record_protection_event('3880_protection_from_new_account', {'prot_time':prot_time,
-                                                                              'prev_end_time': self.resources.protection_end_time,
-                                                                              'new_end_time': server_time + prot_time})
-            self.resources.protection_end_time = server_time + prot_time
+            self.set_protection_end_time(None, server_time + prot_time, '3880_protection_from_new_account')
         else:
-            self.resources.protection_end_time = -1
+            self.set_protection_end_time(None, -1, None)
 
         auras = self.get_any_abtest_value('starting_player_auras', gamedata['starting_conditions']['player_auras'])
         for aura in auras:
@@ -7246,13 +7911,19 @@ class Player(AbstractPlayer):
                 to_remove.append(aura); continue
             if is_recalc_stattab and ends_on == 'recalc_stattab':
                 to_remove.append(aura); continue
+            if self.has_damage_protection() and ends_on == 'damage_protection':
+                to_remove.append(aura)
+                metric_event_coded(self.user_id, '5142_dp_cancel_aura_ended', {'aura_name': aura['spec'], 'start_time': aura.get('start_time',-1)}) # XXX hack
+                continue
 
         for aura in to_remove: self.player_auras.remove(aura)
         return bool(to_remove)
 
-    def do_remove_aura(self, aura_name, remove_stack = -1):
+    def do_remove_aura(self, aura_name, remove_stack = -1, data = None):
         for aura in self.player_auras:
-            if aura['spec'] == aura_name:
+            if aura['spec'] == aura_name and \
+               (data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in data.iteritems())):
                 if remove_stack > 0:
                     new_stack = aura.get('stack',1) - remove_stack
                     if new_stack <= 0:
@@ -7266,13 +7937,13 @@ class Player(AbstractPlayer):
         return False
 
     # confusing: remove_aura sends stattab update, apply_aura does not (both recalc stattab)
-    def remove_aura(self, session, retmsg, aura_name, remove_stack = -1, force = False):
+    def remove_aura(self, session, retmsg, aura_name, remove_stack = -1, force = False, data = None):
         spec = gamedata['auras'][aura_name]
         if (not force) and (not spec.get('cancelable', True)):
             if retmsg is not None: retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
 
-        if self.do_remove_aura(aura_name, remove_stack = remove_stack):
+        if self.do_remove_aura(aura_name, remove_stack = remove_stack, data = data):
             self.recalc_stattab(self)
             if retmsg is not None:
                 self.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
@@ -7284,9 +7955,11 @@ class Player(AbstractPlayer):
         spec = gamedata['auras'][aura_name]
         aura = None
 
-        # find any existing aura with same spec and level
+        # find any existing aura with same spec, level, and data
         for a in self.player_auras:
-            if a['spec'] == aura_name and a.get('level',1) == level:
+            if a['spec'] == aura_name and a.get('level',1) == level and \
+               (data is None or \
+                all(a.get('data',{}).get(k,None) == v for k,v in data.iteritems())):
                 aura = a
                 break
 
@@ -7314,13 +7987,15 @@ class Player(AbstractPlayer):
             max_stack = spec.get('max_stack',-1)
             if max_stack > 0: aura['stack'] = min(aura['stack'], max_stack)
 
-            # overwrite data
+            # overwrite data (but note match requirement above)
             if (data is None) and 'data' in aura: del aura['data']
             if (data is not None): aura['data'] = data
 
         else:
-            if (not ignore_limit) and (len(self.player_auras) >= gamedata['player_aura_limit']):
-                return False
+            if (not ignore_limit) and spec.get('limited',True):
+                aura_count = sum((1 for x in self.player_auras if gamedata['auras'][x['spec']].get('limited',True)), 0)
+                if aura_count >= gamedata['player_aura_limit']:
+                    return False
             # create new aura
             aura = {'spec': aura_name, 'start_time': server_time}
             if strength != 1:
@@ -7418,15 +8093,15 @@ class Player(AbstractPlayer):
                                         count += prod.get('stack', 1)
         return count
 
-    def has_item(self, name, min_count = 1, level = None, check_mail = False, check_crafting = False):
+    def has_item(self, name, min_count = 1, level = None, min_level = None, check_mail = False, check_crafting = False):
         count = 0
         for item in self.stored_item_iter(): # inventory and loot buffer
-            if item['spec'] == name and (level is None or item.get('level',1) == level):
+            if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                 count += item.get('stack',1)
                 if count >= min_count:
                     return True
         for item in self.equipped_item_iter():
-            if item['spec'] == name and (level is None or item.get('level',1) == level):
+            if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                 count += 1
                 if count >= min_count:
                     return True
@@ -7434,7 +8109,7 @@ class Player(AbstractPlayer):
             for mail in self.mailbox:
                 if ('attachments' in mail):
                     for at in mail['attachments']:
-                        if at['spec'] == name and (level is None or at.get('level',1) == level):
+                        if at['spec'] == name and (level is None or at.get('level',1) == level) and (min_level is None or at.get('level',1) >= min_level):
                             count += at.get('stack',1)
                             if count >= min_count:
                                 return True
@@ -7446,7 +8121,7 @@ class Player(AbstractPlayer):
                         recipe = gamedata['crafting']['recipes'].get(recipe_name, None)
                         if recipe:
                             for prod in GameObjectSpec.get_crafting_recipe_product_list(recipe, bus.craft_state.get('level', 1)):
-                                if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level): # only works with deterministic products!
+                                if ('spec' in prod) and prod['spec'] == name and (level is None or prod.get('level',1) == level) and (min_level is None or prod.get('level',1) >= min_level): # only works with deterministic products!
                                     count += prod.get('stack',1)
                                     if count >= min_count:
                                         return True
@@ -7455,12 +8130,11 @@ class Player(AbstractPlayer):
                             if ingr_list and gamedata['crafting']['categories'][recipe['crafting_category']].get('refund_ingredients', False):
                                 # only check ingredients if they are refundable and thus available to the player if cancelled
                                 for item in ingr_list:
-                                    if item['spec'] == name and (level is None or item.get('level',1) == level):
+                                    if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                                         count += item.get('stack',1)
                                         if count >= min_count:
                                             return True
         return False
-
 
     def prune_inventory(self, session):
         to_remove = []
@@ -7469,13 +8143,9 @@ class Player(AbstractPlayer):
 
             # check for forced expirations
             if spec and (item.get('expire_time',-1) < 0):
-                item_expire_time = -1
-                if 'force_duration' in spec:
-                    force_duration = Predicates.eval_cond_or_literal(spec['force_duration'], session, self)
-                    if force_duration > 0: item['expire_time'] = min(force_duration+server_time, item_expire_time) if (item_expire_time > 0) else force_duration+server_time
-                if 'force_expire_by' in spec:
-                    expire_by = Predicates.eval_cond_or_literal(spec['force_expire_by'], session, self)
-                    if expire_by > 0: item['expire_time'] = min(item_expire_time, expire_by) if (item_expire_time > 0) else expire_by
+                expire_time = session.get_item_spec_forced_expiration(spec)
+                if expire_time > 0:
+                    item['expire_time'] = expire_time
 
             if (item.get('expire_time',-1) > 0) and (server_time > item['expire_time']):
                 to_remove.append(item)
@@ -7632,6 +8302,10 @@ class Player(AbstractPlayer):
                 gamesite.exception_log.event(server_time, 'unit_repair_integrity_check() player %d tossing item with bad obj_id %s\n%s' % (self.user_id, repr(item), ''.join(traceback.format_stack())))
                 to_remove.append(item)
                 continue
+            if obj.is_temporary():
+                gamesite.exception_log.event(server_time, 'unit_repair_integrity_check() player %d tossing temporary object %s\n%s' % (self.user_id, repr(item), ''.join(traceback.format_stack())))
+                to_cancel.append(obj)
+                continue
             squad_id = obj.squad_id or 0
             if (not (SQUAD_IDS.is_mobile_squad_id(squad_id) or squad_id == SQUAD_IDS.BASE_DEFENDERS)):
                 gamesite.exception_log.event(server_time, 'unit_repair_integrity_check() player %d tossing object %s with bad squad_id %s\n%s' % (self.user_id, repr(item), repr(squad_id), ''.join(traceback.format_stack())))
@@ -7725,9 +8399,8 @@ class Player(AbstractPlayer):
             else:
                 self.unit_repair_queue.pop()
 
-
+    @admin_stats.measure_latency('ping_squads')
     def ping_squads(self, session, return_army = False, originator = None, reason=''):
-        start_time = time.time()
         if gamesite.nosql_client and self.home_region:
             map_squad_data = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(self.home_region, self.user_id, 'squad', reason='ping_squads(%s)'%reason))
             map_object_data = list(gamesite.nosql_client.get_mobile_objects_by_owner(self.my_home.base_region, self.user_id, reason='ping_squads(%s)'%reason))
@@ -7738,7 +8411,11 @@ class Player(AbstractPlayer):
         map_squads = dict([(int(data['base_id'].split('_')[1]), data) for data in map_squad_data])
         map_objects_by_squad = {}
         for entry in map_object_data:
-            squad_id = entry.get('squad_id',0)
+            # note: in case of a corrupted map object with no squad_id, default to a mobile ID so that
+            # we don't try to return BASE_DEFENDERS (0) to base!
+            squad_id = entry.get('squad_id',None)
+            if (squad_id is None) or (not SQUAD_IDS.is_mobile_squad_id(squad_id)):
+                squad_id = 1 # default "could be valid" mobile squad id
             if (squad_id not in map_objects_by_squad): map_objects_by_squad[squad_id] = []
             map_objects_by_squad[squad_id].append(entry)
 
@@ -7767,7 +8444,7 @@ class Player(AbstractPlayer):
                 must_recall = False
                 # check that no objects are at home
                 if (squad_id in home_objects_by_squad):
-                    if gamedata['server'].get('log_nosql',0) >= 1:
+                    if gamedata['server'].get('log_nosql',0) >= 2:
                         gamesite.exception_log.event(server_time, 'player %d squad %d has map_loc %s but has in-base objects: %s' % \
                                                      (self.user_id, squad_id, repr(squad['map_loc']), repr(home_objects_by_squad[squad_id])))
                     must_recall = True
@@ -7856,9 +8533,6 @@ class Player(AbstractPlayer):
         else:
             ret_army = None
 
-
-        end_time = time.time()
-        admin_stats.record_latency('ping_squads(%s)' % ('nosql' if (gamesite.nosql_client and self.home_region) else 'local'), end_time-start_time)
         return ret_army, ret_features, mailbox_update
 
     # check for oversized armies
@@ -7874,7 +8548,7 @@ class Player(AbstractPlayer):
             # check overall army being too large
             space_usage = self.get_army_space_usage_by_squad(map_object_data = map_object_data)
             if space_usage['ALL'] > self.stattab.total_space:
-                candidates = sorted(filter(lambda obj: obj.is_mobile() and obj.owner is self, self.home_base_iter()), key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
+                candidates = sorted(filter(lambda obj: obj.is_mobile() and (obj.owner is self) and (not obj.is_temporary()), self.home_base_iter()), key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
                 for obj in candidates:
                     item_spec = 'packaged_'+obj.spec.name
                     if item_spec not in gamedata['items']:
@@ -7898,7 +8572,7 @@ class Player(AbstractPlayer):
                 spec = self.get_abtest_spec(GameObjectSpec, name)
                 if spec.limit >= 0 and qty > spec.limit:
                     # pull units out of home base. Note, squad units are not affected!
-                    candidates = filter(lambda obj: obj.spec is spec and obj.owner is self, self.home_base_iter())
+                    candidates = filter(lambda obj: obj.spec is spec and (obj.owner is self) and (not obj.is_temporary()), self.home_base_iter())
                     for obj in candidates:
                         item_spec = 'packaged_'+obj.spec.name
                         if item_spec not in gamedata['items']:
@@ -7954,7 +8628,7 @@ class Player(AbstractPlayer):
                                                              (self.user_id, squad_id, space_usage[sid], limit))
                             continue
                         else:
-                            candidates = sorted(filter(lambda obj: obj.is_mobile() and obj.owner is self and obj.squad_id == squad_id, self.home_base_iter()),
+                            candidates = sorted(filter(lambda obj: obj.is_mobile() and (obj.owner is self) and (not obj.is_temporary()) and obj.squad_id == squad_id, self.home_base_iter()),
                                                 key = lambda obj: obj.get_leveled_quantity(obj.spec.consumes_space))
 
                             for obj in candidates:
@@ -8020,7 +8694,7 @@ class Player(AbstractPlayer):
         return ret
 
     # optionally supply map_object_data in case you just queried it
-    def get_army_space_usage_by_squad(self, map_object_data = None):
+    def get_army_space_usage_by_squad(self, map_object_data = None, exclude_manuf_queue = None):
         ret = dict([(k,0) for k in self.squads.iterkeys()] + [('ALL',0), (str(SQUAD_IDS.RESERVES),0)])
         for obj in self.home_base_iter():
             if (obj.owner is self) and obj.is_mobile():
@@ -8030,7 +8704,7 @@ class Player(AbstractPlayer):
                 ret['ALL'] += space
 
             # also add space occupied by units that are under construction
-            elif (obj.owner is self) and obj.is_building() and obj.is_manufacturer():
+            elif (obj.owner is self) and obj.is_building() and obj.is_manufacturer() and (obj is not exclude_manuf_queue):
                 for item in obj.manuf_queue:
                     spec = GameObjectSpec.lookup(item['spec_name'])
                     space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, item.get('level',1))
@@ -8360,7 +9034,7 @@ class Player(AbstractPlayer):
                 assert state['kind'] == 'mobile'
                 assert state['owner_id'] == self.user_id
                 if ('obj_id' in state) and self.get_object_by_obj_id(state['obj_id'], fail_missing = False):
-                    if gamedata['server'].get('log_nosql',0) >= 1:
+                    if gamedata['server'].get('log_nosql',0) >= 2:
                         gamesite.exception_log.event(server_time, 'player %d squad_exit_map %d already has object %s at home, skipping' % \
                                                      (self.user_id, squad_id, state['obj_id']))
                     continue
@@ -8484,6 +9158,11 @@ class Player(AbstractPlayer):
         return gamedata['ai_bases']['bases'].get(str(user_id), None)
     def get_abtest_title(self, name):
         return gamedata['titles'].get(name, None)
+    def get_gamedata_var(self, name): # similar to get_abtest(), for use by Predicates, but does not support overrides
+        v = gamedata
+        for elem in name.split('.'):
+            v = v[elem]
+        return v
 
     # check for ANY active abtest group we're in that contains a value named 'key'
     # but, do NOT apply "default_group" behavior
@@ -8503,10 +9182,12 @@ class Player(AbstractPlayer):
             cur_time = server_time
         return cur_time
 
-    def get_event(self, event_kind, event_name, ref_time, ignore_activation = False):
-        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale',
+    # Return the event_schedule entry for an event in progress
+    def get_event_schedule(self, event_kind, event_name, ref_time, ignore_activation):
+        assert event_kind in ('current_event', 'current_event_store', 'facebook_sale', 'bargain_sale',
                               'current_trophy_pve_challenge', 'current_trophy_pvp_challenge',
                               'current_stat_tournament')
+        assert ref_time is not None
 
         # PvP-isolated players may not get trophies
         if self.isolate_pvp and ('trophy' in event_kind): return None
@@ -8518,8 +9199,17 @@ class Player(AbstractPlayer):
             data = gamedata['events'].get(entry['name'], None)
             if not data: continue
             if ('kind' not in data) or (data['kind'] != event_kind): continue
-            if entry['end_time'] <= ref_time: continue # event is in the past
+
+            # first run of event starts at start_time and ends at end_time
+            # if repeat_interval is specified, event re-runs at start_time + repeat_interval
             if entry['start_time'] > ref_time: continue # event is in the future
+            if 'repeat_interval' in entry:
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                if delta >= (entry['end_time'] - entry['start_time']): continue # we are between runs
+            else:
+                if entry['end_time'] <= ref_time: continue # event is in the past
+
+
             if (event_name and (entry['name'] != event_name)): continue
             if not ignore_activation:
                 if ('activation' in entry) and (not Predicates.read_predicate(entry['activation']).is_satisfied(self, None)): continue
@@ -8535,20 +9225,46 @@ class Player(AbstractPlayer):
 
         return None
 
-    def get_event_time(self, event_kind, event_name, method, ignore_activation = False, t_offset = 0):
-        cur_time = self.get_absolute_time() + t_offset
-        event_data = self.get_event(event_kind, event_name, cur_time, ignore_activation = ignore_activation)
-        if not event_data: return None
+    def get_event_data(self, event_kind, event_name = None, ref_time = None, ignore_activation = False):
+        if ref_time is None: ref_time = self.get_absolute_time()
+        sched = self.get_event_schedule(event_kind, event_name, ref_time, ignore_activation)
+        if sched:
+            return gamedata['events'][sched['name']]
+        return None
 
-        if method == 'start':
-            return cur_time - event_data['start_time']
-        elif method == 'end':
-            return cur_time - event_data['end_time']
-        elif method == 'inprogress':
-            return (cur_time >= event_data['start_time'] and cur_time < event_data['end_time'])
-        elif method == 'progress':
-            if cur_time < event_data['start_time'] or cur_time >= event_data['end_time']: return 0
-            return (cur_time - event_data['start_time'])/float(event_data['end_time']-event_data['start_time'])
+    def get_event_time(self, event_kind, event_name, method, ignore_activation = False, t_offset = 0):
+        ref_time = self.get_absolute_time() + t_offset
+        entry = self.get_event_schedule(event_kind, event_name, ref_time, ignore_activation)
+        if not entry: return None
+
+        if method == 'start': # time since start of current run
+            if 'repeat_interval' in entry:
+                return (ref_time - entry['start_time']) % entry['repeat_interval']
+            else:
+                return ref_time - entry['start_time']
+        elif method == 'end': # negative time until end of current run
+            if 'repeat_interval' in entry:
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                return delta - (entry['end_time'] - entry['start_time'])
+            else:
+                return ref_time - entry['end_time']
+        elif method == 'inprogress': # true if event is in progress, false if not
+            if 'repeat_interval' in entry:
+                if ref_time < entry['start_time']: return False
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                return (delta < (entry['end_time'] - entry['start_time']))
+            else:
+                return (ref_time >= entry['start_time'] and ref_time < entry['end_time'])
+        elif method == 'progress': # 0.0-1.0 progress during current run of event
+            if 'repeat_interval' in entry:
+                if ref_time < entry['start_time']: return 0
+                delta = (ref_time - entry['start_time']) % entry['repeat_interval']
+                if delta >= (entry['end_time'] - entry['start_time']): return 0
+                return delta / float(entry['end_time']-entry['start_time'])
+            else:
+                if ref_time < entry['start_time']: return 0
+                if ref_time >= entry['end_time']: return 0
+                return (ref_time - entry['start_time'])/float(entry['end_time']-entry['start_time'])
         elif method == 'enabled':
             return True
         else:
@@ -8806,8 +9522,8 @@ class Player(AbstractPlayer):
         id = candidate_list[0] if candidate_list else None
         return id
 
+    @admin_stats.measure_latency('find_suitable_ladder_match')
     def find_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = []):
-        start_time = time.time()
         id = None
         min_trophies = None
         if 'ladder_match_min_trophies' in gamedata['matchmaking']:
@@ -8826,18 +9542,10 @@ class Player(AbstractPlayer):
                 if id: break
         else:
             raise Exception('unknown ladder_match_by method '+gamedata['matchmaking']['ladder_match_by'])
-        end_time = time.time()
-        admin_stats.record_latency('find_suitable_ladder_match', end_time-start_time)
         return id
 
+    @admin_stats.measure_latency('is_suitable_ladder_match')
     def is_suitable_ladder_match(self, other_id):
-        start_time = time.time()
-        ret = self._is_suitable_ladder_match(other_id)
-        end_time = time.time()
-        admin_stats.record_latency('is_suitable_ladder_match', end_time-start_time)
-        return ret
-
-    def _is_suitable_ladder_match(self, other_id):
         if gamedata['anti_bullying']['enable_ladder_fatigue'] and self.cooldown_active('ladder_fatigue:%d' % other_id): return False
         if is_ai_user_id_range(other_id): return True
 
@@ -8976,6 +9684,22 @@ class Player(AbstractPlayer):
         if self.is_same_alliance(other_player_id): return True
         return False
 
+    def can_spy_on_home(self, self_user, dest_player, dest_social_id, new_ladder_state, new_deployable_squads):
+        if (dest_player is self) or dest_player.is_ai(): return (True, None)
+        if new_ladder_state or self.can_take_ladder_revenge(dest_player): return (True, None)
+        if self.is_legacy_pvp_player() and (not dest_player.is_legacy_pvp_player()):
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_THEM")
+        elif (not self.is_legacy_pvp_player()) and dest_player.is_legacy_pvp_player():
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_YOU")
+        elif (not self.is_legacy_pvp_player()) and (not dest_player.is_legacy_pvp_player()) and \
+             ((len(new_deployable_squads) < 1) or (len(new_deployable_squads) == 1 and new_deployable_squads.values()[0]['squad_id']==SQUAD_IDS.BASE_DEFENDERS)):
+            # cannot use session.using_squad_deployment() because we haven't set session.deployable_squads yet
+            if (not self.can_spy_despite_map_violation(self_user, dest_player.user_id, dest_social_id)):
+                return (False, "CANNOT_SPY_MAP_BOTH")
+        return (True, None)
+
     def can_take_ladder_revenge(self, other_player):
         return self.is_ladder_player() and other_player.is_ladder_player() and (not other_player.is_ai()) and \
                self.cooldown_active('revenge_defender:%d' % other_player.user_id) and \
@@ -8985,7 +9709,7 @@ class Player(AbstractPlayer):
         if (not ((self.home_region in gamedata['regions']) and \
                  ('ladder_on_map_if' in gamedata['regions'][self.home_region]) and \
                  Predicates.read_predicate(gamedata['regions'][self.home_region]['ladder_on_map_if']).is_satisfied(self, None))): return False
-        if other_player.resources.protection_end_time > server_time: return False
+        if other_player.has_damage_protection(): return False
         apply_level_limit = True
         if (self.home_region in gamedata['regions']) and (not gamedata['regions'][self.home_region].get('enable_pvp_level_gap', True)):
             apply_level_limit = False
@@ -9001,9 +9725,50 @@ class Player(AbstractPlayer):
            (not Predicates.read_predicate(gamedata['regions'][self.home_region]['ladder_on_map_if_defender']).is_satisfied(other_player, None)): return False
         return True
 
+    def get_pvp_balance(self, other_player, base):
+        if other_player.is_ai(): return None
+        my_level = self.resources.player_level
+        his_level = other_player.resources.player_level
+
+        my_level_range = self.attackable_level_range()
+
+        if gamedata['prevent_same_alliance_attacks'] and \
+           self.is_same_alliance(other_player.user_id):
+            return 'same_alliance'
+
+        elif (base is not other_player.my_home):
+            # quarry/squad - no limit
+            return None
+
+        elif (self.home_region in gamedata['regions']) and (not gamedata['regions'][self.home_region].get('enable_pvp_level_gap', True)):
+            # region has no limits
+            return None
+
+        elif (gamedata['matchmaking']['revenge_time'] > 0) and self.cooldown_active('revenge_defender:%d' % other_player.user_id):
+            # revenge - no limit
+            return None
+
+        elif (my_level_range[0]>=0) and (his_level < my_level_range[0]):
+            # we are much stronger
+            return 'player'
+
+        elif (my_level_range[1]>=0) and (his_level > my_level_range[1]):
+            # we are much weaker - prevent attack
+            return 'enemy_strict'
+
+        elif my_level < other_player.attackable_level_range()[0]:
+            # we are much weaker - allow attack, but warn
+            return 'enemy'
+
+        else:
+            # equal strength
+            return None
+
     def ladder_point_decay_check(self, session, retmsg, base_damage = None, base_repair_time = None):
         if base_damage is not None: assert base_repair_time is not None # must be given together
 
+        mode = gamedata['matchmaking'].get('ladder_point_decay_mode', 'damage')
+        assert mode in ('damage', 'protection')
         pred = gamedata['matchmaking'].get('ladder_point_decay_if', None)
         pred_ok = (pred and Predicates.read_predicate(pred).is_satisfied(self, None))
 
@@ -9012,11 +9777,15 @@ class Player(AbstractPlayer):
             for aura in self.player_auras:
                 if aura['spec'] == 'trophy_pvp_decay':
                     elapsed = server_time - aura['start_time']
-                    if ('data' in aura):
-                        if aura['data'].get('base_repair_time',-1) >= aura['start_time']:
-                            elapsed = min(elapsed, aura['data']['base_repair_time'] - aura['start_time'])
-                    else:
-                        elapsed = 0 # legacy compatibility
+                    # note: aura['end_time'] may be -1 or missing for damaged-and-not-yet-repairing bases
+
+                    # legacy compatibility
+                    if ('data' in aura) and aura['data'].get('base_repair_time',-1) >= aura['start_time']:
+                        elapsed = min(elapsed, aura['data']['base_repair_time'] - aura['start_time'])
+
+                    # limit by end_time
+                    elif aura.get('end_time',-1) >= server_time and aura['end_time'] >= aura['start_time']:
+                        elapsed = min(elapsed, aura['end_time'] - aura['start_time'])
 
                     if elapsed > 0:
                         # exponential decay constant
@@ -9026,14 +9795,19 @@ class Player(AbstractPlayer):
 
         # check if decay aura should be applied
         decay = False
+        end_time = -1
+
         if pred_ok:
-            if base_damage is None:
-                base_damage, base_repair_time = self.my_home.calc_base_damage_and_repair_time()
-            if base_damage >= gamedata['matchmaking']['ladder_win_damage']:
-                decay = True
+            if mode == 'damage':
+                if base_damage is None:
+                    base_damage, base_repair_time = self.my_home.calc_base_damage_and_repair_time()
+                if base_damage >= gamedata['matchmaking']['ladder_win_damage']:
+                    decay = True; end_time = base_repair_time
+            elif mode == 'protection':
+                decay = self.has_damage_protection(); end_time = self.resources.protection_end_time
 
         if decay:
-            if self.apply_aura('trophy_pvp_decay', data = {'base_repair_time':base_repair_time}, ignore_limit = True) and (retmsg is not None):
+            if self.apply_aura('trophy_pvp_decay', duration = (end_time - server_time) if (end_time > 0) else -1, ignore_limit = True) and (retmsg is not None):
                 retmsg.append(["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras])
         else:
             self.remove_aura(session, retmsg, 'trophy_pvp_decay', force = True)
@@ -9145,6 +9919,7 @@ class Player(AbstractPlayer):
                 'foreman_speed': ModChain.make_chain(1),
                 'loot_factor_pvp': ModChain.make_chain(1),
                 'loot_factor_pve': ModChain.make_chain(1),
+                'loot_factor_tokens': ModChain.make_chain(1),
                 'quarry_yield_bonus': ModChain.make_chain(1),
                 'turf_quarry_yield_bonus': ModChain.make_chain(1),
                 'travel_speed': ModChain.make_chain(1),
@@ -9511,59 +10286,6 @@ class Player(AbstractPlayer):
                     # no more powerplants to upgrade
                     break
 
-    # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
-    def modify_scores(self, *args, **kwargs):
-        #self.modify_scores1(*args, **kwargs) # XXXXXX remove when proven safe
-        self.modify_scores2(*args, **kwargs)
-
-    # old legacy score system
-    def modify_scores1(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
-        mutated = set()
-
-        # add to player score counters
-        for name, value in stats.iteritems():
-            for period in SCORE_PERIODS:
-                field_name = score_field_name(self, name, period)
-                incr = value
-                if name.startswith('trophies_'):
-                    kind = name[9:12]; assert kind in ('pve','pvp','pvv')
-
-                    # handle trophy floor
-                    cur_val = self.history.get(field_name, 0)
-                    if trophy_decay_k != 0:
-                        # special case for decay aura
-                        assert method == 'decay'
-                        assert value == 0
-                        if cur_val > gamedata['trophy_floor'].get(kind,0):
-                            new_val = int(gamedata['trophy_floor'].get(kind,0) + (cur_val - gamedata['trophy_floor'].get(kind,0)) * math.exp(trophy_decay_k * trophy_decay_elapsed) + 0.5)
-                            incr = new_val - cur_val
-                        else:
-                            incr = 0
-                    else:
-                        new_val = cur_val + incr
-                        if new_val < gamedata['trophy_floor'].get(kind,0):
-                            incr = gamedata['trophy_floor'].get(kind,0) - cur_val
-
-                if method == '=':
-                    func = dict_setvalue
-                elif method == '+=' or method == 'decay':
-                    func = dict_increment
-                else:
-                    raise Exception('unhandled method '+method)
-
-                if record_player_metric(self, func, field_name, incr, time_series = False, bucket = True):
-                    mutated.add(field_name)
-
-                # update global version of region-specific scores
-                if SCORE_FIELDS[name].get('region_specific',False):
-                    global_name = name+'_global'
-                    if global_name in SCORE_FIELDS:
-                        global_field_name = score_field_name(self, global_name, period, force_global = True)
-                        if record_player_metric(self, func, global_field_name, incr, time_series = False, bucket = True):
-                            mutated.add(global_field_name)
-
-        self.publish_scores1(mutated = mutated, reason = 'modify_scores1')
-
     # new score system
 
     # which continent are we in (or which one would we be in, if we aren't on the map for some reason)
@@ -9621,18 +10343,21 @@ class Player(AbstractPlayer):
             space_scope, space_loc = self.scores2_wide_space()
         return (client_name, Scores2.make_point(time_scope, time_loc, space_scope, space_loc))
 
-    def modify_scores2(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
+    # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
+    def modify_scores(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
         time_coords = Scores2.make_time_coords(self.get_absolute_time(),
                                                SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time()),
                                                SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time()),
                                                SpinConfig.get_pvp_day(gamedata['matchmaking']['week_origin'], self.get_absolute_time()))
 
         # look for an ongoing stat tournament
-        event_stat_name = None
-        event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-        if event:
-            event_data = gamedata['events'][event['name']]
+        event_data = self.get_event_data('current_stat_tournament')
+        if event_data:
             event_stat_name = event_data['stat']['name']
+        else:
+            event_stat_name = None
+
+        any_changed = False
 
         for name, value in stats.iteritems():
 
@@ -9662,48 +10387,29 @@ class Player(AbstractPlayer):
                 space_coords = Scores2.make_space_coords(self.home_continent(), self.home_region)
                 stat_method = method
 
-            self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
+            any_changed |= self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
 
-        self.publish_scores2(reason = 'modify_scores2')
+        self.publish_scores(reason = 'modify_scores')
+        return any_changed
 
-    # send updated personal scores to live database. Also recache any affected alliance scores.
-    # "mutated" = iterator containing the names of score fields to send (if None, send all our scores).
-    def publish_scores1(self, mutated = None, alliance_id = None, reason=''):
-        reason = 'publish_scores1(%s:%s)' % (reason, 'ALL' if mutated is None else 'incremental')
-        if (mutated is None):
-            # publish all currently recorded stats
-            mutated = (field for field in score_field_names(self) if field in self.history)
-
-        if mutated:
-            updates = [(parse_score_field_for_sql(field), int(self.history.get(field,0))) for field in mutated]
-            gamesite.sql_client.update_player_scores(self.user_id, updates, reason = reason)
-
-            mutated_trophies = (field for field in mutated if field.startswith('trophies_'))
-            if mutated_trophies:
-                # recache alliance scores
-                if alliance_id is None: alliance_id = gamesite.sql_client.get_users_alliance(self.user_id, reason = reason)
-                if alliance_id > 0:
-                    self.update_alliance_score_cache1(alliance_id, addrs = [parse_score_field_for_sql(field) for field in mutated_trophies], reason = reason)
-
-
-    def publish_scores2(self, alliance_id = None, reason=''):
+    def publish_scores(self, alliance_id = None, reason=''):
         if self.history.get('scores2_migration',0) < SCORES2_MIGRATION_VERSION: return
 
         # force publish of all scores?
         do_all = self.history.get('scores2_publish_refresh',-1) < gamedata['server'].get('scores2_publish_refresh',-1)
         if do_all:
             it = self.scores2.all_iter()
-            event_stat_name = None
-            event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-            if event:
-                event_data = gamedata['events'][event['name']]
+            event_data = self.get_event_data('current_stat_tournament')
+            if event_data:
                 event_stat_name = event_data['stat']['name']
+            else:
+                event_stat_name = None
             it_a = filter(lambda x: x['stat'].startswith('trophies_') or x['stat'] == event_stat_name, it)
         else:
             it = self.scores2.dirty_iter()
             it_a = self.scores2.dirty_alliance_iter()
 
-        reason = 'publish_scores2(%s,%s)' % ('full' if do_all else 'incr', reason)
+        reason = 'publish_scores(%s,%s)' % ('full' if do_all else 'incr', reason)
 
         if it:
             gamesite.mongo_scores2_client.player_scores2_write(self.user_id, it)
@@ -9723,19 +10429,8 @@ class Player(AbstractPlayer):
 
     # this gets called when leaving/joining an alliance, to update affected scores
     def update_alliance_score_cache(self, alliance_id, alliance_info = None, reason=''):
-        self.update_alliance_score_cache1(alliance_id, alliance_info = alliance_info, addrs = None, reason = reason)
+        # scores1 API is obsolete now
         self.update_alliance_score_cache2(alliance_id, alliance_info = alliance_info, it_a = None, reason = reason)
-
-    def update_alliance_score_cache1(self, alliance_id, alliance_info = None, addrs = None, reason = ''):
-        assert alliance_id > 0
-        if addrs is None:
-            addrs = [parse_score_field_for_sql(field) for field in trophy_field_names(self) if field in self.history] # note: only recache values that we affect
-        gamesite.sql_client.update_alliance_score_cache(alliance_id, addrs,
-                                                        gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
-                                                        {'trophies_pvp':gamedata['trophy_display_offset']['pvp'],
-                                                         'trophies_pve':gamedata['trophy_display_offset']['pve'],
-                                                         'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0)},
-                                                        reason = reason)
 
     def update_alliance_score_cache2(self, alliance_id, alliance_info = None, it_a = None, reason=''):
         assert alliance_id > 0
@@ -9743,11 +10438,11 @@ class Player(AbstractPlayer):
 
         if it_a is None:
             # look for an ongoing stat tournament
-            event_stat_name = None
-            event = self.get_event('current_stat_tournament', None, self.get_absolute_time())
-            if event:
-                event_data = gamedata['events'][event['name']]
+            event_data = self.get_event_data('current_stat_tournament')
+            if event_data:
                 event_stat_name = event_data['stat']['name']
+            else:
+                event_stat_name = None
             it_a = filter(lambda item: item['stat'].startswith('trophies_') or (event_stat_name and (item['stat'] == event_stat_name)), self.scores2.all_iter())
 
         # do not cache alliance scores regionally
@@ -9777,13 +10472,6 @@ class Player(AbstractPlayer):
                                                                             'trophies_pve':gamedata['trophy_display_offset']['pve'],
                                                                             'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0)},
                                                                            reason = reason)
-    def count_battles_since(self, t):
-        count = 0
-        for v in self.battle_history.itervalues():
-            for summary in v.get('summary',[]):
-                if summary.get('time',-1) > t:
-                    count += 1
-        return count
 
     # after a battle, stick the summary info into self.battle_history and increment history/time series counters
     # works for both attacking and defending
@@ -9802,30 +10490,31 @@ class Player(AbstractPlayer):
         opponent_type = 'ai' if summary.get(oprole+'_is_ai', False) else 'human'
 
         # create/update entry in self.battle_history
-        key = str(opponent_id)
-        if not self.battle_history.has_key(key):
-            self.battle_history[key] = {}
-        hist = self.battle_history[key]
-        hist['last_time'] = summary.get('time', server_time)
+        if gamedata['battle_log_max_age'] > 0:
+            key = str(opponent_id)
+            if not self.battle_history.has_key(key):
+                self.battle_history[key] = {}
+            hist = self.battle_history[key]
+            hist['last_time'] = summary.get('time', server_time)
 
-        dict_increment(hist, 'count', 1)
+            dict_increment(hist, 'count', 1)
 
-        # note: victory/defeat and defense_victory/defense_defeat are used to create exceptions to the PvP level gap restriction
-        if (summary.get('base_type','home') == 'home') or gamedata['territory']['quarries_affect_pvp_level_exception']:
-            dict_increment(hist, summary[myrole+'_outcome'], 1)
-            if myrole == 'defender':
-                dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
+            # update victory/defeat and defense_victory/defense_defeat counters
+            if (summary.get('base_type','home') == 'home'):
+                dict_increment(hist, summary[myrole+'_outcome'], 1)
+                if myrole == 'defender':
+                    dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
 
-        # append summary to self.battle_history.summary
-        if not hist.has_key('summary'):
-            hist['summary'] = []
-        sumlist = hist['summary']
-        # prune old entries
-        while len(sumlist) > gamedata['battle_log_max_summary_num']:
-            sumlist.pop(0)
-        while len(sumlist) > 0 and (server_time - sumlist[0]['time']) > gamedata['battle_log_max_summary_age']:
-            sumlist.pop(0)
-        sumlist.append(summary)
+            # append summary to self.battle_history.summary
+            if not hist.has_key('summary'):
+                hist['summary'] = []
+            sumlist = hist['summary']
+            # prune old entries
+            while len(sumlist) > gamedata['battle_log_max_summary_num']:
+                sumlist.pop(0)
+            while len(sumlist) > 0 and (server_time - sumlist[0]['time']) > gamedata['battle_log_max_summary_age']:
+                sumlist.pop(0)
+            sumlist.append(summary)
 
         # update history counters/time series
         if myrole == 'attacker':
@@ -10061,7 +10750,7 @@ class Player(AbstractPlayer):
             for season in xrange(0, len(gamedata['matchmaking']['season_starts'])+1):
                 season_total = 0
                 for region_id in region_ids:
-                    key = seasonal_name(prefix + (('_%s' % region_id) if region_id else ''), season_num = season)
+                    key = prefix + (('_%s' % region_id) if region_id else '') + ('_s%d' % season)
                     if self.history.get(key, 0) != 0:
                         season_total = space_accum(season_total, self.history[key])
                         total_s = time_accum(total_s, self.history[key])
@@ -10081,7 +10770,7 @@ class Player(AbstractPlayer):
             for week in xrange(creation_week, SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time)+1):
                 week_total = 0
                 for region_id in region_ids:
-                    key = weekly_name(prefix + (('_%s' % region_id) if region_id else ''), week_num = week)
+                    key = prefix + (('_%s' % region_id) if region_id else '') + ('_wk%d' % week)
                     if self.history.get(key, 0) != 0:
                         week_total = space_accum(week_total, self.history[key])
                         total_w = time_accum(total_w, self.history[key])
@@ -10121,6 +10810,42 @@ class Player(AbstractPlayer):
 
         # note: if we're being loaded as a PvP opponent, this migration might happen more than once
         self.history['scores2_migration'] = SCORES2_MIGRATION_VERSION # mark as migrated
+
+    def has_damage_protection(self): return self.resources.protection_end_time > server_time
+
+    def set_protection_end_time(self, session, new_end_time, event_name, extra_event_props = None):
+        old_end_time = self.resources.protection_end_time
+
+        if event_name:
+            props = {'prev_end_time': old_end_time, 'new_end_time': new_end_time, 'count': self.protection_attack_count}
+            if new_end_time > server_time: props['prot_time'] = new_end_time - server_time
+            if extra_event_props: props.update(extra_event_props)
+            self.record_protection_event(event_name, props)
+
+        self.resources.protection_end_time = new_end_time
+
+        was_active = (old_end_time > server_time)
+        is_active = (new_end_time > server_time)
+
+        if was_active != is_active:
+            self.protection_attack_count = 0
+
+        # perform external updates
+        is_changed = (was_active != is_active) or (is_active and (new_end_time != old_end_time))
+
+        if is_changed and session:
+            if self.prune_player_auras():
+                session.send([["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras]])
+
+            gamesite.pcache_client.player_cache_update(self.user_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
+
+            if self.is_on_map():
+                gamesite.nosql_client.update_map_feature(self.my_home.base_region, self.my_home.base_id, {'protection_end_time': new_end_time if new_end_time > server_time else None}, reason = 'set_protection_end_time')
+
+            if (self is session.player): # only run for connected player
+                session.deferred_ladder_point_decay_check = True
+                session.deferred_player_state_update = True
+                session.deferred_stattab_update = True
 
     def record_protection_event(self, event_name, props):
         if not gamedata['server']['record_protection_history']: return
@@ -10162,6 +10887,7 @@ class Player(AbstractPlayer):
         metric_event_coded(self.user_id, event_name, props)
 
     def send_fb_notification(self, user, text, config, force = False):
+        if not user.facebook_id: return # not on Facebook
 
         if (not self.has_write_lock):
             gamesite.exception_log.event(server_time, 'attempt to send_fb_notification without write lock! %d' % self.user_id)
@@ -10261,6 +10987,8 @@ class Player(AbstractPlayer):
         if self.developer: ret['developer'] = self.developer # also insert "developer" flag here in case ETL scripts want to ignore these
         return ret
 
+    def alt_record_attack(self, other): pass
+
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
 
@@ -10300,15 +11028,7 @@ class LivePlayer(Player):
     def unit_repair_send(self, retmsg):
         retmsg.append(["UNIT_REPAIR_UPDATE", self.unit_repair_queue])
 
-    # return the subset of player battle history data that the client expects on ADD_FRIEND
-    def get_battle_data_for_client(self, opponent_id):
-        key = str(opponent_id)
-        if self.battle_history.has_key(key):
-            hist = self.battle_history[key]
-            return {'count':hist.get('count',0), 'last_time':hist.get('last_time',-1), 'attack_cooldown_expire': self.get_repeat_attack_cooldown_expire_time(opponent_id, home_base_id(opponent_id)) }
-        return {}
-
-    def spawn_deposits(self):
+    def spawn_deposits(self, seed):
         if self.tutorial_state != "COMPLETE":
             # no deposits until tutorial is over
             return
@@ -10335,7 +11055,7 @@ class LivePlayer(Player):
         specname = 'iron_deposit'
         spec = self.get_abtest_spec(GameObjectSpec, specname)
 
-        random.seed(server_time + int(1000*random.random()))
+        randgen = random.Random(seed) # deterministic from the seed
 
         for i in range(num_to_spawn):
             ncells = self.my_home.ncells()
@@ -10343,8 +11063,8 @@ class LivePlayer(Player):
 
             # rejection sampling for determining spawn location
             while True:
-                x = int(random.random()*ncells[0])
-                y = int(random.random()*ncells[1])
+                x = int(randgen.random()*ncells[0])
+                y = int(randgen.random()*ncells[1])
                 if self.my_home.is_deposit_location_valid([x,y], spec.gridsize) or iter > 100:
                     break
                 iter += 1
@@ -10352,14 +11072,14 @@ class LivePlayer(Player):
             metadata = {}
             max_pct = config['worth_range'][0]
             min_pct = config['worth_range'][1]
-            amount = max(0, int(max_res * (min_pct + random.random() * (max_pct-min_pct))))
+            amount = max(0, int(max_res * (min_pct + randgen.random() * (max_pct-min_pct))))
             if amount > 0:
                 metadata['iron'] = amount
 
             if self.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks':
-                contains_gamebucks = (random.random() < config['gamebucks_chance'])
+                contains_gamebucks = (randgen.random() < config['gamebucks_chance'])
                 if contains_gamebucks:
-                    gamebucks_amount = config['gamebucks_range'][0] + int(random.random() * (config['gamebucks_range'][1]-config['gamebucks_range'][0]))
+                    gamebucks_amount = config['gamebucks_range'][0] + int(randgen.random() * (config['gamebucks_range'][1]-config['gamebucks_range'][0]))
                     if gamebucks_amount > 0:
                         metadata['gamebucks'] = gamebucks_amount
 
@@ -10410,7 +11130,13 @@ class LivePlayer(Player):
             self.resources.gain_gamebucks(quest.reward_gamebucks, reason='quest_reward')
 
         if hasattr(quest, "reward_consequent"):
-            session.execute_consequent_safe(quest.reward_consequent, self, retmsg, reason='give_quest_rewards')
+            # awkward - needs to pass same parameters as the on_login_pre_hello consequent
+            snap = self.resources.calc_snapshot()
+            session.execute_consequent_safe(quest.reward_consequent, self, retmsg,
+                                            {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                             'largest_purchase': self.history.get('largest_purchase', 0),
+                                             'largest_purchase_gamebucks': self.history.get('largest_purchase_gamebucks', 0)},
+                                            reason='give_quest_rewards')
 
         new_objects = []
 
@@ -10440,6 +11166,7 @@ class LivePlayer(Player):
 
     def strip_fields_for_army_update(self, state):
         assert 'obj_id' in state
+        if state.get('temporary', None): return None # don't persist temporary objects
         for field in state.keys():
             if field not in ('obj_id','spec','level','owner_id','squad_id','hp','max_hp','hp_ratio'):
                 del state[field]
@@ -10448,13 +11175,17 @@ class LivePlayer(Player):
     def send_army_update_one(self, object, retmsg):
         assert object.owner is self
         assert object.is_mobile()
-        retmsg.append(["PLAYER_ARMY_UPDATE", [self.strip_fields_for_army_update(object.persist_state(nosql = True))]])
+        if object.is_temporary(): return
+        fields = self.strip_fields_for_army_update(object.persist_state(nosql = True))
+        if fields is not None:
+            retmsg.append(["PLAYER_ARMY_UPDATE", [fields]])
     def send_army_update_destroyed(self, object, retmsg):
-        retmsg.append(["PLAYER_ARMY_UPDATE_DESTROYED", object.obj_id])
+        if not object.is_temporary():
+            retmsg.append(["PLAYER_ARMY_UPDATE_DESTROYED", object.obj_id])
     def ping_squads_and_send_update(self, session, retmsg, originator=None, reason=''):
         army, map_features, mailbox_update = self.ping_squads(session, return_army = True, originator=originator, reason=reason)
         retmsg.append(["SQUADS_UPDATE", self.squads])
-        retmsg.append(["PLAYER_ARMY_UPDATE_FULL", map(self.strip_fields_for_army_update, army)])
+        retmsg.append(["PLAYER_ARMY_UPDATE_FULL", filter(lambda x: x is not None, map(self.strip_fields_for_army_update, army))])
         if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features])
         if mailbox_update: self.send_mailbox_update(retmsg)
 
@@ -10602,21 +11333,19 @@ class LivePlayer(Player):
                     admin_stats.econ_flow_res(self, 'item', 'fungible', gained_res)
                     count += gained
                     stack -= gained
-                elif spec['resource'] == 'lottery_ticket':
-                    lottery_building = self.find_lottery_building()
-                    if lottery_building:
-                        # XXX how to notify the client?
-                        lottery_building.contents += stack
-                        count += stack
-                        stack = 0
-                    break
+                elif spec['resource'] == 'lottery_scans':
+                    if expire_time < 0 or expire_time > server_time:
+                        self.do_apply_aura('lottery_scans', stack = stack,
+                                           duration = (expire_time - server_time) if expire_time > 0 else -1,
+                                           ignore_limit = True)
+                    count += stack; stack = 0
                 else:
                     gamesite.exception_log.event(server_time, 'unhandled fungible resource'+spec['resource'])
                     break
                 break
             else:
                 # out of space?
-                if len(self.inventory) >= max_slots:
+                if max_slots >= 0 and (len(self.inventory) >= max_slots):
                     #gamesite.exception_log.event(server_time, 'all %s slots used (%d)' % (max_slots, len(self.inventory)))
                     break
 
@@ -10676,7 +11405,18 @@ class LivePlayer(Player):
         msg['received_time'] = server_time
         self.mailbox.append(msg)
 
+    # return unique player history key for a daily tip or message
+    @staticmethod
+    def get_daily_tip_key(kind, data, ref_time):
+        assert kind in ('daily_tip', 'daily_msg')
+        ret = kind+':'+data['name']
+        if ('repeat_interval' in data) and ('start_time' in data):
+            run_num = (ref_time - data['start_time'])//data['repeat_interval']
+            ret += ':run%d' % run_num
+        return ret
+
     def get_daily_tips(self, session, retmsg):
+        ref_time = self.get_absolute_time()
         popup_tip = None # only one popup tip is allowed
         pageable_tips = [] # any number of pageable tips are allowed (oldest->newest)
         all_pageable_tips_seen = True
@@ -10684,7 +11424,7 @@ class LivePlayer(Player):
         for tip in gamedata['daily_tips']:
             if ('show_if' in tip) and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
 
-            key = 'daily_tip:'+tip['name']
+            key = self.get_daily_tip_key('daily_tip', tip, ref_time)
             already_understood = (self.history.get(key, 0) >= 2)
 
             kind = tip.get('kind', 'popup')
@@ -10700,7 +11440,7 @@ class LivePlayer(Player):
                 popup_tip = tip
 
         if popup_tip:
-            key = 'daily_tip:'+popup_tip['name']
+            key = self.get_daily_tip_key('daily_tip', popup_tip, ref_time)
             if ('action' in popup_tip) and (self.history.get(key, 0) < 1):
                 session.execute_consequent_safe(popup_tip['action'], self, retmsg, reason='get_daily_tips')
                 session.setmax_player_metric(key, 1)
@@ -10712,17 +11452,26 @@ class LivePlayer(Player):
 
     def get_daily_messages(self, session, retmsg):
         got_any = False
+        ref_time = self.get_absolute_time()
+
         for tip in gamedata['daily_messages']:
-            key = 'daily_msg:'+tip['name']
+            key = self.get_daily_tip_key('daily_msg', tip, ref_time)
             if self.history.get(key, 0) and (not tip.get('recurring',False)): continue
 
             if 'expire_at' in tip:
                 expire_time = tip['expire_at']
+            elif 'end_time' in tip:
+                if ('repeat_interval' in tip) and ('start_time' in tip):
+                    # time remaining in this run
+                    delta = (ref_time - tip['start_time']) % tip['repeat_interval']
+                    expire_time = ref_time + (tip['end_time'] - tip['start_time'] - delta)
+                else:
+                    expire_time = tip['end_time']
             elif 'expire_in' in tip:
-                expire_time = server_time + tip['expire_in']
+                expire_time = ref_time + tip['expire_in']
             else:
                 expire_time = -1
-            if expire_time > 0 and server_time >= expire_time: continue
+            if expire_time > 0 and ref_time >= expire_time: continue
 
             if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
             msg = {'type': 'mail',
@@ -10732,7 +11481,14 @@ class LivePlayer(Player):
                    'subject': tip['ui_subject'],
                    'body': tip['ui_body']}
             if 'attachments' in tip:
-                msg['attachments'] = tip['attachments']
+                msg['attachments'] = []
+                for a in tip['attachments']:
+                    attachment = copy.deepcopy(a)
+                    if 'item_duration' in attachment:
+                        attachment['expire_time'] = session.get_item_spec_forced_expiration(gamedata['items'][attachment['spec']],
+                                                                                            prev_expire_time = attachment['item_duration'] + server_time)
+                        del attachment['item_duration']
+                    msg['attachments'].append(attachment)
             if 'on_send' in tip:
                session.execute_consequent_safe(tip['on_send'], self, retmsg,
                                                context = {'home_region': self.home_region},
@@ -10813,6 +11569,10 @@ class LivePlayer(Player):
         max_summary_num = gamedata['battle_log_max_summary_num']
         max_summary_age = gamedata['battle_log_max_summary_age']
         max_age = gamedata['battle_log_max_age']
+
+        if max_age < 0:
+            self.battle_history = {} # blow it away
+            return
 
         # compile list of all held summaries, sort by age
         all = []
@@ -10957,7 +11717,7 @@ class LivePlayer(Player):
         if not alt_data: return
         alt_data['attacks'] = alt_data.get('attacks',0) + 1
 
-    def possible_alt_record_login(self, alt_id):
+    def possible_alt_record_login(self, alt_id, ip = None):
         if alt_id == self.user_id: return
         key = str(alt_id)
 
@@ -10981,20 +11741,25 @@ class LivePlayer(Player):
         if alt_data is not None:
             alt_data['logins'] = alt_data.get('logins',0) + 1
             alt_data['last_login'] = server_time # record time of last simultaneous login
+            if ip:
+                alt_data['last_ip'] = ip
 
     def is_alt_account_unattackable(self, other):
+        if (not spin_secure_mode): return False
         limit = gamedata['server']['alt_no_attack_after']
         if limit < 0: return False
         alt_data = self.get_alt_data(other)
         return alt_data and (alt_data.get('attacks',0) >= limit)
 
     def is_alt_account_unprotectable(self, other):
+        if (not spin_secure_mode): return False
         limit = gamedata['server']['alt_no_protect_after']
         if limit < 0: return False
         alt_data = self.get_alt_data(other)
         return alt_data and (alt_data.get('attacks',0) >= limit)
 
     def is_alt_account_unladderable(self, other):
+        if (not spin_secure_mode): return False
         limit = gamedata['server'].get('alt_no_ladder_after',0)
         if limit < 0: return False
         alt_data = self.get_alt_data(other)
@@ -11011,6 +11776,8 @@ class LivePlayer(Player):
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s -> %s' % \
                                                  (self.user_id, test_name, group))
                     self.abtests[test_name] = group
+                    metric_event_coded(self.user_id, '0800_abtest_joined', {'test_name': test_name, 'group_name': group,
+                                                                            'reason': 'manual_override'})
                 else:
                     gamesite.exception_log.event(server_time, 'override_abtests_from_url: user %d %s GROUP %s NOT FOUND' % \
                                                  (self.user_id, test_name, group))
@@ -11032,7 +11799,9 @@ class LivePlayer(Player):
 
     # update the player's membership in any ongoing A/B tests
     # called once per login
-    def update_abtests(self, user, is_first_visit):
+    def update_abtests(self, session, is_first_visit):
+        user = session.user
+
         want_tests = []
         want_cohorts = []
         want_limits = []
@@ -11058,98 +11827,26 @@ class LivePlayer(Player):
                 if 'eligible' in data:
                     # predicate-based eligibility
                     if type(data['eligible']) == dict and 'predicate' in data['eligible']:
-                        if not Predicates.read_predicate(data['eligible']).is_satisfied(self,None):
+                        if not Predicates.read_predicate(data['eligible']).is_satisfied2(session,self,None):
                             #print 'FAILED PREDICATE', data['eligible'], self.price_region
                             continue
-                    elif data['eligible'].startswith('browser_name:'):
-                        name = data['eligible'].split(':')[1]
-                        if user.browser_name != name:
-                            continue
-                    elif data['eligible'] == 'chrome_18+_on_windows':
-                        if not ((user.browser_os == "Windows") and (user.browser_name == "Chrome") and (user.browser_version >= 18)):
-                            continue
-                    elif data['eligible'] == 'tier4_10days_old':
-                        if not user.country: continue
-                        if SpinConfig.country_tier_map.get(user.country, 4) != 4: continue
-                        if (server_time - user.account_creation_time) < (10*24*60*60): continue
-                    elif data['eligible'] == 'non_tier4':
-                        if not user.country: continue
-                        if SpinConfig.country_tier_map.get(user.country, 4) == 4: continue
-                    elif data['eligible'] == 'motion_cannon_upgrade':
-                        continue
-                    elif data['eligible'] == 'repair_bay_cohort':
-                        if 'T029_repair_bay' in self.abtests: continue # don't overlap with new cohort
-                        if (not user.locale) or (user.locale == 'en_US'): continue
-                        if self.history.get('attacks_launched_vs_human',0) < 5: continue
-                    elif data['eligible'] == 'highend_unit_cohort':
-                        continue
-                    elif data['eligible'] == 'repair_bay2_cohort':
-                        if ('T029_repair_bay' in self.abtests) or ('T029B_repair_bay_elder' in self.abtests): continue # don't overlap with old cohorts
-                        # apply to all new users, but only Canadian old users
-                        if not is_first_visit:
-                            if (not user.country) or (user.country != 'ca'): continue
-
-                    elif data['eligible'] == 'soundfx_cohort':
-                        # apply to ALL new users, and ONLY existing users in the limited non-en_ PvP groups
-                        if not is_first_visit:
-                            if (not user.locale) or (user.locale.startswith('en_')): continue
-                            if self.history.get('attacks_launched_vs_human',0) < 5: continue
-                    elif data['eligible'] == 'leaderboard_cohort':
-                        if (not user.locale) or (user.locale.startswith('en_')): continue
-                        #if (not user.country) or (user.country not in ['de','ph']): continue
-                        if self.history.get('attacks_launched_vs_human',0) < 2: continue
-
-                    elif data['eligible'] == 'no_free_rover_speedup_elder':
-                        # apply to ALL new users, and ONLY non-en_ existing users, and don't touch whales
-                        if ('T033_no_free_rover_speedup' in self.abtests) or ('T033B_no_free_rover_speedup_elder' in self.abtests): continue
-                        if not is_first_visit:
-                            if (not user.locale) or (user.locale.startswith('en_')): continue
-                            if self.history.get('money_spent',0) >= 50.0: continue
-                    elif data['eligible'] == 'new_ai_base_cohort':
-                        # apply to ALL new users
-                        if not is_first_visit:
-                            # don't touch whales
-                            if self.history.get('money_spent',0) >= 50.0: continue
-
-                            # DO touch Cerberus farmers
-                            is_farmer = False
-                            if self.battle_history.has_key('1007') and self.battle_history['1007'].get('count',0) > 200:
-                                is_farmer = True
-
-                            # do NOT touch en_* locale users
-                            if (not is_farmer) and ((not user.locale) or (user.locale.startswith('en_'))): continue
-
                     else:
-                        raise Exception('unhandled "eligible" value %s' % data['eligible'])
+                        gamesite.exception_log.event(server_time, 'unhandled "eligible" value %r' % data['eligible'])
+                        continue
 
                 groups = sorted(data['groups'].keys())
 
                 if data.get('assign_by_predicate', False):
                     group = None
                     for grname in groups:
-                        if ('assign_if' in data['groups'][grname]) and Predicates.read_predicate(data['groups'][grname]['assign_if']).is_satisfied(self,None):
+                        if ('assign_if' in data['groups'][grname]) and Predicates.read_predicate(data['groups'][grname]['assign_if']).is_satisfied2(session,self,None):
                             group = grname
                             break
                     if group is None:
                         continue
                 else:
                     # assign randomly, with optional weighing
-                    breakpoints = []
-                    bp = 0.0
-                    for group in groups:
-                        if group not in data['groups']:
-                            raise Exception('group %r not found in %r' % (group, data))
-                        weight = data['groups'][group].get('weight', 1.0/len(groups))
-                        bp += weight
-                        breakpoints.append(bp)
-
-                    r = random.random()
-                    groupnum = 0
-                    while groupnum < len(groups)-1 and r >= breakpoints[groupnum]:
-                        groupnum += 1
-
-                    #groupnum = int(random.random()*len(groups))
-                    group = groups[groupnum]
+                    group = weighted_random_choice(groups, [data['groups'][g].get('weight',1) for g in groups], random.random())
 
                 want_tests = []
                 want_cohorts = []
@@ -11167,6 +11864,7 @@ class LivePlayer(Player):
                         group = want_cohorts[i]
                         if results[i]:
                             self.abtests[test_name] = group # success!
+                            metric_event_coded(self.user_id, '0800_abtest_joined', {'test_name': test_name, 'group_name': group})
 
         # REPLACE OBJECT SPECS WITH A/B TEST VERSIONS
         patch_specs = False
@@ -11222,6 +11920,11 @@ class LivePlayer(Player):
         for key, start_level in gamedata['starting_conditions']['tech'].iteritems():
             if self.tech.get(key, 0) < start_level:
                 self.tech[key] = start_level
+
+        # migrate old user chat_gagged flag to player aura
+        if session.user.chat_gagged:
+            if self.apply_aura('chat_gagged', duration = -1, ignore_limit = True):
+                session.user.chat_gagged = None
 
         # establish default non-auto-unit control setting on elder accounts
         if SpinConfig.game() == 'mf' and \
@@ -11353,7 +12056,7 @@ class LivePlayer(Player):
                 self.history['unit_equip_migration_done'] = 1
 
             except:
-                gamesite.exception_log.event(server_time, 'unit_equip_migration: %d EXCEPTION:\n%s' % (user_id, traceback.format_exc()))
+                gamesite.exception_log.event(server_time, 'unit_equip_migration (player %d) Exception: %s' % (user_id, traceback.format_exc().strip())) # OK
                 pass
 
         # remove invalid objects from donated units
@@ -11465,6 +12168,13 @@ class LivePlayer(Player):
         if 'attacks_made' not in self.travel_state:
             self.travel_state['attacks_made'] = 0
 
+
+        # dump alt_account data if too old
+        if self.history.get('alt_account_data_epoch',-1) < gamedata['server'].get('alt_account_data_epoch',-1):
+            self.possible_alt_accounts = {}
+            self.known_alt_accounts = {}
+        self.history['alt_account_data_epoch'] = server_time
+
         # change format of known_alt_accounts
         if self.known_alt_accounts is None:
             self.known_alt_accounts = {}
@@ -11478,6 +12188,30 @@ class LivePlayer(Player):
         if gamedata['townhall']+'_level' not in self.history:
             self.history[gamedata['townhall']+'_level'] = self.get_townhall_level()
 
+        # ensure largest_purchase history value is set up
+        if ('money_purchase_history' in self.history) and (('largest_purchase' not in self.history) or ('largest_purchase_gamebucks' not in self.history)):
+            largest = 0
+            largest_gamebucks = 0
+            for x in self.history['money_purchase_history']:
+                if 'dollar_amount' in x:
+                    largest = max(largest, x['dollar_amount'])
+
+                # note: doesn't handle in-kind payments like payer promos/TrialPay
+                spellname = None
+                if x.get('spellname','').startswith('BUY_GAMEBUCKS_'):
+                    spellname = x['spellname']
+                elif x.get('description','').startswith('BUY_GAMEBUCKS_'):
+                    spellname = x['description'].split(',')[0]
+                if spellname:
+                    try:
+                        gamebucks = session.user.parse_buy_gamebucks_spell_quantity(spellname, None)
+                        largest_gamebucks = max(gamebucks, largest_gamebucks)
+                    except:
+                        pass
+
+            self.history['largest_purchase'] = largest
+            self.history['largest_purchase_gamebucks'] = largest_gamebucks
+
         # check resource levels
         if gamedata['server'].get('log_storage_limit', True) and gamedata['loot_storage_limit'] > 0:
             snap = self.resources.calc_snapshot()
@@ -11488,7 +12222,7 @@ class LivePlayer(Player):
                         self.resources.gain_res({res: -1 * (snap.cur_res(res) - snap.max_res(res))}, reason = 'storage_limit', break_limit = True)
 
         # get rid of bloated obsolete history fields
-        BLOAT = ['purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
+        BLOAT = ['logins_by_day', 'purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
                  'resources_stolen_at_time', 'attacks_launched_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
                  'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time']
@@ -11497,9 +12231,7 @@ class LivePlayer(Player):
 
         # get rid of obsolete Scores1 time series history fields
         for k in self.history.keys():
-            manuf_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$')
-            if score_time_series_re.match(k) or manuf_re.match(k):
-                #gamesite.exception_log.event(server_time, k)
+            if obsolete_time_series_re.match(k):
                 del self.history[k]
 
         # fix bad intro mails
@@ -11530,7 +12262,7 @@ class LivePlayer(Player):
             self.history['achievement_points_published'] = 1
 
         # publish any modified scores
-        self.publish_scores2(reason = 'migrate')
+        self.publish_scores(reason = 'migrate')
 
     def recalculate_xp(self):
         new_player_xp = gamedata['player_xp']
@@ -11592,10 +12324,20 @@ class LivePlayer(Player):
         if force or (self.lottery_slate is None) or (len(self.lottery_slate) != len(slot_tables)) or \
            (not self.cooldown_active('lottery_reseed')):
 
+            new_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1)) for slot_name, tab in slot_tables.iteritems())
+            weights = self.get_any_abtest_value('lottery_slot_weights', gamedata.get('lottery_slot_weights', None))
+
+            if weights:
+                for slot_name in slot_tables:
+                    assert slot_name in weights # sanity check
+                new_weights = copy.deepcopy(weights)
+            else:
+                new_weights = None
+
+            # update atomically, in case there was an exception above
+            self.lottery_slate = new_slate
+            self.lottery_slate_weights = new_weights
             self.cooldown_trigger('lottery_reseed', gamedata['lottery_reseed_cooldown'])
-            lottery_seed = random.randint(0, 1<<31)
-            randgen = random.Random(lottery_seed)
-            self.lottery_slate = dict((slot_name, session.get_loot_items(self, tab, -1, -1, rand_func = randgen.random)) for slot_name, tab in slot_tables.iteritems())
 
     # get the current lottery slate
     def get_lottery_slate(self, session):
@@ -11741,11 +12483,14 @@ class LivePlayer(Player):
 
         return True
 
+    def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+        with admin_stats.latency_measurer('change_region(%s)' % reason):
+            return self._change_region(request_region, request_loc, session, retmsg, reason = reason)
 
     # main region-change function
     # pass None to get a random region
     # returns whether it succeeded or not
-    def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+    def _change_region(self, request_region, request_loc, session, retmsg, reason = ''):
         if (not gamesite.nosql_client):
             return False
 
@@ -11756,7 +12501,7 @@ class LivePlayer(Player):
         if gamedata['server']['log_map']:
             gamesite.exception_log.event(server_time, 'map: player %d change_region %s %s' % (self.user_id, repr(new_region), repr(new_loc)))
 
-        random.seed(self.user_id + gamedata['territory']['map_placement_gen'] + int(100*random.random()))
+        randgen = random.Random(self.user_id ^ gamedata['territory']['map_placement_gen'] ^ int(server_time))
 
         if (new_region is None) or (type(new_region) is list):
             # load-balance to lowest-population applicable region
@@ -11844,8 +12589,8 @@ class LivePlayer(Player):
                 trials_set = set()
                 rad = gamedata['territory']['neighbor_search_radius']
                 for i in xrange(100):
-                    tr = (new_loc[0] + int((2*random.random()-1)*rad),
-                          new_loc[1] + int((2*random.random()-1)*rad))
+                    tr = (new_loc[0] + int((2*randgen.random()-1)*rad),
+                          new_loc[1] + int((2*randgen.random()-1)*rad))
                     if tr[0] < BORDER or tr[0] >= map_dims[0]-BORDER or tr[1] < BORDER or tr[1] >= map_dims[1]-BORDER:
                         continue # skip, out of bounds
                     trials_set.add(tr)
@@ -11869,8 +12614,8 @@ class LivePlayer(Player):
                 # rectangle within which we can place the player
                 placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                    [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
-                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
+                trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
+                                        min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
 
             trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
 
@@ -11882,7 +12627,7 @@ class LivePlayer(Player):
                 i += 1
                 self.my_home.base_region = new_region
                 self.my_home.base_map_loc = tr
-                props = self.my_home.get_cache_props()
+                props = self.my_home.get_cache_props(extra_props = {'protection_end_time': self.resources.protection_end_time})
 
                 if (new_region == old_region):
                     success = gamesite.nosql_client.move_map_feature(self.my_home.base_region, self.my_home.base_id, props, old_loc = old_loc,
@@ -11994,39 +12739,23 @@ class LivePlayer(Player):
         waves = [dict([(data[kind],qty) for kind, qty in sz.iteritems() if qty>0]) for sz in wave_size]
         return waves
 
+    # unused for now
     def get_repeat_attack_cooldown_expire_time(self, victim_id, victim_base_id):
         # only applies to legacy PvP
         if self.is_ladder_player() or (not self.is_legacy_pvp_player()): return 0
 
         ai_or_human = 'ai' if is_ai_user_id_range(victim_id) else 'human'
 
-        # does not apply to squad PvP attacks
-        if ((not self.is_legacy_pvp_player()) and (ai_or_human == 'human')): return 0
-
         config = self.get_any_abtest_value('repeat_attack_cooldown', gamedata['repeat_attack_cooldown'])[ai_or_human]
 
         if config['base'] <= 0: return 0
         if victim_id == self.user_id: return 0
-        if victim_base_id != home_base_id(victim_id): return 0 # no cooldown for quarry attacks
+        if victim_base_id != home_base_id(victim_id): return 0 # no cooldown for quarry/squad attacks
 
         last_time = -1 # time of very last attack
         last_count = 0 # number of attacks within cooldown reset time
 
-        key = str(victim_id)
-        if key in self.battle_history:
-            hist = self.battle_history[key]
-            if 'summary' in hist:
-                sumlist = hist['summary']
-                for i in xrange(len(sumlist)-1, -1, -1):
-                    summary = sumlist[i]
-                    if 'time' in summary:
-                        if (server_time - summary['time']) < config['reset']:
-                            if summary.get('attacker_id',-1) == self.user_id and \
-                               summary.get('base_id', home_base_id(victim_id)) == victim_base_id:
-                                last_count += 1
-                                last_time = max(last_time, summary['time'])
-                        else:
-                            break
+        # XXX calculate based on player.cooldowns
 
         last_count -= config['freebies']
 
@@ -12214,6 +12943,7 @@ def setup_ai_base(strid, cb):
 
             if 'orders' in p: obj.orders = p['orders']
             if 'patrol' in p: obj.patrol = p['patrol']
+            if 'temporary' in p: obj.temporary = p['temporary']
             player.home_base_add(obj)
 
         player.my_home.init_production(player)
@@ -12358,61 +13088,6 @@ def parse_canvas_oversample(v):
         else: v = int(v)
     return v
 
-# raw 35-byte representation of a 1x1 transparent GIF, used as the "return value" from metrics requests
-TINY_GIF = 'GIF89a\x01\x00\x01\x00\x80\xff\x00\xff\xff\xff\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
-
-# DEPRECATED - METRICSAPI is now handled entirely inside of proxyserver!
-class METRICSAPI(resource.Resource):
-    isLeaf = True
-    def __init__(self, gameapi):
-        resource.Resource.__init__(self)
-        self.gameapi = gameapi
-    def record_metric(self, anon_id, event_name, props):
-
-        props['anon_id'] = anon_id
-        props['event_name'] = event_name
-
-        gamesite.metrics_log.event(server_time, props)
-
-    def render_GET(self, request):
-        update_server_time()
-        SpinHTTP.set_access_control_headers(request)
-
-        # wrap this block so the server does not return a revealing error message in case of exceptions
-        try:
-            anon_id = request.args['id'][0]
-            event_name = request.args['event'][0]
-            props_raw = request.args['props'][0]
-
-            # some browsers append '/' to the URL and cause failure in JSON parsing, fix it here
-            if props_raw[-1] == '/':
-                props_raw = props_raw[:-1]
-
-            props = SpinJSON.loads(props_raw)
-            self.record_metric(anon_id, event_name, props)
-        except Exception:
-            gamesite.exception_log.event(server_time, 'METRICSAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-
-        request.setHeader('Content-Type', 'image/gif')
-        request.setHeader('Pragma','no-cache, no-store')
-        request.setHeader('Cache-Control','no-cache, no-store')
-        return TINY_GIF
-
-    def render_POST(self, request):
-        update_server_time()
-        SpinHTTP.set_access_control_headers(request)
-
-        try:
-            msg = SpinJSON.loads(request.args['myarg'][0])
-            anon_id = msg[0]
-            event_name = msg[1]
-            props = msg[2]
-            self.record_metric(anon_id, event_name, props)
-        except Exception:
-            gamesite.exception_log.event(server_time, 'METRICSAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-
-        return 'ok'
-
 # Facebook Open Graph object endpoint
 class OGPAPI(resource.Resource):
     isLeaf = True
@@ -12435,223 +13110,237 @@ class OGPAPI(resource.Resource):
         return ("http://%s%s/OGPAPI?" % (host, port_str)) + qs
 
     def render_GET(self, request):
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('OGPAPI request %s args %r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
+
+    @admin_stats.measure_latency('OGPAPI')
+    def handle_request(self, request):
         if gamedata['server']['log_fb_open_graph']:
             gamesite.exception_log.event(server_time, 'OGPAPI HIT: '+repr(request)+' args '+repr(request.args))
-        SpinHTTP.set_access_control_headers(request)
+
         if 'type' not in request.args:
             # bad hit, like from a web crawler
             request.setResponseCode(http.BAD_REQUEST)
             return 'spinpunch error'
-        try:
-            ret = '<!DOCTYPE html>\n<html>\n'
-            type = request.args['type'][0]
-            # order of precedence:
-            # image_url > art_asset_file > art_asset_s3
-            image_url = None
-            art_asset_file = None
-            art_asset_s3 = None
-            my_extra_prefix = ''
-            my_og_type = None
-            my_url = None
-            my_spin_ref = None
-            my_spin_ref_user_id = None
-            my_spin_link_qs = None
-            my_ui_name = None
-            my_ui_description = None
-            my_ui_determiner = None
-            extra_props = {}
-            extra_raw_props = []
 
-            if type in (OGPAPI.object_type('gamebucks'), OGPAPI.object_type('alloy')):
-                my_url = self.get_object_endpoint({'type':type})
-                my_extra_prefix = ' product: http://ogp.me/ns/product#' # ' fbpayment:http://ogp.me/ns/fb/fbpayment#'
-                my_og_type = 'og:product' # 'fbpayment:currency'
-                my_ui_name = gamedata['strings']['game_name'] +' ' + gamedata['store']['gamebucks_ui_name']
-                my_ui_description = "Can be spent in game on speed-ups, resources, and special items"
-                my_ui_determiner = 'the'
-                art_asset_s3 = gamedata['store']['fb_open_graph_gamebucks_icon']
-                #extra_raw_props.append(('fbpayment:rate', gamedata['store']['gamebucks_per_fbcredit']))
-                for currency, amount in gamedata['store']['gamebucks_open_graph_prices']:
+        ret = '<!DOCTYPE html>\n<html>\n'
+        type = request.args['type'][0]
+        # order of precedence:
+        # image_url > art_asset_file > art_asset_s3
+        image_url = None
+        art_asset_file = None
+        art_asset_s3 = None
+        my_extra_prefix = ''
+        my_og_type = None
+        my_url = None
+        my_spin_ref = None
+        my_spin_ref_user_id = None
+        my_spin_link_qs = None
+        my_ui_name = None
+        my_ui_description = None
+        my_ui_determiner = None
+        extra_props = {}
+        extra_raw_props = []
+
+        if type in (OGPAPI.object_type('gamebucks'), OGPAPI.object_type('alloy')):
+            my_url = self.get_object_endpoint({'type':type})
+            my_extra_prefix = ' product: http://ogp.me/ns/product#' # ' fbpayment:http://ogp.me/ns/fb/fbpayment#'
+            my_og_type = 'og:product' # 'fbpayment:currency'
+            my_ui_name = gamedata['strings']['game_name'] +' ' + gamedata['store']['gamebucks_ui_name']
+            my_ui_description = "Can be spent in game on speed-ups, resources, and special items"
+            my_ui_determiner = 'the'
+            art_asset_s3 = gamedata['store']['fb_open_graph_gamebucks_icon']
+            #extra_raw_props.append(('fbpayment:rate', gamedata['store']['gamebucks_per_fbcredit']))
+            for currency, amount in gamedata['store']['gamebucks_open_graph_prices']:
+                extra_raw_props.append(('product:price:amount', amount))
+                extra_raw_props.append(('product:price:currency', currency))
+
+        elif type == OGPAPI.object_type('sku'):
+            spellname = request.args['spellname'][0]
+            if spellname not in gamedata['spells']:
+                request.setResponseCode(http.NOT_FOUND)
+                return 'invalid spellname'
+            spell = gamedata['spells'][spellname]
+            assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
+            my_url_props = {'type':type, 'spellname': spellname}
+            if 'want_loot' in request.args:
+                my_url_props['want_loot'] = request.args['want_loot'][0]
+            my_url = self.get_object_endpoint(my_url_props)
+            my_extra_prefix = ' product: http://ogp.me/ns/product#'
+            my_og_type = 'og:product'
+            # note: for localized languages, we'll have to have individual SKUs here
+            spellarg = None
+            if 'quantity' in request.args:
+                spellarg = int(request.args['quantity'][0])
+            elif 'want_loot' in request.args: # opt-in to item bundle
+                spellarg = {'want_loot': bool(int(request.args['want_loot'][0]))}
+            else:
+                spellarg = {'want_loot': 0} # default
+            my_ui_name = Store.format_ui_string(None, spellname, spellarg, spell, spell['ui_name'])
+            my_ui_description = Store.format_ui_string(None, spellname, spellarg, spell, spell['ui_description'])
+
+            art_asset_s3 = spell.get('fb_open_graph_s3_image', gamedata['store']['fb_open_graph_gamebucks_icon'])
+            if 'open_graph_prices' in spell:
+                for i in xrange(len(spell['open_graph_prices'])):
+                    # for details see https://developers.facebook.com/docs/payments/ads_virtual_goods
+                    if 'open_graph_original_prices' in spell:
+                        currency, amount = spell['open_graph_original_prices'][i]
+                        extra_raw_props.append(('product:original_price:amount', amount))
+                        extra_raw_props.append(('product:original_price:currency', currency))
+                    currency, amount = spell['open_graph_prices'][i]
                     extra_raw_props.append(('product:price:amount', amount))
                     extra_raw_props.append(('product:price:currency', currency))
+            if 'open_graph_purchase_limit' in spell:
+                extra_raw_props.append(('product:purchase_limit', spell['open_graph_purchase_limit']))
 
-            elif type == OGPAPI.object_type('sku'):
-                spellname = request.args['spellname'][0]
-                if spellname not in gamedata['spells']:
-                    request.setResponseCode(http.NOT_FOUND)
-                    return 'invalid spellname'
-                spell = gamedata['spells'][spellname]
-                assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
-                my_url = self.get_object_endpoint({'type':type, 'spellname': spellname})
-                my_extra_prefix = ' product: http://ogp.me/ns/product#'
-                my_og_type = 'og:product'
-                # note: for localized languages, we'll have to have individual SKUs here
-                my_ui_name = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_name'])
-                my_ui_description = Store.format_ui_string(None, spellname, (request.args['quantity'][0] if 'quantity' in request.args else None), spell, spell['ui_description'])
+        elif type == OGPAPI.object_type('achievement'):
+            name = request.args['name'][0]
+            data = gamedata['achievements'][name]
+            my_url = self.get_object_endpoint({'type':type, 'name':name})
+            my_og_type = data['fb_open_graph'].get('fb_type', 'game.achievement').replace('$APP_NAMESPACE', SpinConfig.config['facebook_app_namespace'])
+            my_ui_name = data['fb_open_graph'].get('fb_name', data['ui_name'])
+            my_ui_description = data['fb_open_graph'].get('fb_description', data['ui_description'])
+            art_asset_s3 = data['fb_open_graph']['s3_image']
+            if my_og_type == 'game.achievement':
+                extra_raw_props.append(('game:points', data['fb_open_graph']['points']))
 
-                art_asset_s3 = spell.get('fb_open_graph_s3_image', gamedata['store']['fb_open_graph_gamebucks_icon'])
-                if 'open_graph_prices' in spell:
-                    for i in xrange(len(spell['open_graph_prices'])):
-                        # for details see https://developers.facebook.com/docs/payments/ads_virtual_goods
-                        if 'open_graph_original_prices' in spell:
-                            currency, amount = spell['open_graph_original_prices'][i]
-                            extra_raw_props.append(('product:original_price:amount', amount))
-                            extra_raw_props.append(('product:original_price:currency', currency))
-                        currency, amount = spell['open_graph_prices'][i]
-                        extra_raw_props.append(('product:price:amount', amount))
-                        extra_raw_props.append(('product:price:currency', currency))
-                if 'open_graph_purchase_limit' in spell:
-                    extra_raw_props.append(('product:purchase_limit', spell['open_graph_purchase_limit']))
+        elif type == OGPAPI.object_type('base'):
+            user_id = int(request.args['user_id'][0])
+            base = gamedata['ai_bases']['bases'][str(user_id)]
+            #art_asset_file =gamedata['art'][base['portrait']]['states']['normal']['images'][0]
+            my_url = self.get_object_endpoint({'type':type,'user_id':user_id})
+            if 'fb_open_graph' in base:
+                my_ui_name = base['fb_open_graph'].get('name', base['ui_name'])
+                my_ui_description = base['fb_open_graph']['description']
+                art_asset_s3 = base['fb_open_graph']['s3_image']
+            else:
+                my_ui_name = "%s Level %d" % (base['ui_name'], base['resources']['player_level'])
+                my_ui_description = "A vicious computer opponent" # ui_name
 
-            elif type == OGPAPI.object_type('achievement'):
-                name = request.args['name'][0]
-                data = gamedata['achievements'][name]
-                my_url = self.get_object_endpoint({'type':type, 'name':name})
-                my_og_type = data['fb_open_graph'].get('fb_type', 'game.achievement').replace('$APP_NAMESPACE', SpinConfig.config['facebook_app_namespace'])
-                my_ui_name = data['fb_open_graph'].get('fb_name', data['ui_name'])
-                my_ui_description = data['fb_open_graph'].get('fb_description', data['ui_description'])
-                art_asset_s3 = data['fb_open_graph']['s3_image']
-                if my_og_type == 'game.achievement':
-                    extra_raw_props.append(('game:points', data['fb_open_graph']['points']))
+            extra_props['level'] = base['resources']['player_level']
+            extra_props['owner'] = base['ui_name']
+            extra_props['user_id'] = user_id
 
-            elif type == OGPAPI.object_type('base'):
-                user_id = int(request.args['user_id'][0])
-                base = gamedata['ai_bases']['bases'][str(user_id)]
-                #art_asset_file =gamedata['art'][base['portrait']]['states']['normal']['images'][0]
-                my_url = self.get_object_endpoint({'type':type,'user_id':user_id})
-                if 'fb_open_graph' in base:
-                    my_ui_name = base['fb_open_graph'].get('name', base['ui_name'])
-                    my_ui_description = base['fb_open_graph']['description']
-                    art_asset_s3 = base['fb_open_graph']['s3_image']
-                else:
-                    my_ui_name = "%s Level %d" % (base['ui_name'], base['resources']['player_level'])
-                    my_ui_description = "A vicious computer opponent" # ui_name
+        elif type == OGPAPI.object_type('player_level'):
+            level = int(request.args['level'][0])
+            my_url = self.get_object_endpoint({'type':type, 'level': level})
+            my_ui_name = "Level %d" % level
+            extra_props['level'] = level
 
-                extra_props['level'] = base['resources']['player_level']
-                extra_props['owner'] = base['ui_name']
-                extra_props['user_id'] = user_id
+        elif type in [OGPAPI.object_type(x) for x in ('spec_building','spec_unit','spec_mobile','spec_inert','spec_tech','spec_aura')]:
+            spec_name = request.args['spec'][0]
+            level = int(request.args['level'][0]) if ('level' in request.args) else -1
 
-            elif type == OGPAPI.object_type('player_level'):
-                level = int(request.args['level'][0])
-                my_url = self.get_object_endpoint({'type':type, 'level': level})
-                my_ui_name = "Level %d" % level
+            spec = GameObjectSpec.lookup(spec_name)
+            # need to get the raw gamedata spec for UI strings
+            raw_spec = gamedata[Spec.KEY_MAP[spec.kind]][spec_name]
+            my_ui_name = "%s" % raw_spec['ui_name']
+            my_ui_description = "%s" % raw_spec['ui_description']
+
+            if 'external_art_asset' in raw_spec:
+                art_asset_s3 = raw_spec['external_art_asset']
+
+            url_params = {'type':type,'spec':spec_name}
+            if level > 0:
+                url_params['level'] = str(level)
+                my_ui_name += " Level %d" % level
                 extra_props['level'] = level
 
-            elif type in [OGPAPI.object_type(x) for x in ('spec_building','spec_unit','spec_mobile','spec_inert','spec_tech','spec_aura')]:
-                spec_name = request.args['spec'][0]
-                level = int(request.args['level'][0]) if ('level' in request.args) else -1
+            my_url = self.get_object_endpoint(url_params)
 
-                spec = GameObjectSpec.lookup(spec_name)
-                # need to get the raw gamedata spec for UI strings
-                raw_spec = gamedata[Spec.KEY_MAP[spec.kind]][spec_name]
-                my_ui_name = "%s" % raw_spec['ui_name']
-                my_ui_description = "%s" % raw_spec['ui_description']
+        elif type == OGPAPI.object_type('ranking'):
+            #value = int(request.args['value'][0])
+            #percentile = str(request.args['percentile'][0])
+            #category = str(request.args['category'][0])
+            #extra_props['value'] = value
+            #extra_props['percentile'] = percentile
 
-                if 'external_art_asset' in raw_spec:
-                    art_asset_s3 = raw_spec['external_art_asset']
+            my_ui_name = 'Leaderboard Ranking'
+            if 'category' in request.args:
+                category = str(request.args['category'][0])
+                extra_props['category'] = category
+                my_ui_name += ': '+category
 
-                url_params = {'type':type,'spec':spec_name}
-                if level > 0:
-                    url_params['level'] = str(level)
-                    my_ui_name += " Level %d" % level
-                    extra_props['level'] = level
+            my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
+            #my_ui_description = 'For '+category
 
-                my_url = self.get_object_endpoint(url_params)
+        elif type == OGPAPI.object_type('literal'):
+            for MANDATORY_ARG in ('spin_ref', 'ui_name'):
+                if MANDATORY_ARG not in request.args:
+                    request.setResponseCode(http.BAD_REQUEST)
+                    return 'missing %s' % MANDATORY_ARG
 
-            elif type == OGPAPI.object_type('ranking'):
-                #value = int(request.args['value'][0])
-                #percentile = str(request.args['percentile'][0])
-                #category = str(request.args['category'][0])
-                #extra_props['value'] = value
-                #extra_props['percentile'] = percentile
-
-                my_ui_name = 'Leaderboard Ranking'
-                if 'category' in request.args:
-                    category = str(request.args['category'][0])
-                    extra_props['category'] = category
-                    my_ui_name += ': '+category
-
-                my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
-                #my_ui_description = 'For '+category
-
-            elif type == OGPAPI.object_type('literal'):
-                for MANDATORY_ARG in ('spin_ref', 'ui_name'):
-                    if MANDATORY_ARG not in request.args:
-                        request.setResponseCode(http.BAD_REQUEST)
-                        return 'missing %s' % MANDATORY_ARG
-
-                my_ui_name = request.args['ui_name'][0].decode('utf-8')
-                if ('ui_description' in request.args):
-                    my_ui_description = request.args['ui_description'][0].decode('utf-8')
-                else:
-                    my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
-                my_spin_ref = str(request.args['spin_ref'][0])
-                if ('spin_ref_user_id' in request.args):
-                    my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
-                if ('spin_link_qs' in request.args):
-                    my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
-                    assert my_spin_link_qs.__class__ is dict
-                my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
-
+            my_ui_name = request.args['ui_name'][0].decode('utf-8')
+            if ('ui_description' in request.args):
+                my_ui_description = request.args['ui_description'][0].decode('utf-8')
             else:
-                raise Exception('unknown type "%s"' % type)
+                my_ui_description = SpinConfig.config['proxyserver'].get('fbexternalhit_description', '')
+            my_spin_ref = str(request.args['spin_ref'][0])
+            if ('spin_ref_user_id' in request.args):
+                my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
+            if ('spin_link_qs' in request.args):
+                my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
+                assert my_spin_link_qs.__class__ is dict
+            my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
 
-            ns = SpinConfig.config['facebook_app_namespace']
-            ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
-            ret += '<meta property="fb:app_id" content="%s" />\n' % SpinConfig.config['facebook_app_id']
-            ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
-            #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
-            ret += '<meta property="og:url"    content="%s" />\n' % my_url
-            ret += u'<meta property="og:title"  content="'+cgi_escape(my_ui_name,True)+u'" />\n'
+        else:
+            raise Exception('unknown type "%s"' % type)
 
-            if my_ui_description:
-                ret += u'<meta property="og:description"  content="'+cgi_escape(my_ui_description,True)+u'" />\n'
-            if my_ui_determiner is not None:
-                ret += u'<meta property="og:determiner"  content="'+cgi_escape(my_ui_determiner,True)+u'" />\n'
+        ns = SpinConfig.config['facebook_app_namespace']
+        ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
+        ret += '<meta property="fb:app_id" content="%s" />\n' % SpinConfig.config['facebook_app_id']
+        ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
+        #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
+        ret += '<meta property="og:url"    content="%s" />\n' % my_url
+        ret += u'<meta property="og:title"  content="'+cgi_escape(my_ui_name,True)+u'" />\n'
 
-            if not image_url:
-                # add image file, either from in-game art asset (200x200px minimum!),
-                # or use a generic default Mars Frontier image if none is specified
+        if my_ui_description:
+            ret += u'<meta property="og:description"  content="'+cgi_escape(my_ui_description,True)+u'" />\n'
+        if my_ui_determiner is not None:
+            ret += u'<meta property="og:determiner"  content="'+cgi_escape(my_ui_determiner,True)+u'" />\n'
 
-                if ('image_url' in request.args): # allow client-provided fallback
-                    image_url = str(request.args['image_url'][0])
-                elif art_asset_file:
-                    if 'art_cdn_path' in SpinConfig.config['proxyserver']:
-                        art_server = SpinConfig.config['proxyserver']['art_cdn_path']
-                    else:
-                        # URL to art asset assumes proxyserver is running on same host if no CDN is in use!
-                        art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
-                                                  SpinConfig.config['proxyserver']['external_http_port'])
-                    image_url = 'http://%s%s' % (art_server, art_asset_file)
-                elif art_asset_s3:
-                    image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+        if not image_url:
+            # add image file, either from in-game art asset (200x200px minimum!),
+            # or use a generic default Mars Frontier image if none is specified
+
+            if ('image_url' in request.args): # allow client-provided fallback
+                image_url = str(request.args['image_url'][0])
+            elif art_asset_file:
+                if 'art_cdn_path' in SpinConfig.config['proxyserver']:
+                    art_server = SpinConfig.config['proxyserver']['art_cdn_path']
                 else:
-                    image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
+                    # URL to art asset assumes proxyserver is running on same host if no CDN is in use!
+                    art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
+                                              SpinConfig.config['proxyserver']['external_http_port'])
+                image_url = 'http://%s%s' % (art_server, art_asset_file)
+            elif art_asset_s3:
+                image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
+            else:
+                image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
 
-            ret += '<meta property="og:image"  content="%s" />\n' % image_url
+        ret += '<meta property="og:image"  content="%s" />\n' % image_url
 
-            for key, val in extra_props.iteritems():
-                ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
-            for key, val in extra_raw_props:
-                ret += '<meta property="%s"  content="%s" />\n' % (key, cgi_escape(str(val),True))
+        for key, val in extra_props.iteritems():
+            ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
+        for key, val in extra_raw_props:
+            ret += '<meta property="%s"  content="%s" />\n' % (key, cgi_escape(str(val),True))
 
-            if not my_spin_ref:
-                my_spin_ref = 'open_graph_'+type
+        if not my_spin_ref:
+            my_spin_ref = 'open_graph_'+type
 
-            # add JavaScript code to redirect end-user browser hits (not Facebook back-end Open Graph hits) to the game
-            game_qs = 'spin_ref='+my_spin_ref
-            if my_spin_ref_user_id:
-                game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
-            if my_spin_link_qs:
-                game_qs += '&'+urllib.urlencode(my_spin_link_qs)
-            ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
-                   (SpinConfig.config['facebook_app_namespace'], game_qs)
-            return ret.encode('utf-8')
-
-        except Exception:
-            gamesite.exception_log.event(server_time, 'OGPAPI Exception: '+traceback.format_exc()+'while handling request '+repr(request)+' args '+repr(request.args))
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'spinpunch error'
+        # add JavaScript code to redirect end-user browser hits (not Facebook back-end Open Graph hits) to the game
+        game_qs = 'spin_ref='+my_spin_ref
+        if my_spin_ref_user_id:
+            game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
+        if my_spin_link_qs:
+            game_qs += '&'+urllib.urlencode(my_spin_link_qs)
+        ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
+               (SpinConfig.config['facebook_app_namespace'], game_qs)
+        return ret.encode('utf-8')
 
 OGPAPI_instance = OGPAPI()
 
@@ -12663,49 +13352,44 @@ class CONTROLAPI(resource.Resource):
         self.gameapi = gameapi
 
     def render_POST(self, request): return self.render_GET(request)
-
     def render_GET(self, request):
-        start_time = time.time()
-        ret = self.do_render_GET(request)
-        end_time = time.time()
-        if 'method' in request.args:
-            reason = request.args['method'][0]
-        else:
-            reason = 'unknown'
-        admin_stats.record_latency('CONTROLAPI(HTTP:%s)' % reason, end_time-start_time)
-        return ret
-
-    def do_render_GET(self, request):
         update_server_time()
+        ret = None
 
         if ('secret' in request.args and 'method' in request.args):
             secret = str(request.args['secret'][0])
             method = str(request.args['method'][0])
             args = dict([(k, str(v[0])) for k, v in request.args.iteritems() if k not in ('secret','method')])
 
-            # wrap this block so the server does not return a revealing error message in case of exceptions
-            try:
-                return self.handle(request, secret, method, args)
-            except Exception:
-                gamesite.exception_log.event(server_time, 'CONTROLAPI Exception (method %r args %r):\n%s' % (method, args, traceback.format_exc()))
+            with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
+                ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
 
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'error\n'
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'error\n'
+        return ret
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
-        self.gameapi.log_out_async(session, 'forced_relog', lambda : SpinHTTP.complete_deferred_request(body, request))
+        d = self.gameapi.log_out_async(session, 'forced_relog')
+        d.addCallback(lambda _, session=session: ascdebug('kill_session %d %s async end' % (session.user.user_id, session.session_id)))
+        d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
+
         return server.NOT_DONE_YET
 
     # function for receiving cross-server IPC broadcasts
-    def chat_recv(self, channel, sender_info, text):
+    def chat_recv(self, channel, id, sender_info, text):
         assert channel == 'CONTROL'
         if gamedata['server']['log_controlapi']:
             gamesite.exception_log.event(server_time, 'CONTROLAPI(CHAT): %s got %s %s' % (spin_server_name, repr(sender_info), text))
-        start_time = time.time()
-        ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
-        end_time = time.time()
-        admin_stats.record_latency('CONTROLAPI(CHAT:%s)' % sender_info['method'], end_time-start_time)
+        ret = None
+
+        try:
+            with admin_stats.latency_measurer('CONTROLAPI(CHAT:%s)' % sender_info['method']):
+                ret = self.handle(None, sender_info['secret'], sender_info['method'], sender_info['args'])
+        except:
+            gamesite.exception_log.event(server_time, 'CONTROL chat_recv exception method %r args %r: %s' % (sender_info['method'], sender_info['args'], traceback.format_exc().strip())) # OK
+
         return ret
 
     # encapsulate state needed to load, mutate, then store player and user JSON structs
@@ -12715,8 +13399,8 @@ class CONTROLAPI(resource.Resource):
             self.method_name = method_name
             self.handler = handler
             self.d = d
-            self.player_json = None
-            self.user_json = None
+            self.player_raw = None
+            self.user_raw = None
             self.has_player = False
             self.has_user = False
             self.wrote_player = False
@@ -12724,8 +13408,17 @@ class CONTROLAPI(resource.Resource):
             self.error = None
             self.val = None # return value
         def start(self):
-            io_system.async_read_player(self.user_id, self.player_read_success, self.player_read_error, reason='CustomerSupport')
-            io_system.async_read_user(self.user_id, self.user_read_success, self.user_read_error, reason='CustomerSupport')
+            if self.handler.need_player:
+                io_system.async_read_player(self.user_id, self.player_read_success, self.player_read_error, reason='CustomerSupport')
+            else:
+                self.has_player = True
+                self.player_raw = ''
+            if self.handler.need_user:
+                io_system.async_read_user(self.user_id, self.user_read_success, self.user_read_error, reason='CustomerSupport')
+            else:
+                self.has_user = True
+                self.user_raw = ''
+            self.try_mutate()
         def player_read_error(self, reason):
             self.has_player = True
             self.error = reason
@@ -12733,7 +13426,7 @@ class CONTROLAPI(resource.Resource):
         def player_read_success(self, buf):
             self.has_player = True
             if buf != 'NOTFOUND':
-                self.player_json = SpinJSON.loads(buf)
+                self.player_raw = buf
             else:
                 self.error = 'player not found'
             self.try_mutate()
@@ -12744,27 +13437,56 @@ class CONTROLAPI(resource.Resource):
         def user_read_success(self, buf):
             self.has_user = True
             if buf != 'NOTFOUND':
-                self.user_json = SpinJSON.loads(buf)
+                self.user_raw = buf
             else:
                 self.error = 'user not found'
             self.try_mutate()
         def try_mutate(self):
             if (not self.has_player) or (not self.has_user): return # I/O not done yet
-            if (not self.player_json) or (not self.user_json) or self.error:
+            if (self.player_raw is None) or (self.user_raw is None) or self.error:
                 # failed reading - stop here, don't write
                 self.d.callback(CustomerSupport.ReturnValue(error = 'error on player %d: %s' % (self.user_id, self.error or 'unknown')))
                 return
             try:
-                self.val = self.handler.exec_offline(self.user_json, self.player_json)
-                self.player_json['generation'] = self.player_json.get('generation',-1)+1
+                if self.handler.want_raw:
+                    player_json = None
+                    user_json = None
+                    self.val = self.handler.exec_offline_raw(self.user_raw, self.player_raw)
+                else:
+                    if self.handler.need_player:
+                        player_json = SpinJSON.loads(self.player_raw)
+                    else:
+                        player_json = None
+                    if self.handler.need_user:
+                        user_json = SpinJSON.loads(self.user_raw)
+                    else:
+                        user_json = None
+                    self.val = self.handler.exec_offline(user_json, player_json)
             except:
-                gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r:\n%s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc()))
-                self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc()))
+                gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r: %s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc().strip())) # OK
+                self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
-            player_buf = SpinJSON.dumps(self.player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-            user_buf = SpinJSON.dumps(self.user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
-            io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
-            io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
+
+            assert self.val
+            if self.handler.read_only:
+                self.d.callback(self.val)
+                return
+            else:
+                if self.handler.need_player:
+                    assert player_json
+                    player_json['generation'] = player_json.get('generation',-1)+1
+                    player_buf = SpinJSON.dumps(player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
+                else:
+                    self.wrote_player = True
+                if self.handler.need_user:
+                    assert user_json
+                    user_buf = SpinJSON.dumps(user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
+                else:
+                    self.wrote_user = True
+                self.try_finish()
+
         def player_write_success(self):
             self.wrote_player = True
             self.try_finish()
@@ -12779,7 +13501,7 @@ class CONTROLAPI(resource.Resource):
         assert secret == str(SpinConfig.config['proxy_api_secret'])
 
         if (method_name in CustomerSupport.methods):
-            # new-style CustomerSupport handlers
+            # new-style CustomerSupport handlers that operate on a session or playerdb/userdb backing store
             user_id = None
             if 'user_id' in args:
                 user_id = int(args['user_id'])
@@ -12791,81 +13513,88 @@ class CONTROLAPI(resource.Resource):
             handler = CustomerSupport.methods[method_name](server_time, user_id, gamedata, gamesite, args)
 
             # see if the user is logged in
-            session = None
-            for s in session_table.itervalues():
-                if s.user.user_id == user_id:
-                    session = s
-                    break
+            session = get_session_by_user_id(user_id)
 
             if session:
                 # ONLINE edit
-                try:
-                    val = handler.exec_online(session, session.deferred_messages)
-                except:
-                    gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r:\n%s' % (user_id, method_name, args, traceback.format_exc()))
-                    val = CustomerSupport.ReturnValue(error = traceback.format_exc())
 
-                if val.async:
-                    assert isinstance(val.async, defer.Deferred) # sanity check
-                    ret = server.NOT_DONE_YET
+                ret = server.NOT_DONE_YET
 
-                    def after_async(async_result, request, session):
-                        # note: only handles one asynchronous step; if more are needed, this would have to recurse
-                        session.flush_deferred_messages()
-                        SpinHTTP.complete_deferred_request(async_result.as_body(), request)
-                    val.async.addBoth(after_async, request, session)
+                def handle_online(request, session, handler, method_name, args, _):
+                    try:
+                        val = handler.exec_online(session, session.outgoing_messages)
+                    except:
+                        gamesite.exception_log.event(server_time, 'CustomerSupport online exception player %d method %r args %r: %s' % \
+                                                     (session.user.user_id, method_name, args, traceback.format_exc().strip())) # OK
+                        val = CustomerSupport.ReturnValue(error = traceback.format_exc().strip()) # OK
 
-                else:
-                    if val.kill_session:
-                        ret = self.kill_session(request, session, body = val.as_body())
+                    if val.async:
+                        assert isinstance(val.async, defer.Deferred) # sanity check
+
+                        def online_error(fail, session, method_name, args):
+                            gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r: %s' % \
+                                                         (session.user.user_id, method_name, args, fail.getTraceback().strip())) # OK
+                            # turn exception into a regular result
+                            return CustomerSupport.ReturnValue(error = fail.getTraceback().strip()) # OK
+
+                        val.async.addErrback(online_error, session, method_name, args)
+
+                        session.start_async_request(val.async)
+                        val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request))
+
                     else:
-                        ret = val.as_body()
+                        if val.kill_session:
+                            ret = self.kill_session(request, session, body = val.as_body()) # this adds complete_deferred_request() when necessary
+                        else:
+                            ret = val.as_body()
+                        session.queue_flush_outgoing_messages()
+                        SpinHTTP.complete_deferred_request(ret, request)
 
-                session.flush_deferred_messages()
+                d = make_deferred('CustomerSupport:'+method_name+'(online)')
+
+                # if player logged out, this is going to fail
+                def handle_online_race(request, fail):
+                    fail.trap(Session.AlreadyLoggedOut)
+                    SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request)
+
+                d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
+                               functools.partial(handle_online_race, request))
+
+                session.after_async_request(d)
 
             else:
                 # OFFLINE edit
-                state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
-                if state != Player.LockState.being_attacked:
-                    ret = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id).as_body()
-                else:
-                    d = defer.Deferred()
-                    def unlock(val, uid):
-                        gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
-                        return val
-                    d.addBoth(unlock, user_id)
-                    def complete(val, request):
-                        SpinHTTP.complete_deferred_request(val.as_body(), request)
-                    d.addBoth(complete, request)
+                ret = None
+                d = make_deferred('CustomerSupport:'+method_name+'(offline)')
+
+                if not handler.read_only:
+                    # get lock
+                    state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
+                    if state != Player.LockState.being_attacked:
+                        ret = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id).as_body()
+                    else:
+                        def unlock(val, uid):
+                            gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
+                            return val
+                        d.addBoth(unlock, user_id) # OK
+
+                if ret is None: # no lock error
+                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request))
 
                     self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
 
         else:
-            # old-style custom handlers
+
+            # custom handlers that do not work with live sessions
+            # these are more for server-global operations, plus the terminate_session special case
+
             handler = getattr(self, 'handle_'+method_name, None)
             if handler is None:
+                request.setResponseCode(http.BAD_REQUEST)
                 return 'badmethod\n'
 
-            handler_args = copy.deepcopy(args)
-            # common code for methods that operate on a user
-            # replace 'user_id' arg with 'session'
-            if 'user_id' in handler_args:
-                user_id = int(args['user_id'])
-                del handler_args['user_id']
-                session = None
-                for s in session_table.itervalues():
-                    if s.user.user_id == user_id:
-                        session = s
-                        break
-                if (not session) and (method_name != 'terminate'):
-                    # always return OK for terminate, since it may fail due to innocent race conditions
-                    return 'notfound\n'
-                else:
-                    handler_args['session'] = session
-
-
-            ret = handler(request, **handler_args)
+            ret = handler(request, **args)
 
         # note: can go asynchronous
         return ret if (ret is not None) else 'ok\n'
@@ -12884,11 +13613,13 @@ class CONTROLAPI(resource.Resource):
 
         self.gameapi.AsyncLogin.cancel_existing(None, session_id)
 
-        if session_id in session_table:
+        if session_id in session_table: # note: we DO want to see logout_in_progress sessions here, to wait until they finish logout before responding
             # note: this goes asynchronous
+            ascdebug('terminate_session %s async start' % (session_id))
             return self.kill_session(request, session_table[session_id])
         else:
             # still return 'ok' even if session was not found, since it may have timed out
+            ascdebug('terminate_session %s ok' % (session_id))
             return 'ok\n'
 
     def handle_sql_on(self, request):
@@ -12900,9 +13631,9 @@ class CONTROLAPI(resource.Resource):
     def handle_nosql_off(self, request):
         gamesite.nosql_shutdown()
     def handle_maint_kick(self, request):
-        return SpinJSON.dumps({'result': gamesite.start_maint_kick()})
+        return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
-        gamesite.panic_kick()
+        gamesite.panic_kick(request.transport)
         return SpinJSON.dumps({'result': 'ok'})
     def handle_change_state(self, request, state = None):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
@@ -12911,13 +13642,15 @@ class CONTROLAPI(resource.Resource):
     def handle_shutdown(self, request, force = False):
         if (not force) and len(session_table) > 0:
             return SpinJSON.dumps({'error':'not shutting down - %d sessions still active\n' % len(session_table)})
-        reactor.callLater(5, reactor.stop) # ugly hack - make sure the response gets written
-        return SpinJSON.dumps({'result':'ok'})
-    def handle_terminate(self, request, session = None):
-        if session:
-            return self.kill_session(request, session)
-        else:
-            return 'ok\n' # can get here due to race condition
+
+        # redundant with gamesite.shutdown(), but makes the status_json result show correct shutting_down state
+        status_json = gamesite.change_state('shutting_down')
+
+        request.setHeader('Connection', 'close')
+        reactor.stop()
+
+        return SpinJSON.dumps({'result':status_json}, newline=True)
+
     def handle_ping(self, request):
         pass
     def handle_sleep(self, request, duration = 5):
@@ -12932,70 +13665,41 @@ class CONTROLAPI(resource.Resource):
         return server.NOT_DONE_YET
     def handle_server_eval(self, request, expr = None):
         result = eval(expr)
-        gamesite.exception_log.event(server_time, 'eval %s -> %s' % (expr, repr(result)))
-    def handle_ban(self, request, session = None):
-        session.player.banned_until = server_time + gamedata['server']['default_ban_time']
-        return self.kill_session(request, session)
-    def handle_ai_attack(self, request, session = None, attack_type = None):
-        session.start_ai_attack(session.deferred_messages, attack_type, override_protection = True, verbose = True)
-    def handle_lockout(self, request, session = None, lockout_time = None, lockout_message = None):
-        session.player.lockout_until = server_time + lockout_time
-        session.player.lockout_message = lockout_message
-        return self.kill_session(request, session)
-    def handle_push_gamedata(self, request, session = None):
-        self.gameapi.push_gamedata(session, session.deferred_messages)
-        session.flush_deferred_messages()
-    def handle_force_reload(self, request, session = None):
-        session.send_deferred_message([["FORCE_RELOAD"]], flush_now = True)
-    def handle_client_eval(self, request, session = None, expr = None):
-        session.send_deferred_message([["CLIENT_EVAL", expr]], flush_now = True)
-    def handle_offer_payer_promo(self, request, session = None):
-        session.user.offer_payer_promo(session, session.deferred_messages)
-        session.flush_deferred_messages()
-    def handle_invoke_facebook_auth(self, request, session = None, scope = None):
-        if not scope: scope = SpinConfig.config.get('facebook_auth_scope', 'email')
-        session.send_deferred_message([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
-    def handle_join_abtest(self, request, session = None, name = None, group = None):
-        assert group in gamedata['abtests'][name]['groups']
-        session.player.abtests[name] = group
-        # note: does NOT update object specs, will likely require a reload to work
-        session.deferred_messages.append(["ABTEST_UPDATE", session.player.abtests])
-    def handle_clear_abtest(self, request, session = None, name = None):
-        if name in session.player.abtests: del session.player.abtests[name]
-        session.deferred_messages.append(["ABTEST_UPDATE", session.player.abtests])
-    def handle_pvp_isolate(self, request, session = None):
-        session.player.isolate_pvp = True
-    def handle_pvp_unisolate(self, request, session = None):
-        session.player.isolate_pvp = False
-    def handle_add_battle_fatigue(self, request, session = None, stack = None, defender_id = None):
-        if stack is None: stack = gamedata['anti_bullying']['sandstorm_max_battle_fatigue']
-        session.player.cooldown_trigger('battle_fatigue:%d' % int(defender_id),
-                                        gamedata['anti_bullying']['battle_fatigue_duration'],
-                                        add_stack = stack)
-    def handle_remove_battle_fatigue(self, request, session = None, defender_id = None):
-        session.player.cooldown_reset('battle_fatigue:%d' % int(defender_id))
+        ui_result = ('\n'+result) if isinstance(result, basestring) else (' '+repr(result))
+        gamesite.exception_log.event(server_time, 'eval %s ->%s' % (expr, ui_result))
+        return SpinJSON.dumps({'result': repr(result)}, newline=True)
     def handle_system_announcement(self, request, body = None):
-        for session in session_table.itervalues():
-            if not session.logout_in_progress:
-                for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
-                    session.chat_recv(channel, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
+        for session in iter_sessions():
+            for channel in ('GLOBAL', 'ALLIANCE', 'REGION'):
+                session.chat_recv(channel, None, {'chat_name':'System', 'type':'system', 'time': server_time, 'facebook_id':'-1', 'user_id':-1}, body)
+
+    # one server gets this request, and then it goes out to all local sessions and other servers via broadcast
+    def handle_censor_chat_message(self, request, channel = None, message_id = None, target_user_id = None, new_type = None):
+        assert channel and message_id
+        if target_user_id: target_user_id = int(target_user_id)
+        gamesite.chat_mgr.send(channel, None,
+                               {'time': server_time,
+                                'type': 'message_hide', 'new_type': (new_type or 'abuse_violated'),
+                                'chat_name': 'System', 'user_id': -1,
+                                'target_user_id': target_user_id,
+                                'target_message_id': message_id}, '', log = True)
+        return SpinJSON.dumps({'result': 'ok'}, newline=True)
     def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
         if server != spin_server_name:
             self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False)
-    def handle_broadcast_map_attack(self, request, msg = None, region_id = None, base_id = None,
+    def handle_broadcast_map_attack(self, request, msg = None, region_id = None, feature = None,
                                     attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None):
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_attack(region_id, base_id, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
+            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
-        for session in session_table.itervalues():
-            if not session.logout_in_progress:
-                if session.player.home_region == region_id:
-                    session.send_deferred_message([["REGION_TURF_UPDATE", session.player.home_region, data]])
+        for session in iter_sessions():
+            if session.player.home_region == region_id:
+                session.send([["REGION_TURF_UPDATE", session.player.home_region, data]])
 
-class Store:
+class Store(object):
 
     # given a list of damaged units and/or in-production manuf queue items, return a dictionary mapping
     # from unit specname to rough gamebucks equivalent of speedup cost.
@@ -13054,7 +13758,7 @@ class Store:
             return p
 
         # only check for currency match when price > 0
-        if (not (sale_currency.startswith('item:') or (sale_currency in gamedata['resources']))):
+        if (not (sale_currency.startswith('item:') or sale_currency.startswith('score:') or (sale_currency in gamedata['resources']))):
             spell_currency = spell.get('currency', session.player.get_any_abtest_value('currency', gamedata['currency']) if session else gamedata['currency'])
             # wildcard matches for unknown real currencies
             if spell_currency == 'fbpayments:*' and sale_currency.startswith('fbpayments:') or \
@@ -13155,7 +13859,7 @@ class Store:
 
         for PRED in ('requires',): # XXXXXX this never checked show_if - should it?
             if PRED in spell:
-                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                     error_reason.append('spell "%s" predicate is not satisfied' % PRED)
                     return -1, p_currency
 
@@ -13473,10 +14177,6 @@ class Store:
 
             if formula == 'upgrade':
                 # check requirements
-                if 0 and session.player.foreman_is_busy():
-                    # allow instant upgrades while foreman is busy?
-                    error_reason.append('foreman is busy')
-                    return -1, p_currency
 
                 max_level = unit.spec.maxlevel
                 if unit.spec.max_ui_level and (not session.player.is_cheater):
@@ -13711,6 +14411,17 @@ class Store:
                 if stack > 1:
                     ui_name = ('%dx ' % stack) + ui_name
             s = s.replace('%ITEM_NAME', ui_name)
+        if '%ITEM_BUNDLE' in s:
+            ui_bundle = ''
+            want_loot = spell.get('loot_table')
+            if want_loot and spellarg and (isinstance(spellarg, int) or isinstance(spellarg, basestring)):
+                want_loot = False # quantity-based SKU
+            if want_loot and spellarg and isinstance(spellarg, dict) and not spellarg.get('want_loot', False):
+                want_loot = False
+            # session is None for OGPAPI, which makes want_loot opt-in
+            if want_loot and ((session is None) or session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)):
+                ui_bundle = ' (plus FREE items)'
+            s = s.replace('%ITEM_BUNDLE', ui_bundle)
         return s
 
     # given the order_info passed from the client, return a dictionary with
@@ -13719,8 +14430,8 @@ class Store:
     def make_credit_order(cls, order_id, order_info, currency):
         assert currency in ('fbcredits', 'kgcredits')
         session_id = str(order_info['session_id'])
-        session = session_table[session_id]
-        assert (not session.logout_in_progress)
+        session = get_session_by_session_id(session_id)
+        assert session
         unit_id = order_info['unit_id']
         spellname = order_info['spellname']
         spellarg = order_info.get('spellarg', None)
@@ -13784,7 +14495,7 @@ class Store:
     # (new) FB Payments go through a different code path!
 
     @classmethod
-    def execute_credit_order(cls, order_id, gameapi, request, session, buyer, receiver, currency, credits_amount, my_data):
+    def execute_credit_order(cls, order_id, gameapi, session, buyer, receiver, currency, credits_amount, my_data):
         assert currency in ('fbcredits', 'kgcredits', 'gamebucks') or currency.startswith('xsolla:')
         # note that gamebucks here is only used for platform offers that pay out in gamebucks, NOT in-game purchases
 
@@ -13802,10 +14513,7 @@ class Store:
 
             # note: we have to find the session manually, because this request comes from Facebook without passing through the client!
             if session is None:
-                for s in session_table.itervalues():
-                    if s.user.facebook_id == buyer:
-                        session = s
-                        break
+                session = get_session_by_facebook_id(buyer)
             if session is None: raise Exception(('session not found for in-app currency order! (FB buyer %s)' % buyer)+repr(my_data))
             unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_PROMO_GAMEBUCKS'
@@ -13826,7 +14534,7 @@ class Store:
 
         else:
             if session is None:
-                session = session_table[my_data['session_id']]
+                session = get_session_by_session_id(my_data['session_id'])
             unit_id = my_data['unit_id']
             spellname = my_data['spellname']
             spellarg = my_data.get('spellarg', None)
@@ -13849,7 +14557,7 @@ class Store:
         if network_id != receiver:
             gamesite.exception_log.event(server_time, 'execute_order: strange, receiver is mismatched (%s %s)' % (network_id, receiver))
 
-        price_description, detail_props = Store.execute_order(gameapi, request, session, session.deferred_messages,
+        price_description, detail_props = Store.execute_order(gameapi, session, session.outgoing_messages,
                                                               currency, credits_amount,
                                                               unit_id, spellname, spellarg,
                                                               server_time_according_to_client,
@@ -13864,6 +14572,9 @@ class Store:
                                                                  'currency': currency,
                                                                  'currency_amount': credits_amount,
                                                                  'country_tier': session.player.country_tier,
+                                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                                  'order_id': order_id})
 
         gamesite.credits_log.event(server_time, {'user_id':session.user.user_id,
@@ -13875,6 +14586,9 @@ class Store:
                                                  'currency_amount': credits_amount,
                                                  'summary': session.player.get_denormalized_summary_props('brief'),
                                                  'country_tier': session.player.country_tier,
+                                                 'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                                 'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                                 'num_purchases': session.player.history.get('num_purchases',0),
                                                  'order_id': order_id})
 
         session.activity_classifier.spent_money(dollar_amount, descr)
@@ -13892,6 +14606,7 @@ class Store:
         # new-style player metrics (redundant with old style above)
         session.increment_player_metric('money_spent', dollar_amount)
         session.increment_player_metric('num_purchases', 1)
+        session.setmax_player_metric('largest_purchase', dollar_amount)
 
         if 'money_purchase_history' not in session.player.history:
             session.player.history['money_purchase_history'] = []
@@ -13904,21 +14619,21 @@ class Store:
                                                                  'order_id': order_id,
                                                                  'description': descr})
 
-        session.send_adnetwork_purchase_event(session.deferred_messages, order_id, dollar_amount) # note: post-FB-tax
-        session.send_adnetwork_events(session.deferred_messages)
+        session.send_adnetwork_purchase_event(session.outgoing_messages, order_id, dollar_amount) # note: post-FB-tax
+        session.send_adnetwork_events(session.outgoing_messages)
 
         # update client's version of spend metrics
-        session.player.send_history_update(session.deferred_messages)
+        session.deferred_history_update = True
         if tag: # send acknowledgement to client
-            session.deferred_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag])
-        session.flush_deferred_messages()
+            session.outgoing_messages.append([{'fbcredits':"FBCREDITS_ORDER_ACK",'kgcredits':"KGCREDITS_ORDER_ACK"}[currency], tag, True])
+        session.queue_flush_outgoing_messages()
         return session
 
     @classmethod
-    def execute_gamebucks_order(cls, gameapi, request, session, retmsg, amount_willing_to_pay,
+    def execute_gamebucks_order(cls, gameapi, session, retmsg, amount_willing_to_pay,
                                 unit_id, spellname, spellarg,
                                 server_time_according_to_client):
-        price_description, detail_props = Store.execute_order(gameapi, request, session, retmsg, 'gamebucks', amount_willing_to_pay,
+        price_description, detail_props = Store.execute_order(gameapi, session, retmsg, 'gamebucks', amount_willing_to_pay,
                                                               unit_id, spellname, spellarg,
                                                               server_time_according_to_client)
 
@@ -13963,21 +14678,7 @@ class Store:
         return descr
 
     @classmethod
-    def execute_item_order(cls, gameapi, request, session, retmsg, item_name, amount_willing_to_pay,
-                           unit_id, spellname, spellarg,
-                           server_time_according_to_client):
-        return Store.execute_order(gameapi, request, session, retmsg, 'item:'+str(item_name), amount_willing_to_pay,
-                                   unit_id, spellname, spellarg,
-                                   server_time_according_to_client)
-    @classmethod
-    def execute_fungible_order(cls, gameapi, request, session, retmsg, resname, amount_willing_to_pay,
-                               unit_id, spellname, spellarg,
-                               server_time_according_to_client):
-        return Store.execute_order(gameapi, request, session, retmsg, resname, amount_willing_to_pay,
-                                   unit_id, spellname, spellarg,
-                                   server_time_according_to_client)
-    @classmethod
-    def execute_order(cls, gameapi, request, session, retmsg, currency, amount_willing_to_pay,
+    def execute_order(cls, gameapi, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
                       server_time_according_to_client,
                       usd_equivalent = None, gift_order = None, payment_id = None):
@@ -14057,7 +14758,7 @@ class Store:
             record_spend_type = 'gamebucks'
             record_price_type = 'gamebucks_price'
             record_amount = amount_willing_to_pay
-        elif currency.startswith('item:'):
+        elif currency.startswith('item:') or currency.startswith('score:'):
             item_name = currency.split(':')[1]
             record_spend_type = item_name
             record_price_type = item_name+'_price'
@@ -14139,7 +14840,7 @@ class Store:
             assert aura
             aura['end_time'] = server_time - 1
             session.player.prune_player_auras()
-            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+            session.deferred_player_auras_update = True
             session.increment_player_metric('player_aura_speedups_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
 
@@ -14203,15 +14904,23 @@ class Store:
                 assert gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
                                                                       generation=base.base_generation, do_hook=False, reason=spellname) \
                                                                       == Player.LockState.being_attacked # generation=-1?
+            to_remove = []
             try:
                 for object in base.iter_objects():
+                    if object.is_mobile() and object.is_temporary(): # get rid of temporary units
+                        to_remove.append(object)
+                        continue
                     if object.is_building() and object.is_damaged():
                         object.repair_finish_time = server_time - 1
                         if session.has_object(object.obj_id):
                             gameapi.ping_object(session, retmsg, object.obj_id, base)
                         if write_base:
                             base.nosql_write_one(object, spellname)
-
+                for object in to_remove:
+                    base.drop_object(object)
+                    if session.has_object(object.obj_id):
+                        retmsg.append(["OBJECT_REMOVED2", object.obj_id])
+                        session.rem_object(object.obj_id)
             finally:
                 if write_base and session.viewing_base_lock != base.lock_id():
                     gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason=spellname)
@@ -14326,26 +15035,22 @@ class Store:
 
         elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
+            want_loot = spell.get('loot_table') # whether to give loot items
+
             if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT", "BUY_GAMEBUCKS_TOPUP"):
                 bucks = int(spellarg)
             else:
                 bucks = spell['quantity']
+                if want_loot:
+                    if spellarg:
+                        assert isinstance(spellarg, dict)
+                        if not spellarg.get('want_loot', True):
+                            want_loot = False
+
             session.player.resources.gain_gamebucks(bucks, reason='payment')
-            metric_event_coded(session.user.user_id, '5090_purchase_gamebucks', {'amount_added':bucks,
-                                                                                 'sku': spellname,
-                                                                                 'currency': currency,
-                                                                                 record_price_type: amount_willing_to_pay})
-            if gamedata['server'].get('log_purchase_ui',False):
-                # the other purchase_ui_log events are all client-side, but we have to do this on the server
-                # because Facebook's credit API callback is unreliable :(
-                gamesite.purchase_ui_log.event(server_time, {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
-                                                             'user_id': session.player.user_id, 'sku': spellname, 'api': currency.split(':')[0],
-                                                             'gamebucks': bucks,
-                                                             'currency': currency, 'currency_price': amount_willing_to_pay,
-                                                             'usd_equivalent': usd_equivalent,
-                                                             'gift_order': gift_order,
-                                                             'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
-                                                             })
+            session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
+
+            session.setmax_player_metric('largest_purchase_gamebucks', bucks)
 
             session.increment_player_metric('gamebucks_purchased', bucks)
             session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount)
@@ -14361,6 +15066,73 @@ class Store:
                     session.increment_player_metric('payer_promo_gamebucks_earned', bucks)
                     metric_event_coded(session.user.user_id, '4501_payer_promo_claimed', props.copy())
                 metric_event_coded(session.user.user_id, '4590_promo_gamebucks_earned', props.copy())
+
+            items = []
+            loggable_items = []
+            discovered_where = None
+
+            if want_loot: # item bundle
+                assert not gift_order # XXX no code path yet for gifted bundles
+                loot_table = gamedata['loot_tables'][spell['loot_table']]
+                items += session.get_loot_items(session.player, loot_table['loot'], -1, -1)
+                if items:
+                    loggable_items = copy.deepcopy(items) # because inventory operations might mutate it
+                    if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
+                       session.player.find_object_by_type(gamedata['inventory_building']):
+
+                        # add directly to inventory, allowing over-stuffed warehouse?
+                        bypass_pred = session.player.get_any_abtest_value('buy_gamebucks_bypass_loot_buffer', gamedata['store'].get('buy_gamebucks_bypass_loot_buffer', None))
+
+                        if bypass_pred and ((bypass_pred in (1,True)) or Predicates.read_predicate(bypass_pred).is_satisfied2(session, session.player, {})):
+                            # go directly into inventory
+                            for item in items:
+                                session.player.inventory_add_item(item, -1)
+                                spec = gamedata['items'].get(item['spec'])
+                                if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                                    session.deferred_player_auras_update = True
+                            session.player.send_inventory_update(retmsg)
+                            discovered_where = 'inventory'
+
+                        else:
+                            # use loot buffer
+
+                            # give promo warehouse space? (XXX note: no GUI for this on the client)
+                            promo_warehouse_pred = session.player.get_any_abtest_value('buy_gamebucks_promo_warehouse_space_if', gamedata['store'].get('buy_gamebucks_promo_warehouse_space_if',None))
+                            if promo_warehouse_pred and ((promo_warehouse_pred in (1,True)) or Predicates.read_predicate(promo_warehouse_pred).is_satisfied2(session, session.player, {})):
+                                cls.give_promo_warehouse_space(session, retmsg, items)
+
+                            session.player.loot_buffer += items
+                            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+                            discovered_where = 'loot_buffer'
+
+                        for item in loggable_items:
+                            session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
+
+                    else:
+                        session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
+                        discovered_where = 'messages'
+
+
+                if 'metrics_description' in loot_table:
+                    extra_description = Predicates.eval_cond_or_literal(loot_table['metrics_description'], session, session.player)
+                    if extra_description:
+                        price_description.append(extra_description)
+
+                # very important to do this last, since it may change the loot/description
+                if 'on_purchase' in loot_table:
+                     session.execute_consequent_safe(loot_table['on_purchase'], session.player, retmsg, reason=spellname+':loot_table')
+
+            # show "additional" gamebucks earned for purchase as if it were an item
+            if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
+               cls.buy_gamebucks_dialog_gamebucks_as_item(session, session.player):
+                gamebucks_item = {'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']}
+                items = [gamebucks_item,] + items
+                loggable_items = [gamebucks_item,] + loggable_items
+                if discovered_where is None:
+                    discovered_where = 'inventory' # assume already added
+
+            if loggable_items and discovered_where:
+                retmsg.append(["ITEMS_DISCOVERED", loggable_items, -1, discovered_where])
 
             if gift_order:
                 # try to send gamebucks gift. On failure, leave the gamebucks in the player's balance
@@ -14395,11 +15167,11 @@ class Store:
 
                     # send notifications
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
-                    if config:
+                    if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         session.player.do_send_fb_notification_to(session.user.facebook_id, notif_text, config, config['ref'])
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
-                    if config:
+                    if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         session.player.do_send_fb_notification_to(entry['recipient_facebook_id'], notif_text, config, config['ref'])
 
@@ -14429,14 +15201,36 @@ class Store:
 
                         return 'packaged_'+unit_name+ (('_L%d' % level) if (level > 1) else '')
 
-                    items = [{'spec':item_sku(session.player, name, cc_level), 'stack':qty} for name, qty in spell['give_units'].iteritems() if (name in gamedata['units'])]
-                    session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['buy_gamebucks_bonus_mail'])
+                    unit_items = [{'spec':item_sku(session.player, name, cc_level), 'stack':qty} for name, qty in spell['give_units'].iteritems() if (name in gamedata['units'])]
+                    session.player.send_loot_mail('', 0, unit_items, retmsg, mail_template = gamedata['strings']['buy_gamebucks_bonus_mail'])
                     retmsg.append(["YOU_GOT_BONUS_UNITS"])
                 else:
                     session.spawn_new_units_for_player(session.player, retmsg, spell['give_units'])
 
-            session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
             session.deferred_player_state_update = True
+
+            if 1:
+                # the other purchase_ui_log events are all client-side, but we have to do this on the server
+                # because Facebook's credit API callback is unreliable :(
+                purchase_ui_event_props = {'code':4450, 'event_name': '4450_buy_gamebucks_payment_complete',
+                                           'user_id': session.player.user_id,
+                                           'sku': Store.get_description(session, unit_id, spellname, spellarg, price_description),
+                                           'api': currency.split(':')[0],
+                                           'gamebucks': bucks,
+                                           'currency': currency, 'currency_price': amount_willing_to_pay,
+                                           'usd_equivalent': usd_equivalent,
+                                           'last_purchase_time': session.player.history.get('last_purchase_time',-1),
+                                           'prev_largest_purchase': session.player.history.get('largest_purchase',0),
+                                           'num_purchases': session.player.history.get('num_purchases',0),
+                                           'gift_order': gift_order,
+                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
+                                           }
+                for aura in session.player.player_auras:
+                    if aura['spec'] in ('flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
+                        for FIELD in ('kind', 'duration', 'tag'):
+                            if FIELD in aura['data']:
+                                purchase_ui_event_props['flash_sale_'+FIELD] = aura['data'][FIELD]
+                gamesite.purchase_ui_log.event(server_time, purchase_ui_event_props)
 
         elif spellname.startswith("BUY_PROTECTION"):
             assert gameapi.execute_spell(session, retmsg, spellname, None, reason = 'purchased_protection')
@@ -14500,6 +15294,76 @@ class Store:
 
         return price_description, detail_props
 
+    @classmethod
+    def give_promo_warehouse_space(cls, session, retmsg, items):
+        warehouse = session.player.find_object_by_type(gamedata['inventory_building'])
+        if not warehouse: return False
+        if warehouse.level >= warehouse.spec.maxlevel: return False
+        can_fit = False
+        while warehouse.level < warehouse.spec.maxlevel:
+            can_fit, extra_slots_needed = inventory_items_can_all_fit(items, session.player.inventory, session.player.resources.calc_snapshot())
+            if can_fit: break
+            if not gamesite.gameapi.do_upgrade_instant(session, retmsg, warehouse, ignore_requires = True): break
+            metric_event_coded(session.user.user_id, '4461_promo_warehouse_upgrade', {'level': warehouse.level})
+
+        return can_fit
+
+    @classmethod
+    def buy_gamebucks_dialog_gamebucks_as_item(cls, session, player):
+        # whether to show "extra" discount gamebucks in ITEMS_DISCOVERED even though they are just part of the SKU
+        # this should happen whenever the "version 2" scrollable buy_gamebucks dialog is in use
+        return Predicates.eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, player) == 2
+
+
+def fungible_inventory_item_can_fit(spec, stack, resource_state):
+    if spec['resource'] == 'gamebucks': return True
+    elif spec['resource'] in resource_state:
+        return (stack + resource_state[spec['resource']][1] <= resource_state[spec['resource'][0]])
+    return False
+
+# returns (can_fit, extra_slots_needed)
+def inventory_items_can_all_fit(items, inventory, snapshot):
+    max_usable_inventory = snapshot.max_usable_inventory()
+    can_fit = True
+    extra_slots_needed = 0
+
+    # operate on a copy of the inventory and resources
+    scratch = copy.deepcopy(inventory)
+    scratch_resource_state = dict((res,[snapshot.max_res(res), snapshot.cur_res(res)]) for res in gamedata['resources'])
+
+    for item in items:
+        spec = gamedata['items'][item['spec']]
+        max_stack = spec.get('max_stack', 1)
+        togo = item.get('stack', 1)
+
+        if spec.get('fungible'):
+            # check for entire fungible amount to fit
+            if fungible_inventory_item_can_fit(spec, togo, scratch_resource_state):
+                if spec['resource'] in scratch_resource_state:
+                    scratch_resource_state[spec['resource']][1] += togo
+                continue
+            else:
+                can_fit = False
+                extra_slots_needed += 1
+        else:
+            # check for stackable item
+            for inv in scratch:
+                if inv['spec'] == item['spec'] and inv.get('level',1) == item.get('level',1):
+                    inv_stack = inv.get('stack',1)
+                    if inv_stack < max_stack:
+                        added = min(togo, max_stack - inv_stack)
+                        togo -= added
+                        inv['stack'] = inv_stack + added
+
+            if togo <= 0: continue # able to accommodate everything just by stacking
+            if len(scratch) >= max_usable_inventory:
+                # now we need another slot
+                can_fit = False
+                extra_slots_needed += 1
+            scratch.append(copy.deepcopy(item))
+
+    return can_fit, extra_slots_needed
+
 class CREDITAPI(resource.Resource):
     isLeaf = True
     def __init__(self, gameapi):
@@ -14508,18 +15372,14 @@ class CREDITAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('CREDITAPI')(self.handle_request)(request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
-            admin_stats.record_latency('CREDITAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'CREDITAPI Exception: '+text)
-        return 'spinpunch error'
-
+    @admin_stats.measure_latency('CREDITAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
@@ -14564,11 +15424,7 @@ class CREDITAPI(resource.Resource):
             assert 'currency' in spell
             assert spell['currency'].startswith('fbpayments:')
 
-            session = None
-            for s in session_table.itervalues():
-                if s.user.facebook_id == request_data['user_id']:
-                    session = s
-                    break
+            session = get_session_by_facebook_id(request_data['user_id'])
             if session is None:
                 gamesite.exception_log.event(server_time, 'payments_get_item_price on unknown session: %s' % repr(request_data))
 
@@ -14617,7 +15473,7 @@ class CREDITAPI(resource.Resource):
 
                 if status == 'placed':
                     # okay to actually give the stuff here
-                    session = Store.execute_credit_order(order_id, self.gameapi, request, None, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
+                    session = Store.execute_credit_order(order_id, self.gameapi, None, buyer, receiver, 'fbcredits', fb_credits_amount, SpinFacebook.order_data_decode(order_details['items'][0]['data']))
 
                     if not session: raise Exception('execute_credit_order() returned no session')
 
@@ -14655,8 +15511,8 @@ class CREDITAPI(resource.Resource):
                     my_data = SpinFacebook.order_data_decode(order_details['items'][0]['data'])
 
                     session_id = my_data['session_id']
-                    session = session_table[session_id]
-                    assert (not session.logout_in_progress)
+                    session = get_session_by_session_id(session_id)
+                    assert session
                     unit_id = my_data['unit_id']
 
                     # XXX spell may be undefined here when the order is a Facebook payer promo, need to fix this.
@@ -14708,17 +15564,14 @@ class KGAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('KGAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'KGAPI Exception: '+text)
-        return 'spinpunch error'
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('KGAPI')(self.handle_request)(request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
+    @admin_stats.measure_latency('KGAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
 
@@ -14740,7 +15593,7 @@ class KGAPI(resource.Resource):
             retmsg['status'] = 'canceled' # first set this in case of failure
 
             # okay to actually give the stuff here
-            session = Store.execute_credit_order(order_id, self.gameapi, request, None,
+            session = Store.execute_credit_order(order_id, self.gameapi, None,
                                                  str(request_data['buyer_id']),
                                                  str(request_data['recipient_id']),
                                                  'kgcredits', order_info['client_price'], # must trust this?
@@ -14775,27 +15628,19 @@ class TRIALPAYAPI(resource.Resource):
     def render_GET(self, request):
         return self.render_POST(request)
     def render_POST(self, request):
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('TRIALPAYAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'TRIALPAYAPI Exception: '+text)
-        request.setResponseCode(http.BAD_REQUEST)
-        return 'spinpunch error'
+        SpinHTTP.set_access_control_headers(request)
+        ret = catch_all('TRIALPAYAPI')(self.handle_request)(request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
 
+    @admin_stats.measure_latency('TRIALPAYAPI')
     def handle_request(self, request):
         SpinHTTP.set_access_control_headers(request)
         # find session
         user_id = int(request.args['order_info'][0])
-        session = None
-        for s in session_table.itervalues():
-            if s.user.user_id == user_id:
-                session = s
-                break
+        session = get_session_by_user_id(user_id)
         if not session:
             raise Exception('session not found for TRIALPAYAPI order (user_id %d)' % user_id)
         return self.handle_payment(request, session,
@@ -14817,25 +15662,30 @@ class TRIALPAYAPI(resource.Resource):
 
         if gamebucks_amount > 0:
             # we (ab)use the credit order path here to share all of its metrics output
-            Store.execute_credit_order(request_args['oid'][0], self.gameapi, request, session, session.user.facebook_id, session.user.facebook_id,
+            Store.execute_credit_order(request_args['oid'][0], self.gameapi, session, session.user.facebook_id, session.user.facebook_id,
                                        'gamebucks', gamebucks_amount,
                                        # awkward syntax here
                                        {'spellname': 'FB_TRIALPAY_GAMEBUCKS',
                                         'session_id': session.session_id,
                                         'currency_url': str(request_args['currency_url'][0])})
 
-            # do not return HTTP response until player state is fully flushed
-            def complete_settlement(request, session):
-                # send mtime/spend update to player cache so upcache will pick it up immediately
-                gamesite.pcache_client.player_cache_update(session.user.user_id,
-                                                           {'last_mtime': server_time,
-                                                            'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
-                if request:
-                    request.write('1')
-                    request.finish()
+            # As of September 2015, TrialPay is now doing rapid-fire transactions on small amounts (~2 gamebucks)
+            # that cause asynchronous stores to overlap. So, only synchronize on large transactions.
 
-            player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
-            return server.NOT_DONE_YET
+            if gamebucks_amount >= gamedata['server'].get('trialpay_sync_threshold',50):
+                # do not return HTTP response until player state is fully flushed
+
+                def complete_settlement(request, session):
+                    # send mtime/spend update to player cache so upcache will pick it up immediately
+                    gamesite.pcache_client.player_cache_update(session.user.user_id,
+                                                               {'last_mtime': server_time,
+                                                                'money_spent': session.player.history.get('money_spent',0.0)}, reason = 'purchase')
+                    if request:
+                        request.write('1')
+                        request.finish()
+
+                player_table.store_async(session.player, functools.partial(complete_settlement, request, session), True, 'TRIALPAYAPI')
+                return server.NOT_DONE_YET
 
         return str('1')
 
@@ -14850,18 +15700,13 @@ class XSAPI(resource.Resource):
         return self.render_POST(request)
     def render_POST(self, request):
         SpinHTTP.set_access_control_headers(request)
-        try:
-            start_time = time.time()
-            ret = self.handle_request(request)
-            end_time = time.time()
-            admin_stats.record_latency('XSAPI', end_time-start_time)
-            return ret
-        except Exception:
-            text = traceback.format_exc()
-            gamesite.exception_log.event(server_time, 'XSAPI Exception: '+text)
-        request.setResponseCode(http.BAD_REQUEST)
-        return SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+        ret = catch_all('XSAPI')(self.handle_request)(request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+        return ret
 
+    @admin_stats.measure_latency('XSAPI')
     def handle_request(self, request):
         request_body = request.content.read()
 
@@ -14877,11 +15722,7 @@ class XSAPI(resource.Resource):
 
         # find session
         xs_id = request_data['user']['id']
-        session = None
-        for s in session_table.itervalues():
-            if s.user.get_xsolla_id() == xs_id and (not s.logout_in_progress):
-                session = s
-                break
+        session = get_session_by_xsolla_id(xs_id)
         if not session:
             gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
             request.setResponseCode(http.BAD_REQUEST)
@@ -14923,7 +15764,7 @@ class XSAPI(resource.Resource):
             if session.user.frame_platform == 'ag':
                 usd_receipts = round(usd_receipts*0.6, 2)
 
-            Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, request, session,
+            Store.execute_credit_order(request_data['transaction']['id'], self.gameapi, session,
                                        request_data['user']['id'], request_data['user']['id'],
                                        real_currency,
                                        real_currency_amount,
@@ -14954,7 +15795,7 @@ class XSAPI(resource.Resource):
         spell = gamedata['spells'][spellname]
         assert spell['currency'].startswith('xsolla:')
         for PRED in ('show_if', 'requires'):
-            if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+            if (PRED in spell) and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 return None
         real_currency = spell['currency'].split(':')[1]
@@ -14968,7 +15809,7 @@ class XSAPI(resource.Resource):
                                                                    session.player.level(), session.user.account_creation_time)
         if gamedata['server'].get('log_xsolla', False):
             gamesite.xsolla_log.event(server_time, SpinJSON.dumps({'url':url, 'method':method, 'headers':headers, 'body':body}))
-        d = defer.Deferred()
+        d = make_deferred('SpinXsolla:get_token') # OK - doesn't block message processing
         gamesite.AsyncHTTP_Xsolla.queue_request(server_time, url,
                                                 lambda result, _d=d: _d.callback(SpinJSON.loads(result)['token']),
                                                 method=method, headers=headers, postdata=body)
@@ -14993,7 +15834,7 @@ class GAMEAPI(resource.Resource):
         myset = self.deferred_sessions
         self.deferred_sessions = set()
         for session in myset:
-            session.flush_deferred_messages()
+            session.do_flush_outgoing_messages()
 
     def render_OPTIONS(self, request):
         # necessary for FireFox 3.6
@@ -15004,49 +15845,41 @@ class GAMEAPI(resource.Resource):
 
 
     # after an attack on another player, clear lock on victim's base and record state
-    # unfortunately, this has to be asynchronous, since we want on-disk player state to be consistent
-    # at least we can put all the I/O at the end
+    # unfortunately, this has to be asynchronous. Returns a Deferred instance that will
+    # be called when all I/O finishes.
 
     # wrap complete_attack in an exception trap, because it is part of the logout path -
     # if execution gets aborted, the session will be left in a broken state
 
-    def complete_attack(self, session, retmsg, cb, client_props = None, reason='unknown'):
-        if session.complete_attack_in_progress:
-            if gamedata['server']['log_abnormal_logins'] >= 2:
-                gamesite.exception_log.event(server_time, 're-entered complete_attack() from %s: %d at %s' % (reason, session.user.user_id, session.viewing_base.base_id))
-            session.complete_attack_cbs.append(cb)
-            return True
-
-        run_cbs = False
+    def complete_attack(self, session, retmsg, client_props = None, reason='unknown'):
 
         try:
-            is_async = self._complete_attack(session, retmsg, cb, client_props=client_props, reason=reason)
+            return self._complete_attack(session, retmsg, client_props=client_props, reason=reason)
         except:
-            gamesite.exception_log.event(server_time, 'complete_attack exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-            is_async = False
-            run_cbs = True # hobble onwards after the exception
+            gamesite.exception_log.event(server_time, 'complete_attack exception on player %d: %s' % (session.user.user_id, traceback.format_exc().strip())) # OK?
 
-        if run_cbs:
-            session.complete_attack_in_progress = False
-            cb_list = session.complete_attack_cbs
-            session.complete_attack_cbs = None
-            if cb_list:
-                for cb in cb_list:
-                    cb('defeat', {}, not is_async)
+        # error path
+        session.complete_attack_in_progress = False
+        d, session.complete_attack_d = session.complete_attack_d, None
+        if not d: d = make_deferred('complete_attack(fail)')
+        reactor.callLater(0, d.callback, False)
+        return d
 
-        return is_async
+    @admin_stats.measure_latency('_complete_attack')
+    def _complete_attack(self, session, retmsg, client_props = None, reason='unknown'):
+        if session.complete_attack_in_progress:
+            assert session.complete_attack_d
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 're-entered complete_attack() from %s: %d at %s' % (reason, session.user.user_id, session.viewing_base.base_id))
+            return session.complete_attack_d
 
-    def _complete_attack(self, session, retmsg, cb, client_props = None, reason='unknown'):
         ascdebug('complete_attack %d' % session.user.user_id)
-        start_time = time.time()
 
-        assert session.complete_attack_cbs is None
+        assert session.complete_attack_d is None
         assert not session.complete_attack_in_progress
 
-        # note: these may be immediately set back to null if this particular call to complete_attack() can finish synchronously.
-        # we just prepare them so that if an exception is thrown, the wrapper above will still do the right thing.
+        session.complete_attack_d = make_deferred('_complete_attack')
         session.complete_attack_in_progress = True
-        session.complete_attack_cbs = [cb]
 
         # record last bits of damage
         if session.damage_log:
@@ -15207,6 +16040,12 @@ class GAMEAPI(resource.Resource):
             for role, id, cache in (('attacker', session.alliance_id_cache, session.alliance_info_cache),
                                     ('defender', session.viewing_alliance_id_cache, session.viewing_alliance_info_cache)):
                 if id >= 0 and cache:
+                    # update involved_alliances only for PvP battles
+                    if (not session.viewing_player.is_ai()) or session.is_ladder_battle():
+                        if 'involved_alliances' not in summary: summary['involved_alliances'] = []
+                        if id not in summary['involved_alliances']:
+                            summary['involved_alliances'].append(id)
+
                     for FIELD in ('id','ui_name','chat_tag'):
                         if FIELD in cache:
                             summary[role+'_alliance_'+FIELD] = cache[FIELD]
@@ -15307,21 +16146,16 @@ class GAMEAPI(resource.Resource):
                     protection_based_on = session.viewing_player.get_any_abtest_value('protection_based_on', gamedata['server']['protection_based_on'])
                     ladder_prot_time = session.viewing_base.calc_ladder_protection(base_damage)
 
-                    session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
-
                     # update victim's protection timer
-                    if session.is_ladder_battle() and session.viewing_player.resources.protection_end_time > 0:
+                    if session.is_ladder_battle() and (session.protection_eligible is True):
                         protection_based_on = 'ladder_battle'
                         prot_time = ladder_prot_time
                         if prot_time > 0:
-                            session.viewing_player.record_protection_event('3881_protection_from_ladder_battle',
+                            session.viewing_player.set_protection_end_time(session, server_time + int(prot_time),
+                                                                           '3881_protection_from_ladder_battle',
                                                                            {'attacker_id': session.player.user_id,
-                                                                            'prev_end_time': session.viewing_player.resources.protection_end_time,
-                                                                            'new_end_time': server_time + int(prot_time),
-                                                                            'prot_time': int(prot_time),
                                                                             'base_damage': base_damage,
                                                                             'precurve_storage_damage': precurve_storage_damage})
-                            session.viewing_player.resources.protection_end_time = server_time + int(prot_time)
 
                             if gamedata['server']['enable_protection_fatigue']:
                                 session.player.cooldown_trigger('protection_fatigue:%d'%session.viewing_player.user_id, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
@@ -15334,10 +16168,10 @@ class GAMEAPI(resource.Resource):
                                 if gamedata['server']['global_protection_cooldown'] > 0:
                                     session.viewing_player.cooldown_trigger('global_protection', int(prot_time + gamedata['server']['global_protection_cooldown']*prot_time))
                         else:
-                            session.viewing_player.resources.protection_end_time = -1
+                            session.viewing_player.set_protection_end_time(session, -1, None)
 
-                    # ordinary attacks: based on damage suffered (only if the battle_start code gave a nonzero time)
-                    elif session.viewing_player.resources.protection_end_time > 0:
+                    # ordinary attacks: based on damage suffered (only if the battle_start code made it eligible)
+                    elif (session.protection_eligible is True):
                         min_time = session.viewing_player.get_leveled_quantity(session.viewing_player.get_any_abtest_value('protection_time_min', gamedata['server']['protection_time_min']))
                         max_time = session.viewing_player.get_leveled_quantity(session.viewing_player.get_any_abtest_value('protection_time_max', gamedata['server']['protection_time_max']))
                         prot_time = 0
@@ -15359,15 +16193,12 @@ class GAMEAPI(resource.Resource):
                                 prot_time = min(prot_time, ladder_prot_time)
 
                         if prot_time > 0:
-                            session.viewing_player.record_protection_event('3882_protection_from_nonladder_battle',
+                            session.viewing_player.set_protection_end_time(session, server_time + int(prot_time),
+                                                                           '3882_protection_from_nonladder_battle',
                                                                            {'attacker_id': session.player.user_id,
-                                                                            'prev_end_time': session.viewing_player.resources.protection_end_time,
-                                                                            'new_end_time': server_time + int(prot_time),
-                                                                            'prot_time': int(prot_time),
                                                                             'base_damage': base_damage,
                                                                             'damage':damage,
                                                                             'precurve_storage_damage': precurve_storage_damage})
-                            session.viewing_player.resources.protection_end_time = server_time + int(prot_time)
 
                             if gamedata['server']['enable_protection_fatigue']:
                                 session.player.cooldown_trigger('protection_fatigue:%d'%session.viewing_player.user_id, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
@@ -15377,13 +16208,13 @@ class GAMEAPI(resource.Resource):
                                         if aid > 0:
                                             session.player.cooldown_trigger('protection_fatigue:a%d' % aid, gamedata['server']['protection_fatigue_duration'], add_stack = 1)
                         else:
-                            session.viewing_player.resources.protection_end_time = -1
+                            session.viewing_player.set_protection_end_time(session, -1, None)
 
                     else:
                         # temp, for tracking how the test works
                         protection_based_on = 'none_given'
                         prot_time = 0
-                        session.viewing_player.resources.protection_end_time = -1
+                        session.viewing_player.set_protection_end_time(session, -1, None)
 
                     summary['prot_time'] = prot_time
 
@@ -15404,6 +16235,8 @@ class GAMEAPI(resource.Resource):
                                                       storage_damage,
                                                       prot_time))
 
+                    session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
+
                     # send real-time Facebook notification to the victim
                     # XXX not working for quarries or squads because we have no way to write viewing_player.last_fb_notification_time as global state
                     config = gamedata['fb_notifications']['notifications']['you_got_attacked']
@@ -15423,20 +16256,10 @@ class GAMEAPI(resource.Resource):
 
             # END is human
 
-            else: # viewing_player.is_ai()
-                # AI players do not receive attack protection
-                session.viewing_player.resources.protection_end_time = 0
-                if 0:
-                    gamesite.exception_log.event(server_time, 'AI attack end %d (L%d) vs AI %d (L%d): loot %d units %d' % \
-                                                 (session.user.user_id,
-                                                  session.player.resources.player_level,
-                                                  session.viewing_user.user_id,
-                                                  session.viewing_player.resources.player_level,
-                                                  sum((session.loot.get(res,0) for res in gamedata['resources']),0),
-                                                  sum(session.loot.get('units_killed',{}).itervalues())))
-
             if is_conquest:
                 session.increment_player_metric('conquests', 1, time_series = False)
+
+            session.protection_eligible = None # reset flag
 
             session.viewing_player.lock_state = Player.LockState.open
             session.viewing_player.lock_time = 0
@@ -15496,9 +16319,9 @@ class GAMEAPI(resource.Resource):
                                 # this finds any squads that were not in the original defending_squads query, like ones that were on the way but not arrived yet
                                 defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(session.player.home_region, session.viewing_base.base_map_loc, reason='complete_attack(victory/defending_squads)') if x.get('base_type',None)=='squad']
                                 for feature in defense_features:
-                                    self.broadcast_map_attack(session.player.home_region, feature['base_id'], session.player.user_id, session.viewing_player.user_id,
+                                    self.broadcast_map_attack(session.player.home_region, feature, session.player.user_id, session.viewing_player.user_id,
                                                               None,
-                                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                              [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                               msg = "REGION_MAP_ATTACK_DIVERT")
                                     gamesite.nosql_client.drop_map_feature(session.player.home_region, feature['base_id'])
 
@@ -15627,7 +16450,6 @@ class GAMEAPI(resource.Resource):
                                'base_damage': session.viewing_player.my_home.calc_base_damage(),
                                'base_repair_time': -1,
                                'last_defense_time': server_time,
-                               'protection_end_time': session.viewing_player.resources.protection_end_time,
                                'last_fb_notification_time': session.viewing_player.last_fb_notification_time
                                }
                 gamesite.pcache_client.player_cache_update(session.viewing_user.user_id, cache_props, reason = 'attack_victim')
@@ -15808,6 +16630,7 @@ class GAMEAPI(resource.Resource):
                     # this is denormalized to show players historical data
                     for role, id, cache in (('defender', session.alliance_id_cache, session.alliance_info_cache),):
                         if id >= 0 and cache:
+                            # note: no involved_alliances here, since it's not PvP
                             for FIELD in ('id','ui_name','chat_tag'):
                                 if FIELD in cache:
                                     summary[role+'_alliance_'+FIELD] = cache[FIELD]
@@ -15846,10 +16669,10 @@ class GAMEAPI(resource.Resource):
                 session.loot['hive_kill_points'] = max(1, int(gamedata['regions'][session.viewing_base.base_region].get('hive_kill_point_scale',1)*session.loot['hive_kill_points']))
 
             if mutated_auras:
-                retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                session.deferred_player_auras_update = True
 
             if (session.viewing_player.is_ai() or session.incoming_attack_data) and (outcome == 'victory'):
-                session.user.repopulate_ai_list(retmsg)
+                session.user.repopulate_ai_list(session)
 
             # update score_foo history fields for leaderboard rankings
             if (not session.player.isolate_pvp):
@@ -15882,24 +16705,26 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server'].get('nosql_battle_record',True) and summary.get('attack_type',None) != 'tutorial' and summary['defender_id'] != LION_STONE_ID:
                     gamesite.nosql_client.battle_record(summary, reason=summary['battle_type'])
 
-                if summary['battle_type'] == 'attack' and not summary['defender_is_ai']:
-                    # PvP offense attack
-                    # mail the victim a "you've been attacked" message and battle summary
-                    gamesite.msg_client.msg_send([{'from': session.player.user_id,
-                                                   'to': [summary['defender_id']],
-                                                   'type': 'i_attacked_you',
-                                                   'expire_time': server_time + gamedata['server']['message_expire_time']['i_attacked_you'],
-                                                   'from_fbid': str(summary['attacker_facebook_id']),
-                                                   'from_name': unicode(session.user.get_ui_name(session.player)),
-                                                   'summary': summary}])
+                if summary['battle_type'] == 'attack': # offensive attack
+                    if not summary['defender_is_ai']: # PvP
+                        # mail the victim a "you've been attacked" message and battle summary
+                        gamesite.msg_client.msg_send([{'from': session.player.user_id,
+                                                       'to': [summary['defender_id']],
+                                                       'type': 'i_attacked_you',
+                                                       'expire_time': server_time + gamedata['server']['message_expire_time']['i_attacked_you'],
+                                                       'from_fbid': str(summary['attacker_facebook_id']),
+                                                       'from_name': unicode(session.user.get_ui_name(session.player)),
+                                                       'summary': summary}])
 
                     if summary['base_type'] != 'home' and 'base_region' in summary:
-                        # PvP offense attack against quarry or squad
+                        # offense attack against quarry or squad
                         # broadcast map attack to victim
-                        self.broadcast_map_attack(summary['base_region'], summary['base_id'],
+                        self.broadcast_map_attack(summary['base_region'], session.viewing_base.get_cache_props(),
                                                   summary['attacker_id'], summary['defender_id'],
-                                                  summary,
-                                                  [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                                  # The only part of the summary actually used by the client is the defender_outcome.
+                                                  # Trim it down to hide sensitive info like analytics summary data. (XXX simplify args)
+                                                  {'defender_outcome': summary['defender_outcome']},
+                                                  [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                                   msg = "REGION_MAP_ATTACK_COMPLETE")
 
             session.player.send_history_update(retmsg)
@@ -15911,6 +16736,8 @@ class GAMEAPI(resource.Resource):
             # END has_attacked
 
         session.has_attacked = False
+        session.debug_log_action('_complete_attack')
+
         session.defender_cc_standing = False
         session.reset_attack_log()
         session.attack_finish_time = -1
@@ -15930,7 +16757,7 @@ class GAMEAPI(resource.Resource):
         # note: not sending updates to retmsg, so we assume a session change will come right after this
         if session.home_base:
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-            session.player.ladder_point_decay_check(session, None) # after attack - player
+            session.player.ladder_point_decay_check(session, retmsg) # after attack - player
 
         if summary:
             retmsg.append(["BATTLE_ENDED",
@@ -15939,23 +16766,13 @@ class GAMEAPI(resource.Resource):
                            session.viewing_base.get_cache_props(), # extra_props = {'deployment_buffer': session.viewing_base.deployment_buffer} ?
                            session.ladder_state])
 
-        end_time = time.time()
-        admin_stats.record_latency('complete_attack', end_time - start_time)
-
-        # there are two ways out of this function: if io_type is None, then call the callback and return synchronously
-        # otherwise, queue the callback (and any future complete_attack()s called before the I/O completes), and call them after I/O completes
-
-        if io_type is None:
-            session.complete_attack_in_progress = False
-            session.complete_attack_cbs = None
-            return cb(io_type is None)
-
-        # go async
+        # queue the callback (and any future complete_attack()s called before the I/O completes), and call them after I/O completes
 
         def finish(session, io_type):
             if io_type == 'store_viewing_player':
                 # release squads and home map feature lock
-                session.release_base(extra_base_props = {'protection_end_time': session.viewing_player.resources.protection_end_time})
+                session.release_base()
+
                 # release lock AFTER playerdb store completes
                 gamesite.lock_client.player_lock_release(session.viewing_user.user_id,
                                                          session.viewing_player.generation,
@@ -15968,225 +16785,119 @@ class GAMEAPI(resource.Resource):
                 session.release_base()
 
             session.complete_attack_in_progress = False
-            cb_list = session.complete_attack_cbs
-            session.complete_attack_cbs = None
-            for cb in cb_list:
-                cb(io_type is None)
+            d, session.complete_attack_d = session.complete_attack_d, None
+            if d: d.callback(True)
 
         post_result = functools.partial(finish, session, io_type)
 
-        if io_type == 'store_ai_instance':
+        if io_type is None:
+            reactor.callLater(0, post_result)
+        elif io_type == 'store_ai_instance':
             ai_instance_table.store_async(session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
-            return True
         elif io_type == 'del_ai_instance':
             ai_instance_table.delete_async(session.user.user_id, session.viewing_user.user_id, post_result)
-            return True
         elif io_type == 'store_viewing_player':
             player_table.store_async(session.viewing_player, post_result, True, 'complete_attack')
-            return True
         elif io_type == 'store_viewing_base':
-            if not gamedata['server'].get('nosql_full_store', True):
-                reactor.callLater(0.01, post_result)
-            else:
+            if gamedata['server'].get('nosql_full_store', False):
+                # should be unnecessary - all updates should have been written out individually
                 base_table.store_async(session.viewing_base, post_result, True, 'complete_attack')
-            return True
+            else:
+                reactor.callLater(0, post_result)
         elif io_type == 'del_viewing_base':
             base_table.delete_async(session.viewing_base.base_region, session.viewing_base.base_id, post_result)
-            return True
         else:
             raise Exception('unknown io_type '+io_type)
 
+        return session.start_async_request(session.complete_attack_d)
+
     # the outer change_session() function just checks whether the player is eligible to change sessions right now
-    def change_session(self, request, session, retmsg, dest_user_id = None, dest_base_id = None, force = False, new_ladder_state = None, delay = 0, client_props = None):
+    def change_session(self, session, retmsg, dest_user_id = None, dest_base_id = None, force = False, new_ladder_state = None, delay = 0, client_props = None):
         assert dest_user_id or dest_base_id
         assert not (dest_user_id and dest_base_id)
-        dest_feature = None
+        pre_attack = client_props.get('pre_attack', None) if client_props else None
 
         if dest_user_id:
             # old inline path
-            ascdebug('change_session (old) %d -> %d' % (session.user.user_id, dest_user_id))
-
             if (not force) and (session.viewing_user is not None) and (session.viewing_user.user_id == dest_user_id) and (session.viewing_base is session.viewing_player.my_home) and (not session.has_attacked):
-                # already viewing this base
-                session.visit_base_in_progress = False
-                return
-            deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
-                                  'base_landlord_id': session.player.user_id,
-                                  'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-            new_deployable_squads = {deployable_feature['base_id']: deployable_feature}
-            defending_feature = {'base_id': 's%d_%d' % (dest_user_id, SQUAD_IDS.BASE_DEFENDERS),
-                                 'base_landlord_id': dest_user_id,
-                                 'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-            new_defending_squads = {defending_feature['base_id']: defending_feature}
+                return session.start_async_request(defer.succeed(False)) # already viewing this base
         else:
             # new quarry path
-            ascdebug('change_session (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
+            assert gamesite.nosql_client and session.player.home_region
             if (not force) and (session.viewing_base.base_id == dest_base_id) and (not session.has_attacked):
-                session.visit_base_in_progress = False
-                return
-
-            if gamesite.nosql_client and session.player.home_region:
-
-                # query for target feature (to verify type and location)
-                dest_feature = gamesite.nosql_client.get_map_feature_by_base_id(session.player.home_region, dest_base_id, reason='change_session(dest)')
-
-                if (not dest_feature) or \
-                   (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
-                   (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
-                   (dest_feature['base_type'] == 'squad' and not session.player.squad_combat_enabled()) or \
-                   (dest_feature['base_type'] == 'home' and not session.player.map_home_combat_enabled()):
-                    if gamedata['server'].get('log_nosql',0) < 2 and dest_base_id[0]=='s':
-                        pass # do not bother logging failed attempts to spy on squads that have moved
-                    else:
-                        gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (session.player.user_id, dest_base_id, repr(dest_feature)))
-                    retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", dest_base_id, 'change_session'])
-                    session.visit_base_in_progress = False
-                    return
-
-                # query for attacker's deployable squads
-                new_deployable_squads = {}
-                if dest_feature['base_landlord_id'] != session.player.user_id:
-                    squad_features = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(session.player.home_region, session.player.user_id, 'squad', reason='change_session(deployable_squads)'))
-
-                    for squad_feature in squad_features:
-                        if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
-                        if squad_feature.get('LOCK_STATE',0) > 0 and \
-                           squad_feature.get('LOCK_OWNER',-1) != session.player.user_id:
-#                           ((not session.viewing_squad_locks) or (SpinDB.base_lock_id(self.home_region, self.squad_base_id(squad_id)) not in session.viewing_squad_locks)):
-                            continue # squad is already locked
-                        if hex_distance(squad_feature['base_map_loc'], dest_feature['base_map_loc']) == 1: # note: don't take squads on top of the target
-                            squad_id = squad_feature['squad_id'] = int(squad_feature['base_id'].split('_')[1])
-                            if str(squad_id) in session.player.squads:
-                                new_deployable_squads[squad_feature['base_id']] = squad_feature
-
-                if hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) == 1:
-                    # battle is taking place next to home base - allow deployment of squads that are at home
-                    for squad_data in session.player.squads.itervalues():
-                        if ((SQUAD_IDS.is_mobile_squad_id(squad_data['id']) or gamedata['territory']['base_defenders_can_attack_neighbors']) and \
-                            (not session.player.squad_is_deployed(squad_data['id']))):
-                            squad_feature = {'base_id': session.player.squad_base_id(squad_data['id']),
-                                             'base_landlord_id': session.player.user_id, 'squad_id': squad_data['id']}
-                            new_deployable_squads[squad_feature['base_id']] = squad_feature
-
-                if len(new_deployable_squads) < 1 and dest_feature['base_landlord_id'] != session.player.user_id and \
-                   hex_distance(dest_feature['base_map_loc'], session.player.my_home.base_map_loc) != 1:
-                    # no squads in range, cannot spy on hostile base
-                    retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
-                    session.visit_base_in_progress = False
-                    return
-
-                # check for defending squads
-                if dest_feature['base_type'] == 'home':
-                    defending_feature = {'base_id': 's%d_%d' % (dest_feature['base_landlord_id'], SQUAD_IDS.BASE_DEFENDERS),
-                                         'base_landlord_id': dest_feature['base_landlord_id'],
-                                         'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-                    new_defending_squads = {defending_feature['base_id']: defending_feature}
-                elif dest_feature['base_type'] == 'squad':
-                    new_defending_squads = {dest_feature['base_id']: {'base_id': dest_feature['base_id'],
-                                                                      'base_landlord_id': dest_feature['base_landlord_id'],
-                                                                      'squad_id': int(dest_feature['base_id'].split('_')[1])}}
-
-                    if client_props and client_props.get('pre_attack',None) and (dest_feature['base_landlord_id'] != session.player.user_id):
-                        # attempt to lock the destination squad immediately, to reduce the time window for the defender to manipulate it before the player can attack
-                        state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, dest_base_id, session.player.user_id, reason='VISIT_BASE2_pre_attack')
-                        if state != Player.LockState.being_attacked:
-                            # try to figure out more specifically why we didn't get the lock
-                            if dest_feature.get('LOCK_OWNER',-1) == dest_feature['base_landlord_id']:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE"
-                            elif dest_feature.get('LOCK_OWNER',-1) > 0:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_DEFENSE"
-                            else:
-                                err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
-                            retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
-                            # abort the spy attempt
-                            session.visit_base_in_progress = False
-                            return
-
-                        # record the fact that we're now holding the lock
-                        # note that we MUST proceed with the attack after spying completes (or fails), or else this could open exploits where you hold a lock on a hostile squad forever
-                        session.pre_locks.add(SpinDB.base_lock_id(session.player.home_region, dest_base_id))
-
-                elif dest_feature['base_type'] == 'quarry':
-                    # find guard squad(s)
-                    new_defending_squads = {}
-                    defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(session.player.home_region, dest_feature['base_map_loc'], reason='change_session(guards)') if x.get('base_type',None)=='squad']
-
-                    for squad_feature in defense_features:
-                        if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
-                            continue # squad has not arrived at its destination yet
-                        if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
-                            # "defending" squad, but it's owned by someone other than the quarry owner
-                            # this can happen via race condition where the old quarry owner had a squad on the way to the quarry (or left over due to undeployable units hanging around),
-                            # but then it got attacked and taken over before it arrives
-                            gamesite.exception_log.event(server_time, 'quarry %s (owner %d) has foreign squad %s (owner %d) at same location - recalling it back to base' % \
-                                                         (dest_feature['base_id'], dest_feature['base_landlord_id'], squad_feature['base_id'], squad_feature['base_landlord_id']))
-                            gamesite.nosql_client.drop_map_feature(session.player.home_region, squad_feature['base_id'], originator = session.player.user_id, reason='visit_quarry_guard_race_cleanup')
-                            continue
-                        squad_id = int(squad_feature['base_id'].split('_')[1])
-                        squad_feature['squad_id'] = squad_id
-                        new_defending_squads[squad_feature['base_id']] = squad_feature
-                else:
-                    new_defending_squads = {} # hive
-
-                # XXXXXXXXXXX MUST move query for defending/deployable squads AFTER complete_attack to avoid ordering bugs
-                # a better way to do this is to have the client send base_map_loc and verify in change_session_complete
-                # XXX may become invalid after complete_attack()!
-                # dest_feature = None
-
-            else:
-                # legacy path
-                deployable_feature = {'base_id': session.player.squad_base_id(SQUAD_IDS.BASE_DEFENDERS),
-                                      'base_landlord_id': session.player.user_id,
-                                      'squad_id': SQUAD_IDS.BASE_DEFENDERS}
-                new_deployable_squads = {deployable_feature['base_id']: deployable_feature}
-                new_defending_squads = {}
+                return session.start_async_request(defer.succeed(False)) # already viewing this base
 
         if session.home_base and session.has_attacked:
             # reset daily attack timer
             session.player.last_daily_attack = server_time
             # do not do this from complete_attack, because that is called in the logout/relog path
 
-        # first clean up any ongoing attack, then perform the actual session change
-        return self.complete_attack(session, retmsg, functools.partial(self.change_session2, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay,
-                                                                       client_props.get('pre_attack', None) if client_props else None),
-                                    client_props = client_props, reason='change_session')
-
-    # ready to change sessions, begin the I/O
-    def change_session2(self, request, session, retmsg, dest_user_id, dest_base_id, dest_feature, new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack, is_sync):
-        if dest_user_id:
-            ascdebug('change_session2 (old) %d -> %d (sync %d)' % (session.user.user_id, dest_user_id, is_sync))
-            if dest_user_id == session.user.user_id:
-                # visiting self - complete synchronously
-                ret = self.change_session_complete(request, session, retmsg, dest_user_id, session.user, session.player, None, None, None, new_ladder_state, new_deployable_squads, new_defending_squads)
-                if not is_sync:
-                    # UGLY - need to know if we are in the initial render() call stack or not
-                    self.complete_deferred_request(request, session, retmsg)
-                return ret
-            change = SessionChangeOld(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+        if dest_user_id == session.user.user_id:
+            reason = 'change_session (home) %d' % (session.user.user_id)
+            change = SessionChangeHome(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
+        elif dest_user_id:
+            reason = 'change_session (old) %d -> %d' % (session.user.user_id, dest_user_id)
+            change = SessionChangeOld(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
         else:
-            ascdebug('change_session2 (new) %d:%s -> %s' % (session.user.user_id, session.viewing_base.base_id, dest_base_id))
-            change = SessionChangeNew(self, session, request, retmsg, dest_user_id, dest_base_id, dest_feature, is_ai_user_id_range(dest_user_id), new_ladder_state, new_deployable_squads, new_defending_squads, delay, pre_attack)
+            reason = 'change_session (new) %d:%s -> %s pre_attack %r' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, pre_attack)
+            change = SessionChangeNew(session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack)
 
-        change.begin()
-        return True
+        ascdebug(reason)
+        session.debug_log_action(reason)
 
-    # wrap change_session_complete so that exceptions cannot break a session that went async
-    def change_session_complete(self, request, session, retmsg, *args, **kwargs):
-        ret = False
-        try:
-            ret = self._change_session_complete(request, session, retmsg, *args, **kwargs)
-        except:
-            gamesite.exception_log.event(server_time, 'change_session_complete exception on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-        finally:
+        # it's cleaner to string everything together in one callback chain
+        master_d = make_deferred('change_session')
+
+        def set_progress_and_pass_result(result, session, prog):
+            #ascdebug('change_session set_progress_and_pass_result in_progress %r result %r' % (prog, result))
+            session.visit_base_in_progress = prog
+            return result
+        master_d.addBoth(set_progress_and_pass_result, session, True) # OK
+
+        master_d.addCallback(lambda _, self=self,session=session,retmsg=retmsg,client_props=client_props:
+                             self.complete_attack(session, retmsg, client_props = client_props, reason='change_session'))
+
+        # note: continue even if complete_attack() fails
+        master_d.addErrback(report_and_absorb_deferred_failure, session)
+
+        master_d.addCallback(lambda _, change=change: change.begin())
+
+        # if the main session change fails after begin(), we need to insert a forced change back to base
+        # (since we already ran complete_attack(), which irreversibly mutates state like res_looter)
+        def handle_failed_change(self, session, retmsg):
             session.release_pre_locks()
+            # go back home
+            new_change = SessionChangeHome(session, retmsg, session.user.user_id, None, None, 0, None)
+            reason = 'change_session (home) %d because of failure' % (session.user.user_id)
+            ascdebug(reason)
+            session.debug_log_action(reason)
+            return new_change.begin().addCallback(lambda args, self=self: self.change_session_complete(*args))
 
-        return ret
+        master_d.addCallback(lambda args, self=self, session=session, retmsg=retmsg:
+                             # note: receives the list of arguments to pass from change.d's callback
+                             # if args is None, that means the change attempt failed
+                             self.change_session_complete(*args) if args else handle_failed_change(self, session, retmsg))
 
-    def _change_session_complete(self, request, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id, dest_feature, dest_base, new_ladder_state, new_deployable_squads, new_defending_squads, pre_attack = None):
+        # we DO care about exceptions inside change_session_complete(), since we need to release locks
+        master_d.addErrback(report_and_reraise_deferred_failure, session)
+        master_d.addErrback(lambda err, session=session: session.release_pre_locks()) # now swallow the exception
+
+        master_d.addBoth(set_progress_and_pass_result, session, False) # OK
+
+        reactor.callLater(0, master_d.callback, True)
+        return session.start_async_request(master_d)
+
+    def change_session_complete(self, session, retmsg, dest_user_id, dest_user, dest_player, dest_base_id,
+                                dest_base, new_ladder_state, new_deployable_squads, new_defending_squads,
+                                pre_attack):
+
         if dest_base_id:
-            ascdebug('change_session_complete (new) %d:%s -> %s (%d,%d,%d)' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base)))
+            reason = 'change_session_complete (new) %d:%s -> %s (%d,%d,%d) pre_attack %r' % (session.user.user_id, session.viewing_base.base_id, dest_base_id, bool(dest_user), bool(dest_player), bool(dest_base), pre_attack)
         else:
-            ascdebug('change_session_complete (old) %d -> %d (%d,%d)' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player)))
+            reason = 'change_session_complete (old) %d -> %d (%d,%d) pre_attack %r' % (session.user.user_id, dest_user_id, bool(dest_user), bool(dest_player), pre_attack)
+
+        ascdebug(reason)
+        session.debug_log_action(reason)
 
         cannot_spy = False
 
@@ -16221,24 +16932,23 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
                     cannot_spy = True
 
+        # check for uncollected loot when leaving home base
+        if dest_base or (dest_user is not session.user):
+            # for safety, abort the session change instead of dumping buffered loot
+            if session.player.loot_buffer:
+                retmsg.append(["ERROR", "CANNOT_SPY_LOOT_BUFFER_NOT_EMPTY"])
+                cannot_spy = True
+            # dump buffered loot when leaving home base
+            # session.player.loot_buffer_release('change_session_complete')
+
         # check for map violations
 
-        if (not dest_base_id) and dest_player and (dest_player is not session.player) and (not dest_player.is_ai()) and \
-           ((not new_ladder_state) and (not session.player.can_take_ladder_revenge(dest_player))):
-            if session.player.is_legacy_pvp_player() and (not dest_player.is_legacy_pvp_player()):
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_THEM"])
-                    cannot_spy = True
-            elif (not session.player.is_legacy_pvp_player()) and dest_player.is_legacy_pvp_player():
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_YOU"])
-                    cannot_spy = True
-            elif (not session.player.is_legacy_pvp_player()) and (not dest_player.is_legacy_pvp_player()) and \
-                 ((len(new_deployable_squads) < 1) or (len(new_deployable_squads) == 1 and new_deployable_squads.values()[0]['squad_id']==SQUAD_IDS.BASE_DEFENDERS)):
-                # cannot use session.using_squad_deployment() because we haven't set session.deployable_squads yet
-                if (not session.player.can_spy_despite_map_violation(session.user, dest_player.user_id, dest_user.social_id)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_MAP_BOTH"])
-                    cannot_spy = True
+        if (not cannot_spy) and \
+           (not dest_base_id) and dest_player and dest_user:
+            map_ok, map_violation_error = session.player.can_spy_on_home(session.user, dest_player, dest_user.social_id, new_ladder_state, new_deployable_squads)
+            if not map_ok:
+                retmsg.append(["ERROR", map_violation_error])
+                cannot_spy = True
 
         # in NoSQL-land when spying on a friendly squad or quarry, grab the lock immediately so that we can mutate objects we own
         if dest_base and (dest_base.base_type in ('squad','quarry')) and (dest_base.base_landlord_id == session.player.user_id) \
@@ -16259,6 +16969,7 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
             else:
                 session.has_attacked = True
+                session.debug_log_action('reinforce')
                 session.attack_finish_time = server_time + gamedata['reinforce_time']
 
         if cannot_spy:
@@ -16271,6 +16982,8 @@ class GAMEAPI(resource.Resource):
                                  'base_landlord_id': dest_user_id,
                                  'squad_id': SQUAD_IDS.BASE_DEFENDERS}
             new_defending_squads = {defending_feature['base_id']: defending_feature}
+            new_ladder_state = None
+            pre_attack = None
             session.release_pre_locks()
 
         session.clear_objects()
@@ -16304,6 +17017,7 @@ class GAMEAPI(resource.Resource):
         session.defending_squads = new_defending_squads
         session.deployed_units = None
         session.deployed_donated_units = None
+        session.protection_eligible = None # reset flag
 
         # simulate passage of time for repairs
         session.viewing_player.unit_repair_tick()
@@ -16392,7 +17106,7 @@ class GAMEAPI(resource.Resource):
 
             session.pvp_balance = None
 
-            if gamedata['server']['query_lock_state_on_spy'] and gamesite.nosql_client:
+            if gamesite.nosql_client:
                 spyee_lock_state = gamesite.nosql_client.map_feature_lock_get_state_batch(session.player.home_region, [session.viewing_base.base_id], reason = 'spy_quarry')[0][0]
             else:
                 spyee_lock_state = Player.LockState.open
@@ -16424,72 +17138,14 @@ class GAMEAPI(resource.Resource):
                     break
             session.defender_protection_expired_at = session.viewing_player.resources.protection_end_time if (not session.viewing_player.is_ai()) else -1
 
+            session.pvp_balance = session.player.get_pvp_balance(session.viewing_player, session.viewing_base)
+
             if session.viewing_player.is_ai():
-                session.pvp_balance = None
                 spyee_lock_state = Player.LockState.open
-                if 0:
-                    gamesite.exception_log.event(server_time, 'spy %d (L%d) on AI %d (L%d)' % (session.user.user_id,
-                                                                                               session.player.resources.player_level,
-                                                                                               session.viewing_user.user_id,
-                                                                                               session.viewing_player.resources.player_level))
             else:
-                my_level = session.player.resources.player_level
-                his_level = session.viewing_player.resources.player_level
-
-                if 0:
-                    gamesite.exception_log.event(server_time, 'spy %d (L%d) on %d (L%d) %s gap %d' % \
-                                                 (session.user.user_id,
-                                                  session.player.resources.player_level,
-                                                  session.viewing_user.user_id,
-                                                  session.viewing_player.resources.player_level,
-                                                  'friend' if session.viewing_user.is_friends_with(session.user.social_id) else 'stranger',
-                                                  my_level - his_level
-                                                  ))
-
-                my_level_range = session.player.attackable_level_range()
-
-                if (session.viewing_base is not session.viewing_player.my_home):
-                    # quarry/squad - no limit
-                    session.pvp_balance = None
-
-                elif (session.player.home_region in gamedata['regions']) and (not gamedata['regions'][session.player.home_region].get('enable_pvp_level_gap', True)):
-                    # region has no limits
-                    session.pvp_balance = None
-
-                elif (gamedata['matchmaking']['revenge_time'] > 0) and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                    # revenge - no limit
-                    session.pvp_balance = None
-
-                elif (my_level_range[0]>=0) and (his_level < my_level_range[0]):
-                    # we are much stronger
-                    session.pvp_balance = 'player'
-
-                elif (my_level_range[1]>=0) and (his_level > my_level_range[1]):
-                    # we are much weaker - prevent attack
-                    session.pvp_balance = 'enemy_strict'
-
-                elif my_level < session.viewing_player.attackable_level_range()[0]:
-                    # we are much weaker - allow attack, but warn
-                    session.pvp_balance = 'enemy'
-
-                else:
-                    # equal strength
-                    session.pvp_balance = None
-
                 # do this here so we send an up-to-date guess about lock state to the client upon Spying
                 session.viewing_player.bust_expired_locks()
-                if gamedata['server']['query_lock_state_on_spy']:
-                    spyee_lock_state = gamesite.lock_client.player_lock_get_state_batch([session.viewing_user.user_id], reason = 'spy')[0][0]
-                else:
-                    spyee_lock_state = session.viewing_player.lock_state
-                    if spyee_lock_state == Player.LockState.open:
-                        # search session table to see if they're logged in
-                        # this helps because viewing_player may have been updated from a disk file whereas the
-                        # actual player is logged in and has not been flushed yet
-                        for s in session_table.itervalues():
-                            if s.user.user_id == session.viewing_user.user_id:
-                                spyee_lock_state = Player.LockState.logged_in
-                                break
+                spyee_lock_state = gamesite.lock_client.player_lock_get_state_batch([session.viewing_user.user_id], reason = 'spy')[0][0]
 
             props['pvp_balance'] = (session.pvp_balance if session.pvp_balance else 'equal')
             if ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
@@ -16502,12 +17158,6 @@ class GAMEAPI(resource.Resource):
                                                             'defender_res': session.viewing_player.resources.get_fungible_amounts(),
                                                             'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                             'ladder_state': session.ladder_state})
-
-        if gamedata['prevent_same_alliance_attacks'] and \
-           (session.viewing_player is not session.player) and \
-           session.viewing_player.is_human() and \
-           session.player.is_same_alliance(session.viewing_player.user_id):
-            session.pvp_balance = 'same_alliance'
 
         # add relevant objects into the session
         session.deferred_object_state_updates = set() # no need to send anymore
@@ -16558,13 +17208,9 @@ class GAMEAPI(resource.Resource):
 
         if session.viewing_player is not session.player and (not session.viewing_player.is_ai()) and \
            gamesite.sql_client and session.player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']):
-            try:
-                session.viewing_alliance_id_cache = gamesite.sql_client.get_users_alliance(session.viewing_user.user_id, reason = 'VISIT_BASE')
-                if session.viewing_alliance_id_cache > 0:
-                    session.viewing_alliance_info_cache = gamesite.sql_client.get_alliance_info(session.viewing_alliance_id_cache, reason = 'VISIT_BASE')
-            except:
-                gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for spy on behalf of %d:\n%s' % \
-                                             (session.viewing_user.user_id, session.user.user_id, traceback.format_exc()))
+            session.viewing_alliance_id_cache = gamesite.sql_client.get_users_alliance(session.viewing_user.user_id, reason = 'VISIT_BASE')
+            if session.viewing_alliance_id_cache > 0:
+                session.viewing_alliance_info_cache = gamesite.sql_client.get_alliance_info(session.viewing_alliance_id_cache, reason = 'VISIT_BASE')
 
         # sanity check
         if session.ladder_state:
@@ -16596,7 +17242,7 @@ class GAMEAPI(resource.Resource):
                        session.pvp_balance,
                        spyee_lock_state,
                        session.viewing_player.isolate_pvp,
-                       session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id),
+                       0, # repeat_attack_cooldown expire time - obsolete
                        session.viewing_base.deployment_buffer,
                        session.viewing_base.base_id,
                        session.viewing_base.base_landlord_id,
@@ -16620,7 +17266,7 @@ class GAMEAPI(resource.Resource):
 
                        [x['squad_id'] for x in session.defending_squads.itervalues()],
                        session.viewing_player.is_pvp_player(),
-                       [self.get_player_cache_props(session.user, session.player)] + \
+                       [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
                        list(session.player.equipped_items_serialize()),
                        session.debug_session_change_count,
@@ -16734,11 +17380,6 @@ class GAMEAPI(resource.Resource):
         change_retmsg.append(["BASE_POWER_UPDATE", power_state])
         change_retmsg.append(["BASE_SIZE_UPDATE", session.viewing_base.base_size])
 
-        if not session.home_base:
-            # dump buffered loot when leaving home base
-            # note: this means if you end an attack by visiting somewhere that isn't home base, you'll lose the loot
-            session.player.loot_buffer_release('change_session_complete')
-
         change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
@@ -16746,8 +17387,6 @@ class GAMEAPI(resource.Resource):
 
         # tell client about res looter state
         session.res_looter.send_update(change_retmsg)
-
-        session.visit_base_in_progress = False
 
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
@@ -16771,69 +17410,184 @@ class GAMEAPI(resource.Resource):
             if on_visit_consequent:
                 session.execute_consequent_safe(on_visit_consequent, session.player, change_retmsg, reason='on_visit')
 
-        if pre_attack: # immediately proceed with attack attempt
+        if pre_attack and (not cannot_spy): # immediately proceed with attack attempt
             do_attack_retmsg = [] # collect error messages separately
             attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
 
             if pre_attack >= 2: # pre-auto-resolve
                 if attack_success:
                     self.auto_resolve(session, change_retmsg) # will be thrown away
-
-                    # the attack completion will go async to write the battle result, so we shouldn't call it in-line, since the async return isn't propagated out to the caller
-
                     if True: # dangerous - skips session change on client side
-                        def go_home_and_flush_skip(self, session):
-                            session.visit_base_in_progress = True
-                            # divert the messages
-                            unused = []
-                            self.change_session(None, session, unused, dest_user_id = session.player.user_id, force = True)
-                            session.deferred_messages.append(["SESSION_CHANGE_SKIPPED"])
-                            session.flush_deferred_messages()
-                        reactor.callLater(0, functools.partial(self.complete_attack, session, session.deferred_messages, lambda sync: go_home_and_flush_skip(self, session)))
-                        return
+                        # first complete the attack manually so we get the battle-end messages
+                        compl_d = self.complete_attack(session, retmsg)
+                        compl_d.addErrback(report_and_absorb_deferred_failure, session)
+                        # then go home, throwing away the session-change messages
+                        compl_d.addCallback(lambda _, self=self, session=session, change_retmsg=change_retmsg: \
+                                            self.change_session(session, change_retmsg, dest_user_id = session.player.user_id, force = True))
+                        # then let the client know we skipped the session change
+                        compl_d.addErrback(report_and_absorb_deferred_failure, session)
+                        compl_d.addCallback(lambda _, session=session: session.outgoing_messages.append(["SESSION_CHANGE_SKIPPED"]))
+                        return compl_d
+
                 else:
                     retmsg += do_attack_retmsg # send error messages to client
 
                 # safer, but sends ineffective session change to client
                 # also necessary in case do_attack() fails
-                def go_home_and_flush(self, session):
-                    session.visit_base_in_progress = True
-                    self.change_session(None, session, session.deferred_messages, dest_user_id = session.player.user_id, force = True)
-                    session.flush_deferred_messages()
+                return self.change_session(session, session.outgoing_messages, dest_user_id = session.player.user_id, force = True)
 
-                reactor.callLater(0, lambda: go_home_and_flush(self, session))
             else:
                 retmsg += do_attack_retmsg
 
         else:
             assert not session.pre_locks
 
+        return defer.succeed(not cannot_spy) # success
+
+    def query_recent_attackers(self, session, retmsg, arg):
+        tag = arg[1]
+
+        if gamedata['server'].get('battle_history_source','nosql/sql') in ('nosql','nosql/sql'):
+            # get summary data from database
+            summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, -1, -1, time_range = [server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400), server_time],
+                                                          limit = gamedata['server'].get('nosql_battle_history_limit',50),
+                                                          ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
+                                                          fields = ('attacker_id','attacker_type','defender_id'), reason = 'query_recent_attackers')
+        else:
+            # query ALL opponents
+            summaries = sum([entry.get('summary',[]) for entry in session.player.battle_history.itervalues()], [])
+
+        attacker_id_set = set()
+
+        for s in summaries:
+            if 'attacker_id' in s and \
+               s.get('defender_id') == session.user.user_id and \
+               s.get('attacker_type') == 'human': # check for home base attack?
+                attacker_id_set.add(s['attacker_id'])
+
+        retmsg.append(["QUERY_RECENT_ATTACKERS_RESULT", tag, list(attacker_id_set), None])
+
+    # fields we care about for battle history (summary) queries
+    BATTLE_HISTORY_FIELDS = ('time', 'duration', 'ladder_state',
+                             'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
+                             'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
+                             'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
+                             'facebook_friends',
+                             'attacker_name', 'defender_name',
+                             'attacker_level', 'defender_level',
+                             'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
+
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
-        source = arg[2] # from the perspective of this player
-        tag = arg[3]
+        source = arg[2] # from the perspective of this player (-1 for anyone)
+        alliance_A = arg[3] # require involvement from this alliance
+        alliance_B = arg[4]
+        tag = arg[5]
+        ai_or_human = arg[6]
+        assert ai_or_human in ('any','ai','human')
+        time_range = arg[7]
+        if time_range:
+            assert isinstance(time_range, list) and len(time_range) == 2 and all(isinstance(x, (int,float)) for x in time_range)
 
-        if source == session.user.user_id:
-            # get any pending updates
-            self.do_receive_mail(session, retmsg)
-            battle_history = session.player.battle_history
-        else:
-            if (not session.player.is_developer()):
-                # no peeking at others' battle histories unless you are a developer
+        # sanity check
+        assert (source > 0) or (alliance_A > 0) or (alliance_B > 0)
+
+        # permission check
+        if (not session.player.is_developer()):
+            # no peeking at others' battle histories unless you are a developer
+            if (source > 0 and source != session.user.user_id) or \
+               ((alliance_A > 0 or alliance_B > 0) and (session.get_alliance_id(reason='query_battle_history') < 0 or session.alliance_id_cache not in (alliance_A, alliance_B))):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 return
-            if source == session.viewing_user.user_id:
+
+        # "nosql" for hot-only, "nosql/sql" for hot/cold, or "playerdb" (obsolete)
+        battle_history_source = gamedata['server'].get('battle_history_source','nosql/sql') # also update query_recent_attackers()!
+
+        battle_history = None
+        if battle_history_source == 'playerdb':
+            if source == session.user.user_id:
+                # get any pending updates
+                self.do_receive_mail(session, retmsg)
+                battle_history = session.player.battle_history
+            elif source == session.viewing_user.user_id:
                 battle_history = session.viewing_player.battle_history
+            elif (alliance_A > 0) or (alliance_B > 0):
+                # alliance queries not supported from playerdb
+                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], None, True, 'offline'])
+                return
+
+        if battle_history_source in ('nosql','nosql/sql'):
+            # get summary data from database
+            # XXX need token-based paging to avoid infinite re-query if more than "limit" battles happen within one second
+
+            # use "hot" MongoDB and/or "cold" PostgreSQL database depending on how far back in time we want to go
+
+            # to ensure we don't miss any battles, we always do the hot query, and then also do the cold query
+            # if the hot query is exhaustive.
+
+            # hot query
+            hot_limit = gamedata['server'].get('nosql_battle_history_limit', 50 if time_range else 10) # optimize for fast first range-less query
+            hot_summaries = gamesite.nosql_client.battles_get(source, target, alliance_A, alliance_B, limit = hot_limit,
+                                                              ai_or_human = {'any': SpinNoSQL.NoSQLClient.BATTLES_ALL,
+                                                                             'ai': SpinNoSQL.NoSQLClient.BATTLES_AI_ONLY,
+                                                                             'human': SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY}[ai_or_human],
+                                                              time_range = time_range,
+                                                              fields = self.BATTLE_HISTORY_FIELDS,
+                                                              reason = 'query_battle_history(hot)')
+            # is_final is true if there are no more battles earlier than this to query
+            hot_is_final = len(hot_summaries) < hot_limit
+            #gamesite.exception_log.event(server_time, 'HOT %r final %r' % ([x['time'] for x in hot_summaries], hot_is_final))
+
+            # do we also need to do a cold query?
+            if hot_is_final and \
+               battle_history_source == 'nosql/sql' and \
+               gamesite.sql_battles_client:
+                # cold query
+                cold_limit = gamedata['server'].get('sql_battle_history_limit', 50)
+                cold_time_range = [-1, server_time]
+                if time_range and time_range[0] > 0:
+                    cold_time_range[0] = time_range[0]
+                if time_range and time_range[1] > 0:
+                    cold_time_range[1] = time_range[1]
+                # don't overlap with hot data
+                if hot_summaries:
+                    cold_time_range[1] = min(cold_time_range[1], min(x['time'] for x in hot_summaries))
+                cold_d = gamesite.sql_battles_client.battles_get_async(source, target, alliance_A, alliance_B, limit = cold_limit,
+                                                                       ai_or_human = {'any': SpinSQLBattles.SQLBattlesClient.BATTLES_ALL,
+                                                                                      'ai': SpinSQLBattles.SQLBattlesClient.BATTLES_AI_ONLY,
+                                                                                      'human': SpinSQLBattles.SQLBattlesClient.BATTLES_HUMAN_ONLY}[ai_or_human],
+                                                                       time_range = cold_time_range,
+                                                                       reason = 'query_battle_history(cold)')
+                if cold_d is None: # can happen if db is down
+                    # return hot query only
+                    result_d = defer.succeed((hot_summaries, hot_is_final, 'partial'))
+                else:
+                    # reformat results from raw summary list to (summaries, is_final, is_error)
+                    cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, None))
+
+                    # merge hot and cold summaries, in descending time order
+                    def merge_hot_and_cold(cold_result, hot_summaries, hot_is_final):
+                        cold_summaries, cold_is_final, cold_is_error = cold_result
+                        #gamesite.exception_log.event(server_time, 'COLD %r final %r' % ([x['time'] for x in cold_summaries], cold_is_final))
+                        #gamesite.exception_log.event(server_time, 'FINAL %r final %r' % ([x['time'] for x in (hot_summaries+cold_summaries)], cold_is_final and hot_is_final))
+                        return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, None)
+                    cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
+
+                    # if cold query fails, just return the hot results as if the cold query never happened
+                    cold_d.addErrback(report_and_reraise_deferred_failure, session)
+                    cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, 'partial'))
+
+                    result_d = cold_d
+
             else:
-                battle_history = None # not found
+                # return hot query only
+                result_d = defer.succeed((hot_summaries, hot_is_final, None))
 
-        ret = []
-        pcache_data = []
-
-        latest_returned_time = -1
-
-        if battle_history:
+        elif battle_history_source == 'playerdb' and battle_history:
             # pull summary data out of player.battle_history
+            is_final = True
+            is_error = None
+
             if target < 0:
                 # query ALL opponents
                 summaries = sum([entry.get('summary',[]) for entry in battle_history.itervalues()], [])
@@ -16845,51 +17599,73 @@ class GAMEAPI(resource.Resource):
                 else:
                     summaries = []
 
+            if time_range:
+                summaries = filter(lambda x: x['time'] >= time_range[0] and x['time'] < time_range[1], summaries)
 
-            if len(summaries) > 0:
-                # old entries are missing Facebook ID info and can't be used :(
-                summaries = filter(lambda s: 'attacker_facebook_id' in s, summaries)
-                # perform player cache lookup
-                qmap = dict([(s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id'], None) for s in summaries])
-                qlist = qmap.keys()
+            if ai_or_human == 'ai':
+                # do not list AI ladder battles here
+                summaries = filter(lambda x: (x.get('attacker_type')=='ai' or x.get('defender_type')=='ai') and (not x.get('ladder_state')), summaries)
+            elif ai_or_human == 'human':
+                # list AI ladder battles here
+                summaries = filter(lambda x: (x.get('attacker_type')=='human' and x.get('defender_type')=='human') or x.get('ladder_state'), summaries)
+            result_d = defer.succeed((summaries, is_final, is_error))
 
-                if len(qlist) > 0:
-                    pcache_data = self.do_query_player_cache(session, qlist, reason = 'query_battle_history')
-                    for i in xrange(len(qlist)):
-                        qmap[qlist[i]] = pcache_data[i]
+        else:
+            is_final = True
+            is_error = None
+            summaries = []
+            result_d = defer.succeed((summaries, is_final, is_error))
 
-                for s in summaries:
-                    r = {}
-                    for field in ('time', 'duration', 'ladder_state',
-                                  'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
-                                  'attacker_facebook_id', 'defender_facebook_id',
-                                  'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
-                                  'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
-                                  'facebook_friends',
-                                  'attacker_name', 'defender_name',
-                                  'attacker_level', 'defender_level',
-                                  'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time'):
-                        r[field] = s.get(field, None)
-                    latest_returned_time = max(latest_returned_time, r.get('time',-1))
-                    other_id = s['attacker_id'] if s['attacker_id'] != session.user.user_id else s['defender_id']
-                    #qentry = qmap.get(other_id, None)
-                    #if qentry: r['protection_end_time'] = qentry.get('protection_end_time', -1)
-                    r['attack_cooldown_expire'] = session.player.get_repeat_attack_cooldown_expire_time(other_id, r['base_id'] if 'base_id' in r else home_base_id(other_id))
-                    ret.append(r)
+        # on async failure, replace summaries/is_final with blank data, then respond to client
+        result_d.addErrback(report_and_reraise_deferred_failure, session)
+        result_d.addErrback(lambda _: ([], True, 'offline')) # return blank (summaries, is_final, is_error)
+        result_d.addCallback(self.query_battle_history_complete, session, tag, source if (alliance_A <= 0 and alliance_B <= 0) else None)
+        result_d.addErrback(report_and_absorb_deferred_failure, session)
+        return None # note: asynchronous with other session traffic!
+
+    def query_battle_history_complete(self, summaries_is_final_is_error, session, tag, source):
+        if session.logout_in_progress: return
+        summaries, is_final, is_error = summaries_is_final_is_error
+        assert is_error in (None, 'partial', 'offline') # "partial" means we have some data, "offline" means none
+        ret = []
+        pcache_data = None
+        latest_returned_time = -1 # timestamp of most recent battle summary returned
+
+        if not isinstance(summaries, list):
+            raise Exception('unexpected summaries: %r ' % summaries)
+
+        if summaries:
+
+            # perform player cache lookups
+            qset = set()
+            for s in summaries:
+                if not isinstance(s, dict):
+                    raise Exception('unexpected summary: %r' % s)
+                for player_id in (s['attacker_id'], s['defender_id']):
+                    if player_id != session.user.user_id:
+                        qset.add(player_id)
+            if qset:
+                pcache_data = self.do_query_player_cache(session, list(qset), reason = 'query_battle_history')
+
+            # extract the fields we want from the summaries
+            ret = [dict((k,s[k]) for k in self.BATTLE_HISTORY_FIELDS if k in s) for s in summaries]
+            latest_returned_time = max(s.get('time',-1) for s in summaries)
 
         # update battle_history_seen
-        if source == session.user.user_id:
+        if source and source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
-            retmsg.append(["NEW_BATTLE_HISTORIES", session.player.count_battles_since(session.player.battle_history_seen)])
+            session.send([["NEW_BATTLE_HISTORIES", 0]])
 
-        retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data])
+        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final, is_error]], flush_now = True)
 
-    def query_achievements(self, request, session, retmsg, arg):
+    def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
 
-        def complete_query(self, session, retmsg, tag, result):
+        d = make_deferred('query_achievements')
+
+        def complete_query(self, d, session, retmsg, tag, result):
             retmsg.append(["QUERY_ACHIEVEMENTS_RESULT", tag, result])
-            self.complete_deferred_request(request, session, retmsg)
+            d.callback(True)
 
         result = None
 
@@ -16900,7 +17676,7 @@ class GAMEAPI(resource.Resource):
             result = session.viewing_player.achievements
 
         if result is not None:
-            reactor.callLater(0.01, functools.partial(complete_query, self, session, retmsg, tag, result))
+            reactor.callLater(0, functools.partial(complete_query, self, d, session, retmsg, tag, result))
         else:
             # otherwise do an async load
             # XXX this could be vulnerable to DDOS
@@ -16908,13 +17684,13 @@ class GAMEAPI(resource.Resource):
                 result = player.achievements if (success and player) else None
                 continuation(result)
             player_table.lookup_async(session.player, id, False,
-                                      functools.partial(player_cb, functools.partial(complete_query, self, session, retmsg, tag)),
+                                      functools.partial(player_cb, functools.partial(complete_query, self, d, session, retmsg, tag)),
                                       'query_achievements')
 
-        return True # async
+        return session.start_async_request(d) # async
 
     # simulate player cache query results by just reading from the in-memory player
-    def get_player_cache_props(self, user, player, alliance_id = None):
+    def get_player_cache_props(self, user, player, alliance_id):
         #base_damage, base_repair_time = player.my_home.report_base_damage_and_repair_time_for_ladder(player)
         ret =  {'user_id': user.user_id,
                 'ui_name': user.get_ui_name(player),
@@ -16950,7 +17726,6 @@ class GAMEAPI(resource.Resource):
                       'facebook_id', 'kg_id', 'ag_id',
                       'facebook_name', 'facebook_first_name', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
-            if session.user.is_chat_mod(): fields.append('chat_gagged')
 
         result = gamesite.pcache_client.player_cache_lookup_batch(user_ids, fields = fields, reason = reason)
 
@@ -16987,24 +17762,26 @@ class GAMEAPI(resource.Resource):
         reason += ',incr' if updated_since > 0 else ',full'
 
         db_time = 1
-        start_time = time.time()
-        result = list(gamesite.nosql_client.get_map_features(region, updated_since = updated_since, reason = 'do_quarry_query_uncached('+reason+')'))
-        admin_stats.record_latency('do_quarry_query_uncached('+reason+':get_map_features)', time.time()-start_time)
+
+        with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':get_map_features)'):
+            result = list(gamesite.nosql_client.get_map_features(region, updated_since = updated_since, reason = 'do_quarry_query_uncached('+reason+')'))
 
         for x in result:
             db_time = max(db_time, x.get('last_mtime',-1))
 
         if gamedata['server']['enable_map_compression'] and updated_since < 0:
-            start_time = time.time()
 
             if has_lz4 and gamedata['server']['map_compression_codec'] == 'lz4':
                 codec = 'lz4'
-                z_result = base64.b64encode(bytes(lz4.compress(SpinJSON.dumps(result))))
             else:
                 codec = 'lzjb'
-                z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(SpinJSON.dumps(result)))))
 
-            admin_stats.record_latency('do_quarry_query_uncached('+reason+':'+codec+'encode)', time.time()-start_time)
+            with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':'+codec+'encode)'):
+                if codec == 'lz4':
+                    z_result = base64.b64encode(bytes(lz4.compress(SpinJSON.dumps(result))))
+                elif codec == 'lzjb':
+                    z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(SpinJSON.dumps(result)))))
+
             #SpinJSON.dump(result, open('/tmp/zzz.txt','w'), pretty=True)
 
         else:
@@ -17013,7 +17790,7 @@ class GAMEAPI(resource.Resource):
 
         return db_time, codec, z_result
 
-    def get_battle_log3(self, request, session, retmsg, arg):
+    def get_battle_log3(self, session, retmsg, arg):
         battle_time = arg[1]
         attacker = arg[2]
         defender = arg[3]
@@ -17036,25 +17813,26 @@ class GAMEAPI(resource.Resource):
                 # try S3 download
                 bucket = AttackLog.storage_s3_bucket()
                 name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
-                def cb(self, request, session, retmsg, tag, success, buf):
+                d = make_deferred('get_battle_log3(S3)')
+                def cb(self, d, session, retmsg, tag, success, buf):
                     ret = None
                     if success and buf and (buf != 'NOTFOUND'):
-                        start_time = time.time()
-                        ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
-                        admin_stats.record_latency('GET_BATTLE_LOG3(s3 parse)', time.time()-start_time)
+                        with admin_stats.latency_measurer('GET_BATTLE_LOG3(s3 parse)'):
+                            ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
                     retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
-                    self.complete_deferred_request(request, session, retmsg)
+                    d.callback(True)
                 io_system.do_async_read((bucket,name),
-                                        functools.partial(cb, self, request, session, retmsg, tag, True),
-                                        functools.partial(cb, self, request, session, retmsg, tag, False),
+                                        functools.partial(cb, self, d, session, retmsg, tag, True),
+                                        functools.partial(cb, self, d, session, retmsg, tag, False),
                                         0)
-                return True # go async
+                return session.start_async_request(d) # go async
         except:
             gamesite.exception_log.event(server_time, 'error reading battle log %s on behalf of player %d: %s' % \
-                                         (filename, session.player.user_id, traceback.format_exc()))
+                                         (filename, session.player.user_id, traceback.format_exc().strip())) # OK
             ret = None
 
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
+        return None # not async
 
     def do_complete_quest(self, session, retmsg, questname):
         quest = session.player.get_abtest_quest(questname)
@@ -17121,7 +17899,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["COMPLETED_QUEST", quest.name, qdata])
 
         # some quests may reveal new AI enemies on completion
-        session.user.repopulate_ai_list(retmsg)
+        session.user.repopulate_ai_list(session)
 
         props = {'quest':quest.name,
                  'sum': session.player.get_denormalized_summary_props('brief')
@@ -17428,14 +18206,8 @@ class GAMEAPI(resource.Resource):
                 metric_event_coded(session.player.user_id, event_name, event_props)
 
         elif spellname.startswith("BUY_PROTECTION"):
-            session.player.record_protection_event('3883_protection_from_spell',
-                                                   {'prev_end_time': session.player.resources.protection_end_time,
-                                                    'new_end_time': max(session.player.resources.protection_end_time, server_time) + spell['duration'],
-                                                    'prot_time': spell['duration'],
-                                                    'spellname': spellname,
-                                                    'reason': reason})
-            session.player.resources.protection_end_time = max(session.player.resources.protection_end_time, server_time) + spell['duration']
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.player.set_protection_end_time(session, max(session.player.resources.protection_end_time, server_time) + spell['duration'],
+                                                   '3883_protection_from_spell', {'spellname': spellname, 'reason':reason})
 
         elif spellname.startswith("FREE_RANDOM_") or spellname.startswith("BUY_RANDOM_"):
             items = session.get_loot_items(session.player, gamedata['loot_tables'][spell['loot_table']]['loot'], -1, -1)
@@ -17444,10 +18216,10 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.user.user_id, '5100_free_random_item' if spellname.startswith("FREE_RANDOM_") else '5110_buy_random_item',
                                {'items':items})
 
-            retmsg.append(["ITEM_DISCOVERED", items, spell['mail_template'].get('duration',-1)])
+            use_modal_looting = (session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
+                                 session.player.find_object_by_type(gamedata['inventory_building']))
 
-            if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
-               session.player.find_object_by_type(gamedata['inventory_building']):
+            if use_modal_looting:
                 session.player.loot_buffer += items
                 for item in items:
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
@@ -17456,6 +18228,8 @@ class GAMEAPI(resource.Resource):
             else:
                 session.player.send_loot_mail('', 0, items, retmsg, mail_template = spell['mail_template'])
 
+            retmsg.append(["ITEMS_DISCOVERED", items, spell['mail_template'].get('duration',-1), 'loot_buffer' if use_modal_looting else 'messages'])
+
         elif spellname == "BUY_ITEM":
             skudata = Store.buy_item_find_skudata(spellarg, session.player)
             assert skudata
@@ -17463,12 +18237,18 @@ class GAMEAPI(resource.Resource):
             item = {'spec':skudata['item'], 'stack': stack}
             if 'level' in skudata: item['level'] = skudata['level']
 
+            expire_time = -1
             melt_time = int(skudata.get('melt_time',-1))
             melt_dur = int(skudata.get('melt_duration',-1))
             if melt_dur > 0:
-                item['expire_time'] = server_time + melt_dur
-            if melt_time > 0:
-                item['expire_time'] = melt_time
+                expire_time = server_time + melt_dur
+            elif melt_time > 0:
+                expire_time = melt_time
+
+            expire_time = session.get_item_spec_forced_expiration(gamedata['items'][item['spec']], prev_expire_time = expire_time)
+            if expire_time > 0:
+                assert expire_time >= server_time # don't sell an expired item
+                item['expire_time'] = expire_time
 
             items = [item,]
 
@@ -17573,7 +18353,7 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["OBJECT_CREATED2", object.serialize_state(fake_xy = death_location)])
                         session.player.send_army_update_one(object, retmsg)
                     except:
-                        gamesite.exception_log.event(server_time, 'player %d: error healing %s:\n%s' % (session.player.user_id, object.spec.name, traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'player %d: error healing %s: %s' % (session.player.user_id, object.spec.name, traceback.format_exc().strip())) # OK
 
                 for entry in to_remove:
                     session.resurrectable_objects.remove(entry)
@@ -17634,7 +18414,7 @@ class GAMEAPI(resource.Resource):
     def ping_object(self, session, retmsg, id, base):
         if id == GameObject.VIRTUAL_ID:
             # just ping player resources
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
         else:
             # possible race condition due to unserialized AJAX
             if not session.has_object(id):
@@ -17644,7 +18424,9 @@ class GAMEAPI(resource.Resource):
             object = session.get_object(id)
             return self.do_ping_object(session, retmsg, object, base)
 
+    @admin_stats.measure_latency('do_ping_object')
     def do_ping_object(self, session, retmsg, object, base, force_write = False):
+
             if not object.is_building():
                 # no need to ping objects that aren't buildings
                 return
@@ -18567,8 +19349,8 @@ class GAMEAPI(resource.Resource):
                     looted += loot
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
                 except:
-                    gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding.\n%s' % \
-                                                 (object.owner.user_id, repr(bus.craft_state), traceback.format_exc()))
+                    gamesite.exception_log.event(server_time, 'player %d crafting delivery %s target not found, discarding. %s' % \
+                                                 (object.owner.user_id, repr(bus.craft_state), traceback.format_exc().strip())) # OK
             else:
 
                 # returned "looted" list does include fungible items
@@ -19013,6 +19795,9 @@ class GAMEAPI(resource.Resource):
             # keep track of added objects so we can send a UNIT_MANUFACTURED message to the client
             new_object_ids = []
 
+            # expensive query, so only do it once
+            space_usage = session.player.get_army_space_usage_by_squad(exclude_manuf_queue = object)
+
             # grab items off the manufacturing queue in FIFO order
             while len(object.manuf_queue) > 0:
                 if object.manuf_queue[0]['total_time'] > prog:
@@ -19034,7 +19819,6 @@ class GAMEAPI(resource.Resource):
                         gamesite.exception_log.event(server_time, 'player %d not allowed to finish unit of spec %s due to count limit' % (session.player.user_id, spec.name))
                         continue # drop the unit
 
-                space_usage = session.player.get_army_space_usage_by_squad()
                 destination_squad = SQUAD_IDS.BASE_DEFENDERS
 
                 if (not session.player.is_cheater):
@@ -19062,6 +19846,8 @@ class GAMEAPI(resource.Resource):
                 newobj.squad_id = destination_squad
 
                 base.adopt_object(newobj)
+                space_usage['ALL'] += space
+                space_usage[str(destination_squad)] += space
                 session.player.send_army_update_one(newobj, retmsg)
 
                 new_object_ids.append(newobj.obj_id)
@@ -19101,6 +19887,7 @@ class GAMEAPI(resource.Resource):
         squad_to_repair = session.player.which_squad_is_under_repair() or SQUAD_IDS.BASE_DEFENDERS
         units_to_repair = [] # list units separately so we can sort them by time
         unit_repair_cost = dict([(res,0) for res in gamedata['resources']])
+        units_to_remove = []
 
         if write_base and session.viewing_base_lock != base.lock_id():
             # not going to hold it for an extended period of time, so no need to broadcast
@@ -19108,7 +19895,7 @@ class GAMEAPI(resource.Resource):
                                                                   generation=base.base_generation, do_hook=False, reason='do_start_repairs') \
                                                                   != Player.LockState.being_attacked: # generation=-1?
                 retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                return False
+                return
 
         try:
             for object in base.iter_objects():
@@ -19128,14 +19915,22 @@ class GAMEAPI(resource.Resource):
                                 self.do_ping_object(session, retmsg, object, base)
                                 if write_base:
                                     base.nosql_write_one(object, 'do_start_repairs')
-                if do_units and object.is_mobile():
-                    if object.is_damaged() and session.player.can_repair_unit(object) and \
+                if object.is_mobile():
+                    if object.is_temporary(): # get rid of temporary units
+                        units_to_remove.append(object)
+                    elif do_units and object.is_damaged() and session.player.can_repair_unit(object) and \
                        ((object.squad_id or 0) == squad_to_repair) and \
                        (not session.player.unit_repair_queued(object)):
                         units_to_repair.append(object)
                         my_cost = object.cost_to_repair(session.player)
                         for res in gamedata['resources']:
                             unit_repair_cost[res] += my_cost.get(res,0)
+
+            for object in units_to_remove:
+                base.drop_object(object)
+                if session.has_object(object.obj_id):
+                    if retmsg is not None: retmsg.append(["OBJECT_REMOVED2", object.obj_id])
+                    session.rem_object(object.obj_id)
         finally:
             if write_base and session.viewing_base_lock != base.lock_id():
                 gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='do_start_repairs')
@@ -19173,8 +19968,6 @@ class GAMEAPI(resource.Resource):
             session.player.unit_repair_send(retmsg)
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-        return False
-
     def do_unit_repair_queue(self, session, id):
         if not session.home_base or session.has_attacked: return None
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -19182,6 +19975,7 @@ class GAMEAPI(resource.Resource):
         assert obj.owner is session.player
         assert obj.is_mobile()
         if not obj.is_damaged(): return None
+        if obj.is_temporary(): return None
 
         # see if it's already under repair
         for item in session.player.unit_repair_queue:
@@ -19431,7 +20225,8 @@ class GAMEAPI(resource.Resource):
                 session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
-                assert session.player.inventory_add_item(remove_item, max_usable_inventory + inventory_buffer) == 1
+                # in over-full warehouse situtations, we don't want this to fail, so pass -1 instead of the true slot count
+                assert session.player.inventory_add_item(remove_item, -1 if inventory_buffer >= 1 else (max_usable_inventory + inventory_buffer)) == 1
                 # no need to log - player already had item
             if 'on_unequip' in remove_spec['equip']:
                 session.execute_consequent_safe(remove_spec['equip']['on_unequip'], session.player, retmsg, reason='on_unequip')
@@ -19453,7 +20248,7 @@ class GAMEAPI(resource.Resource):
 
     def do_lottery_scan(self, session, retmsg, scanner, spellname, source):
         # how we are getting permission to scan
-        assert source in ('cooldown', 'contents', 'paid')
+        assert source in ('cooldown', 'contents', 'paid', 'aura')
         spell = session.player.get_abtest_spell(spellname)
         success = True
 
@@ -19470,12 +20265,21 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 success = False
 
+        aura = None
+
         if source == 'cooldown':
             if session.player.cooldown_active('lottery_free'):
                 retmsg.append(["ERROR", "CANNOT_SCAN_ON_COOLDOWN"])
                 success = False
         elif source == 'contents':
             if scanner.contents < 1:
+                retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
+                success = False
+        elif source == 'aura':
+            for a in session.player.player_auras:
+                if a['spec'] == 'lottery_scans' and ('end_time' not in a or a['end_time'] > server_time):
+                    aura = a; break
+            if (not aura) or (aura.get('stack',1) < 1):
                 retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
                 success = False
 
@@ -19487,14 +20291,26 @@ class GAMEAPI(resource.Resource):
 
         if success:
             slate = session.player.get_lottery_slate(session)
+            if session.player.lottery_slate_weights:
+                weight_dict = session.player.lottery_slate_weights
+            else:
+                weight_dict = dict((slot_name, 1) for slot_name in slate)
+
             slot_names = sorted(slate.keys())
-            which_slot = slot_names[int(random.random() * len(slot_names))]
+            weight_array = [weight_dict[slot_name] for slot_name in slot_names]
+            which_slot = weighted_random_choice(slot_names, weight_array, random.random())
+
             loot = slate[which_slot]
 
             assert len(loot) == 1
             item = loot[0]
             stack_to_add = item.get('stack',1)
+            spec = gamedata['items'].get(item['spec'])
+            if spec and spec.get('fungible') and spec['resource'] == 'lottery_scans':
+                session.deferred_player_auras_update = True
+
             assert session.player.inventory_add_item(item, snapshot.max_usable_inventory()) == stack_to_add
+
             # item gets mutated by add_item() - restore the original stack here
             item['stack'] = stack_to_add
             session.player.inventory_log_event('5125_item_obtained', item['spec'], stack_to_add, item.get('expire_time',-1), level=item.get('level',None), reason='lottery')
@@ -19516,9 +20332,15 @@ class GAMEAPI(resource.Resource):
             elif source == 'contents':
                 scanner.contents -= 1
                 session.deferred_object_state_updates.add(scanner)
+            elif source == 'aura':
+                aura['stack'] = aura.get('stack',1) - 1
+                if aura['stack'] <= 0: aura['end_time'] = server_time - 1
+                session.player.prune_player_auras()
+                session.deferred_player_auras_update = True
 
             session.player.reseed_lottery(session, force = True)
             session.increment_player_metric('lottery_scans', 1, time_series = False)
+            session.increment_player_metric('lottery_scans_'+source, 1, time_series = False)
 
         else: # failure
             which_slot = -1
@@ -19528,24 +20350,237 @@ class GAMEAPI(resource.Resource):
 
         return True
 
+    def instant_attack(self, my_session, retmsg, spellargs):
+        dest_user_id = spellargs[0]
+        assert dest_user_id != my_session.user.user_id
+        assert not my_session.visit_base_in_progress
+        assert not my_session.complete_attack_in_progress
+        their_session = get_session_by_user_id(dest_user_id)
+        if not their_session:
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            return defer.succeed(False)
+        d = make_deferred('instant_attack')
+        d.addCallback(lambda _: self.do_instant_attack(my_session, their_session, their_session.player.my_home))
+        their_session.after_async_request(d)
+        return d
+
+    def do_instant_attack(self, my_session, their_session, base):
+        ladder_state = None
+        dest_feature = SessionChangeNew.query_dest_feature(my_session.player, base.base_id)
+        if not dest_feature or dest_feature['base_landlord_id'] != their_session.player.user_id:
+            my_session.send(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", base.base_id, 'do_instant_attack'])
+            return
+        deployable_squads = SessionChangeNew.query_deployable_squads(my_session.player, dest_feature)
+        if len(deployable_squads) < 1:
+            my_session.send(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
+            return
+        map_ok, map_violation_error = my_session.player.can_spy_on_home(my_session.user, their_session.player, their_session.user.social_id, ladder_state, deployable_squads)
+        if not map_ok:
+            my_session.send(["ERROR", map_violation_error])
+            return
+        pvp_balance = my_session.player.get_pvp_balance(their_session.player, base)
+        attack_ok, attack_error = self.can_attack(my_session.player, their_session.player, base, pvp_balance, deployable_squads, ladder_state)
+        if not attack_ok:
+            my_session.send(["ERROR", attack_error])
+            return
+
+        self.init_attack(my_session, my_session.player, their_session.player, base, ladder_state)
+        gamesite.exception_log.event(server_time, 'HERE! %r' % deployable_squads)
+        my_session.deferred_history_update = True
+
+    def can_attack(self, player, other_player, base, pvp_balance, deployable_squads, ladder_state):
+        if server_time < player.get_repeat_attack_cooldown_expire_time(other_player.user_id, base.base_id):
+            return (False, "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN")
+
+        if pvp_balance == 'same_alliance':
+            return (False, "CANNOT_ATTACK_SAME_ALLIANCE")
+
+        if base is not other_player.my_home:
+            # quarry reinforcement or attack
+
+            # check control limit before attacking unowned quarry
+            if (other_player is not player) and (base.base_type == 'quarry') and \
+               base.base_region and gamedata['regions'][base.base_region].get('limit_quarry_control',True):
+                if player.num_quarries_controlled() >= player.stattab.quarry_control_limit:
+                    return (False, "CANNOT_ATTACK_QUARRY_LIMIT_REACHED")
+
+        elif other_player.is_human():
+            # attack against a human home base
+
+            if pvp_balance == 'player':
+                return (False, "CANNOT_ATTACK_WEAKER_PLAYER")
+
+            elif pvp_balance == 'enemy_strict':
+                return (False, "CANNOT_ATTACK_STRONGER_PLAYER")
+
+            if player.isolate_pvp and (not other_player.isolate_pvp):
+                return (False, "CANNOT_ATTACK_YOU_ARE_ISOLATED")
+
+            if (not player.isolate_pvp) and other_player.isolate_pvp:
+                return (False, "CANNOT_ATTACK_THEY_ARE_ISOLATED")
+
+            if other_player.has_damage_protection():
+                return (False, "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION")
+
+            # check for PvP ability
+            if (not player.is_pvp_player()):
+                return (False, "CANNOT_ATTACK_NOPVP_YOU")
+
+            elif (not other_player.is_pvp_player()):
+                return (False, "CANNOT_ATTACK_NOPVP_THEM")
+
+            # check for ladder/nonladder firewall violations
+            if len(deployable_squads) == 1 and deployable_squads.values()[0]['squad_id'] == SQUAD_IDS.BASE_DEFENDERS:
+                if player.is_ladder_player():
+                    if (not other_player.is_ladder_player()):
+                        return (False, "CANNOT_ATTACK_LADDER_YOU")
+                    elif (not ladder_state):
+                        return (False, "CANNOT_ATTACK_LADDER_YOU")
+                else:
+                    if other_player.is_ladder_player():
+                        return (False, "CANNOT_ATTACK_LADDER_THEM")
+
+                # check for map/legacy firewall violations
+                if (not ladder_state):
+                    if (not other_player.is_legacy_pvp_player()):
+                        return (False, "CANNOT_ATTACK_MAP_THEM")
+                    elif (not player.is_legacy_pvp_player()):
+                        return (False, "CANNOT_ATTACK_MAP_YOU")
+
+            if player.stattab.sandstorm_max:
+                return (False, "CANNOT_ATTACK_SANDSTORM_MAX")
+
+            if player.is_alt_account_unattackable(other_player) and gamedata['prevent_alt_attacks']:
+                return (False, "CANNOT_ATTACK_ALT_ACCOUNT")
+
+        return (True, None)
+
+    def is_protection_eligible(self, session, attacker, attacker_user, defender, defender_user, base, ladder_state):
+        if defender.is_ai() or (base is not defender.my_home): return False
+
+        if attacker.home_region and (attacker.home_region in gamedata['regions']) and \
+           ('enable_battle_protection_if' in gamedata['regions'][attacker.home_region]) and \
+           (not Predicates.read_predicate(gamedata['regions'][attacker.home_region]['enable_battle_protection_if']).is_satisfied(defender, None)):
+            return False # turned off for this region and this defender
+
+        if gamedata['server']['global_protection_cooldown'] > 0 and defender.cooldown_active('global_protection'):
+            return False # turned off by cooldown
+
+        if ('enable_protection_if' in gamedata['server']) and (not Predicates.read_predicate(gamedata['server']['enable_protection_if']).is_satisfied(defender, None)):
+            return False # turned off by predicate
+
+        protect_facebook_friends = defender.get_any_abtest_value('protect_facebook_friends', gamedata['server']['protect_facebook_friends'])
+        protect_same_ip = defender.get_any_abtest_value('protect_same_ip', gamedata['server']['protect_same_ip'])
+        protect_same_alliance = defender.get_any_abtest_value('protect_same_alliance', gamedata['server']['protect_same_alliance'])
+
+        is_same_ip = ((defender_user.last_login_ip == attacker_user.last_login_ip) and (attacker_user.last_login_ip != 'unknown'))
+
+        # have these two players exchanged DP too much recently?
+        max_player_stacks = Predicates.eval_cond_or_literal(gamedata['server']['protection_fatigue_stacks'], session, defender)
+        is_fatigued = gamedata['server']['enable_protection_fatigue'] and \
+                      (attacker.cooldown_active('protection_fatigue:%d'%defender.user_id) >= max_player_stacks or \
+                       (gamedata['server']['bidirectional_protection_fatigue'] and defender.cooldown_active('protection_fatigue:%d'%attacker.user_id) >= gamedata['server']['protection_fatigue_stacks']))
+
+        # are these two players in the same alliance, or have these two players recently exchanged too much DP with members of each others' alliances?
+        max_alliance_stacks = Predicates.eval_cond_or_literal(gamedata['server']['alliance_protection_fatigue_stacks'], session, defender)
+        if gamedata['server']['alliance_stickiness'] > 0:
+            is_same_alliance, my_alliances, other_alliances = attacker.is_same_alliance_sticky(defender)
+            if gamedata['server']['enable_protection_fatigue'] and gamedata['server']['enable_alliance_protection_fatigue'] and (not is_same_alliance):
+                for aid in my_alliances.union(other_alliances):
+                    if attacker.cooldown_active('protection_fatigue:a%d'%aid) >= max_alliance_stacks or \
+                       (gamedata['server']['bidirectional_protection_fatigue'] and defender.cooldown_active('protection_fatigue:a%d'%aid) >= gamedata['server']['alliance_protection_fatigue_stacks']):
+                        is_fatigued = True
+                        break
+        else:
+            is_same_alliance = attacker.is_same_alliance(defender.user_id)
+
+        # always enable protection for non-secure testing. Otherwise perform checks.
+        if (not spin_secure_mode) or \
+           ((not attacker.is_alt_account_unprotectable(defender)) and \
+            (not is_fatigued) and \
+            (protect_same_ip or (not is_same_ip)) and \
+            (protect_same_alliance or (not is_same_alliance)) and \
+            (protect_facebook_friends or (not attacker_user.is_friends_with(defender_user.social_id)))):
+
+            # if the last attack was a long time ago, don't count it for purposes of the protection attack counter
+            if (server_time - defender.protection_attack_time) >= defender.get_any_abtest_value('protection_backoff_time', gamedata['server']['protection_backoff_time']):
+                defender.protection_attack_count = 0
+
+            defender.protection_attack_count += 1 # XXX mutation
+            defender.protection_attack_time = server_time
+
+            if ladder_state:
+                # for ladder battles, enable directly
+                return True
+            else:
+                # for non-ladder battles, wait for N attacks
+                if defender.protection_attack_count >= defender.get_any_abtest_value('protection_attacks', gamedata['server']['protection_attacks']):
+                    return True
+        else:
+            # AI players, and Facebook friends, do not receive attack protection
+            if (not protect_same_ip) and is_same_ip and (not attacker_user.is_friends_with(defender_user.social_id)):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to same-ip attack: %d vs. %d (%s) friends %d' % \
+                                                 (attacker_user.user_id, defender_user.user_id, attacker_user.last_login_ip, int(attacker_user.is_friends_with(defender_user.social_id))))
+            elif (not protect_same_alliance) and is_same_alliance and (not attacker_user.is_friends_with(defender_user.social_id)):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to same-alliance attack: %d vs. %d (%s) friends %d' % \
+                                                 (attacker_user.user_id, defender_user.user_id, attacker_user.last_login_ip, int(attacker_user.is_friends_with(defender_user.social_id))))
+            elif attacker.is_alt_account_unprotectable(defender):
+                if gamedata['server']['log_alt_accounts'] >= 1:
+                    gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (attacker_user.user_id, defender_user.user_id))
+
+        return False
+
+    def init_attack(self, session, attacker, defender, base, ladder_state):
+        # perform all necessary mutations at the start of an offensive attack
+        # note: assumes all necessary locks are already taken
+        if defender.is_human() and base is defender.my_home:
+            defender.record_protection_event('3885_i_got_attacked',
+                                             {'prev_end_time': defender.resources.protection_end_time,
+                                              'attacker_id': attacker.user_id,
+                                              'ladder': bool(ladder_state)})
+            attacker.alt_record_attack(defender)
+
+        base.base_last_attack_time = server_time
+        base.base_times_attacked += 1
+        attacker.attack_cooldown_start = server_time
+
+        if gamedata['server'].get('track_battle_streaks',0) > 0:
+            cd_list = ['battle_streak']
+            if ladder_state:
+                cd_list.append('battle_streak_ladder')
+            for cd in cd_list:
+                attacker.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
+
+        if defender.is_human() and \
+           ((base is defender.my_home) or \
+            (base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
+            (base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
+            # remove the protection timer of the player making the attack
+            attacker.set_protection_end_time(session, -1,
+                                             '3884_protection_removed' if attacker.has_damage_protection() else None,
+                                             {'defender_id':defender.user_id})
+            record_player_metric(attacker, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+        record_player_metric(attacker, dict_increment, 'attacks_launched', 1, time_series = False)
+        record_player_metric(attacker, dict_increment, 'attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
+
+        if defender.is_human() and attacker.cooldown_active('revenge_defender:%d' % defender.user_id):
+            record_player_metric(attacker, dict_increment, 'revenge_attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
+            record_player_metric(defender, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
+
     # deploy units against a foreign (human or AI) player
     # returns true if successful
     def do_attack(self, session, retmsg, spellargs):
         loc = spellargs[0]
         unit_id_list = spellargs[1]
 
-        if session.complete_attack_in_progress:
-            # This can happen due to race conditions, like the server
-            # forcing attack completion and then the client sending
-            # DEPLOY_UNITS before it becomes aware the battle is over.
-            # Just ignore the invalid request.
-            return False
-
         if session.home_base:
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return False
 
-        if session.complete_attack_in_progress or session.visit_base_in_progress or session.logout_in_progress or (not session.has_attacked and (session.viewing_base_lock is not None)):
+        if (not session.has_attacked and (session.viewing_base_lock is not None)):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             gamesite.exception_log.event(server_time, 'do_attack() with invalid session state: %s args [%r,%r]' % (session.dump_exception_state(), loc, unit_id_list))
             return False
@@ -19558,44 +20593,13 @@ class GAMEAPI(resource.Resource):
         if not session.has_attacked:
             # first deployment - check for permission to attack, and acquire locks
 
-            # look up AI base or hive
-            if (session.viewing_base is session.viewing_player.my_home) and \
-               session.viewing_player.is_ai():
-                ai_data = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
-            elif session.viewing_base.base_type == 'hive':
-                ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
-            else:
-                ai_data = None
-
-            if server_time < session.player.get_repeat_attack_cooldown_expire_time(session.viewing_player.user_id, session.viewing_base.base_id):
-                retmsg.append(["ERROR", "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"])
+            attack_ok, attack_error_message = self.can_attack(session.player, session.viewing_player, session.viewing_base, session.pvp_balance, session.deployable_squads, session.ladder_state)
+            if not attack_ok:
+                retmsg.append(["ERROR", attack_error_message])
                 return False
 
-            if session.pvp_balance == 'same_alliance':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_SAME_ALLIANCE"])
-                    return False
-
+            # get all necessary locks
             if session.viewing_base is not session.viewing_player.my_home:
-                # quarry reinforcement or attack
-
-                # check control limit before attacking unowned quarry
-                if (session.viewing_player is not session.player) and (session.viewing_base.base_type == 'quarry') and \
-                   session.viewing_base.base_region and gamedata['regions'][session.viewing_base.base_region].get('limit_quarry_control',True):
-                    if session.player.num_quarries_controlled() >= session.player.stattab.quarry_control_limit:
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_QUARRY_LIMIT_REACHED"])
-                        return False
-
-                if (gamesite.nosql_client and session.player.home_region):
-                    # nosql path
-                    pass
-                else:
-                    if (not session.player.travel_satisfied(session.viewing_base)):
-                        retmsg.append(["ERROR", "CANNOT_DEPLOY_TRAVEL_NOT_ARRIVED"])
-                        return False
-                    else:
-                        session.player.travel_deploy_at(session.viewing_base.base_id)
-                        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
-
                 lock_errors = []
                 state = session.acquire_base(errors = lock_errors)
                 if state != Player.LockState.being_attacked:
@@ -19603,74 +20607,12 @@ class GAMEAPI(resource.Resource):
                     return False
 
                 if session.viewing_player is not session.player:
-                    self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.base_id,
+                    self.broadcast_map_attack(session.viewing_base.base_region, session.viewing_base.get_cache_props(),
                                               session.player.user_id, session.viewing_player.user_id, None, # no summary -> attack start
-                                              [self.get_player_cache_props(u,p) for u,p in ((session.user,session.player),(session.viewing_user,session.viewing_player))],
+                                              [self.get_player_cache_props(u,p,aid) for u,p,aid in ((session.user,session.player,session.alliance_id_cache),(session.viewing_user,session.viewing_player,session.viewing_alliance_id_cache))],
                                               msg = "REGION_MAP_ATTACK_START")
 
             elif session.viewing_player.is_human():
-                # attack against a human home base
-
-                if session.pvp_balance == 'player':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_WEAKER_PLAYER"])
-                    return False
-                elif session.pvp_balance == 'enemy_strict':
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_STRONGER_PLAYER"])
-                    return False
-
-                if session.player.isolate_pvp and (not session.viewing_player.isolate_pvp):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_YOU_ARE_ISOLATED"])
-                    return False
-
-                if (not session.player.isolate_pvp) and session.viewing_player.isolate_pvp:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_THEY_ARE_ISOLATED"])
-                    return False
-
-                if session.viewing_player.resources.protection_end_time > server_time:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION"])
-                    return False
-
-                # check for PvP ability
-                if (not session.player.is_pvp_player()):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_YOU"])
-                    return False
-                elif (not session.viewing_player.is_pvp_player()):
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_NOPVP_THEM"])
-                    return False
-
-                # check for ladder/nonladder firewall violations
-                if (not session.using_squad_deployment()):
-                    if session.player.is_ladder_player():
-                        if (not session.viewing_player.is_ladder_player()):
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return False
-                        elif (not session.is_ladder_battle()):
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_YOU"])
-                            return False
-                    else:
-                        if session.viewing_player.is_ladder_player():
-                            retmsg.append(["ERROR", "CANNOT_ATTACK_LADDER_THEM"])
-                            return False
-
-                # check for map/legacy firewall violations
-                if (not session.using_squad_deployment()) and (not session.is_ladder_battle()):
-                    if (not session.viewing_player.is_legacy_pvp_player()):
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_THEM"])
-                        return False
-                    elif (not session.player.is_legacy_pvp_player()):
-                        retmsg.append(["ERROR", "CANNOT_ATTACK_MAP_YOU"])
-                        return False
-
-                if session.player.stattab.sandstorm_max:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_SANDSTORM_MAX"])
-                    return False
-
-                if session.player.is_alt_account_unattackable(session.viewing_player) and gamedata['prevent_alt_attacks']:
-                    retmsg.append(["ERROR", "CANNOT_ATTACK_ALT_ACCOUNT"])
-                    return False
-                else:
-                    session.player.alt_record_attack(session.viewing_player)
-
                 state = gamesite.lock_client.player_lock_acquire_attack(session.viewing_user.user_id, session.viewing_player.generation, owner_id=session.player.user_id)
                 if state == -Player.LockState.logged_in:
                     retmsg.append(["ERROR", "CANNOT_ATTACK_PLAYER_WHILE_LOGGED_IN", 1])
@@ -19683,7 +20625,7 @@ class GAMEAPI(resource.Resource):
                 state = session.do_acquire_base(session.viewing_player, session.viewing_player.my_home, session.deployable_squads, session.defending_squads, errors = lock_errors)
                 if state != Player.LockState.being_attacked:
                     gamesite.lock_client.player_lock_release(session.viewing_user.user_id, session.viewing_player.generation, Player.LockState.being_attacked,
-                                                           expected_owner_id = session.player.user_id)
+                                                             expected_owner_id = session.player.user_id)
                     retmsg.append(["ERROR", lock_errors[0], "attack_home"])
                     return False
 
@@ -19693,18 +20635,11 @@ class GAMEAPI(resource.Resource):
                 # then set the flag, because we have exclusive write permission now
                 session.viewing_player.has_write_lock = True
 
-                if session.is_ladder_battle() and gamedata['server']['log_ladder_pvp'] >= 2:
-                    gamesite.exception_log.event(server_time, 'ladder attack START: ' + session.format_ladder_state())
-
-                session.viewing_player.record_protection_event('3885_i_got_attacked',
-                                                               {'prev_end_time': session.player.resources.protection_end_time,
-                                                                'attacker_id':session.player.user_id,
-                                                                'ladder':session.is_ladder_battle()})
+            if session.viewing_player is not session.player:
+                self.init_attack(session, session.player, session.viewing_player, session.viewing_base, session.ladder_state)
 
             session.has_attacked = True
-            session.viewing_base.base_last_attack_time = server_time
-            session.viewing_base.base_times_attacked += 1
-            session.player.attack_cooldown_start = server_time
+            session.debug_log_action('do_attack')
 
             session.deployed_units = {}
             session.deployed_donated_units = {}
@@ -19714,22 +20649,20 @@ class GAMEAPI(resource.Resource):
                                                if (obj.owner is session.player) and obj.is_mobile()])
             session.deployed_donated_unit_space = 0
 
-            event_props = {'attacker_user_id': session.user.user_id,
-                           'attacker_level': session.player.resources.player_level,
-                           'attacker_deployable_squads': session.deployable_squads.copy(),
-                           'base_id': session.viewing_base.base_id,
-                           'starting_base_damage': session.starting_base_damage,
-                           'opponent_user_id':session.viewing_user.user_id,
-                           'opponent_level':session.viewing_player.resources.player_level,
-                           'opponent_type':session.viewing_player.ai_or_human()}
-
             # open attack log
             if session.viewing_player is session.player:
                 # reinforcement
                 session.open_attack_log(-1,-1)
             else:
                 session.open_attack_log(session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
-                session.attack_event(session.user.user_id, '3820_battle_start', event_props.copy())
+                session.attack_event(session.user.user_id, '3820_battle_start', {'attacker_user_id': session.user.user_id,
+                                                                                 'attacker_level': session.player.resources.player_level,
+                                                                                 'attacker_deployable_squads': session.deployable_squads.copy(),
+                                                                                 'base_id': session.viewing_base.base_id,
+                                                                                 'starting_base_damage': session.starting_base_damage,
+                                                                                 'opponent_user_id':session.viewing_user.user_id,
+                                                                                 'opponent_level':session.viewing_player.resources.player_level,
+                                                                                 'opponent_type':session.viewing_player.ai_or_human()})
                 if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                     session.player.record_ladder_pvp_event('3305_ladder_attack_start', {'defender_id': session.viewing_player.user_id,
                                                                                         'attacker_pts': session.player.ladder_points(),
@@ -19744,27 +20677,13 @@ class GAMEAPI(resource.Resource):
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
                 if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
 
-                session.increment_player_metric('attacks_launched', 1, time_series = False)
-                session.increment_player_metric('attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
-
-                if session.viewing_player.is_human() and session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                    session.increment_player_metric('revenge_attacks_launched_vs_'+session.viewing_player.ai_or_human(), 1, time_series = False)
-                    record_player_metric(session.viewing_player, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
-
-                if session.viewing_player.is_human() and \
-                   ((session.viewing_base is session.viewing_player.my_home) or \
-                    (session.viewing_base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
-                    (session.viewing_base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
-                    # remove the protection timer of the player making the attack
-                    old_end_time = session.player.resources.protection_end_time
-                    if old_end_time > server_time:
-                        session.player.record_protection_event('3884_protection_removed',
-                                                               {'prev_end_time': session.player.resources.protection_end_time,
-                                                                'new_end_time': 0,
-                                                                'defender_id':session.viewing_player.user_id})
-                    session.player.resources.protection_end_time = 0
-                    session.player.protection_attack_count = 0
-                    session.setmax_player_metric('last_pvp_aggression_time', server_time, time_series = False)
+            # look up AI base or hive
+            if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
+                ai_data = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+            elif session.viewing_base.base_type == 'hive':
+                ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+            else:
+                ai_data = None
 
             if session.player.tutorial_state != "COMPLETE":
                 attack_time = gamedata['tutorial_attack_time']
@@ -19801,97 +20720,12 @@ class GAMEAPI(resource.Resource):
 
             # INITIAL damage protection calculation
             # at the start of the battle, we check whether any damage protection is potentially available (based on recent attacks, who is attacking, etc)
-            # if available, set protection_end_time > 0 here, otherwise protection_end_time = 0
+            # if available, set protection_eligible True
             # after the battle, we'll calculate the exact amount of time based on damage done
 
-            enable_protection = session.viewing_player.is_human() and (session.viewing_base is session.viewing_player.my_home)
-
-            if session.player.home_region and (session.player.home_region in gamedata['regions']) and \
-               ('enable_battle_protection_if' in gamedata['regions'][session.player.home_region]) and \
-               (not Predicates.read_predicate(gamedata['regions'][session.player.home_region]['enable_battle_protection_if']).is_satisfied(session.viewing_player, None)):
-                enable_protection = False # turned off for this region and this defender
-
-            if gamedata['server']['global_protection_cooldown'] > 0 and session.viewing_player.cooldown_active('global_protection'):
-                enable_protection = False # turned off by cooldown
-
-            if ('enable_protection_if' in gamedata['server']) and (not Predicates.read_predicate(gamedata['server']['enable_protection_if']).is_satisfied(session.viewing_player, None)):
-                enable_protection = False # turned off by predicate
-
-            if enable_protection:
-                protect_facebook_friends = session.viewing_player.get_any_abtest_value('protect_facebook_friends', gamedata['server']['protect_facebook_friends'])
-                protect_same_ip = session.viewing_player.get_any_abtest_value('protect_same_ip', gamedata['server']['protect_same_ip'])
-                protect_same_alliance = session.viewing_player.get_any_abtest_value('protect_same_alliance', gamedata['server']['protect_same_alliance'])
-
-                is_same_ip = ((session.viewing_user.last_login_ip == session.user.last_login_ip) and (session.user.last_login_ip != 'unknown'))
-
-                # have these two players exchanged DP too much recently?
-                max_player_stacks = Predicates.eval_cond_or_literal(gamedata['server']['protection_fatigue_stacks'], session, session.viewing_player)
-                is_fatigued = gamedata['server']['enable_protection_fatigue'] and \
-                              (session.player.cooldown_active('protection_fatigue:%d'%session.viewing_player.user_id) >= max_player_stacks or \
-                               (gamedata['server']['bidirectional_protection_fatigue'] and session.viewing_player.cooldown_active('protection_fatigue:%d'%session.player.user_id) >= gamedata['server']['protection_fatigue_stacks']))
-
-                # are these two players in the same alliance, or have these two players recently exchanged too much DP with members of each others' alliances?
-                max_alliance_stacks = Predicates.eval_cond_or_literal(gamedata['server']['alliance_protection_fatigue_stacks'], session, session.viewing_player)
-                if gamedata['server']['alliance_stickiness'] > 0:
-                    is_same_alliance, my_alliances, other_alliances = session.player.is_same_alliance_sticky(session.viewing_player)
-                    if gamedata['server']['enable_protection_fatigue'] and gamedata['server']['enable_alliance_protection_fatigue'] and (not is_same_alliance):
-                        for aid in my_alliances.union(other_alliances):
-                            if session.player.cooldown_active('protection_fatigue:a%d'%aid) >= max_alliance_stacks or \
-                               (gamedata['server']['bidirectional_protection_fatigue'] and session.viewing_player.cooldown_active('protection_fatigue:a%d'%aid) >= gamedata['server']['alliance_protection_fatigue_stacks']):
-                                is_fatigued = True
-                                break
-                else:
-                    is_same_alliance = session.player.is_same_alliance(session.viewing_player.user_id)
-
-                if (not session.player.is_alt_account_unprotectable(session.viewing_player)) and \
-                   (not is_fatigued) and \
-                   (protect_same_ip or (not is_same_ip)) and \
-                   (protect_same_alliance or (not is_same_alliance)) and \
-                   (protect_facebook_friends or (not session.user.is_friends_with(session.viewing_user.social_id))):
-
-                    # if the last attack was a long time ago, don't count it for purposes of the protection attack counter
-                    if (server_time - session.viewing_player.protection_attack_time) >= session.viewing_player.get_any_abtest_value('protection_backoff_time', gamedata['server']['protection_backoff_time']):
-                        session.viewing_player.protection_attack_count = 0
-
-                    session.viewing_player.protection_attack_count += 1
-                    session.viewing_player.protection_attack_time = server_time
-
-                    if session.is_ladder_battle():
-                        # for ladder battles, enable directly
-                        session.viewing_player.resources.protection_end_time = server_time # protection IS enabled
-                    else:
-                        # for non-ladder battles, wait for N attacks
-                        if session.viewing_player.protection_attack_count >= session.viewing_player.get_any_abtest_value('protection_attacks', gamedata['server']['protection_attacks']):
-                            # trigger the protection timer (exact amount computed on battle end)
-                            session.viewing_player.resources.protection_end_time = server_time # protection IS enabled
-                            session.viewing_player.protection_attack_count = 0
-                        else:
-                            session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
-
-                else:
-                    # AI players, and Facebook friends, do not receive attack protection
-                    if (not protect_same_ip) and is_same_ip and (not session.user.is_friends_with(session.viewing_user.social_id)):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to same-ip attack: %d vs. %d (%s) friends %d' % \
-                                                         (session.user.user_id, session.viewing_user.user_id, session.user.last_login_ip, int(session.user.is_friends_with(session.viewing_user.social_id))))
-                    elif (not protect_same_alliance) and is_same_alliance and (not session.user.is_friends_with(session.viewing_user.social_id)):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to same-alliance attack: %d vs. %d (%s) friends %d' % \
-                                                         (session.user.user_id, session.viewing_user.user_id, session.user.last_login_ip, int(session.user.is_friends_with(session.viewing_user.social_id))))
-                    elif session.player.is_alt_account_unprotectable(session.viewing_player):
-                        if gamedata['server']['log_alt_accounts'] >= 1:
-                            gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (session.user.user_id, session.viewing_user.user_id))
-
-                    session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
-            else:
-                session.viewing_player.resources.protection_end_time = 0 # protection NOT enabled
-
-            if gamedata['server'].get('track_battle_streaks',0) > 0:
-                cd_list = ['battle_streak']
-                if session.is_ladder_battle():
-                    cd_list.append('battle_streak_ladder')
-                for cd in cd_list:
-                    session.player.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
+            session.protection_eligible = self.is_protection_eligible(session, session.player, session.user,
+                                                                      session.viewing_player, session.viewing_user,
+                                                                      session.viewing_base, session.ladder_state)
 
             if ai_data and ('on_attack' in ai_data):
                 session.execute_consequent_safe(ai_data['on_attack'], session.player, retmsg, reason='on_attack')
@@ -20038,7 +20872,7 @@ class GAMEAPI(resource.Resource):
                        'to': [], # will be filled in below
                        'type': 'resource_gift',
                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
-                       'from_pcache': self.get_player_cache_props(session.user, session.player),
+                       'from_pcache': self.get_player_cache_props(session.user, session.player, session.alliance_id_cache),
                        'unique_per_sender': 'resource_gift'}
 
         for recipient_user_id in recipient_user_id_list:
@@ -20066,6 +20900,7 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.user.user_id, '4120_send_gift_completed', props)
             session.deferred_history_update = True
 
+    @catch_all('do_receive_mail')
     def do_receive_mail(self, session, retmsg, is_login = False, type_filter = None):
         ret = {
             'was_attacked': False, # True if battle history should be shown upon login
@@ -20196,7 +21031,7 @@ class GAMEAPI(resource.Resource):
                     if end_time > server_time:
                         if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
                                                      duration = end_time - server_time, ignore_limit = True):
-                            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+                            session.deferred_player_auras_update = True
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'chat_report':
@@ -20218,7 +21053,7 @@ class GAMEAPI(resource.Resource):
                         ret['was_attacked'] = False # disable this for now, let the client do it
 
                     session.player.append_battle_summary(session, summary['attacker_id'], summary)
-                    retmsg.append(["NEW_BATTLE_HISTORIES", session.player.count_battles_since(session.player.battle_history_seen)])
+                    retmsg.append(["NEW_BATTLE_HISTORIES", 1])
 
                     to_ack.append(msg['msg_id'])
 
@@ -20246,7 +21081,7 @@ class GAMEAPI(resource.Resource):
                         session.increment_player_metric('gift_orders_received', 1)
                         session.increment_player_metric('gamebucks_received_from_gift_orders', gift_amount)
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
-                        if config:
+                        if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                             session.player.do_send_fb_notification_to(msg['from_fbid'], notif_text, config, config['ref'])
 
@@ -20282,7 +21117,7 @@ class GAMEAPI(resource.Resource):
                     try:
                         gamesite.trialpayapi.handle_payment(None, session, msg['their_hash'], msg['request_args'], msg['request_body'])
                     except:
-                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r:' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'TRIALPAYAPI_payment API fail on user %d payment %r: ' % (session.user.user_id, msg.get('request_args')) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20328,9 +21163,16 @@ class GAMEAPI(resource.Resource):
                             spellname = spellarg = None
                             if client_price and client_currency:
                                 # look for a zombie SKU slate order
-                                if ('type' in qs) and (qs['type'][-1] == OGPAPI.object_type('sku')):
-                                    spellname = qs['spellname'][-1]
-                                    assert url == OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('sku'), 'spellname': spellname})
+                                if ('type' in qs) and (qs['type'][0] == OGPAPI.object_type('sku')):
+                                    spellname = qs['spellname'][0]
+                                    url_props = {'type':OGPAPI.object_type('sku'), 'spellname': spellname}
+                                    if 'want_loot' in qs:
+                                        url_props['want_loot'] = qs['want_loot'][0]
+                                        spellarg = {'want_loot': bool(int(qs['want_loot'][0]))}
+                                    if url != OGPAPI_instance.get_object_endpoint(url_props):
+                                        gamesite.exception_log.event('fbpayment URL mismatch: got %s expected %s' % \
+                                                                     (url, OGPAPI_instance.get_object_endpoint(url_props)))
+                                        raise Exception('fbpayment URL mismatch')
 
                                 # look for an order that buys in-game currency directly on the OG currency object, like a payer promo
                                 elif url == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})) or \
@@ -20355,10 +21197,10 @@ class GAMEAPI(resource.Resource):
                                 session.user.ping_fbpayment_complete(None, session, retmsg, request_id, {'data':[response]})
 
                         if (status not in ('INFLIGHT','COMPLETED','FAILED','SYNTHESIZED')) or gamedata['server']['log_fbpayments'] >= 2:
-                            gamesite.exception_log.event(server_time, 'FBRTAPI_payment API call on user %d payment %s request_id %s: items %s actions %s status %s' % (session.user.user_id, payment_id, request_id, str(response['items']), str(response['actions']), status))
+                            gamesite.exception_log.event(server_time, 'FBRTAPI_payment API call on user %d payment %s request_id %s: items %s actions %s status %s' % (session.user.user_id, payment_id, request_id, str(response['items']), str(response['actions']), status)) # OK
 
                     except:
-                        gamesite.exception_log.event(server_time, 'FBRTAPI_payment API fail on user %d payment %s:' % (session.user.user_id, msg['payment_id']) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'FBRTAPI_payment API fail on user %d payment %s: ' % (session.user.user_id, msg['payment_id']) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20377,7 +21219,7 @@ class GAMEAPI(resource.Resource):
                             gamesite.xsapi.handle_payment(None, session, request_data)
                             gamesite.exception_log.event(server_time, 'XSAPI_payment API success on user %d payment %s' % (session.user.user_id, payment_id))
                     except:
-                        gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s:' % (session.user.user_id, payment_id) + traceback.format_exc())
+                        gamesite.exception_log.event(server_time, 'XSAPI_payment API fail on user %d payment %s: ' % (session.user.user_id, payment_id) + traceback.format_exc().strip()) # OK
                         pass
                     to_ack.append(msg['msg_id'])
 
@@ -20428,9 +21270,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
     def auto_resolve(self, session, retmsg):
-        if session.visit_base_in_progress or \
-           session.complete_attack_in_progress or \
-           not session.has_attacked or \
+        if not session.has_attacked or \
            ((not session.home_base) and session.player is session.viewing_player): # quarry reinforcement
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return
@@ -20518,11 +21358,12 @@ class GAMEAPI(resource.Resource):
         resolve_iter = 0
 
         while True: # iterate, because object destruction can spawn new objects (security teams)
-            objects_destroyed, combat_updates = AutoResolve.resolve(session, log_func = log_func)
-            if gamedata['server'].get('log_auto_resolve', 0) >= 2:
-                gamesite.exception_log.event(server_time, "player %d at %s auto-resolve iter %d destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, resolve_iter, objects_destroyed, combat_updates))
+            action_list = AutoResolve.resolve(session, log_func = log_func)
 
-            if not objects_destroyed and not combat_updates:
+            if gamedata['server'].get('log_auto_resolve', 0) >= 2:
+                gamesite.exception_log.event(server_time, "player %d at %s auto-resolve iter %d destroys: %r ... updates: %r" % (session.player.user_id, session.viewing_base.base_id, resolve_iter, [x[0] for x in action_list if x[0]], [x[1] for x in action_list if x[1]]))
+
+            if not action_list:
                 break # nothing happened
 
             resolve_iter += 1
@@ -20530,14 +21371,18 @@ class GAMEAPI(resource.Resource):
             # compare number of objects before and after submitting
             # the changes, to pick up new security team objects
             num_before = session.num_objects()
-            for args in objects_destroyed:
-                self.destroy_object(session, retmsg, *args)
-            self.object_combat_updates(session, retmsg, combat_updates)
+            destroyed_count = 0
+            for objects_destroyed_arg, combat_updates_arg in action_list:
+                if objects_destroyed_arg:
+                    self.destroy_object(session, retmsg, *objects_destroyed_arg)
+                    destroyed_count += 1
+                if combat_updates_arg:
+                    self.object_combat_updates(session, retmsg, [combat_updates_arg,])
 
             # check for security team spawning
             num_after = session.num_objects()
 
-            if num_after <= num_before - len(objects_destroyed):
+            if num_after <= num_before - destroyed_count:
                 break # nothing new spawned
 
     def object_combat_updates(self, session, retmsg, arg):
@@ -20551,12 +21396,6 @@ class GAMEAPI(resource.Resource):
         update_viewing_player = False
         recalc_resources = False
         recalc_power = False
-
-        if session.visit_base_in_progress:
-            if gamedata['server'].get('log_combat_race_conditions', False):
-                gamesite.exception_log.event(server_time, 'object_combat_updates: player %d visit_base_in_progress' % \
-                                             (session.player.user_id))
-            return
 
         # for each affected object
         for a in arg:
@@ -20624,7 +21463,6 @@ class GAMEAPI(resource.Resource):
 
             # handle battle damage
             if newhp != obj.hp:
-                #start_time = time.time()
 
                 max_hp = obj.max_hp
                 if newhp > obj.hp:
@@ -20810,9 +21648,6 @@ class GAMEAPI(resource.Resource):
 
                 update_viewing_player = True
 
-                #end_time = time.time()
-                #admin_stats.record_latency('OBJECT_COMBAT_UPDATES_hp'+obj.spec.kind+('_loot' if obj.hp == 0 else ''), end_time-start_time)
-
             # END handle damage
 
             # write object state to NoSQL, if it's stored there
@@ -20850,14 +21685,11 @@ class GAMEAPI(resource.Resource):
             session.power_changed(session.viewing_base, None, retmsg)
 
         if recalc_resources:
-            start_time = time.time()
-            if update_player:
-                retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
-            if update_viewing_player and session.has_attacked:
-                retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
-
-            end_time = time.time()
-            admin_stats.record_latency('OBJECT_COMBAT_UPDATES_state', end_time - start_time)
+            with admin_stats.latency_measurer('OBJECT_COMBAT_UPDATES_state'):
+                if update_player:
+                    retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                if update_viewing_player and session.has_attacked:
+                    retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -20890,14 +21722,6 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
     def destroy_object(self, session, retmsg, id, death_location, killer_info):
-
-        # possible race condition due to unserialized AJAX:
-        # client sends VISIT_BASE then destroys an object belonging to the old base
-        # not much we can do, preventing this is hard
-        if session.visit_base_in_progress:
-            if gamedata['server'].get('log_combat_race_conditions', False):
-                gamesite.exception_log.event(server_time, 'destroy_object: player %d visit_base_in_progress' % session.player.user_id)
-            return
 
         if (not session.has_object(id)):
             if gamedata['server'].get('log_combat_race_conditions', False):
@@ -21166,7 +21990,7 @@ class GAMEAPI(resource.Resource):
             request.setHeader('Connection', 'keep-alive')
             request.setHeader('Keep-Alive', 'timeout=%d' % gamedata['server']['http_connection_timeout'])
 
-        client_ip = SpinHTTP.get_twisted_header(request, 'spin-orig-ip') or request.getClientIP()
+        client_ip = SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret'])
         user_agent = SpinHTTP.get_twisted_header(request, 'user-agent')
         args_dict = dict((k, request.args[k][0]) for k in request.args)
 
@@ -21177,19 +22001,19 @@ class GAMEAPI(resource.Resource):
         try:
             response = self.do_render_request(http_request, args_dict, client_ip, user_agent)
 
-        except Exception:
-            text = traceback.format_exc()
-
+        except:
             # try to determine user id
             suser_id = 'unknown'
             if 'session' in args_dict:
                 session_id = args_dict['session']
-                if session_table.has_key(session_id):
-                    suser_id = str(session_table[session_id].user.user_id)
+                session = get_session_by_session_id(session_id, include_logout_in_progress = True)
+                if session:
+                    suser_id = str(session.user.user_id)
 
-            gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+text)
+            gamesite.exception_log.event(server_time, 'GAMEAPI Exception (user '+suser_id+'): '+traceback.format_exc().strip()) # OK
 
             # return a formatted error for the client
+            http_request.setHeader('Connection', 'close') # stop keepalive
             error_response = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]})
 
         return error_response or response
@@ -21214,9 +22038,10 @@ class GAMEAPI(resource.Resource):
                 arg = None
                 # only log exception if it's not an empty request
                 if True or len(args_dict) > 1:
-                    gamesite.exception_log.event(server_time, 'bad client message! ' + repr(http_request) + ' args ' + repr(args_dict) + ' from '+repr(client_ip) + ' User-Agent "'+ user_agent +'" Exception:\n' + traceback.format_exc())
+                    gamesite.exception_log.event(server_time, 'bad client message! ' + repr(http_request) + ' args ' + repr(args_dict) + ' from '+repr(client_ip) + ' User-Agent "'+ user_agent +'" Exception: ' + traceback.format_exc().strip()) # OK
 
         if arg is None:
+            http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR","UNKNOWN_SESSION"]]})
 
         session_id = args_dict["session"]
@@ -21230,14 +22055,12 @@ class GAMEAPI(resource.Resource):
                 client_str = 'sid %s' % pretty_print_session(session_id)
             log.msg(('from client (%s:%d): ' % (client_str, serial)) +repr(arg))
 
-        retmsg = []
         session = None
 
         # CLIENT_HELLO message is handled as a special case, because it does not have a session yet
         if arg[0][0] == "CLIENT_HELLO":
 
-            # with use_deferred_messages, initialize retmsg here
-
+            retmsg = [] # to trap errors only - will be connected to session.outgoing_messages after session set-up
             go_async = self.handle_client_hello(http_request, client_ip, user_agent, arg[0], retmsg)
 
             arg = arg[1:]
@@ -21248,15 +22071,13 @@ class GAMEAPI(resource.Resource):
                 return server.NOT_DONE_YET
 
             # some kind of error happened
+            http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
         else:
-            if session_id and session_table.has_key(session_id):
-                session = session_table[session_id]
-                if session.logout_in_progress:
-                    session = None
-
+            session = get_session_by_session_id(session_id)
             if not session:
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             # after this point, session is guaranteed to be valid
@@ -21270,6 +22091,7 @@ class GAMEAPI(resource.Resource):
 
             # compare serial number of incoming message vs. the next expected serial number
             if (serial < session.incoming_serial):
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
 
             if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
@@ -21278,41 +22100,33 @@ class GAMEAPI(resource.Resource):
                     session.lagged_out = True
                     metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
                                                                                  'country': session.user.country })
+                http_request.setHeader('Connection', 'close') # stop keepalive
                 return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
 
         session.message_buffer.append([serial, arg])
         #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
 
-        if http_request.__class__ is WSFakeRequest: # XXXXXX nasty hack
+        if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
             # park this request as the longpoll request so we have something to write the client back on
             if session.longpoll_request is None:
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
-        if gamedata['server'].get('use_deferred_messages',False):
-            is_async = self.handle_message_buffer(http_request, session, session.deferred_messages)
-            if not is_async:
-                reactor.callLater(0, self.complete_deferred_request, http_request, session, [])
-            return server.NOT_DONE_YET
-        else:
-            is_async = self.handle_message_buffer(http_request, session, retmsg)
-            if is_async:
-                return server.NOT_DONE_YET
-            if session and (not session.is_async): # could have been set async by a previous request
-                self.run_deferred_actions(session, retmsg)
-            return self.make_response(session, retmsg)
+        session.sync_requests.append(http_request)
+        session.queue_flush_outgoing_messages()
+        return server.NOT_DONE_YET
 
     # process as many bundles of AJAX messages on a session as possible
     # may terminate early if bundles are out of order, or may go asynchronous
     # returns True if going asynchronous, otherwise False.
 
-    def handle_message_buffer(self, request, session, retmsg):
+    def handle_message_buffer(self, session, retmsg):
         # look through the message buffer for a processable message bundle
         i = 0
         start_time = -1
 
         while i < len(session.message_buffer):
-            if session.is_async:
+            if session.is_async():
                 # prevent re-entry of handle_message_buffer() on a subsequent client message while an async request is still happening
                 # the client will get its answer from complete_deferred_message after the async request completes
                 #gamesite.exception_log.event(server_time, 'user %d: skipping message processing while async in flight, in %d out %d buf %s' % (session.user.user_id, session.incoming_serial, session.outgoing_serial, repr(session.message_buffer)))
@@ -21322,10 +22136,6 @@ class GAMEAPI(resource.Resource):
                 break
 
             if session.message_buffer[i][0] == session.incoming_serial:
-
-                # for debugging only, helps print message below when things get screwed up
-                # by bad asynchronous code
-                temp_message_buffer = None # copy.deepcopy(session.message_buffer[i])
 
                 # ok, we got the next expected message bundle
                 serial_arg = session.message_buffer[i]
@@ -21347,10 +22157,12 @@ class GAMEAPI(resource.Resource):
                     else:
                         latency_tag = msg[0]
 
+                    session.debug_log_action(latency_tag)
+
                     try:
                         if start_time < 0: start_time = time.time()
 
-                        go_async = self.handle_message_guts(request, session, msg, retmsg)
+                        go_async = self.handle_message_guts(session, msg, retmsg)
 
                         end_time = time.time()
 
@@ -21361,39 +22173,39 @@ class GAMEAPI(resource.Resource):
                         if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
                                                        'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
                                                        'REPORT_METRIC'):
-                            session.last_action.append([latency_tag, server_time, session.last_active_time == server_time])
+                            session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
 
                         if go_async:
-                            # go asynchronous, breaking out of message processing here
-                            # eventually the relevant async callback should call complete_deferred_request()
-                            session.is_async = True
-                            return True
+                            assert isinstance(go_async, defer.Deferred)
+                            if not deferred_is_finished(go_async):
+                                # go asynchronous, breaking out of message processing here
+                                if (not session.logout_in_progress) and (go_async not in session.async_ds):
+                                    gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
+                                    session.start_async_request(go_async)
+                                return
 
                     except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc()))
+                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
                         retmsg.append(["ERROR", "SERVER_EXCEPTION"])
                         break
 
                 if len(serial_arg[1]) == 0:
                     # processed one complete bundle. Advance to next.
-                    try:
-                        session.message_buffer.pop(i)
-                    except:
-                        gamesite.exception_log.event(server_time, 'player %d hit the message_buffer error at i=%d: %s WAS:\n%s' % (session.player.user_id, i, traceback.format_exc(), repr(temp_message_buffer)))
-                        raise
+                    session.message_buffer.pop(i)
                     session.incoming_serial += 1
 
                 i = 0
             else:
                 i += 1
 
-        return False
-
     # we're about to send a response to the client. Run any pending batched actions.
-    def run_deferred_actions(self, session, retmsg):
+    @admin_stats.measure_latency('run_deferred_actions')
+    def run_deferred_actions(self, session, retmsg, reason = 'unknown'):
+        do_player_cache_update = False
+
         if session.deferred_ping_squads:
             session.deferred_ping_squads = False
-            session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='deferred_ping_squads(sync)')
+            session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason='run_deferred_actions(%s)' % reason)
 
         if session.deferred_ladder_point_decay_check:
             session.deferred_ladder_point_decay_check = False
@@ -21403,6 +22215,10 @@ class GAMEAPI(resource.Resource):
             session.deferred_stattab_update = False
             session.player.recalc_stattab(session.player)
             session.player.stattab.send_update(session, retmsg)
+
+        if session.deferred_mailbox_update:
+            session.deferred_mailbox_update = False
+            session.player.send_mailbox_update(retmsg)
 
         if session.deferred_power_change: # probably needs to come after stattab
             session.deferred_power_change = False
@@ -21423,6 +22239,10 @@ class GAMEAPI(resource.Resource):
             session.deferred_player_state_update = False
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
+        if session.deferred_player_auras_update:
+            session.deferred_player_auras_update = False
+            retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+
         if session.deferred_player_cooldowns_update:
             session.deferred_player_cooldowns_update = False
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
@@ -21436,113 +22256,79 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
             retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
             retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
-            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player)]])
+            do_player_cache_update = True
 
-    # obsoleted by use_deferred_messages
-    def make_response(self, session, retmsg):
-        # can happen on async login failure
-        if not session:
-            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+        if session.deferred_player_trophies_update:
+            session.deferred_player_trophies_update = False
+            do_player_cache_update = True
 
-        # send any pending deferred messages
-        if (not session.is_async) and (retmsg is not session.deferred_messages) and len(session.deferred_messages) > 0:
-            retmsg = session.deferred_messages + retmsg # prepend or append? not sure...
-            del session.deferred_messages[:] # note: do not create a new array, since outstanding deferred requests may reference it
-
-        if gamesite.raw_log:
-            client_str = 'sid %s' % pretty_print_session(session.session_id)
-            log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
-
-        r = SpinJSON.dumps({'serial': session.outgoing_serial,
-                            'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                            'msg': retmsg})
-        session.outgoing_serial += 1
-        return r
+        if do_player_cache_update:
+            retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
 
     def complete_deferred_request(self, request, session, retmsg):
+        # works for both standard HTTP request and WSFakeRequest
+
+        if request and hasattr(request, '_disconnected') and request._disconnected: return
+
+        # note: retmsg is ONLY used to convey error messages that happen prior to session set-up
+        # once the session is alive, only session.outgoing_messages is used for transmission
+
         if not session: # can happen on async login failure
             assert request
             # DO pay attention to retmsg here
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
+            request.setHeader('Connection', 'close') # stop keepalive
+            request.write(r)
 
         else:
-            session.is_async = False
+            # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
+            if gamesite.raw_log:
+                client_str = 'sid %s' % pretty_print_session(session.session_id)
+                log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
 
-            if gamedata['server'].get('use_deferred_messages',False):
-                # note: IGNORE retmsg here - all traffic is on session.deferred_messages
+            msg = session.outgoing_messages[:]
+            del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
-                # process any new pending messages
-                self.handle_message_buffer(request, session, session.deferred_messages)
-                if session.is_async:
-                    return
+            if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
+                msg.append(["NOMESSAGE"])
 
-                self.run_deferred_actions(session, session.deferred_messages)
-
-                # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
-                # if so, don't run the normal path. But flush deferred messages.
-                if request is None:
-                    session.flush_deferred_messages()
-                    return
-
-                if gamesite.raw_log:
-                    client_str = 'sid %s' % pretty_print_session(session.session_id)
-                    log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
-
+            if len(msg) > 0:
                 r = SpinJSON.dumps({'serial': session.outgoing_serial,
                                     'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                    'msg': session.deferred_messages})
+                                    'msg': msg})
                 session.outgoing_serial += 1
-                del session.deferred_messages[:] # note: do not create a new array
+                request.write(r)
 
-            else:
-                # process any new pending messages
-                self.handle_message_buffer(request, session, retmsg)
-                if session.is_async: # hmm, if another request set this to async, we might miss the response?
-                    return
-
-                self.run_deferred_actions(session, retmsg)
-
-                # sometimes this is called from a non-request context (e.g. bgtask calling complete_attack() on a timed-out session)
-                # if so, don't run the normal path. But flush deferred messages.
-                if request is None:
-                    session.flush_deferred_messages()
-                    return
-
-                r = self.make_response(session, retmsg)
-
-        # works for both standard HTTP request and WSFakeRequest
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(r)
         request.finish()
 
-    def complete_longpoll(self, request, session, sync = False):
-        msg = session.deferred_messages[:]
-        del session.deferred_messages[:] # note: do not create a new array, since in-flight async requests may reference it
+    def complete_longpoll(self, request, session):
+        # works for both standard HTTP request and WSFakeRequest
 
-        if len(msg) == 0: # must send something
+        if hasattr(request, '_disconnected') and request._disconnected: return
+
+        msg = session.outgoing_messages[:]
+        del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
+
+        if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
             msg.append(["NOMESSAGE"])
 
-        r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
-                            'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                            'msg': msg})
-        session.outgoing_serial += 1
+        if len(msg) > 0:
+            r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
+                                'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                                'msg': msg})
+            session.outgoing_serial += 1
+            request.write(r)
 
-        if sync:
-            assert request.__class__ is not WSFakeRequest
-            return r
-        if hasattr(request, '_disconnected') and request._disconnected: return
-        request.write(r)
         request.finish()
 
     def handle_longpoll(self, request, session):
-        if session.longpoll_request: # overlapped request, return the previous one
+        if session.longpoll_request: # overlapped request, respond to the previous one immediately
             self.complete_longpoll(session.longpoll_request, session)
         session.longpoll_request = request
         session.longpoll_request_time = server_time
-        if len(session.deferred_messages) > 0 or session.logout_in_progress:
-            # plan to return immediately if messages are pending, or if we're on our way out
-            ret = session.send_deferred_message([], flush_now = False, sync = True)
-            if ret is not None: return ret
+        if len(session.outgoing_messages) > 0 or session.logout_in_progress:
+            # plan to respond immediately if messages are pending, or if we're on our way out
+            session.queue_flush_outgoing_messages()
         return server.NOT_DONE_YET # park the request
 
     # the login process is broken into two parts:
@@ -21626,6 +22412,7 @@ class GAMEAPI(resource.Resource):
         def cancel(self, cancel_reason):
             self.cancel_reason = cancel_reason
             if self.has_lock:
+                ascdebug('UNLOCKED player %d (cancel)' % self.user_id)
                 gamesite.lock_client.player_lock_release(self.user_id, -1, Player.LockState.logged_in, expected_owner_id = self.user_id)
                 self.has_lock = False
             if self.user_id in self.in_progress_by_user_id:
@@ -21641,24 +22428,16 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'ignoring user/player data for cancelled login %d: %s' % (self.user_id, self.cancel_reason))
                 self.retmsg.append(["ERROR", self.cancel_reason])
-                return self.api.complete_deferred_request(self.request, None, self.retmsg)
+                return self.api.complete_deferred_request(self.request, None, self.retmsg) # OK - do want to work with the raw request here
             assert self.has_lock
             del self.in_progress_by_user_id[self.user_id]
             del self.in_progress_by_session_id[self.session_id]
             return self.api.complete_client_hello(self.request, self.retmsg, self.user_id, self.frame_platform, self.social_id, self.auth_token, self.lockgen, self.user, self.player, self.session_id, self.metrics_anon_id, self.user_demographics, self.client_browser_caps, self.client_session_data, self.query_string, self.client_permissions, self.client_login_country, self.client_ip)
 
     # handle initial handshake message from client
-    # if login is successful, return the new Session, otherwise None
-
-    def handle_client_hello(self, *args):
-        start_time = time.time()
-        ret = self.do_handle_client_hello(*args)
-        end_time = time.time()
-        admin_stats.record_latency('handle_client_hello', end_time - start_time)
-        return ret
-
     # returns whether or not to go async
-    def do_handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
+    @admin_stats.measure_latency('handle_client_hello')
+    def handle_client_hello(self, request, client_ip, user_agent, arg, retmsg):
         # check IP bans
         if client_ip and str(client_ip) in gamedata['server']['banned_ips']:
             gamesite.exception_log.event(server_time, 'prevented banned IP %s from logging in' % client_ip)
@@ -21748,24 +22527,18 @@ class GAMEAPI(resource.Resource):
             wait_for_session = session_table[client_session_id]
             wait_reason = 'double_login'
         else:
-            for id, sess in session_table.iteritems():
-                if sess.user.user_id == user_id:
-                    wait_for_session = sess
-                    wait_reason = 'relog'
-                    break
+            sess = get_session_by_user_id(user_id, include_logout_in_progress = True)
+            if sess:
+                wait_for_session = sess
+                wait_reason = 'relog'
 
         if wait_for_session:
 
             # best to just stop the login attempt right here.
-            if gamedata['server'].get('stop_abnormal_logins',True):
-                if gamedata['server']['log_abnormal_logins'] >= 2:
-                    gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
-                retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
-                return False
-
-            self.log_out_async(wait_for_session, wait_reason,
-                               functools.partial(self.handle_client_hello, request, client_ip, user_agent, arg, retmsg))
-            return True
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 'stopping login for user %d after %s' % (user_id, wait_reason))
+            retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
+            return False
 
         # ensure that only one login on a user_id runs to successful completion
         self.AsyncLogin.cancel_existing(user_id, client_session_id)
@@ -21777,6 +22550,8 @@ class GAMEAPI(resource.Resource):
         if lockret == -Player.LockState.being_attacked or lockret == -Player.LockState.logged_in or lockret < 0:
             retmsg.append(["ERROR", "CANNOT_LOG_IN_WHILE_UNDER_ATTACK"])
             return False
+
+        ascdebug('LOCKED player %d in session %s' % (user_id, client_session_id))
 
         # open a new session, using the ID passed in by the client
         aslogin = self.AsyncLogin(self, request, retmsg, client_session_id, frame_platform, client_social_id, client_auth_token,
@@ -21793,31 +22568,30 @@ class GAMEAPI(resource.Resource):
 
         return True
 
+    @admin_stats.measure_latency('complete_client_hello')
     def complete_client_hello(self, request, retmsg, user_id, *args):
-        session = None
-
-        start_time = time.time()
+        d = None # deferred for completion
 
         try:
-            session = self.do_complete_client_hello(request, retmsg, user_id, *args)
-            if session:
-                session_table[session.session_id] = session
+            d = self.do_complete_client_hello(request, retmsg, user_id, *args)
+            if d is not None:
+                # note: if complete_client_hello2() fails, the session arg here will be None
+                d.addBoth(lambda session, d=d, request=request, retmsg=retmsg: session.complete_async_request(None, d) if session else self.complete_deferred_request(request, None, retmsg)) # OK
+
         except:
-            session = None
-            retmsg = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
-            gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc())
+            retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
+            gamesite.exception_log.event(server_time, ('complete_client_hello Exception (player %d): ' % user_id) + traceback.format_exc().strip()) # OK
 
-        if session is None:
+        if d is None: # failure path
+            ascdebug('UNLOCKED player %d (client_hello failure)' % user_id)
             gamesite.lock_client.player_lock_release(user_id, -1, Player.LockState.logged_in, expected_owner_id = user_id)
-
-        end_time = time.time()
-        admin_stats.record_latency('complete_client_hello', end_time - start_time)
-
-        return self.complete_deferred_request(request, session, retmsg)
+            self.complete_deferred_request(request, None, retmsg) # OK - failure path
 
     def do_complete_client_hello(self, request, retmsg, user_id, frame_platform, social_id, auth_token, lockgen, user, player, session_id,
                                  metrics_anon_id, user_demographics, client_browser_caps, client_session_data, query_string, client_permissions, client_login_country,
                                  client_ip):
+
+        d = make_deferred('do_complete_client_hello') # OK - login path is special - we'll return this for the caller
 
         # parse query string
         url_qs = urlparse.parse_qs(query_string)
@@ -21828,13 +22602,13 @@ class GAMEAPI(resource.Resource):
             try:
                 acq_data = get_acquisition_data_from_url('/?'+query_string, user_id)
             except:
-                gamesite.exception_log.event(server_time, ('error in get_acquisition_data_from_url user %d "%s":\n' % (user_id, query_string)) + traceback.format_exc())
+                gamesite.exception_log.event(server_time, ('error in get_acquisition_data_from_url user %d "%s": ' % (user_id, query_string)) + traceback.format_exc().strip()) # OK
                 pass
 
         # prep user ###############################
 
         if user is None:
-            # person has never played a SpinPunch game before
+            # person has never played our game before
             user = User(user_id)
             user.account_creation_time = server_time
             if not spin_secure_mode: # mark new accounts as developers
@@ -21969,6 +22743,9 @@ class GAMEAPI(resource.Resource):
                     if gamedata['server']['log_mobile_successes']:
                         gamesite.exception_log.event(server_time, 'mobile hit from player %d ACCEPTED' % player.user_id)
 
+        if abuse_warning_msg:
+            retmsg += abuse_warning_msg
+
         # if player is new or didn't finish the tutorial, or stale, reset
         # their state to the starting conditions
 
@@ -21992,10 +22769,6 @@ class GAMEAPI(resource.Resource):
 
         if player.tutorial_state != "COMPLETE":
             player.reset()
-            needs_tutorial_units = True
-        else:
-            needs_tutorial_units = False
-
 
         # record that the player is logged in now
         player.lock_state = Player.LockState.logged_in
@@ -22011,22 +22784,24 @@ class GAMEAPI(resource.Resource):
         else:
             is_paying_user = 0
 
-        # assign player to A/B test cohorts
-        player.read_url_overrides(user, url_qs)
-        player.update_abtests(user, not is_returning_user)
-
-        if needs_tutorial_units:
-            # note: this must come AFTER abtests are set up, since they may override starting conditions
-            init_game(player, 0)
-
-        player.my_home.spawn_scenery(player, user.user_id)
-
         # create the new session
         session = Session(session_id, user, player, server_time)
 
-        if gamedata['server'].get('use_deferred_messages',False):
-            # upon success, retmsg will be ignored, and client messages should go via deferred_messages
-            session.deferred_messages = retmsg # !!!
+        # assign player to A/B test cohorts
+        player.read_url_overrides(user, url_qs)
+        player.update_abtests(session, not is_returning_user)
+
+        if player.tutorial_state != "COMPLETE":
+            # note: this must come AFTER abtests are set up, since they may override starting conditions
+            init_game(player, 0)
+
+        player.my_home.spawn_scenery(player, user.user_id) # time-constant seed
+
+        # upon success, retmsg will be ignored, and future client messages should go via session.outgoing_messages
+        session.outgoing_messages = retmsg # !!!
+        # kick-start HTTP request processing
+        session.sync_requests.append(request)
+        session.async_ds.append(d) # caller will attach complete_async_request()
 
         # get rid of old combat debris
         player.update_inerts()
@@ -22036,7 +22811,7 @@ class GAMEAPI(resource.Resource):
         player.prune_sessions()
         player.prune_activity()
         player.prune_battle_history()
-        player.spawn_deposits()
+        player.spawn_deposits(user.user_id ^ int(server_time)) # time-varying seed
         player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
         player.prune_player_auras(is_session_change = True, is_login = True)
 
@@ -22047,41 +22822,18 @@ class GAMEAPI(resource.Resource):
         if client_session_data:
             possible_alts = map(int, client_session_data.split(','))
             for alt in possible_alts:
-                player.possible_alt_record_login(alt)
+                player.possible_alt_record_login(alt, ip = client_ip)
 
         on_login_cons = player.get_abtest_consequent('on_login_pre_hello', fail_missing = False)
         if on_login_cons:
-            session.execute_consequent_safe(on_login_cons, session.player, retmsg, reason='on_login_pre_hello')
-
-        # add to list of days since account creation on which this user logged in
-        # player.history['logins_by_day'] = {"0":5, "2":1, "3":1, ...}
-        if 'logins_by_day' not in player.history:
-            player.history['logins_by_day'] = {}
-        this_day = int((server_time - user.account_creation_time)/(60*60*24))
-        dict_increment(player.history['logins_by_day'], str(this_day), 1)
+            snap = session.player.resources.calc_snapshot()
+            session.execute_consequent_safe(on_login_cons, session.player, retmsg,
+                                            context = {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                                       'largest_purchase': session.player.history.get('largest_purchase', 0),
+                                                       'largest_purchase_gamebucks': session.player.history.get('largest_purchase_gamebucks', 0)},
+                                            reason='on_login_pre_hello')
 
         admin_stats.add_visit(user.user_id, not is_returning_user, is_paying_user)
-
-        # set up alliance state, but catch errors so the login doesn't bug out
-        alliance_info = None
-        alliance_membership = None
-        alliance_chat_catchup_messages = []
-        alliance_join_requests = None
-        try:
-            alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
-
-            # fix missing alliances_joined count in player_history, for quest purposes
-            if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
-
-            # for leaders, get pending join requests
-            if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
-                alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
-
-            if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
-                session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
-        except:
-            gamesite.exception_log.event(server_time, 'Error setting up alliance state for player %d for SERVER_HELLO:\n%s' % \
-                                         (user.user_id, traceback.format_exc()))
 
         session.increment_player_metric('logged_in_times', 1, time_series = False)
         if 'sessions' not in player.history:
@@ -22093,7 +22845,7 @@ class GAMEAPI(resource.Resource):
         needs_daily_attack = False
 
         if player.tutorial_state == "COMPLETE" and \
-           player.resources.protection_end_time <= server_time and \
+           (not player.has_damage_protection()) and \
            (server_time - session.player.last_daily_attack) > player.get_any_abtest_value('daily_attack_interval', gamedata['daily_attack_interval']):
             base_damage = player.my_home.calc_base_damage()
             # conventional daily attack
@@ -22107,70 +22859,8 @@ class GAMEAPI(resource.Resource):
                 gamesite.exception_log.event(server_time, 'player %d has logged in excessively - triggering AI attack!' % player.user_id)
                 needs_daily_attack = True
 
-        # record acquisition data (for this visit)
-        user.update_acquisition_data(acq_data, session.player)
-
-        retmsg.append(["SERVER_HELLO",
-                       gamedata["version"],
-                       session.user.user_id,
-                       session_id,
-                       server_time, # not used anymore!
-                       session.user.facebook_name,
-                       session.player.tutorial_state,
-                       session.player.player_preferences,
-                       needs_daily_attack,
-                       session.user.country,
-                       session.player.country_tier,
-                       session.player.price_region,
-                       session.player.history['logged_in_times'],
-                       session.player.abtests,
-                       session.player.is_developer(),
-                       session.user.is_suspicious(),
-                       session.player.isolate_pvp,
-                       session.user.acquisition_campaign,
-                       session.player.my_home.base_id,
-                       session.player.history.get('money_spent',0),
-                       session.player.creation_time,
-                       session.player.chat_seen,
-                       session.user.is_chat_mod(),
-                       session.player.get_daily_banner(session, retmsg)
-                       ])
-        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
-        retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
-        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
-
         if session.user.frame_platform == 'fb':
-            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
-            if session.user.facebook_third_party_id:
-                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", session.user.facebook_third_party_id])
-
-        # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
-        session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
-
-        # note: this relies on change_session() completing synchronously when at home base
-        async = self.change_session(request, session, retmsg, dest_user_id = user.user_id, force = True)
-        assert not async
-
-        if needs_tutorial_units:
-            spawn_tutorial_units(session, retmsg)
-
-        retmsg.append(["TECH_UPDATE", session.player.tech])
-        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
-        session.player.send_inventory_update(retmsg)
-
-        retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
-        assert session.player.stattab.player is session.player
-        session.player.stattab.send_update(session, retmsg) # should be up to date from load_tech/auras_and_init_stattab()
-
-        retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
-
-        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
-
-        # check cache and begin background retrieval of user's Facebook info
-        user.populate_friends_who_play(retmsg)
-
-        if session.user.frame_platform == 'fb':
-            user.retrieve_facebook_info(retmsg)
+            user.retrieve_facebook_info(session)
             user.retrieve_facebook_requests_start()
             user.retrieve_facebook_credit_info_start()
 
@@ -22202,11 +22892,7 @@ class GAMEAPI(resource.Resource):
                                         })
 
             # check status of any unhandled inflight payments
-            try:
-                # somewhat likely to have exceptions here - don't break login path
-                user.ping_fbpayments(session, retmsg, [data['request_id'] for key, data in player.fbpayments_inflight.items()])
-            except Exception:
-                gamesite.exception_log.event(server_time, ('ping_fbpayments Exception on login for player %d: ' % user.user_id) + traceback.format_exc())
+            user.ping_fbpayments(session, retmsg, [data['request_id'] for key, data in player.fbpayments_inflight.items()])
         elif session.user.frame_platform == 'kg':
             user.retrieve_kg_info(session, retmsg)
         elif session.user.frame_platform == 'ag':
@@ -22255,17 +22941,139 @@ class GAMEAPI(resource.Resource):
         session.send_adnetwork_visit_event(retmsg)
         session.send_adnetwork_events(retmsg)
 
-        # accept any queued messages the user has received
-        mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
-        show_battle_history = mail_stat.get('was_attacked', False)
+        # record acquisition data (for this visit)
+        user.update_acquisition_data(acq_data, session.player)
 
-        # send applicable daily messages
-        session.player.get_daily_messages(session, retmsg)
+        retmsg.append(["SERVER_HELLO",
+                       gamedata["version"],
+                       session.user.user_id,
+                       session_id,
+                       server_time, # not used anymore!
+                       session.user.facebook_name,
+                       session.player.tutorial_state,
+                       session.player.player_preferences,
+                       needs_daily_attack,
+                       session.user.country,
+                       session.player.country_tier,
+                       session.player.price_region,
+                       session.player.history['logged_in_times'],
+                       session.player.abtests,
+                       session.player.is_developer(),
+                       session.user.is_suspicious(),
+                       session.player.isolate_pvp,
+                       session.user.acquisition_campaign,
+                       session.player.my_home.base_id,
+                       session.player.history.get('money_spent',0),
+                       session.player.creation_time,
+                       session.player.chat_seen,
+                       session.user.is_chat_mod(),
+                       session.player.get_daily_banner(session, retmsg)
+                       ])
+        retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
+        retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
+        retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
 
         # check for promo codes
         if ('spin_promo_code' in url_qs):
             for code in url_qs['spin_promo_code']:
                 session.player.apply_promo_code(session, retmsg, code)
+
+        if session.player.tutorial_state == "COMPLETE":
+            # force repairs to start to avoid exploits where you leave your own buildings unrepaired
+            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
+
+            session.player.ladder_point_decay_check(session, retmsg) # login
+
+        if session.user.frame_platform == 'fb':
+            retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
+            if session.user.facebook_third_party_id:
+                retmsg.append(["FACEBOOK_THIRD_PARTY_ID_UPDATE", session.user.facebook_third_party_id])
+
+        # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
+        session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
+
+        self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addCallback(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
+        return d
+
+    @admin_stats.measure_latency('complete_client_hello2')
+    def complete_client_hello2(self, d, session, retmsg):
+        # there's a race window where terminate_session() is called between change_session() and here,
+        # and the invalidation doesn't work since we past CLIENT_HELLO but not in the session table yet.
+        # XXX band-aid fix for now - need to untangle the login path later...
+        if session.session_id in invalid_sessions:
+            if gamedata['server']['log_abnormal_logins'] >= 2:
+                gamesite.exception_log.event(server_time, 'user %d almost logged in with invalidated session %s' % (session.user.user_id, session.session_id))
+            retmsg.append(["ERROR", "CANNOT_LOG_IN_SIMULTANEOUS"])
+            ascdebug('UNLOCKED player %d (complete_client_hello2 invalidated)' % session.user.user_id)
+            gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
+            d.callback(session) # return session so that complete_async_request gets called
+            return
+
+        try:
+            self.do_complete_client_hello2(d, session, retmsg)
+            return
+        except:
+            retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
+            gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc().strip()) # OK
+
+        # failure path
+        ascdebug('UNLOCKED player %d (complete_client_hello2 failure)' % session.user.user_id)
+        gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
+        d.callback(None) # return error instead of session
+
+    def do_complete_client_hello2(self, d, session, retmsg):
+        user = session.user
+        player = session.player
+
+        if player.tutorial_state != "COMPLETE":
+            spawn_tutorial_units(session, retmsg)
+
+        retmsg.append(["TECH_UPDATE", session.player.tech])
+        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+        session.player.send_inventory_update(retmsg)
+
+        retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
+        assert session.player.stattab.player is session.player
+        session.player.stattab.send_update(session, retmsg) # should be up to date from load_tech/auras_and_init_stattab()
+
+        retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
+
+        retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
+
+        # set up alliance state
+        alliance_info = None
+        alliance_membership = None
+        alliance_chat_catchup_messages = []
+        alliance_join_requests = None
+
+        alliance_info, alliance_membership = session.init_alliance(alliance_chat_catchup_messages, reason = 'SERVER_HELLO')
+
+        # fix missing alliances_joined count in player_history, for quest purposes
+        if alliance_info and ('alliances_joined' not in session.player.history): session.player.history['alliances_joined'] = 1
+
+        # for leaders, get pending join requests
+        if alliance_info and (alliance_info.get('leader_id', -1) == session.player.user_id):
+            alliance_join_requests = gamesite.sql_client.poll_join_requests(session.player.user_id, alliance_info['id'], server_time, reason='SERVER_HELLO')
+
+        if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
+            session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
+
+        # accept any queued messages the user has received
+        mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
+        show_battle_history = mail_stat and mail_stat.get('was_attacked', False)
+
+        # send alliance state
+        retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
+        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
+        if alliance_join_requests:
+            pcache_data = self.do_query_player_cache(session, alliance_join_requests, reason = 'ALLIANCE_JOIN_REQUESTS')
+            retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
+
+        # check cache and begin background retrieval of user's Facebook info
+        user.populate_friends_who_play(session)
+
+        # send applicable daily messages
+        session.player.get_daily_messages(session, retmsg)
 
         session.player.send_mailbox_update(retmsg)
 
@@ -22275,19 +23083,11 @@ class GAMEAPI(resource.Resource):
         # note: achievements update should come AFTER history update, so that client will resolve PLAYER_HISTORY predicates in achievements correctly
         retmsg.append(["ACHIEVEMENTS_UPDATE", session.player.achievements])
 
-        # send alliance state
-        retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
-        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
-        if alliance_join_requests:
-            pcache_data = self.do_query_player_cache(session, alliance_join_requests, reason = 'ALLIANCE_JOIN_REQUESTS')
-            retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
-
         if session.player.tutorial_state == "COMPLETE" and Predicates.read_predicate(gamedata['client']['motd_filter']).is_satisfied(session.player,None):
             # check if player is due for various popups
             force_time = session.player.get_any_abtest_value('motd_refresh_time', gamedata['server']['message_of_the_day'].get('refresh_time',-1))
             if ((server_time - session.player.last_motd) > gamedata['client']['motd_interval']) or \
-               (session.player.last_motd < force_time) or \
-               'force_motd' in url_qs:
+               (session.player.last_motd < force_time):
                 session.player.last_motd = server_time
                 session.player.get_daily_tips(session, retmsg)
 
@@ -22319,6 +23119,10 @@ class GAMEAPI(resource.Resource):
                 if gamesite.nosql_client.map_feature_lock_acquire(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
                                                                   reason = 'SERVER_HELLO') == Player.LockState.being_attacked:
                     session.player_base_lock = (session.player.my_home.base_region, session.player.my_home.base_id)
+
+                    # XXXXXX only necessary during migration, shouldn't be necessary once all updates are sent in real-time
+                    gamesite.nosql_client.update_map_feature(session.player.my_home.base_region, session.player.my_home.base_id, {'protection_end_time': session.player.resources.protection_end_time}, reason = 'SERVER_HELLO')
+
                 else:
                     # uh oh, can't acquire our own home base lock - playerdb and map feature state are out of sync
                     gamesite.exception_log.event(server_time, 'player %d could not get own home base lock in %s on login, plucking from map!' % (session.player.user_id, session.player.home_region))
@@ -22334,16 +23138,6 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["MAP_BOOKMARKS_UPDATE", session.player.map_bookmarks])
 
-        if session.player.tutorial_state == "COMPLETE":
-            # force repairs to start to avoid exploits where you leave your own buildings unrepaired
-            # XXXXXX this should be moved before initial session change!
-            self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-
-            session.player.ladder_point_decay_check(session, retmsg) # login
-
-        if abuse_warning_msg:
-            retmsg += abuse_warning_msg
-
         self.send_player_cache_update(session, 'login') # mainly for uninstalled flag and last_login_time
 
         # mark end of login messages
@@ -22354,28 +23148,72 @@ class GAMEAPI(resource.Resource):
         # since CLIENT_HELLO is a special case outside the usual message buffer handling,
         # we have to bump the expected next serial number here
         session.incoming_serial += 1
-        return session
+        session_table[session.session_id] = session
+        d.callback(session)
 
     # like login, logout is broken into pre- and post-I/O portions
 
-    # wrap logout path in exception traps to avoid bad lock behavior
+    # new asynchronous logout
+    # it should be safe to call this function from any context
+    def log_out_async(self, session, method, force = False):
+
+        if session.logout_in_progress:
+            if deferred_is_finished(session.logout_d):
+                ascdebug('log_out_async (already finished) %d' % (session.user.user_id))
+                # session has ALREADY finished logging out - this is a dangling reference!
+                return defer.succeed(True) # probably OK to return session.logout_d, but that might have exceptions on it
+            elif force:
+                # do not wait for complete_attack(), just kill the session
+                gamesite.exception_log.event(server_time, 'log_out_async: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
+                session.logout_in_progress.wrote_user = True
+                session.logout_in_progress.wrote_player = True
+                reactor.callLater(0, session.logout_in_progress.try_finish)
+                return defer.succeed(True)
+            else:
+                ascdebug('log_out_async (waiting) %d' % (session.user.user_id))
+                return session.logout_d
+
+        ascdebug('log_out_async %d' % (session.user.user_id))
+        session.debug_log_action('log_out_async (%s)' % method)
+
+        session.logout_in_progress = Session.AsyncLogout(session)
+        session.logout_d = make_deferred('log_out_async')
+
+        # we're going to get this exception from complete_async_request if after_async_request() waits, so absorb it
+        def absorb_logout_exception(fail):
+            fail.trap(Session.AlreadyLoggedOut)
+            return None
+        session.logout_d.addErrback(absorb_logout_exception)
+
+        # if an attack was going on, clean it up
+        session.logout_d.addCallback(lambda _, self=self,session=session:
+                                     self.complete_attack(session, session.outgoing_messages, reason='log_out_async'))
+        session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
+
+        # then continue with preflush
+        session.logout_d.addCallback(lambda _, self=self, session=session, method=method:
+                                     self.log_out_preflush(session, method))
+        session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
+
+        # then session.shutdown
+        session.logout_d.addCallback(lambda _, session=session: session.shutdown())
+        session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
+
+        # then the flush happens...
+        def flushit(session):
+            user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
+            player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
+            return session.logout_in_progress.d or True
+
+        session.logout_d.addCallback(lambda _, session=session: flushit(session))
+        session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
+
+        # then postflush cleanup
+        session.logout_d.addCallback(lambda _, self=self, session=session: self.log_out_postflush(session))
+
+        return session.after_async_request(session.logout_d)
+
     def log_out_preflush(self, session, method):
-        try:
-            self._log_out_preflush(session, method)
-        except:
-            gamesite.exception_log.event(server_time, 'log_out_preflush error on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-
-        # remove the session from chat etc.
-        try:
-            session.shutdown()
-        except:
-            gamesite.exception_log.event(server_time, 'session.shutdown() error on player %d: %s' % (session.user.user_id, traceback.format_exc()))
-
-        # unlock and save the player's personal state
-        session.player.lock_state = Player.LockState.open
-        session.player.lock_time = 0
-
-    def _log_out_preflush(self, session, method):
         # PRE-WRITE portion
 
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
@@ -22419,21 +23257,15 @@ class GAMEAPI(resource.Resource):
         self.send_fb_achievements(session)
         self.log_out_preflush_open_graph(session)
 
-        if gamesite.sql_client:
-            alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
-            if alliance_id >= 0:
-                session.player.history['alliance_id_cache'] = alliance_id
-            elif 'alliance_id_cache' in session.player.history:
-                del session.player.history['alliance_id_cache']
+        alliance_id = gamesite.sql_client.get_users_alliance(session.user.user_id, reason = 'log_out_preflush')
+        if alliance_id >= 0:
+            session.player.history['alliance_id_cache'] = alliance_id
         else:
             alliance_id = None
+            if 'alliance_id_cache' in session.player.history:
+                del session.player.history['alliance_id_cache']
 
-        alliance_id = self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
-
-        # update all leaderboard stats - legacy only (scores2 gets updated on the fly)
-        # XXXXXX remove when proven safe
-        #if not session.player.isolate_pvp:
-        #    session.player.publish_scores1(alliance_id = alliance_id, reason = 'log_out_preflush')
+        self.send_player_cache_update(session, 'log_out_preflush', alliance_id = alliance_id)
 
     # record login/logout in MongoDB log
     # if recording logins (that are still active), set logout_time = -1
@@ -22486,57 +23318,23 @@ class GAMEAPI(resource.Resource):
                                                     session.player.resources.xp)
 
 
-            # XXX this needs porting to new SpinNoSQL API
-            # config = gamedata['fb_open_graph']['update_rank']
-            # if config['enable'] and \
-            #    session.player.resources.player_level >= config['min_level'] and \
-            #    (server_time - session.player.last_rank_update) >= config['interval']:
-            #     session.player.last_rank_update = server_time
-            #     CATEGORIES = [ {'score_field': 'resources_looted',
-            #                     'ui_category': 'Resources Looted'},
-            #                    {'score_field': 'damage_inflicted',
-            #                     'ui_category': 'Damage Achieved'} ]
-
-            #     result = gamesite.db_client.player_cache_get_scores([session.user.user_id],
-            #                                                         [score_field_name(cat['score_field'],'week') for cat in CATEGORIES])
-
-            #     # pick the category in which the player scores highest
-            #     index = -1
-            #     max_pct = -1
-            #     if result and len(result) > 0 and result[0]:
-            #         for i in xrange(len(CATEGORIES)):
-            #             if result[0][i]:
-            #                 pct = (1.0-result[0][i]['percentile'])
-            #                 if pct > max_pct and pct >= config['min_percentile']:
-            #                     index = i
-            #                     max_pct = pct
-
-            #     if index >= 0:
-            #         res = result[0][index]
-            #         ui_category = CATEGORIES[index]['ui_category']
-            #         pct_num = 0.999 if res['rank'] != 0 else res['percentile']
-            #         pct_str = '%.1f%%' % (100.0*pct_num)
-            #         session.user.create_fb_open_graph_action('update_rank',
-            #                                                  {OGPAPI.object_type('ranking'): OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('ranking'),
-            #                                                                                                                       'category':ui_category}),
-            #                                                   'category': ui_category,
-            #                                                   'value': res['absolute'],
-            #                                                   'percentile_num': 100.0*(1.0-res['percentile']),
-            #                                                   'percentile': 'Superior to %s of players in Mars Frontier' % pct_str
-            #                                                   })
-
-    # wrap logout path in exception traps to avoid bad lock behavior
     def log_out_postflush(self, session):
-        try:
-            self._log_out_postflush(session)
-        except:
-            gamesite.exception_log.event(server_time, 'log_out_postflush error on player %d: %s' % (session.user.user_id, traceback.format_exc()))
+        ascdebug('log_out_postflush %d' % (session.user.user_id))
+        session.debug_log_action('log_out_postflush')
 
         # remove the session from the global session table
         if session_table.get(session.session_id, None) is session:
             del session_table[session.session_id]
 
-        # final step - release lock
+        # final step - release locks
+
+        if session.player.is_on_map():
+            # update status of player's home base on map, and broadcast lock release
+            # assert session.player_base_lock
+            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id, reason = 'log_out')
+            session.player_base_lock = None
+
+        ascdebug('UNLOCKED player %d (normal logout)' % session.user.user_id)
         gamesite.lock_client.player_lock_release(session.user.user_id, session.player.generation, Player.LockState.logged_in, expected_owner_id=session.user.user_id)
 
         if gamesite.nosql_client:
@@ -22546,20 +23344,6 @@ class GAMEAPI(resource.Resource):
             # send active session count to server status table
             if gamedata['server'].get('update_server_status_on_login', True):
                 gamesite.nosql_client.server_status_update(spin_server_name, {'active_sessions':admin_stats.get_active_sessions()}, reason='logout')
-
-    # called AFTER playerdb is written
-    def _log_out_postflush(self, session):
-        #start_time = time.time()
-
-        if session.player.is_on_map():
-            # update status of player's home base on map, and broadcast lock release
-            assert session.player_base_lock
-            gamesite.nosql_client.map_feature_lock_release(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
-                                                           extra_props = {'protection_end_time': session.player.resources.protection_end_time}, reason = 'log_out')
-            session.player_base_lock = None
-
-        #end_time = time.time()
-        #admin_stats.record_latency('log_out_postflush', end_time-start_time)
 
     def send_player_cache_update(self, session, reason,
                                  # alliance update is optional. None is a possible value, so use special marker for skipping the update.
@@ -22611,6 +23395,7 @@ class GAMEAPI(resource.Resource):
             cache_props['units_donated_cur_alliance'] = session.player.history['units_donated_cur_alliance']
 
         if alliance_id != 'skip': # might be None
+            if alliance_id is not None: assert alliance_id >= 0 # don't pass negative alliance_ids
             cache_props['alliance_id'] = alliance_id
 
         if session.player.isolate_pvp:
@@ -22622,65 +23407,24 @@ class GAMEAPI(resource.Resource):
         else:
             cache_props['known_alt_count'] = None
 
+        session.player.idle_check.prune_history(server_time)
+        idle_check_fails = session.player.idle_check.count_fails()
+        if idle_check_fails >= 1:
+            cache_props['idle_check_fails'] = idle_check_fails
+            cache_props['idle_check_last_fail_time'] = session.player.idle_check.last_fail_time()
+        else:
+            cache_props['idle_check_fails'] = None
+            cache_props['idle_check_last_fail_time'] = None
+
         gamesite.pcache_client.player_cache_update(session.user.user_id, cache_props, reason = reason)
 
-    # new asynchronous logout
-    def log_out_async(self, session, method, cb, force = False):
-        ascdebug('log_out_async %d' % (session.user.user_id))
-
-        if session.logout_in_progress:
-            if session.logout_in_progress.cbs is None:
-                # session has ALREADY finished logging out - this is a dangling reference!
-                # we must call the callback, but callers of this function assume it's async, so use callLater
-                reactor.callLater(0.01, cb)
-            else:
-                if force:
-                    # do not call complete_attack(), just kill the session
-                    self.log_out_async2(session, method, cb, force = force)
-                else:
-                    session.logout_in_progress.cbs.append(cb)
-        else:
-            # if an attack was going on, clean it up
-            # then continue with log_out_async2
-            def continue_log_out(self, session, method, cb, force, is_sync):
-                self.log_out_async2(session, method, cb, force = force)
-            self.complete_attack(session, session.deferred_messages, functools.partial(continue_log_out, self, session, method, cb, force), reason='log_out_async')
-
-    def log_out_async2(self, session, method, cb, force = False):
-        ascdebug('log_out_async2 %d' % (session.user.user_id))
-
-        if not session.logout_in_progress:
-            session.logout_in_progress = Session.AsyncLogout(session)
-            if session.longpoll_request:
-                request = session.longpoll_request
-                session.longpoll_request = None
-                self.complete_longpoll(request, session)
-
-            self.log_out_preflush(session, method)
-            session.logout_in_progress.cbs.append(functools.partial(self.log_out_postflush, session)) # mandatory unlock callback
-            session.logout_in_progress.cbs.append(cb) # add user-provided callback
-            player_table.store_async(session.player, session.logout_in_progress.player_cb, True, 'logout')
-            user_table.store_async(session.user, session.logout_in_progress.user_cb, True, 'logout')
-            return
-
-        else: # logout is already in progress
-            session.logout_in_progress.cbs.append(cb) # add user-provided callback
-
-            if force:
-                # it looks like the session is broken - we tried to shut it down, but the async stores failed
-                # -> force async completion
-                # (this assumes self.log_out_postflush is already in the AsyncLogout cblist, so that the locks will be released)
-                gamesite.exception_log.event(server_time, 'log_out_async2: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
-                session.logout_in_progress.wrote_user = True
-                session.logout_in_progress.wrote_player = True
-                reactor.callLater(0.01, session.logout_in_progress.try_finish)
-
-    def handle_message_guts(self, request, session, arg, retmsg):
+    def handle_message_guts(self, session, arg, retmsg):
 
         if arg[0] == "VISIT_BASE" or arg[0] == "VISIT_BASE2" or arg[0] == "VISIT_LADDER_RIVAL":
-            if session.visit_base_in_progress:
-                # do not allow overlapping client-initiated requests
-                return
+            # do not allow overlapping client-initiated requests
+            assert not session.visit_base_in_progress
+            assert not session.complete_attack_in_progress
+
             if session.incoming_attack_pending():
                 # don't allow the player to change sessions if an AI attack is about to occur
                 retmsg.append(["ERROR", "INCOMING_ATTACK_PENDING"])
@@ -22872,12 +23616,10 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI", dest_id])
                         return
 
-            session.visit_base_in_progress = True
-            return self.change_session(request, session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
+            return self.change_session(session, retmsg, dest_user_id = dest_id, dest_base_id = dest_base_id, force = True, new_ladder_state = ladder_state, delay = delay, client_props = client_props)
 
         elif arg[0] == "LOGOUT":
-            self.log_out_async(session, 'onunload', functools.partial(self.complete_deferred_request, request, session, retmsg))
-            return True
+            return self.log_out_async(session, 'onunload')
 
         elif arg[0] == "CLIENT_SYNC":
             retmsg.append(["SERVER_SYNC", arg[1]])
@@ -22904,25 +23646,7 @@ class GAMEAPI(resource.Resource):
             key = arg[1]
             val = arg[2]
 
-            if val:
-                assert type(val) is dict
-                if val.get('attack_event', False):
-                    # write to attack log instead of main metrics log
-                    session.attack_event(session.user.user_id, key, val)
-                    return
-                elif val.get('purchase_ui_event', False):
-                    # write to purchase ui log instead of main metrics log
-                    if gamedata['server'].get('log_purchase_ui',False):
-                        val['user_id'] = session.user.user_id
-                        val['event_name'] = key
-                        assert ('alloy' not in val['event_name']) # don't record previous-generation events
-                        val['code'] == int(key[0:4])
-                        assert val['client_time']
-                        del val['purchase_ui_event']
-                        gamesite.purchase_ui_log.event(server_time, val)
-                    return
-
-            metric_event(session.user.user_id, key, val)
+            session.metric_event_coded(session.player, key, val)
 
             # save canvas_width/height from framerate events
             if key == '0960_framerate' and 'canvas_width' in val:
@@ -22978,13 +23702,11 @@ class GAMEAPI(resource.Resource):
                 print 'SIMULATED ORDER', item
                 try:
                     network_id = {'fbcredits':session.user.facebook_id, 'kgcredits':session.user.kg_id}[currency]
-                    Store.execute_credit_order('0', self, request, session, network_id, network_id, currency, item['price'],
+                    Store.execute_credit_order('0', self, session, network_id, network_id, currency, item['price'],
                                                order_info if currency == 'kgcredits' else item['data'])
                 except:
-                    text = traceback.format_exc()
-                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception: '+text)
+                    gamesite.exception_log.event(server_time, 'DEV_SIMULATE_ORDER Exception (player %d): %s' % (arg[0], session.user.user_id, traceback.format_exc().strip())) # OK
                     retmsg.append(["ERROR", "ORDER_PROCESSING"])
-                    return
 
         elif arg[0] == "FBPAYMENT_CREATE":
             # client has started the order flow - register the payment as inflight
@@ -23040,7 +23762,10 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "FBPAYMENT_PING":
             request_id = arg[1]
             signed_request = arg[2] # optional - speeds processing by avoiding the round-trip
-            return session.user.ping_fbpayment(request, session, retmsg, request_id, signed_request = signed_request)
+            d = session.user.ping_fbpayment(session, retmsg, request_id, signed_request = signed_request)
+            # this might or might not go async
+            return session.start_async_request(d) if d else None
+
         elif arg[0] == "FBPAYMENT_SIMULATE_PURCHASE":
             request_id = arg[1]
             if spin_secure_mode:
@@ -23081,8 +23806,8 @@ class GAMEAPI(resource.Resource):
             d = gamesite.xsapi.get_token(session, retmsg, spellname, spellarg)
             if d:
                 # let's try doing this asynchronously to the other session traffic...
-                d.addBoth(lambda result, _session = session, _tag = tag: \
-                          _session.send_deferred_message([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True))
+                d.addCallback(lambda result, _session = session, _tag = tag: \
+                              _session.send([["XSOLLA_GET_TOKEN_RESULT", _tag, result]], flush_now = True) if (not _session.logout_in_progress) else None)
             return # do not go async
 
         # pay with gamebucks
@@ -23112,7 +23837,7 @@ class GAMEAPI(resource.Resource):
             success = False
 
             try:
-                descr = Store.execute_gamebucks_order(self, request, session, retmsg, client_price,
+                descr = Store.execute_gamebucks_order(self, session, retmsg, client_price,
                                                       unit_id, spellname, spellarg,
                                                       server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and subtract gamebucks
@@ -23120,11 +23845,10 @@ class GAMEAPI(resource.Resource):
                 success = True
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-            except Exception:
-                text = traceback.format_exc()
+            except:
                 my_filter = gamedata['server'].get('bad_internet_exception_log_filter', None)
                 if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied(session.player, None)):
-                    gamesite.exception_log.event(server_time, 'GAMEBUCKS_ORDER Exception (player %d):\n%s' % (session.player.user_id,text))
+                    gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
                 # update object state, in case the client is out of sync
                 if session.has_object(unit_id):
@@ -23159,16 +23883,15 @@ class GAMEAPI(resource.Resource):
                 return
 
             try:
-                Store.execute_item_order(self, request, session, retmsg, item_name, client_price,
-                                         unit_id, spellname, spellarg,
-                                         server_time_according_to_client)
+                Store.execute_order(self, session, retmsg, 'item:'+str(item_name), client_price,
+                                    unit_id, spellname, spellarg,
+                                    server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and take the items
                 session.player.inventory_remove_by_type(item_name, client_price, '5130_item_activated', reason='purchase')
                 success = True
 
-            except Exception:
-                text = traceback.format_exc()
-                gamesite.exception_log.event(server_time, 'ITEM_ORDER Exception: '+text)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             finally:
@@ -23193,9 +23916,9 @@ class GAMEAPI(resource.Resource):
                 if getattr(session.player.resources, resname) < client_price:
                     retmsg.append(["ERROR", "INSUFFICIENT_"+resname.upper(), client_price])
                 else:
-                    price_description, detail_props = Store.execute_fungible_order(self, request, session, retmsg, resname, client_price,
-                                                                                   unit_id, spellname, spellarg,
-                                                                                   server_time_according_to_client)
+                    price_description, detail_props = Store.execute_order(self, session, retmsg, resname, client_price,
+                                                                          unit_id, spellname, spellarg,
+                                                                          server_time_according_to_client)
                     # at this point the order has changed player state, so go ahead and take the resources
                     success = True
                     negative_cost = {resname: -client_price}
@@ -23214,13 +23937,59 @@ class GAMEAPI(resource.Resource):
                         props.update(detail_props)
                         gamesite.gamebucks_log.event(server_time, props)
 
-            except Exception:
-                text = traceback.format_exc()
-                gamesite.exception_log.event(server_time, 'FUNGIBLE_ORDER Exception: '+text)
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
 
             retmsg.append(["FUNGIBLE_ORDER_ACK", tag, success])
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
+
+        elif arg[0] == "SCORE_ORDER":
+            tag = arg[1]
+            stat_name = arg[2]
+            currency = 'score:'+stat_name
+            client_price = int(arg[3])
+            unit_id = arg[4]
+            spellname = arg[5]
+            spellarg = arg[6]
+            server_time_according_to_client = arg[7]
+            success = False
+
+            # note: client_price is UNTRUSTED input, but if it's too low, then execute_order() will throw an exception
+            assert client_price >= 0
+
+            try:
+                # check for insufficient resources
+                if session.player.get_master_score(stat_name) < client_price:
+                    retmsg.append(["ERROR", "INSUFFICIENT_"+stat_name.upper(), client_price])
+                else:
+                    price_description, detail_props = Store.execute_order(self, session, retmsg, currency, client_price,
+                                                                          unit_id, spellname, spellarg,
+                                                                          server_time_according_to_client)
+                    # at this point the order has changed player state, so go ahead and take the resources
+                    success = True
+                    negative_cost = {stat_name: -client_price}
+                    session.player.modify_scores(negative_cost, method = '+=', reason = 'score_order')
+                    session.deferred_player_trophies_update = True
+
+                    if spellname != 'BUY_ITEM': # awkward overlap with 5120_buy_item logging
+                        descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
+                        props = {'user_id': session.user.user_id,
+                                 'summary': session.player.get_denormalized_summary_props('brief'),
+                                 'event_name': '1402_score_spent',
+                                 'code': 1401,
+                                 'price': client_price,
+                                 'price_currency': currency,
+                                 'Billing Description': descr}
+                        props.update(detail_props)
+                        gamesite.gamebucks_log.event(server_time, props)
+
+            except:
+                gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
+                retmsg.append(["ERROR", "ORDER_PROCESSING"])
+
+            retmsg.append(["SCORE_ORDER_ACK", tag, success])
+            session.deferred_player_state_update = True
 
         elif arg[0] == "DSTROY_OBJECT":
             id = arg[1]
@@ -23329,7 +24098,7 @@ class GAMEAPI(resource.Resource):
                 if gamesite.nosql_client.map_feature_lock_acquire(base.base_region, base.base_id, session.player.user_id,
                                                                   generation=base.base_generation, do_hook=False, reason='QUARRY_ABANDON') != Player.LockState.being_attacked: # generation=-1?
                     retmsg.append(["ERROR", "CANNOT_LOCK_QUARRY", base.base_ui_name])
-                    return False
+                    return # no async
 
             success = False
             try:
@@ -23344,11 +24113,10 @@ class GAMEAPI(resource.Resource):
                     gamesite.nosql_client.map_feature_lock_release(base.base_region, base.base_id, session.player.user_id, generation=base.base_generation, reason='QUARRY_ABANDON')
 
             if not success:
-                return
+                return # no async
 
             # go back home
-            session.visit_base_in_progress = True
-            return self.change_session(request, session, retmsg, dest_user_id = session.player.user_id, force = True)
+            return self.change_session(session, retmsg, dest_user_id = session.player.user_id, force = True)
 
         elif arg[0] == "QUARRY_QUERY":
             tag = arg[1]
@@ -23520,6 +24288,7 @@ class GAMEAPI(resource.Resource):
             if session.has_attacked and session.is_ladder_battle():
                 props['is_ladder_win'] = session.viewing_base.ladder_victory_satisfied(session, base_damage)
                 if props['is_ladder_win']:
+                    # note: this doesn't include the effect of any scale_by auras
                     props['ladder_win_points'] = session.ladder_state['points']['victory'][str(session.player.user_id)]
                     bonus = 0
                     if 'ladder_bonus_damage' in gamedata['matchmaking']:
@@ -23530,8 +24299,8 @@ class GAMEAPI(resource.Resource):
                     if bonus > 0:
                         props['ladder_win_points'] += max(1, int(props['ladder_win_points']*bonus))
 
-                ladder_protection = 0
-                if session.viewing_player.resources.protection_end_time > 0:
+                ladder_protection = -1
+                if session.protection_eligible is True:
                     ladder_protection = session.viewing_base.calc_ladder_protection(base_damage)
                 props['ladder_protection'] = ladder_protection
             retmsg.append(["PING_BASE_DAMAGE_RESULT", session.viewing_base.base_id, base_damage, props])
@@ -23589,12 +24358,14 @@ class GAMEAPI(resource.Resource):
             assert type(arg[1]) == dict
             session.player.player_preferences = arg[1]
 
+        elif arg[0] == "QUERY_RECENT_ATTACKERS":
+            self.query_recent_attackers(session, retmsg, arg)
         elif arg[0] == "QUERY_BATTLE_HISTORY":
-            self.query_battle_history(session, retmsg, arg)
+            return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
-            return self.get_battle_log3(request, session, retmsg, arg)
+            return self.get_battle_log3(session, retmsg, arg)
         elif arg[0] == "QUERY_ACHIEVEMENTS":
-            return self.query_achievements(request, session, retmsg, arg)
+            return self.query_achievements(session, retmsg, arg)
 
         elif arg[0] == "QUERY_RIVALS":
             pass # obsolete legacy message
@@ -23861,7 +24632,7 @@ class GAMEAPI(resource.Resource):
                                                    'from_name': msg['ui_from'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)),
                                                    'to': [invitee],
                                                    'subject': msg['ui_subject'],
-                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
+                                                   'body': msg['ui_body'].replace('%LEADER_NAME', session.user.get_chat_name(session.player)).replace('%LEADER_ROLE_NAME', my_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info)).replace('%ALLIANCE_ID', str(alliance_id))
                                                    }])
 
             retmsg.append(["ALLIANCE_INVITE_RESULT", alliance_id, invitee, success, tag])
@@ -23980,7 +24751,7 @@ class GAMEAPI(resource.Resource):
 
                 # send FB notifications XXXXXX need to rewrite this path so that it respects enable_fb_notifications preference
                 config = gamedata['fb_notifications']['notifications'].get('alliance_promoted' if new_role > old_role else 'alliance_demoted',None)
-                if config and ('facebook_id' in pcache_data):
+                if config and pcache_data.get('facebook_id'):
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                     session.player.do_send_fb_notification_to(pcache_data['facebook_id'], notif_text, config, config['ref'])
 
@@ -24127,9 +24898,15 @@ class GAMEAPI(resource.Resource):
                 bdict = batch.get_qs_dict()
                 rdict = {}
                 tag_list = sorted(bdict.keys())
+                master_d = make_deferred('QUERY_PLAYER_SCORES')
 
                 # launch next query in chain
-                def next_query(request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                def next_query(master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
+                    if session.logout_in_progress:
+                        # session went away, abort
+                        master_d.callback(True)
+                        return
+
                     if i > 0: # remember result from previous successful query
                         rdict[tag_list[i-1]] = last_result
 
@@ -24140,32 +24917,31 @@ class GAMEAPI(resource.Resource):
                             for j in xrange(len(sql_query_i_addrs)):
                                 result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
                         # complete async request
-                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None])
-                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
+                        session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None]], flush_now = True)
+                        master_d.callback(True)
                         return
 
-                    def on_error(request, session, retmsg, retmsg_tag, result, user_ids, failure):
+                    def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, fail):
                         # complete async request, returning the incomplete results
-                        #retmsg.append(["ERROR", "SCORES_OFFLINE"])
-                        retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE'])
-                        gamesite.gameapi.complete_deferred_request(request, session, retmsg)
-                        return
+                        if not session.logout_in_progress:
+                            session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE']], flush_now = True)
+                        master_d.callback(True)
 
                     if not gamesite.sql_scores2_client:
-                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
-                        return
+                        on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL client is down'))
+                        return # not async
 
                     qs, qs_args = bdict[tag_list[i]]
                     d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
                     if d is None:
-                        on_error(request, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
-                        return
+                        on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
+                        return # not async
 
-                    d.addCallbacks(functools.partial(next_query, request, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
-                                   functools.partial(on_error, request, session, retmsg, retmsg_tag, result, user_ids))
+                    d.addCallbacks(functools.partial(next_query, master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
+                                   functools.partial(on_error, master_d, session, retmsg, retmsg_tag, result, user_ids))
 
-                reactor.callLater(0, functools.partial(next_query, request, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
-                return True # go async
+                reactor.callLater(0, functools.partial(next_query, master_d, session, retmsg, tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, -1, None))
+                return None # note: asynchronous with other session traffic! - not session.start_async_request(master_d)
 
             elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
                 offline_msg = 'SCORES_OFFLINE'
@@ -24199,6 +24975,13 @@ class GAMEAPI(resource.Resource):
 
             if not text: return # don't send empty message
 
+            if chat_filter.is_ugly(text):
+                if gamedata['server'].get('log_ugly_chat', True):
+                    gamesite.exception_log.event(server_time, 'Player %d stopped from sending ugly chat message: %r' % (session.player.user_id, text))
+                retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None])
+                return
+
             success = True
 
             if session.player.cooldown_active('CHAT_SEND') >= gamedata['chat_spam_threshold'] or \
@@ -24211,7 +24994,7 @@ class GAMEAPI(resource.Resource):
             if togo > 0:
                 success = False
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo)))])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None])
 
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
@@ -24258,6 +25041,18 @@ class GAMEAPI(resource.Resource):
             target_uid = arg[1]
             target_chat_name = SpinHTTP.unwrap_string(arg[2])
             session.do_chat_report(target_uid, target_chat_name, retmsg)
+        elif arg[0] == "CHAT_REPORT2":
+            target_uid = arg[1]
+            channel = {'GLOBAL': session.global_chat_channel,
+                       'REGION': session.region_chat_channel,
+                       }.get(arg[2], None)
+            context_time = arg[3]
+            target_message_id = arg[4] if len(arg) >= 5 else None
+            if not channel:
+                retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
+                return
+            assert target_uid > 0
+            session.do_chat_report2(target_uid, channel, context_time, target_message_id)
 
         elif arg[0] == "UNIT_REPAIR_TICK":
             self.do_unit_repair_tick(session, retmsg, must_reply = True)
@@ -24282,7 +25077,11 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "CANCEL_PLAYER_AURA":
             specname = arg[1]
-            session.player.remove_aura(session, retmsg, specname)
+            if specname == 'damage_protection': # special case
+                if session.player.has_damage_protection():
+                    session.player.set_protection_end_time(session, -1, '3886_protection_removed_manually')
+            else:
+                session.player.remove_aura(session, retmsg, specname)
 
         elif arg[0] in ("INVENTORY_TRASH", "INVENTORY_TRASH_ALL", "INVENTORY_REFUND", "INVENTORY_REFUND_ALL"):
             if session.player.warehouse_is_busy():
@@ -24391,19 +25190,16 @@ class GAMEAPI(resource.Resource):
                     else:
                         retmsg.append(["ERROR", "STORAGE_LIMIT", spec['resource']])
 
-                elif spec['resource'] == 'lottery_ticket':
-                    if not session.home_base:
-                        retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    else:
-                        scanner = session.player.find_lottery_building()
-                        if not scanner:
-                            retmsg.append(["ERROR", "CANNOT_SCAN_NO_BUILDING"])
-                        else:
-                            success = True
-                            used_count = item.get('stack',1)
-                            scanner.contents += used_count
-                            session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
-                            retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
+                elif spec['resource'] == 'lottery_scans':
+                    used_count = item.get('stack',1)
+                    if item.get('expire_time',-1) < 0 or item.get('expire_time',-1) > server_time:
+                        assert session.player.do_apply_aura('lottery_scans', stack = used_count,
+                                                            duration = (item['expire_time'] - server_time) if item.get('expire_time',-1) > 0 else -1,
+                                                            ignore_limit = True)
+                    success = True
+                    session.player.inventory_remove_stack(item, '5130_item_activated', reason='lottery')
+                    session.deferred_player_auras_update = True
+
                 else:
                     raise Exception('unhandled fungible resource '+spec['resource'])
 
@@ -24564,11 +25360,9 @@ class GAMEAPI(resource.Resource):
                             if spec.get('fungible',False):
                                 # if we successfully take a fungible item, which adds to resources directly,
                                 # then we'll need to send an update of that
-                                if spec['resource'] == 'lottery_ticket':
+                                if spec['resource'] == 'lottery_scans':
                                     need_lottery_update = True
-                                    scanner = session.player.find_lottery_building()
-                                    if scanner:
-                                        session.deferred_object_state_updates.add(scanner)
+                                    session.deferred_player_auras_update = True
                                 else:
                                     need_resource_update = True
 
@@ -24641,6 +25435,7 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 if need_resource_update:
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
             retmsg.append(["MAIL_TAKE_ATTACHMENTS_RESULT", msg_id, client_index, success, need_resource_update or need_lottery_update, mail if mail else None])
             if need_space:
                 retmsg.append(["ERROR", "INVENTORY_LIMIT"])
@@ -24669,7 +25464,12 @@ class GAMEAPI(resource.Resource):
                 for item in to_take:
                     full_stack = item.get('stack',1)
                     item_spec = gamedata['items'].get(item['spec'],{})
+
                     taken = session.player.inventory_add_item(item, res.max_usable_inventory())
+
+                    if taken > 0 and item_spec.get('fungible',False) and item_spec['resource'] == 'lottery_scans':
+                        session.deferred_player_auras_update = True
+
                     if taken >= full_stack:
                         session.player.loot_buffer.remove(item)
                     elif taken > 0:
@@ -24811,7 +25611,7 @@ class GAMEAPI(resource.Resource):
                 self.do_speedup_for_free(session, retmsg, object)
 
             elif spellname == "REPAIR":
-                return self.do_start_repairs(session, retmsg, spellargs[0])
+                self.do_start_repairs(session, retmsg, spellargs[0])
 
             elif spellname == "UPGRADE_FOR_FREE":
                 self.do_upgrade(session, retmsg, object)
@@ -24886,10 +25686,16 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_make_droids(session, retmsg, object, spellargs)
 
             elif spellname == "BUILD":
-                return self.do_build(session, retmsg, spellargs, False)
+                self.do_build(session, retmsg, spellargs, False)
 
             elif spellname == "DEPLOY_UNITS":
                 self.do_attack(session, retmsg, spellargs)
+
+            elif spellname == "INSTANT_ATTACK":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    return session.start_async_request(self.instant_attack(session, retmsg, spellargs))
 
             elif spellname == "CONFIG_SET":
                 if object not in session.player.home_base_iter():
@@ -24917,7 +25723,7 @@ class GAMEAPI(resource.Resource):
                 session.viewing_base.nosql_write_one(object, 'CONFIG_SET', fields = ['config'])
 
             elif spellname == "MOVE_BUILDING":
-                return self.do_move_building(session, retmsg, object, spellargs)
+                self.do_move_building(session, retmsg, object, spellargs)
 
             elif spellname == "LOTTERY_GET_SLATE":
                 session.player.reseed_lottery(session, force = False)
@@ -24926,7 +25732,7 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == "LOTTERY_SCAN":
                 source = spellargs[0]
-                assert source in ('cooldown','contents') # cannot use "paid" here!
+                assert source in ('cooldown','contents','aura') # cannot use "paid" here!
                 if (session.viewing_base is not session.player.my_home) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
@@ -24986,7 +25792,15 @@ class GAMEAPI(resource.Resource):
                     for res in gamedata['resources']:
                         setattr(session.player.resources, res, 0)
                     session.player.resources.gamebucks = 0
-                    retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                    session.deferred_player_state_update = True
+                    scores_to_modify = {}
+                    if session.player.ladder_points() != 0:
+                        scores_to_modify['trophies_pvp'] = 0
+                    if session.player.trophies_pvv() != 0:
+                        scores_to_modify['trophies_pvv'] = 0
+                    if scores_to_modify:
+                        if session.player.modify_scores(scores_to_modify, method = '=', reason = spellname):
+                            session.deferred_player_trophies_update = True
             elif spellname == "CHEAT_GET_DONATED_UNITS":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
@@ -25011,9 +25825,10 @@ class GAMEAPI(resource.Resource):
                                                        'type': 'resource_gift',
                                                        'msg_id': generate_mail_id(),
                                                        'expire_time': server_time + gamedata['server']['message_expire_time']['resource_gift'],
-                                                       'from_pcache': self.get_player_cache_props(session.user, session.player),
+                                                       'from_pcache': self.get_player_cache_props(session.user, session.player, session.alliance_id_cache),
                                                        'unique_per_sender': 'resource_gift'}])
-                    if self.do_receive_mail(session, retmsg)['new_mail']:
+                    mail_stat = self.do_receive_mail(session, retmsg)
+                    if mail_stat and mail_stat['new_mail']:
                         session.player.send_mailbox_update(retmsg)
 
             elif spellname == "CHEAT_GIVE_ITEMS":
@@ -25105,8 +25920,7 @@ class GAMEAPI(resource.Resource):
                         session.player.abtests[name] = group
 
                 # really the user needs to be kicked and relogged
-                return self.handle_message_guts(request, session, ["LOGOUT"], retmsg)
-                #retmsg.append(["ABTEST_UPDATE", session.player.abtests])
+                return self.log_out_async(session, spellname)
 
             elif spellname == "CHEAT_RESET_GAME":
                 if spin_secure_mode:
@@ -25125,20 +25939,31 @@ class GAMEAPI(resource.Resource):
                     # have to reset the tutorial before changing sessions, so that client will apply special AI states correctly
                     retmsg.append(["TUTORIAL_STATE_UPDATE", session.player.tutorial_state])
 
-                    self.change_session(request, session, retmsg, dest_user_id = session.user.user_id, force = True)
+                    d = self.change_session(session, retmsg, dest_user_id = session.user.user_id, force = True)
 
-                    spawn_tutorial_units(session, retmsg)
+                    def after_session_change(self, session, retmsg, change_session_result):
+                        spawn_tutorial_units(session, retmsg)
+                        session.player.send_history_update(retmsg)
+                        retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+                        retmsg.append(["TECH_UPDATE", session.player.tech])
+                        retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
 
-                    session.player.send_history_update(retmsg)
-                    retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
-                    retmsg.append(["TECH_UPDATE", session.player.tech])
-                    retmsg.append(["QUEST_STATE_UPDATE", session.player.completed_quests])
+                    d.addCallback(functools.partial(after_session_change, self, session, retmsg))
+                    return d # async
 
             elif spellname == "CHEAT_SPAWN_UNITS":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     self.execute_spell(session, retmsg, "GIVE_UNITS_LIMIT_BREAK", spellargs[0])
+
+            elif spellname == "CHEAT_MODIFY_SCORE":
+                if not session.player.is_cheater:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                else:
+                    stat_name, stat_method, stat_delta = spellargs[0:3]
+                    if session.player.modify_scores({stat_name: stat_delta}, method = stat_method, reason = spellname):
+                        session.deferred_player_trophies_update = True
 
             elif spellname == "LOAD_AI_BASE":
                 if spin_secure_mode or not session.home_base:
@@ -25181,15 +26006,23 @@ class GAMEAPI(resource.Resource):
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
                             if 'orders' in data: obj.orders = data['orders']
                             if 'patrol' in data: obj.patrol = data['patrol']
+                            if 'temporary' in data: obj.temporary = data['temporary']
                             session.player.home_base_add(obj)
                         for data in base.get('scenery',[]):
                             obj = instantiate_object_for_player(session.player, EnvironmentOwner, data['spec'], x=data['xy'][0], y=data['xy'][1])
                             session.player.home_base_add(obj)
 
                         session.player.ping_squads_and_send_update(session, retmsg, originator = session.player.user_id, reason = 'load_ai_base')
-                        self.change_session(request, session, retmsg, dest_user_id = session.user.user_id, force = True)
+                        d = self.change_session(session, retmsg, dest_user_id = session.user.user_id, force = True)
+
+                        def after_session_change(self, session, retmsg, filename, change_session_result):
+                            retmsg.append(["LOAD_AI_BASE_RESULT", True, None, filename])
+
+                        d.addCallback(functools.partial(after_session_change, self, session, retmsg, filename))
+                        return d # async
+
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["LOAD_AI_BASE_RESULT", success, "LOAD_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
@@ -25227,6 +26060,7 @@ class GAMEAPI(resource.Resource):
                                 if obj.equipment: props['equipment'] = obj.equipment
                                 out['buildings'].append(props)
                             elif obj.is_mobile():
+                                if obj.is_temporary(): continue # don't save these
                                 props = {'spec': obj.spec.name, 'xy': [obj.x, obj.y] }
                                 if obj.orders: props['orders'] = obj.orders
                                 if obj.patrol: props['patrol'] = obj.patrol
@@ -25240,7 +26074,7 @@ class GAMEAPI(resource.Resource):
                         atom.fd.write(SpinJSON.dumps(out, pretty = True)[1:-1]+'\n') # note: get rid of surrounding {}
                         atom.complete()
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["SAVE_AI_BASE_RESULT", success, "SAVE_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else filename])
@@ -25278,7 +26112,7 @@ class GAMEAPI(resource.Resource):
                             setup_next_ai_base([str(idnum),])
 
                     except:
-                        error_msg = traceback.format_exc()
+                        error_msg = traceback.format_exc().strip() # OK
                         success = False
 
                     retmsg.append(["PUBLISH_AI_BASE_RESULT", success, "PUBLISH_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else str(idnum)])
@@ -25307,17 +26141,18 @@ class GAMEAPI(resource.Resource):
                 # offline mutation.
 
                 rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
-                def finish(self, request, session, retmsg, spellname, target_id, response_or_error):
+                d = make_deferred(spellname)
+                def finish(self, d, session, retmsg, spellname, target_id, response_or_error):
                     retmsg.append([spellname+"_RESULT", target_id, True])
-                    self.complete_deferred_request(request, session, retmsg)
+                    d.callback(True)
                 host = SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host)
                 port = SpinConfig.config['proxyserver']['external_http_port']
                 rq.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode({'method':spellname.lower(),
                                                                                                            'user_id':target_id,
                                                                                                            'secret':SpinConfig.config['proxy_api_secret']}),
-                                 functools.partial(finish, self, request, session, retmsg, spellname, target_id),
-                                 error_callback = functools.partial(finish, self, request, session, retmsg, spellname, target_id))
-                return True # go async
+                                 functools.partial(finish, self, d, session, retmsg, spellname, target_id),
+                                 error_callback = functools.partial(finish, self, d, session, retmsg, spellname, target_id))
+                return session.start_async_request(d) # go async
 
             elif spellname == "ALLIANCE_CREATE" or spellname == "ALLIANCE_MODIFY":
                 props = spellargs[0]
@@ -25470,6 +26305,7 @@ class GAMEAPI(resource.Resource):
                 ui_name = spellargs[0][:64].strip()
                 success = True
 
+                # subtract 1 for Base Defenders which doesn't count against the squad limit
                 if len(session.player.squads)-1 >= session.player.stattab.max_squads:
                     retmsg.append(["ERROR", "CANNOT_CREATE_SQUAD_LIMIT_REACHED"])
                     success = False
@@ -25868,10 +26704,10 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["DONATE_UNITS_RESULT", success, error_reason])
 
             else:
-                return self.handle_protocol_error(request, session, retmsg, arg)
+                return self.handle_protocol_error(session, retmsg, arg)
 
         else:
-            return self.handle_protocol_error(request, session, retmsg, arg)
+            return self.handle_protocol_error(session, retmsg, arg)
 
         return
 
@@ -25888,7 +26724,7 @@ class GAMEAPI(resource.Resource):
         else:
             squad_owner_id = None
 
-        for session in session_table.itervalues():
+        for session in iter_sessions():
             if session.player.home_region == region_id:
                 # if the update concerns one of the player's squads, and it's from an external player,
                 # then have the owner ping squads to see what happened
@@ -25897,49 +26733,94 @@ class GAMEAPI(resource.Resource):
                     session.deferred_ping_squads = True
 
                 if (originator != session.player.user_id): # is async to session
-                    session.send_deferred_message([upd])
+                    session.send([upd], flush_now = False) # avoid storms
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_update',
-                                               'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
-                                                         'server': spin_server_name, 'originator': originator },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_update',
+                                                     'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
+                                                               'server': spin_server_name, 'originator': originator },
+                                                     }, '', log = False)
 
-    def broadcast_map_attack(self, region_id, base_id, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
+    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
-        upd = [msg, region_id, base_id, attacker_id, defender_id, summary, pcache_info]
-        for session in session_table.itervalues():
-            if session.player.user_id == defender_id and session.player.home_region == region_id and attacker_id != session.player.user_id:
-                session.send_deferred_message([upd], flush_now = True)
+        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info]
+        for session in iter_sessions():
+            if session.player.home_region == region_id:
+                if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
+                    session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
         if send_to_net:
-            gamesite.chat_mgr.send('CONTROL', {'secret':SpinConfig.config['proxy_api_secret'],
-                                               'server':spin_server_name,
-                                               'method':'broadcast_map_attack',
-                                               'args': { 'msg': msg,
-                                                         'region_id': region_id, 'base_id': base_id,
-                                                         'attacker_id': attacker_id, 'defender_id': defender_id,
-                                                         'summary': summary, 'pcache_info': pcache_info,
-                                                         'server': spin_server_name },
-                                               }, '', log = False)
+            gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                     'server':spin_server_name,
+                                                     'method':'broadcast_map_attack',
+                                                     'args': { 'msg': msg,
+                                                               'region_id': region_id, 'feature': feature,
+                                                               'attacker_id': attacker_id, 'defender_id': defender_id,
+                                                               'summary': summary, 'pcache_info': pcache_info,
+                                                               'server': spin_server_name },
+                                                     }, '', log = False)
 
-    def handle_protocol_error(self, request, session, retmsg, arg):
+    def handle_protocol_error(self, session, retmsg, arg):
         # called when there is a problem with the AJAX message the client sent
         # records this to the exceptions log to pick up hacking/fuzzing attempts
         # then logs out the client
         retmsg.append(["ERROR", "SERVER_PROTOCOL"])
-        self.log_out_async(session, 'prococol_error', functools.partial(self.complete_deferred_request, request, session, retmsg))
         if gamedata['server']['log_protocol_errors']:
             gamesite.exception_log.event(server_time, ('user %d sent invalid message: ' % session.user.user_id) + repr(arg))
-        return True
+
+        return self.log_out_async(session, 'protocol_error')
+
 
 # subclass of Twisted's built-in web server
 # this adds periodic function calls to perform background tasks for the game
 class GameSite(server.Site):
+    class GameProtocol(http.HTTPChannel):
+        def __init__(self, *args, **kwargs):
+            http.HTTPChannel.__init__(self, *args, **kwargs)
+            self.close_connection_watchdog = None
+            self.connect_time = -1
+            self.last_request = None # for debugging only
+            self.last_request_time = -1
+        def connectionMade(self):
+            http.HTTPChannel.connectionMade(self)
+            self.connect_time = int(time.time())
+            self.site.gotClient(self)
+        def connectionLost(self, reason):
+            http.HTTPChannel.connectionLost(self, reason)
+            self.connect_time = -1
+            self.site.lostClient(self)
+            if self.close_connection_watchdog:
+                self.close_connection_watchdog.cancel()
+                self.close_connection_watchdog = None
+            self.last_request = None # break circular reference
+        def close_connection_aggressively(self, force = False):
+            if force:
+                self.close_connection_watchdog = None
+                self.transport.abortConnection()
+            else:
+                self.transport.loseConnection()
+
+                if not self.close_connection_watchdog:
+                    # set watchdog timer to abort badly-behaved TCP connections
+                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection_aggressively, True)
+
+        def allContentReceived(self): # remember last request for debugging
+            self.last_request_time = int(time.time())
+            self.last_request = self.requests[-1] # save reference here, but have to wait until it parses request to repr()
+            return http.HTTPChannel.allContentReceived(self)
+
+        def __repr__(self):
+            if self.last_request_time > 0:
+                ago = server_time - self.last_request_time
+            else:
+                ago = -1
+            return 'GameProtocol (last request %ds ago: %r)' % (ago, self.last_request)
+
     displayTracebacks = False
+    protocol = GameProtocol
 
     def log_async_exception(self, exc):
         self.exception_log.event(server_time, exc)
@@ -25964,6 +26845,7 @@ class GameSite(server.Site):
             self.game_ssl_port = json.get('game_ssl_port',-1)
             self.game_ws_port = json.get('game_ws_port',-1)
             self.game_wss_port = json.get('game_wss_port',-1)
+            self.tcp_accept_backlog = json.get('tcp_accept_backlog', 511)
             self.affinities = json.get('affinities',['default'])
             self.start_state = json.get('start_state', 'ok')
 
@@ -26126,8 +27008,10 @@ class GameSite(server.Site):
         self.chat_mgr = ChatChannels.ChatChannelMgr(relay = self.chat_client)
         self.chat_mgr.join(controlapi, 'CONTROL')
 
-        # make sure players are logged out and flushed before server shuts down
-        reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
+        # will be fired when last connection drops
+        self.clients_stopped_deferred = None
+        self.active_clients = set()
+        self.active_requests = set()
 
         signal.signal(signal.SIGUSR1, self.handle_SIGUSR1)
         signal.signal(signal.SIGUSR2, self.handle_SIGUSR2)
@@ -26140,16 +27024,103 @@ class GameSite(server.Site):
         self.server_status_task = task.LoopingCall(self.server_status_func)
         self.reset_interval(True)
 
+        # these will be set up by start_listening()
+        self.listener_tcp = None
+        self.listener_ssl = None
+
+    def start_listening(self):
+        self.listener_tcp = reactor.listenTCP(self.config.game_http_port, self, interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
+        if self.config.game_ssl_port > 0:
+            self.listener_ssl = reactor.listenSSL(self.config.game_ssl_port, self,
+                                                  SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
+                                                                                        SpinConfig.config['ssl_crt_file'],
+                                                                                        certificateChainFile=SpinConfig.config['ssl_chain_file']),
+                                                  interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
+
+        # make sure players are logged out and flushed before server shuts down
+        reactor.addSystemEventTrigger('before', 'shutdown', self.shutdown)
+
+    def shutdown(self):
+        # ordering here is important: close listening socket, then close sessions, then close HTTP/WS traffic
+
+        self.change_state('shutting_down') # send status update to tell latency probe to ignore us
+        # (there's a small race condition here - could fix by inserting a deley here, but probably not a problem)
+
+        d = self.stop_listening()
+        d.addCallback(lambda _, self=self: self.stop_all_sessions())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_sessions() exception: %s' % err.getTraceback()))
+        d.addCallback(lambda _, self=self: self.stop_all_clients())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'stop_all_clients() exception: %s' % err.getTraceback()))
+        if self.chat_client:
+            d.addCallback(lambda _, self=self: self.chat_client.disconnect())
+            d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'chat_client.disconnect() exception: %s' % err.getTraceback()))
+        d.addCallback(lambda _: io_system.shutdown())
+        d.addErrback(lambda err, self=self: self.exception_log.event(server_time, 'io_system.shutdown() exception: %s' % err.getTraceback()))
+        # send a final server status update when we're finished
+        d.addCallback(lambda _, self=self: self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown'))
+        return d
+
+    def stop_listening(self):
+        return defer.DeferredList([defer.maybeDeferred(self.listener_tcp.stopListening)] + \
+                                  ([defer.maybeDeferred(self.listener_ssl.stopListening)] if self.listener_ssl else []))
+
+    # client/request management boilerplate - see https://github.com/habnabit/polecat/blob/master/polecat.py
+    def gotClient(self, client):
+        self.active_clients.add(client)
+        #gamesite.exception_log.event(server_time, 'gotClient %r clients %d requests %d' % (client, len(self.active_clients), len(self.active_requests)))
+    def lostClient(self, client):
+        self.active_clients.discard(client)
+        #gamesite.exception_log.event(server_time, 'lostClient %r clients %d requests %d' % (client, len(self.active_clients), len(self.active_requests)))
+        if not self.active_clients and self.clients_stopped_deferred:
+            d = self.clients_stopped_deferred
+            self.clients_stopped_deferred = None
+            d.callback(None)
+    def getResourceFor(self, request):
+        self.active_requests.add(request)
+        request.notifyFinish().addBoth(lambda _, self=self, request=request: self.active_requests.discard(request)) # OK
+        return server.Site.getResourceFor(self, request)
+
+    def stop_all_clients(self):
+        "Returns a Deferred that fires when all clients have disconnected."
+        if not self.active_clients:
+            return defer.succeed(None)
+        else:
+            d = make_deferred('stop_all_clients')
+            self.clients_stopped_deferred = d
+
+            # tell any keep-alive requests that we're closing down
+            for request in self.active_requests:
+                request.setHeader('Connection', 'close')
+
+            for client in self.active_clients:
+                client.close_connection_aggressively()
+            return d
+
+    def log_exception_func(self, x): self.exception_log.event(server_time, x)
+
     def sql_init(self):
         self.sql_scores2_client = None
         if ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
                                                                                      verbosity = 0,
-                                                                                     log_exception_func = lambda x: self.exception_log.event(server_time, x)))
+                                                                                     log_exception_func = self.log_exception_func))
+        self.sql_battles_client = None
+        if ((game_id+'_battles') in SpinConfig.config.get('pgsql_servers',{})):
+            import AsyncPostgres
+            if self.sql_scores2_client and \
+               SpinConfig.get_pgsql_config(game_id+'_battles') == self.sql_scores2_client.sql_client.dbconfig:
+                # re-use same connection
+                pg = self.sql_scores2_client.sql_client
+            else:
+                pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_battles'),
+                                                 verbosity = 0,
+                                                 log_exception_func = self.log_exception_func)
+            self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg)
+
     def sql_shutdown(self):
-        if self.sql_scores2_client:
-            self.sql_scores2_client = None
+        self.sql_scores2_client = None
+        self.sql_battles_client = None
 
     def nosql_init(self, is_startup = False):
         if self.nosql_client: return
@@ -26166,7 +27137,7 @@ class GameSite(server.Site):
                                                       map_update_hook = self.gameapi.broadcast_map_update,
                                                       identity = spin_server_name,
                                                       max_retries = -1, # never give up
-                                                      log_exception_func = lambda x: self.exception_log.event(server_time, x),
+                                                      log_exception_func = self.log_exception_func,
                                                       latency_func = admin_stats.record_latency)
         except Exception as e:
             if is_startup:
@@ -26230,7 +27201,8 @@ class GameSite(server.Site):
             self.server_status_task.start(self.server_status_interval, now = run_now)
 
     def change_state(self, state):
-        assert state in ('ok','closed')
+        assert state in ('ok','closed','shutting_down')
+        if self.server_state == state: return admin_stats.get_server_status_json()
         self.server_state = state
         if state == 'ok':
             self.maint_kick_time = -1
@@ -26253,8 +27225,8 @@ class GameSite(server.Site):
     # send logged-in players maintenance warnings, then kick all after 5 minutes
     # note: this does not prevent NEW log-ins, so make sure the proxyserver is not routing any new logins here
     def start_maint_kick(self):
-        for session in session_table.itervalues():
-            session.send_deferred_message([["SERVER_MAINTENANCE_WARNING"]], flush_now = True)
+        for session in iter_sessions():
+            session.send([["SERVER_MAINTENANCE_WARNING"]], flush_now = False)
         self.maint_kick_time = server_time + gamedata['server']['maint_kick_time']
         self.server_state = 'maint_kick'
         status_json = admin_stats.get_server_status_json()
@@ -26263,13 +27235,19 @@ class GameSite(server.Site):
         return status_json
 
     # immediately kick all sessions, even if they are stuck on I/O
-    def panic_kick(self):
-        for session in session_table.values():
-            self.gameapi.log_out_async(session, 'panic', lambda: None, force = True)
+    def panic_kick(self, ignore_transport):
+        for session in list(iter_sessions()):
+            try:
+                self.gameapi.log_out_async(session, 'panic', force = True)
+            except:
+                pass
+        for client in list(self.active_clients):
+            if client.transport is not ignore_transport:
+                client.transport.abortConnection() # if loseConnection() isn't enough
 
     # print Python stack frame to trace log upon receiving SIGUSR1
     def handle_SIGUSR1(self, signum, frm):
-        self.trace_log.event(server_time, string.join(traceback.format_stack(frm), ''))
+        self.trace_log.event(server_time, ''.join(traceback.format_stack(frm)))
 
     # reload config.json and gamedatadata upon receiving SIGHUP
     def handle_SIGHUP(self, signum, frm):
@@ -26303,51 +27281,28 @@ class GameSite(server.Site):
             # don't log every boring HTTP request
             pass
 
-    def shutdown(self):
+    def stop_all_sessions(self):
         # server is shutting down - forcefully log out all active sessions
 
         # need to wait for all async logouts to finish before proceeding
-        waiting_on = {}
-        semaphore = defer.Deferred()
+        waiting_on = []
+        for session in list(iter_sessions(include_logout_in_progress = True)):
+            waiting_on.append(self.gameapi.log_out_async(session, 'server_shutdown'))
 
-        def try_finish(waiting_on, id, semaphore):
-            del waiting_on[id]
-            if len(waiting_on) == 0:
-                semaphore.callback(1)
-                self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown')
+        return defer.DeferredList(waiting_on, consumeErrors = True)
 
-        for id, session in session_table.items():
-            waiting_on[id] = session
-            self.gameapi.log_out_async(session_table[id], 'server_restart',
-                                       functools.partial(try_finish, waiting_on, id, semaphore))
-
-        print 'logging out %d active sessions' % len(waiting_on)
-
-        if len(waiting_on) == 0:
-            semaphore.callback(1)
-            self.nosql_client.server_status_update(spin_server_name, None, reason='shutdown')
-            return None
-        else:
-            return semaphore
-
+    @catch_all('server_status_func')
     def server_status_func(self):
-        try:
-            # report server stats
-            if self.nosql_client:
-                self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
-        except:
-            self.exception_log.event(server_time, 'server_status_func Exception: ' + traceback.format_exc())
+        # report server stats
+        if self.nosql_client:
+            self.nosql_client.server_status_update(spin_server_name, admin_stats.get_server_status_json(), reason='server_status_func')
 
+    @catch_all('bgfunc')
+    @admin_stats.measure_latency('bgfunc')
     def bgfunc(self):
-        try:
-            self.do_bgfunc()
-        except:
-            self.exception_log.event(server_time, 'bgfunc Exception: ' + traceback.format_exc())
-
-    def do_bgfunc(self):
         # run housekeeping functions
 
-        start_time = update_server_time()
+        update_server_time()
 
         # garbage-collect old AI instances
         if (server_time - self.last_ai_base_gc_time) >= gamedata['server'].get('ai_base_gc_interval', 1800):
@@ -26357,15 +27312,9 @@ class GameSite(server.Site):
         # if we're about to go down for maintenance, kick all logged-in players
         maint_kicks = 0
         if self.maint_kick_time > 0 and server_time >= self.maint_kick_time:
-            for session in session_table.values():
-                if session.logout_in_progress: continue
-                try:
-                    self.gameapi.log_out_async(session, 'maint_kick', lambda: None)
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during server_restart kick (POSSIBLE DATA LOSS): ' % (session.user.user_id)) + \
-                                             traceback.format_exc())
-                    del session_table[session.session_id]
-
+            for session in list(iter_sessions()):
+                session.send([["ERROR", "MAINT_KICK"]], flush_now = True)
+                self.gameapi.log_out_async(session, 'maint_kick')
                 maint_kicks += 1
                 if maint_kicks >= gamedata['server']['maint_kicks_at_once']:
                     break
@@ -26380,20 +27329,19 @@ class GameSite(server.Site):
         lock_keepalive_states = []
         region_lock_keepalives = {}
 
-        for id in session_table.keys():
-            session = session_table[id]
-            if session.logout_in_progress: continue
+        for session in list(iter_sessions()): # make a copy since we might mutate the table
 
-            need_flush = False
             kick_reason = None
 
             # check for expired idle sessions
 
             if (server_time - session.last_active_time) > timeout:
                 kick_reason = 'timeout'
+                session.send([["ERROR", "IDLE_KICK"]], flush_now = True)
 
             elif (session.last_active_time <= session.login_time) and ((server_time - session.last_active_time) > gamedata['server']['initial_session_timeout']):
                 kick_reason = 'timeout'
+                session.send([["ERROR", "IDLE_KICK"]], flush_now = True)
                 if gamedata['server']['log_abnormal_logins'] >= 2:
                     gamesite.exception_log.event(server_time, 'user %d - no activity within %d sec of login, kicking.' % (session.user.user_id, gamedata['server']['initial_session_timeout']))
 
@@ -26412,11 +27360,10 @@ class GameSite(server.Site):
             elif idle_timeout_status == IdleCheck.STATUS_SEND_AGAIN or \
                  (idle_timeout_status == IdleCheck.STATUS_NO_RESULT and \
                   (session.player.idle_check.forced_check_needed() or \
-                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied(session.player, None)) and \
+                   Predicates.read_predicate(gamedata['server']['idle_check']['enable_if']).is_satisfied2(session, session.player, None)) and \
                   session.player.idle_check.check_needed(session.login_time, server_time, playtime)):
                 idle_check_msg = session.player.idle_check.start_check(session.login_time, server_time, playtime)
-                session.send_deferred_message([["IDLE_CHECK", idle_check_msg]])
-                need_flush = True
+                session.send([["IDLE_CHECK", idle_check_msg]])
                 metric_event_coded(session.user.user_id, '0691_idle_check', idle_check_msg)
 
             if not kick_reason:
@@ -26424,19 +27371,13 @@ class GameSite(server.Site):
                 if (session.player.lockout_until > 0) and (server_time < session.player.lockout_until):
                     # abuse detected, kick them out
                     m = session.player.lockout_message if (session.player.lockout_message and (session.player.lockout_message in gamedata['errors'])) else gamedata['server']['login_abuse_error_code']
-                    session.send_deferred_message([["ERROR", m]], flush_now = True)
+                    session.send([["ERROR", m]], flush_now = True)
                     kick_reason = 'abuse'
                 elif abuse_warning_msg:
-                    session.send_deferred_message(abuse_warning_msg)
-                    need_flush = True
+                    session.send(abuse_warning_msg)
 
             if kick_reason:
-                try:
-                    self.gameapi.log_out_async(session, kick_reason, lambda: None)
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception due to damaged session %d during kick for %s (POSSIBLE DATA LOSS): ' % (session.user.user_id, kick_reason)) + \
-                                             traceback.format_exc())
-                    del session_table[id]
+                self.gameapi.log_out_async(session, kick_reason)
                 continue
 
             # conclude any longpolls that are idle for more than the wait interval
@@ -26461,18 +27402,18 @@ class GameSite(server.Site):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack(session.deferred_messages)
-                need_flush = True
+                session.deploy_ai_attack(session.outgoing_messages, force = True)
+                session.queue_flush_outgoing_messages()
+
             elif session.incoming_attack_wave_time > 0 and (server_time >= session.incoming_attack_wave_time):
                 if gamedata['server']['log_ai_attack_overdue'] and session.incoming_attack_type != 'tutorial':
                     gamesite.exception_log.event(server_time, 'deploying overdue AI attack wave (%s) on player %d' % \
                                                  (str(session.incoming_attack_type), session.player.user_id))
-                session.deploy_ai_attack_wave(session.deferred_messages)
-                need_flush = True
+                session.deploy_ai_attack_wave(session.outgoing_messages)
+                session.queue_flush_outgoing_messages()
 
             # check for sessions where an attack has been going on for too long
-            elif (not session.is_async) and \
-                 (session.has_attacked) and (not session.visit_base_in_progress) and (not session.complete_attack_in_progress) and \
+            elif (session.has_attacked) and (not session.is_async()) and \
                  (session.attack_finish_time > 0) and (server_time >= session.attack_finish_time):
                 # force the attack to conclude
                 client_inactive_time = server_time - session.last_active_time
@@ -26481,10 +27422,19 @@ class GameSite(server.Site):
                     # (either the client's clock is way out of sync, or very lagged, or the player is trying to cheat by changing his clock to get more battle time)
                     gamesite.exception_log.event(server_time, 'user %d - forcing long attack at %d:%s to conclude (client inactive %d sec)' % (session.user.user_id, session.viewing_user.user_id, session.viewing_base.base_id, client_inactive_time))
                 session.attack_finish_time = -1
-                # change_session will unlock the victim's state for us
-                session.visit_base_in_progress = True
-                session.is_async = self.gameapi.change_session(None, session, session.deferred_messages, dest_user_id = session.user.user_id, force = True)
-                need_flush = True
+
+                # note: change_session will unlock the victim's state for us
+                d = make_deferred('force_attack_end')
+                def force_attack_end(self, session):
+                    if session.has_attacked:
+                        return self.gameapi.change_session(session, session.outgoing_messages, dest_user_id = session.user.user_id, force = True)
+                def ignore_logout_race(fail):
+                    fail.trap(Session.AlreadyLoggedOut)
+                    return None
+                d.addCallbacks(lambda _, self=self, session=session: force_attack_end(self, session),
+                               ignore_logout_race)
+                session.debug_log_action('force_attack_end')
+                session.after_async_request(d)
 
             if (not session.sprobe_in_progress):
                 sprobe_config = gamedata['server'].get('sprobe',None)
@@ -26495,12 +27445,9 @@ class GameSite(server.Site):
                         if ((when == 'only_during_attack') and session.has_attacked) or \
                            ((when == 'anytime') and ((server_time - session.login_time) >= sprobe_config.get('sec_after_login',15))):
                             session.sprobe_in_progress = True
-                            session.send_deferred_message([["SPROBE_RUN"]], flush_now = True)
-                            need_flush = True
+                            session.send([["SPROBE_RUN"]], flush_now = True)
 
             session.record_activity_sample()
-            if need_flush:
-                session.flush_deferred_messages()
 
         # send lock keepalive requests in one big batch
         messages_pending = gamesite.lock_client.player_lock_keepalive_batch(lock_keepalive_ids, lock_keepalive_generations, lock_keepalive_states, True, reason='bgfunc')
@@ -26523,19 +27470,18 @@ class GameSite(server.Site):
             if messages_pending[i]:
                 session = lock_keepalive_sessions[i]
                 if session.has_attacked: continue
-                try:
-                    stat = self.gameapi.do_receive_mail(session, session.deferred_messages)
-                    if stat['new_mail']:
-                        session.player.send_mailbox_update(session.deferred_messages)
-                        session.player.send_history_update(session.deferred_messages)
-                        session.flush_deferred_messages()
-                except:
-                    self.exception_log.event(server_time, ('bgfunc exception while processing mail for player %d: ' % session.user.user_id) + \
-                                             traceback.format_exc())
+                stat = self.gameapi.do_receive_mail(session, session.outgoing_messages)
+                if stat and stat['new_mail']:
+                    session.deferred_mailbox_update = True
+                    session.deferred_history_update = True
+                    session.queue_flush_outgoing_messages()
 
-
-        end_time = time.time()
-        admin_stats.record_latency('bgtask', end_time-start_time)
+        # close TCP connections that have been idling too long
+        for client in list(self.active_clients):
+            assert isinstance(client, self.GameProtocol) or isinstance(client, WS_GAMEAPI_Protocol) # duck typed :P
+            last_activity = max(client.connect_time, client.last_request_time)
+            if server_time - last_activity > gamedata['server']['http_connection_timeout']:
+                client.close_connection_aggressively()
 
 # glue code that links GAMEAPI to WebSocket
 
@@ -26543,43 +27489,80 @@ class GameSite(server.Site):
 class WSFakeRequest(object):
     def __init__(self, proto):
         self.proto = proto
+        self.want_close = False
+    def setHeader(self, key, val):
+        # detect removal of keepalive header to signal that we should close after next write
+        if key == 'Connection' and val == 'close':
+            self.want_close = True
     def write(self, buf):
         if self.proto.connected:
             self.proto.transport.write(buf)
-    def finish(self): pass
+    def finish(self):
+        if self.want_close:
+            self.proto.close_connection_aggressively()
+    def close_connection_aggressively(self): return self.proto.close_connection_aggressively()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
-    def __init__(self, gameapi, addr):
+    def __init__(self, gameapi, peer):
         self.gameapi = gameapi
-        self.peer_ip = None
+        self.peer_ip = str(peer.host)
         self.connected = False
+        self.close_connection_watchdog = None
+        self.connect_time = -1
+        self.last_request_repr = '' # for debugging only
+        self.last_request_time = -1
 
     def connectionMade(self):
-        self.peer_ip = str(self.transport.getPeer().host)
-        #gamesite.exception_log.event(server_time, str(self.peer_ip))
         self.connected = True
+        self.connect_time = int(time.time())
+        gamesite.gotClient(self) # XXX not sure how to get a reference to the "site" here
+
     def connectionLost(self, reason):
         self.connected = False
+        self.connect_time = -1
+        if self.close_connection_watchdog:
+            self.close_connection_watchdog.cancel()
+            self.close_connection_watchdog = None
+        gamesite.lostClient(self) # XXX not sure how to get a reference to the "site" here
+        self.last_request_repr = 'connectionLost'
+
+    def close_connection_aggressively(self, force = False):
+        if self.connected:
+            if force:
+                self.close_connection_watchdog = None
+                self.transport.abortConnection()
+            else:
+                self.transport.loseConnection()
+
+                if not self.close_connection_watchdog:
+                    # set watchdog timer to abort badly-behaved TCP connections
+                    self.close_connection_watchdog = reactor.callLater(10.0, self.close_connection_aggressively, True)
 
     def dataReceived(self, data):
         update_server_time()
-        try:
-            args_dict = SpinJSON.loads(data)
-            response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
-            if response == twisted.web.server.NOT_DONE_YET:
-                pass
-            else:
-                self.transport.write(response)
-
-            # old test code
-#            if 'ping_only' in args_dict: # respond to latency probe
-#                self.transport.write("ok\n")
-#            else:
-#                raise Exception('unhandled message')
-
-        except Exception:
-            gamesite.exception_log.event(server_time, 'WS_GAMEAPI Exception: '+traceback.format_exc())
+        ret = self.do_dataReceived(data)
+        if ret is None: # error
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
+            self.transport.loseConnection()
+
+    @catch_all('WS_GAMEAPI')
+    def do_dataReceived(self, data):
+        args_dict = SpinJSON.loads(data)
+        self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
+        self.last_request_time = server_time
+        response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
+        if response == twisted.web.server.NOT_DONE_YET:
+            pass
+        else:
+            self.transport.write(response)
+        return True # signal wrapper that we're OK
+
+    def __repr__(self):
+        if self.last_request_time > 0:
+            ago = server_time - self.last_request_time
+        else:
+            ago = -1
+        return 'WS_GAMEAPI_Protocol (last request %ds ago: %s...)' % (ago, self.last_request_repr)
 
 class WS_GAMEAPI_Factory(protocol.Factory):
     def __init__(self, gameapi):
@@ -26592,244 +27575,31 @@ class WS_GAMEAPI(websockets.WebSocketsResource):
     def render(self, request):
         update_server_time()
         SpinHTTP.set_access_control_headers(request)
-        return websockets.WebSocketsResource.render(self, request)
 
-# live server administration interface
-class AdminStats:
-    def __init__(self):
-        self.reset()
-    def reset(self):
-        self.start_time = server_time
-        self.developer_revenue = 0.0
-        self.revenue = 0.0
-        self.users_seen = set()
-        self.paying_users_seen = set()
-        self.new_users_seen = set()
-        self.last_payments = collections.deque([], 10)
-        self.last_gamebucks = collections.deque([], 10)
-        self.campaigns = {}
-        self.econ = {}
-        self.latency = {}
-        self.quarry_cache_misses = 0
-        self.quarry_cache_hits = 0
+        # WebSocketsResource swaps WS_GAMEAPI_Protocol in place of GameProtocol, so we have
+        # to let the gamesite know it's gone to get the accounting right
 
-    def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
-        # eventually need to separate third resource out
-        total = sum(res.itervalues(),0)
-        if total == 0: return # we assume that entries are either all positive or all negative
-        if category not in self.econ:
-            self.econ[category] = {}
-        self.econ[category][reason] = self.econ[category].get(reason,0) + total
+        # Secure connections wrap in TLSMemoryBIOProtocol too.
+        old_protocol = request.transport.protocol.wrappedProtocol if request.isSecure() else request.transport.protocol
+        assert isinstance(old_protocol, GameSite.GameProtocol)
 
-        if gamedata['server'].get('log_econ_res', False) and gamesite.nosql_client:
-            props = {'user_id':player.user_id, 'res':res, 'cat':category, 'sub': reason}
-            if spec is not None:
-                props['spec'] = spec
-            if level is not None:
-                props['level'] = level
-            props.update(player.get_denormalized_summary_props('brief'))
-            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow_res')
-
-    def record_latency(self, name, elapsed):
-        if name not in self.latency:
-            self.latency[name] = {'N':0.0, 'total':0.0, 'max': 0.0}
-        self.latency[name]['N'] += 1
-        self.latency[name]['total'] += elapsed
-        self.latency[name]['max'] = max(self.latency[name]['max'], elapsed)
-
-    def add_visit(self, user_id, is_new, is_paying):
-        self.users_seen.add(user_id)
-        if is_paying:
-            self.paying_users_seen.add(user_id)
-        if is_new:
-            self.new_users_seen.add(user_id)
-
-    def add_revenue(self, user_id, dollar_amount, descr):
-        self.revenue += dollar_amount
-        # add here in case this is the user's first payment
-        self.paying_users_seen.add(user_id)
-        self.last_payments.append({'user_id':user_id,
-                                   'time':server_time,
-                                   'dollar_amount':dollar_amount,
-                                   'description':descr})
-
-    def add_gamebucks_spend(self, user_id, bucks, descr):
-        self.last_gamebucks.append({'user_id':user_id,
-                                    'time':server_time,
-                                    'gamebucks_amount':bucks,
-                                    'description':descr})
-
-    def add_logout(self, user_id, campaign, length):
-        # only track FIRST visits
-        if user_id not in self.new_users_seen:
-            return
-
-        if campaign not in self.campaigns:
-            self.campaigns[campaign] = {'lengths': collections.deque([], 5), 'num': 0}
-        self.campaigns[campaign]['lengths'].append(length)
-        self.campaigns[campaign]['num'] += 1
-
-    def get_active_sessions(self):
-        # also count valid in-flight asynchronous logins here
-        return len(session_table) + sum((1 for async in gamesite.gameapi.AsyncLogin.in_progress_by_user_id.itervalues() if (not async.cancel_reason)),0)
-
-    def get_server_status_json(self):
-        return {'server_time': server_time,
-                'launch_time': spin_server_launch_time,
-                'type': SpinConfig.game(),
-                'state': gamesite.server_state,
-                'hostname': gamesite.config.game_host,
-                'pid': os.getpid(),
-                'game_listen_host': gamesite.config.game_listen_host,
-                'game_http_port': gamesite.config.game_http_port,
-                'game_ssl_port': gamesite.config.game_ssl_port,
-                'game_ws_port': gamesite.config.game_ws_port,
-                'game_wss_port': gamesite.config.game_wss_port,
-                'affinities': gamesite.config.affinities,
-                'scm_version': SERVER_VERSION,
-                'gamedata_build': gamedata['gamedata_build_info']['date'],
-                'gameclient_build': gameclient_build_date,
-                'uptime': server_time - self.start_time,
-                'load_unhalted': self.get_load(),
-                'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
-                'active_sessions': self.get_active_sessions(),
-                'paying_sessions': sum((1 for session in session_table.itervalues() if session.player.history.get('money_spent',0)>0),0)
-                }
-
-    def get_stats(self):
-        props = {}
-        up_hours = float(server_time - self.start_time)/3600.0
-        up_days = up_hours/24.0
-        props['uptime hours'] = up_hours
-        props['revenue'] = self.revenue
-        props['revenue/day (projected)'] = self.revenue / up_days
-        props['revenue (developers)'] = self.developer_revenue
-        props['unique users'] = len(self.users_seen)
-        props['unique paying users'] = len(self.paying_users_seen)
-        props['unique new users'] = len(self.new_users_seen)
-        DAU = len(self.users_seen) / up_days
-        PDAU = len(self.paying_users_seen) / up_days
-        props['DAU (projected)'] = DAU
-        props['PDAU (projected)'] = PDAU
-        props['ARPDAU (projected)'] = self.revenue / (DAU+0.0001)
-        props['ARPPDAU (paying, projected)'] = self.revenue / (PDAU+0.0001)
-        return props
-
-    def get_campaigns(self):
-        ret = ''
-        ret += '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Name</td><td>Last Session Lengths (new users only)</td><td>Average</td><td># Acquisitions</td></tr>'
-        for name in sorted(self.campaigns.iterkeys()):
-            data = self.campaigns[name]
-            lengths = data['lengths']
-            num = data['num']
-            if len(lengths) > 0:
-                str_average = SpinConfig.pretty_print_time(sum(lengths)/len(lengths))
-            else:
-                str_average = '-'
-            str_lengths = string.join(map(SpinConfig.pretty_print_time, lengths), ', ')
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%d</td></tr>' % (name, str_lengths, str_average, num)
-        ret += '</table>'
+        ret = websockets.WebSocketsResource.render(self, request)
+        if ret is server.NOT_DONE_YET:
+            # success - drop the GameProtocol client since it's been swapped to WS_GAMEAPI_Protocol
+            old_protocol.site.lostClient(old_protocol)
+            old_protocol.site.active_requests.discard(request)
         return ret
-
-    def get_payments(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
-        for props in reversed(self.last_payments):
-            elapsed = server_time - props['time']
-            ret += '<tr><td>%s</td><td>%d</td><td>$%0.2f</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
-                                                                       props['user_id'],
-                                                                       props['dollar_amount'],
-                                                                       props['description'])
-        ret += '</table>'
-        return ret
-
-    def get_gamebucks(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Time ago</td><td>User ID</td><td>Amount</td><td>Description</td></tr>'
-        for props in reversed(self.last_gamebucks):
-            elapsed = server_time - props['time']
-            ret += '<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (SpinConfig.pretty_print_time(elapsed),
-                                                                       props['user_id'],
-                                                                       props['gamebucks_amount'],
-                                                                       props['description'])
-        ret += '</table>'
-        return ret
-
-    def get_load(self):
-        if 'ALL' in self.latency:
-            return self.latency['ALL']['total'] / max(1, float(server_time - self.start_time))
-        else:
-            return -1
-
-    def get_latency(self):
-        ret = ''
-
-        if 'ALL' in self.latency:
-            ret += 'Approximate unhalted load: <b>%.1f%%</b><br>' % (100.0*self.get_load())
-            ret += 'Average request latency: <b>%.1f ms</b><p>' % ((1000.0*self.latency['ALL']['total'])/self.latency['ALL']['N'])
-
-        def sort_by_max(kv): return -kv[1]['max']
-        def sort_by_average(kv): return -kv[1]['total']/kv[1]['N']
-        def sort_by_total(kv): return -kv[1]['total']
-
-        grand_total = sum([data['total'] for name, data in self.latency.iteritems() if name != 'ALL'])
-
-        for sort_name, sort_func in {'Max': sort_by_max, 'Avg': sort_by_average, 'Total': sort_by_total}.iteritems():
-            ret += '<p>Sort by %s<br>' % sort_name
-            ret += '<table border="1" cellspacing="1">'
-            ret += '<tr><td>Request</td><td>Average</td><td>Max</td><td>Total</td><td>Total %</td><td>#Calls</td></tr>'
-            ls = self.latency.items()
-            ls.sort(key = sort_func)
-            for name, data in ls[0:25]:
-                ret += '<tr><td>%s</td><td>%.1f ms</td><td>%.1f ms</td><td>%.1f s</td><td>%.1f%%</td><td>%d</td></tr>' % \
-                       (name, 1000.0*data['total']/data['N'],
-                        1000.0*data['max'],
-                        data['total'],
-                        (100.0*data['total']/grand_total) if grand_total != 0 else 0,
-                        int(data['N'])
-                        )
-            ret += '</table>'
-
-        quarry_total = self.quarry_cache_misses + self.quarry_cache_hits
-        if quarry_total > 0:
-            ret += '<p>Quarry cache hit rate: <b>%.1f%%</b><br>' % (100*self.quarry_cache_hits/float(quarry_total))
-        return ret
-
-    def get_econ(self):
-        ret = '<table border="1" cellspacing="1">'
-        ret += '<tr><td>Category</td><td>Reason</td><td>Amount</td><td>%</td></tr>'
-        cat_totals = {}
-        cat_totals = dict([(category, sum(self.econ[category].itervalues())) for category in self.econ.iterkeys()])
-        grand_total = sum(cat_totals.itervalues())
-        abs_total = sum([abs(x) for x in cat_totals.itervalues()])
-
-        def big_number(x):
-            return '%.3fM' % (x/1000000.0)
-
-        for cat, data in sorted(self.econ.items()):
-            cat_ratio = cat_totals[cat]/float(abs_total) if (abs_total != 0) else 0
-            ret += '<tr><td><b>%s</b></td><td>%s</td><td><b>%s</b></td><td><b>%.1f%%</b></td></tr>' % (cat, '', big_number(cat_totals[cat]), 100.0*cat_ratio)
-            for reason, amount in sorted(data.items()):
-                ratio = amount/float(cat_totals[cat]) if (cat_totals[cat] != 0) else 0
-                ret += '<tr><td></td><td>%s</td><td>%s</td><td>%.1f%%</td></tr>' % (reason, big_number(amount), 100.0*ratio)
-
-        ret += '<tr><td><b>TOTAL</b></td><td></td><td>%s</td><td>-</td></tr>' % big_number(grand_total)
-        ret += '</table>'
-        return ret
-
-admin_stats = AdminStats()
-
 
 class AdminResource(resource.Resource):
     isLeaf = True
     def render(self, request):
         # do not return a revealing error message on exceptions
-        try:
-            return resource.Resource.render(self, request)
-        except:
-            gamesite.exception_log.event(server_time, 'ADMIN Exception: ' + traceback.format_exc())
-        return 'spinpunch error'
+        ret = catch_all('ADMIN')(resource.Resource.render)(self, request)
+        if ret is None:
+            request.setResponseCode(http.BAD_REQUEST)
+            ret = 'spinpunch error'
+        return ret
+
     def revenue_image(self):
         rev = admin_stats.revenue
         src = 'http://s3.amazonaws.com/'+SpinConfig.config['public_s3_bucket']+'/'
@@ -26849,20 +27619,14 @@ class AdminResource(resource.Resource):
             src += 'revenue0.jpg'
         return '<div style="position:absolute; top:50px;right:30px;"><img src="%s" border="0"></div>' % src
 
+    @admin_stats.measure_latency('ADMIN')
     def render_GET(self, request):
-        start_time = time.time()
-        ret = self.do_render_GET(request)
-        end_time = time.time()
-        admin_stats.record_latency('ADMIN', end_time-start_time)
-        return ret
-
-    def do_render_GET(self, request):
         update_server_time()
 
         # protect with auth
-        if (not SpinGoogleAuth.twisted_request_is_local(request)):
-            if spin_secure_mode and (not SpinGoogleAuth.twisted_request_is_ssl(request)): return 'must use HTTPS'
-            auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time)
+        if (not SpinGoogleAuth.twisted_request_is_local(request, proxy_secret = SpinConfig.config['proxy_api_secret'])):
+            if spin_secure_mode and (not SpinHTTP.twisted_request_is_ssl(request, proxy_secret = SpinConfig.config['proxy_api_secret'])): return 'must use HTTPS'
+            auth_info = SpinGoogleAuth.twisted_do_auth(request, 'ADMIN', server_time, proxy_secret = SpinConfig.config['proxy_api_secret'])
             if not auth_info['ok']:
                 if 'redirect' in auth_info:
                     return str(auth_info['redirect'])
@@ -26935,7 +27699,7 @@ class AdminResource(resource.Resource):
             link = urllib.urlencode(props)
             return '<a href="?%s">%s</a>' % (link, text)
 
-        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
+        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Async</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
 
         # sort by money spent, then player level
         sort_by = request.args['sort'][0] if ('sort' in request.args) else 'default'
@@ -26959,7 +27723,7 @@ class AdminResource(resource.Resource):
             user_link = '<a href="http://apps.facebook.com/'+SpinConfig.config['facebook_app_namespace']+'/?visit_base='+user+'">'+user+'</a>'
             name = session.user.get_ui_name(session.player)
             if session.user.facebook_id:
-                name = '<a href="http://www.facebook.com/'+session.user.facebook_id+'/">'+name+'</a>'
+                name = '<a href="https://www.facebook.com/'+session.user.facebook_id+'/">'+name+'</a>'
 
             country = session.user.country + (' (%d)' % SpinConfig.country_tier_map.get(session.user.country, 4))
 
@@ -26974,12 +27738,16 @@ class AdminResource(resource.Resource):
                 campaign = 'unknown'
             acct_age = 'unk' if (session.player.creation_time < 0) else '%0.1f' % ((server_time - session.player.creation_time)/86400.0)
             active = SpinConfig.pretty_print_time(session.last_active_time - session.login_time)
+            if len(session.async_ds) + len(session.after_async) > 0:
+                async = '%d,%d' % (len(session.async_ds), len(session.after_async))
+            else:
+                async = ''
             last_active = SpinConfig.pretty_print_time(server_time - session.last_active_time)
 
             action = []
             for act in reversed(session.last_action):
-                s = '%s (%ds)' % (act[0], server_time-act[1])
-                if not act[2]:
+                s = '%s (%ds)' % (act['tag'], server_time-act['time'])
+                if not act['keepalive']:
                     s = '<font color="#a0a0a0">'+s+'</font>'
                 action.append(s)
             action = '<font size="-2">'+string.join(action, '<br>')+'</font>'
@@ -26988,7 +27756,7 @@ class AdminResource(resource.Resource):
             tutorial = tutorial[0:1]
             if tutorial != "C":
                 tutorial = make_red(tutorial)
-            if session.player.resources.protection_end_time >= server_time:
+            if session.player.has_damage_protection():
                 protect = make_blue(SpinConfig.pretty_print_time(session.player.resources.protection_end_time - server_time))
             else:
                 protect = ''
@@ -27028,7 +27796,7 @@ class AdminResource(resource.Resource):
                 spend = '<b>$%.2f</b>' % spend
             else:
                 spend = '$%.2f' % spend
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
 
         ret += '</table><p>'
 
@@ -27135,7 +27903,6 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     root.putChild("TRIALPAYAPI",trialpayapi)
     root.putChild("XSAPI",xsapi)
     root.putChild("KGAPI",KGAPI(gameapi))
-    root.putChild("METRICSAPI",METRICSAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)
     root.putChild("OGPAPI",OGPAPI_instance)
     root.putChild("ADMIN",ADMINAPI_instance)
@@ -27158,16 +27925,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
         cherrypy.engine.start()
         reactor.addSystemEventTrigger('after', 'shutdown', cherrypy.engine.exit)
 
-    backlog = gamedata['server'].get('tcp_accept_backlog', 4000)
-
-    reactor.listenTCP(config.game_http_port, gamesite, interface=config.game_listen_host, backlog=backlog)
-
-    if config.game_ssl_port > 0:
-        reactor.listenSSL(config.game_ssl_port, gamesite,
-                          SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
-                                                                SpinConfig.config['ssl_crt_file'],
-                                                                certificateChainFile=SpinConfig.config['ssl_chain_file']),
-                          interface=config.game_listen_host, backlog=backlog)
+    gamesite.start_listening()
 
     print 'Game server up and running on %s:%d (HTTP)%s%s%s' % (config.game_host, config.game_http_port,
                                                                 (' :%d (SSL)' % config.game_ssl_port) if config.game_ssl_port > 0 else '',
@@ -27203,7 +27961,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     if do_ai_setup:
         # have to do this after the loop starts, because we need to wait for io_system to be fully alive
-        reactor.callLater(0.1, do_account_setup)
+        reactor.callLater(0, do_account_setup)
 
     TwistedLatency.setup(reactor, admin_stats.record_latency)
 

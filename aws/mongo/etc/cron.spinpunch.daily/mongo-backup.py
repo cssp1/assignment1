@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
                 os.chdir(mydir)
             if verbose: print 'dumping', database, 'to', mydir, '...'
             if not dry_run:
-                subprocess.check_call([mongo_cmd[0]+'dump']+mongo_cmd[1:]+['--authenticationDatabase','admin',
+                subprocess.check_call([mongo_cmd[0]+'dump']+mongo_cmd[1:]+['--authenticationDatabase','admin','--quiet',
                                                                            '-d', database,
                                                                            '-o', '.'], stdout=open('/dev/null','w'))
 

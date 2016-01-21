@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -10,10 +10,10 @@
 
     "log_machine_stats": false,
     "machine_stats_interval": 600, // number of seconds between metric reports of server memory/CPU/disk stats
-    "session_timeout": 600, // number of seconds after which an idle session is automatically closed by the server
+    "session_timeout": 1200, // number of seconds after which an idle session is automatically closed by the server
     "player_lock_timeout": 600, // number of seconds after which login/attack locks on players are treated as invalid
-    "absolute_session_timeout": 36000, // never let a session go longer than this (a few hours) to avoid abuse
-    "initial_session_timeout": 240, // number of seconds after which to terminate an idle session when no activity happens after login
+    "absolute_session_timeout": 43200, // never let a session go longer than this (a few hours) to avoid abuse
+    "initial_session_timeout": 300, // number of seconds after which to terminate an idle session when no activity happens after login
     "session_signature_time_tolerance": 300, // how many seconds out of date a session signature is allowed to be
     // (this also controls for how long the gameserver remembers session invalidations sent from proxyserver to CONTROLAPI)
 
@@ -25,6 +25,8 @@
         "ioslave": { "max_in_flight": 50 },
         "s3": { "max_in_flight": 150 }
     },
+
+    "log_nosql": 1, // log detail level for NoSQL messages
 
     "log_abnormal_logins": 1, // log overlapped/cancelled logins (0 = off, 1 = log most serious conditions, 2 = log all conditions)
 
@@ -39,15 +41,6 @@
     // retry_delay = seconds to wait before retrying a failed request
     "AsyncHTTP_metrics": { "concurrent_request_limit": 50, "total_request_limit": 200, "request_timeout": 15, "max_tries": 5, "retry_delay": 10.0 },
     "AsyncHTTP_Facebook": { "concurrent_request_limit": 50, "total_request_limit": 200, "request_timeout": 30, "max_tries": 2, "retry_delay": 5.0 },
-    "AsyncHTTP_S3": { "concurrent_request_limit": -1, "total_request_limit": -1, "request_timeout": 30,
-                      "max_tries": 10, "retry_delay": 2.0,
-
-                      // wait this many seconds after the actual HTTP response before returning success from an async write
-                      // this is necessary to deal with S3's "eventual consistency" model, so that player files don't get
-                      // over-written with old data when being attacked immediately after logging out
-                      // need to keep it as low as possible, because it adds directly to complete_attack() latency
-                      "post_write_delay": 5.0
-                    },
 
     "use_http_keep_alive": true, // whether or not to allow persistent (HTTP/1.1 Connection: keep-alive) connections to GAMEAPI
 
@@ -92,8 +85,6 @@
     "chat_memory": 30, // number of recent chat messages to send to newly-joined clients (per channel)
     "chat_alliance_logins": false, // whether to shout alliance member logins to chat
     "chat_alliance_membership": true, // whether to shout alliance leave/join messages to chat
-
-    "query_lock_state_on_spy": true, // ping dbserver upon Spying to get current lock state to show client
 
     "log_controlapi": false, // log CONTROLAPI IPC calls
 
@@ -215,10 +206,12 @@
     "anti_bullying_in_ladder": false, // deactivate anti-bullying log in ladder battles
 
     "idle_check": {
-        "enable_if": { "predicate": "ALWAYS_FALSE" },
-        "interval": 14400, // check every 4 hours
+        "enforce": 1, // allow PolicyBot to take action
+        "enable_if": {"predicate": "TIME_IN_GAME", "seconds": 201600, "within_last": 604800}, // logged in at least 33% of the time for the last week
+        "keep_history_for": 604800, // keep 1 week of success/fail history
+        "interval": 28800, // check every 8 hours
         "max_tries": 3, // allow this many incorrect answers before failing
-        "timeout": 60, // time limit for response
+        "timeout": 300, // time limit for response
         "max_timeouts": 2 // allow this many timeouts before failing
     },
 
@@ -230,7 +223,6 @@
     "log_fbpayments": 1, // log intensity for FB Payments API
     "log_fb_open_graph": false, // write FB open graph HTTP interaction to exceptions.txt
     "log_fb_achievements": false, // write FB Achievements API interaction to exceptions.txt
-    "log_purchase_ui": true, // write purchase_ui events to purchase_ui_log
 
     "log_ladder_pvp": 1, // log intensity level for ladder PvP activity
 

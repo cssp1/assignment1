@@ -1,4 +1,4 @@
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -50,7 +50,7 @@ class PlayerHistoryConsequent(Consequent):
         self.key = key
 
         # if "value" starts with "$" then it's a reference to a context variable
-        if type(value) in (str,unicode) and len(value) >= 1 and value[0] == '$':
+        if isinstance(value, basestring) and len(value) >= 1 and value[0] == '$':
             self.value = None
             self.value_from_context = value[1:]
         else: # otherwise it's a literal value
@@ -58,6 +58,8 @@ class PlayerHistoryConsequent(Consequent):
             self.value_from_context = None
 
         self.method = method
+        self.time_series = data.get('time_series', True)
+
     def execute(self, session, player, retmsg, context=None):
         if self.value_from_context:
             if context and (self.value_from_context in context):
@@ -68,11 +70,11 @@ class PlayerHistoryConsequent(Consequent):
             new_value = self.value
 
         if self.method == 'max':
-            session.deferred_history_update |= session.setmax_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setmax_player_metric(self.key, new_value, time_series = self.time_series)
         elif self.method == 'set':
-            session.deferred_history_update |= session.setvalue_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.setvalue_player_metric(self.key, new_value, time_series = self.time_series)
         elif self.method == 'increment':
-            session.deferred_history_update |= session.increment_player_metric(self.key, new_value)
+            session.deferred_history_update |= session.increment_player_metric(self.key, new_value, time_series = self.time_series)
         else:
             raise Exception('unknown method '+self.method)
 
@@ -97,15 +99,33 @@ class MetricEventConsequent(Consequent):
             if session.sent_metrics.get(self.tag, False):
                 return # already sent
             session.sent_metrics[self.tag] = True
+
+        # prepare properties
         props = copy.deepcopy(self.props)
-        for k in props.iterkeys():
-            # context variable
-            if type(props[k]) in (str,unicode) and len(props[k]) >= 1 and props[k][0] == '$':
+        for k in props.keys():
+            # special cases
+
+            # grab a piece of data off an aura
+            if isinstance(props[k], dict) and '$aura_data' in props[k]:
+                aura_specname = props[k]['$aura_data']['spec']
+                aura_dataname = props[k]['$aura_data']['data']
+                aura = None
+                for a in player.player_auras:
+                    if a['spec'] == aura_specname:
+                        aura = a; break
+                if aura:
+                    props[k] = aura.get('data', {}).get(aura_dataname)
+                else:
+                    del props[k] # silently drop the property
+
+            # context variables
+            elif isinstance(props[k], basestring) and len(props[k]) >= 1 and props[k][0] == '$':
                 context_key = props[k][1:]
                 if context and (context_key in context):
                     props[k] = context[context_key]
                 else:
                     del props[k]
+
         if self.summary_key:
             props[self.summary_key] = player.get_denormalized_summary_props('brief')
         session.metric_event_coded(player, self.event_name, props)
@@ -115,8 +135,9 @@ class SpawnSecurityTeamConsequent(Consequent):
         Consequent.__init__(self, data)
         self.units = data['units']
         self.spread = data.get('spread',-1)
+        self.persist = data.get('persist',False)
     def execute(self, session, player, retmsg, context=None):
-        session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread)
+        session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist)
 
 class DisplayMessageConsequent(Consequent):
     def __init__(self, data):
@@ -200,6 +221,7 @@ class GiveLootConsequent(Consequent):
         self.item_duration = data.get('item_duration', -1)
         self.item_expire_at = data.get('item_expire_at', -1)
         self.force_send_by_mail = data.get('force_send_by_mail', False)
+        self.show_items_discovered = data.get('show_items_discovered', False)
     def execute(self, session, player, retmsg, context=None):
         reason = context.get('loot_reason', self.reason) if context else self.reason
         assert reason
@@ -209,7 +231,8 @@ class GiveLootConsequent(Consequent):
                           reason_id = reason_id,
                           mail_template = mail_template,
                           item_duration = self.item_duration, item_expire_at = self.item_expire_at,
-                          force_send_by_mail = self.force_send_by_mail)
+                          force_send_by_mail = self.force_send_by_mail,
+                          show_items_discovered = self.show_items_discovered)
 
 class GiveTrophiesConsequent(Consequent):
     def __init__(self, data):
@@ -249,8 +272,10 @@ class ApplyAuraConsequent(Consequent):
         Consequent.__init__(self, data)
         self.name = data['aura_name']
         self.duration = data.get('aura_duration',-1)
+        self.duration_from_event = data.get('aura_duration_from_event', None)
         self.strength = data.get('aura_strength',1)
         self.level = data.get('aura_level',1)
+        self.aura_data = data.get('aura_data', None)
         self.stack = data.get('stack',-1)
         self.stack_decay = data.get('stack_decay', None)
         if self.stack_decay:
@@ -269,6 +294,16 @@ class ApplyAuraConsequent(Consequent):
         stack = -1
         duration = self.duration
 
+        if self.duration_from_event:
+            event_kind = self.duration_from_event.get('event_kind', 'current_event')
+            event_name = self.duration_from_event.get('event_name', None)
+            neg_time_to_end = player.get_event_time(event_kind, event_name, 'end', ignore_activation = True)
+            if neg_time_to_end is None or (-neg_time_to_end) < 0: # event not happening?
+                return
+            else:
+                togo = -neg_time_to_end
+                duration = togo if (duration < 0) else min(duration, togo)
+
         if self.stack > 0:
             stack = self.stack
             if self.stack_decay:
@@ -286,7 +321,14 @@ class ApplyAuraConsequent(Consequent):
                 # override with the context value
                 stack = context.get(self.stack_from_context, stack)
 
-        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, ignore_limit = True):
+        if self.aura_data:
+            instance_data = copy.deepcopy(self.aura_data)
+            for k in instance_data.keys():
+                if instance_data[k] == '$duration': # dynamic replacement
+                    instance_data[k] = duration
+        else:
+            instance_data = None
+        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True):
             session.player.stattab.send_update(session, retmsg)
             spec = session.player.get_abtest_aura(self.name)
             if ('on_apply' in spec):
@@ -579,6 +621,8 @@ def read_consequent(data):
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)
-    elif kind in ('INVOKE_UPGRADE_DIALOG','INVOKE_BLUEPRINT_CONGRATS','START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI'): return ClientConsequent(data)
+    elif kind in ('INVOKE_UPGRADE_DIALOG','INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','INVOKE_LOTTERY_DIALOG',
+                  'INVOKE_OFFER_CHOICE',
+                  'START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI'): return ClientConsequent(data)
     else:
         raise Exception('unknown consequent '+kind)

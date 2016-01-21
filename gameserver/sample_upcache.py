@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -17,7 +17,7 @@ import SpinConfig
 import sys, time, calendar
 import csv
 
-# load SpinPunch Upcache S3 access library
+# load Upcache S3 access library
 import SpinS3, SpinUpcacheIO
 
 # load gamedata so we can reference it if necessary

@@ -2,19 +2,25 @@
 # XXX enable manually 0 7 * * * ec2-user run-parts /etc/cron.spinpunch.daily
 # XXX enable manually 0 7 * * * ec2-user run-parts /etc/cron.spinpunch.skynet-daily
 
-# run daily SQL ETL scripts at 0800 UTC for lowest latency before North American workday starts (~1300 UTC)
-# XXX enable manually 0 8 * * * ec2-user run-parts /etc/cron.spinpunch.mysql-daily
-# run hourly SQL ETL scripts
-# XXX enable manually 0 * * * * ec2-user run-parts /etc/cron.spinpunch.mysql-hourly
+# run daily SQL ETL scripts at 0801 UTC for lowest latency before North American workday starts (~1300 UTC)
+# XXX enable manually 1 8 * * * ec2-user run-parts /etc/cron.spinpunch.mysql-daily
+
+# run hourly SQL ETL scripts at xx02 UTC
+# XXX enable manually 2 * * * * ec2-user run-parts /etc/cron.spinpunch.mysql-hourly
+
+# run weekly SQL (backup) scripts at 0700 UTC Sundays
+# XXX enable manually 0 7 * * Sun ec2-user run-parts /etc/cron.spinpunch.mysql-weekly
 
 # run skynet adstat recorder hourly
 # leave	some time after the hour boundary for facebook to catch	up...
 # XXX enable manually 35 * * * * ec2-user run-parts /etc/cron.spinpunch.skynet-hourly
 
 # run metrics cache updates
-
 # every other hour at 0:05, 2:05, 4:05, ...
 # XXX enable manually 5 0,2,4,6,8,10,12,14,16,18,20,22 * * * ec2-user run-parts /etc/cron.spinpunch.highfreq
+
+# run chat monitor every 15 minutes
+0,15,30,45 * * * * ec2-user run-parts /etc/cron.spinpunch.chat
 
 # send memory statistics to CloudWatch every minute
 * * * * * ec2-user /usr/local/bin/ec2-send-memory-metrics.py

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -17,6 +17,7 @@ import SpinSQLUtil
 import SpinParallel
 import SpinSingletonProcess
 import MySQLdb
+from abtests_to_sql import abtests_schema
 
 def field_column(key, val):
     return "`%s` %s" % (key, val)
@@ -256,6 +257,9 @@ def do_slave(input):
         # accumulate batch totals for resource levels
         resource_levels = {}
 
+        # accumulate A/B test updates
+        abtest_memberships = {}
+
         def flush():
             con.commit() # commit other tables first
 
@@ -309,6 +313,25 @@ def do_slave(input):
                                     [(time_now,) + k + tuple(v) + tuple(v) for k,v in resource_levels.iteritems()])
                     con.commit()
                     resource_levels.clear() # clear accumulator
+                    break
+                except MySQLdb.OperationalError as e:
+                    if e.args[0] == 1213: # deadlock
+                        con.rollback()
+                        deadlocks += 1
+                        continue
+                    else:
+                        raise
+
+            while len(abtest_memberships) > 0:
+                try:
+                    cur.executemany("INSERT INTO "+sql_util.sym(input['abtests_table']) + \
+                                    " (user_id, test_name, group_name, join_time) " + \
+                                    " VALUES (%s, %s, %s, %s) " + \
+                                    " ON DUPLICATE KEY UPDATE group_name = %s, join_time = %s",
+                                    # note: "k" is (user_id, test_name, "v" is (group_name, join_time)
+                                    [k + v + v for k,v in abtest_memberships.iteritems()])
+                    con.commit()
+                    abtest_memberships.clear() # clear accumulator
                     break
                 except MySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
@@ -516,6 +539,12 @@ def do_slave(input):
                 for res in gamedata['resources']:
                     update_resource_levels_entry(res, user.get(res, 0))
 
+            # current A/B test memberships
+            for test_name in gamedata['abtests']:
+                if test_name in user:
+                    group_name = user[test_name]
+                    abtest_memberships[(user_id, test_name)] = (group_name, -1)
+
             batch += 1
             total += 1
             if input['commit_interval'] > 0 and batch >= input['commit_interval']:
@@ -627,6 +656,7 @@ if __name__ == '__main__':
             alts_table = cfg['table_prefix']+game_id+'_alt_accounts'
             army_composition_table = cfg['table_prefix']+game_id+'_active_player_army_composition'
             resource_levels_table = cfg['table_prefix']+game_id+'_active_player_resource_levels'
+            abtests_table = cfg['table_prefix']+game_id+'_abtests'
 
             # these are the tables that are replaced entirely each run
             atomic_tables = [upcache_table,facebook_campaign_map_table] + \
@@ -653,6 +683,8 @@ if __name__ == '__main__':
                                                   ('to', 'VARCHAR(64)')]})
             sql_util.do_insert_batch(cur, facebook_campaign_map_table+'_temp',
                                      [[('from',k),('to',v)] for k,v in SpinUpcache.FACEBOOK_CAMPAIGN_MAP.iteritems()])
+
+            sql_util.ensure_table(cur, abtests_table, abtests_schema)
 
             sorted_field_names = sorted(fields.keys())
 
@@ -749,6 +781,7 @@ if __name__ == '__main__':
                           'activity_table': activity_table+'_temp',
                           'do_army_composition': do_army_composition, 'army_composition_table': army_composition_table,
                           'do_resource_levels': do_resource_levels, 'resource_levels_table': resource_levels_table,
+                          'abtests_table': abtests_table,
                           'mode':'get_rows', 'sorted_field_names':sorted_field_names,
                           'segnum':segnum,
                           'commit_interval':commit_interval, 'verbose':verbose, 'use_local':use_local,

@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -34,4 +34,22 @@
     //   { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 }
     //  ] }
     // },
+
+    {"name": "flash_sale", "recurring": 1, // display more than once
+     "image": "20150721_personal_sale_gold2.jpg",
+     "event_countdown_hack": {
+         "enable": 1,
+         "aura_name": "flash_sale",
+         "ui_name": "Sale ends in: %s",
+         "time_precision": 4, "spell_time_units": 1, "realtime": 1,
+         "xy": [45,387], "dimensions": [341, 25], "text_size": 20, "text_hjustify": "left"
+     },
+     "understood_button_xy": [590,387],
+     "understood_button_ui_name": "Buy Gold Now",
+     "understood_button_consequent": { "consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG", "reason": "flash_sale_login_tip" },
+     "show_if": { "predicate": "AND", "subpredicates": [
+         {"predicate": "ALWAYS_FALSE"} // triggered by sale activation consequent
+         // optionally, could appear on each login using {"predicate": "AURA_ACTIVE", "aura_name": "flash_sale"}
+     ] }
+    }
 ]

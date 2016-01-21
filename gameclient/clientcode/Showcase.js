@@ -1,6 +1,6 @@
 goog.provide('Showcase');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -81,7 +81,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         ItemDisplay.set_inventory_item_asset(dialog.widgets['corner_token'], token_item_spec);
 
         // create a fake token item for use by the tooltip
-        var force_expire_by = (eval_cond_or_literal(token_item_spec['force_expire_by'] || -1, player, null) || -1);
+        var force_expire_by = session.get_item_spec_forced_expiration(token_item_spec);
         var token_item = {'spec': hack['token_item'], 'expire_time': force_expire_by};
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['corner_token'], token_item);
 
@@ -323,19 +323,30 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             dialog.data['widgets']['plus_text']['ui_name_more'] +'[/sku][/u][/color]';
         Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['plus_text'], plus_str, null, bbcode_click_handlers, plus_and_more);
 
-        var sales = Showcase.collect_active_sales_data({'name':'', 'skus':gamedata['store']['catalog']});
-        if(sales.length > 0) {
-            var sale_str_list = [];
-            var link_color = SPUI.make_colorv(dialog.data['widgets']['sale_text']['link_color']).hex();
-            for(var i = 0; i < sales.length; i++) {
-                sale_str_list.push('[color=#'+link_color+'][u][sku=' + sales[i]['path'] + ']' + sales[i]['ui_name'] + '[/sku][/u][/color]');
+        var show_active_sales = true;
+
+        if(hack['ui_final_reward_title_bbcode']) {
+            var s = eval_cond_or_literal(hack['ui_final_reward_title_bbcode'],player,null);
+            if(s && goog.array.contains(s.toLowerCase().split(' '), "sale")) { // XXX hack
+                show_active_sales = false;
             }
-            var sale_str = sale_str_list.join(', ');
-            if(sale_str.length > 0) {
-                dialog.widgets['sale_label'].show = dialog.widgets['sale_text'].show = true;
-                var sale_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
-                    dialog.data['widgets']['sale_text']['ui_name_more'] +'[/sku][/u][/color]';
-                Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['sale_text'], sale_str, null, bbcode_click_handlers, sale_and_more);
+        }
+
+        if(show_active_sales) {
+            var sales = Showcase.collect_active_sales_data({'name':'', 'skus':gamedata['store']['catalog']});
+            if(sales.length > 0) {
+                var sale_str_list = [];
+                var link_color = SPUI.make_colorv(dialog.data['widgets']['sale_text']['link_color']).hex();
+                for(var i = 0; i < sales.length; i++) {
+                    sale_str_list.push('[color=#'+link_color+'][u][sku=' + sales[i]['path'] + ']' + sales[i]['ui_name'] + '[/sku][/u][/color]');
+                }
+                var sale_str = sale_str_list.join(', ');
+                if(sale_str.length > 0) {
+                    dialog.widgets['sale_label'].show = dialog.widgets['sale_text'].show = true;
+                    var sale_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
+                        dialog.data['widgets']['sale_text']['ui_name_more'] +'[/sku][/u][/color]';
+                    Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['sale_text'], sale_str, null, bbcode_click_handlers, sale_and_more);
+                }
             }
         }
     }
@@ -656,16 +667,23 @@ Showcase.collect_active_sales_data = function(sku, path) {
             //sales = sales.concat();
         });
         return sales;
-    } else if (('item' in sku) && ('ui_banner' in sku) && (eval_cond_or_literal(sku['ui_banner'], player, null)||'').toUpperCase().indexOf('SALE') != -1) {
+    } else if (('item' in sku) && ('ui_banner' in sku) && (eval_cond_or_literal(sku['ui_banner'], player, null)||'').toUpperCase().indexOf("SALE") != -1) {
         if(!(read_predicate(sku['show_if']).is_satisfied(player, null))) { return []; }
         var sale = {'path': path + sku['item']};
-        if('ui_name' in sku) {
-            sale['ui_name'] = ''+sku['ui_name'];
-            while(sale['ui_name'].indexOf('\n') != -1) { // get rid of newlines
-                sale['ui_name'] = sale['ui_name'].replace('\n', ' ');
+        var item_ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(sku['item']));
+        var sale_ui_name = null;
+        if('ui_name' in sku) { // SKU has a name override
+            sale_ui_name = ''+sku['ui_name'];
+            while(sale_ui_name.indexOf('\n') != -1) { // get rid of newlines
+                sale_ui_name = sale_ui_name.replace('\n', ' ');
             }
+        }
+        // SKU name overrides item name
+        // but, special case - if the SKU name is too long to fit the dialog, and the item name is shorter, then use the item name
+        if(sale_ui_name && ((sale_ui_name.length < item_ui_name.length) || sale_ui_name.length < 33)) {
+            sale['ui_name'] = sale_ui_name;
         } else {
-            sale['ui_name'] = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(sku['item']));
+            sale['ui_name'] = item_ui_name;
         }
         return [sale];
     }

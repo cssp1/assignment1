@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -117,8 +117,10 @@ if __name__ == '__main__':
                 if 'count' in row:
                     keyvals.append(('stack',row['count']))
             elif row['event_name'] == '4701_change_region_success':
-                if row.get('reason',None) in ('player_request','CustomerSupport'): # only include player- and PCHECK-initiated changes
+                if row.get('reason',None) in ('player_request',): # only include player-initiated changes
                     keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
+                else:
+                    continue # do not dump "involuntary" region changes to SQL
             elif row['event_name'] == '4702_region_close_notified':
                 keyvals.append(('spec',row.get('region',None))) # stick the region name in the 'spec' column
 
@@ -142,6 +144,16 @@ if __name__ == '__main__':
 
             elif row['event_name'] == '6000_reacquisition_gift_sent':
                 keyvals.append(('spec', row['gift']))
+
+            elif row['event_name'] == '5141_dp_cancel_aura_acquired':
+                keyvals.append(('spec', row['aura_name']))
+                keyvals.append(('stack', int(100*row['aura_strength'])))
+            elif row['event_name'] == '5142_dp_cancel_aura_ended':
+                keyvals.append(('spec', row['aura_name']))
+                keyvals.append(('stack', row['start_time']))
+
+            elif row['event_name'] == '4461_promo_warehouse_upgrade':
+                keyvals.append(('stack', row['level']))
 
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',

@@ -2,9 +2,14 @@
 
 # script that runs on the cloud node
 
+# IAM key for this host, passed by setup-here-*.sh
+AWSCRED_KEYID=$1
+AWSCRED_SECRET=$2
+AWS_CRON_SNS_TOPIC=$3
+
 # stop SSH brute-force attacks
 echo "SETUP(remote): Setting up fail2ban..."
-sudo yum install fail2ban
+sudo yum -y install fail2ban
 sudo sh -c '/bin/cat > /etc/fail2ban/jail.local' <<EOF
 [DEFAULT]
 bantime = 3600
@@ -42,10 +47,42 @@ enabled=1
 EOF
 
 # add mongodb repo address
-sudo sh -c '/bin/cat > /etc/yum.repos.d/mongodb.repo' <<EOF
-[mongodb]
-name=MongoDB Repository
-baseurl=http://downloads-distro.mongodb.org/repo/redhat/os/x86_64/
+sudo sh -c '/bin/cat > /etc/yum.repos.d/mongodb-org-3.2.repo' <<EOF
+[mongodb-org-3.2]
+name=MongoDB Repository (3.2)
+baseurl=https://repo.mongodb.org/yum/amazon/2013.03/mongodb-org/3.2/x86_64/
 gpgcheck=0
 enabled=1
 EOF
+
+# set up ~/.aws/credentials with host's IAM key proper default region
+CUR_REGION=`curl -s http://instance-data/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}'`
+for homedir in /root /home/ec2-user; do
+    sudo mkdir -p "${homedir}/.aws"
+    sudo sh -c "/bin/cat > ${homedir}/.aws/credentials" <<EOF
+[default]
+region = ${CUR_REGION}
+EOF
+    if [ ${AWSCRED_KEYID} != "none" ]; then
+        sudo sh -c "/bin/cat >> ${homedir}/.aws/credentials" <<EOF
+aws_access_key_id = ${AWSCRED_KEYID}
+aws_secret_access_key = ${AWSCRED_SECRET}
+EOF
+    fi
+    sudo sh -c "chmod 0700 ${homedir}/.aws"
+    sudo sh -c "chmod 0600 ${homedir}/.aws/credentials"
+done
+sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
+
+# set up cron-to-sns gateway
+sudo yum -y install python-boto
+sudo install ./cron-mail-to-sns.py /usr/local/bin/cron-mail-to-sns.py
+sudo sh -c "/bin/cat > /etc/sysconfig/crond" <<EOF
+# send cron errors via SNS instead of system mail
+CRONDARGS=" -m '/usr/local/bin/cron-mail-to-sns.py ${AWS_CRON_SNS_TOPIC}'"
+EOF
+
+# install memory-metrics reporting script (may not be enabled, see cron setup)
+sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
+
+

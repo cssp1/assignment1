@@ -24,12 +24,12 @@ goog.provide('goog.events.FileDropHandler.EventType');
 
 goog.require('goog.array');
 goog.require('goog.dom');
-goog.require('goog.events');
 goog.require('goog.events.BrowserEvent');
 goog.require('goog.events.EventHandler');
 goog.require('goog.events.EventTarget');
 goog.require('goog.events.EventType');
 goog.require('goog.log');
+goog.require('goog.log.Level');
 
 
 
@@ -43,13 +43,14 @@ goog.require('goog.log');
  *     area outside the {@code element}. Default false.
  * @constructor
  * @extends {goog.events.EventTarget}
+ * @final
  */
 goog.events.FileDropHandler = function(element, opt_preventDropOutside) {
   goog.events.EventTarget.call(this);
 
   /**
    * Handler for drag/drop events.
-   * @type {!goog.events.EventHandler}
+   * @type {!goog.events.EventHandler<!goog.events.FileDropHandler>}
    * @private
    */
   this.eventHandler_ = new goog.events.EventHandler(this);
@@ -195,7 +196,14 @@ goog.events.FileDropHandler.prototype.onElemDragOver_ = function(e) {
     e.stopPropagation();
     // Allow the drop on the drop zone.
     var dt = e.getBrowserEvent().dataTransfer;
-    dt.effectAllowed = 'all';
+
+    // IE bug #811625 (https://goo.gl/UWuxX0) will throw error SCRIPT65535
+    // when attempting to set property effectAllowed on IE10+.
+    // See more: https://github.com/google/closure-library/issues/485.
+    try {
+      dt.effectAllowed = 'all';
+    } catch (err) {
+    }
     dt.dropEffect = 'copy';
   }
 };

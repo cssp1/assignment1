@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -47,17 +47,19 @@ if __name__ == '__main__':
     game_id = SpinConfig.game()
     commit_interval = 1000
     verbose = True
+    optimize = False
     force = False
     do_reset = False
     do_mongo_drop = False
     dry_run = 0
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['reset','mongo-drop','dry-run','force'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['reset','mongo-drop','optimize','dry-run','force'])
 
     for key, val in opts:
         if key == '-g': game_id = val
         elif key == '-c': commit_interval = int(val)
         elif key == '-q': verbose = False
+        elif key == '--optimize': optimize = True
         elif key == '--mongo-drop': do_mongo_drop = True
         elif key == '--reset': do_reset = True
         elif key == '--dry-run': dry_run = 1
@@ -190,7 +192,7 @@ if __name__ == '__main__':
                         batch.append(keyvals)
                         n_updated += 1
 
-                    if not dry_run:
+                    if (not dry_run) and batch:
                         cur.executemany("SELECT upsert_"+kind+"_score("+','.join(["%s"]*10)+")", [[v for k,v in keyvals2] for keyvals2 in batch])
                         con.commit() # new scores become permanent in SQL
 
@@ -199,8 +201,12 @@ if __name__ == '__main__':
                             print kind, freq, loc, 'updated', n_updated, 'rows', 'mongo_count', mongo_count
 
                     if do_mongo_drop:
-                        # remove historical data (earlier than N-1) from Mongo
-                        if loc < now_time_coords[freq]-1: # maybe change to earlier than N?
+                        # remove historical data (earlier than this time period minus keep_history) from Mongo
+                        keep_history = {Scores2.FREQ_ALL: 0,
+                                        Scores2.FREQ_SEASON: 1, # keep last season
+                                        Scores2.FREQ_WEEK: 2 # keep last TWO weeks
+                                        }[freq]
+                        if loc < now_time_coords[freq] - keep_history:
 
                             # THIS DOES NOT FIX THE RACE CONDITION, but it's close enough that I wouldn't worry about it.
                             if mongo_scores._scores2_get_stats_for_time(kind, freq, loc, mtime_gte = sql_last_mtime).count() != mongo_count:
@@ -209,7 +215,7 @@ if __name__ == '__main__':
                             else:
                                 if verbose: print kind, freq, loc, 'dropping from MongoDB'
                                 if not dry_run: mongo_scores._scores2_drop_stats_for_time(kind, freq, loc)
-            if not dry_run:
+            if not dry_run and optimize:
                 old = con.isolation_level
                 con.set_isolation_level(0)
                 try:

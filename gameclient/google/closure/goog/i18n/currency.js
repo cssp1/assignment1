@@ -267,7 +267,7 @@ goog.i18n.currency.adjustPrecision = function(pattern, currencyCode) {
  * 18: two decimals precision (2), currency sign last (16), no space (0)
  * 50: two decimals precision (2), currency sign last (16), space (32)
  *
- * @type {!Object.<!Array>}
+ * @const {!Object<!Array<?>>}
  */
 goog.i18n.currency.CurrencyInfo = {
   'AED': [2, 'dh', '\u062f.\u0625.', 'DH'],
@@ -284,7 +284,7 @@ goog.i18n.currency.CurrencyInfo = {
   'COP': [0, '$', 'COL$'],
   'CRC': [0, '\u20a1', 'CR\u20a1'],
   'CZK': [50, 'K\u010d', 'K\u010d'],
-  'DKK': [18, 'kr', 'kr'],
+  'DKK': [50, 'kr.', 'kr.'],
   'DOP': [2, '$', 'RD$'],
   'EGP': [2, '£', 'LE'],
   'ETB': [2, 'Birr', 'Birr'],
@@ -303,8 +303,8 @@ goog.i18n.currency.CurrencyInfo = {
   'KRW': [0, '\u20A9', 'KR₩'],
   'LKR': [2, 'Rs', 'SLRs'],
   'LTL': [2, 'Lt', 'Lt'],
-  'LVL': [2, 'Ls', 'Ls'],
   'MNT': [0, '\u20AE', 'MN₮'],
+  'MVR': [2, 'Rf', 'MVR'],
   'MXN': [2, '$', 'Mex$'],
   'MYR': [2, 'RM', 'RM'],
   'NOK': [50, 'kr', 'NOkr'],
@@ -325,7 +325,7 @@ goog.i18n.currency.CurrencyInfo = {
   'TZS': [0, 'TSh', 'TSh'],
   'UAH': [2, '\u20B4', 'UAH'],
   'USD': [2, '$', 'US$'],
-  'UYU': [2, '$', 'UY$'],
+  'UYU': [2, '$', '$U'],
   'VND': [0, '\u20AB', 'VN\u20AB'],
   'YER': [0, 'Rial', 'Rial'],
   'ZAR': [2, 'R', 'ZAR']
@@ -334,11 +334,12 @@ goog.i18n.currency.CurrencyInfo = {
 
 /**
  * Tier 2 currency information.
- * @type {!Object.<!Array>}
+ * @const {!Object<!Array<?>>}
  */
 goog.i18n.currency.CurrencyInfoTier2 = {
   'AFN': [48, 'Af.', 'AFN'],
   'AMD': [0, 'Dram', 'dram'],
+  'ANG': [2, 'NAf.', 'ANG'],
   'AOA': [2, 'Kz', 'Kz'],
   'ARS': [2, '$', 'AR$'],
   'AWG': [2, 'Afl.', 'Afl.'],
@@ -414,6 +415,7 @@ goog.i18n.currency.CurrencyInfoTier2 = {
   'SLL': [0, 'SLL', 'SLL'],
   'SOS': [0, 'SOS', 'SOS'],
   'SRD': [2, '$', 'SR$'],
+  'SSP': [2, '£', 'SSP'],
   'STD': [0, 'Db', 'Db'],
   'SYP': [0, '£', 'SY£'],
   'SZL': [2, 'SZL', 'SZL'],
@@ -422,7 +424,6 @@ goog.i18n.currency.CurrencyInfoTier2 = {
   'TOP': [2, 'T$', 'T$'],
   'TTD': [2, '$', 'TT$'],
   'UGX': [0, 'UGX', 'UGX'],
-  'UYU': [1, '$', '$U'],
   'UZS': [0, 'so\u02bcm', 'UZS'],
   'VEF': [2, 'Bs', 'Bs'],
   'VUV': [0, 'VUV', 'VUV'],
@@ -431,5 +432,6 @@ goog.i18n.currency.CurrencyInfoTier2 = {
   'XCD': [2, '$', 'EC$'],
   'XOF': [0, 'CFA', 'CFA'],
   'XPF': [0, 'FCFP', 'FCFP'],
-  'ZMK': [0, 'ZMK', 'ZMK']
+  'ZMW': [0, 'ZMW', 'ZMW'],
+  'ZWD': [0, '$', 'Z$']
 };

@@ -1,6 +1,6 @@
 goog.provide('QuestBar');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -157,16 +157,21 @@ QuestBar.update = function(dialog) {
             var quest = quest_list[i];
             var can_complete = player.can_complete_quest(quest);
 
-            var tip = dialog.data['widgets']['frame'][(can_complete ? 'ui_tooltip_complete' : 'ui_tooltip_available')].replace('%s', quest['ui_name']);
-            var show_text = 'ui_description'; // 'ui_instructions';
-            if(!can_complete && quest[show_text]) {
-                var instr = eval_cond_or_literal(quest[show_text], player, null);
-                if(instr) {
-                    instr = SPUI.break_lines(instr, dialog.widgets['frame'+wname].tooltip.font, [dialog.data['widgets']['frame']['tooltip_width_'+show_text],0])[0];
-                    tip += '\n\n' + instr;
+            var show_tip = !selection.ui;
+            if(show_tip) {
+                var tip = dialog.data['widgets']['frame'][(can_complete ? 'ui_tooltip_complete' : 'ui_tooltip_available')].replace('%s', quest['ui_name']);
+                var show_text = 'ui_description'; // 'ui_instructions';
+                if(!can_complete && quest[show_text]) {
+                    var instr = eval_cond_or_literal(quest[show_text], player, null);
+                    if(instr) {
+                        instr = SPUI.break_lines(instr, dialog.widgets['frame'+wname].tooltip.font, [dialog.data['widgets']['frame']['tooltip_width_'+show_text],0])[0];
+                        tip += '\n\n' + instr;
+                    }
                 }
+                dialog.widgets['frame'+wname].tooltip.str = tip;
+            } else {
+                dialog.widgets['frame'+wname].tooltip.str = null;
             }
-            dialog.widgets['frame'+wname].tooltip.str = tip;
             dialog.widgets['frame'+wname].state = (player.quest_tracked == quest ? 'highlight' : dialog.data['widgets']['frame']['state']);
             dialog.widgets['icon'+wname].asset = quest['icon'] || 'inventory_unknown';
 
@@ -194,12 +199,7 @@ QuestBar.update = function(dialog) {
                 player.record_feature_use('quest_bar');
                 var mis = invoke_missions_dialog(true, _quest);
                 if(mis) {
-                    if(player.can_complete_quest(_quest)) {
-                        // trigger claim
-                        if(0 && mis.widgets['claim_button'].state != 'disabled') {
-                            mis.widgets['claim_button'].onclick(mis.widgets['claim_button']);
-                        }
-                    } else {
+                    if(!player.can_complete_quest(_quest)) {
                         // trigger tracker
                         tutorial_opt_in(_quest);
                     }

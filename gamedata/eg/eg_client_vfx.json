@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -42,6 +42,10 @@
         ] },
         { "type": "particles", "emit_instant": 20, "max_count": 20, "radius": 0.9, "speed": 7.0, "max_age": 1.0, "color": [1,1,0.5,1] },
         { "type": "sound", "assets": ["fx/zg02"] }
+    ] },
+
+    "region_map_battle_complete": { "type": "combine", "effects": [
+        { "layer": "ui", "type": "explosion", "sprite": "fx/zg02", "composite_mode": "lighter" }
     ] },
 
     // bursts of iron/water that explode out of buildings when you loot them

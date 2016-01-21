@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -8,7 +8,7 @@
 # this uses the fully asynchronous Twisted AMP library
 # it attempts to handle lost connections seamlessly
 
-from twisted.internet import reactor, defer
+from twisted.internet import reactor, defer, error
 from twisted.protocols import amp
 from twisted.internet.protocol import ClientCreator
 
@@ -31,12 +31,16 @@ class Client:
     CONNECTING = 1
     AUTHENTICATING = 2
     CONNECTED = 3
+    DISCONNECTING = 4
 
     class Proxy (amp.AMP):
         # this is one "session" - can be re-instantiated if we reconnect after a failure
         def __init__(self, **kw):
             amp.AMP.__init__(self, **kw)
             self.chat_parent = None
+        def connectionLost(self, reason):
+            amp.AMP.connectionLost(self, reason)
+            self.chat_parent.disconnected(reason)
         def chat_recv(self, data):
             self.chat_parent.chat_recv(data)
             return {'success': 1}
@@ -57,6 +61,9 @@ class Client:
         self.latency_func = latency_func
         self.verbose = verbose
         self.connect_sem = None
+        self.disconnect_sem = None
+        self.reconnect_task = None
+
         self.listener = None
 
         self.chat_state = self.NOT_CONNECTED
@@ -86,11 +93,13 @@ class Client:
         if self.chat_state != self.NOT_CONNECTED:
             self.chat_state = self.NOT_CONNECTED
             self.connect_sem = None
-            # wait 10sec, then try to reconnect
-            reactor.callLater(10.0, self.connect_start)
+        # wait 10sec, then try to reconnect
+        if not self.reconnect_task:
+            self.reconnect_task = reactor.callLater(10.0, self.connect_start)
 
     def connect_start(self):
         if self.verbose: print 'connect_start'
+        self.reconnect_task = None
         assert self.chat_state == self.NOT_CONNECTED
         self.connect_sem = defer.Deferred()
         creator = ClientCreator(reactor, self.Proxy)
@@ -111,12 +120,36 @@ class Client:
         if self.verbose: print 'authenticate_finish', result
         assert self.chat_state == self.AUTHENTICATING
         self.chat_state = self.CONNECTED
-        sem = self.connect_sem
-        self.connect_sem = None
+        sem, self.connect_sem = self.connect_sem, None
         if sem: sem.callback(self)
         if self.catchup > 0:
             self.callRemote_safe('chat_catchup', num=self.catchup)
             self.catchup = 0
+
+    def disconnect(self):
+        if self.reconnect_task:
+            self.reconnect_task.cancel()
+            self.reconnect_task = None
+
+        self.disconnect_sem = defer.Deferred()
+        if self.proxy:
+            self.proxy.transport.loseConnection()
+        else:
+            self.disconnect_sem.callback(None)
+        return self.disconnect_sem
+
+    def disconnected(self, reason):
+        sem, self.disconnect_sem = self.disconnect_sem, None
+        self.chat_state = self.NOT_CONNECTED
+        self.proxy = None
+        self.connect_sem = None
+
+        if sem:
+            # we want to callback, not errback, on clean disconnections
+            if reason.type is error.ConnectionDone: reason = None
+            sem.callback(reason)
+        else: # unclean/unexpected disconnection - reconnect!
+            self.handle_remote_error('unexpected disconnection')
 
     def chat_send(self, json_data, log = True):
         str_data = json_dumps_compact(json_data)
@@ -173,9 +206,11 @@ if __name__ == '__main__':
                     subscribe = False,
                     verbose = True)
 
+    @defer.inlineCallbacks
     def after_connect(client):
         client.chat_send({'channel':message_channel, 'sender':message_sender, 'text':message_text})
-        reactor.callLater(0.01, lambda: reactor.stop())
+        yield client.disconnect()
+        reactor.stop()
 
     client.connect_sem.addCallback(after_connect)
 

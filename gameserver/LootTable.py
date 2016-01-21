@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -27,6 +27,8 @@ def get_loot(tables, tab, tabname = 'toplevel', depth = 0, cond_resolver = None,
     assert type(tab) is list
     if verbose:
         print '\t'*depth, '->', tabname
+
+    if len(tab) <= 0: return []
 
     breakpoints = []
     bp = 0.0

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -136,7 +136,7 @@ class ChatProtocolHandlers (amp.AMP):
             json_data = SpinJSON.loads(data)
             chat_log.event(server_time, json_data)
 
-            nosql_client.chat_record(json_data['channel'], json_data['sender'], json_data.get('text',None))
+            nosql_client.chat_record(json_data['channel'], json_data.get('id', None), json_data['sender'], json_data.get('text',None))
 
             # store so that clients who connect in the future can catch up
             g_buffer.append((json_data, len(data)))

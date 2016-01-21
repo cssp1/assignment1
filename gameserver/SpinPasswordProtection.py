@@ -1,4 +1,4 @@
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -27,7 +27,7 @@ class SecureResource(twisted.web.guard.HTTPAuthSessionWrapper):
     def __init__(self, resource_factory, username = default_username, password = default_password):
         passdb = twisted.cred.checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username:password})
         portal = twisted.cred.portal.Portal(self.AdminRealm(resource_factory), [passdb])
-        credfact = twisted.web.guard.DigestCredentialFactory('md5', 'SpinPunch Admin')
+        credfact = twisted.web.guard.DigestCredentialFactory('md5', 'Game Admin')
         twisted.web.guard.HTTPAuthSessionWrapper.__init__(self, portal, [credfact])
     def render(self, request):
         # do not return a revealing error message on exceptions

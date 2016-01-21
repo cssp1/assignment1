@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -12,6 +12,11 @@ import base64, hmac, hashlib
 def sign_session(user_id, country, session_id, session_time, server_name, auth_user, auth_token, extra_data, secret):
     SALT = '3RqMRLWY9ypDrZt6gNJtukmgWuaqeuzR'
     tosign = str(user_id) + ':' + str(country) + ':' + str(session_id) + ':' + str(session_time) + ':' + str(server_name) + ':' + auth_user + ':' + auth_token + ':' + extra_data + ':' + SALT
+    return base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest())
+
+def sign_proxy_headers(protocol, host, port, uri, ip, referer, secret):
+    SALT = 'mzOT9MR8Gs7hWr6FpoSYLXVcCiiqNg9E'
+    tosign = str(protocol)+':'+str(host)+':'+str(port)+':'+str(uri)+':'+str(ip)+':'+str(referer)+':'+SALT
     return base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest())
 
 class AnonID (object):

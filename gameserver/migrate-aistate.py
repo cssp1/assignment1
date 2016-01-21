@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -38,7 +38,7 @@ def migrate_to_s3(filename):
         return
     print 'uploaded'
 
-    #wrote_data = con.do_delete(bucket, objname)
+    #wrote_data = con.delete(bucket, objname)
     #print 'DELETE OK', wrote_data
 
 def migrate_from_s3(data):

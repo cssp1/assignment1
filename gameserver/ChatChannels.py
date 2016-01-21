@@ -1,4 +1,4 @@
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -14,10 +14,10 @@ class ChatChannel(object):
     def leave(self, member):
         if member in self.listeners:
             self.listeners.remove(member)
-    def send(self, sender_info, text, exclude_listener = None):
+    def send(self, id, sender_info, text, exclude_listener = None):
         for member in self.listeners:
             if member is exclude_listener: continue
-            member.chat_recv(self.name, sender_info, text)
+            member.chat_recv(self.name, id, sender_info, text)
 
 # note: "relay" is optionally an instance of SpinChatClient.Client,
 # to perform relaying to/from the global chat server
@@ -39,17 +39,20 @@ class ChatChannelMgr(object):
         if channame in self.channels:
             self.channels[channame].leave(session)
 
-    def send(self, channame, sender, text, log = True, exclude_listener = None):
+    def send(self, channame, id, sender, text, log = True, exclude_listener = None):
         if channame in self.channels:
-            self.channels[channame].send(sender, text, exclude_listener = exclude_listener)
+            self.channels[channame].send(id, sender, text, exclude_listener = exclude_listener)
         if self.relay:
-            self.relay.chat_send({'channel':channame, 'sender':sender, 'text': text}, log = log)
+            props = {'channel':channame, 'sender':sender, 'text': text}
+            if id: props['id'] = id
+            self.relay.chat_send(props, log = log)
 
     def relay_recv(self, data):
         channel = data['channel']
         sender = data['sender']
         text = data.get('text','')
+        id = data.get('id',None)
         if channel not in self.channels:
             self.channels[channel] = ChatChannel(channel)
-        self.channels[channel].send(sender, text)
+        self.channels[channel].send(id, sender, text)
 

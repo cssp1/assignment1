@@ -1,6 +1,6 @@
 goog.provide('RegionMap');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -9,7 +9,9 @@ goog.provide('RegionMap');
 */
 
 goog.require('SPUI');
+goog.require('SPFX');
 goog.require('GameArt');
+goog.require('SquadControlDialog');
 goog.require('PlayerInfoDialog');
 goog.require('goog.array');
 goog.require('goog.string');
@@ -344,10 +346,8 @@ RegionMap.MoveCursor.prototype.on_mouseup = function(cell, button) {
         }
 
         this.map.cursor = null;
-        return true;
     } else {
         // invalid movement location
-        return true;
     }
 
     return true;
@@ -489,9 +489,17 @@ RegionMap.RegionMap = function(data) {
     this.font = SPUI.make_font(14, 17, 'thick');
     this.cursor = null;
 
+    this.spfx_list = [];
+
     this.zoom_to_default();
 };
 goog.inherits(RegionMap.RegionMap, SPUI.DialogWidget);
+
+/** @override */
+RegionMap.RegionMap.prototype.destroy = function() {
+    // kill any ongoing SPFX instances
+    goog.array.forEach(this.spfx_list, function(fx) { SPFX.remove(fx); } );
+};
 
 // save/restore state, for reloading the map after session changes
 RegionMap.RegionMap.prototype.get_state = function() {
@@ -596,13 +604,6 @@ RegionMap.RegionMap.prototype.pan_to_field = function(fxy, options) {
     } else {
         this.pan_goal = null;
         this.pan = [fxy[0], fxy[1]];
-    }
-    if(options && options.with_zoom) {
-        /*
-        var old_zoom = this.zoom_linear;
-        this.zoom_to_default();
-        this.set_zoom_linear(Math.max(old_zoom, this.zoom_linear));
-        */
     }
 };
 
@@ -847,27 +848,22 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
             }
             return hit[0];
         } else {
-            if(1 || hit[0]) {
-                var wxy = [this.xy[0]+uv[0]+offset[0],
-                           this.xy[1]+uv[1]+offset[1]];
-                var DEADZONE = 5;
-                if(this.drag_full ||
-                   Math.abs(wxy[0]-this.drag_start[0]) >= DEADZONE ||
-                   Math.abs(wxy[1]-this.drag_start[1]) >= DEADZONE) {
+            var wxy = [this.xy[0]+uv[0]+offset[0],
+                       this.xy[1]+uv[1]+offset[1]];
+            var DEADZONE = 5;
+            if(this.drag_full ||
+               Math.abs(wxy[0]-this.drag_start[0]) >= DEADZONE ||
+               Math.abs(wxy[1]-this.drag_start[1]) >= DEADZONE) {
 
-                    this.drag_full = true;
-                    this.set_popup(null);
-                    this.pan = [this.pan[0] - (wxy[0]-this.drag_start[0])/(this.zoom),
-                                this.pan[1] - (wxy[1]-this.drag_start[1])/(this.zoom)];
-                    this.drag_start = wxy;
+                this.drag_full = true;
+                this.set_popup(null);
+                this.pan = [this.pan[0] - (wxy[0]-this.drag_start[0])/(this.zoom),
+                            this.pan[1] - (wxy[1]-this.drag_start[1])/(this.zoom)];
+                this.drag_start = wxy;
 
-                    player.record_feature_use('region_map_scrolled');
-                }
-                return true;
-            } else {
-                this.drag_start = null;
-                this.drag_full = false;
+                player.record_feature_use('region_map_scrolled');
             }
+            return true;
         }
     } else {
         this.drag_start = null;
@@ -951,7 +947,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
 
                 // pre-attack-and-resolve button
-                if(gamedata['client']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
+                if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
                     var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
                     var wrapped_resolve_cb = (will_lose_protection ? (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb) : resolve_cb);
                     ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
@@ -970,7 +966,7 @@ RegionMap.RegionMap.prototype.make_bookmark_button = function(feature) {
                 if(_feature['base_type'] == 'quarry') {
                     bm_name = gamedata['strings']['regional_map']['quarry'].replace('%s',_feature['base_ui_name']);
                 } else if(_feature['base_landlord_id'] && PlayerCache.query_sync(_feature['base_landlord_id'])) {
-                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']), 0);
+                    bm_name = _this.pcache_to_name(PlayerCache.query_sync(_feature['base_landlord_id']), 0, true);
                 } else if(_feature['base_ui_name']) {
                     bm_name = _feature['base_ui_name'];
                 } else {
@@ -1035,9 +1031,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             }
 
         // OWN NOT-SQUAD (BASE OR QUARRY)
-        } else if(1 ||
-                  (player.travel_satisfied(feature['base_map_loc']) &&
-                   feature['base_id'] != player.home_base_id)) {
+        } else {
 
             // BASE WE'RE LOOKING AT NOW
             if(session.viewing_base.base_id === feature['base_id']) {
@@ -1062,7 +1056,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         buttons.push([gamedata['strings']['regional_map']['deploy'],
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
-                                          var picker = do_invoke_squad_control('deploy', {'deploy_from':_feature['base_map_loc']});
+                                          SquadControlDialog.invoke_deploy(_feature['base_map_loc']);
                                       }; })(mapwidget, feature), 'passive']);
                     }
                 }
@@ -1104,42 +1098,16 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         buttons.push([gamedata['strings']['regional_map']['call'],
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
-                                          var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                          SquadControlDialog.invoke_call(_feature['base_map_loc']);
                                       }; })(mapwidget, feature), 'passive']);
                     }
                 }
-            }
-
-            if(0 && feature['base_type'] === 'quarry') {
-                var togo = Math.max(player.cooldown_togo('quarry_collect'), player.cooldown_togo('quarry_collect_'+feature['base_id']));
-                buttons.push([(togo <= 0 ? gamedata['strings']['regional_map']['collect_now'] : gamedata['strings']['regional_map']['collect_in'].replace('%s',pretty_print_time_brief(togo+1))),
-                              (function (_mapwidget, _feature) { return function() {
-                                  send_to_server.func(["QUARRY_COLLECT", _feature['base_id'], true]);
-                                  _mapwidget.set_popup(null);
-                              }; })(mapwidget, feature),
-                              (togo <= 0 ? 'normal' : 'disabled')]);
             }
 
             if(feature['base_type'] === 'quarry') {
                 buttons.push(mapwidget.make_bookmark_button(feature));
             }
 
-        } else if(mapwidget.region.data['storage'] != 'nosql') {
-            // OWN TRAVEL DESTINATION
-            if(player.travel_state['dest_loc'] && vec_equals(player.travel_state['dest_loc'], feature['base_map_loc'])) {
-                buttons.push([gamedata['strings']['regional_map']['cancel_travel'], (function(_mapwidget) { return function() {
-                    send_to_server.func(["TRAVEL_BEGIN", null, 0]);
-                    _mapwidget.set_popup(null);
-                }; })(mapwidget), 'passive']);
-
-            // OWN QUARRY
-            } else if(feature['base_id'] != player.home_base_id) {
-                buttons.push([gamedata['strings']['regional_map']['reinforce'].replace('%s',pretty_print_time(player.travel_time_to(feature['base_map_loc']))),
-                              (function(_mapwidget, _feature) { return function() {
-                                  send_to_server.func(["TRAVEL_BEGIN", _feature['base_map_loc'], player.travel_time_to(_feature['base_map_loc'])]);
-                                  _mapwidget.set_popup(null);
-                              }; })(mapwidget, feature), 'passive']);
-            }
         }
 
     } else if(feature['base_type'] == 'home') {
@@ -1153,7 +1121,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 buttons.push([gamedata['strings']['regional_map']['call'],
                               (function(_mapwidget, _feature) { return function() {
                                   _mapwidget.set_popup(null);
-                                  var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                  SquadControlDialog.invoke_call(_feature['base_map_loc']);
                               }; })(mapwidget, feature), 'passive']);
             }
             buttons.push(mapwidget.make_bookmark_button(feature));
@@ -1181,7 +1149,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             buttons.push([gamedata['strings']['regional_map']['call'],
                           (function(_mapwidget, _feature) { return function() {
                               _mapwidget.set_popup(null);
-                              var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                              SquadControlDialog.invoke_call(_feature['base_map_loc']);
                           }; })(mapwidget, feature), 'passive']);
         }
         // GET INFO
@@ -1211,7 +1179,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     buttons.push([gamedata['strings']['regional_map']['call'],
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
-                                      var picker = do_invoke_squad_control('call', {'call_to':_feature['base_map_loc']});
+                                      SquadControlDialog.invoke_call(_feature['base_map_loc']);
                                   }; })(mapwidget, feature), 'passive']);
                 }
             } else {
@@ -1349,6 +1317,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     var ftype = feature['base_type'];
     var owned = (feature['base_landlord_id'] === session.user_id);
 
+    if(!mapwidget.region.feature_shown(feature)) { // the feature got moved off the map
+        mapwidget.set_popup(null);
+        return;
+    }
+
     // when panning in from well off-screen, wait until the base is in view before showing popup
     var BUFFER = vec_scale(0.5, dialog.wh);
     if(base_wxy[0] < -BUFFER[0] || base_wxy[0] >= mapwidget.wh[0]+BUFFER[0] ||
@@ -1397,7 +1370,8 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 ui.widgets['portrait_pending'].show = true;
             } else {
                 ui.widgets['portrait_pending'].show = false;
-                ui.widgets['name'].str = mapwidget.pcache_to_name(info, 0);
+                // don't show player level on quarries
+                ui.widgets['name'].str = mapwidget.pcache_to_name(info, 0, (feature['base_type'] !== 'quarry'));
                 ui.widgets['portrait'].onclick = (function (_info) { return function(w) {
                     PlayerInfoDialog.invoke(_info['user_id']);
                 }; })(info);
@@ -1440,13 +1414,8 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
                 }
             }
         }
-        var RICHNESS = gamedata['strings']['regional_map']['richness'];
-        var rich_str = '?';
-        for(var r = 0; r < RICHNESS.length; r++) {
-            if(feature['base_richness'] >= RICHNESS[r][0]) {
-                rich_str = RICHNESS[r][1];
-            } else { break; }
-        }
+
+        var rich_str = quarry_richness_ui_str(feature['base_richness']);
 
         ui.widgets['qstat'].state = fullness_state;
 
@@ -1863,6 +1832,50 @@ RegionMap.RegionMap.prototype.draw_hovercell = function() {
     SPUI.ctx.stroke();
 };
 
+RegionMap.RegionMap.prototype.draw_feature_strength = function(feature, wxy) {
+    // query stats
+    var unit_strength_by_manuf_category = null;
+    if(feature['base_landlord_id'] === session.user_id && feature['base_type'] === 'squad') {
+        // horrible temporary deep query
+        unit_strength_by_manuf_category = {};
+        var squad_id = parseInt(feature['base_id'].split('_')[1], 10);
+        goog.object.forEach(player.my_army, function(obj, obj_id) {
+            if(obj['squad_id'] === squad_id) {
+                var spec = gamedata['units'][obj['spec']];
+                var catname = spec['manufacture_category'];
+                var cur_max = army_unit_hp(obj);
+                var space = army_unit_space(obj);
+                var contribution = space * (cur_max[0]/cur_max[1]); // scale contribution by unit health
+                unit_strength_by_manuf_category[catname] = (unit_strength_by_manuf_category[catname]||0) + contribution;
+            }
+        });
+    }
+    if(!unit_strength_by_manuf_category) { return; }
+    var n_categories = goog.object.getCount(gamedata['strings']['manufacture_categories']);
+    // max contribution = full squad of largest possible space
+    var provides_squad_space = gamedata['buildings'][gamedata['squad_building']]['provides_squad_space'];
+    var max_contribution = provides_squad_space[provides_squad_space.length-1];
+    var total_width = 40;
+    var spacing = 2;
+    var bar_width = Math.floor(total_width/n_categories) - spacing;
+    var max_height = 60;
+    var i = 0;
+    goog.object.forEach(gamedata['strings']['manufacture_categories'], function(catdata, catname) {
+        var height = (unit_strength_by_manuf_category[catname]||0)/max_contribution * max_height;
+        if(height > 0) {
+            var xy = [wxy[0] + i * (bar_width+spacing), wxy[1] - height];
+            var wh = [bar_width, height];
+            if(true /* SPFX.detail >= 2*/) { // drop shadow
+                SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
+                SPUI.ctx.fillRect(xy[0]+1/this.zoom, xy[1]+1/this.zoom, wh[0], wh[1]);
+            }
+            SPUI.ctx.fillStyle = SPUI.make_colorv(catdata['ui_color']).str();
+            SPUI.ctx.fillRect(xy[0], xy[1], wh[0], wh[1]);
+        }
+        i += 1;
+    }, this);
+};
+
 RegionMap.RegionMap.prototype.draw_feature_label = function(wxy, str, color_str, size) {
     var has_state = false;
     if(size != 1) {
@@ -1871,8 +1884,10 @@ RegionMap.RegionMap.prototype.draw_feature_label = function(wxy, str, color_str,
     }
 
     // adds drop shadow
-    SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
-    this.do_draw_feature_label([wxy[0]+1/this.zoom,wxy[1]+1/this.zoom], str, size);
+    if(true /* SPFX.detail >= 2 */) {
+        SPUI.ctx.fillStyle = 'rgba(0,0,0,1)';
+        this.do_draw_feature_label([wxy[0]+1/this.zoom,wxy[1]+1/this.zoom], str, size);
+    }
 
     SPUI.ctx.fillStyle = (SPUI.low_fonts && color_str != gamedata['territory']['label_colors']['owned'] ? 'rgba(255,255,255,1)' : color_str);
     var ret = this.do_draw_feature_label(wxy, str, size);
@@ -2003,12 +2018,12 @@ RegionMap.RegionMap.prototype.sort_features_for_draw = function(roi, feature_lis
 // convert PlayerCache entry to the most specific name we can
 /** @param {Object} info
     @param {number} abbreviate (0 = full name, 1 = strip title, 2 = strip title and level) */
-RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate) {
+RegionMap.RegionMap.prototype.pcache_to_name = function(info, abbreviate, show_level) {
     var name = PlayerCache._get_ui_name(info) || gamedata['strings']['regional_map']['unknown_name'];
     if(abbreviate >= 1) {
         name = PlayerCache.strip_title_prefix(name);
     }
-    if(abbreviate < 2 && ('player_level' in info)) {
+    if(show_level && abbreviate < 2 && ('player_level' in info)) {
         name += ' L'+info['player_level'].toString();
     }
     return name;
@@ -2022,6 +2037,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
     if(1) {
         var base_xy = this.cell_to_field(loc);
         var moving = this.region.feature_is_moving(feature);
+        var moving_xy = null; // only valid if moving is true
         var selected = (this.selection_feature === feature); // (this.selection_loc && this.selection_loc[0] === loc[0] && this.selection_loc[1] === loc[1]);
 
         if(gamedata['territory']['clip_features']) { // clip for speed
@@ -2129,7 +2145,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     var last_xy = this.cell_to_field(last_next_progress[0]);
                     var next_xy = this.cell_to_field(last_next_progress[1]);
                     var delta = vec_sub(next_xy, last_xy);
-                    var moving_xy = vec_add(last_xy, vec_scale(last_next_progress[2], delta));
+                    moving_xy = vec_add(last_xy, vec_scale(last_next_progress[2], delta));
 
                     if(owned) {
                         // draw movement path
@@ -2215,7 +2231,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 GameArt.assets['region_tiles'].states[icon_type].draw_topleft([base_xy[0]-cover[0], base_xy[1]-cover[1]-2], 0, 0);
             }
 
-            var show_bubble = false, show_padlock = false, show_token_icon = false;
+            var show_bubble = false, show_padlock = false, show_token_icon = false, show_strength = false;
             var show_trophy = this.winnable_ladder_points(feature);
 
             if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] == feature['base_landlord_id'] && (feature['base_landlord_id'] != session.user_id ||
@@ -2246,6 +2262,10 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                    !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
                     show_padlock = true; // hive that player cannot attack
                 }
+            }
+
+            if(gamedata['territory']['show_feature_strength']) {
+                show_strength = true;
             }
 
             if(show_token_icon && this.token_icon) {
@@ -2311,6 +2331,11 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 var offset = (busy_asset == 'map_flame' ? [0.5,0.15] : [0.5,0.4]);
                 GameArt.assets[busy_asset].states['normal'].draw(vec_add(base_xy, vec_mul(offset,gamedata['territory']['cell_size'])), 0, client_time);
             }
+
+            if(show_strength) {
+                var offset = [0.70,0.66];
+                this.draw_feature_strength(feature, vec_add(moving_xy || base_xy, vec_mul(offset, gamedata['territory']['cell_size'])));
+            }
         }
 
         if(this.popup && this.popup.user_data['feature'] == feature && !moving) {
@@ -2337,7 +2362,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             if(!label && ('base_landlord_id' in feature)) {
                 var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
                 if(info) {
-                    label = this.pcache_to_name(info, (this.zoom < gamedata['territory']['abbreviate_labels_below_zoom'] ? 2 : 1));
+                    // quarries show the size of the quarry instead of the owner's level
+                    var show_level = (feature['base_type'] !== 'quarry');
+                    label = this.pcache_to_name(info, (this.zoom < gamedata['territory']['abbreviate_labels_below_zoom'] ? 2 : 1), show_level);
+                    if(feature['base_type'] === 'quarry') {
+                        label += ' ('+quarry_richness_ui_str(feature['base_richness'])+')';
+                    }
                 } else {
                     label = gamedata['strings']['regional_map']['loading'];
                 }
@@ -2490,6 +2520,17 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
         color = 'default';
     }
     return color;
+};
+
+RegionMap.RegionMap.prototype.trigger_spfx_at = function(vfx_data, loc) {
+    var wxy = this.cell_to_widget(vec_add(loc, [0.5,0.5]));
+    // clip
+    if(wxy[0] < 0 || wxy[0] >= this.wh[0] || wxy[1] < 0 || wxy[1] >= this.wh[1]) {
+        return;
+    }
+    var absolute_xy = vec_add(wxy, this.get_absolute_xy());
+    // XXX leaks - find a way to delete when obsolete
+    this.spfx_list.push(SPFX.add_visual_effect_at_time(absolute_xy, 0, [0,1,0], client_time, vfx_data, false /* no sound */, {'is_ui': true, 'sprite_scale': [this.zoom,this.zoom]}));
 };
 
 RegionMap.RegionMap.prototype.draw = function(offset) {
@@ -2711,19 +2752,20 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
                         throw Error('gamedata.art.region_tiles missing sprite '+tile_type);
                     }
 
-                    // something is bad about IE performance rendering the little tiles...
+                    /* something is bad about IE performance rendering the little tiles...
                     if((spin_demographics['browser_name'] !== 'Explorer') && false && (this.zoom < 0.15)) {
                         SPUI.ctx.fillStyle = sprite.avg_color;
                         SPUI.ctx.fillRect(xy[0], xy[1], skip*gamedata['territory']['cell_size'][0], skip*gamedata['territory']['cell_size'][1]);
-                    } else {
-                        var tile_xy = [xy[0]-cover[0], xy[1]-cover[1]];
+                        continue;
+                    } */
 
-                        if(sprite.wh[0] != csize[0]+2*cover[0] || sprite.wh[1] != csize[1]+2*cover[1]) {
-                            throw Error('region tile has unexpected size, got '+sprite.wh[0]+'x'+sprite.wh[1]+' wanted '+(csize[0]+2*cover[0])+'x'+(csize[1]+2*cover[1]));
-                        }
+                    var tile_xy = [xy[0]-cover[0], xy[1]-cover[1]];
 
-                        sprite.draw_topleft(tile_xy, 0, 0);
+                    if(sprite.wh[0] != csize[0]+2*cover[0] || sprite.wh[1] != csize[1]+2*cover[1]) {
+                        throw Error('region tile has unexpected size, got '+sprite.wh[0]+'x'+sprite.wh[1]+' wanted '+(csize[0]+2*cover[0])+'x'+(csize[1]+2*cover[1]));
                     }
+
+                    sprite.draw_topleft(tile_xy, 0, 0);
                 }
             }
             SPUI.ctx.restore();

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -14,6 +14,7 @@ import sys, os, stat, re, getopt, cStringIO, traceback
 IGNORE_DIRS = set(['.svn','.git', # SCM data
                    'userdb','playerdb','basedb','aistate','db','art','built', # server state
                    'logs','ujson','pysvg','dowser','google', # third-party
+                   'puppet', # don't even try
                    ])
 
 def dir_filter(name):

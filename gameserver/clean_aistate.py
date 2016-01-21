@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -19,4 +19,4 @@ if __name__ == '__main__':
         if data['name'].endswith('_tr_10.txt'):
             if data['mtime'] < time_now - 3600:
                 print "DEL", data['name']
-                con.do_delete(SpinConfig.config['aistate_s3_bucket'], data['name'])
+                con.delete(SpinConfig.config['aistate_s3_bucket'], data['name'])

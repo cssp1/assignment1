@@ -1,6 +1,6 @@
 goog.provide('FBSendRequests');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -56,6 +56,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
     dialog.user_data['preselect_user_id'] = to_user;
 
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_gift'];
+    dialog.widgets['recent_alliance_logins_only'].show = (gamedata['gift_alliancemates'] && session.is_in_alliance());
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     scrollable_dialog_change_page(dialog, 0);

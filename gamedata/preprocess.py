@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -13,7 +13,7 @@ try: import simplejson as json
 except: import json
 
 import AtomicFileWrite
-import sys, re, os, time, getopt
+import sys, re, os, time, getopt, traceback
 
 # regular expression that matches C++-style comments
 # this is kind of an ugly regex, basically it's hard to detect and ignore // that appear within quoted strings
@@ -27,6 +27,7 @@ build_info_detector = re.compile('\$GAMEDATA_BUILD_INFO\$')
 spin_gameclient = os.getenv('SPIN_GAMECLIENT'); assert spin_gameclient
 
 profile = False
+verbose = False
 
 def filename_replace_vars(filename, game_id):
     filename = filename.replace('$GAME_ID', game_id)
@@ -48,7 +49,7 @@ def parse_input_subfile(filename, game_id, build_info, depth = 0, stripped = Fal
     start_time = time.time()
 
     filename = filename_replace_vars(filename, game_id)
-#    if profile: print >> sys.stderr, 'subfile', '  '*depth, filename, '...'
+    if profile or verbose: print >> sys.stderr, 'subfile', '  '*depth, filename, '...'
 
     dir = os.path.dirname(filename) or '.'
 
@@ -244,7 +245,7 @@ def format_deps_flat(in_filename, tree, base_path = None):
 
 # by default, use stdin for input
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:g:', ['game-id=','repeatable','get-deps','get-deps-as=','profile'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'o:g:v', ['game-id=','repeatable','get-deps','get-deps-as=','profile'])
     repeatable = False
     get_deps = False
     get_deps_as = None
@@ -257,6 +258,7 @@ if __name__ == '__main__':
         elif key == '--get-deps-as': get_deps_as = val
         elif key == '-o': out_filename = val
         elif key == '--profile': profile = True
+        elif key == '-v': verbose = True
 
     time_now = int(time.time())
     ident = str(os.getpid())
@@ -296,6 +298,7 @@ if __name__ == '__main__':
             atom.complete()
     except Exception as e:
         sys.stderr.write(str(e)+'\n')
-        #sys.stderr.write(traceback.format_exc())
+        if verbose:
+            sys.stderr.write(traceback.format_exc())
         os.chdir(save_dir)
         sys.exit(1)

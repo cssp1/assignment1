@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -21,7 +21,7 @@ do
         GAME_DIR="$OPTARG"
         ;;
     m)
-        MAIL_RECIPIENTS="$OPTARG"
+        UNUSED_MAIL_RECIPIENTS="$OPTARG" # replaced by SpinConfig heartbeat_recipients
         ;;
     esac
 done
@@ -46,6 +46,8 @@ fi
 touch $HOME/.awsrc
 
 GAME_NAME=`basename $GAME_DIR`
+GAME_ID=`(cd $GAME_DIR/gameserver && ./SpinConfig.py --getvar game_id --getvar-format raw)`
+GAME_ID_UPPER=`echo ${GAME_ID} | tr [a-z] [A-Z]`
 
 TODAY=`date +%Y%m%d`
 # process both yesterday and today's logs, to ensure nothing is missed
@@ -79,8 +81,7 @@ for DAY in $YESTERDAY; do
 #    gzip -c $INPUT > $SAVE_DIR/$ZIPFILE
 #
 #    echo "uploading $ZIPFILE to S3..."
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$ZIPFILE $SAVE_DIR/$ZIPFILE
+#    aws s3 cp $SAVE_DIR/$ZIPFILE s3://spinpunch-logs/$MONTH/$ZIPFILE
 #    if [[ $? != 0 ]]; then
 #        echo "S3 upload error!"
 #        ERROR=1
@@ -102,8 +103,7 @@ for DAY in $YESTERDAY; do
 #    echo "uploading $ZIP to S3..."
 #    cp $INPUT $SAVE_DIR/$SRCFILE
 #    (cd $SAVE_DIR && zip $ZIP $SRCFILE && rm -f $SRCFILE)
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$ZIP $SAVE_DIR/$ZIP
+#    aws s3 cp $SAVE_DIR/$ZIP s3://spinpunch-logs/$MONTH/$ZIP
 #    if [[ $? != 0 ]]; then
 #        echo "S3 upload error!"
 #        ERROR=1
@@ -130,8 +130,7 @@ for DAY in $YESTERDAY; do
 #    done
 #
 #    echo "uploading $TOTALSFILE to S3..."
-#    $SCRIPT_DIR/aws --secrets-file="$S3_KEYFILE" --md5 put \
-#    spinpunch-logs/$MONTH/$TOTALSFILE $SAVE_DIR/$TOTALSFILE
+#    aws s3 cp $SAVE_DIR/$TOTALSFILE s3://spinpunch-logs/$MONTH/$TOTALSFILE
 #    if [[ $? != 0 ]]; then
 #    echo "S3 upload error!"
 #    ERROR=1
@@ -146,7 +145,10 @@ done
 
 # send SMS update
 echo "sending SMS message..."
-$GAME_DIR/aws/text-message.py --body-from "$SMSFILE" --sender-name "$UI_MAIL_SENDER" --recipients-json "$MAIL_RECIPIENTS"
+(cd $GAME_DIR/gameserver && \
+    ./SpinReminders.py \
+        --body-from "$SMSFILE" --from "$UI_MAIL_SENDER" --subject "${GAME_ID_UPPER} Heartbeat" \
+        --recipients "`(cd ${GAME_DIR}/gameserver && ./SpinConfig.py --getvar heartbeat_recipients)`")
 rm -f "$SMSFILE"
 
 exit $ERROR

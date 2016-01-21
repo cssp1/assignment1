@@ -1,6 +1,6 @@
 goog.provide('SPUI');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -455,11 +455,7 @@ SPUI.Container.prototype.on_mousewheel = function(uv, offset, delta) {
         }
         // inside of client area but not on a child element
         // note: never interfere with mousewheel events by default
-        if(1 || this.transparent_to_mouse) {
-            return false;
-        } else {
-            return true;
-        }
+        return false;
     }
     return false;
 };
@@ -941,15 +937,13 @@ SPUI.Dialog.prototype.destroy = function() {
 
 SPUI.Dialog.prototype.get_address = function() {
     var ret = 'Dialog';
-    if(false && this.user_data['dialog']) {
-        ret += '('+this.user_data['dialog']+')';
-    } else {
-        for(var name in gamedata['dialogs']) {
-            if(gamedata['dialogs'][name] === this.data) {
-                ret += '('+name+')';
-            }
+
+    for(var name in gamedata['dialogs']) {
+        if(gamedata['dialogs'][name] === this.data) {
+            ret += '('+name+')';
         }
     }
+
     ret = goog.base(this, 'get_address') + '-'+ret;
     return ret;
 };
@@ -1580,6 +1574,7 @@ SPUI.RichTextField = function(data) {
     this.text_offset = data['text_offset'] || [0,0];
     this.drop_shadow = data['drop_shadow'] || false;
     this.resize_to_fit_text = data['resize_to_fit_text'] || false;
+    this.push_text = ('push_text' in data ? data['push_text'] : false); // whether text gets "pushed"
     this.text = null;
     this.sblines = null;
     this.rtxt = null;
@@ -1611,8 +1606,11 @@ SPUI.RichTextField.prototype.set_text_ablocks = function(ablocks) {
     this.sblines = this.rtxt = null;
     this.dims_dirty = true;
 };
-SPUI.RichTextField.prototype.set_text_bbcode = function(str) {
-    this.set_text_ablocks(str ? SPText.cstring_to_ablocks_bbcode(str) : null);
+/** @param {string} str
+    @param {Object|null=} props
+    @param {Object=} click_handlers */
+SPUI.RichTextField.prototype.set_text_bbcode = function(str, props, click_handlers) {
+    this.set_text_ablocks(str ? SPText.cstring_to_ablocks_bbcode(str, props, click_handlers) : null);
 };
 // clip text if it takes more than "max_lines" lines. If we truncate text, add "appendage" (bbcode) to the end, e.g. "... See More"
 SPUI.RichTextField.prototype.clip_to_max_lines = function(max_lines, appendage) {
@@ -1663,12 +1661,12 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     }
     SPUI.ctx.save();
     SPUI.ctx.font = this.font.str();
-    var text_offset = vec_add(this.text_offset, [offset[0], offset[1] + (this.pushed ? 1 : 0)]);
+    var text_offset = vec_add(this.text_offset, [offset[0], offset[1] + ((this.pushed && this.push_text) ? 1 : 0)]);
     if(this.drop_shadow) {
-        SPUI.ctx.fillStyle = '#000000';
+        SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0]+this.drop_shadow,text_offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
     }
-    SPUI.ctx.fillStyle = SPUI.default_text_color.str();
+    SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = SPUI.default_text_color.str();
     SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0],text_offset[1]+this.xy[1]], this.font);
     SPUI.ctx.restore();
     return true;
@@ -1729,6 +1727,22 @@ SPUI.RichTextField.prototype.on_mouseup = function(uv, offset, button) {
        uv[1] >= this.xy[1]+offset[1] &&
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) { // click is inside the area
         if(this.state === 'disabled') { return true; }
+        if(this.rtxt) {
+            var testxy = [uv[0]-this.xy[0]-offset[0]-this.text_offset[0],
+                          uv[1]-this.xy[1]-offset[1]-this.text_offset[1]];
+            testxy[1] += this.font.size; // XXX adjust for baseline in SPText
+            var props = SPText.detect_hit(this.rtxt, testxy);
+            if(props && (props.onclick || (props.onclick_state && props.onclick_state.callback))) {
+                if(props.onclick) {
+                    props.onclick(this, uv);
+                } else {
+                    props.onclick_state.callback(this, uv);
+                }
+                // force the tooltip to disappear
+                if(this.tooltip) { this.tooltip.onleave(); }
+                return true;
+            }
+        }
         if(this.onclick) {
             // force the tooltip to disappear
             if(this.tooltip) { this.tooltip.onleave(); }
@@ -1842,19 +1856,18 @@ SPUI.Tooltip.prototype.draw = function(offset) {
                    [this.xy[0]+offset[0]-this.pad, this.xy[1]+offset[1]+this.wh[1]+this.pad]];
 
     // draw dark background
-    if(1) {
-        var sprite = GameArt.assets['tooltip_bg'].states['normal'];
-        sprite.draw_topleft_at_size([corners[0][0], corners[0][1]], 0, SPUI.time, [corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]]);
-    } else {
-        SPUI.ctx.fillStyle = SPUI.tooltip_bg_color.str();
-        SPUI.ctx.fillRect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    var sprite = GameArt.assets['tooltip_bg'].states['normal'];
+    sprite.draw_topleft_at_size([corners[0][0], corners[0][1]], 0, SPUI.time, [corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]]);
 
-        SPUI.ctx.strokeStyle = this.text_color.str(); /* SPUI.tooltip_outline_color.str(); */
-        SPUI.ctx.lineWidth = 1;
-        SPUI.ctx.beginPath();
-        SPUI.ctx.rect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
-        SPUI.ctx.stroke();
-    }
+    /*
+    SPUI.ctx.fillStyle = SPUI.tooltip_bg_color.str();
+    SPUI.ctx.fillRect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    SPUI.ctx.strokeStyle = this.text_color.str(); // SPUI.tooltip_outline_color.str()
+    SPUI.ctx.lineWidth = 1;
+    SPUI.ctx.beginPath();
+    SPUI.ctx.rect(corners[0][0], corners[0][1], corners[2][0] - corners[0][0], corners[2][1] - corners[0][1]);
+    SPUI.ctx.stroke();
+    */
 
     SPUI.ctx.fillStyle = this.text_color.str();
 
@@ -1898,6 +1911,7 @@ SPUI.ActionButton = function(data) {
 
     this.fade_unless_hover = data['fade_unless_hover'] || false;
     this.alpha = data['alpha'] || 1;
+    this.composite_mode = data['composite_mode'] || null;
     this.mouseover_sound = data['mouseover_sound'] || false;
 
     if('highlight_text_color' in data) {
@@ -1960,6 +1974,11 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
         SPUI.ctx.beginPath();
         SPUI.ctx.rect(offset[0]+this.clip_to[0], offset[1]+this.clip_to[1], this.clip_to[2], this.clip_to[3]);
         SPUI.ctx.clip();
+    }
+
+    if(this.composite_mode) {
+        if(!ctx_saved) { SPUI.ctx.save(); ctx_saved = true; }
+        if(this.composite_mode) { SPUI.ctx.globalCompositeOperation = this.composite_mode; }
     }
 
     var text_offset = [offset[0], offset[1]];
@@ -2914,12 +2933,13 @@ SPUI.ProgressBar.prototype.on_mouseup = function(uv, offset, button) {
   */
 SPUI.TextInput = function(data) {
     goog.base(this, data);
+    // XXX note: blank_on_enter is only used for chat frame- maybe remove this option?
     this.blank_on_enter = ('blank_on_enter' in data ? data['blank_on_enter'] : true);
     this.max_chars = data['max_chars'] || 1000;
     this.multiline = ('multiline' in data ? data['multiline'] : false);
     this.clip_to = data['clip_to'] || null;
     this.allowed_chars = data['allowed_chars'] || null;
-    this.disallowed_chars = null;
+    this.disallowed_chars = data['disallowed_chars'] || null;
     this.force_uppercase = data['force_uppercase'] || false;
     this.state = 'normal';
 
@@ -2971,18 +2991,20 @@ SPUI.TextInput.prototype.onkeydown = function(code) {
         }
         return true;
     } else if(code === 13) { // enter
-        if(this.ontextready) {
-            this.ontextready(this, this.str);
-        }
+        var str = this.str;
         if(this.blank_on_enter) {
-            this.str = '';
-            this.left_char = 0;
+            this.clear();
+        }
+        if(this.ontextready) {
+            this.ontextready(this, str);
         }
         return true;
     }
 
     return false;
 };
+SPUI.TextInput.prototype.clear = function() { this.str = ''; this.left_char = 0; };
+SPUI.TextInput.prototype.set_str = function(s) { this.str = s; this.reset_left_char(); };
 SPUI.TextInput.prototype.onkeypress = function(code, c) {
     if(this.state == 'disabled') { return true; }
 
@@ -3178,6 +3200,18 @@ SPUI.ScrollingTextField.prototype.set_text = function(text, user_data) {
     this.append_text(text, user_data);
 };
 
+/** @param {string} text
+    @param {Object|null=} props
+    @param {Object=} click_handlers
+    @param {Object|null=} user_data */
+SPUI.ScrollingTextField.prototype.append_text_with_linebreaking_bbcode = function(text, props, click_handlers, user_data) {
+    // break lines, protecting BBCode
+    var broken_s = SPUI.break_lines(text, this.font, this.wh, {bbcode:true})[0];
+    goog.array.forEach(broken_s.split('\n'), function(line) {
+        this.append_text(SPText.cstring_to_ablocks_bbcode(line, props, click_handlers), user_data);
+    }, this);
+};
+
 SPUI.ScrollingTextField.prototype.clear_text = function() {
     var next;
     for(var node = this.head.next; node != this.head; node = next) {
@@ -3315,7 +3349,7 @@ SPUI.ScrollingTextField.prototype.do_draw = function(offset) {
     }
     SPUI.ctx.font = this.font.str();
     if(this.drop_shadow) {
-        SPUI.ctx.fillStyle = '#000000';
+        SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [offset[0]+this.xy[0]+this.drop_shadow,offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
     }
     SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = this.text_color.str();
@@ -3337,8 +3371,12 @@ SPUI.ScrollingTextField.prototype.on_mouseup = function(uv, offset, button) {
                       uv[1]-this.xy[1]-offset[1]-this.text_offset[1]];
         testxy[1] += this.font.size; // XXX adjust for baseline in SPText
         var props = SPText.detect_hit(this.rtxt, testxy);
-        if(props && props.onclick) {
-            props.onclick(this, uv);
+        if(props && (props.onclick || (props.onclick_state && props.onclick_state.callback))) {
+            if(props.onclick) {
+                props.onclick(this, uv);
+            } else {
+                props.onclick_state.callback(this, uv);
+            }
             // force the tooltip to disappear
             if(this.tooltip) { this.tooltip.onleave(); }
             return true;
@@ -3498,9 +3536,6 @@ SPUI.SpellIcon.prototype.do_draw = function(offset) {
         SPUI.ctx.fillRect(this.xy[0]+offset[0]+this.inset[0], this.xy[1]+offset[1]+this.inset[1], 50, 50);
     } else {
         var icon_offset = [offset[0]+this.inset[0], offset[1]+this.inset[1]];
-        if(this.pushed || this.pushed_key) {
-            //icon_offset[1] += 1;
-        }
         this.icon.draw_topleft([this.xy[0]+icon_offset[0], this.xy[1]+icon_offset[1]], 0, client_time);
         // draw text on top
         /*

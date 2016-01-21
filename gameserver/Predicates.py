@@ -1,4 +1,4 @@
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -162,33 +162,76 @@ class SessionLengthTrendPredicate(Predicate):
 class TimeInGamePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        self.seconds = 60*60*data['hours']
-        self.by_age = 24*60*60*data['by_day']
-    def is_satisfied(self, player, qdata):
+        if 'seconds' in data:
+            self.seconds = data['seconds']
+        else:
+            self.seconds = 60*60*data['hours']
+        if 'by_day' in data:
+            self.by_age = 24*60*60*data['by_day']
+        else:
+            self.by_age = None
+        if 'within_last' in data:
+            self.within_last = data['within_last']
+        else:
+            self.within_last = None
+
+    def is_satisfied2(self, session, player, qdata):
         if player.creation_time < 0: return False
-        by_time = player.creation_time + self.by_age
-
         if ('sessions' not in player.history): return False
-        sessions = player.history['sessions']
-        count = 0
 
-        for s in sessions:
+        cur_time = player.get_absolute_time()
+        sessions = player.history['sessions']
+
+        time_range = [player.creation_time, cur_time]
+        direction = 1
+
+        if self.by_age is not None:
+            time_range[1] = player.creation_time + self.by_age
+        if self.within_last is not None:
+            time_range[0] = cur_time - self.within_last
+            direction = -1 # iterate backwards, it's likely faster
+
+        total_seconds = 0
+
+        if direction > 0:
+            sessions_iter = xrange(0, len(sessions), 1)
+        else:
+            sessions_iter = xrange(len(sessions)-1, -1, -1)
+
+        for i in sessions_iter:
+            s = sessions[i]
             if s[0] < 0 or s[1] < 0: continue
-            if s[0] >= by_time: break
-            end = min(s[1], by_time)
-            if (end-s[0]) >= 0:
-                count += end-s[0]
-            if count >= self.seconds: break
-        return count >= self.seconds
+            if s[1] < time_range[0]: continue
+            if s[0] >= time_range[1]: continue
+            clipped_start = max(s[0], time_range[0])
+            clipped_end = min(s[1], time_range[1])
+            if clipped_end > clipped_start:
+                total_seconds += clipped_end - clipped_start
+            if total_seconds >= self.seconds: break
+
+        # add the current session
+        if session.login_time < time_range[1]:
+            clipped_start = max(session.login_time, time_range[0])
+            clipped_end = min(cur_time, time_range[1])
+            if clipped_end > clipped_start:
+                total_seconds += clipped_end - clipped_start
+
+        return total_seconds >= self.seconds
 
 class AccountCreationTimePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-        self.range = data['range']
+        self.range = data.get('range', None)
+        self.age_range = data.get('age_range', None)
     def is_satisfied(self, player, qdata):
         creat = player.creation_time
-        if self.range[0] >= 0 and creat < self.range[0]: return False
-        if self.range[1] >= 0 and creat > self.range[1]: return False
+        if self.range:
+            if self.range[0] >= 0 and creat < self.range[0]: return False
+            if self.range[1] >= 0 and creat > self.range[1]: return False
+        if self.age_range:
+            age = player.get_absolute_time() - creat
+            if self.age_range[0] >= 0 and age < self.age_range[0]: return False
+            if self.age_range[1] >= 0 and age > self.age_range[1]: return False
         return True
 
 class ObjectUndamagedPredicate(Predicate):
@@ -316,9 +359,12 @@ class AuraActivePredicate(Predicate):
         for aura in player.player_auras:
             if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
                 if self.match_data is not None:
+                    is_matched = True
                     for k, v in self.match_data.iteritems():
                         if aura.get('data',{}).get(k, None) != v:
-                            return False
+                            is_matched = False
+                            break
+                    if not is_matched: continue
                 return True
         return False
 class AuraInactivePredicate(Predicate):
@@ -400,8 +446,12 @@ class UserIDPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.allow = data['allow']
+        self.mod = data.get('mod', None)
     def is_satisfied(self, player, qdata):
-        return player.user_id in self.allow
+        test_id = player.user_id
+        if self.mod is not None:
+            test_id = test_id % self.mod
+        return test_id in self.allow
 
 class FacebookIDPredicate(Predicate):
     def __init__(self, data):
@@ -454,6 +504,23 @@ class PurchasedRecentlyPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         now = player.get_absolute_time()
         return player.history.get('last_purchase_time',-1) >= (now - self.seconds_ago)
+
+class GamedataVarPredicate(Predicate):
+    def __init__(self, data, name, value, method):
+        Predicate.__init__(self, data)
+        self.name = name
+        self.value = value
+        self.method = method or '=='
+
+    def is_satisfied2(self, session, player, qdata):
+        test_value = eval_cond_or_literal(player.get_gamedata_var(self.name), session, player)
+        if self.method == '==':
+            return test_value == self.value
+        elif self.method == 'in':
+            assert isinstance(self.value, list)
+            return test_value in self.value
+        else:
+            raise Exception('unknown method '+self.method)
 
 # generic predicate that searches player history stats for a specific minimum value
 class PlayerHistoryPredicate(Predicate):
@@ -606,14 +673,24 @@ class AbsoluteTimePredicate(Predicate):
         self.range = data['range']
         self.mod = data.get('mod', -1)
         self.shift = data.get('shift', 0)
+        self.repeat_interval = data.get('repeat_interval', None)
     def is_satisfied(self, player, qdata):
         et = player.get_absolute_time()
         if et is None: return False
         et = et + self.shift
         if self.mod > 0:
             et = et % self.mod
+
+        # before range start?
         if self.range[0] >= 0 and et < self.range[0]: return False
-        if self.range[1] >= 0 and et >= self.range[1]: return False
+
+        # after range end?
+        if self.range[1] >= 0:
+            if self.repeat_interval:
+                delta = (et - self.range[0]) % self.repeat_interval
+                if delta >= (self.range[1] - self.range[0]): return False
+            else:
+                if et >= self.range[1]: return False
         return True
 
 class TimeOfDayPredicate(Predicate):
@@ -684,10 +761,11 @@ class HasItemPredicate(Predicate):
         self.item_name = data['item_name']
         self.min_count = data.get('min_count', 1)
         self.level = data.get('level', None)
+        self.min_level = data.get('min_level', None)
         self.check_mail = data.get('check_mail', False) # also check mailbox attachments
         self.check_crafting = data.get('check_crafting', False)
     def is_satisfied(self, player, qdata):
-        return player.has_item(self.item_name, level = self.level, min_count = self.min_count, check_mail = self.check_mail, check_crafting = self.check_crafting)
+        return player.has_item(self.item_name, level = self.level, min_level = self.min_level, min_count = self.min_count, check_mail = self.check_mail, check_crafting = self.check_crafting)
 
 class HasItemSetPredicate(Predicate):
     def __init__(self, data):
@@ -866,6 +944,7 @@ def read_predicate(data):
     elif kind == 'PVP_AGGRESSED_RECENTLY': return PvPAggressedRecentlyPredicate(data)
     elif kind == 'PURCHASED_RECENTLY': return PurchasedRecentlyPredicate(data)
     elif kind == 'PLAYER_HISTORY': return PlayerHistoryPredicate(data, data['key'], data['value'], data['method'])
+    elif kind == 'GAMEDATA_VAR': return GamedataVarPredicate(data, data['name'], data['value'], data.get('method', None))
     elif kind == 'ATTACKS_LAUNCHED': return PlayerHistoryPredicate(data, 'attacks_launched', data['number'], ">=")
     elif kind == 'ATTACKS_VICTORY': return PlayerHistoryPredicate(data, 'attacks_victory', data['number'], ">=")
     elif kind == 'CONQUESTS': return PlayerHistoryPredicate(data, data['key'], data['value'], data['method'])

@@ -22,10 +22,10 @@ goog.provide('goog.ui.SplitBehavior');
 goog.provide('goog.ui.SplitBehavior.DefaultHandlers');
 
 goog.require('goog.Disposable');
+goog.require('goog.asserts');
 goog.require('goog.dispose');
-goog.require('goog.dom');
 goog.require('goog.dom.NodeType');
-goog.require('goog.dom.classes');
+goog.require('goog.dom.classlist');
 goog.require('goog.events.EventHandler');
 goog.require('goog.ui.ButtonSide');
 goog.require('goog.ui.Component');
@@ -42,7 +42,7 @@ goog.require('goog.ui.registry');
  *
  * @param {goog.ui.Control} first A ui control.
  * @param {goog.ui.Control} second A ui control.
- * @param {function(goog.ui.Control,Event)=} opt_behaviorHandler A handler
+ * @param {function(!goog.ui.Control, !Event)=} opt_behaviorHandler A handler
  *     to apply for the behavior.
  * @param {string=} opt_eventType The event type triggering the
  *     handler.
@@ -69,7 +69,7 @@ goog.ui.SplitBehavior = function(first, second, opt_behaviorHandler,
 
   /**
    * Handler for this behavior.
-   * @type {function(goog.ui.Control,Event)}
+   * @type {function(!goog.ui.Control, !Event)}
    * @private
    */
   this.behaviorHandler_ = opt_behaviorHandler ||
@@ -81,12 +81,6 @@ goog.ui.SplitBehavior = function(first, second, opt_behaviorHandler,
    * @private
    */
   this.eventType_ = opt_eventType || goog.ui.Component.EventType.ACTION;
-
-  /**
-   * @type {goog.dom.DomHelper}
-   * @private
-   */
-  this.dom_ = opt_domHelper || goog.dom.getDomHelper();
 
   /**
    * True iff the behavior is active.
@@ -117,6 +111,7 @@ goog.ui.SplitBehavior = function(first, second, opt_behaviorHandler,
   this.disposeSecond_ = true;
 };
 goog.inherits(goog.ui.SplitBehavior, goog.Disposable);
+goog.tagUnsealableClass(goog.ui.SplitBehavior);
 
 
 /**
@@ -128,7 +123,7 @@ goog.ui.SplitBehavior.CSS_CLASS = goog.getCssName('goog-split-behavior');
 
 /**
  * An emum of split behavior handlers.
- * @enum {function(goog.ui.Control,Event)}
+ * @enum {function(!goog.ui.Control, !Event)}
  */
 goog.ui.SplitBehavior.DefaultHandlers = {
   NONE: goog.nullFunction,
@@ -165,7 +160,7 @@ goog.ui.SplitBehavior.prototype.getElement = function() {
 
 
 /**
- * @return {function(goog.ui.Control,Event)} The behavior handler.
+ * @return {function(!goog.ui.Control,!Event)} The behavior handler.
  */
 goog.ui.SplitBehavior.prototype.getBehaviorHandler = function() {
   return this.behaviorHandler_;
@@ -226,7 +221,7 @@ goog.ui.SplitBehavior.prototype.setEventType = function(eventType) {
  * @param {Element} element An element to decorate.
  * @param {boolean=} opt_activate Whether to activate the behavior
  *     (default=true).
- * @return {goog.ui.SplitBehavior} A split behavior.
+ * @return {!goog.ui.SplitBehavior} A split behavior.
  */
 goog.ui.SplitBehavior.prototype.decorate = function(element, opt_activate) {
   if (this.first_ || this.second_) {
@@ -245,10 +240,11 @@ goog.ui.SplitBehavior.prototype.decorate = function(element, opt_activate) {
  * @param {Element} element An element to decorate.
  * @param {boolean=} opt_activate Whether to activate the behavior
  *     (default=true).
- * @return {goog.ui.SplitBehavior} A split behavior.
+ * @return {!goog.ui.SplitBehavior} A split behavior.
  */
 goog.ui.SplitBehavior.prototype.render = function(element, opt_activate) {
-  goog.dom.classes.add(element, goog.ui.SplitBehavior.CSS_CLASS);
+  goog.asserts.assert(element);
+  goog.dom.classlist.add(element, goog.ui.SplitBehavior.CSS_CLASS);
   this.first_.render(element);
   this.second_.render(element);
   this.collapseSides_(this.first_, this.second_);
@@ -306,10 +302,11 @@ goog.ui.SplitBehavior.prototype.decorateChildren_ = function(
   for (var i = 0; i < len && !finished; i++) {
     var child = childNodes[i];
     if (child.nodeType == goog.dom.NodeType.ELEMENT) {
+      var el = /** @type {!Element} */ (child);
       if (!this.first_) {
-        this.first_ = /** @type {goog.ui.Control} */ (goog.ui.decorate(child));
+        this.first_ = /** @type {goog.ui.Control} */ (goog.ui.decorate(el));
       } else if (!this.second_) {
-        this.second_ = /** @type {goog.ui.Control} */ (goog.ui.decorate(child));
+        this.second_ = /** @type {goog.ui.Control} */ (goog.ui.decorate(el));
         finished = true;
       }
     }
@@ -337,4 +334,3 @@ goog.ui.registry.setDecoratorByClassName(goog.ui.SplitBehavior.CSS_CLASS,
     function() {
       return new goog.ui.SplitBehavior(null, null);
     });
-

@@ -1,6 +1,6 @@
 goog.provide('SPay');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -71,7 +71,8 @@ SPay.redeem_fb_gift_card = function(callback) {
 /** @param {string} currency_url
     @param {function(?)} callback */
 SPay.offer_payer_promo = function(currency_url, callback) {
-    SPFB.ui({'method':'fbpromotion', 'display': 'popup',
+    SPFB.ui({'method':'fbpromotion',
+             //'display': 'popup',
              //'package_name': 'zero_promo',
              'quantity': 300,
              'product': currency_url}, callback);

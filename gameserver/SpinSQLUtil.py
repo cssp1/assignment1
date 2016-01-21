@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -60,11 +60,15 @@ class MySQLUtil(SQLUtil):
     def sym(self, s):
         return '`'+s+'`'
     def ensure_table(self, cur, name, schema, temporary = False):
+        for iname, idata in schema.get('indices',{}).iteritems():
+            assert not idata.get('where') # MySQL does not support partial indexes
+
         cur.execute("CREATE "+("TEMPORARY" if temporary else "")+" TABLE IF NOT EXISTS "+self.sym(name)+" (" + \
                     ", ".join([(self.sym(key)+" "+type) for key, type in schema['fields']] + \
                               [(("UNIQUE " if idata.get('unique', False) else '') + "KEY %s (" % self.sym(name+'_'+iname)) + ",".join([self.sym(key)+" "+order for key, order in idata['keys']]) + ")" \
                                for iname, idata in schema.get('indices',{}).iteritems()]) + \
                     ") CHARACTER SET utf8")
+
     # string-concat trick to get percentile aggregates
     def percentile(self, expr, fraction):
         return """SUBSTRING_INDEX(
@@ -85,4 +89,4 @@ class PostgreSQLUtil(SQLUtil):
             if cur.fetchall()[0][0] == 0:
                 cur.execute("CREATE %s INDEX %s ON %s (" % ('UNIQUE' if idata.get('unique',False) else '', self.sym(index_name), self.sym(name)) + \
                             ", ".join([(self.sym(key)+" "+order) for key, order in idata['keys']]) + \
-                            ")")
+                            ")" + ((' WHERE '+idata['where']) if idata.get('where') else ''))

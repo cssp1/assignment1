@@ -43,7 +43,7 @@ goog.require('goog.net.XhrIo');
  * Currently requires the result be a JS object that can be evaluated and
  * set to a variable and doesn't require strict JSON notation.
  *
- * @param {string || goog.Uri} uri URI for the request.
+ * @param {(string|goog.Uri)} uri URI for the request.
  * @param {string} name Name of the datasource.
  * @param {string=} opt_startText Text to expect/strip before JS response.
  * @param {string=} opt_endText Text to expect/strip after JS response.
@@ -51,6 +51,7 @@ goog.require('goog.net.XhrIo');
  *
  * @extends {goog.ds.FastDataNode}
  * @constructor
+ * @final
  */
 goog.ds.JsXmlHttpDataSource = function(uri, name, opt_startText, opt_endText,
                                        opt_usePost) {

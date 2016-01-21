@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 # CGI script for customer support and server management
 
 import os, sys, subprocess, traceback, time, re, copy
-import cgi, cgitb
+import cgi, cgitb, socket
 import urllib, urllib2
 import SpinFacebook
 import SpinNoSQL
@@ -17,7 +17,6 @@ import SpinJSON
 import SpinGoogleAuth
 import SpinLog
 import FastGzipFile
-import pymongo # 3.0+ OK
 
 time_now = int(time.time())
 
@@ -94,8 +93,10 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
         '$SPIN_TOKEN_COOKIE_NAME$': spin_token_cookie_name,
         '$SPIN_TOKEN_DOMAIN$': SpinConfig.config['spin_token_domain'],
         '$GOOGLE_ACCESS_TOKEN$': spin_token_data['google_access_token'],
+        '$GOOGLE_TRANSLATE_ENABLED$': 'true' if SpinConfig.config.get('google_translate_api_key') else 'false',
         '$SPIN_USERNAME$': spin_token_data['spin_user'],
         '$SPIN_URL$': my_endpoint,
+        '$SPIN_DIRECT_MULTIPLEX$': 'true' if SpinConfig.config['proxyserver'].get('direct_multiplex',0) else 'false',
         '$SPIN_GAME_ID$': SpinConfig.game(),
         '$SPIN_LOG_BOOKMARK$': str(log_bookmark or -1),
         '$GAMEBUCKS_NAME$': gamedata['store']['gamebucks_ui_name'],
@@ -115,8 +116,8 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
 def get_regions(gamedata):
     ret = []
     for key, val in gamedata['regions'].iteritems():
-        # skip obsolete regions - these tend to have auto_join off plus a "requires" predicate
-        if not (val.get('auto_join',1) or ('requires' not in val) or val['requires']['predicate'] == 'AURA_INACTIVE'): continue
+        # skip obsolete regions
+        if not (val.get('open_join',1)): continue
         val = copy.copy(val)
         val['name'] = key
         ret.append(val)
@@ -136,6 +137,150 @@ def run_shell_command(argv, ignore_stderr = False):
          raise Exception(err or out)
      return out
 
+CHAT_ABUSE_MEMORY_DURATION = 30*86400
+CHAT_ABUSE_MEMORY_COOLDOWN_NAME = 'chat_abuse_violation'
+
+def chat_abuse_clear(control_args):
+    check_stacks_args = control_args.copy()
+    check_stacks_args.update({'method': 'cooldown_active', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME})
+    active_stacks = max(do_CONTROLAPI_checked(check_stacks_args), 0)
+
+    if active_stacks > 0:
+        new_stacks = max(0, active_stacks - 1)
+        clear_cd_args = control_args.copy()
+        clear_cd_args.update({'method':'clear_cooldown', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME})
+        assert do_CONTROLAPI_checked(clear_cd_args) == 'ok'
+        if new_stacks > 0:
+            add_stack_args = control_args.copy()
+            add_stack_args.update({'method': 'trigger_cooldown', 'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME, 'add_stack': new_stacks, 'duration': CHAT_ABUSE_MEMORY_DURATION})
+            assert do_CONTROLAPI_checked(add_stack_args) == 'ok'
+    else:
+        new_stacks = 0
+
+    ungag_args = control_args.copy()
+    ungag_args.update({'method': 'chat_ungag'})
+    assert do_CONTROLAPI_checked(ungag_args) == 'ok'
+    return "Player was unmuted and reduced to %d chat offense(s)." % new_stacks
+
+def bbcode_quote(s):
+    r = ''
+    for c in s:
+        if c in ('\\', '[', ']'):
+            r += '\\'+c
+        else:
+            r += c
+    return r
+
+def chat_abuse_violate(control_args, action, ui_context, channel_name, message_id):
+    assert action in ('violate','warn')
+
+    ui_reason = 'The player said: "%s"' % ui_context
+    spin_user = control_args['spin_user']
+
+    # query current repeat-offender stacks and gag status
+    check_args = control_args.copy()
+    check_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps([{'method': 'cooldown_active', 'args': {'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME}},
+                                                                          {'method': 'aura_active', 'args': {'aura_name': 'chat_gagged'}}])})
+    check_result = do_CONTROLAPI_checked(check_args)
+    active_stacks = max(check_result[0], 0)
+    is_gagged_now = bool(check_result[1])
+
+    # for policy see https://sites.google.com/a/spinpunch.com/support/about-zendesk/chat-moderation-process
+    # active_stacks 0 -> warning message only.
+    # active_stacks 1 -> message and 24h mute
+    # active_stacks 2 -> message and 48h mute
+    # active_stacks 3 -> message and 72h mute
+    # active_stacks 4 -> permanent mute, also mute alts.
+    ui_policy_link = '[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]chat abuse policy[/url][/u][/color]'
+    ui_player_context = '[color=#ff0000]'+bbcode_quote(ui_context)+'[/color]'
+    ui_actions = []
+    message_body = None
+    alt_message_body = None
+    add_stack = False
+    temporary_mute_duration = -1
+    permanent_mute = False
+    permanent_mute_alts = False
+
+    if message_id and channel_name:
+        new_type = ('abuse_violated' if (action == 'violate' and active_stacks >= 1) else 'abuse_warned')
+        censor_args = {'method': 'censor_chat_message', 'channel': channel_name, 'target_user_id': control_args['user_id'],
+                       'message_id': message_id, 'new_type': new_type}
+        assert do_CONTROLAPI_checked(censor_args) == 'ok'
+        ui_actions.append("Hid this chat message from other players")
+
+    if is_gagged_now:
+        ui_actions.append("Player is currently muted, perhaps because of a recent violation. No action taken against the player.")
+
+    elif action == 'warn':
+        message_body = "Hello! You were reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that any future offenses may result in a temporary or permanent mute from public chat rooms. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+    elif active_stacks == 0:
+        message_body = "Hello! You were reported for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a warning, and a notification that any future offenses may result in a temporary or permanent mute from public chat rooms. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        add_stack = True
+    elif active_stacks == 1:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 2nd warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        add_stack = True
+        temporary_mute_duration = 24*3600
+    elif active_stacks == 2:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 3rd warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses may result in a longer temporary or permanent mute from chat. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        add_stack = True
+        temporary_mute_duration = 48*3600
+    elif active_stacks == 3:
+        message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nThis message is to serve as a 4th warning, and a notification that you are receiving a temporary mute from public chat rooms. Any future offenses will result in a permanent chat mute without further warning. Thanks in advance for your understanding." % (ui_policy_link, ui_player_context)
+        add_stack = True
+        temporary_mute_duration = 72*3600
+    elif active_stacks >= 4:
+        if active_stacks == 4:
+            message_body = "You were reported again for violating our %s. A support agent reviewed this report and confirmed your message was offensive or spam:\n\n%s\n\nSince this is your 5th offense, you have been muted permanently from public chat rooms." % (ui_policy_link, ui_player_context)
+            alt_message_body = "Hello! This message is to inform you that your account has been muted from public chat rooms due to chat violations on a related game account (ID: %d). If you feel this ban may have been made in error, please submit a ticket to our Customer Support team. Thanks in advance for your understanding." % int(control_args['user_id'])
+        add_stack = (active_stacks < 5)
+        permanent_mute = True
+        permanent_mute_alts = True
+
+    batch = []
+    if add_stack:
+        batch.append({'method': 'trigger_cooldown', 'args':{'name': CHAT_ABUSE_MEMORY_COOLDOWN_NAME, 'add_stack': 1, 'duration': CHAT_ABUSE_MEMORY_DURATION, 'spin_user': spin_user}})
+        ui_actions.append("Offense count increased to %d" % (active_stacks + 1))
+    if message_body:
+        batch.append({'method': 'send_message', 'args':{'message_subject': 'Chat Warning', 'message_body': message_body, 'ui_reason': ui_reason, 'spin_user': spin_user}})
+        ui_actions.append("Sent warning message")
+    if temporary_mute_duration > 0:
+        batch.append({'method': 'chat_gag', 'args':{'duration': temporary_mute_duration, 'spin_user': spin_user}})
+        ui_actions.append("Muted player for %d hours" % (temporary_mute_duration / 3600))
+    if permanent_mute:
+        batch.append({'method': 'chat_gag', 'args':{'ui_reason': ui_reason, 'spin_user': spin_user}})
+        ui_actions.append("Muted player permanently")
+
+    if batch:
+        batch_args = control_args.copy()
+        batch_args.update({'method': 'player_batch', 'batch': SpinJSON.dumps(batch)})
+        assert do_CONTROLAPI_checked(batch_args) == ['ok',]*len(batch)
+
+    if permanent_mute_alts or alt_message_body:
+        pass # XXXXXX no handling for alts yet
+
+    return "Player had %d offense(s) before this. Took actions:\n\n- %s" % (active_stacks, "\n- ".join(ui_actions))
+
+def filter_chat_report_list_for_enforcement(reports):
+    # clean up a list of chat reports and return only the ones still eligible for enforcement
+    # in addition to filtering reports that are already resolved, we also need to avoid "double jeopardy"
+    # (report -> violate -> report again -> violate again) by ignoring any reports that refer to things
+    # said before a player's latest violation
+    latest_violations = {}
+    for report in reports:
+        if report.get('resolved', False) and report.get('resolution', None) != 'ignore' and ('resolution_time' in report):
+            latest_violations[report['target_id']] = max(latest_violations.get(report['target_id'],-1), report['resolution_time'])
+
+    return filter(lambda x:
+                  (not x.get('resolved')) and # unresolved
+                  (x['time'] > latest_violations.get(x['target_id'],-1)), # no later violation
+                  reports)
+
+def filter_chat_report_list_drop_automated(reports):
+    return filter(lambda x: x.get('source') not in ('rule','ml'), reports)
+
+def filter_chat_report_list_drop_tier34(reports):
+    return filter(lambda x: x.get('channel').startswith('r:') or x.get('channel') in ('global_english','global_t123'), reports)
+
 def do_action(path, method, args, spin_token_data, nosql_client):
     try:
         do_log = False
@@ -147,7 +292,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 do_log = True # log all write activity
 
             # require special role for writes, except for chat, aura, and alt actions
-            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','ignore_alt','unignore_alt')):
+            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt')):
                 check_role(spin_token_data, 'PCHECK-WRITE')
                 if method in ('ban','unban'):
                     check_role(spin_token_data, 'PCHECK-BAN')
@@ -159,6 +304,11 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             if method == 'lookup':
                 result = {'result':do_lookup(control_args)}
+            # chat abuse handling doesn't map 1-to-1 with CONTROLAPI calls, so handle them specially
+            elif method == 'chat_abuse_violate':
+                result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
+            elif method == 'chat_abuse_clear':
+                result = {'result':chat_abuse_clear(control_args)}
             elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
                             'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member'):
                 result = do_CONTROLAPI(control_args)
@@ -209,7 +359,9 @@ def do_action(path, method, args, spin_token_data, nosql_client):
 
             elif method in ('reconfig','change_state','maint_kick','panic_kick','shutdown'):
                 server_name = args['server']
-                row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'game_http_port':1, 'external_http_port':1, 'type':1})
+                row = nosql_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'internal_listen_host': 1,
+                                                                                 'game_http_port':1, 'game_ssl_port': 1,
+                                                                                 'external_http_port':1, 'external_ssl_port': 1, 'type':1})
                 if not row:
                     raise Exception('server %s not found' % server_name)
                 control_args = args.copy()
@@ -218,7 +370,10 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 # tell proxyserver to handle it instead of forwarding
                 if row['type'] == 'proxyserver':
                     control_args['server'] = 'proxyserver'
-                result = do_CONTROLAPI(control_args, host = row['hostname'], port = row.get('game_http_port',None) or row.get('external_http_port',None))
+                result = do_CONTROLAPI(control_args, host = row.get('internal_listen_host', row['hostname']),
+                                       http_port = row.get('game_http_port',None) or row.get('external_http_port',None),
+                                       ssl_port = row.get('game_ssl_port',None) or row.get('external_ssl_port',None)
+                                       )
 
             elif method == 'start':
                 server_name = args['server']
@@ -276,6 +431,54 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                     qs['time']['$lt'] = int(args['end_time'])
 
                 result = {'result': list(nosql_client.chat_buffer_table().find(qs, {'_id':0,'channel':1,'sender':1,'text':1,'time':1}).sort([('time',-1)]).limit(1000))}
+            elif method == 'get_reports':
+                report_list = list(nosql_client.chat_reports_get(args['start_time'], args['end_time']))
+                show_automated = False
+                show_resolved = True
+                show_tier34 = True
+                if 'filter' in args:
+                    filters = args['filter'].split(',')
+                else:
+                    filters = []
+                for f in filters:
+                    if f == 'unresolved': show_resolved = False
+                    elif f == 'automated': show_automated = True
+                    elif f == 'tier12': show_tier34 = False
+
+                if not show_resolved: # always do this first, since it needs access to all reports
+                    report_list = filter_chat_report_list_for_enforcement(report_list)
+                if not show_tier34:
+                    report_list = filter_chat_report_list_drop_tier34(report_list)
+                if not show_automated:
+                    report_list = filter_chat_report_list_drop_automated(report_list)
+                result = {'result': report_list }
+            elif method == 'resolve_report':
+                assert args['action'] in ('ignore', 'violate', 'warn')
+                do_log = True
+                if args['action'] == 'ignore':
+                    result = {'result': nosql_client.chat_report_resolve(args['id'], 'ignore', time_now)}
+                elif args['action'] in ('violate','warn'):
+                    if not nosql_client.chat_report_resolve(args['id'], args['action'], time_now): # start here to avoid race condition
+                        result = {'result': 'This report has already been resolved, perhaps by another PCHECK user.'}
+                    # query for the report so we can get the context and time
+                    target_report = nosql_client.chat_report_get_one(args['id'])
+                    if nosql_client.chat_report_is_obsolete(target_report):
+                        result = {'result': 'This report is obsolete. The player has already been punished for a more recent report.'}
+                    else:
+                        control_args = args.copy()
+                        control_args['user_id'] = args['user_id'] # trusting the client - but they have the power to violate anyone anyway.
+                        del control_args['action']
+                        if 'spin_token' in control_args: # do not pass credentials along
+                            del control_args['spin_token']
+                        control_args['spin_user'] = spin_token_data['spin_user']
+                        violate_result = chat_abuse_violate(control_args, args['action'], target_report['context'], target_report['channel'], target_report.get('message_id',None))
+                        result = {'result': violate_result}
+            elif method == 'translate':
+                # use Google Translate API conventions
+                from_language = args.get('from_language', None)
+                to_language = args.get('to_language', 'en')
+                text = args['text']
+                result = {'result': do_google_translate(from_language, to_language, text)}
             else:
                 raise Exception('unknown '+path[0]+' method '+method)
 
@@ -324,217 +527,6 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             else:
                 raise Exception('unknown log method '+method)
 
-        elif path[0] == 'skynet':
-            # skynet methods
-            check_role(spin_token_data, 'SKYNET')
-
-            import SkynetLib
-
-            # special-case skynet_remote for local use
-            dbconfig = SpinConfig.get_mongodb_config('skynet_remote' if 'skynet_remote' in SpinConfig.config['mongodb_servers'] else 'skynet_readonly')
-
-            skynet_con = pymongo.MongoClient(*dbconfig['connect_args'], **dbconfig['connect_kwargs'])
-            skynet_db = skynet_con[dbconfig['dbname']]
-
-            if method == 'graph':
-                ui_info = None
-                adgroup_dtgt_qs = SkynetLib.adgroup_dtgt_filter_query(SkynetLib.stgt_to_dtgt(args['query']))
-                adgroup_list = [{'_id':str(row['_id']), 'name':row.get('adgroup_name','BAD')} for row in \
-                                skynet_db.fb_adstats_hourly.aggregate([
-                    {'$match': adgroup_dtgt_qs},
-                    {'$group':{'_id':'$adgroup_id', 'adgroup_name':{'$last':'$adgroup_name'}}}
-                    ]) \
-                                if (not SkynetLib.adgroup_name_is_bad(row.get('adgroup_name','BAD'))) and \
-                                   (SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, row['adgroup_name'])[1] is not None)]
-                adgroup_dict = dict((x['_id'], x) for x in adgroup_list)
-
-                # add some extra properties to each adgroup
-                for entry in adgroup_list:
-                    stgt, tgt = SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, entry['name'])
-                    entry['tgt'] = tgt
-                    coeff, install_rate, unused_info = SkynetLib.bid_coeff(SkynetLib.standin_spin_params, tgt, 1.0, use_bid_shade = False,
-                                                                           use_install_rate = tgt['bid_type'] in ('CPC', 'oCPM_CLICK', 'oCPM_INSTALL'))
-                    entry['est_ltv'] = coeff # this is the 90-day est LTV associated with the bid_type event
-
-                # figure out what bid types we're dealing with
-                bid_types = list(set(SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, x['name'])[1]['bid_type'] for x in adgroup_list))
-                game_ids = list(set(SkynetLib.decode_adgroup_name(SkynetLib.standin_spin_params, x['name'])[1].get('game','tr') for x in adgroup_list))
-
-                # query time series
-                time_interval = max(int(args.get('time_interval','3600')), 3600)
-                time_range = [time_now-10*86400,time_now] # XXXXXX
-                time_range[0] = max(time_range[0], 1389337632) # started recording valid context data from this time onward
-
-                start_time = (time_range[0]//time_interval)*time_interval
-                end_time = (time_range[1]//time_interval)*time_interval
-
-                adstat_qs = {'adgroup_id':{'$in':[x['_id'] for x in adgroup_list]},
-                             'start_time':{'$gte':start_time},
-                             'end_time':{'$lte':end_time},
-                             'impressions':{'$gt':0}}
-
-                if 0:
-                    click_weighted_value_available = False
-                    agg = [{'$match': adstat_qs},
-                           {'$project':{'start_time':1,'spent':1,'clicks':1,'impressions':1,'bid':1}},
-                           {'$group':{'_id':'$start_time' if time_interval == 3600 else { '$subtract' :['$start_time', {'$mod':['$start_time', time_interval]}] },
-                                      'spent':{'$sum':'$spent'},
-                                      'impressions':{'$sum':'$impressions'},
-                                      'clicks':{'$sum':'$clicks'},
-                                      'avg_bid':{'$avg':'$bid'},
-                                      'click_weighted_bid':{'$sum':{'$multiply':['$bid','$clicks']}},
-                                      'imp_weighted_bid':{'$sum':{'$multiply':['$bid','$impressions']}},
-                                      'samples':{'$sum':1}}}]
-                    agg_ret = skynet_db.fb_adstats_hourly.aggregate(agg)
-                else:
-                    click_weighted_value_available = True
-                    by_time = {}
-                    for row in skynet_db.fb_adstats_hourly.find(adstat_qs, {'start_time':1,'adgroup_id':1,'spent':1,'clicks':1,'impressions':1,'bid':1}):
-                        ts = (row['start_time']//time_interval)*time_interval
-                        if ts not in by_time: by_time[ts] = []
-                        # get value-add
-                        row['value_add'] = adgroup_dict[row['adgroup_id']]['est_ltv']
-                        by_time[ts].append(row)
-                    agg_ret = []
-                    for ts, samples in by_time.iteritems():
-                        agg_ret.append({'_id':ts,
-                                        'spent':sum((x['spent'] for x in samples),0),
-                                        'impressions':sum((x['impressions'] for x in samples),0),
-                                        'clicks':sum((x['clicks'] for x in samples),0),
-                                        'avg_bid':sum((x['bid'] for x in samples),0)/len(samples),
-                                        'click_weighted_bid':sum((x['bid']*x['clicks'] for x in samples),0),
-                                        'imp_weighted_bid':sum((x['bid']*x['impressions'] for x in samples),0),
-                                        'click_weighted_value':sum((x['value_add']*x['clicks'] for x in samples),0),
-                                        'samples':len(samples)})
-
-
-                if agg_ret:
-                    agg_ret.sort(key = lambda x: x['_id']) # sort by start_time
-                    ret = [{'ui_name': "Impressions",
-                            'plot_params': {'yaxis': {'min': 0, 'panRange':[0,None]}, 'xaxis': time_axis_params},
-                            'series': [{'label':'impressions', 'points':{'show':True}, 'lines':{'show':True},
-                                        'data': [(1000*datum['_id'], datum['impressions']) for datum in agg_ret]},
-                                       ]},
-                            {'ui_name': "Clicks",
-                            'plot_params': {'yaxis': {'min': 0, 'panRange':[0,None]}, 'xaxis': time_axis_params},
-                            'series': [{'label':'clicks', 'points':{'show':True}, 'lines':{'show':True},
-                                        'data': [(1000*datum['_id'], datum['clicks']) for datum in agg_ret]},
-                                       ]},
-                           {'ui_name': "CTR%",
-                            'plot_params': {'yaxis': {'min': 0, 'panRange':[0,None]}, 'xaxis': time_axis_params},
-                            'series': [{'label':'CTR%', 'points':{'show':True}, 'lines':{'show':True},
-                                        'data': [(1000*datum['_id'], 100.0*datum['clicks']/max(datum['impressions'],0.01)) for datum in agg_ret]}]}]
-
-                    if len(bid_types) == 1:
-                        # graph bid performance
-                        bid_type = bid_types[0]
-                        if bid_type == 'CPC':
-                            series =  [{'label':'click_weighted_bid', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(0,0,255)',
-                                        'data': [(1000*datum['_id'], (0.01*datum['click_weighted_bid']/max(1.0*datum['clicks'],0.01))) for datum in agg_ret]},
-                                       {'label':'imp_weighted_bid', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(200,200,200)',
-                                        'data': [(1000*datum['_id'], (0.01*datum['imp_weighted_bid']/max(1.0*datum['impressions'],0.01))) for datum in agg_ret]},
-#                                       {'label':'avg_bid', 'points':{'show':True}, 'lines':{'show':True},
-#                                        'data': [(1000*datum['_id'], 0.01*datum['avg_bid']) for datum in agg_ret]},
-                                       {'label':'CPC', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(255,0,0)',
-                                        'data': [(1000*datum['_id'], (0.01*datum['spent']/max(1.0*datum['clicks'],0.01))) for datum in agg_ret]}]
-
-                            if click_weighted_value_available:
-                                series.insert(0,{'label':'LTV/Click', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(0,255,0)',
-                                                 'data': [(1000*datum['_id'], (datum['click_weighted_value']/max(1.0*datum['clicks'],0.01))) for datum in agg_ret]})
-
-                            ret.append({'ui_name': "Bid Performance (%s)" % bid_type,
-                                        'plot_params': {'yaxis': {'min': 0, 'panRange':[0,None]}, 'xaxis': time_axis_params},
-                                        'series':series})
-
-                        elif bid_type.startswith('oCPM_'):
-
-                            if bid_type == 'oCPM_INSTALL':
-                                kpi = 'acquisition_event'
-                            else:
-                                kpi = bid_type[len('oCPM_'):][(0 if game_ids[0]=='tr' else len(game_ids[0]+'_')):]
-
-                            gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
-                            if kpi in gamedata['adnetworks']['fb_conversion_pixels']['events']:
-                                # pull acquisition events from production server log
-                                if len(game_ids) != 1:
-                                    ui_info = 'Multiple game_ids, cannot query conversions'
-                                elif game_ids[0] not in SpinConfig.config['mongodb_servers']:
-                                    ui_info = 'config.json has no mongodb_servers entry for game_id %s, cannot query conversions' % game_ids[0]
-
-                                else:
-                                    remote_nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_ids[0]), identity = 'pcheck_skynet')
-                                    event_qs = {'time':{'$gte':start_time, '$lte': end_time}, 'kpi':kpi}
-                                    event_qs.update(adgroup_dtgt_qs)
-
-                                    if 0:
-                                        weighted_value_available = False
-                                        remote_agg =  [{'$match':event_qs},
-                                                       {'$project':{'time':1}},
-                                                       {'$group': {'_id': { '$subtract' :['$time', {'$mod':['$time', time_interval]}] }, # group by hour
-                                                                   'count':{'$sum': 1}}}]
-
-                                        events = dict((x['_id'], {'count':x['count']}) for x in remote_nosql_client.log_buffer_table('log_fb_conversion_pixels').aggregate(remote_agg))
-                                    else:
-                                        weighted_value_available = True
-                                        events_by_time = {}
-                                        for row in remote_nosql_client.log_buffer_table('log_fb_conversion_pixels').find(event_qs, {'time':1,'context':1}):
-                                            ts = time_interval*(row['time']//time_interval)
-                                            tgt = SkynetLib.decode_params(SkynetLib.standin_spin_params, row['context'])
-                                            row['tgt'] = tgt
-                                            coeff, install_rate, unused_info = SkynetLib.bid_coeff(SkynetLib.standin_spin_params, tgt, 1.0, use_bid_shade = False,
-                                                                                                   use_install_rate = tgt['bid_type'] in ('CPC', 'oCPM_CLICK', 'oCPM_INSTALL'))
-                                            row['est_ltv'] = coeff # this is the 90-day est LTV associated with the bid_type event
-                                            if ts not in events_by_time: events_by_time[ts] = []
-                                            events_by_time[ts].append(row)
-                                        events = {}
-                                        for ts, rows in events_by_time.iteritems():
-                                            events[ts] = {'count':len(rows),
-                                                          'weighted_value':sum((row['est_ltv'] for row in rows), 0)
-                                                          }
-
-                                    if len(events) < 1:
-                                        ui_info = 'No conversion events found'
-                                    else:
-                                        series = [
-                                            #{'label':'avg_bid', 'points':{'show':True}, 'lines':{'show':True},
-                                            # 'data': [(1000*datum['_id'], 0.01*datum['avg_bid']) for datum in agg_ret]},
-                                            #{'label':'imp_weighted_bid', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(200,200,200)',
-                                            # 'data': [(1000*datum['_id'], (0.01*datum['imp_weighted_bid']/max(1.0*datum['impressions'],0.01))) for datum in agg_ret]},
-                                            {'label':'click_weighted_bid', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(0,0,255)',
-                                             'data': [(1000*datum['_id'], (0.01*datum['click_weighted_bid']/max(1.0*datum['clicks'],0.01))) for datum in agg_ret]},
-
-                                            {'label':'Cost/event', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(255,0,0)',
-                                             'data': [(1000*datum['_id'], 0.01*datum['spent']/events.get(datum['_id'],{}).get('count',0)) for datum in agg_ret if \
-                                                      events.get(datum['_id'],{}).get('count',0)>0]}]
-                                        if weighted_value_available:
-                                            series.append({'label':'LTV/event', 'points':{'show':True}, 'lines':{'show':True}, 'color':'rgb(0,255,0)',
-                                                           'data': [(1000*datum['_id'], events.get(datum['_id'],{}).get('weighted_value',0)/events.get(datum['_id'],{}).get('count',0)) for datum in agg_ret if \
-                                                                     events.get(datum['_id'],{}).get('count',0)>0]})
-
-                                        ret.append({'ui_name': "Bid Performance (%s: %s)" % (game_ids[0], bid_type),
-                                                    'plot_params': {'yaxis': {'min': 0, 'panRange':[0,None]}, 'xaxis': time_axis_params},
-                                                    'series': series})
-
-                            else:
-                                ui_info = 'Unhandled oCPM bid KPI "%s", cannot graph bid performance' % kpi
-                        else:
-                            ui_info = 'Unhandled bid type "%s", cannot graph bid performance' % bid_type
-                    else:
-                        ui_info = 'Multiple bid types (%s), cannot graph bid performance.' % repr(bid_types)
-                else:
-                    ui_info = 'No adstats found'
-                    ret = []
-
-                result = {'result': {'graphs': ret,
-                                     'query': args['query'],
-                                     'bid_types': list(bid_types),
-                                     'adgroup_dtgt_qs': adgroup_dtgt_qs,
-                                     'adgroup_list_len': len(adgroup_list),
-                                     'ui_info': ui_info
-                                     }}
-            else:
-                raise Exception('unknown skynet method '+method)
-
         else:
             raise Exception('unknown path '+repr(path))
 
@@ -554,12 +546,47 @@ def do_action(path, method, args, spin_token_data, nosql_client):
     except:
         return {"error":traceback.format_exc()}
 
-def do_CONTROLAPI(args, host = None, port = None):
-    url = 'http://%s:%d/CONTROLAPI' % (host or SpinConfig.config['proxyserver'].get('external_listen_host','localhost'),
-                                       port or SpinConfig.config['proxyserver']['external_http_port'])
+def do_google_translate(from_language, to_language, text):
+    args = {'target': to_language, 'q': text}
+    if from_language:
+        args['source'] = from_language
+    args['key'] = SpinConfig.config['google_translate_api_key']
+    url = 'https://www.googleapis.com/language/translate/v2?' + urllib.urlencode(args)
+    try:
+        request = urllib2.urlopen(url)
+        response_text = request.read()
+    except urllib2.HTTPError as e:
+        raise Exception('Google Translate API error:\n%s' % e.read())
+    response = SpinJSON.loads(response_text.strip())
+    translation = response['data']['translations'][0]
+    ret = {'translation': translation['translatedText']}
+    if 'detectedSourceLanguage' in translation:
+        ret['source_language'] = translation['detectedSourceLanguage']
+    return ret
+
+def do_CONTROLAPI(args, host = None, http_port = None, ssl_port = None):
+    host = host or SpinConfig.config['proxyserver'].get('internal_listen_host',
+                                                        SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
+    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
+    url = '%s://%s:%d/CONTROLAPI' % (proto, host,
+                                     (ssl_port or SpinConfig.config['proxyserver']['external_ssl_port']) if proto == 'https' else \
+                                     (http_port or SpinConfig.config['proxyserver']['external_http_port'])
+                                     )
     args['secret'] = SpinConfig.config['proxy_api_secret']
-    response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
-    return SpinJSON.loads(response)
+    try:
+        response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
+        return SpinJSON.loads(response)
+    except urllib2.HTTPError as e:
+        args['secret']='...'
+        raise Exception('CONTROLAPI connection failed: %d %r for %s?%s' % (e.code, e.read(), url, urllib.urlencode(args)))
+
+# this version assumes the CustomerSupport return value conventions
+def do_CONTROLAPI_checked(args):
+    ret = do_CONTROLAPI(args)
+    if 'error' in ret:
+        raise Exception('CONTROLAPI method failed: ' + (ret['error'] if isinstance(ret['error'], basestring) else repr(ret['error'])))
+    else:
+        return ret['result']
 
 def do_lookup(args):
     cmd_args = ['--live']
@@ -615,13 +642,15 @@ def get_server_latency(nosql_client):
                                   #get_client_perf_series(nosql_client, 'avg_framerate_us', '$graphics.framerate', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}),
                                   ]
                        },
-                      {'ui_name': 'Client Pings',
-                       'plot_params': {'yaxis': {'min':0, 'max':2000.0, 'panRange':[0,None]}, 'xaxis': time_axis_params, 'legend':{'position':'nw'} },
-                       'series': [get_client_perf_series(nosql_client, 'avg_ping', '$direct_ssl.ping', {'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
-                                  get_client_perf_series(nosql_client, 'avg_ping_us', '$direct_ssl.ping', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
+
+#                      {'ui_name': 'Client Pings',
+#                       'plot_params': {'yaxis': {'min':0, 'max':2000.0, 'panRange':[0,None]}, 'xaxis': time_axis_params, 'legend':{'position':'nw'} },
+#                       'series': [get_client_perf_series(nosql_client, 'avg_ping', '$direct_ssl.ping', {'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
+#                                  get_client_perf_series(nosql_client, 'avg_ping_us', '$direct_ssl.ping', {'country':'us', 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
                                   #get_client_perf_series(nosql_client, 'avg_ping_aunz', '$direct_ssl.ping', {'country':{'$in':['au','nz']}, 'time':{'$gte':time_range[0],'$lt':time_range[1]}}, rescale=1000),
-                                  ]
-                       },
+#                                  ]
+#                       },
+
                       ]}
 
 if __name__ == "__main__":

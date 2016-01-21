@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -151,7 +151,7 @@ def get_csv_fields(gamedata):
           "browser_supports_audio_wav", "browser_supports_audio_mp3", "browser_supports_audio_aac", "browser_supports_audio_context",
           "friends_in_game", "initial_friends_in_game", ] + \
           ['likes_'+x for x in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iterkeys()] + \
-          ["timezone", "chat_gagged", "last_fb_notification_time",
+          ["timezone", "last_fb_notification_time",
           ] + RETENTION_FIELDS + SPEND_FIELDS + VISITS_FIELDS + BROWSER_CAP_FIELDS + FEATURE_USE_FIELDS + get_quest_fields(gamedata) + get_unit_fields(gamedata) + get_item_fields(gamedata) + get_viral_fields(gamedata) + get_fb_notification_fields(gamedata) + ALL_ABTESTS
     FIELDS += TimeSeriesCSVWriter.TIME_CURRENT_FIELDS
     return FIELDS
@@ -548,7 +548,7 @@ def ai_base_has_tokens(gamedata, base):
 
 # utility functions to parse AI base JSON to obtain start/end time and repeat interval
 
-def pred_start_end_times(gamedata, pred): # return array of (start_time, end_time) if present in the predicate, else None
+def pred_start_end_times(gamedata, pred): # return array of (start_time, end_time, repeat_interval) if present in the predicate, else None
     if pred['predicate'] == 'OR':
         # return the union of all the times
         time_list = []
@@ -563,7 +563,7 @@ def pred_start_end_times(gamedata, pred): # return array of (start_time, end_tim
             if temp is not None:
                 return temp
     elif pred['predicate'] == 'ABSOLUTE_TIME':
-        return [[pred['range'][0], pred['range'][1]]]
+        return [[pred['range'][0], pred['range'][1], pred.get('repeat_interval',None)]]
     return None
 
 def cons_cooldown(gamedata, cons): # return cooldown trigger interval if present in the consequent, else None
@@ -575,28 +575,25 @@ def cons_cooldown(gamedata, cons): # return cooldown trigger interval if present
         return cons['period']
     return None
 
-def ai_base_timings(gamedata, base): # return list of [start_time, end_time, repeat_interval] for this base
-    start_end_times = None
+def ai_base_timings(gamedata, base): # return list of [start_time, end_time, reset_interval, repeat_interval] for this base
+    start_end_repeat = None
     if 'activation' in base:
-        start_end_times = pred_start_end_times(gamedata, base['activation'])
-    if (start_end_times is None) and ('show_if' in base):
-        start_end_times = pred_start_end_times(gamedata, base['show_if'])
+        start_end_repeat = pred_start_end_times(gamedata, base['activation'])
+    if (start_end_repeat is None) and ('show_if' in base):
+        start_end_repeat = pred_start_end_times(gamedata, base['show_if'])
 
-    if start_end_times is None: # unrestricted
-        start_end_times = [[-1,-1]]
+    if start_end_repeat is None: # unrestricted
+        start_end_repeat = [[-1,-1,None]]
 
-    # append the repeat intervals to each start_end_times entry
+    # detect the reset interval
     if 'completion' in base:
-        repeat_interval = cons_cooldown(gamedata, base['completion'])
+        reset_interval = cons_cooldown(gamedata, base['completion'])
     else:
-        repeat_interval = None
+        reset_interval = None
 
-    for entry in start_end_times:
-        entry.append(repeat_interval)
+    return [[start, end, reset_interval, repeat] for start, end, repeat in start_end_repeat]
 
-    return start_end_times
-
-# utility function to parse AI hive JSON to obtain list of start/end times
+# utility function to parse AI hive JSON to obtain list of [start_time, end_time, reset_interval, repeat_interval] for this template
 def hive_timings(gamedata, template):
     start_end_times = []
     max_duration = gamedata['hives']['duration'] # extend hive end_time by the max duration, since spawned hives can last that long
@@ -604,11 +601,11 @@ def hive_timings(gamedata, template):
         if entry['template'] == template:
             if not entry.get('active',True): continue
             if 'spawn_times' in entry:
-                start_end_times += [[x[0],x[1]+max_duration] for x in entry['spawn_times']]
+                start_end_times += [[x[0],x[1]+max_duration,None,None] for x in entry['spawn_times']]
             elif 'start_time' in entry:
-                start_end_times.append([entry['start_time'], entry['end_time']+max_duration])
+                start_end_times.append([entry['start_time'], entry['end_time']+max_duration, None, entry.get('repeat_interval',None)])
             else:
-                start_end_times.append([-1,-1]) # unrestricted
+                start_end_times.append([-1,-1,None,None]) # unrestricted
     return start_end_times
 
 # utility functions to classify the type of an AI base, hive, or quarry for analytics purposes
@@ -828,7 +825,7 @@ class TimeSeriesCSVWriter(object):
         #age = 11*self.DAY
 
         if user_ver < 2:
-            # resolution is limited to days because we only have old money_spent_by_day and logins_by_day fields for old users
+            # resolution is limited to days because we only have old money_spent_by_day fields for old users
             age_days = age/self.DAY
             cum = {'user_id': obj['user_id'], 'history_version':user_ver,
                    self.TIME_RES_NAME: 0, 'money_spent': 0.0, 'logged_in_times': 0}
@@ -839,8 +836,6 @@ class TimeSeriesCSVWriter(object):
                     self.writer.writerow(cum)
                 if 'money_spent_by_day' in obj:
                     cum['money_spent'] += obj['money_spent_by_day'].get(str(day), 0)
-                if 'logins_by_day' in obj:
-                    cum['logged_in_times'] += obj['logins_by_day'].get(str(day), 0)
             return
 
         # only include fields where the user history_version is recent enough
@@ -1391,7 +1386,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
 
                 # copy these fields directly, omitting if absent in playerdb file
                 for field in ['money_spent_by_day',
-                              'logins_by_day', 'sessions',
+                              'sessions',
                               # 'activity', 'purchase_ui_log', # removed for bloating
                               'friends_in_game', 'initial_friends_in_game',
                               'time_of_first_purchase', 'last_purchase_time',
@@ -1625,7 +1620,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                     if days_old >= threshold:
                         if day <= threshold:
                             obj['spend_%dd' % threshold] += amount
-        if 'logins_by_day' in obj:
+        if 0: # XXX 'logins_by_day' removed - port this to 'sessions'
             for strday, amount in obj['logins_by_day'].iteritems():
                 day = int(strday)
                 for threshold in DAY_MARKS:

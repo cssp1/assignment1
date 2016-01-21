@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -32,7 +32,7 @@
     "damage_protection": {
         "name": "damage_protection",
         "icon": "inventory_protection",
-        "help": 1, "cancelable": 0,
+        "help": 1, "cancelable": 1, "limited": 0,
         "ui_name": "Damage Protection", "name_color": [1,0.5,0,1],
         "ui_description": "Your base is protected from attack."
     },
@@ -189,6 +189,51 @@
         "ui_name": "Banished from Map(s)",
         "ui_description": "You have been banished from certain map regions."
         // effects happen via AURA_(IN)ACTIVE predicates
+    },
+
+    "flash_sale": {
+        "name": "flash_sale",
+        // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
+        "ui_name": "Limited-time Sale", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
+        "ui_description": "Up to %oneminuspct% off %gamebucks purchases. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+        // effects happen via AURA_(IN)ACTIVE predicates
+    },
+    "item_bundles": {
+        "name": "item_bundles",
+        // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
+        "ui_name": "Special Offer", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
+        "ui_description": "Get FREE items with %gamebucks purchases. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+        // effects happen via AURA_(IN)ACTIVE predicates
+    },
+    "generic_sale": {
+        "name": "generic_sale",
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
+        "ui_name": "Facebook Sale", "show": 1, "show_in_battle_log": 0, "name_color": [0,1,0.25,1],
+        "ui_description": "More FREE bonus %gamebucks with purchases from the Buy %gamebucks menu. Act quickly, this offer ends soon!",
+        "on_click": {"consequent": "INVOKE_BUY_GAMEBUCKS_DIALOG"}
+        // no effects, for GUI only
+    },
+
+    "lottery_scans": {
+        "name": "lottery_scans",
+        "icon": "inventory_random_offer_A",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0,
+        "ui_name": "War Chest", "show": 1, "show_in_battle_log": 0, "name_color": [1,0.75,0],
+        "ui_description": "You have %stack FREE War Chest play. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
+        "ui_description_plural": "You have %stack FREE War Chest plays. Act quickly, this offer ends soon.\n\n[b]Click to play now[/b]",
+        "on_click": {"consequent": "INVOKE_LOTTERY_DIALOG", "force": 1, "reason": "aura_click"}
+        // effects happen via server decrementing the stacks
     },
 
     // these are only applied during AI base visits or attacks, triggered by the consequents generated in make_ai_skeleton.py

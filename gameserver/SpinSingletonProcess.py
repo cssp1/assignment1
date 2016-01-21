@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import os
+import os, errno, time
 
 # try to ensure we only run a given process once
 
@@ -15,9 +15,18 @@ class SingletonProcess(object):
         self.key = key
         # note: /var/run is not user-writable on OSX, so use /tmp instead
         self.path = '/tmp/spin-singleton-%s.pid' % self.key
-    def __enter__(self):
+
+    def __enter__(self, max_age = 86400): # ignore lock files older than max_age seconds
         # XXX not really atomic
-        if os.path.exists(self.path):
+        mtime = -1
+        try:
+            mtime = os.path.getmtime(self.path)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                pass # file not found
+            else:
+                raise
+        if mtime > 0 and (max_age < 0 or mtime > time.time() - max_age):
             raise AlreadyRunning('%s exists - not starting.' % self.path)
         open(self.path, 'w').write('%d\n' % os.getpid())
         return self.key

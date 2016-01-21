@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -25,7 +25,8 @@
 
         // enable manual setting of canvas_div size to work around buggy Facebook iframe resizing
         "facebook_iframe_resize_hack": true,
-        "facebook_iframe_footer_peek": 30, // how many pixels to shrink the game canvas vertically to reveal the top of the footer
+        // how many pixels to shrink the game canvas vertically to reveal the top of the footer
+        "facebook_iframe_footer_peek": 44, // XXX this should be 30, but as of 2015 Dec 4, Facebook imposes a horizontal scrollbar at the bottom of the screen, so we add 14 pixels to ensure the linkbar is fully visible
 
         "armorgames_iframe_size_mode": "screen", // initialize AG iframe size based on screen dimensions at connect time
         "armorgames_iframe_margins": [50, 195], // pixels to shrink the iframe relative to the maximum window size, for safety
@@ -83,7 +84,9 @@
         "ajax_config": {
             "default": {
                 // number of seconds to wait before deciding that an outstanding AJAX request has failed
-                "message_timeout_hello": 12, // timeout used for CLIENT_HELLO connection attempt
+                "message_timeout_hello": 30, // timeout used for CLIENT_HELLO connection attempt
+                // ^ XXXXXX lower this back to 12 after websockets is enabled
+
                 "message_timeout_gameplay": 120, // timeout used for normal gameplay messages
                 "enable_proxy": 1 },
             "high_latency": {
@@ -91,11 +94,11 @@
                 // since it's more likely people just have slow connections instead of business firewalls.
                 "message_timeout_hello": 120,
                 "message_timeout_gameplay": 120,
-                "enable_proxy": 0 }
+                "enable_proxy": 1 } // needed for haproxy setup
         },
         "websocket_keepalive_interval": 50, // always send something down the websocket this frequently
 
-        "ajax_message_buffer": 10, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
+        "ajax_message_buffer": 20, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
 
         "enable_ajax_longpoll": 1, // use longpoll request mechanism
         "ajax_longpoll_timeout": 120, // standard timeout (sec) for longpoll requests - MUST be longer than gamedata.server.ajax_longpoll_wait + bgtask interval
@@ -108,7 +111,7 @@
         "player_ping_interval": 29.0, // max number of seconds between automatic PING_PLAYER requests
         "combat_state_save_interval": 44.0, // max number of seconds between flushing dirty position/HP values with OBJECT_COMBAT_STATES message
         "unit_repair_ping_interval": 8.0, // min number of seconds between UNIT_REPAIR_TICK requests when looking for completed repairs
-        "base_damage_ping_interval": 5.0, // min number of seconds between pings of base damage during ladder battles
+        "base_damage_ping_interval": 10.0, // min number of seconds between PING_BASE_DAMAGE when used for non-critical synchronization
         "base_damage_ping_detail": true, // whether to send detailed info with the base damage ping, for debugging only
 
         "quarry_collect_poll_interval": -1, // delay before polling for quarry collect results after a Collect All, in seconds (no longer needed since quarry collection is synchronous in NoSQL-land)
@@ -244,6 +247,7 @@
         "enable_alliances": 1,
         "enable_alliance_chat_tags": 1,
         "enable_alliance_role_gui": 1,
+        "enable_alliance_battle_history": 0,
 
         "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
             {"predicate": "LIBRARY", "name": "quarry_requirement"},
@@ -383,6 +387,14 @@
                 {"predicate":"BROWSER_NAME", "names": ["Explorer"]},
                 {"predicate":"BROWSER_VERSION", "versions": [12,-1]}
             ]}, true],
+            [{"predicate":"AND", "subpredicates":[ // Chrome 47+
+                {"predicate":"BROWSER_NAME", "names": ["Chrome"]},
+                {"predicate":"BROWSER_VERSION", "versions": [47,-1]}
+            ]}, true],
+            [{"predicate":"AND", "subpredicates":[ // Firefox 42+
+                {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
+                {"predicate":"BROWSER_VERSION", "versions": [42,-1]}
+            ]}, true],
             [{"predicate":"ALWAYS_TRUE"}, false]
         ],
 
@@ -434,6 +446,8 @@
         "vfx":
 #include "$GAME_ID/$GAME_ID_client_vfx.json"
         ,
+        "camera_shake_scale": 0.5, // global scale on camera_shake SPFX effects
+
         "inert_warn_count": 100, // warn developers if more than this many inert objects are used
 
         // controls overall intensity of weapon projectile glow effect (only in high_gfx mode)
@@ -628,7 +642,7 @@
 
     "battle_log_max_summary_num": 50, // maximum number of battle summaries to keep in battle history (total, ALL opponents)
     "battle_log_max_summary_age": 2592000, // maximum age (seconds) of battle summaries to keep in battle history (30 days)
-    "battle_log_max_age": 2592000, // maximum age (seconds) to keep any playerdb battle history data at all (30 days)
+    "battle_log_max_age": -1, // maximum age (seconds) to keep any playerdb battle history data at all (2592000 = 30 days, -1 to disable)
 
     "repeat_attack_cooldown": {
         // "ai" for AI opponents, "human" for human opponents

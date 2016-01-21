@@ -1,11 +1,11 @@
 // "territory" refers to the base-control metagame (regional map)
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
 {
-    "default_quarry_landlord_id": 901, // used for abandoned quarries
+    "default_quarry_landlord_id": 1001, // used for abandoned quarries
 
     "show_coords_in_player_info": 1, // whether to show home base location of other players in their Player Info
     "travel_time_per_hex": 0.5, // seconds of travel time per map hex
@@ -174,6 +174,9 @@
     "exclusive_zone_player": 2, // minimum hex distance spacing of player base from other objects
     "neighbor_search_radius": 8, // when relocating base, how far away from the desired location to search for an empty spot
     "map_placement_gen": 3, // temporary - generation number for successive map placement trials
+
+    "enable_auto_resolve": 1,
+    "enable_pre_resolve": 1,
 
     "tiles":
 #include "$GAME_ID_territory_tiles.json"

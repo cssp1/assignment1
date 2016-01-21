@@ -1,7 +1,5 @@
 #!/bin/sh
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"
@@ -11,6 +9,7 @@ YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tool
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
 YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-simplejson"
+YUMPACKAGES+=" libstdc++48" # for TensorFlow
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -23,7 +22,7 @@ sudo /etc/init.d/nscd start
 sudo chkconfig mysqld off # moved to RDS
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-analytics1.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-analytics1.tar.gz)
 
 # fix permissions
 sudo chown -R root:root /etc
@@ -44,9 +43,6 @@ sudo newaliases
 echo "SETUP(remote): Mounting all volumes..."
 sudo mount -a
 
-echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
-sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
-
 echo "SETUP(remote): analytics1 setup done!"
 
 echo "/etc/fstab"
@@ -62,16 +58,16 @@ echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade asana" # for Ship Schedule integration
+echo "pip install --upgrade tensorflow"
 
 echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/analytics1.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
-echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
+echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
 echo "MISSING: /home/ec2-user/.ssh/slack.token (with incoming webhook for analytics channel) for automated messages"
 echo "MISSING: /home/ec2-user/.ssh/host-awssecret"
-echo "MISSING: /home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics"
 echo "MISSING: set up scratch space in /media/aux/tmp for backup script"
 echo "MISSING: set up swap space"
 echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql_secure_installation to set root password)"

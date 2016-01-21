@@ -16,7 +16,7 @@
  * @fileoverview Provides a utility for tracing and debugging WebChannel
  *     requests.
  *
- * @visibility {//visibility:private}
+ * @visibility {:internal}
  */
 
 
@@ -32,6 +32,7 @@ goog.require('goog.log');
  *
  * @constructor
  * @struct
+ * @final
  */
 goog.labs.net.webChannel.WebChannelDebug = function() {
   /**
@@ -111,46 +112,6 @@ WebChannelDebug.prototype.xmlHttpChannelResponseText =
       'XMLHTTP TEXT (' + id + '): ' +
       this.redactResponse_(responseText) +
       (opt_desc ? ' ' + opt_desc : ''));
-};
-
-
-/**
- * Logs a Trident ActiveX request.
- * @param {string} verb The request type (GET/POST).
- * @param {goog.Uri} uri The request destination.
- * @param {string|number|undefined} id The request id.
- * @param {number} attempt Which attempt # the request was.
- */
-WebChannelDebug.prototype.tridentChannelRequest =
-    function(verb, uri, id, attempt) {
-  this.info(
-      'TRIDENT REQ (' + id + ') [ attempt ' + attempt + ']: ' +
-      verb + '\n' + uri);
-};
-
-
-/**
- * Logs the response text received from a Trident ActiveX request.
- * @param {string|number|undefined} id The request id.
- * @param {string} responseText The response text.
- */
-WebChannelDebug.prototype.tridentChannelResponseText =
-    function(id, responseText) {
-  this.info(
-      'TRIDENT TEXT (' + id + '): ' +
-      this.redactResponse_(responseText));
-};
-
-
-/**
- * Logs the done response received from a Trident ActiveX request.
- * @param {string|number|undefined} id The request id.
- * @param {boolean} successful Whether the request was successful.
- */
-WebChannelDebug.prototype.tridentChannelResponseDone =
-    function(id, successful) {
-  this.info(
-      'TRIDENT TEXT (' + id + '): ' + successful ? 'success' : 'failure');
 };
 
 
@@ -241,7 +202,7 @@ WebChannelDebug.prototype.redactResponse_ = function(responseText) {
 
 /**
  * Removes data from a response array that may be sensitive.
- * @param {!Array} array The array to clean.
+ * @param {!Array<?>} array The array to clean.
  * @private
  */
 WebChannelDebug.prototype.maybeRedactArray_ = function(array) {

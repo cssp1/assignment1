@@ -1,10 +1,6 @@
 #!/bin/sh
 
-SYSTEM=$1
-
-. ./setup-there-common.sh
-
-YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen"
+YUMPACKAGES="git xfsprogs telnet subversion nscd munin-node strace sendmail-cf patch screen python-boto"
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -14,7 +10,7 @@ sudo chkconfig --add nscd
 sudo chkconfig nscd on
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-${SYSTEM}.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-mongo.tar.gz)
 
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools
@@ -50,10 +46,7 @@ sudo /etc/init.d/munin-node restart
 echo "SETUP(remote): Fixing mail configuration..."
 sudo ./fix-ec2-mail.py
 
-echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
-sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
-
-echo "SETUP(remote): ${SYSTEM} setup done!"
+echo "SETUP(remote): mongo setup done!"
 
 echo "MISSING:"
 echo "/etc/sysconfig/network hostname."
@@ -73,6 +66,5 @@ echo "check fstab"
 echo "keys: /home/ec2-user/.ssh"
 echo "                     xxprod-mongo-awssecret (backups)"
 echo "                     xxprod-mongo-root-password (backups)"
-echo "/home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics"
 echo "configure /etc/cron.spinpunch.daily/mongo-backup.py backup script (check that SCRATCH_DIR exists!)"
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"

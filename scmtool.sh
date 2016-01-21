@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -21,11 +21,13 @@ function usage {
     echo "  revert - revert changes to origin (leaving new untracked files alone)"
     echo "  force-revert - revert changes to origin (deleting new untracked files)"
     echo "  site-patch - apply all patches in the *-private/ directory"
-    echo "  version - get current version"
+    echo "  version - get current version, in active SCM system"
+    echo "  git-version - get current Git version (from active Git, or from git-sync.txt if SVN slave)"
     echo "  stat - show modified file list"
     echo "  diff - show differences"
     echo "  commit [MESSAGE] - make a commit"
     echo "  push - (Git only) send commits to origin"
+    echo "  clean - perform garbage collection maintenance"
     return 1
 }
 
@@ -63,6 +65,10 @@ function do_force_up_svn {
 function do_version_svn {
     (cd "$ROOT" && svn info | grep Revision | cut -d' ' -f 2)
 }
+function do_git_version_svn {
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    (cd "${ROOT}/${SUBPATH}" && cat 'git-sync.txt')
+}
 function do_stat_svn {
     (cd "$ROOT" && svn stat)
 }
@@ -71,6 +77,9 @@ function do_diff_svn {
 }
 function do_commit_svn {
     (cd "$ROOT" && svn ci -m "$1")
+}
+function do_clean_svn {
+    (cd "$ROOT" && svn cleanup)
 }
 
 # synchronize SVN repository with Git repository by pulling in deltas since last sync
@@ -143,7 +152,8 @@ function do_force_revert_git {
     (cd "$ROOT" && git reset --hard HEAD && git clean -f -d)
 }
 function do_version_git {
-    (cd "$ROOT" && git rev-parse HEAD)
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    (cd "${ROOT}/${SUBPATH}" && git rev-parse HEAD)
 }
 function do_stat_git {
     for dir in $GIT_DIRS; do
@@ -153,7 +163,7 @@ function do_stat_git {
 function do_diff_git {
     for dir in $GIT_DIRS; do
         # rewrite the +++/--- part of the diff to have the right relative paths
-        (cd $dir && git diff | sed "s|--- a/|--- $dir/|" | sed "s|+++ b/|+++ $dir/|")
+        (cd $dir && git diff HEAD | sed "s|--- a/|--- $dir/|" | sed "s|+++ b/|+++ $dir/|")
     done
 }
 function do_commit_git {
@@ -166,6 +176,12 @@ function do_push_git {
     for dir in $GIT_DIRS; do
         echo "pushing game-${dir}..."
         (cd $dir && git push)
+    done
+}
+function do_clean_git {
+    for dir in $GIT_DIRS; do
+        echo "Cleaning up game-${dir}..."
+        (cd $dir && git gc --auto)
     done
 }
 
@@ -190,6 +206,12 @@ else
                 do_site_patch $@
                 ;;
             version)
+                do_version_git $@
+                ;;
+        clean)
+        do_clean_git $@
+        ;;
+            git-version)
                 do_version_git $@
                 ;;
             stat)
@@ -228,6 +250,9 @@ else
             version)
                 do_version_svn $@
                 ;;
+            git-version)
+                do_git_version_svn $@
+                ;;
             stat)
                 do_stat_svn $@
                 ;;
@@ -240,6 +265,9 @@ else
             git-sync)
                 do_git_sync_svn $@
                 ;;
+        clean)
+        do_clean_svn $@
+        ;;
             *)
                 usage
                 ;;

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     with SpinSingletonProcess.SingletonProcess('gamebucks_to_mysql-%s' % game_id):
 
-        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
+        nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config((game_id+'test') if SpinConfig.config['game_id'].endswith('test') else game_id))
 
         cur = con.cursor(MySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, store_table, store_schema(sql_util))
@@ -202,11 +202,11 @@ if __name__ == '__main__':
 
             keyvals += summary
 
-            if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent'):
+            if row['event_name'] in ('1400_gamebucks_spent', '1401_fungible_spent', '1402_score_spent'):
                 if row['event_name'] == '1400_gamebucks_spent':
                     keyvals.append(('price',row['gamebucks_price']))
                     keyvals.append(('currency','gamebucks'))
-                elif row['event_name'] == '1401_fungible_spent':
+                elif row['event_name'] in ('1401_fungible_spent', '1402_score_spent'):
                     keyvals.append(('price',row['price']))
                     keyvals.append(('currency',row['price_currency']))
 

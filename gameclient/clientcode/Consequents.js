@@ -1,6 +1,6 @@
 goog.provide('Consequents');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -11,6 +11,7 @@ goog.provide('Consequents');
 // for Logic only
 goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
+goog.require('OfferChoice');
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but
@@ -398,11 +399,49 @@ InvokeStoreConsequent.prototype.execute = function(state) {
 function InvokeBuyGamebucksConsequent(data) {
     goog.base(this, data);
     this.reason = data['reason'] || 'INVOKE_BUY_GAMEBUCKS_DIALOG';
+    this.highlight_only = data['highlight_only'] || false;
+    this.notification_params = data['notification_params'] || null;
 }
+
 goog.inherits(InvokeBuyGamebucksConsequent, Consequent);
 InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
-    change_selection_ui(null);
-    invoke_buy_gamebucks_dialog(this.reason, -1, null);
+    var cb = (function (_this) { return function() {
+        invoke_buy_gamebucks_dialog(_this.reason, -1, null, {'highlight_only': _this.highlight_only});
+    }; })(this);
+    if(this.notification_params) {
+        notification_queue.push(cb, this.notification_params);
+    } else {
+        change_selection_ui(null);
+        cb();
+    }
+};
+
+/** @constructor
+  * @extends Consequent */
+function InvokeLotteryConsequent(data) {
+    goog.base(this, data);
+    this.reason = data['reason'] || 'INVOKE_LOTTERY_DIALOG';
+    this.force = ('force' in data? data['force'] : false);
+}
+goog.inherits(InvokeLotteryConsequent, Consequent);
+InvokeLotteryConsequent.prototype.execute = function(state) {
+    var cb = (function (_this) { return function() {
+        var scanner = null;
+        for(var id in session.cur_objects.objects) {
+            var obj = session.cur_objects.objects[id];
+            if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && !obj.is_under_construction()) {
+                var state = player.get_lottery_state(/** @type {!Building} */ (obj));
+                if(_this.force || state.can_scan) {
+                    scanner = obj;
+                    break;
+                }
+            }
+        }
+        if(scanner) {
+            invoke_lottery_dialog(scanner, _this.reason);
+        }
+    }; })(this);
+    notification_queue.push(cb);
 };
 
 /** @constructor
@@ -577,10 +616,28 @@ function DisplayDailyTipConsequent(data) {
     goog.base(this, data);
     this.name = data['name'] || null;
     this.skip_notification_queue = data['skip_notification_queue'] || null;
+    this.notification_params = data['notification_params'] || null;
 }
 goog.inherits(DisplayDailyTipConsequent, Consequent);
 DisplayDailyTipConsequent.prototype.execute = function(state) {
-    invoke_daily_tip(this.name, this.skip_notification_queue);
+    invoke_daily_tip(this.name, this.skip_notification_queue, this.notification_params);
+};
+
+/** @constructor
+  * @extends Consequent */
+function InvokeOfferChoiceConsequent(data) {
+    goog.base(this, data);
+    this.then_cons = read_consequent(data['then']);
+}
+goog.inherits(InvokeOfferChoiceConsequent, Consequent);
+InvokeOfferChoiceConsequent.prototype.execute = function(state) {
+    var then_cb = (function (_this) { return function() {
+        _this.then_cons.execute(state);
+    }; })(this);
+    var invoker = (function (_then_cb) { return function() {
+        OfferChoice.invoke_offer_choice(_then_cb);
+    }; })(then_cb);
+    notification_queue.push(invoker);
 };
 
 /** @constructor
@@ -743,6 +800,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_MISSIONS_DIALOG') { return new InvokeMissionsDialogConsequent(data); }
     else if(kind === 'INVOKE_STORE_DIALOG') { return new InvokeStoreConsequent(data); }
     else if(kind === 'INVOKE_BUY_GAMEBUCKS_DIALOG') { return new InvokeBuyGamebucksConsequent(data); }
+    else if(kind === 'INVOKE_LOTTERY_DIALOG') { return new InvokeLotteryConsequent(data); }
     else if(kind === 'INVOKE_UPGRADE_DIALOG') { return new InvokeUpgradeConsequent(data); }
     else if(kind === 'INVOKE_BUILD_DIALOG') { return new InvokeBuildDialogConsequent(data); }
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
@@ -758,6 +816,7 @@ function read_consequent(data) {
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
+    else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }

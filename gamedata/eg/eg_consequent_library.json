@@ -1,6 +1,13 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
 {
+    "on_login_pre_hello": { "consequent": "AND", "subconsequents": [
+        // Facebook sales - apply GUI aura
+        {"consequent": "IF", "if": {"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"},
+                                                                          {"predicate": "EVENT_TIME", "event_kind": "facebook_sale", "method": "inprogress", "ignore_activation": 1}]},
+         "then": {"consequent": "APPLY_AURA", "aura_name": "generic_sale", "aura_duration_from_event": {"event_kind": "facebook_sale"}, "aura_strength": 0.30,
+                  "aura_data": {"kind": "facebook_sale"}}}
+    ]}
 }

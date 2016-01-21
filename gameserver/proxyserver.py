@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -18,7 +18,7 @@ if sys.platform == 'linux2':
     from twisted.internet import epollreactor
     epollreactor.install()
 
-from twisted.internet import reactor, task, defer, protocol
+from twisted.internet import reactor, task, defer, protocol, utils
 from twisted.web import proxy, resource, static, http, twcgi
 import twisted.web.error
 import twisted.web.server
@@ -171,7 +171,7 @@ def get_static_include(name):
 
 def verbose():
     if verbose_in_argv:
-        return 1
+        return 2
     return SpinConfig.config['proxyserver'].get('verbose',0)
 
 def metric_event_coded(visitor, event_name, props):
@@ -196,10 +196,10 @@ def uniqid(prefix='', more_entropy=False):
 
 unique_session_counter = 0
 
-def generate_session_id():
+def generate_session_id(user_id):
     global unique_session_counter
     unique_session_counter += 1
-    return hashlib.sha256('SP!NP0NCH' + str(time.time()) + str(unique_session_counter)).hexdigest()[32:64]
+    return str(user_id)+'_'+hashlib.sha256(SpinConfig.config.get('session_id_salt','SP!NP0NCH') + str(time.time()) + str(unique_session_counter)).hexdigest()[32:64]
 
 
 def parse_host_port(hostport, is_ssl):
@@ -230,27 +230,38 @@ def get_http_origin(visitor, is_ssl):
 # the server behind the proxy knows where the request originally came from
 
 def add_proxy_headers(request):
-    orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', request.isSecure())
+    # note: don't use proxy_secret here, since we don't double-proxy anything - no spin-orig headers should be set yet
+    orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', SpinHTTP.twisted_request_is_ssl(request))
+    orig_uri = request.uri
+    orig_ip = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
+    orig_referer = SpinHTTP.get_twisted_header(request, 'referer') or 'unknown'
+    SpinHTTP.set_twisted_header(request,'spin-orig-signature', SpinSignature.sign_proxy_headers(orig_protocol, orig_host, orig_port, orig_uri, orig_ip, orig_referer, SpinConfig.config['proxy_api_secret']))
     SpinHTTP.set_twisted_header(request,'spin-orig-protocol',orig_protocol)
     SpinHTTP.set_twisted_header(request,'spin-orig-host',orig_host)
     SpinHTTP.set_twisted_header(request,'spin-orig-port',orig_port)
-    SpinHTTP.set_twisted_header(request,'spin-orig-uri',request.uri)
-    SpinHTTP.set_twisted_header(request,'spin-orig-ip',request.getClientIP() or 'unknown')
-    SpinHTTP.set_twisted_header(request,'spin-orig-referer',SpinHTTP.get_twisted_header(request, 'referer') or 'unknown')
+    SpinHTTP.set_twisted_header(request,'spin-orig-uri',orig_uri)
+    SpinHTTP.set_twisted_header(request,'spin-orig-ip',orig_ip)
+    SpinHTTP.set_twisted_header(request,'spin-orig-referer',orig_referer)
 
 def dump_request(request):
     print 'REQUEST', request
+    print 'getClientIP()', request.getClientIP()
+    print 'isSecure()', request.isSecure()
     print 'HEADERS', repr(request.requestHeaders)
-    print 'COOKIES', request.received_cookies
+    #print 'COOKIES', request.received_cookies
     print 'ARGS', request.args
     #print 'CONTENT', str(request.content)
 
 def log_request(request):
+    try:
+        ip = SpinHTTP.get_twisted_client_ip(request, proxy_secret = SpinConfig.config['proxy_api_secret'])
+    except:
+        ip = '*invalid*'
     ret = repr(request)+ \
           ' args '+repr(request.args)+ \
-          ' cookies '+repr(request.received_cookies)+ \
+          ' headers '+repr(request.requestHeaders)+ \
           ' user-agent "'+SpinHTTP.get_twisted_header(request,'user-agent')+ \
-          '" ip ' + repr(request.getClientIP())
+          '" getClientIP() '+repr(request.getClientIP())+' isSecure() '+repr(request.isSecure())+' parsed ip ' + repr(ip)
     return ret
 
 def set_cookie(request, cookie_name, value, duration):
@@ -332,12 +343,13 @@ class Visitor(object):
         if 'locale_override' in request.args:
             self.demographics['locale'] = request.args['locale_override'][0]
         self.demographics['User-Agent'] = SpinHTTP.get_twisted_header(request, 'user-agent') or 'unknown'
-        self.demographics['ip'] = request.getClientIP() or 'unknown'
+        self.demographics['ip'] = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
         self.browser_info = BrowserDetect.get_browser(self.demographics['User-Agent'])
 
         # canonical protocol/host/port for game server (in case browser needs to reload it)
         self.server_protocol, self.server_host, self.server_port = \
-                              parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', request.isSecure())
+                              parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown',
+                                              SpinHTTP.twisted_request_is_ssl(request))
 
         if self.first_hit_uri is None:
             self.set_first_hit(request)
@@ -441,7 +453,7 @@ class KGVisitor(Visitor):
         if 'kongregate_game_url' in request.args:
             self.game_container = request.args['kongregate_game_url'][0] + q_clean_qs(request.uri)
         else:
-            self.game_container = 'http://www.spinpunch.com' # punt :(
+            self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.kongregate.com/') # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/KGROOT' + q_clean_qs(self.first_hit_uri,
@@ -479,7 +491,7 @@ class AGVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.armorgames_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = 'http://www.spinpunch.com' # punt :(
+        self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.armorgames.com/') # punt :(
 
     def canvas_url(self):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
@@ -606,6 +618,26 @@ def send_payment_dispute_notification(response, user_id, dry_run = False):
     if dry_run: args.append('--dry-run')
     reactor.spawnProcess(PaymentDisputeProcess(exe, response), exe, args=args, env=os.environ)
 
+# call scmtool to get the SCM version, then send a status notification
+@defer.inlineCallbacks
+def send_proxyserver_status_notification(status_json):
+    if 'server_status_recipients' not in SpinConfig.config: return
+    scm_version_root = yield utils.getProcessOutput('../scmtool.sh', args=['git-version'], env=os.environ)
+    scm_version_root = scm_version_root.strip()[0:8] # truncate git checksum
+    scm_version_gamedata = yield utils.getProcessOutput('../scmtool.sh', args=['git-version', 'gamedata/%s' % SpinConfig.game().encode('ascii')], env=os.environ)
+    scm_version_gamedata = scm_version_gamedata.strip()[0:8] # truncate git checksum
+    exe = './SpinReminders.py'
+    args = ['--from', '%s proxyserver' % SpinConfig.game_id_long(),
+            '--subject', '%s Update deployed' % SpinConfig.game_id_long().upper(),
+            '--body', 'Now serving engine version %s, %s gamedata version %s (builds: gamedata "%s" gameclient "%s")' % \
+            (scm_version_root,
+             SpinConfig.game().upper().encode('ascii'),
+             scm_version_gamedata,
+             status_json['gamedata_build'].encode('ascii'),
+             status_json['gameclient_build'].encode('ascii')),
+            '--recipients', SpinJSON.dumps(SpinConfig.config['server_status_recipients'])]
+    ret = yield utils.getProcessValue(exe, args=args, env=os.environ)
+    defer.returnValue(ret)
 
 class GameProxy(proxy.ReverseProxyResource):
     proxyClientFactoryClass = GameProxyClientFactory
@@ -636,7 +668,7 @@ class GameProxy(proxy.ReverseProxyResource):
         SpinHTTP.set_access_control_headers(request)
 
         # check for spam from this IP
-        ip = request.getClientIP()
+        ip = SpinHTTP.get_twisted_client_ip(request)
         if ip:
             if ip in ip_table:
                 rec = ip_table[ip]
@@ -660,7 +692,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # check for cookie-reflect landing
         if (reflect_cookie in request.received_cookies) and SpinConfig.config['proxyserver'].get('enable_reflect_cookie_landing',True):
             new_args = urlparse.parse_qs(request.received_cookies[reflect_cookie])
-            metric_event_coded(None, '0011_reflect_cookie_landing', {'Viewed URL': request.uri, 'ip': request.getClientIP(), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args, 'new_args': new_args})
+            metric_event_coded(None, '0011_reflect_cookie_landing', {'Viewed URL': request.uri, 'ip': SpinHTTP.get_twisted_client_ip(request), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args, 'new_args': new_args})
             for k, v in new_args.iteritems():
                 if k not in request.args:
                     request.args[k] = v
@@ -669,7 +701,7 @@ class GameProxy(proxy.ReverseProxyResource):
         elif ('spin_rfl' in request.args) and SpinConfig.config['proxyserver'].get('enable_reflect_cookie_launch',True):
             new_qs = urllib.urlencode([(k,v[-1]) for k,v in request.args.iteritems() if (k.startswith('spin_') and k != 'spin_rfl')])
             set_cookie(request, reflect_cookie, new_qs, SpinConfig.config['proxyserver'].get('reflect_cookie_duration',300))
-            metric_event_coded(None, '0010_reflect_cookie_launch', {'Viewed URL': request.uri, 'ip': request.getClientIP(), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args})
+            metric_event_coded(None, '0010_reflect_cookie_launch', {'Viewed URL': request.uri, 'ip': SpinHTTP.get_twisted_client_ip(request), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args})
             return self.index_visit_redirect(request.args['spin_rfl'][-1])
 
         return self.index_visit(request, frame_platform)
@@ -679,14 +711,14 @@ class GameProxy(proxy.ReverseProxyResource):
         cookie_name = 'spin_anon_id2_'+str(SpinConfig.config['game_id']) + '_' + frame_platform
 
         if (cookie_name in request.received_cookies) and \
-           SpinSignature.AnonID.verify(request.received_cookies[cookie_name], proxy_time, request.getClientIP(), frame_platform, SpinConfig.config['proxy_api_secret']):
+           SpinSignature.AnonID.verify(request.received_cookies[cookie_name], proxy_time, SpinHTTP.get_twisted_client_ip(request), frame_platform, SpinConfig.config['proxy_api_secret']):
             anon_id = request.received_cookies[cookie_name]
             #exception_log.event(proxy_time, 'proxyserver: recognized cookie '+anon_id)
         else:
             # generate anon ID
             duration = SpinConfig.config['proxyserver'].get('anon_id_duration', 600)
             anon_id = SpinSignature.AnonID.create(proxy_time + duration,
-                                                  request.getClientIP(), frame_platform, SpinConfig.config['proxy_api_secret'], str(random.randint(0,100000)))
+                                                  SpinHTTP.get_twisted_client_ip(request), frame_platform, SpinConfig.config['proxy_api_secret'], str(random.randint(0,100000)))
             set_cookie(request, cookie_name, anon_id, duration)
             #exception_log.event(proxy_time, 'proxyserver: NEW cookie '+anon_id)
 
@@ -762,7 +794,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.kongregate_auth_token = str(request.args['kongregate_game_auth_token'][0])
 
         # geolocate country
-        visitor.demographics['country'] = geoip_client.get_country(request.getClientIP())
+        visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
             return self.index_visit_go_away(request, visitor)
@@ -790,7 +822,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_kg_verify(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         vc = self.KGVerifyCheck(self, request, visitor, d)
         kg_async_http.queue_request(proxy_time,
                                     'https://www.kongregate.com/api/authenticate.json?'+urllib.urlencode({'user_id':visitor.kongregate_id,
@@ -849,7 +881,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.armorgames_auth_token = str(request.args['auth_token'][0])
 
         # geolocate country
-        visitor.demographics['country'] = geoip_client.get_country(request.getClientIP())
+        visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
             return self.index_visit_go_away(request, visitor)
@@ -867,7 +899,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_ag_verify(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         vc = self.AGVerifyCheck(self, request, visitor, d)
         ag_async_http.queue_request(proxy_time,
                                     'https://services.armorgames.com/services/rest/v1/authenticate/user.json?' + \
@@ -886,7 +918,7 @@ class GameProxy(proxy.ReverseProxyResource):
         def on_response(self, response):
             self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, response))
         def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, '{"payload":null,"message":"SpinPunch error"}'))
+            self.d.callback(self.parent.index_visit_ag_verify_response(self.request, self.visitor, '{"payload":null,"message":"proxyserver.py error"}'))
 
     def index_visit_ag_verify_response(self, request, visitor, response):
         r = SpinJSON.loads(response)
@@ -977,9 +1009,9 @@ class GameProxy(proxy.ReverseProxyResource):
         if (not visitor.raw_signed_request):
             if SpinHTTP.get_twisted_header(request,'user-agent').startswith('facebookexternalhit'):
                 replacements = {
-                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'SpinPunch'),
-                    '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', ''),
-                    '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', ''),
+                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit TItle'),
+                    '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+                    '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
                     }
                 expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
                 template = get_static_include('facebookexternalhit.html')
@@ -1036,7 +1068,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_fetch_oauth_token(self, request, visitor, code):
         # asynchronously call Facebook API to retrieve an oauth_token using the "code" from the auth redirect
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         sc = self.OAuthGetter(self, request, visitor, d)
 
         url = SpinFacebook.versioned_graph_endpoint('oauth', 'oauth')
@@ -1080,7 +1112,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_verify_oauth_token(self, request, visitor, token):
         # asynchronously call Facebook API to verify an oauth_token and get its associated facebook_id
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         sc = self.OAuthVerifier(self, request, visitor, token, d)
         url = SpinFacebook.versioned_graph_endpoint('oauth', 'debug_token') + '?' + \
               urllib.urlencode({'input_token':token,
@@ -1136,7 +1168,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_check_scope(self, request, visitor):
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         sc = self.ScopeCheck(self, request, visitor, d)
         sc.go()
         return twisted.web.server.NOT_DONE_YET
@@ -1158,15 +1190,26 @@ class GameProxy(proxy.ReverseProxyResource):
         def on_response(self, response):
             self.d.callback(self.parent.index_visit_check_scope_response(self.request, self.visitor, response))
 
+        def is_recoverable_error(self, reason):
+            if not reason: return False
+            # awkward - un-parse the stringified version!
+            if ('500' in reason) and ('"is_transient":true' in reason): return True
+            if 'TimeoutError' in reason: return True
+            return False
+
         def on_error(self, reason):
-            if reason and ('500' in reason) and ('"is_transient":true' in reason) and self.attempt < 1:
-                # manually retry - this does not use the normal
-                # AsyncHTTP retry mechanism, since we want most
-                # failures (e.g. 400 Bad Request) to give up
-                # immediately, in order to not delay the user's login
-                # process any further. However, a 500 Internal Server Error should be retried at least once.
+            # manually retry - this does not use the normal
+            # AsyncHTTP retry mechanism, since we want most
+            # failures (e.g. 400 Bad Request) to give up
+            # immediately, in order not to delay the user's login
+            # process any further. However, a 500 Internal Server Error
+            # and timeouts should be retried at least once.
+
+            config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Facebook', {})
+
+            if self.attempt < config.get('scope_check_max_tries', 2) - 1 and self.is_recoverable_error(reason):
                 self.attempt += 1
-                self.go()
+                reactor.callLater(config.get('scope_check_retry_delay', 1.0), self.go)
                 return
 
             # in the event of an API failure, return a fake JSON response that encodes the error so that we can detect and handle it below
@@ -1334,11 +1377,11 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_prohibited_country(self, request, visitor):
         metric_event_coded(visitor, '0930_prohibited_country', visitor.add_demographics({}))
-        redirect_url = SpinConfig.config['proxyserver'].get('prohibited_country_landing', '//www.spinpunch.com/')
+        redirect_url = SpinConfig.config['proxyserver']['prohibited_country_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_go_away(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('server_maintenance_landing', '//www.spinpunch.com/server-maintenance/')
+        redirect_url = SpinConfig.config['proxyserver']['server_maintenance_landing']
         if ('country' in visitor.demographics) and ('server_maintenance_landing_country_override' in SpinConfig.config['proxyserver']):
             for entry in SpinConfig.config['proxyserver']['server_maintenance_landing_country_override']:
                 if visitor.demographics['country'] in entry['countries']:
@@ -1352,19 +1395,19 @@ class GameProxy(proxy.ReverseProxyResource):
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_server_overload(self):
-        redirect_url = SpinConfig.config['proxyserver'].get('server_overload_landing', '//www.spinpunch.com/mars-frontier-server-overload/')
+        redirect_url = SpinConfig.config['proxyserver']['server_overload_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_login_spam(self):
-        redirect_url = SpinConfig.config['proxyserver'].get('login_spam_landing', '//www.spinpunch.com/login-spam/')
+        redirect_url = SpinConfig.config['proxyserver']['login_spam_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_race_condition(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('login_race_condition_landing', '//www.spinpunch.com/login-race-condition/')
+        redirect_url = SpinConfig.config['proxyserver']['login_race_condition_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_coming_soon(self, request, visitor):
-        redirect_url = SpinConfig.config['proxyserver'].get('coming_soon_landing', '//www.spinpunch.com/coming-soon-to-your-country/')
+        redirect_url = SpinConfig.config['proxyserver']['coming_soon_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_authorized(self, request, visitor):
@@ -1506,7 +1549,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
-        session = ProxySession(generate_session_id(), user_id, visitor.social_id, visitor.demographics['ip'],
+        session = ProxySession(generate_session_id(user_id), user_id, visitor.social_id, visitor.demographics['ip'],
                                server.name, server.host, server.port)
         session.last_active_time = proxy_time
 
@@ -1518,7 +1561,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if old_session:
             # invalidate the old session on this user, then try again
             d = defer.Deferred()
-            d.addBoth(SpinHTTP.complete_deferred_request, request)
+            d.addCallback(SpinHTTP.complete_deferred_request, request)
             if verbose(): print 'encountered old session on %s for %d, invalidating %s...' % (old_session.gameserver_name, user_id, old_session.session_id)
 
             # prev_session here is just for debugging messages
@@ -1559,7 +1602,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     # return dictionary of strings to replace in the Facebook page template
     def get_fb_global_variables(self, request, visitor):
-        http_origin = get_http_origin(visitor, request.isSecure())
+        http_origin = get_http_origin(visitor, SpinHTTP.twisted_request_is_ssl(request))
         # pull promo codes out of request.uri since we need to tack those on to the query string
         extra_query_params = {}
         request_q = urlparse.parse_qs(urlparse.urlparse(request.uri).query)
@@ -1568,9 +1611,9 @@ class GameProxy(proxy.ReverseProxyResource):
         game_query_string = clean_qs(visitor.first_hit_uri if SpinConfig.config.get('secure_mode',0) else request.uri, add_props = extra_query_params)
         replacements = {
             '$DEMOGRAPHICS$': SpinJSON.dumps(visitor.demographics),
-            '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'SpinPunch'),
-            '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', ''),
-            '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', ''),
+            '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit Title'),
+            '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+            '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
             '$CANVAS_URL$': visitor.canvas_url(), # https://apps.facebook.com/MYAPP/
             '$GAME_CONTAINER_URL$': visitor.game_container, # https://apps.facebook.com/MYAPP/?original_query_string=goes_here
             # query string sent with GAMEAPI requests - should NOT include signed_request
@@ -1601,7 +1644,7 @@ class GameProxy(proxy.ReverseProxyResource):
         art_path = SpinConfig.config['proxyserver'].get('art_cdn_path', None)
 
         # the page request won't have an Origin: header, but we can figure it out
-        http_origin = get_http_origin(visitor, request.isSecure())
+        http_origin = get_http_origin(visitor, SpinHTTP.twisted_request_is_ssl(request))
 
         if SpinConfig.config['proxyserver'].get('high_latency_tiers', None):
             if ('country' in visitor.demographics) and \
@@ -1694,12 +1737,15 @@ class GameProxy(proxy.ReverseProxyResource):
         # look up other accounts logged in from the same IP and tell
         # the gameserver about it so that we can detect alt accounts
 
-        stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
-        if stickiness > 0: # use new persistent record
-            db_client.ip_hit_record(session.ip, session.user_id)
-            possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
-        else: # old instantaneous-only approach
-            possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
+        if session.ip == '10.181.117.67': # bad CloudFlare IP
+            possible_alts = []
+        else:
+            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
+            if stickiness > 0: # use new persistent record
+                db_client.ip_hit_record(session.ip, session.user_id)
+                possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
+            else: # old instantaneous-only approach
+                possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
 
         if possible_alts:
             # for this account, send the other account IDs with the login message
@@ -1707,6 +1753,8 @@ class GameProxy(proxy.ReverseProxyResource):
 
             # for the other accounts, notify via CONTROLAPI
             if SpinConfig.config['proxyserver'].get('alt_ip_notify', True):
+                if len(possible_alts) >= SpinConfig.config['proxyserver'].get('alt_ip_notify_log_min', 2):
+                    raw_log.event(proxy_time, 'long possible alt list for %r: %r from %s' % (session.user_id, possible_alts, log_request(request)))
                 for alt_user_id in possible_alts:
                     fwd = None
                     alt_session = self.session_emulate(db_client.session_get_by_user_id(alt_user_id, reason='record_alt_login'))
@@ -1721,6 +1769,7 @@ class GameProxy(proxy.ReverseProxyResource):
                                                          controlapi_url(fwd[0], fwd[1]) + '?' + \
                                                          urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
                                                                                method = 'record_alt_login',
+                                                                               ip = session.ip,
                                                                                other_id = session.user_id,
                                                                                user_id = str(alt_user_id))),
                                                          lambda response: None)
@@ -1745,6 +1794,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$GAME_SERVER_WS_PORT$': str(server.ws_port),
             '$GAME_SERVER_WSS_PORT$': str(server.wss_port),
             '$DIRECT_CONNECT$': 'true' if SpinConfig.config['proxyserver'].get('direct_connect',0) else 'false',
+            '$DIRECT_MULTIPLEX$': 'true' if SpinConfig.config['proxyserver'].get('direct_multiplex',0) else 'false',
             '$AJAX_CONFIG$': ajax_config,
             '$USER_ID$': str(session.user_id),
             '$LOGIN_COUNTRY$': visitor.demographics['country'],
@@ -1765,7 +1815,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$SIGNED_REQUEST$': "'"+visitor.raw_signed_request+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login
             '$OAUTH_TOKEN$': visitor.auth_token(),
-            '$UNSUPPORTED_BROWSER_LANDING$': SpinConfig.config['proxyserver'].get('unsupported_browser_landing', 'http://www.spinpunch.com/approaching-mars/'),
+            '$UNSUPPORTED_BROWSER_LANDING$': SpinConfig.config['proxyserver'].get('unsupported_browser_landing','http://www.google.com/chrome/'),
 
             '$LOAD_GAME_DATA$': load_game_data,
             '$LOAD_GAME_CODE$': load_game_code,
@@ -1778,7 +1828,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
-            '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform),
+            '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
@@ -1799,8 +1849,6 @@ class GameProxy(proxy.ReverseProxyResource):
     def render_API(self, request):
         update_time()
 
-        add_proxy_headers(request)
-
         if verbose() >= 2:
             print '================',self.path,'=================='
             dump_request(request)
@@ -1816,7 +1864,8 @@ class GameProxy(proxy.ReverseProxyResource):
             session = self.session_emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
             if not session:
                 if verbose(): print 'GAMEAPI proxy error: session not recognized', session_id
-                return SpinJSON.dumps({'serial':0, 'clock': proxy_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
+                request.setHeader('Connection', 'close')
+                return SpinJSON.dumps({'serial':-1, 'clock': proxy_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
 
             if 'proxy_logout' in request.args:
                 # client is politely telling us it's going away
@@ -1824,7 +1873,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 # it is NOT safe to just drop session immediately, because the server could still be busy doing the logout right now,
                 # and we need to wait until it completes before allowing another login to proceed.
                 d = defer.Deferred()
-                d.addBoth(SpinHTTP.complete_deferred_request, request)
+                d.addCallback(SpinHTTP.complete_deferred_request, request)
                 self.start_async_termination(request, session.session_id, session.user_id,
                                              session.gameserver_name, session.gameserver_ctrl,
                                              lambda success, is_latest: d.callback("true"), reason = 'proxy_logout')
@@ -1870,7 +1919,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     response = [{'server_name':namelist[i], 'result':rlist[i][1]} if rlist[i][0] else {'server_name':namelist[i], 'error':rlist[i][1]} \
                                 for i in xrange(len(rlist))]
                     SpinHTTP.complete_deferred_request(SpinJSON.dumps(response, newline=True), request)
-                d.addBoth(functools.partial(gather_responses, self, request, namelist))
+                d.addCallback(functools.partial(gather_responses, self, request, namelist))
                 return twisted.web.server.NOT_DONE_YET
 
             fwd = None
@@ -2168,12 +2217,20 @@ class GameProxy(proxy.ReverseProxyResource):
         raise Exception('unhandled API request '+repr(request))
 
     def render_via_proxy(self, hostport, request):
+        add_proxy_headers(request)
+
         self.host = str(hostport[0]) # Twisted barfs if the hostname is Unicode
         self.port = hostport[1]
         return proxy.ReverseProxyResource.render(self, request)
 
     def render(self, request):
         try:
+            # deflect requests with bogus IPv6 stuff in the headers
+            if SpinHTTP.get_twisted_header(request, 'host').startswith('[') and \
+               (not SpinHTTP.get_twisted_header(request, 'user-agent')):
+                request.setResponseCode(http.BAD_REQUEST)
+                return str('We do not support IPv6 "Host" headers')
+
             start_time = time.time()
             if self.path == '/':
                 ret = self.render_ROOT(request, frame_platform = 'fb')
@@ -2263,6 +2320,7 @@ class AdminStats(object):
                 'hostname': SpinConfig.config['proxyserver'].get('external_host', os.getenv('HOSTNAME') or socket.gethostname()),
                 'pid': os.getpid(),
                 'external_listen_host': SpinConfig.config['proxyserver'].get('external_listen_host',''),
+                'internal_listen_host': SpinConfig.config['proxyserver'].get('internal_listen_host',''),
                 'external_http_port': SpinConfig.config['proxyserver']['external_http_port'],
                 'external_ssl_port': SpinConfig.config['proxyserver'].get('external_ssl_port',-1),
                 'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
@@ -2438,7 +2496,7 @@ class PortraitProxy(twisted.web.resource.Resource):
             if origin:
                 listen_host = SpinConfig.config['proxyserver'].get('external_listen_host','')
                 # XXX this may cause problems if we ever have proxyserver listen on different origins
-                if listen_host and origin != listen_host:
+                if listen_host and origin not in (listen_host, 'http://'+listen_host, 'https://'+listen_host):
                     raise Exception('origin mismatch: %s vs %s' % (origin, listen_host))
                 request.args['spin_origin'] = [origin]
 
@@ -2459,7 +2517,7 @@ class PortraitProxy(twisted.web.resource.Resource):
             return 'invalid parameters'
         self.set_cdn_headers(request)
         d = defer.Deferred()
-        d.addBoth(SpinHTTP.complete_deferred_request, request)
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
         fw = self.Forwarded(self, request, d)
         self.async_http.queue_request(proxy_time, source_url, fw.on_response, error_callback = fw.on_error, callback_type = self.async_http.CALLBACK_FULL)
         return twisted.web.server.NOT_DONE_YET
@@ -2479,7 +2537,7 @@ class PortraitProxy(twisted.web.resource.Resource):
                     self.request.setHeader(HEADER, headers[HEADER][-1])
             self.d.callback(body)
         def on_error(self, ui_reason = None, body = None, headers = None, status = None):
-            self.d.errback(ui_reason)
+            self.d.callback(ui_reason)
 
 class FBPortraitProxy(PortraitProxy):
     def __init__(self):
@@ -2599,12 +2657,12 @@ class FlashXDResource(static.Data):
 class SpinCGIScript(twcgi.CGIScript):
     def render(self, request):
         # when server is in secure_mode, do not respond unless it's HTTPS
-        if SpinConfig.config.get('secure_mode',0) and (not request.isSecure()):
+        if SpinConfig.config.get('secure_mode',0) and (not SpinHTTP.twisted_request_is_ssl(request)):
             return TwistedNoResource().render(request)
         return twcgi.CGIScript.render(self, request)
 
     def runProcess(self, env, request, *args, **kwargs):
-        env['SPIN_IS_SSL'] = '1' if request.isSecure() else '0'
+        env['SPIN_IS_SSL'] = '1' if SpinHTTP.twisted_request_is_ssl(request) else '0'
         return twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 # first stop for all requests in the hierarchy
@@ -2736,6 +2794,7 @@ def reconfig():
         status_json = admin_stats.get_server_status_json()
         if db_client:
             db_client.server_status_update('proxyserver', status_json, reason='reconfig')
+        send_proxyserver_status_notification(status_json)
         return {'result':status_json}
     except:
         msg = traceback.format_exc()
@@ -2764,7 +2823,7 @@ def do_main():
 
     myport_http = SpinConfig.config['proxyserver']['external_http_port']
     myport_ssl  = SpinConfig.config['proxyserver'].get('external_ssl_port',-1)
-    backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 50)
+    backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()
     reactor.listenTCP(myport_http, proxysite, backlog=backlog)
     if myport_ssl > 0:
@@ -2877,6 +2936,8 @@ def do_main():
         log.addObserver(log_exceptions)
 
     TwistedLatency.setup(reactor, admin_stats.record_latency)
+
+    send_proxyserver_status_notification(admin_stats.get_server_status_json())
 
     reactor.run()
 

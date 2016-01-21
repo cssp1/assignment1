@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -24,12 +24,13 @@ class AsyncHTTPRequester(object):
     CALLBACK_FULL = 'full'
 
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, postdata, max_tries, callback_type):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type):
             self.method = method
-            self.url = str(url)
+            self.url = url
             self.headers = headers
             self.callback = callback
             self.error_callback = error_callback
+            self.preflight_callback = preflight_callback
             self.postdata = postdata
             self.fire_time = qtime
             self.max_tries = max_tries
@@ -89,7 +90,7 @@ class AsyncHTTPRequester(object):
         self.idle_cb = cb
         # defer so that if we are in the shutdown path, we don't
         # prematurely shut down before other shutdown callbacks start their own I/O requests
-        self.reactor.callLater(0.01, self.idlecheck)
+        self.reactor.callLater(0, self.idlecheck)
 
 
     def idlecheck(self):
@@ -98,7 +99,7 @@ class AsyncHTTPRequester(object):
             self.idle_cb = None
             cb()
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -109,7 +110,8 @@ class AsyncHTTPRequester(object):
         else:
             max_tries = max(max_tries, self.default_max_tries)
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, postdata, max_tries, callback_type)
+        if headers: assert isinstance(headers, dict)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -121,6 +123,8 @@ class AsyncHTTPRequester(object):
 
     def _send_request(self):
         request = self.queue.popleft()
+        if request.preflight_callback: # allow caller to adjust headers/url/etc at the last minute before transmission
+            request.preflight_callback(request)
         self.n_attempted += 1
         self.on_wire.add(request)
         if self.verbosity >= 1:
@@ -128,10 +132,10 @@ class AsyncHTTPRequester(object):
 
         # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
         # and not just its .deferred member, since we want access to response headers.
-        getter = twisted.web.client._makeGetterFactory(request.url, twisted.web.client.HTTPClientFactory,
+        getter = twisted.web.client._makeGetterFactory(bytes(request.url), twisted.web.client.HTTPClientFactory,
                                                        method=request.method,
                                                        headers=request.headers,
-                                                       agent='SpinPunch Game Server',
+                                                       agent='spinpunch game server',
                                                        timeout=self.request_timeout,
                                                        postdata=request.postdata)
         d = getter.deferred
@@ -207,7 +211,8 @@ class AsyncHTTPRequester(object):
                     body = None # things like TimeoutError have no .response attribute
 
                 if request.callback_type == self.CALLBACK_FULL:
-                    request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers, status = getter.status)
+                    request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers,
+                                           status = getattr(getter, 'status', '999')) # status may not be present on a failed request
                 else:
                     request.error_callback(ui_reason)
             except:

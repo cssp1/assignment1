@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -74,13 +74,16 @@
 
     "BUY_PROTECTION1": { "ui_name": "Add 24 hours of protection", "ui_description": "Removed if you attack others", "paid": 1, "price_formula": "constant", "price": 9, "duration": 86400, "cooldown": 432000, "cooldown_name": "BUY_PROTECTION1", "activation": "instant", "icon": "store_icon_prot_l1",
                          "ui_new_store_name": "24-Hour Shield", "new_store_icon": "inventory_protection_green",
+                         "ui_purchase_confirm": "Buy \"%thing\" for %price? 24 hours of damage protection will be added immediately.",
                          "new_store_tip_item": "protection_1d" },
 
     "BUY_PROTECTION7": { "ui_name": "Add 7 days of protection", "ui_description": "Removed if you attack others", "paid": 1, "price_formula": "constant", "price": 69, "duration": 604800, "cooldown": 1209600, "cooldown_name": "BUY_PROTECTION7", "activation": "instant", "icon": "store_icon_prot_l3",
                          "ui_new_store_name": "7-Day Shield", "new_store_icon": "inventory_protection_blue",
+                         "ui_purchase_confirm": "Buy \"%thing\" for %price? 7 days of damage protection will be added immediately.",
                          "new_store_tip_item": "protection_7d" },
     "BUY_PROTECTION28": { "ui_name": "Add 28 days of protection", "ui_description": "Removed if you attack others", "paid": 1, "price_formula": "constant", "price": 279, "duration": 2419200, "cooldown": 2419200, "cooldown_name": "BUY_PROTECTION28", "activation": "instant", "icon": "store_icon_prot_l5",
                           "ui_new_store_name": "28-Day Shield", "new_store_icon": "inventory_protection_purple",
+                          "ui_purchase_confirm": "Buy \"%thing\" for %price? 28 days of damage protection will be added immediately.",
                           "new_store_tip_item": "protection_28d" },
 
     "FREE_RANDOM_DAILY_ITEM": { "ui_name": "Free Expedition", "ui_description": "Activate to explore the world and discover a special item.",
@@ -393,9 +396,20 @@
         "activation": "instant"
     },
     "LOTTERY_SCAN": {
-        "ui_name": "Scan Region",
-        "ui_tooltip_busy": "Speed Up to access",
-        "activation": "popup"
+        "ui_name": "War Chest",
+        "ui_verb": "Claim",
+        "ui_verb_pending": "Claiming...",
+        "ui_verb_paid": "Play Again",
+        "ui_tooltip_busy": "Warehouse is busy. Speed Up to access.",
+        "ui_tooltip_inventory_full": "War Chest requires at least one open Warehouse slot",
+        "ui_tooltip_on_cooldown": "Your next FREE War Chest ready in %s",
+        "ui_tooltip_remaining": "Commander, your daily FREE War Chest is ready to claim",
+        "ui_tooltip_aura": "%d FREE War Chest play remaining",
+        "ui_tooltip_aura_plural": "%d FREE War Chest plays remaining",
+        "paid": 1, "price_formula": "constant", "currency": "gamebucks", "price": 55,
+        "activation": "instant",
+        "show_if": {"predicate": "PLAYER_HISTORY", "key": "items_activated", "method": ">=", "value": 1}, // definitely don't even show it before activate_an_item is done, otherwise this might break tutorial
+        "requires": {"predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 2}
     },
     "CHANGE_REGION": {
         "ui_name": "Relocate Base",

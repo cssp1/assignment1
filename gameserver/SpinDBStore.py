@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 # Map: implements a JSON-based mapping from string keys to arbitrary data structure values
 # intended to hold a lot of keys (one per player) and update the backing-store file efficiently
-# used for Facebook ID -> SpinPunch ID mapping
+# used for Facebook ID -> game ID mapping
 
 import SpinJSON
 import AtomicFileWrite

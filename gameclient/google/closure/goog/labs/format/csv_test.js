@@ -32,6 +32,53 @@ function testGoldenPath() {
       goog.labs.format.csv.parse('a,b,c\r\nd,e,f\r\ng,h,i\r\n'));
 }
 
+function testGoldenPathWithSpaceAsCustomDelimiter() {
+  assertObjectEquals(
+      [['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i']],
+      goog.labs.format.csv.parse(
+          'a b c\nd e f\ng h i\n', undefined, ' '));
+  assertObjectEquals(
+      [['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i']],
+      goog.labs.format.csv.parse(
+          'a b c\r\nd e f\r\ng h i\r\n', undefined, ' '));
+}
+
+function testGoldenPathWithEmptyStringAsCustomDelimiterUsesComma() {
+  assertObjectEquals(
+      [['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i']],
+      goog.labs.format.csv.parse('a,b,c\nd,e,f\ng,h,i\n', undefined, ''));
+  assertObjectEquals(
+      [['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i']],
+      goog.labs.format.csv.parse('a,b,c\r\nd,e,f\r\ng,h,i\r\n', undefined, ''));
+}
+
+function testBadDelimitersNewLine() {
+  var e = assertThrows(function() {
+    goog.labs.format.csv.parse('a,b,c\r\nd,e,f\r\ng,h,i\r\n', undefined, '\n');
+  });
+  assertEquals(
+      'Assertion failed: Cannot use newline or carriage return has delimiter.',
+      e.message);
+}
+
+function testBadDelimitersCarriageReturn() {
+  var e = assertThrows(function() {
+    goog.labs.format.csv.parse('a,b,c\r\nd,e,f\r\ng,h,i\r\n', undefined, '\r');
+  });
+  assertEquals(
+      'Assertion failed: Cannot use newline or carriage return has delimiter.',
+      e.message);
+}
+
+function testBadDelimitersTwoCharacter() {
+  var e = assertThrows(function() {
+    goog.labs.format.csv.parse('a,b,c\r\nd,e,f\r\ng,h,i\r\n', undefined, 'aa');
+  });
+  assertEquals(
+      'Assertion failed: Delimiter must be a single character.',
+      e.message);
+}
+
 function testNoCrlfAtEnd() {
   assertObjectEquals(
       [['a', 'b', 'c'], ['d', 'e', 'f'], ['g', 'h', 'i']],
@@ -111,6 +158,44 @@ function testEmptyRecords() {
   assertObjectEquals(
       [['a', '', 'c'], ['d', 'e', ''], ['', '', '']],
       goog.labs.format.csv.parse('a,,c\r\nd,e,\n,,'));
+}
+
+function testEmptyRecordsWithColonCustomDelimiter() {
+  assertObjectEquals(
+      [['a', '', 'c'], ['d', 'e', ''], ['', '', '']],
+      goog.labs.format.csv.parse('a::c\r\nd:e:\n::', undefined, ':'));
+}
+
+function testIgnoringErrors() {
+  // The results of these tests are not defined by the RFC. They
+  // generally strive to be "reasonable" while keeping the code simple.
+
+  // Quotes inside field
+  assertObjectEquals(
+      [['Hello "World"!', 'b'], ['c', 'd']], goog.labs.format.csv.parse(
+          'Hello "World"!,b\nc,d', true));
+
+  // Missing closing quote
+  assertObjectEquals(
+      [['Hello', 'World!']], goog.labs.format.csv.parse(
+          'Hello,"World!', true));
+
+  // Broken use of quotes in quoted field
+  assertObjectEquals(
+      [['a', '"Hello"World!"']], goog.labs.format.csv.parse(
+          'a,"Hello"World!"', true));
+
+  // All of the above. A real mess.
+  assertObjectEquals(
+      [['This" is', '"very\n\tvery"broken"', ' indeed!']],
+      goog.labs.format.csv.parse(
+          'This" is,"very\n\tvery"broken"," indeed!', true));
+}
+
+function testIgnoringErrorsTrailingTabs() {
+  assertObjectEquals(
+      [['"a\tb"\t'], ['c,d']], goog.labs.format.csv.parse(
+          '"a\tb"\t\n"c,d"', true));
 }
 
 function testFindLineInfo() {

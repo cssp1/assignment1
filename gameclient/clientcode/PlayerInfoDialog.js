@@ -1,6 +1,6 @@
 goog.provide('PlayerInfoDialog');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -569,20 +569,13 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
 
     var show_coords = gamedata['enable_region_map'] && gamedata['territory']['show_coords_in_player_info'] && (session.region.data && session.region.data['storage'] == 'nosql' && session.region.map_enabled());
     dialog.widgets['battle_count_label'].show = dialog.widgets['battle_count'].show =
-        dialog.widgets['battle_age_label'].show = dialog.widgets['battle_age'].show = !show_coords;
+        dialog.widgets['battle_age_label'].show = dialog.widgets['battle_age'].show = false; // no longer supported
     dialog.widgets['home_region_label'].show = dialog.widgets['home_region_value'].show =
         dialog.widgets['home_base_loc_label'].show = dialog.widgets['home_base_loc_value'].show = show_coords;
 
     if(show_coords) {
         // these are set from update_player_info_profile_tab
         dialog.widgets['spy_button'].state = 'disabled';
-    } else {
-        dialog.widgets['battle_count'].str = (('battle_count' in knowledge) ? knowledge['battle_count'].toString() : '-');
-        if(('last_battle_time' in knowledge) && (knowledge['last_battle_time'] > 0)) {
-            dialog.widgets['battle_age'].str = dialog.data['widgets']['battle_age']['ui_name'].replace('%s', pretty_print_time(server_time - knowledge['last_battle_time']));
-        } else {
-            dialog.widgets['battle_age'].str = '-';
-        }
     }
 
     dialog.widgets['alliance'].onclick = null;
@@ -591,7 +584,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         // looking at yourself
         dialog.widgets['spy_button'].show = false;
         dialog.widgets['friend_icon'].state = 'disabled';
-        dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, '', -1); };
+        dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); };
     } else {
         dialog.widgets['spy_button'].onclick = (function(uid) { return function() {
             visit_base(uid);
@@ -605,19 +598,23 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
 
         // see battles from MY perspective against this opponent
         dialog.widgets['battles_button'].onclick = (function(_uid, _name, _level) { return function() {
-            invoke_battle_history_dialog(session.user_id, _uid, _name, _level);
+            invoke_battle_history_dialog(session.user_id, _uid, -1, _name, _level);
         }; })(user_id, PlayerCache.get_ui_name(knowledge), knowledge['player_level'] || 1);
 
         // see all battles from OPPONENT'S perspective (developer only)
         dialog.widgets['dev_battles_button'].show = (player.is_developer() && (session.viewing_user_id == user_id));
         dialog.widgets['dev_battles_button'].onclick = (function(_uid) { return function() {
-            invoke_battle_history_dialog(_uid, -1, '(DEV-ALL)', -1);
+            invoke_battle_history_dialog(_uid, -1, -1, '(DEV-ALL)', -1);
         }; })(user_id);
     }
 
     PlayerInfoDialog.update_blockstate(dialog);
 
     dialog.widgets['report_button'].onclick = (function(uid) { return function() {
+        if(player.has_advanced_chat_reporting()) {
+            return invoke_report_abuse_dialog(uid);
+        }
+
         // come up with a fake chat name for the report confirmation
         var fake_chat_name = dialog.widgets['name'].str;
         send_to_server.func(["CHAT_REPORT", uid, SPHTTP.wrap_string(fake_chat_name)]);
@@ -757,15 +754,15 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
                 dialog.widgets['gift_button'].state = is_giftable ? 'normal' : 'disabled';
                 dialog.widgets['gift_button'].onclick = (function (_uid) { return function() {
                     change_selection(null);
-                    invoke_send_gifts_dialog(_uid, 'player_info_profile_tab');
+                    invoke_send_gifts(_uid, 'player_info_profile_tab');
                 }; })(user_id);
                 dialog.widgets['gift_button'].tooltip.str = is_giftable ? null : dialog.data['widgets']['gift_button']['ui_tooltip_already_sent'];
             } else {
                 dialog.widgets['gift_button'].show = false;
             }
 
-            if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances']) && ('alliance_id' in r)) {
-                if(r['alliance_id'] <= 0) {
+            if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances'])) {
+                if(!('alliance_id' in r) || r['alliance_id'] <= 0) {
                     // player is not currently in an alliance
                     dialog.widgets['alliance'].str = dialog.data['widgets']['alliance']['ui_name_none'];
 
@@ -905,7 +902,7 @@ PlayerInfoDialog.update_scores = function(dialog) {
         point_time_scope = event['stat']['time_scope'];
         point_icon = event['icon'];
         point_icon_state = 'icon_30x30';
-        dialog.user_data['tournament_end_time'] = player.current_stat_tournament()['end_time'];
+        dialog.user_data['tournament_end_time'] = player.current_stat_tournament_end_time();
     } else if(trophy_type) { // show pvp points on primary display
         point_ui_name = gamedata['events'][trophy_challenge_name]['ui_name'];
         point_stat = 'trophies_'+trophy_type;

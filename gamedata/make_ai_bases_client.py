@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
                         'activation': base['activation'] }
 
         for FIELD in ('kind', 'show_if', 'persistent', 'attack_time', 'base_resource_loot',
-                      'ui_priority', 'ui_category', 'ui_info', 'ui_info_url', 'ui_resets', 'ui_instance_cooldown', 'ui_spy_button', 'ui_map_name', 'ui_progress', 'ui_difficulty',
+                      'ui_priority', 'ui_category', 'ui_info', 'ui_info_url', 'ui_resets', 'ui_instance_cooldown', 'ui_spy_button', 'ui_map_name', 'ui_progress', 'ui_difficulty', 'ui_difficulty_index',
                       'ui_battle_stars_key', 'ui_fancy_victory_text',
                       'challenge_icon', 'challenge_item',
                       'map_portrait'

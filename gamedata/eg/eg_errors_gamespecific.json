@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -7,6 +7,7 @@
 "INSUFFICIENT_WATER": { "ui_name": "Need %d Fuel to do this" },
 "INSUFFICIENT_GAMEBUCKS": { "ui_name": "Need %d Gold to do this" },
 "INSUFFICIENT_ITEMS": { "ui_title": "Insufficient Items", "ui_name": "Need %dx %s. Earn them by fighting selected Single Player opponents on the Attack menu, or by conquering epic event bases on the Multiplayer regional map." },
+"INSUFFICIENT_TROPHIES_PVP": { "ui_title": "Insufficient PvP Points", "ui_name": "Need %d more PvP points. Earn them by fighting selected opponents on the Multiplayer map." },
 
 "UNIT_SPACE_LIMIT": { "ui_name": "Not enough unit space - upgrade Tactical Ops Center or disband old units" },
 "POWER_LIMIT": { "ui_name": "Not enough power - repair, build, or upgrade Generator" },
@@ -22,6 +23,7 @@
 "CANNOT_LOG_IN_LOGIN_ABUSE_FREQUENCY": { "ui_name": "Your account is on login cooldown",
                                          "redirect": "//www.XXXXXX.com/error-login-spam/" },
 
-"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED_BASE_DEFENDERS": { "ui_title": "Not Enough Space", "ui_name": "Base Defenders does not have enough space for this unit. Upgrade Tactical Ops Center to raise limit." },
+"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED": { "ui_title": "Not Enough Space", "ui_name": "Battalion does not have enough space for new unit. Upgrade Reserves Bay to raise limit." },
+"CANNOT_SQUAD_ASSIGN_UNIT_LIMIT_REACHED_BASE_DEFENDERS": { "ui_title": "Not Enough Space", "ui_name": "Base Defenders does not have enough space for new unit. Upgrade Tactical Ops Center to raise limit." },
 
 "CANNOT_DEPLOY_SQUAD_NO_NOSQL": { "ui_title": "Deployment Unavailable", "ui_name": "Your current region does not support battalion combat.\n\nUse \"Relocate Base\" option on Tactical Ops Center or Transmitter to enter a NEW Multiplayer region." }

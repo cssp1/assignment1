@@ -1,6 +1,6 @@
 goog.provide('ModChain');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -207,6 +207,9 @@ ModChain.display_value_on_destroy = function(value, context) {
                 units.push(gamedata['strings']['modstats']['security_team_unit'].replace('%qty', val['units'][specname].toString()).replace('%name', gamedata['units'][specname]['ui_name']));
             }
             v = gamedata['strings']['modstats']['security_team'].replace('%units', units.join(', '));
+            if(val['persist']) {
+                v += ' '+gamedata['strings']['modstats']['security_team_persist'];
+            }
         } else {
             throw Error('unhandled on_destroy consequent '+(val['consequent']||'UNKNOWN').toString());
         }
@@ -240,6 +243,8 @@ ModChain.display_value = function(value, display_mode, context) {
             ui_value = (100*(1-value)).toFixed(parsed.precision)+'%';
         } else if(parsed.mode == 'pct') {
             ui_value = (100*value).toFixed(parsed.precision)+'%';
+        } else if(parsed.mode == 'pct_minus_one') {
+            ui_value = (100*(value-1)).toFixed(parsed.precision)+'%';
         } else if(parsed.mode == 'integer') {
             ui_value = pretty_print_number(value);
         } else if(parsed.mode == 'fixed') {
@@ -386,9 +391,7 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     ModChain.check_chain(modchain);
 
     var ui_base = ModChain.display_value(modchain['val'], display_mode, 'tooltip');
-    if(0 && modchain['mods'].length < 2) {
-        return gamedata['strings']['modstats']['base_value'].replace('%value', ui_base).replace('%level', modchain['mods'][0]['level'].toString());
-    } else {
+
         var ls = [];
         goog.array.forEach(modchain['mods'], function(mod, i) {
 
@@ -454,7 +457,6 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
         });
         var ui_mods = ls.join(gamedata['strings']['modstats']['mod_value_sep']);
         return ui_mods;
-    }
 };
 
 /** Set a SPUI TextWidget to display the right text label and tooltip for a stat

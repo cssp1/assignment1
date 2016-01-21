@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -66,7 +66,7 @@ def do_migrate_to_s3(params):
                 print '%-35s -> %s/%-40s' % (filename, bucket, objname)
 
             if pre_delete and (not dry_run):
-                con.do_delete(bucket, objname)
+                con.delete(bucket, objname)
 
             # check if the S3 object already exists and is up to date
             elif skip_present:

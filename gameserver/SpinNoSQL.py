@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 # MongoDB adaptor API
 
 import time, sys, re, random
-import datetime
+import datetime, calendar
 import pymongo, bson # 3.0+ OK
 import SpinConfig
 import SpinNoSQLId
@@ -136,19 +136,14 @@ class NoSQLClient (object):
 
     # must match dbserver.py and server.py definitions of these lock states
     LOCK_OPEN = 0
-    LOCK_LOGGED_IN = 1 # not used anymore
+    LOCK_LOGGED_IN = 1
     LOCK_BEING_ATTACKED = 2
 
     LOCK_TIMEOUT = 600 # seconds after which a lock is considered stale and may be busted
 
     # how long to keep old lock generation counters around - this should be longer than
-    # the longest period of time a server could reasonably have stale (spied but not locked) player/base data
-    LOCK_GEN_TIME = 6*3600
-
-    # XXXXXX temp - for compatibility with SpinSQL
-    SCORE_FREQ_SEASON = 'season'
-    SCORE_FREQ_WEEKLY = 'week'
-    SCORE_RE = re.compile('(.+)_(wk|s)([0-9]+)$')
+    # the longest period of time a server could hold stale (spied but not locked) player/base data
+    LOCK_GEN_TIME = 12*3600
 
     ROLE_DEFAULT = 0
     ROLE_LEADER = 4
@@ -170,6 +165,7 @@ class NoSQLClient (object):
         self.seen_sessions = False
         self.seen_client_perf = False
         self.seen_chat = False
+        self.seen_chat_reports = False
         self.seen_logs = {}
         self.seen_battles = False
         self.seen_dau = {}
@@ -181,8 +177,6 @@ class NoSQLClient (object):
         self.seen_regions = {}
         self.seen_alliances = False
         self.seen_turf = False
-        self.seen_player_scores = False
-        self.seen_alliance_score_cache = False
         self.time = 0 # need to be updated by caller!
         self.slaves = {}
         self.connect()
@@ -315,6 +309,8 @@ class NoSQLClient (object):
 
     def do_maint(self, time_now, cur_season, cur_week):
         print 'Busting stale player locks...'
+        LOCK_IS_OPEN = {'$or':[{'LOCK_STATE':{'$exists':False}},
+                               {'LOCK_STATE':{'$lte':0}}]}
         LOCK_IS_TAKEN = {'$and':[{'LOCK_STATE':{'$exists':True}},
                                  {'LOCK_STATE':{'$gt':0}}]}
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
@@ -322,6 +318,18 @@ class NoSQLClient (object):
                                             {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1,'LOCK_HOLDER':1}}).matched_count
         if n > 0:
             print '  Busted', n, 'stale player locks'
+
+        # strictly speaking we don't need to get rid of old LOCK_GENERATION counters,
+        # but we do this to avoid permanent lock-outs when the playerdb backing store doesn't get
+        # an update to match the last lock generation in the player cache. Can happen due to S3 bugs etc.
+        print 'Deleting old player lock generation counters...'
+        n = self.player_cache().update_many({'$and':[LOCK_IS_OPEN,
+                                                     {'LOCK_GENERATION': {'$exists':True}},
+                                                     {'last_mtime': {'$lt': time_now - self.LOCK_GEN_TIME}}
+                                                     ]},
+                                            {'$unset':{'LOCK_GENERATION':1}}).matched_count
+        if n > 0:
+            print '  Deleted', n, 'old player lock generation counters'
 
         print 'Checking for expired player messages...'
         prune_msg_qs = {'$or': [{'expire_time': {'$gt': 0, '$lt': time_now}}]}
@@ -409,22 +417,6 @@ class NoSQLClient (object):
         n = self.unit_donation_requests_table().delete_many({'time':{'$lt':earliest}}).deleted_count
         if n > 0:
             print '  Deleted', n, 'old unit_donation_requests'
-
-        print 'Checking for old player_scores entries...'
-        n = self.player_scores().delete_many({'$or': [ {'frequency': 'season', 'period': {'$ne': cur_season} },
-                                                       {'frequency': 'week', 'period': {'$lt': cur_week-5} } ]}).deleted_count
-        if n > 0:
-            print '  Deleted', n, 'old player_scores entries'
-
-        print 'Checking for old or dangling alliance_score_cache entries...'
-        n = 0
-        for row in list(self.alliance_score_cache().find()):
-            if row['alliance_id'] not in valid_alliance_ids or \
-               (row['frequency'] == 'season' and row['period'] != cur_season) or \
-               (row['frequency'] == 'week' and row['period'] < cur_week - 5):
-                n += self.alliance_score_cache().delete_one({'_id':row['_id']}).deleted_count
-        if n > 0:
-            print '  Deleted', n, 'old or dangling alliance_score_cache entries'
 
         print 'Dropping old DAU tables...'
         n = 0
@@ -720,6 +712,7 @@ class NoSQLClient (object):
         if not self.seen_battles:
             coll.create_index([('time',pymongo.ASCENDING)])
             coll.create_index([('involved_players',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
+            coll.create_index([('involved_alliances',pymongo.ASCENDING),('time',pymongo.ASCENDING)], sparse = True, background = True)
             self.seen_battles = True
         return coll
     def battle_record(self, summary, reason=''):
@@ -730,6 +723,56 @@ class NoSQLClient (object):
         self.battles_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(summary)
         if '_id' in summary: del summary['_id'] # don't mutate it
 
+    # constants for ai_or_human parameter
+    BATTLES_ALL = 0
+    BATTLES_AI_ONLY = 1
+    BATTLES_HUMAN_ONLY = 2
+    # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
+    # and the limit gets hit part-way through). Might need GUID-based paging.
+    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
+        # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming))
+    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming):
+        qs = {'$and': []}
+        for player_id in (player_id_A, player_id_B):
+            if player_id > 0:
+                qs['$and'].append({'involved_players': player_id})
+        for alliance_id in (alliance_id_A, alliance_id_B):
+            if alliance_id > 0:
+                qs['$and'].append({'involved_alliances': alliance_id})
+
+        if time_range:
+            qs['$and'].append({'time': {'$gte':time_range[0], '$lt':time_range[1]}})
+
+        # type filter
+        if ai_or_human == self.BATTLES_AI_ONLY:
+            qs['$and'].append({'$or':[{'attacker_type':'ai'},{'defender_type':'ai'}]})
+            qs['$and'].append({'$or':[{'ladder_state':{'$exists':False}},{'ladder_state':None}]}) # do not list AI ladder battles here
+        elif ai_or_human == self.BATTLES_HUMAN_ONLY:
+            qs['$and'].append({'$or':[{'$and':[{'attacker_type':'human'},{'defender_type':'human'}]},
+                                      {'$and':[{'ladder_state':{'$exists':True}},{'ladder_state':{'$ne':None}}]}]}) # list AI ladder battles here
+
+
+        if fields:
+            q_fields = {'_id':1} # DO request _id so we can convert it to battle_id
+            for f in fields:
+                q_fields[f] = 1
+        else:
+            q_fields = None
+        cursor = self.battles_table().find(qs, q_fields)
+        cursor = cursor.sort([('time',pymongo.ASCENDING if oldest_first else pymongo.DESCENDING)])
+        if limit > 0:
+            cursor = cursor.limit(limit)
+        cursor = (self.decode_battle(x) for x in cursor)
+        if not streaming:
+            cursor = list(cursor)
+        return cursor
+    def decode_battle(self, row):
+        if '_id' in row:
+            row['battle_id'] = self.decode_object_id(row['_id'])
+            del row['_id']
+        return row
+
     ###### CHAT BUFFER ######
 
     def chat_buffer_table(self):
@@ -739,13 +782,29 @@ class NoSQLClient (object):
             coll.create_index([('channel',pymongo.ASCENDING),('time',pymongo.ASCENDING)])
             self.seen_chat = True
         return coll
-    def chat_record(self, channel, sender, text, reason=''):
-        return self.instrument('chat_record(%s)'%reason, self._chat_record, (channel, sender, text))
-    def _chat_record(self, channel, sender, text):
+
+    # note: id must be a pre-generated unique ID compatible with MongoDB, or None to auto-generate one (that won't be returned)
+    def chat_record(self, channel, id, sender, text, reason=''):
+        self.instrument('chat_record(%s)'%reason, self._chat_record, (id, channel, sender, text))
+        return id
+
+    def _chat_record(self, id, channel, sender, text):
         props = {'time':self.time,'channel':channel,'sender':sender}
         if text:
             props['text'] = unicode(text)
+        if id:
+            props['_id'] = self.encode_object_id(id)
         self.chat_buffer_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
+
+    def decode_chat_row(self, row):
+        if '_id' in row:
+            row['id'] = self.decode_object_id(row['_id'])
+            del row['_id']
+        # insert missing 'time' field on legacy chat messages
+        if type(row['sender']) is dict and ('time' not in row['sender']):
+            row['sender']['time'] = row['time']
+        return row
+
     def chat_catchup(self, channel, start_time = -1, end_time = -1, skip = 0, limit = -1, reason=''):
         return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,skip,limit))
     def _chat_catchup(self, channel, start_time, end_time, skip, limit):
@@ -754,17 +813,112 @@ class NoSQLClient (object):
             props['time'] = {}
             if start_time > 0: props['time']['$gte'] = start_time
             if end_time > 0: props['time']['$lt'] = end_time
-        cur = self.chat_buffer_table().find(props, {'_id':0,'sender':1,'text':1,'time':1}).sort([('time',pymongo.DESCENDING)])
+        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING)])
         if skip > 0: cur = cur.skip(skip)
         if limit > 0: cur = cur.limit(limit)
-        ret = []
-        for row in cur:
-            # insert missing 'time' field on legacy chat messages
-            if type(row['sender']) is dict and ('time' not in row['sender']):
-                row['sender']['time'] = row['time']
-            ret.append(row)
+        ret = map(self.decode_chat_row, cur)
         ret.reverse() # oldest messages first
         return ret
+
+    # retrieve up to 2*limit messages sent around center_time +/- time_limit
+    def chat_get_context(self, channel, sender_id, center_time, time_limit, limit = -1, reason = ''):
+        return self.instrument('chat_get_context(%s)'%reason, self._chat_get_context, (channel, sender_id, center_time, time_limit, limit))
+    def _chat_get_context(self, channel, sender_id, center_time, time_limit, limit):
+        qs = {'sender.user_id': sender_id, 'channel': channel}
+
+        qs['time'] = {'$gte': center_time, '$lt': center_time + time_limit}
+        after = self.chat_buffer_table().find(qs).sort([('time',pymongo.ASCENDING)])
+        if limit > 0: after = after.limit(limit)
+        after = list(after)
+
+        qs['time'] = {'$gt': center_time - time_limit, '$lt': center_time}
+        before =  self.chat_buffer_table().find(qs).sort([('time',pymongo.ASCENDING)])
+        if limit > 0: before = before.limit(limit)
+        before = list(before)
+
+        return map(self.decode_chat_row, before + after)
+
+    ###### CHAT REPORTS ######
+
+    def chat_reports_table(self):
+        coll = self._table('chat_reports')
+        if not self.seen_chat_reports:
+            coll.create_index('millitime', expireAfterSeconds=7*86400) # automatically clear after one week
+            self.seen_chat_reports = True
+        return coll
+    # note: the "time" of a chat report is the time the target said the objectionable thing. "report_time" is when it was reported, "resolution_time" is when it was resolved.
+    def chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence=None, source=None, reason=''):
+        return self.instrument('chat_report(%s)'%reason, self._chat_report, (channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence, source))
+    def _chat_report(self, channel, reporter_id, reporter_ui_name, target_id, target_ui_name, report_time, target_time, message_id, context, confidence, source):
+        props = {'millitime':datetime.datetime.utcfromtimestamp(float(target_time)),
+                 'report_time': report_time,
+                 'channel': channel, 'reporter_id': reporter_id, 'target_id': target_id,
+                 'reporter_ui_name': reporter_ui_name, 'target_ui_name': target_ui_name,
+                 'resolved': False}
+        if message_id: props['message_id'] = self.encode_object_id(message_id)
+        if context is not None:
+            assert isinstance(context, basestring)
+            context = unicode(context)
+            props['context'] = context
+        if confidence is not None: props['confidence'] = confidence
+        if source is not None: props['source'] = source
+        self.chat_reports_table().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).insert_one(props)
+
+    def chat_reports_get(self, start_time, end_time, reason=''):
+        qs = {'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(start_time)),
+                           '$lt': datetime.datetime.utcfromtimestamp(float(end_time))}
+              }
+        return self.instrument('chat_reports_get(%s)'%reason, self._chat_reports_query, (qs,))
+    def chat_report_get_one(self, id, reason=''):
+        qs = {'_id': self.encode_object_id(id)}
+        report_list = self.instrument('chat_report_get_one(%s)'%reason, self._chat_reports_query, (qs,))
+        if len(report_list) != 1: raise Exception('cannot find report: %r' % id)
+        return report_list[0]
+    def chat_report_get_one_by_message_id(self, message_id, reason=''):
+        qs = {'message_id': self.encode_object_id(message_id)}
+        report_list = self.instrument('chat_report_get_one_by_message_id(%s)'%reason, self._chat_reports_query, (qs,))
+        if len(report_list) > 0:
+            return report_list[0]
+        return None
+    def decode_chat_report(self, row):
+        row['id'] = self.decode_object_id(row['_id']); del row['_id'] # convert native ObjectID to string
+        if 'millitime' in row: # convert datetime.datetime to UNIX timestamp
+            row['time'] = calendar.timegm(row['millitime'].timetuple())
+            del row['millitime']
+        if 'message_id' in row: row['message_id'] = self.decode_object_id(row['message_id'])
+        return row
+    def _chat_reports_query(self, qs, limit = -1):
+        cursor = self.chat_reports_table().find(qs)
+        if limit > 0:
+            cursor = cursor.limit(limit)
+        return [self.decode_chat_report(x) for x in cursor]
+
+    def chat_report_resolve(self, id, resolution, resolution_time, reason=''):
+        assert resolution in ('ignore','violate','warn')
+        return self.instrument('chat_report_resolve(%s)'%reason, self._chat_report_resolve, (id, resolution, resolution_time))
+    def _chat_report_resolve(self, id, resolution, resolution_time):
+        return self.chat_reports_table().update_one({'_id': self.encode_object_id(id), 'resolved': False},
+                                                    {'$set': {'resolved': True, 'resolution': resolution, 'resolution_time': resolution_time}}).matched_count > 0
+
+    # check if a chat report is obsolete - i.e. there exists a later resolved (not ignored) chat report on the same player
+    def chat_report_is_obsolete(self, target_report, reason=''):
+        # look for any later resolved-violated chat report on the same player
+        qs = {'_id': {'$ne': self.encode_object_id(target_report['id'])},
+              'millitime':{'$gte':datetime.datetime.utcfromtimestamp(float(target_report['time'] - 5))}, # add fudge margin
+              'resolved': True, 'resolution': {'$ne':'ignore'}, 'target_id': target_report['target_id']}
+        later_resolved_reports = self.instrument('chat_report_is_obsolete(%s)'%reason, self._chat_reports_query, (qs, 1))
+        return len(later_resolved_reports) > 0
+
+    def chat_monitor_bookmarks_table(self): return self._table('chat_monitor_bookmarks')
+    def chat_monitor_bookmark_get(self, key): return self.instrument('chat_monitor_bookmark_get', self._chat_monitor_bookmark_get, (key,))
+    def chat_monitor_bookmark_set(self, key, val): return self.instrument('chat_monitor_bookmark_set', self._chat_monitor_bookmark_set, (key,val))
+    def _chat_monitor_bookmark_get(self, key):
+        row = self.chat_monitor_bookmarks_table().find_one({'_id':key})
+        if row:
+            return row['bookmark']
+        return None
+    def _chat_monitor_bookmark_set(self, key, val):
+        self.chat_monitor_bookmarks_table().update_one({'_id':key}, {'$set': {'bookmark':val}}, upsert=True)
 
     ###### PLAYER ALIAS UNIQUE RESERVATIONS ######
 
@@ -1017,7 +1171,10 @@ class NoSQLClient (object):
     def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges,
                                                                                 townhall_name = None, min_townhall_level = None,
                                                                                 include_home_regions = None,
+                                                                                exclude_home_regions = None,
                                                                                 min_known_alt_count = None,
+                                                                                min_idle_check_fails = None,
+                                                                                min_idle_check_last_fail_time = None,
                                                                                 reason = None):
         qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
                      [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
@@ -1025,8 +1182,14 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {townhall_name+'_level': {'$gte': min_townhall_level}}]}
         if min_known_alt_count:
             qs = {'$and': [qs, {'known_alt_count': {'$gte': min_known_alt_count}}]}
+        if min_idle_check_fails:
+            qs = {'$and': [qs, {'idle_check_fails': {'$gte': min_idle_check_fails}}]}
+        if min_idle_check_last_fail_time:
+            qs = {'$and': [qs, {'idle_check_last_fail_time': {'$gte': min_idle_check_last_fail_time}}]}
         if include_home_regions:
             qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
+        if exclude_home_regions:
+            qs = {'$and': [qs, {'home_region': {'$nin': exclude_home_regions}}]}
         return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
@@ -1344,7 +1507,7 @@ class NoSQLClient (object):
             del props['base_map_path']
 
         # omit unwanted fields
-        for UNWANTED in ('base_map_loc_flat','base_map_path_eta'):
+        for UNWANTED in ('base_map_loc_flat','base_map_path_eta','preserve_locks'):
             if UNWANTED in props: del props[UNWANTED]
 
         return props
@@ -1423,7 +1586,9 @@ class NoSQLClient (object):
     def update_map_feature(self, region, base_id, props, originator=None, do_hook = True, reason=''):
         ret = self.instrument('update_map_feature(%s)'%reason, self._update_map_feature, (region,base_id,props))
         if self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, props, originator)
+            hook_props = props.copy()
+            hook_props['preserve_locks'] = 1
+            self.map_update_hook(region, base_id, hook_props, originator)
         return ret
     def _update_map_feature(self, region, base_id, caller_props):
         props = caller_props.copy()
@@ -1435,6 +1600,8 @@ class NoSQLClient (object):
             props['base_map_path_eta'] = props['base_map_path'][-1]['eta']
         elif 'base_map_path' in props:
             del props['base_map_path']
+        # hack - for client-side propagation only, don't write to the DB
+        if 'preserve_locks' in props: del props['preserve_locks']
         self.region_table(region, 'map').update_one({'_id':base_id}, {'$set': props}, upsert = False)
 
     def create_map_feature(self, region, base_id, props, exclusive = -1, exclude_filter = None, originator=None, do_hook = True, reason=''):
@@ -1448,7 +1615,7 @@ class NoSQLClient (object):
         if ret and self.map_update_hook and do_hook:
             self.map_update_hook(region, base_id, {'base_id':base_id,
                                                    'base_map_loc':props['base_map_loc'],
-                                                   'base_map_path':props.get('base_map_path',None)}, originator)
+                                                   'base_map_path':props.get('base_map_path',None), 'preserve_locks':1}, originator)
         return ret
 
     def _create_map_feature(self, region, base_id, caller_props, originator, exclusive, exclude_filter, old_loc, old_path):
@@ -1583,7 +1750,7 @@ class NoSQLClient (object):
     def map_feature_lock_acquire(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
         state = self.instrument('map_feature_lock_acquire(%s)'%(reason), self._map_feature_lock_acquire, (region,base_id,owner_id,generation))
         if state > 0 and self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, {'LOCK_STATE':state,'LOCK_OWNER':owner_id}, owner_id)
+            self.map_update_hook(region, base_id, {'LOCK_STATE':state, 'LOCK_OWNER':owner_id, 'preserve_locks':1}, owner_id)
         return state
     def _map_feature_lock_acquire(self, region, base_id, owner_id, generation):
         LOCK_IS_OPEN = {'$or':[{'LOCK_STATE':{'$exists':False}},
@@ -1619,12 +1786,12 @@ class NoSQLClient (object):
 
         return -self.LOCK_BEING_ATTACKED
 
-    def map_feature_lock_release(self, region, base_id, owner_id, generation = -1, extra_props = None, do_hook = True, reason=''):
-        ret = self.instrument('map_feature_lock_release(%s)'%reason, self._map_feature_lock_release, (region,base_id,owner_id,generation,extra_props))
+    def map_feature_lock_release(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
+        ret = self.instrument('map_feature_lock_release(%s)'%reason, self._map_feature_lock_release, (region,base_id,owner_id,generation))
         if self.map_update_hook and do_hook:
-            self.map_update_hook(region, base_id, {'LOCK_STATE':0}, owner_id)
+            self.map_update_hook(region, base_id, {'LOCK_STATE':0, 'preserve_locks':1}, owner_id)
         return ret
-    def _map_feature_lock_release(self, region, base_id, owner_id, generation, extra_props):
+    def _map_feature_lock_release(self, region, base_id, owner_id, generation):
         qs = {'$set':{'last_mtime':self.time},
               '$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1}}
         if generation >= 0:
@@ -1633,9 +1800,6 @@ class NoSQLClient (object):
             # do NOT unset lock generation, leave it alone
             pass
 
-        if extra_props:
-            for k,v in extra_props.iteritems():
-                qs['$set'][k] = v
         return self.region_table(region, 'map').update_one({'_id':base_id}, qs)
 
     def map_feature_lock_keepalive_batch(self, region, base_ids, reason=''):
@@ -1670,6 +1834,9 @@ class NoSQLClient (object):
                                                                   {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
                                                                   ]},
                                                          {'$unset':{'base_map_path':1}})
+        if 1: # clean up legacy features that have a field that should not have been written to the DB
+            self.region_table(region, 'map').update_many({'preserve_locks': {'$exists':True}},
+                                                         {'$unset':{'preserve_locks':1}})
 
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
 
@@ -1816,7 +1983,7 @@ class NoSQLClient (object):
         self.alliance_table('alliance_members').delete_many({'alliance_id':id})
         self.alliance_table('alliance_invites').delete_many({'alliance_id':id})
         self.alliance_table('alliance_join_requests').delete_many({'alliance_id':id})
-        self.alliance_score_cache().delete_many({'alliance_id':id})
+        # XXXXXX clear Scores2 data for this alliance
 
     # note: modifications are rejected unless modifier_id has permission
     def modify_alliance(self, alliance_id, modifier_id, ui_name = None, ui_description = None, join_type = None, logo = None, leader_id = None, continent = None, chat_motd = None, chat_tag = None, reason = ''):
@@ -2153,213 +2320,6 @@ class NoSQLClient (object):
                 return (ret['max_space'] - ret['space_left'], ret['max_space']) # return cur, max
         return None
 
-    ###### SCORES ######
-
-    def parse_score_addr(self, addr):
-        field_name, frequency, period = addr
-        assert frequency in ('season', 'week')
-        assert period >= 0
-        return {'field':field_name, 'frequency':frequency, 'period':period}
-    def hash_score_addr(self, addr):
-        return '%s_%s_%d' % (addr['field'], addr['frequency'], addr['period'])
-
-    ###### PLAYER SCORE TABLE ######
-
-    def player_scores(self):
-        tbl = self._table('player_scores')
-        if not self.seen_player_scores:
-            # necessary for correctness (unique scores per user/board), and per-user lookups
-            tbl.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
-            # used for the "Top 10" query
-            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
-            self.seen_player_scores = True
-        return tbl
-
-    def player_scores_rank_cache_update(self, cur_season = None, cur_week = None):
-        self._table('player_scores_rank_cache_inprogress').drop()
-        try:
-            prog = self._table('player_scores_rank_cache_inprogress')
-
-            # obtain all in-use combinations of field/freq/period
-            all_addrs = [x['_id'] for x in self.player_scores().aggregate([{'$group':{'_id':{'field':'$field','frequency':'$frequency','period':'$period'}}}])]
-
-            if cur_season is not None: all_addrs = filter(lambda x: (x['frequency']!='season') or (x['period']==cur_season), all_addrs)
-            if cur_week is not None: all_addrs = filter(lambda x: (x['frequency']!='week') or (x['period']==cur_week), all_addrs)
-
-            for addr in all_addrs:
-                print 'Caching ranks for %-80s...' % repr(addr),
-                sys.stdout.flush()
-                start_time = time.time()
-
-                data = self.player_scores().find(addr,{'_id':0,'user_id':1,'score':1})
-                all_scores = set()
-                users_by_score = {}
-                for x in data:
-                    all_scores.add(x['score'])
-                    if x['score'] not in users_by_score: users_by_score[x['score']] = []
-                    users_by_score[x['score']].append(x['user_id'])
-
-                # rank=0 for highest score
-                all_scores = sorted(list(all_scores), reverse=True)
-
-                def row_generator(addr, all_scores, users_by_score):
-                    for rank in xrange(len(all_scores)):
-                        for user_id in users_by_score[all_scores[rank]]:
-                            row = addr.copy()
-                            row['user_id'] = user_id
-                            row['score'] = all_scores[rank]
-                            row['rank'] = rank
-                            row['n'] = len(all_scores)
-                            yield row
-
-                prog.insert_many(row_generator(addr, all_scores, users_by_score))
-
-                end_time = time.time()
-                print 'done (%.2f ms)' % (1000.0*(end_time-start_time))
-
-            # build index for per-user percentile/rank queries
-            # note, we need to index this by user_id rather than by score, because scores used for ranking become stale
-            prog.create_index([('user_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True, background=True)
-
-            # atomically replace old cache with the new one
-            prog.rename(self.slave_for_table('player_scores_rank_cache').dbconfig['table_prefix']+'player_scores_rank_cache', dropTarget=True)
-        except:
-            # clean up inprogress table
-            prog.drop()
-            raise
-
-    # the "updates" parameter here is a list of (address, score) tuples
-    def update_player_scores(self, player_id, updates, reason=''): return self.instrument('update_player_scores(%s)'%reason, self._update_player_scores, (player_id, updates))
-    def _update_player_scores(self, player_id, updates):
-        for addr, score in updates:
-            qs = self.parse_score_addr(addr)
-            qs['user_id'] = player_id
-            # send asynchronously - this is a performance hotspot
-            self.player_scores().with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).update_one(qs, {'$set':{'score': score}}, upsert=True)
-        return True
-
-    def get_player_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_player_score_leaders(%s)'%reason, self._get_player_score_leaders, (addr, num, start))
-    def _get_player_score_leaders(self, addr, num, start):
-        addr = self.parse_score_addr(addr)
-        ret = list(self.player_scores().find(addr, {'_id':0, 'user_id':1, 'score':1}).sort([('score',pymongo.DESCENDING)]).skip(start).limit(num))
-        for i in xrange(len(ret)):
-            ret[i]['absolute'] = ret[i]['score']; del ret[i]['score']
-            ret[i]['rank'] = start+i
-        return ret
-
-    def get_player_scores(self, player_ids, addrs, rank = False, reason=''): return self.instrument('get_player_scores' + '+RANK' if rank else '' + '(%s)'%reason, self._get_player_scores, (player_ids, addrs, rank))
-    def _get_player_scores(self, player_ids, addrs, rank):
-        ret = [[None,]*len(addrs) for u in xrange(len(player_ids))]
-        addrs = map(self.parse_score_addr, addrs)
-        need_totals = {}
-
-#        start_time = time.time()
-
-        for i in xrange(len(addrs)):
-            qs = addrs[i].copy(); qs['user_id'] = {'$in': player_ids}
-            scores = list(self.player_scores().find(qs, {'_id':0, 'user_id':1, 'score':1}))
-            for score in scores:
-                u = player_ids.index(score['user_id'])
-                ret[u][i] = {'absolute': score['score']}
-                if rank and score['score'] > 0:
-                    need_totals[self.hash_score_addr(addrs[i])] = True
-
-#        end_time = time.time(); print "A %.2fms" % (1000.0*(end_time-start_time)); start_time = end_time
-
-        if rank:
-            n_totals = {}
-            for addr in addrs:
-                if need_totals.get(self.hash_score_addr(addr),False):
-                    # this is actually the slowest part of the query - getting the total number of scores this addr
-                    qs = addr.copy()
-                    n_totals[self.hash_score_addr(addr)] = self.player_scores().find(qs,{'_id':0}).count()
-
-#            end_time = time.time(); print "B %d of %d %.2fms" % (len(n_totals), len(addrs), 1000.0*(end_time-start_time)); start_time = end_time
-            for u in xrange(len(player_ids)):
-                for i in xrange(len(addrs)):
-                    if ret[u][i]:
-                        addr = addrs[i]
-                        if ret[u][i]['absolute'] <= 0:
-                            # if absolute score is zero, don't bother querying
-                            total = 1000000 # use a fictional total so that the rank is like #999,999
-                            ret[u][i]['rank'] = max(total-1, 0)
-                            ret[u][i]['percentile'] = 1.0
-                        else:
-                            total = n_totals[self.hash_score_addr(addr)]
-                            if total > 0:
-                                qs = addr.copy()
-                                qs['score'] = {'$gt': ret[u][i]['absolute']}
-                                n_above_me = self.player_scores().find(qs,{'_id':0}).count()
-                                ret[u][i]['rank'] = n_above_me
-                                ret[u][i]['percentile'] = n_above_me/float(total)
-
-#            end_time = time.time(); print "C %.2fms" % (1000.0*(end_time-start_time)); start_time = end_time
-        return ret
-
-    ###### ALLIANCE SCORE CACHE ######
-
-    def alliance_score_cache(self):
-        tbl = self._table('alliance_score_cache')
-        if not self.seen_alliance_score_cache:
-            tbl.create_index([('alliance_id',pymongo.ASCENDING),('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING)], unique=True)
-            tbl.create_index([('field',pymongo.ASCENDING),('frequency',pymongo.ASCENDING),('period',pymongo.ASCENDING),('score',pymongo.DESCENDING)])
-            self.seen_alliance_score_cache = True
-        return tbl
-
-    def update_alliance_score_cache(self, alliance_id, addrs, weights, offset, reason = ''):
-        return self.instrument('update_alliance_score_cache(%s)'%reason, self._update_alliance_score_cache, (alliance_id, addrs, weights, offset))
-    def _update_alliance_score_cache(self, alliance_id, addrs, weights, offset):
-        member_ids = self.get_alliance_member_ids(alliance_id)
-        if len(member_ids) <= 0: return True
-        addrs = map(self.parse_score_addr, addrs)
-        for addr in addrs:
-            if len(member_ids) > 0:
-                qs = addr.copy(); qs['user_id'] = {'$in': member_ids}
-                player_scores = list(self.player_scores().find(qs, {'user_id':1, 'score':1}))
-            else:
-                player_scores = []
-
-            score_map = {}
-            for row in player_scores:
-                score_map[row['user_id']] = row['score']
-            member_ids.sort(key = lambda id: -score_map.get(id,0))
-
-            #print "SCORE_MAP", score_map
-
-            total = 0.0
-            for i in xrange(min(len(member_ids), len(weights))):
-                sc = score_map.get(member_ids[i],0)
-                total += weights[i] * (sc + offset.get(addr['field'],0))
-            total = int(total)
-
-            qs = addr.copy(); qs['alliance_id'] = alliance_id
-            self.alliance_score_cache().update_one(qs, {'$set': {'score': total}}, upsert = True)
-        return True
-
-    def get_alliance_score_leaders(self, addr, num, start = 0, reason = ''): return self.instrument('get_alliance_score_leaders(%s)'%reason, self._get_alliance_score_leaders, (addr, num, start))
-    def _get_alliance_score_leaders(self, addr, num, start):
-        addr = self.parse_score_addr(addr)
-        ret = list(self.alliance_score_cache().find(addr, {'_id':0, 'alliance_id':1, 'score':1}).sort([('score',pymongo.DESCENDING)]).skip(start).limit(num))
-        for i in xrange(len(ret)):
-            ret[i]['absolute'] = ret[i]['score']; del ret[i]['score']
-            ret[i]['rank'] = start+i
-        return ret
-
-    def get_alliance_score(self, alliance_id, addr, rank = False, reason=''): return self.instrument('get_alliance_score' + '+RANK' if rank else '' + '(%s)'%reason, self._get_alliance_score, (alliance_id, addr, rank))
-    def _get_alliance_score(self, alliance_id, addr, rank):
-        addr = self.parse_score_addr(addr)
-        ret = None
-        myscore = self.alliance_score_cache().find_one({'alliance_id':alliance_id, 'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period']},{'score':1})
-        if myscore:
-            ret = {'absolute':myscore['score']}
-            if rank:
-                n_total = self.alliance_score_cache().find({'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period']}).count()
-                if n_total > 0:
-                    n_above_me = self.alliance_score_cache().find({'field':addr['field'], 'frequency':addr['frequency'], 'period':addr['period'], 'score':{'$gt':myscore['score']}}).count()
-                    ret['rank'] = n_above_me
-                    ret['percentile'] = n_above_me/float(n_total)
-        return ret
-
 if __name__ == '__main__':
     import getopt
     import codecs
@@ -2368,17 +2328,18 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
-                                                      'winners', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
-                                                      'score-scope=', 'score-loc=', 'spend-week=',
-                                                      'recache-player-ranks',
-                                                      'recache-alliance-scores', 'test'])
+                                                        'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
+                                                        'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
+                                                        'recache-alliance-scores', 'test'])
     game_instance = SpinConfig.config['game_id']
     mode = None
+    send_prizes = False
     week = -1
     season = -1
     tournament_stat = None
     score_space_scope = None
     score_space_loc = None
+    score_time_scope = None
     spend_week = None
     time_now = int(time.time())
     maint_region = None
@@ -2391,25 +2352,38 @@ if __name__ == '__main__':
         elif key == '--maint': mode = 'maint' # global maintenance
         elif key == '--region-maint': mode = 'region-maint'; maint_region = val # region maintenance
         elif key == '--winners': mode = 'winners'
+        elif key == '--send-prizes': send_prizes = True
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
         elif key == '--tournament-stat':
             tournament_stat = val
-        elif key == '--score-scope':
+        elif key == '--score-space-scope':
             import Scores2
             if val == 'ALL':
                 score_space_scope = Scores2.SPACE_ALL
                 score_space_loc = Scores2.SPACE_ALL_LOC
-            else:
+            elif val == 'continent':
                 score_space_scope = Scores2.SPACE_CONTINENT
-        elif key == '--score-loc':
+            else:
+                raise Exception('unknown score-space-scope %s' % val)
+        elif key == '--score-space-loc':
             import Scores2
             assert score_space_scope == Scores2.SPACE_CONTINENT
             score_space_loc = val
+        elif key == '--score-time-scope':
+            import Scores2
+            if val == 'ALL':
+                score_time_scope = Scores2.FREQ_ALL
+            elif val == 'season':
+                score_time_scope = Scores2.FREQ_SEASON
+            elif val == 'week':
+                score_time_scope = Scores2.FREQ_WEEK
+            else:
+                raise Exception('unknown score-time-scope %s' % val)
+
         elif key == '--spend-week': spend_week = int(val)
         elif key == '--recache-alliance-scores': mode = 'recache-alliance-scores'
-        elif key == '--recache-player-ranks': mode = 'recache-player-ranks'
         elif key == '--test': mode = 'test'
         elif key == '-g' or key == '--game-id':
             game_instance = val
@@ -2421,7 +2395,6 @@ if __name__ == '__main__':
         print 'Modes:'
         print '    --maint                             Prune stale/invalid data from global tables'
         print '    --region-maint REGION_ID            Prune stale/invalid data from region tables'
-        print '    --recache-player-ranks              Update player score rank cache'
         print '    --recache-alliance-scores --week N --season S  Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
@@ -2433,7 +2406,7 @@ if __name__ == '__main__':
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
 
-    if mode in ('maint', 'winners', 'leaders', 'recache-player-ranks', 'recache-alliance-scores', 'test'):
+    if mode in ('maint', 'winners', 'leaders', 'recache-alliance-scores', 'test'):
         # these modes need access to gamedata for season/week or gamebucks info
         import SpinJSON
         gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -2464,9 +2437,6 @@ if __name__ == '__main__':
                 console.push(arg)
         else:
             console.interact()
-
-    elif mode == 'recache-player-ranks':
-        client.player_scores_rank_cache_update(season if season >= 0 else cur_season, week if week >= 0 else cur_week)
 
     elif mode == 'recache-alliance-scores':
         assert cur_week >= 0 and cur_season >= 0
@@ -2500,13 +2470,10 @@ if __name__ == '__main__':
                 return raw + gamedata['trophy_display_offset'].get(tournament_stat.split('_')[1], 0)
             return raw
 
-        freq = 'season' if season >= 0 else 'week'
-        freq_name = 'SEASON'  if season >= 0 else 'WEEK'
-        period = season if season >= 0 else week
+        assert season >= 0 and week >= 0
+        score_time_loc = {Scores2.FREQ_ALL: 0, Scores2.FREQ_SEASON: season, Scores2.FREQ_WEEK: week}[score_time_scope]
 
-        addr = (tournament_stat, freq, period)
-        time_scope = {'season':Scores2.FREQ_SEASON, 'week':Scores2.FREQ_WEEK}[freq]
-        stat_axes = (tournament_stat, Scores2.make_point(time_scope, period, score_space_scope, score_space_loc))
+        stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc))
 
         if mode == 'leaders':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
@@ -2535,8 +2502,12 @@ if __name__ == '__main__':
 
             top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
 
-            print '[color="#FFFF00"]TOP %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
-                  (tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
+            ui_score_time_scope = {Scores2.FREQ_ALL: 'ALL-TIME',
+                                   Scores2.FREQ_SEASON: 'SEASONAL',
+                                   Scores2.FREQ_WEEK: 'WEEKLY'}[score_time_scope]
+
+            print '[color="#FFFF00"]TOP %s %s ALLIANCES FOR %sWEEK %d%s[/color]' % \
+                  (ui_score_time_scope, tournament_stat, 'SEASON %d ' % (season+gamedata['matchmaking']['season_ui_offset']) if season >= 0 else '', week,
                    (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '')
 
             data = client.get_alliance_info([x['alliance_id'] for x in top_alliances])
@@ -2627,10 +2598,24 @@ if __name__ == '__main__':
                     else:
                         print "    #%2d%s %-24s with %5d points WINS %6d %s (id %7d continent %s spend %s)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
                                                                                         detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data)
-                        commands.append("./check_player.py %d --give-item gamebucks --melt-hours -1 --item-stack %d --give-item-subject 'Tournament Prize' --give-item-body 'Congratulations, here is your Tournament prize for %sWeek %d!  Click the prize to collect it.' --item-log-reason 'tournament_prize_s%d_w%d'" % (member['user_id'], my_prize, ('Season %d ' % (season+gamedata['matchmaking']['season_ui_offset'])) if season >= 0 else '', week, season, week))
+                        commands.append(['./check_player.py', '%d' % member['user_id'],
+                                         '--give-item', 'gamebucks', '--melt-hours', '-1',
+                                         '--item-stack', '%d' % my_prize,
+                                         '--give-item-subject', 'Tournament Prize',
+                                         '--give-item-body', 'Congratulations, here is your Tournament prize for %sWeek %d! Click the prize to collect it.' % (('Season %d ' % (season+gamedata['matchmaking']['season_ui_offset'])) if season >= 0 else '', week),
+                                         '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
             print "COMMANDS"
-            print '\n'.join(commands)
+            def quote(s):
+                if ' ' in s: return "'"+s+"'"
+                return s
+            print '\n'.join(' '.join(quote(word) for word in cmd) for cmd in commands)
+            if send_prizes:
+                import subprocess, os
+                print "SENDING PRIZES"
+                for cmd in commands:
+                    subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
+                print "PRIZES ALL SENT OK"
 
     elif mode == 'test':
         print 'TEST'
@@ -2920,34 +2905,38 @@ if __name__ == '__main__':
         assert client.make_unit_donation(1112, alliance_1, TAG, [100,80,10]) == (100, 100)
         assert client.make_unit_donation(1112, alliance_1, TAG, [1]) is None
 
-        # test scores
-        client.player_scores().drop(); client.seen_player_scores = False
-        client.alliance_score_cache().drop(); client.seen_alliance_score_cache = False
-
-        client.update_player_scores(1112, [[('trophies_pvp','season',0),150],[('trophies_pvp','week',0),100],[('trophies_pvp','week',1),50]])
-        client.update_player_scores(1113, [[('trophies_pvp','season',0),170],[('trophies_pvp','week',0),110],[('trophies_pvp','week',1),60]])
-        client.update_player_scores(1114, [[('trophies_pvp','season',0),75],[('trophies_pvp','week',0),50],[('trophies_pvp','week',1),25]])
-        client.update_player_scores(1115, [[('trophies_pvp','season',0),10],[('trophies_pvp','week',0),10],[('trophies_pvp','week',1),5]])
-        assert client.get_player_score_leaders(('trophies_pvp','season',0), 2, start = 1) == \
-               [{'user_id': 1112, 'rank': 1, 'absolute': 150}, {'user_id': 1114, 'rank': 2, 'absolute': 75}]
-        assert client.get_player_scores([1112,1114], [('trophies_pvp','season',0),('trophies_pvp','week',1)], rank = True) == \
-               [[{'percentile': 0.25, 'rank': 1, 'absolute': 150}, {'percentile': 0.25, 'rank': 1, 'absolute': 50}], [{'percentile': 0.5, 'rank': 2, 'absolute': 75}, {'percentile': 0.5, 'rank': 2, 'absolute': 25}]]
-
-        client.update_player_scores(1115, [[('trophies_pvp','season',0),12],[('trophies_pvp','week',0),12],[('trophies_pvp','week',1),6]])
-        for ALLIANCE in (alliance_1, alliance_2):
-            client.update_alliance_score_cache(ALLIANCE, [('trophies_pvp','season',0), ('trophies_pvp','week',1)],
-                                               gamedata['alliances']['trophy_weights'][0:gamedata['alliances']['max_members']],
-                                               {'trophies_pvp':gamedata['trophy_display_offset']['pvp'],
-                                                'trophies_pve':gamedata['trophy_display_offset']['pve']})
-        assert client.get_alliance_score_leaders(('trophies_pvp','week',1), 5) == \
-               [{'rank': 0, 'alliance_id': 2, 'absolute': 30}, {'rank': 1, 'alliance_id': 1, 'absolute': 28}]
-        assert client.get_alliance_score(alliance_1, ('trophies_pvp','week',1), rank = True) == \
-               {'percentile': 0.5, 'rank': 1, 'absolute': 28}
-        assert client.get_alliance_score(alliance_2, ('trophies_pvp','week',1), rank = True) == \
-               {'percentile': 0, 'rank': 0, 'absolute': 30}
-
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
+
+        # test chat
+        client.chat_buffer_table().drop(); client.seen_chat = False
+        for n in range(4):
+            client.chat_record('global_en', None, {'user_id': 1112, 'chat_name': 'test'}, 'Test message %d' % n)
+        chat_context = client.chat_get_context('global_en', 1112, time_now, 5, limit = 10)
+        assert len(chat_context) == 4
+
+        # test chat reports
+        client.chat_reports_table().drop(); client.seen_chat_reports = False
+        report_time = time_now - 2
+        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, None, u'you are a poopyhead \u4f60\u597d')
+        rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
+        assert len(rep_list) == 1
+        rep = rep_list[0]
+        print rep
+        assert client.chat_report_resolve(rep['id'], 'violate', time_now) # first resolution should succeed
+        assert not client.chat_report_resolve(rep['id'], 'ignore', time_now) # second attempt should fail
+        assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 600, time_now + 600))) == 0
+        # add an obsolete report
+        client.chat_report('global_en', 1114, 'Reporter', 1113, 'Target', time_now, report_time-60, None, 'you are a poopyhead (earlier)')
+        rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
+        print '---'
+        print '\n'.join([repr(x) for x in rep_list])
+        print '---'
+        for rep in rep_list:
+            if not rep.get('resolved'):
+                assert client.chat_report_is_obsolete(rep)
+            else:
+                assert not client.chat_report_is_obsolete(rep)
 
         # test player aliases
         client.player_alias_table().drop(); client.seen_player_aliases = False

@@ -23,12 +23,12 @@ goog.provide('goog.editor.Plugin');
 
 // TODO(user): Remove the dependency on goog.editor.Command asap. Currently only
 // needed for execCommand issues with links.
-goog.require('goog.editor.Command');
 goog.require('goog.events.EventTarget');
 goog.require('goog.functions');
 goog.require('goog.log');
 goog.require('goog.object');
 goog.require('goog.reflect');
+goog.require('goog.userAgent');
 
 
 
@@ -460,4 +460,20 @@ goog.editor.Plugin.prototype.cleanContentsHtml;
  */
 goog.editor.Plugin.prototype.isSupportedCommand = function(command) {
   return false;
+};
+
+
+/**
+ * Saves the field's scroll position.  See b/7279077 for context.
+ * Currently only does anything in Edge, since all other browsers
+ * already seem to work correctly.
+ * @return {function()} A function to restore the current scroll position.
+ * @protected
+ */
+goog.editor.Plugin.prototype.saveScrollPosition = function() {
+  if (this.getFieldObject() && goog.userAgent.EDGE) {
+    var win = this.getFieldObject().getEditableDomHelper().getWindow();
+    return win.scrollTo.bind(win, win.scrollX, win.scrollY);
+  }
+  return function() {};
 };

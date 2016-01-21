@@ -1,6 +1,6 @@
 goog.provide('SPFX');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -65,7 +65,6 @@ SPFX.When.equal = function(a, b) {
         return (b.tick !== null) && GameTypes.TickCount.equal(a.tick, b.tick) && (a.tick_delay === b.tick_delay);
     }
     throw Error('bad When values');
-    return false;
 };
 
 /** @type {number} */
@@ -301,7 +300,7 @@ SPFX.get_camera_shake = function() {
     @param {number} amplitude
     @param {number} falloff */
 SPFX.shake_camera = function(when, amplitude, falloff) {
-    SPFX.shake_impulses.push({when:when, amplitude:amplitude, falloff:falloff, started_at: -1});
+    SPFX.shake_impulses.push({when:when, amplitude: gamedata['client']['camera_shake_scale']*amplitude, falloff:falloff, started_at: -1});
 };
 
 /** @constructor
@@ -992,16 +991,6 @@ SPFX.TimeProjectile.prototype.draw = function() {
 
     SPFX.ctx.save();
 
-    if(0) {
-        //console.log(this.from[0]+','+t+' '+height+','+this.shot_vel[0]);
-        SPFX.ctx.strokeStyle = 'rgba(255,200,50,0.1)';
-        SPFX.ctx.lineWidth = 2;
-        SPFX.ctx.beginPath();
-        SPFX.ctx.moveTo(stroke_start[0], stroke_start[1]);
-        SPFX.ctx.lineTo(stroke_end[0], stroke_end[1]);
-        SPFX.ctx.stroke();
-    }
-
     // quantize to pixels
     quantize_streak(stroke_start, stroke_end);
 
@@ -1476,7 +1465,7 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
     this.opacity = ((data && ('opacity' in data)) ? /** @type {number} */ (data['opacity']) : 1);
     this.composite_mode = ((data && ('composite_mode' in data)) ? /** @type {string} */ (data['composite_mode']) : 'source-over');
 
-    this.sprite_scale = ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]);
+    this.sprite_scale = (instance_data && 'sprite_scale' in instance_data ? SPFX.get_vec_parameter(instance_data['sprite_scale']) : ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]));
 
     this.rotation = (instance_data && 'rotation' in instance_data ? /** @type {number} */ (instance_data['rotation']) : (data && ('rotation' in data) ? /** @type {number} */ (data['rotation']) : 0));
     this.rotate_speed = (instance_data && 'rotate_speed' in instance_data ? /** @type {number} */ (instance_data['rotate_speed']) : (data && ('rotate_speed' in data) ? /** @type {number} */ (data['rotate_speed']) : 0));
@@ -2005,6 +1994,8 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     } else if('path' in instance_data) {
         path = /** @type {!Array.<!Array.<number>>} */ (instance_data['path']);
         dest = path[path.length - 1];
+    } else {
+        throw Error('PhantomUnit requires one of dest, heading, or path in instance data');
     }
 
     this.obj.ai_dest = dest;
@@ -2218,6 +2209,9 @@ SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_soun
             return null;
         }
     } else if(effect_type === 'phantom_unit') {
+        if(instance_data && ('dest' in instance_data) && instance_data['dest'] === null) {
+            return null; // inhibit spawning
+        }
         return SPFX.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
     } else {
         console.log('unhandled visual effect type "'+effect_type+'"!');

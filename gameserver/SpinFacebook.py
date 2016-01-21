@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 import SpinConfig # for API version settings
 import SpinJSON
-import base64, hmac, hashlib, time, calendar
+import base64, hmac, hashlib, time, calendar, os
 
 #
 # FACEBOOK API tools
@@ -91,8 +91,12 @@ def order_data_decode(data):
 # please keep in sync with gameclient/clientcode/SPFB.js
 
 def api_version_string(feature):
+    env_override = os.getenv('SPIN_FACEBOOK_API_VERSION')
     api_versions = SpinConfig.config.get('facebook_api_versions', {})
-    if api_versions and (feature in api_versions):
+
+    if env_override:
+        sver = env_override
+    elif api_versions and (feature in api_versions):
         sver = api_versions[feature]
     elif api_versions and ('default' in api_versions):
         sver = api_versions['default']
@@ -101,20 +105,24 @@ def api_version_string(feature):
     return (sver + '/') if sver else ''
 
 def api_version_number(feature):
+    env_override = os.getenv('SPIN_FACEBOOK_API_VERSION')
     api_versions = SpinConfig.config.get('facebook_api_versions', {})
-    if api_versions and (feature in api_versions):
+
+    if env_override:
+        return float(env_override[1:])
+    elif api_versions and (feature in api_versions):
         ver = float(api_versions[feature][1:])
     elif api_versions and ('default' in api_versions):
         ver = float(api_versions['default'][1:])
     else:
-        ver = 2.2
+        ver = 2.4
     return ver
 
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
     return protocol + subdomain + '.facebook.com/'+api_version_string(feature) + path
 
 # list of fields to query on Graph API "payment" objects
-PAYMENT_FIELDS = 'id,user,application,actions,refundable_amount,items,country,request_id,created_time,payout_foreign_exchange_rate,tax,tax_country'
+PAYMENT_FIELDS = 'id,user,application,actions,refundable_amount,items,country,request_id,created_time,payout_foreign_exchange_rate,tax,tax_country,disputes'
 
 if __name__ == '__main__':
     test_requests = 'AQ3EraQUe8e-DZ9eT6OHmLpr16sYxUigJLuIapupRas.eyJhbGdvcml0aG0iOiJITUFDLVNIQTI1NiIsImV4cGlyZXMiOjEzMjEwMDIwMDAsImlzc3VlZF9hdCI6MTMyMDk5ODA5Nywib2F1dGhfdG9rZW4iOiJBQUFEZmxqNmdrZElCQUxjc1hRMXoxUWw5SHd1Z1h0dDBBNzR1ZWJrZUluM1JVRnV0T1FFRElvaWg1RHd5U29lWkFmZDk5UlQ3VGdFWVhGczVpZG9yaVIyT3hpRFBmSmx5TkQ0NDhhUVpEWkQiLCJ1c2VyIjp7ImNvdW50cnkiOiJ1cyIsImxvY2FsZSI6ImVuX1VTIiwiYWdlIjp7Im1pbiI6MjF9fSwidXNlcl9pZCI6IjQyNzIzMyJ9'.split('.')

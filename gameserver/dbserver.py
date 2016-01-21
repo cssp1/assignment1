@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -54,7 +54,7 @@ def reload_spin_config():
     verbose = SpinConfig.config['dbserver'].get('verbose', True)
 
 
-# mapping of Facebook user IDs to SpinPunch user IDs
+# mapping of Facebook user IDs to game player IDs
 # note: map keys are strings, not ints!
 # "missing" is represented by -1
 class FacebookIDTable (SpinDBStore.AsyncJournaledMap):
@@ -347,7 +347,7 @@ class MapCache (SpinDBStore.JournaledMap):
 map_regions = None # set from init_tables()
 
 
-# mapping of SpinPunch user IDs to cached player info
+# mapping of game player IDs to cached player info
 class PlayerCache (SpinDBStore.AsyncJournaledMap):
     def __init__(self):
         SpinDBStore.AsyncJournaledMap.__init__(self,

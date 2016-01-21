@@ -9,7 +9,7 @@
   <title>SpinPunch</title>
 
 <script type="text/javascript">
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 var spin_pageload_begin = (new Date()).getTime()/1000;
@@ -34,6 +34,12 @@ var spin_game_query_string = '$GAME_QUERY_STRING$';
 var spin_game_direct_connect = $DIRECT_CONNECT$;
 if(document.URL.indexOf('direct_connect=0') != -1) {
     spin_game_direct_connect = false;
+} else if(document.URL.indexOf('direct_connect=1') != -1) {
+    spin_game_direct_connect = true;
+}
+var spin_game_direct_multiplex = $DIRECT_MULTIPLEX$;
+if(document.URL.indexOf('direct_multiplex=1') != -1) {
+    spin_game_direct_multiplex = true;
 }
 var spin_game_use_websocket = false;
 if(document.URL.indexOf('websocket=1') != -1) {
@@ -101,7 +107,7 @@ var spin_try_start = function(module) {
     if(module == 'code') { spin_code_loaded = true; }
     if(spin_gamedata_loaded && spin_code_loaded && spin_allow_start) {
           spin_allow_start = false; //spin_try_start = function(module) {};
-          SPINPUNCHGAME_EXPORT.init();
+          SPINPUNCHGAME.init();
      }
 };
 

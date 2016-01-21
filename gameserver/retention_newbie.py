@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
 # load some standard Python libraries
 import sys, time, urllib, urllib2, getopt, traceback, random, re, functools
-import SpinConfig, SpinUserDB, SpinJSON, SpinParallel, SpinLog
+import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
 import SpinSingletonProcess
@@ -323,8 +323,14 @@ class Sender(object):
         text = ui_name.replace('%s', replace_s)
         print >> self.msg_fd, 'eligible for: "%s"...' % (text)
 
-        # necessary to find country for demographics dimensions
-        user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+        # userdb entry is necessary to find country for demographics dimensions
+        # but ignore failures
+        try:
+            user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+
+        # October 2015 server bug caused some players to get written out without userdb entry. Ignore this.
+        except SpinS3.S3404Exception:
+            user = {}
 
         generation = player.get('generation',0)
         if not self.dry_run:
@@ -420,8 +426,8 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
             sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
-        except:
-            sys.stderr.write(('error processing user %d: '%(batch[i])) + traceback.format_exc())
+        except Exception as e:
+            sys.stderr.write('error processing user %d: %r\n%s\n'% (batch[i], e, traceback.format_exc()))
 
         if limit >= 0 and sender.sent_now >= limit:
             print >> msg_fd, 'limit reached'

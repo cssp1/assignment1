@@ -31,15 +31,16 @@ goog.require('goog.labs.testing.Matcher');
 /**
  * The AllOf matcher.
  *
- * @param {!Array.<!goog.labs.testing.Matcher>} matchers Input matchers.
+ * @param {!Array<!goog.labs.testing.Matcher>} matchers Input matchers.
  *
  * @constructor
  * @struct
  * @implements {goog.labs.testing.Matcher}
+ * @final
  */
 goog.labs.testing.AllOfMatcher = function(matchers) {
   /**
-   * @type {!Array.<!goog.labs.testing.Matcher>}
+   * @type {!Array<!goog.labs.testing.Matcher>}
    * @private
    */
   this.matchers_ = matchers;
@@ -81,15 +82,16 @@ goog.labs.testing.AllOfMatcher.prototype.describe =
 /**
  * The AnyOf matcher.
  *
- * @param {!Array.<!goog.labs.testing.Matcher>} matchers Input matchers.
+ * @param {!Array<!goog.labs.testing.Matcher>} matchers Input matchers.
  *
  * @constructor
  * @struct
  * @implements {goog.labs.testing.Matcher}
+ * @final
  */
 goog.labs.testing.AnyOfMatcher = function(matchers) {
   /**
-   * @type {!Array.<!goog.labs.testing.Matcher>}
+   * @type {!Array<!goog.labs.testing.Matcher>}
    * @private
    */
   this.matchers_ = matchers;
@@ -135,6 +137,7 @@ goog.labs.testing.AnyOfMatcher.prototype.describe =
  * @constructor
  * @struct
  * @implements {goog.labs.testing.Matcher}
+ * @final
  */
 goog.labs.testing.IsNotMatcher = function(matcher) {
   /**

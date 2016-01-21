@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -177,7 +177,7 @@ class S3Driver (Driver):
         self.playerdb_bucket = playerdb_bucket if playerdb_bucket else SpinConfig.config.get('playerdb_s3_bucket', None)
         self.aistate_bucket = aistate_bucket if aistate_bucket else SpinConfig.config.get('aistate_s3_bucket', None)
         self.basedb_bucket = basedb_bucket if basedb_bucket else SpinConfig.config.get('basedb_s3_bucket', None)
-        self.s3con = SpinS3.S3(key_file if key_file else SpinConfig.aws_key_file(), verbose=verbose)
+        self.s3con = SpinS3.S3(key_file if key_file else SpinConfig.aws_key_file(), verbose=verbose, use_ssl=True)
 
     def user_id_bucket(self, id):
         return id % self.nbuckets
@@ -223,7 +223,7 @@ class S3Driver (Driver):
     def sync_write_user(self, id, buf): self._sync_write(*(self.get_user_path(id)+(buf,)))
     def sync_write_player(self, id, buf): self._sync_write(*(self.get_player_path(id)+(buf,)))
     def sync_write_base(self, region, id, buf): self._sync_write(*(self.get_base_path(region, id)+(buf,)))
-    def sync_delete_base(self, region, id): self.s3con.do_delete(*self.get_base_path(region, id))
+    def sync_delete_base(self, region, id): self.s3con.delete(*self.get_base_path(region, id))
     def collect_aistate_garbage(self, min_time): pass # auto-collected by S3 lifecycle rule
 
 DRIVERS = { 'flat': FlatDirectoryDriver,

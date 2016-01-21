@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -72,7 +72,7 @@ IGNORE_FIELDS = ["game_id", "session_id", "location", "timeout_duration"]
 # ignore events coming from users with these IDs - used to filter out developer accounts
 IGNORE_USERS = SpinConfig.config.get('developer_user_id_list', [])
 
-# this dictionary keeps track of the SpinPunch user_id associated with new visitors to the site
+# this dictionary keeps track of the game user_id associated with new visitors to the site
 # who were initially assigned an "anonymous" ID by index.php before they logged in
 ANON_ID_MAP = {}
 

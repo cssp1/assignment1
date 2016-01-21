@@ -1,6 +1,6 @@
 goog.provide('SPWebsocket');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -13,14 +13,8 @@ goog.require('goog.events');
 /** @enum {number} */
 SPWebsocket.SocketState = {CONNECTING:0, CONNECTED:1, CLOSING:2, CLOSED:3, TIMEOUT:4, FAILED:99};
 
-SPWebsocket.is_supported = function() {
-    try {
-        if(typeof(WebSocket) != 'undefined') {
-            return true;
-        }
-    } catch(e) {};
-    return false;
-};
+/** @return {boolean} */
+SPWebsocket.is_supported = function() { return (typeof(WebSocket) != 'undefined'); };
 
 /** @constructor
     @struct
@@ -121,7 +115,8 @@ SPWebsocket.SPWebsocket.prototype.on_close = function() {
     if(this.socket) {
         // if it wasn't us closing the connection, then this represents some kind of failure (server-side close)
         if(this.socket_state != SPWebsocket.SocketState.CLOSING) {
-            this.socket_state = SPWebsocket.SocketState.FAILED;
+            this.socket_state = SPWebsocket.SocketState.CLOSED;
+            this.target.dispatchEvent({type: 'shutdown', data: 'server_initiated'});
         }
 
         // leave it in FAILED state if it's failed previously
@@ -129,6 +124,9 @@ SPWebsocket.SPWebsocket.prototype.on_close = function() {
             this.socket_state = SPWebsocket.SocketState.CLOSED;
         }
         this.socket = null;
+
+        // kill watchdog timers etc. Won't recurse since this.socket is null now
+        this.close();
     }
 };
 /** @param {!Event} event */

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -13,9 +13,10 @@ import SpinConfig
 import SpinJSON
 import SpinNoSQLId
 import SpinSingletonProcess
+import AIBaseRandomizer
 from Region import Region
 import Sobol
-import sys, getopt, time, random, copy
+import sys, getopt, time, random, copy, math
 
 time_now = int(time.time())
 event_time_override = None
@@ -540,22 +541,32 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
     return True
 
 def spawn_all_quarries(db, lock_manager, region_id, force_rotation = False, dry_run = True):
-    if (not gamedata['regions'][region_id].get('spawn_quarries',True)): return
-    map_cache = get_existing_map_by_type(db, region_id, 'quarry')
+    region_data = gamedata['regions'][region_id]
+    if (not region_data.get('spawn_quarries',True)): return
+
     quarries = SpinConfig.load(SpinConfig.gamedata_component_filename("quarries_compiled.json"))
+
+    global_qty_scale = 1.0
+    if 'region_pop' in quarries:
+        global_qty_scale *= quarries['region_pop'].get(region_id,1.0)
+    if global_qty_scale <= 0: return
+
+    player_pop = None # player population, used for scaling the spawn
+    player_pop_factor = None # fullness of player population relative to pop_soft_cap, used for scaling the spawn
+
+    map_cache = get_existing_map_by_type(db, region_id, 'quarry')
     name_idx = 0
 
     spawn_list = quarries.get('spawn_for_'+region_id, quarries['spawn'])
     for spawn_data in spawn_list:
         if not spawn_data.get('active',1): continue
         template = quarries['templates'][spawn_data['template']]
-        resource = spawn_data['resource']
-        distribution = spawn_data.get('distribution', {'func':'uniform'})
-        id_start = spawn_data['id_start']
-        qty = spawn_data['num']
 
-        if 'region_pop' in quarries:
-            qty = int(quarries['region_pop'].get(region_id,1.0)*qty)
+        if 'num_by_region' in spawn_data and region_id in spawn_data['num_by_region']:
+            base_qty = spawn_data['num_by_region'][region_id]
+        else:
+            base_qty = spawn_data['num']
+        if base_qty <= 0: continue
 
         # get list of start,end spawn times
         if 'spawn_times' in spawn_data:
@@ -576,19 +587,41 @@ def spawn_all_quarries(db, lock_manager, region_id, force_rotation = False, dry_
                 do_spawn = True # found a valid spawn time
                 break
 
-        if do_spawn:
-            for i in xrange(qty):
-                if spawn_quarry(quarries, map_cache, db, lock_manager, region_id, (id_start+i), i, name_idx, distribution, spawn_data['template'], template,
-                                resource,
-                                start_time = start_time, end_time = end_time,
-                                force_rotation = force_rotation, dry_run = dry_run):
-                    do_throttle()
-                name_idx += 1
-        else:
-            if verbose: print 'not spawning quarry template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
+        if not do_spawn:
+            #if verbose: print 'not spawning quarry template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
+            continue
+
+        local_qty_scale = 1
+
+        if 'quarry_num_scale_by_player_pop' in region_data:
+            if player_pop is None: # cache this
+                player_pop = nosql_client.count_map_features_by_type(region_id, 'home')
+                player_pop_factor = min(max(float(player_pop) / region_data['pop_soft_cap'], 0), 1)
+                if 'min_player_pop_factor' in region_data:
+                    player_pop_factor = max(player_pop_factor, region_data['min_player_pop_factor'])
+                if verbose: print 'player_pop_factor', player_pop_factor
+
+            # move local_qty_scale proportionally toward local_qty_scale * player_pop_factor
+            local_qty_scale *= (1.0 + region_data['quarry_num_scale_by_player_pop'] * (player_pop_factor - 1.0))
+
+        if local_qty_scale <= 0:
+            if verbose: print 'not spawning quarry template', spawn_data['template'], 'because local_qty_scale is', local_qty_scale
+            continue
+
+        # spawn at least one as long as base_qty is above zero
+        qty = max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale))
+
+        for i in xrange(qty):
+            if spawn_quarry(quarries, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), i, name_idx,
+                            spawn_data.get('distribution', {'func':'uniform'}), spawn_data['template'], template, spawn_data['resource'],
+                            start_time = start_time, end_time = end_time, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
+                            force_rotation = force_rotation, dry_run = dry_run):
+                do_throttle()
+            name_idx += 1
+
 
 def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_serial, name_idx, distribution, template_name, template, resource,
-                 start_time = -1, end_time = -1, force_rotation = False,
+                 start_time = -1, end_time = -1, force_rotation = False, region_player_pop = None,
                  dry_run = True):
 
     base_id = 'q%d' % id_num
@@ -708,16 +741,36 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
     success = False
 
     # place on map with rejection sampling against locations of other map features
-    map_dims = gamedata['regions'][region_id]['dimensions']
+    region_data = gamedata['regions'][region_id]
+    map_dims = region_data['dimensions']
     bzone = max(gamedata['territory']['border_zone_ai'], 2)
     if distribution['func'] == 'uniform':
-        sample_loc = [int(bzone + (map_dims[D] - 2*bzone)*random.random()) for D in xrange(2)]
+
+        midpt = [map_dims[0]//2, map_dims[1]//2]
+        maxranges = [midpt[0] - bzone, midpt[1] - bzone]
+
+        # when entering a low-population region, prefer placing hives close to the center of the map
+        # note: use the same formula used for placing player bases geographically, which scales differently than the spawn number scaling
+        if region_player_pop is not None:
+            cap = region_data.get('pop_hard_cap',-1)
+            if cap > 0:
+                # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
+                fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+                if fullness < 1:
+                    # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
+                    maxranges = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in maxranges]
+
+
+        sample_loc = [int(midpt[D] + maxranges[D]*(2*random.random()-1)) for D in xrange(2)]
+        print maxranges, sample_loc
+
     elif distribution['func'] == 'sobol':
         global sobol_gen
         if sobol_gen is None:
             sobol_gen = Sobol.Sobol(dimensions=2, skip=0)
         p = sobol_gen.get(distribution['start'] + id_serial * distribution['inc'])
         sample_loc = [int(bzone + (map_dims[D] - 2*bzone)*p[D]) for D in xrange(2)]
+
     else: raise Exception('unknown distribution type '+distribution['func'])
 
     for trial in xrange(10):
@@ -909,9 +962,20 @@ def expire_all_hives(db, lock_manager, region_id, dry_run = True):
         clear_base(db, lock_manager, region_id, base_id, dry_run = dry_run)
 
 def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run = True):
-    if (not gamedata['regions'][region_id].get('spawn_hives',True)): return
-    map_cache = get_existing_map_by_type(db, region_id, 'hive')
+    region_data = gamedata['regions'][region_id]
+    if (not region_data.get('spawn_hives',True)): return
+
     hives = SpinConfig.load(SpinConfig.gamedata_component_filename("hives_compiled.json"))
+
+    global_qty_scale = 1.0
+    if 'region_pop' in hives:
+        global_qty_scale *= hives['region_pop'].get(region_id,1.0)
+    if global_qty_scale <= 0: return
+
+    player_pop = None # player population, used for scaling the spawn
+    player_pop_factor = None # fullness of player population relative to pop_soft_cap, used for scaling the spawn
+
+    map_cache = get_existing_map_by_type(db, region_id, 'hive')
     name_idx = 0
 
     spawn_list = hives.get('spawn_for_'+region_id, hives['spawn'])
@@ -920,14 +984,12 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
     for spawn_data in spawn_list:
         if not spawn_data.get('active',1): continue
         template = hives['templates'][spawn_data['template']]
-        id_start = spawn_data['id_start']
 
         if 'num_by_region' in spawn_data and region_id in spawn_data['num_by_region']:
-            base_pop = spawn_data['num_by_region'][region_id]
+            base_qty = spawn_data['num_by_region'][region_id]
         else:
-            base_pop = spawn_data['num']
-
-        pop = int(hives['region_pop'].get(region_id,1.0)*base_pop)
+            base_qty = spawn_data['num']
+        if base_qty <= 0: continue
 
         # get list of start,end spawn times
         if 'spawn_times' in spawn_data:
@@ -935,7 +997,10 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
         else:
             spawn_times = [[spawn_data.get('start_time',-1), spawn_data.get('end_time',-1)]]
 
+        repeat_interval = spawn_data.get('repeat_interval',None)
+
         do_spawn = False
+        ref_time = event_time_override or time_now
         for start_time, end_time in spawn_times:
             # restrict time range by any start/end times provided within the template itself
             if template.get('start_time',-1) > 0:
@@ -943,21 +1008,47 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
             if template.get('end_time',-1) > 0:
                 end_time = min(end_time, template['end_time']) if (end_time > 0) else template['end_time'] # this defaults to [[start_time,end_time]] or [[-1,-1]] if none is specified
 
-            if ((start_time < 0) or ((event_time_override or time_now) >= start_time)) and \
-               ((end_time < 0) or ((event_time_override or time_now) < end_time)):
-                do_spawn = True # found a valid spawn time
-                break
+            if ((start_time > 0) and (ref_time < start_time)): continue # in the future
+            if repeat_interval:
+                delta = (ref_time - start_time) % repeat_interval
+                if ((end_time > 0) and (delta >= (end_time - start_time))): continue # outside a run
+            else:
+                if ((end_time > 0) and (ref_time >= end_time)): continue # in the past
 
-        if do_spawn:
-            for i in xrange(pop):
-                if spawn_hive(hives, map_cache, db, lock_manager, region_id, (id_start+i), name_idx, spawn_data['template'], template,
-                              start_time = start_time, end_time = end_time,
-                              force_rotation = force_rotation, dry_run = dry_run):
-                    num_spawned_by_type[spawn_data['template']] = num_spawned_by_type.get(spawn_data['template'],0) + 1
-                    do_throttle()
-                name_idx += 1
-        else:
-            if verbose: print 'not spawning hive template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
+            do_spawn = True # found a valid spawn time
+            break
+
+        if not do_spawn:
+            #if verbose: print 'not spawning hive template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
+            continue
+
+        local_qty_scale = 1
+
+        if 'hive_num_scale_by_player_pop' in region_data:
+            if player_pop is None: # cache this
+                player_pop = nosql_client.count_map_features_by_type(region_id, 'home')
+                player_pop_factor = min(max(float(player_pop) / region_data['pop_soft_cap'], 0), 1)
+                if 'min_player_pop_factor' in region_data:
+                    player_pop_factor = max(player_pop_factor, region_data['min_player_pop_factor'])
+                if verbose: print 'player_pop_factor', player_pop_factor
+
+            # move local_qty_scale proportionally toward local_qty_scale * player_pop_factor
+            local_qty_scale *= (1.0 + region_data['hive_num_scale_by_player_pop'] * (player_pop_factor - 1.0))
+
+        if local_qty_scale <= 0:
+            if verbose: print 'not spawning hive template', spawn_data['template'], 'because local_qty_scale is', local_qty_scale
+            continue
+
+        # spawn at least one as long as base_qty is above zero
+        qty = max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale))
+
+        for i in xrange(qty):
+            if spawn_hive(hives, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
+                          start_time = start_time, end_time = end_time, repeat_interval = repeat_interval, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
+                          force_rotation = force_rotation, dry_run = dry_run):
+                num_spawned_by_type[spawn_data['template']] = num_spawned_by_type.get(spawn_data['template'],0) + 1
+                do_throttle()
+            name_idx += 1
 
     num_total = sum(num_spawned_by_type.itervalues(),0)
     if num_total > 0:
@@ -967,7 +1058,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
 
 def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, template_name, template,
-               start_time = -1, end_time = -1, force_rotation = False,
+               start_time = -1, end_time = -1, repeat_interval = None, force_rotation = False, region_player_pop = None,
                dry_run = True):
 
     owner_id = template['owner_id']
@@ -977,7 +1068,7 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     else:
         owner_tech = gamedata['ai_bases']['bases'][str(owner_id)].get('tech', {})
 
-    region_min_level = hives['region_min_level'].get(region_id,0)
+    region_min_level = hives.get('region_min_level',{}).get(region_id,0)
     if owner_level < region_min_level: return
 
     base_id = 'v%d' % (id_num)
@@ -997,8 +1088,15 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     duration = int(hives['duration'] * (1.0 - hives['randomize_duration'] * random.random()))
 
     # clamp duration to end time
-    if (end_time > 0) and ((event_time_override or time_now) + duration >= end_time):
-        duration = min(duration, end_time - (event_time_override or time_now))
+    ref_time = (event_time_override or time_now)
+    if (end_time > 0):
+        if repeat_interval:
+            delta = (ref_time - start_time) % repeat_interval
+            run_end_time = ref_time + (end_time - start_time - delta)
+        else:
+            run_end_time = end_time
+        if (ref_time + duration >= run_end_time):
+            duration = min(duration, run_end_time - ref_time)
 
     assign_climate = template.get('base_climate', None)
 
@@ -1044,6 +1142,8 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     nosql_id_generator.set_time(int(time.time()))
 
     base_data['my_base'] = auto_level_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech, xform)
+    if template.get('randomize_defenses',False):
+        AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
     for p in template.get('scenery',[]):
         obj = {'obj_id': nosql_id_generator.generate(),
@@ -1056,10 +1156,22 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     success = False
 
     # place on map with rejection sampling
-    map_dims = gamedata['regions'][region_id]['dimensions']
+    region_data = gamedata['regions'][region_id]
+    map_dims = region_data['dimensions']
     mid = (int(map_dims[0]/2), int(map_dims[1]/2))
     minrange = 0
     maxrange = map_dims[0]/2 - gamedata['territory']['border_zone_ai']
+
+    # when entering a low-population region, prefer placing hives close to the center of the map
+    # note: use the same formula used for placing player bases geographically, which scales differently than the spawn number scaling
+    if region_player_pop is not None:
+        cap = region_data.get('pop_hard_cap',-1)
+        if cap > 0:
+            # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
+            fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+            if fullness < 1:
+                # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
+                maxrange = max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * maxrange))
 
     for x in xrange(20):
         side = [1 if (random.random() > 0.5) else -1,

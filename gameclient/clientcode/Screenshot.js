@@ -1,6 +1,6 @@
 goog.provide('Screenshot');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -17,7 +17,7 @@ Screenshot.Codec = {
 /** Once we get an exception, blacklist further screenshot attempts */
 Screenshot.blacklisted = false;
 /** @return {boolean} */
-Screenshot.supported = function() { return !Screenshot.blacklisted; };
+Screenshot.supported = function() { return !Screenshot.blacklisted && (typeof Blob !== 'undefined'); };
 
 /** @constructor
     @struct
@@ -124,12 +124,12 @@ Screenshot.apply_watermark = function(canvas, context, watermark) {
     }
     bounds[1] = [y_start - Math.floor(leading/2), y_start + (lines.length-1) * leading];
 
-    if(0) {
-        // fill background
-        var BGPAD = 12;
-        context.fillStyle = 'rgba(0,0,0,0.5)';
-        context.fillRect(bounds[0][0]-BGPAD, bounds[1][0]-BGPAD, bounds[0][1]-bounds[0][0]+2*BGPAD, bounds[1][1]-bounds[1][0]+2*BGPAD);
-    }
+    /*
+    // fill background
+    var BGPAD = 12;
+    context.fillStyle = 'rgba(0,0,0,0.5)';
+    context.fillRect(bounds[0][0]-BGPAD, bounds[1][0]-BGPAD, bounds[0][1]-bounds[0][0]+2*BGPAD, bounds[1][1]-bounds[1][0]+2*BGPAD);
+    */
 
     for(var n = 0; n < lines.length; n++) {
         var line = lines[n];

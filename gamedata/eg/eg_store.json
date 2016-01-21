@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -31,6 +31,7 @@
 
     "enable_store_jewel": 1,
     "activate_store_jewel": { "predicate": "LIBRARY", "name": "extended_tutorial_complete" },
+    "purchase_confirm": 1,
 
     "enable_upgrade_all_barriers": 0,
 
@@ -46,7 +47,7 @@
          "skus": [{"spell":"GROW_BASE_PERIMETER1",
                    "show_if": {"predicate": "OR", "subpredicates": [ {"predicate": "AND", "subpredicates": [ { "predicate": "FRAME_PLATFORM", "platform": "kg"}, { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3} ] } , {"predicate": "FRAME_PLATFORM", "platform": "fb" } ] }
                   },
-                  {"spell": "BUY_PROTECTION1"},{"spell": "BUY_PROTECTION7"},{"spell": "BUY_PROTECTION28"}]}
+                  {"spell": "BUY_PROTECTION1"},{"spell": "BUY_PROTECTION7"},{"spell": "BUY_PROTECTION28"}]},
 
         // {"name": "specials", "ui_name": "Specials", "icon": "inventory_random",
         //  "record_feature_use": "store_specials_wk%WEEK",
@@ -59,6 +60,8 @@
         //      {"spell": "BUY_RANDOM_ITEM", "ui_new_store_enterkey_priority": 10}
         // ]}
 
+        {"name": "gamebucks", "ui_name": "Buy Gold", "icon": "inventory_gold_icon", // XXX note: not hooked up to A/B test for gamebucks_name/icon
+         "skus": [], "link": "buy_gamebucks_dialog"} // hard-coded link to buy_gamebucks_dialog
     ],
 
     // exchange rates for translating FB credit prices to gamebucks
@@ -102,7 +105,61 @@
         [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, "fbpayments"]
     ],
 
+    // SKU slate selection variables for fbpayments and xsolla APIs.
+    // These aren't referenced by game code directly - they are checked by individual SKU "requires" predicates, see gamedata/make_country_skus2.py.
+    // NOTE: kgcredits uses a global fixed slate, see gamedata/make_kgcredits_skus.py.
+    "buy_gamebucks_sku_currency": [
+        // assertion that we're using fbpayments or xsolla
+        [{"predicate": "NOT", "subpredicates":[{"predicate": "GAMEDATA_VAR", "name": "store.payments_api", "method": "in", "value": ["fbpayments","xsolla"]}]}, null],
+
+        // US, CA, AU, NZ, UK
+        [{"predicate": "COUNTRY", "countries": ["us"]}, "USD"],
+        [{"predicate": "COUNTRY", "countries": ["ca"]}, "CAD"],
+        [{"predicate": "COUNTRY", "countries": ["au"]}, "AUD"],
+        [{"predicate": "COUNTRY", "countries": ["nz"]}, "NZD"],
+        [{"predicate": "COUNTRY", "countries": ["gb"]}, "GBP"],
+
+        // other Tier 1/2ish: South Africa, Iceland
+        [{"predicate": "COUNTRY", "countries": ["za"]}, "ZAR"],
+        [{"predicate": "COUNTRY", "countries": ["is"]}, "ISK"],
+
+        // Scandinavia
+        [{"predicate": "COUNTRY", "countries": ["no"]}, "NOK"],
+        [{"predicate": "COUNTRY", "countries": ["se"]}, "SEK"],
+        [{"predicate": "COUNTRY", "countries": ["dk"]}, "DKK"],
+        [{"predicate": "COUNTRY", "countries": ["fi"]}, "EUR"],
+
+        // Euro
+        [{"predicate": "COUNTRY", "countries": ["at","nl","be","de","fr","es","it","ie","pt","lt"]}, "EUR"],
+
+        // Middle East
+        [{"predicate": "COUNTRY", "countries": ["qa"]}, "QAR"],
+        [{"predicate": "COUNTRY", "countries": ["ae"]}, "AED"],
+
+        // South America
+        [{"predicate": "COUNTRY", "countries": ["br"]}, "BRL"],
+
+        [{"predicate": "ALWAYS_TRUE"}, "USD"]
+    ],
+
+    "buy_gamebucks_sku_kind": [
+        // flash sales (slates available for all currencies)
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH50"}}, "FLASH50"],
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale", "match_data": {"kind": "FLASH25"}}, "FLASH25"],
+
+        [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]}, "D2SALE"],
+        [{"predicate": "ALWAYS_TRUE"}, "D2"]
+    ],
+
     "buy_gamebucks_dialog_version": 3,
+
+    // GUI text for "Buy Gamebucks" dialog
+    "ui_buy_gamebucks_warning": [
+        [{"predicate": "AURA_ACTIVE", "aura_name": "flash_sale"}, "[color=#ffe020]Your personal offers expire in: [color=#ffffff][b]%togo[/b][/color][/color]"],
+        [{"predicate": "AND", "subpredicates": [{"predicate": "FRAME_PLATFORM", "platform": "fb"}, {"predicate": "LIBRARY", "name": "fbpayments_D2SALE_in_effect"}]},
+         "[color=#ffe020]Your special offers expire in: [color=#ffffff][b]%togo[/b][/color][/color]"],
+        [{"predicate": "ALWAYS_TRUE"}, "[color=#ffe020]Your limited-time special offers:[/color]"]
+    ],
 
     "lock_buy_gamebucks_dialog_during_payment": true,
     "default_gamebucks_offer_index": 3, // default selection in "Add Alloy" menu (zero-based index, from low- to high-alloy SKUs)

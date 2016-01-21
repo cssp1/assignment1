@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# SpinPunch logging module
+# logging module
 
 import SpinJSON
 import time, re, copy
@@ -222,6 +222,9 @@ def MetricsLogFilter(child):
                                   '0694_idle_check_timeout',
 
                                   '0700_login_abuse_detected',
+
+                                  '0800_abtest_joined',
+
                                   '1500_server_restart',
                                   '3870_loot_given',
                                   '4701_change_region_success',
@@ -234,9 +237,12 @@ def MetricsLogFilter(child):
                                   #'4011_quest_complete_again',
                                   '4120_send_gift_completed',
                                   '4056_strategy_guide_opened',
+                                  '4461_promo_warehouse_upgrade',
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
                                   #'5140_mail_attachment_collected'
+                                  '5141_dp_cancel_aura_acquired',
+                                  '5142_dp_cancel_aura_ended',
 
                                   '5149_turret_heads_migrated',
 
@@ -291,7 +297,8 @@ def DamageProtectionLogFilter(child):
                                   '3882_protection_from_nonladder_battle',
                                   '3883_protection_from_spell',
                                   '3884_protection_removed',
-                                  '3885_i_got_attacked'
+                                  '3885_i_got_attacked',
+                                  '3886_protection_removed_manually'
                                   ])
 def QuestsLogFilter(child):
     return JSONLogFilter(child,
@@ -303,6 +310,7 @@ def LotteryLogFilter(child):
                          allow = ['1630_lottery_scan_free',
                                   '1631_lottery_scan_paid',
                                   '1632_lottery_no_space_help',
+                                  '1633_lottery_dialog_open',
                                   ])
 def AchievementsLogFilter(child):
     return JSONLogFilter(child,

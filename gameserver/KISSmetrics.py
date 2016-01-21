@@ -1,4 +1,4 @@
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -14,7 +14,7 @@ import urllib
 import socket
 from datetime import datetime
 
-# DJM - Async HTTP request for SpinPunch server efficiency
+# DJM - Async HTTP request for game server efficiency
 # pass an AsyncHTTPRequester as the 'async' parameter to KM.__init__
 
 class KM(object):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -19,6 +19,21 @@ if __name__ == '__main__':
     AWESOME_WEIGHT = 5
 
     out = dict([(data['name'], data) for data in [
+
+        # Gamebucks SKU item bundles
+
+        # for the ~$5 USD, 500-gamebuck SKU
+        {"name": "item_bundle_500", "loot": []},
+        # for the ~$10 USD, 1000-gamebuck SKU
+        {"name": "item_bundle_1000", "loot": []},
+        # for the ~$25 USD, 2500-gamebuck SKU
+        {"name": "item_bundle_2500", "loot": []},
+        # for the ~$50 USD, 5000-gamebuck SKU
+        {"name": "item_bundle_5000", "loot": []},
+        # for the ~$100 USD, 10000-gamebuck SKU
+        {"name": "item_bundle_10000", "loot": []},
+        # for the ~$200 USD, 20000-gamebuck SKU
+        {"name": "item_bundle_20000", "loot": []},
 
         # return one packaged L1+ unit that represents the "sexiest" unit the player has already unlocked
         {"name": "sexy_unlocked_unit",

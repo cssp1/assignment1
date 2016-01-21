@@ -38,8 +38,10 @@ goog.provide('goog.ui.ScrollFloater');
 goog.provide('goog.ui.ScrollFloater.EventType');
 
 goog.require('goog.array');
+goog.require('goog.asserts');
 goog.require('goog.dom');
-goog.require('goog.dom.classes');
+goog.require('goog.dom.TagName');
+goog.require('goog.dom.classlist');
 goog.require('goog.events.EventType');
 goog.require('goog.style');
 goog.require('goog.ui.Component');
@@ -65,7 +67,7 @@ goog.ui.ScrollFloater = function(opt_parentElement, opt_domHelper) {
   var domHelper = opt_parentElement ?
       goog.dom.getDomHelper(opt_parentElement) : opt_domHelper;
 
-  goog.base(this, domHelper);
+  goog.ui.ScrollFloater.base(this, 'constructor', domHelper);
 
   /**
    * The element to which the scroll-floated element will be attached
@@ -195,7 +197,7 @@ goog.ui.ScrollFloater.FloatMode_ = {
 /**
  * The style properties which are stored when we float an element, so they
  * can be restored when it 'docks' again.
- * @type {Array.<string>}
+ * @type {Array<string>}
  * @private
  */
 goog.ui.ScrollFloater.STORED_STYLE_PROPS_ = [
@@ -204,7 +206,7 @@ goog.ui.ScrollFloater.STORED_STYLE_PROPS_ = [
 
 /**
  * The style elements managed for the placeholder object.
- * @type {Array.<string>}
+ * @type {Array<string>}
  * @private
  */
 goog.ui.ScrollFloater.PLACEHOLDER_STYLE_PROPS_ = [
@@ -226,7 +228,7 @@ goog.ui.ScrollFloater.CSS_CLASS_ = goog.getCssName('goog-scrollfloater');
  * @override
  */
 goog.ui.ScrollFloater.prototype.createDom = function() {
-  goog.base(this, 'createDom');
+  goog.ui.ScrollFloater.base(this, 'createDom');
 
   this.decorateInternal(this.getElement());
 };
@@ -238,19 +240,19 @@ goog.ui.ScrollFloater.prototype.createDom = function() {
  * @override
  */
 goog.ui.ScrollFloater.prototype.decorateInternal = function(element) {
-  goog.base(this, 'decorateInternal', element);
-
-  goog.dom.classes.add(element, goog.ui.ScrollFloater.CSS_CLASS_);
+  goog.ui.ScrollFloater.base(this, 'decorateInternal', element);
+  goog.asserts.assert(element);
+  goog.dom.classlist.add(element, goog.ui.ScrollFloater.CSS_CLASS_);
 };
 
 
 /** @override */
 goog.ui.ScrollFloater.prototype.enterDocument = function() {
-  goog.base(this, 'enterDocument');
+  goog.ui.ScrollFloater.base(this, 'enterDocument');
 
   if (!this.placeholder_) {
-    this.placeholder_ =
-        this.getDomHelper().createDom('div', {'style': 'visibility:hidden'});
+    this.placeholder_ = this.getDomHelper().createDom(
+        goog.dom.TagName.DIV, {'style': 'visibility:hidden'});
   }
 
   this.update();
@@ -287,7 +289,7 @@ goog.ui.ScrollFloater.prototype.update = function() {
 
 /** @override */
 goog.ui.ScrollFloater.prototype.disposeInternal = function() {
-  goog.base(this, 'disposeInternal');
+  goog.ui.ScrollFloater.base(this, 'disposeInternal');
 
   this.placeholder_ = null;
 };
@@ -463,7 +465,7 @@ goog.ui.ScrollFloater.prototype.float_ = function(floatMode) {
     return;
   }
 
-  var elem = this.getElement();
+  var elem = /** @type {!HTMLElement} */ (this.getElement());
   var doc = this.getDomHelper().getDocument();
 
   // Read properties of element before modifying it.

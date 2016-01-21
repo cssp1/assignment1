@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -13,8 +13,6 @@
 
 import SpinJSON
 import random
-import functools
-from twisted.internet import defer
 from Region import Region
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -23,7 +21,7 @@ from Region import Region
 # and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
     def __init__(self, result = None, error = None, kill_session = False, async = None):
-        assert result or error or async
+        assert (result is not None) or (error is not None) or (async is not None)
         self.result = result
         self.error = error
         self.kill_session = kill_session
@@ -37,6 +35,13 @@ class ReturnValue(object):
         return SpinJSON.dumps(ret, newline = True)
 
 class Handler(object):
+    # flags that userdb/playerdb entries need to be provided
+    # can be turned off to optimize methods that don't need access to one of them
+    need_user = True
+    need_player = True
+    read_only = False
+    want_raw = False # prefer the raw strings instead of parsed JSON for offline execution
+
     def __init__(self, time_now, user_id, gamedata, gamesite, args):
         self.time_now = time_now
         self.user_id = user_id
@@ -85,27 +90,51 @@ class Handler(object):
             player['history']['customer_support'].append(log_entry)
         return ret
 
+    # optional execution method that can be called if want_raw is true
+    def exec_offline_raw(self, user_raw, player_raw): raise Exception('not implemented')
+
 class HandleGetRaw(Handler):
-    def format(self, result):
-        if bool(int(self.args.get('stringify',False))):
+    read_only = True
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.stringify = bool(int(self.args.get('stringify',False)))
+        # if caller wants stringified result, we can operate faster by skipping the parsing step
+        self.want_raw = self.stringify
+
+    def format_from_json(self, result):
+        if self.stringify:
             result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return result
+    def format_from_raw(self, result):
+        if not self.stringify:
+            result = SpinJSON.loads(result)
+        return result
+
 class HandleGetRawPlayer(HandleGetRaw):
+    need_user = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        player_json = SpinJSON.loads(self.gamesite.player_table.unparse(session.player))
-        return ReturnValue(result = self.format(player_json))
+        player_json = self.gamesite.player_table.jsonize(session.player)
+        return ReturnValue(result = self.format_from_json(player_json))
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(player))
+        return ReturnValue(result = self.format_from_json(player))
+    def exec_offline_raw(self, user_raw, player_raw):
+        assert self.stringify
+        return ReturnValue(result = player_raw)
 class HandleGetRawUser(HandleGetRaw):
+    need_player = False
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        user_json = SpinJSON.loads(self.gamesite.user_table.unparse(session.user))
-        return ReturnValue(result = self.format(user_json))
+        user_json = self.gamesite.user_table.jsonize(session.user)
+        return ReturnValue(result = self.format_from_json(user_json))
     def exec_offline(self, user, player):
-        return ReturnValue(result = self.format(user))
+        return ReturnValue(result = self.format_from_json(user))
+    def exec_offline_raw(self, user_raw, player_raw):
+        assert self.stringify
+        return ReturnValue(result = user_raw)
 
 class HandleBan(Handler):
+    need_user = False
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         return ReturnValue(result = 'ok', kill_session = True)
@@ -113,11 +142,26 @@ class HandleBan(Handler):
         player['banned_until'] = self.time_now + int(self.args.get('ban_time',self.gamedata['server']['default_ban_time']))
         return ReturnValue(result = 'ok')
 class HandleUnban(Handler):
+    need_user = False
     def do_exec_online(self, session, retmsg):
         session.player.banned_until = -1
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         player['banned_until'] = -1
+        return ReturnValue(result = 'ok')
+
+class HandleApplyLockout(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.lockout_time = int(self.args['lockout_time'])
+        self.lockout_message = self.args.get('lockout_message', 'Account Under Maintenance')
+    def do_exec_online(self, session, retmsg):
+        session.player.lockout_until = self.time_now + self.lockout_time
+        session.player.lockout_message = self.lockout_message
+        return ReturnValue(result = 'ok', kill_session = True)
+    def do_exec_offline(self, user, player):
+        player['lockout_until'] = self.time_now + self.lockout_time
+        player['lockout_message'] = self.lockout_message
         return ReturnValue(result = 'ok')
 class HandleClearLockout(Handler):
     def do_exec_online(self, session, retmsg):
@@ -181,10 +225,14 @@ class HandleRecordAltLogin(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.other_id = int(self.args['other_id'])
+        if 'ip' in self.args:
+            self.ip = str(self.args['ip'])
+        else:
+            self.ip = None
         assert self.other_id != self.user_id
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        session.player.possible_alt_record_login(self.other_id)
+        session.player.possible_alt_record_login(self.other_id, ip = self.ip)
         return ReturnValue(result = 'ok')
 
     def exec_offline(self, user, player):
@@ -209,7 +257,8 @@ class HandleRecordAltLogin(Handler):
         if alt_data is not None:
             alt_data['logins'] = alt_data.get('logins',0) + 1
             alt_data['last_login'] = self.time_now # record time of last simultaneous login
-
+            if self.ip:
+                alt_data['last_ip'] = self.ip
         return ReturnValue(result = 'ok')
 
 class HandleIgnoreAlt(Handler):
@@ -321,6 +370,9 @@ class HandleClearCooldown(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleCooldownTogo(Handler):
+    read_only = True
+    need_user = False
+    # note: returns duration remaining
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
         return ReturnValue(result = session.player.cooldown_togo(self.args['name']))
@@ -330,7 +382,23 @@ class HandleCooldownTogo(Handler):
             togo = max(-1, player['cooldowns'][self.args['name']]['end'] - self.time_now)
         return ReturnValue(result = togo)
 
+class HandleCooldownActive(Handler):
+    read_only = True
+    need_user = False
+    # note: returns number of active stacks
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        return ReturnValue(result = session.player.cooldown_active(self.args['name']))
+    def exec_offline(self, user, player):
+        stacks = 0
+        if self.args['name'] in player['cooldowns']:
+            cd = player['cooldowns'][self.args['name']]
+            if cd['end'] > self.time_now:
+                stacks = cd.get('stack', 1)
+        return ReturnValue(result = stacks)
+
 class HandleTriggerCooldown(Handler):
+    need_user = False
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.cd_name = self.args['name']
@@ -355,20 +423,7 @@ class HandleTriggerCooldown(Handler):
 
         return ReturnValue(result = 'ok')
 
-class HandleRemoveAura(Handler):
-    def do_exec_online(self, session, retmsg):
-        session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True)
-        return ReturnValue(result = 'ok')
-    def do_exec_offline(self, user, player):
-        to_remove = []
-        for aura in player.get('player_auras',[]):
-            if aura['spec'] == self.args['aura_name']:
-                to_remove.append(aura)
-        for aura in to_remove:
-            player['player_auras'].remove(aura)
-        return ReturnValue(result = 'ok')
-
-class HandleApplyAura(Handler):
+class HandleApplyOrRemoveAura(Handler):
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         if 'data' in self.args:
@@ -376,6 +431,23 @@ class HandleApplyAura(Handler):
             assert isinstance(self.aura_data, dict)
         else:
             self.aura_data = None
+
+class HandleRemoveAura(HandleApplyOrRemoveAura):
+    def do_exec_online(self, session, retmsg):
+        session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True, data = self.aura_data)
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        to_remove = []
+        for aura in player.get('player_auras',[]):
+            if aura['spec'] == self.args['aura_name'] and \
+               (self.aura_data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in self.aura_data.iteritems())):
+                to_remove.append(aura)
+        for aura in to_remove:
+            player['player_auras'].remove(aura)
+        return ReturnValue(result = 'ok')
+
+class HandleApplyAura(HandleApplyOrRemoveAura):
     def do_exec_online(self, session, retmsg):
         session.player.apply_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True, data = self.aura_data)
         session.player.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
@@ -385,7 +457,9 @@ class HandleApplyAura(Handler):
         found = False
         if 'player_auras' not in player: player['player_auras'] = []
         for aura in player.get('player_auras',[]):
-            if aura['spec'] == self.args['aura_name']:
+            if aura['spec'] == self.args['aura_name'] and \
+               (self.aura_data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in self.aura_data.iteritems())):
                 found = True
                 if 'duration' in self.args:
                     duration = int(self.args['duration'])
@@ -406,46 +480,54 @@ class HandleApplyAura(Handler):
             player['player_auras'].append(aura)
         return ReturnValue(result = 'ok')
 
+class HandleAuraActive(Handler):
+    read_only = True
+    need_user = False
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        return ReturnValue(result = self.aura_active(session.player.player_auras, self.args['aura_name']))
+    def exec_offline(self, user, player):
+        return ReturnValue(result = self.aura_active(player.get('player_auras', []), self.args['aura_name']))
+    def aura_active(self, player_auras, aura_name):
+        for aura in player_auras:
+            if aura.get('end_time',-1) > 0 and aura['end_time'] < self.time_now: continue
+            if aura['spec'] == aura_name:
+                return True
+        return False
+
 class HandleChatGag(Handler):
-    def do_exec_online(self, session, retmsg):
+    need_user = False
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
         if 'duration' in self.args:
-            # new-style gag
-            if session.player.apply_aura('chat_gagged', duration = int(self.args['duration']), ignore_limit = True):
-                session.player.stattab.send_update(session, session.deferred_messages)
+            self.duration = int(self.args['duration'])
         else:
-            # old-style gag
-            session.user.chat_gagged = True
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
+            self.duration = -1
+    def do_exec_online(self, session, retmsg):
+        if session.player.apply_aura('chat_gagged', duration = self.duration, ignore_limit = True):
+            session.player.stattab.send_update(session, session.outgoing_messages)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        if 'duration' in self.args:
-            duration = int(self.args['duration'])
-            # new-style gag
-            player['player_auras'] = filter(lambda x: x['spec'] != 'chat_gagged', player.get('player_auras',[]))
-            new_aura = {'spec':'chat_gagged', 'start_time': self.time_now}
-            if duration > 0:
-                new_aura['end_time'] = self.time_now + duration
-            player['player_auras'].append(new_aura)
-        else:
-            # old-style gag
-            user['chat_gagged'] = True
-            self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': user['chat_gagged']})
+        player['player_auras'] = filter(lambda x: x['spec'] != 'chat_gagged', player.get('player_auras',[]))
+        new_aura = {'spec':'chat_gagged', 'start_time': self.time_now}
+        if self.duration > 0:
+            new_aura['end_time'] = self.time_now + self.duration
+        player['player_auras'].append(new_aura)
         return ReturnValue(result = 'ok')
+
 class HandleChatUngag(Handler):
     AURAS = ('chat_gagged', 'chat_warned')
+    need_user = False
     def do_exec_online(self, session, retmsg):
         for aura_name in self.AURAS:
-            session.player.remove_aura(session, session.deferred_messages, aura_name, force = True)
-        session.user.chat_gagged = False
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': session.user.chat_gagged})
+            session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        user['chat_gagged'] = False
         player['player_auras'] = filter(lambda x: x['spec'] not in self.AURAS, player.get('player_auras',[]))
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'chat_gagged': user['chat_gagged']})
         return ReturnValue(result = 'ok')
 
 class MessageSender(Handler):
+    need_user = False
     def get_msg_id(self): return str(self.time_now)+'-'+str(int(1000*random.random()))
     def make_message(self): raise Exception('implement this')
     def do_exec_online(self, session, retmsg):
@@ -475,11 +557,11 @@ class HandleGiveItem(MessageSender):
         return {'type':'mail',
                 'expire_time': expire_time,
                 'msg_id': self.get_msg_id(),
-                'from_name': self.args.get('message_sender', 'SpinPunch'),
+                'from_name': self.args.get('message_sender', 'Customer Support'),
                 'to': [self.user_id],
                 'subject':self.args.get('message_subject', 'Special Item'),
                 'attachments': [item],
-                'body': self.args.get('message_body', 'The SpinPunch customer support team sent us a special item.\n\nClick the item to collect it.') + \
+                'body': self.args.get('message_body', 'The Customer Support team sent us a special item.\n\nClick the item to collect it.') + \
                 ('\n\nIMPORTANT: Activate this item quickly! Its time is limited.' if expire_time > 0 else '')}
 class HandleSendMessage(MessageSender):
     def make_message(self):
@@ -487,9 +569,9 @@ class HandleSendMessage(MessageSender):
         return {'type':'mail',
                 'expire_time': expire_time,
                 'msg_id': self.get_msg_id(),
-                'from_name': self.args.get('message_sender', 'SpinPunch'),
+                'from_name': self.args.get('message_sender', 'Customer Support'),
                 'to': [self.user_id],
-                'subject':self.args.get('message_subject', 'Customer Support'),
+                'subject':self.args.get('message_subject', 'Support Issue'),
                 'body': self.args['message_body']}
 
 class HandleChangeRegion(Handler):
@@ -503,22 +585,18 @@ class HandleChangeRegion(Handler):
     # the online handler has to first end any ongoing attack, which may go asynchronous, and then
     # a synchronous return to home base, and finally the region change
     def do_exec_online(self, session, retmsg):
-        self.d = defer.Deferred() # for the asynchronous callback
-        self.gamesite.gameapi.complete_attack(session, retmsg, functools.partial(self.do_exec_online2, session, retmsg),
-                                              reason = 'CustomerSupport')
+        self.d = self.gamesite.gameapi.change_session(session, retmsg, dest_user_id = session.user.user_id, force = True)
+        self.d.addCallback(self.do_exec_online2, session, retmsg)
         return ReturnValue(async = self.d)
 
     # then after complete_attack...
-    def do_exec_online2(self, session, retmsg, is_sync):
-        # force a synchronous session change back to home base
-        if session.viewing_base is not session.player.my_home:
-            self.gamesite.gameapi.change_session_complete(None, session, retmsg, self.user_id, session.user, session.player, None, None, None, None, {}, {})
+    def do_exec_online2(self, change_session_result, session, retmsg):
         success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
         else:
             ret = ReturnValue(error = 'change_region failed')
-        self.d.callback(ret)
+        return ret
 
     # the offline implementation is complex because it needs to do
     # everything Player.change_region() does, including careful trial
@@ -536,6 +614,7 @@ class HandleChangeRegion(Handler):
 
         townhall_level = player['history'].get(self.gamedata['townhall']+'_level', 1)
         if townhall_level > 0: props[self.gamedata['townhall']+'_level'] = townhall_level
+        props['protection_end_time'] = player['resources'].get('protection_end_time',-1)
         return props
 
     def recall_squad(self, player, region_id, squad_id):
@@ -601,7 +680,7 @@ class HandleChangeRegion(Handler):
                 return ReturnValue(error = 'change_region failed: base is locked')
 
         if new_region and new_region != 'LIMBO':
-            random.seed(self.user_id + self.gamedata['territory']['map_placement_gen'] + int(100*random.random()))
+            randgen = random.Random(self.user_id ^ self.gamedata['territory']['map_placement_gen'] ^ int(self.time_now))
 
             map_dims = self.gamedata['regions'][new_region]['dimensions']
             BORDER = self.gamedata['territory']['border_zone_player']
@@ -612,8 +691,8 @@ class HandleChangeRegion(Handler):
             # rectangle within which we can place the player
             placement_range = [[map_dims[0]//2 - radius[0], map_dims[0]//2 + radius[0]],
                                [map_dims[1]//2 - radius[1], map_dims[1]//2 + radius[1]]]
-            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*random.random()), 2), map_dims[0]-2),
-                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*random.random()), 2), map_dims[1]-2)), xrange(100))
+            trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
+                                    min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
 
             trials = filter(lambda x: not Region(self.gamedata, new_region).obstructs_bases(x), trials)
 
@@ -759,6 +838,101 @@ class HandleKickAllianceMember(Handler):
                                                             'reason':'CustomerSupport'})
         return ReturnValue(result = 'ok')
 
+class HandleResetIdleCheckState(Handler):
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        session.player.idle_check.reset_state()
+        return ReturnValue(result = 'ok')
+    def exec_offline(self, user, player):
+        if 'idle_check' in player:
+            if 'history' in player['idle_check']:
+                for entry in player['idle_check']['history']:
+                    entry['seen'] = 1
+        return ReturnValue(result = 'ok')
+
+online_only = Exception('offline execution not implemented')
+
+class HandleAIAttack(Handler):
+    def exec_offline(self, user, player): raise online_only
+    def do_exec_online(self, session, retmsg):
+        session.start_ai_attack(session.outgoing_messages, self.args['attack_type'], override_protection = True, verbose = True)
+        return ReturnValue(result = 'ok')
+
+class HandlePushGamedata(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        self.gamesite.gameapi.push_gamedata(session, session.outgoing_messages)
+        return ReturnValue(result = 'ok')
+
+class HandleForceReload(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.send([["FORCE_RELOAD"]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
+class HandleClientEval(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.send([["CLIENT_EVAL", self.args['expr']]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
+class HandleOfferPayerPromo(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        session.user.offer_payer_promo(session, session.outgoing_messages)
+        return ReturnValue(result = 'ok')
+
+class HandleInvokeFacebookAuth(Handler): # no logging
+    def exec_offline(self, user, player): raise online_only
+    def exec_online(self, session, retmsg):
+        scope = self.args.get('scope', 'email')
+        session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
+        return ReturnValue(result = 'ok')
+
+class HandlePlayerBatch(Handler):
+    read_only = True
+    need_user = False
+    need_player = False
+    def __init__(self, time_now, user_id, gamedata, gamesite, args):
+        Handler.__init__(self, time_now, user_id, gamedata, gamesite, args)
+        batch = SpinJSON.loads(self.args['batch']) # [{'method': 'method0', 'args':{'foo':'bar'}}, ...]
+        self.handlers = []
+        for entry in batch:
+            handler = methods[entry['method']](time_now, user_id, gamedata, gamesite, entry.get('args',{}))
+            if not handler.read_only: self.read_only = False
+            if handler.need_user: self.need_user = True
+            if handler.need_player: self.need_player = True
+            self.handlers.append(handler)
+        self.handlers.reverse() # we're going to use pop() to pull off entries, so go back-to-front
+
+    def exec_offline(self, user, player):
+        self.results = []
+        while self.handlers:
+            h = self.handlers.pop()
+            ret = h.exec_offline(user, player)
+            assert not ret.async # XXX async case not handled
+            self.results.append(ret)
+        return self.reduce_results(self.results)
+    def exec_online(self, session, retmsg):
+        self.results = []
+        while self.handlers:
+            h = self.handlers.pop()
+            ret = h.exec_online(session, retmsg)
+            assert not ret.async # XXX async case not handled
+            self.results.append(ret)
+        return self.reduce_results(self.results)
+
+    def reduce_results(self, retlist):
+        if any(x.error for x in retlist):
+            result = None
+            error = [x.error for x in retlist]
+        else:
+            result = [x.result for x in retlist]
+            error = None
+        return ReturnValue(result = result, error = error,
+                           kill_session = any(x.kill_session for x in retlist),
+                           async = False)
+
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
@@ -775,12 +949,15 @@ methods = {
     'chat_unblock': HandleChatUnblock,
     'chat_official': HandleChatOfficial,
     'chat_unofficial': HandleChatUnofficial,
+    'apply_lockout': HandleApplyLockout,
     'clear_lockout': HandleClearLockout,
     'clear_cooldown': HandleClearCooldown,
     'cooldown_togo': HandleCooldownTogo,
+    'cooldown_active': HandleCooldownActive,
     'trigger_cooldown': HandleTriggerCooldown,
     'apply_aura': HandleApplyAura,
     'remove_aura': HandleRemoveAura,
+    'aura_active': HandleAuraActive,
     'check_idle': HandleCheckIdle,
     'chat_gag': HandleChatGag,
     'chat_ungag': HandleChatUngag,
@@ -789,4 +966,13 @@ methods = {
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
+    'reset_idle_check_state': HandleResetIdleCheckState,
+    'ai_attack': HandleAIAttack,
+    'push_gamedata': HandlePushGamedata,
+    'force_reload': HandleForceReload,
+    'client_eval': HandleClientEval,
+    'offer_payer_promo': HandleOfferPayerPromo,
+    'invoke_facebook_auth': HandleInvokeFacebookAuth,
+    'player_batch': HandlePlayerBatch,
+    # not implemented yet: join_abtest, clear_abtest
 }

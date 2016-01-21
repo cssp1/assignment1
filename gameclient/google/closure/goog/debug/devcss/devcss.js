@@ -25,8 +25,9 @@
 goog.provide('goog.debug.DevCss');
 goog.provide('goog.debug.DevCss.UserAgent');
 
+goog.require('goog.asserts');
 goog.require('goog.cssom');
-goog.require('goog.dom.classes');
+goog.require('goog.dom.classlist');
 goog.require('goog.events');
 goog.require('goog.events.EventType');
 goog.require('goog.string');
@@ -42,6 +43,7 @@ goog.require('goog.userAgent');
  *     If not passed in, will be determined using goog.userAgent.
  * @throws {Error} When userAgent detection fails.
  * @constructor
+ * @final
  */
 goog.debug.DevCss = function(opt_userAgent, opt_userAgentVersion) {
   if (!opt_userAgent) {
@@ -56,6 +58,8 @@ goog.debug.DevCss = function(opt_userAgent, opt_userAgentVersion) {
       opt_userAgent = goog.debug.DevCss.UserAgent.MOBILE;
     } else if (goog.userAgent.OPERA) {
       opt_userAgent = goog.debug.DevCss.UserAgent.OPERA;
+    } else if (goog.userAgent.EDGE) {
+      opt_userAgent = goog.debug.DevCss.UserAgent.EDGE;
     }
   }
   switch (opt_userAgent) {
@@ -66,6 +70,7 @@ goog.debug.DevCss = function(opt_userAgent, opt_userAgentVersion) {
     case goog.debug.DevCss.UserAgent.WEBKIT:
     case goog.debug.DevCss.UserAgent.SAFARI:
     case goog.debug.DevCss.UserAgent.MOBILE:
+    case goog.debug.DevCss.UserAgent.EDGE:
       break;
     default:
       throw Error('Could not determine the user agent from known UserAgents');
@@ -77,6 +82,11 @@ goog.debug.DevCss = function(opt_userAgent, opt_userAgentVersion) {
    * @private
    */
   this.userAgent_ = opt_userAgent;
+
+  /**
+   * @const @private
+   */
+  this.userAgentTokens_ = {};
 
   /**
    * @type {number|string}
@@ -94,7 +104,7 @@ goog.debug.DevCss = function(opt_userAgent, opt_userAgentVersion) {
 
   if (this.isIe6OrLess_) {
     /**
-     * @type {Array.<{classNames,combinedClassName,els}>}
+     * @type {Array<{classNames,combinedClassName,els}>}
      * @private
      */
     this.ie6CombinedMatches_ = [];
@@ -139,13 +149,6 @@ goog.debug.DevCss.prototype.activateBrowserSpecificCssRules = function(
 
 
 /**
- * @type {Object}
- * @private
- */
-goog.debug.DevCss.prototype.userAgentTokens_ = {};
-
-
-/**
  * A list of possible user agent strings.
  * @enum {string}
  */
@@ -156,7 +159,8 @@ goog.debug.DevCss.UserAgent = {
   FIREFOX: 'GECKO',
   WEBKIT: 'WEBKIT',
   SAFARI: 'WEBKIT',
-  MOBILE: 'MOBILE'
+  MOBILE: 'MOBILE',
+  EDGE: 'EDGE'
 };
 
 
@@ -227,8 +231,8 @@ goog.debug.DevCss.prototype.getVersionNumberFromSelectorText_ = function(
  * value needed to determine if we have a match or not.
  * @param {CSSRule} cssRule The rule to test against.
  * @param {string} token The match token to test against the rule.
- * @return {Array|undefined} A tuple with the result of the compareVersions call
- *     and the matched ruleVersion.
+ * @return {!Array|undefined} A tuple with the result of the compareVersions
+ *     call and the matched ruleVersion.
  * @private
  */
 goog.debug.DevCss.prototype.getRuleVersionAndCompare_ = function(cssRule,
@@ -416,7 +420,6 @@ goog.debug.DevCss.prototype.addIe6CombinedClassNames_ = function() {
     return;
   }
   var allEls = document.getElementsByTagName('*');
-  var matches = [];
   // Match nodes for all classNames.
   for (var i = 0, classNameEntry; classNameEntry =
       this.ie6CombinedMatches_[i]; i++) {
@@ -424,7 +427,7 @@ goog.debug.DevCss.prototype.addIe6CombinedClassNames_ = function() {
       var classNamesLength = classNameEntry.classNames.length;
       for (var k = 0, className; className = classNameEntry.classNames[k];
           k++) {
-        if (!goog.dom.classes.has(el, className)) {
+        if (!goog.dom.classlist.contains(el, className)) {
           break;
         }
         if (k == classNamesLength - 1) {
@@ -435,8 +438,10 @@ goog.debug.DevCss.prototype.addIe6CombinedClassNames_ = function() {
     // Walks over our matching nodes and fixes them.
     if (classNameEntry.els.length) {
       for (var j = 0, el; el = classNameEntry.els[j]; j++) {
-        if (!goog.dom.classes.has(el, classNameEntry.combinedClassName)) {
-          goog.dom.classes.add(el, classNameEntry.combinedClassName);
+        goog.asserts.assert(el);
+        if (!goog.dom.classlist.contains(el,
+            classNameEntry.combinedClassName)) {
+          goog.dom.classlist.add(el, classNameEntry.combinedClassName);
         }
       }
     }

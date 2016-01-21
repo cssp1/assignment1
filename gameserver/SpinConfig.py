@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -411,14 +411,18 @@ if __name__ == '__main__':
         assert in_maintenance_window(cfg, 1397544797)
 
     import sys, getopt
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date','getvar=','getvar-format='])
     mode = 'test'
+    getvar_name = None
+    getvar_format = 'json'
     force = False
     for key, val in opts:
         if key == '--get': mode = 'get'
         elif key == '--put': mode = 'put'
         elif key == '--force': force = True
         elif key == '--launch-date': mode = 'launch-date'
+        elif key == '--getvar': mode = 'getvar'; getvar_name = val
+        elif key == '--getvar-format': assert val in ('raw','json'); getvar_format = val
 
     if mode in ('get','put'):
         import SpinS3
@@ -442,6 +446,11 @@ if __name__ == '__main__':
         print 'uploaded config.json to', s3_name
     elif mode == 'launch-date':
         print game_launch_date()
+    elif mode == 'getvar':
+        if getvar_format == 'raw':
+            print config[getvar_name]
+        elif getvar_format == 'json':
+            print SpinJSON.dumps(config[getvar_name], pretty = True)
     else:
         load('config.json', verbose = True)
         print 'config.json OK!'

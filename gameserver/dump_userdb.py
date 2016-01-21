@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -39,8 +39,8 @@ def open_cache(cache_read, cache_segments, from_s3_bucket, from_s3_keyfile, prog
             sys.stderr.write('got cache %s but number of segments is different (cache %d req %d)\n' % \
                              (cache_read, cache.num_segments(), cache_segments))
             cache = None
-    except:
-        sys.stderr.write('error reading previous upcache: '+traceback.format_exc()+'\n')
+    except Exception as e:
+        sys.stderr.write('error reading previous upcache: %r\n%s\n' % (e, traceback.format_exc()))
         cache = None
     return cache
 
@@ -63,8 +63,8 @@ def dump_user(seg, id, entry, method, cache_fd, nosql_table, nosql_deltas_only, 
 
     try:
         obj = SpinUpcache.update_upcache_entry(id, userdb_driver, entry, time_now, gamedata, user_mtime = user_mtime)
-    except:
-        sys.stderr.write('error updating user %d:\n' % id + traceback.format_exc() + '\n')
+    except Exception as e:
+        sys.stderr.write('error updating user %d: %r\n%s\n' % (id, e, traceback.format_exc()))
 
     if not obj:
         return None

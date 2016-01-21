@@ -1,6 +1,6 @@
 goog.provide('FBInviteFriends');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -159,9 +159,7 @@ FBInviteFriends.invoke_fb_invite_friends_dialog_v2 = function(reason) {
     FBInviteFriends.FBInviteFriendsDialogV2.update_send_button(dialog);
 
     if(reason != 'test') {
-        SPFB.api('/me/invitable_friends', (function (_dialog) { return function(response) {
-            FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends(_dialog, response);
-        }; })(dialog));
+        SPFB.api_paged('/me/invitable_friends', 'get', {'limit': '500'}, goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
     }
     if(!dialog.user_data['instant']) {
         metric_event('7101_invite_friends_ingame_prompt', {'api':'invitable_friends', 'api_version': 2, 'attempt_id': dialog.user_data['attempt_id'], 'method': reason, 'sum': player.get_denormalized_summary_props('brief')});

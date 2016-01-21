@@ -1,4 +1,4 @@
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -25,4 +25,6 @@
 
 // note: this opts out of "click here" guidance for the EXTENDED tutorial (after coming home from Lion Stone)
 // there is no way to opt out of the initial "rails" tutorial, because it is completely hard-coded
-"skip_tutorial_button": 1
+"skip_tutorial_button": 1,
+
+"advanced_chat_reporting": 1

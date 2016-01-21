@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -8,7 +8,7 @@
 # 1) uploads earlier days' data to spinpunch-logs bucket in S3
 # 2) deletes data older than the retention period
 
-import sys, os, getopt, time, tempfile
+import sys, os, getopt, time, tempfile, traceback, datetime, calendar
 import SpinS3
 import SpinConfig
 import SpinNoSQL
@@ -30,6 +30,7 @@ TABLES = {
               'table_name': 'chat_buffer',
               'compression': 'zip',
               'retain_for': 30*86400 },
+    'chat_reports': { 's3_name': 'chat_reports', 'table_name': 'chat_reports', 'compression': 'zip', 'retain_for': 30*86400, 'time_key': 'millitime', 'time_format': 'datetime' },
 
     # credits log
     'credits': { 's3_name': 'credits', 'table_name': 'log_credits', 'compression': 'zip', 'retain_for': -1 },
@@ -131,19 +132,33 @@ def safe_unlink(x):
     try: os.unlink(x)
     except: pass
 
+def decode_time(val, format):
+    if format == 'datetime':
+        return calendar.timegm(val.timetuple())
+    else:
+        return val
+def encode_time(val, format):
+    if format == 'datetime':
+        return datetime.datetime.utcfromtimestamp(float(val))
+    else:
+        return val
+
 def do_upload(nosql_client, table, verbose, dry_run, keep_local):
     if not table['s3_name']: return
+    time_key = table.get('time_key', 'time')
+    time_format = table.get('time_format', 'timestamp')
+
     msg_fd = sys.stderr if verbose else NullFD()
     s3_logs = SpinS3.S3(s3_key_file_for_logs)
     print >> msg_fd, '%s: upload' % (table['table_name'])
 
     tbl = nosql_client._table(table['table_name'])
     # find earliest timestamp
-    first = list(tbl.find({}, {'time':1}).sort([('time',1)]).limit(1))
+    first = list(tbl.find({}, {time_key:1}).sort([(time_key,1)]).limit(1))
     if not first:
         print >> msg_fd, 'no records'
         return
-    start_time = first[0]['time']
+    start_time = decode_time(first[0][time_key], time_format)
 
     # snap to day boundary
     start_time = 86400*(start_time//86400)
@@ -167,15 +182,20 @@ def do_upload(nosql_client, table, verbose, dry_run, keep_local):
             tf_name = '%s/%s-%s-%s.json' % (tempfile.gettempdir(), SpinConfig.game_id_long(), date_str, table['s3_name'])
             try:
                 target = SpinLog.SimpleJSONLog(tf_name, buffer = -1)
-                cursor = tbl.find({'time':{'$gte':start_time, '$lt':start_time+86400}}).sort([('time',1)])
+                cursor = tbl.find({time_key:{'$gte':encode_time(start_time, time_format),
+                                             '$lt':encode_time(start_time+86400, time_format)}}).sort([(time_key,1)])
                 total = cursor.count()
                 count = 0
                 for row in cursor:
-                    if '_id' in row:
-                        if type(row['_id']) is bson.objectid.ObjectId:
-                            row['_id'] = SpinNoSQL.NoSQLClient.decode_object_id(row['_id'])
-                    assert 'time' in row
-                    t = row['time']; del row['time']
+                    for ID_FIELD in ('_id', 'message_id'):
+                        if ID_FIELD in row and isinstance(row[ID_FIELD], bson.objectid.ObjectId):
+                            row[ID_FIELD] = SpinNoSQL.NoSQLClient.decode_object_id(row[ID_FIELD])
+                    assert time_key in row
+                    t = decode_time(row[time_key], time_format)
+                    if time_key == 'time':
+                        del row[time_key]
+                    elif time_key == 'millitime':
+                        row[time_key] = t
                     target.event(t, row)
                     count += 1
                     if count == 1 or count == total or (count%1000)==0:
@@ -217,7 +237,12 @@ def do_clean(nosql_client, table, verbose, dry_run):
     msg_fd = sys.stderr if verbose else NullFD()
     print >> msg_fd, '%s: deleting records older than %.1f days...' % (table['table_name'], table['retain_for']/86400.0),
     msg_fd.flush()
-    qs = {'time':{'$lt':time_now - table['retain_for']}}
+
+    time_key = table.get('time_key', 'time')
+    time_format = table.get('time_format', 'timestamp')
+
+    qs = {time_key:{'$lt':encode_time(time_now - table['retain_for'], time_format)}}
+
     if dry_run:
         print >> msg_fd, 'remove(%s) would affect %d' % (qs, nosql_client._table(table['table_name']).find(qs).count())
     else:
@@ -276,7 +301,12 @@ if __name__ == '__main__':
 
     if parallel <= 1:
         for task in task_list:
-            my_slave(task)
+            try:
+                my_slave(task)
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                sys.stderr.write('error in task %r:\n%r\n%s\n' % (task, e, traceback.format_exc()))
     else:
         SpinParallel.go(task_list, [sys.argv[0], '--slave'], on_error = 'continue', nprocs=parallel, verbose = False)
 

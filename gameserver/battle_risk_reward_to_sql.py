@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -157,6 +157,9 @@ if __name__ == '__main__':
 
         cur = con.cursor(MySQLdb.cursors.DictCursor)
 
+        # prepare for big GROUP_CONCAT() percentile queries (MySQL-specific)
+        cur.execute("SET @@session.group_concat_max_len = @@global.max_allowed_packet")
+
         for table, schema in ((battles_risk_reward_table, battles_risk_reward_schema(sql_util)),
                               (battles_risk_reward_hourly_summary_table, battles_risk_reward_summary_schema(sql_util, 'hour')),
                               (battles_risk_reward_daily_summary_table, battles_risk_reward_summary_schema(sql_util, 'day')),
@@ -216,26 +219,26 @@ if __name__ == '__main__':
             IFNULL(get_analytics_tag(base_type, base_template, active_opponent_id, time),
                    NULL -- (SELECT ai_bases.ui_name FROM $GAME_ID_ai_bases ai_bases WHERE ai_bases.user_id = active_opponent_id)
                    ) AS analytics_tag,
-            IFNULL((SELECT SUM(item_price(loot.item, loot.stack)) FROM $GAME_ID_battle_loot loot WHERE loot.battle_id = battles.battle_id),0) AS loot_items_value,
-            IFNULL((SELECT SUM(-1*item_price(items.item, items.stack)) FROM $GAME_ID_battle_items items WHERE items.battle_id = battles.battle_id AND items.user_id = active_player_id),0) AS consumed_items_value,
+            IFNULL((SELECT SUM(item_value(loot.item, loot.stack, active_player_townhall_level, active_player_prev_receipts)) FROM $GAME_ID_battle_loot loot WHERE loot.battle_id = battles.battle_id),0) AS loot_items_value,
+            IFNULL((SELECT SUM(-1*item_value(items.item, items.stack, active_player_townhall_level, active_player_prev_receipts)) FROM $GAME_ID_battle_items items WHERE items.battle_id = battles.battle_id AND items.user_id = active_player_id),0) AS consumed_items_value,
 
             IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`),0) AS loot_iron_amount,
-            iron_price(IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`),0)) AS loot_iron_value,
+            iron_value(IFNULL(IF(active_player_id = attacker_id, `loot:iron`, -1*`loot:iron_lost`), 0), active_player_townhall_level) AS loot_iron_value,
             IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`),0) AS loot_water_amount,
-            water_price(IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`),0)) AS loot_water_value,
+            water_value(IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`), 0), active_player_townhall_level) AS loot_water_value,
             IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0) AS loot_res3_amount,
-            res3_price(IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0)) AS loot_res3_value,
+            res3_value(IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0), active_player_townhall_level) AS loot_res3_value,
 
             IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_iron_amount,
-            iron_price(IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0)) AS damage_iron_value,
+            iron_value(IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_iron_value,
             IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_water_amount,
-            water_price(IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0)) AS damage_water_value,
+            water_value(IFNULL((SELECT SUM(-1*damage.water) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_water_value,
             IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_res3_amount,
-            res3_price(IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0)) AS damage_res3_value,
+            res3_value(IFNULL((SELECT SUM(-1*damage.res3) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level) AS damage_res3_value,
 
             -- note: value repair time for buildings 0.1x as much as repair time for units, because buildings can repair in parallel but units cannot.
-            IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_time_sec,
-            time_price(-1*IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0)) AS damage_time_value,
+            IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) + duration AS damage_time_sec, -- include battle duration as damage time!
+            time_price(-1*(IFNULL((SELECT SUM(IF(damage.mobile,1,0.1)*damage.time) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) + duration)) AS damage_time_value,
 
             IF(active_player_outcome = 'victory', 1, 0) AS is_victory,
             auto_resolved AS auto_resolved,
@@ -295,8 +298,8 @@ if __name__ == '__main__':
 
                     cur.execute("INSERT INTO "+sql_util.sym(summary_table) + " " + \
                                 "SELECT %s*FLOOR((time-%s)/(1.0*%s)) + %s AS "+sql_util.sym(interval)+"," + \
-                                ("       frame_platform," if interval != 'hour' else "") + \
-                                ("       country_tier," if interval != 'hour' else "") + \
+                                ("      frame_platform," if interval != 'hour' else "") + \
+                                ("      country_tier," if interval != 'hour' else "") + \
                                 "       townhall_level," + \
                                 ("      "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," if interval != 'hour' else "") + \
                                 "       IF(battle_type='pvp',-1,opponent_id) AS opponent_id," + \

@@ -1,0 +1,4 @@
+[DEFAULT]
+bantime = 3600
+[ssh-iptables]
+action = iptables[name=SSH, port=ssh, protocol=tcp]

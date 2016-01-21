@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -72,10 +72,6 @@ if __name__ == '__main__':
     do_leaderboard = False
     give_item = None
     send_message = False
-    message_sender = 'SpinPunch'
-    message_subject = ''
-    message_body = ''
-    message_expire_time = -1
     item_stack = 1
     item_melt_hours = -1
     testers_n = 99999999

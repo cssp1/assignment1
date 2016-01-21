@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
+
+# create a ZenDesk ticket for a Facebook payment dispute
 
 import SpinConfig
 import SpinJSON
 import SpinUserDB
+import SpinReminders
 import sys, getopt, time, math
 import base64, urllib2
 
@@ -26,6 +29,7 @@ def reverse_digits(n):
 
 if __name__ == '__main__':
     dry_run = False
+    reminder_recipients = SpinConfig.config.get('payment_dispute_recipients', [])
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', ['dry-run','verbose'])
 
     for key, val in opts:
@@ -76,8 +80,9 @@ if __name__ == '__main__':
         "requester": {"name": player_name,
                       "email": player_email},
         "subject": "Payment Dispute %s %s %s" % (payment_amount, payment_currency, payment_id),
-        "comment": { "body": "Player %d has disputed payment %s for %s %s at Facebook.\n\nWE MUST UPDATE THE DISPUTE STATUS (https://developers.facebook.com/docs/howtos/payments/disputesrefunds/#updatedisputestatus) or Facebook will automatically refund this payment.\n\n%s" % \
-                     (user_id, payment_id, payment_amount, payment_currency, '\n\n'.join(dispute_comments)) },
+        # for instructions on how to update, see https://developers.facebook.com/docs/howtos/payments/disputesrefunds/#updatedisputestatus
+        "comment": { "body": "%s Player %d has disputed payment %s for %s %s at Facebook.\n\nWe must resolve this dispute using PCHECK or Facebook will automatically refund this payment.\n\n%s" % \
+                     (SpinConfig.game().upper(), user_id, payment_id, payment_amount, payment_currency, '\n\n'.join(dispute_comments)) },
         "custom_fields": [{"id": 23205756,"value": zd_game_id},
                           {"id": 21701081,"value": str(user_id)},
                           {"id": 21760571,"value": SpinConfig.game()+"_"+str(user_id)+"_"+camo_money_spent},
@@ -91,8 +96,17 @@ if __name__ == '__main__':
     request.add_header('Content-Type', 'application/json')
     request.add_header('Accept', 'application/json')
     request.add_data(SpinJSON.dumps(body))
+
+    # for debugging
+    SpinJSON.dump(body, open('/tmp/payment-dispute-notification-zendesk.txt','a'), pretty=True, newline=True)
+
+    SpinReminders.send_reminders('payment_dispute_notification.py', reminder_recipients,
+                                 "Payment Dispute %s %s %s" % (payment_amount, payment_currency, payment_id),
+                                 "%s Player %d has disputed payment %s for %s %s at Facebook. Creating ZenDesk ticket." % \
+                                 (SpinConfig.game().upper(), user_id, payment_id, payment_amount, payment_currency),
+                                 dry_run = dry_run)
+
     if dry_run:
         print SpinJSON.dumps(body, pretty=True)
-        SpinJSON.dump(body, open('/tmp/payment-dispute-output','w'), pretty=True, newline=True)
     else:
         print urllib2.urlopen(request).read()

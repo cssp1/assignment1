@@ -1,6 +1,6 @@
 goog.provide('SPAudio');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -220,16 +220,12 @@ SPAudio.BuzzSample.prototype.play = function(time, volume) {
     // prevent overlap on non-looped samples
     if(!this.play_looped && time > 0 && time < this.end_time) { return false; }
     this.buzz_sound.setVolume(100*volume);
-    if(0) {
-        // potential multishot solution for FireFox?
-        // this.buzz_sound.sound.cloneNode().play();
-    } else {
-        this.end_time = time + this.duration;
-        try {
-            this.buzz_sound.play();
-        } catch (ex) {
-            log_exception(ex, 'buzz.play "'+this.url+'"');
-        }
+
+    this.end_time = time + this.duration;
+    try {
+        this.buzz_sound.play();
+    } catch (ex) {
+        log_exception(ex, 'buzz.play "'+this.url+'"');
     }
     return true;
 };
@@ -265,7 +261,9 @@ SPAudio.ACDriver = function(client_time) {
         this.context = new webkitAudioContext();
         this.impl = SPAudio.ACDriverImpl.WEBKIT;
         // name changed from Chrome implementation (createGainNode) to final Web Audio API (createGain)
-        this.context.createGain = this.context.createGainNode;
+        if(typeof(this.context['createGain']) === 'undefined') {
+            this.context['createGain'] = this.context['createGainNode'];
+        }
     }
 
     this.time_offset = this.context.currentTime - client_time;
@@ -294,6 +292,7 @@ SPAudio.ACDriver.prototype.create_sample = function(url, kind, success_cb, fail_
 /** @constructor */
 SPAudio.ACSample = function(driver, url, success_cb, fail_cb) {
     this.driver = driver;
+    this.url = url;
     this.buffer = null;
     /** @type {?} */
     this.last_voice = null;

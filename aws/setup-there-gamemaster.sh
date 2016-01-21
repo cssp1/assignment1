@@ -1,7 +1,5 @@
 #!/bin/sh
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"
@@ -25,9 +23,9 @@ if false; then
     sudo /sbin/service sendmail stop
     sudo /sbin/service postfix restart
 
-#    sudo yum install perl-CPAN
-#    sudo yum groupinstall "Development Tools"
-#    sudo yum install openssl-devel
+#    sudo yum -y install perl-CPAN
+#    sudo yum -y groupinstall "Development Tools"
+#    sudo yum -y install openssl-devel
 #    export PERL_MM_USE_DEFAULT=1
 #    sudo perl -MCPAN -e 'notest install Digest::SHA'
 #    sudo perl -MCPAN -e 'notest install URI::Escape'

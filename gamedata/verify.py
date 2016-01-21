@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -63,70 +63,6 @@ def require_art_file(name):
 
 MAX_RESOURCE_COST = 34000000
 MAX_STORAGE = None
-
-# parse a single predicate for minimum CC level requirement
-def get_cc_requirement_predicate(pred):
-    if pred['predicate'] == 'BUILDING_LEVEL':
-        if pred['building_type'] == gamedata['townhall']:
-            if pred['trigger_level'] > len(gamedata['buildings'][gamedata['townhall']]['build_time']):
-                raise Exception('requirement of CC > max level '+repr(pred))
-            return pred['trigger_level']
-        else:
-            if pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['requires']):
-                raise Exception('requirement of %s > max level: ' % pred['building_type'] + repr(pred))
-            return get_cc_requirement_predicate(gamedata['buildings'][pred['building_type']]['requires'][pred['trigger_level']-1])
-    elif pred['predicate'] == 'TECH_LEVEL':
-        return get_cc_requirement_predicate(gamedata['tech'][pred['tech']]['requires'][pred['min_level']-1])
-    elif pred['predicate'] == 'AND':
-        ls = [get_cc_requirement_predicate(subpred) for subpred in pred['subpredicates']]
-        if -1 in ls: return -1
-        return max(ls)
-    elif pred['predicate'] == 'ALWAYS_FALSE':
-        return -1
-    elif pred['predicate'] == 'LIBRARY':
-        return get_cc_requirement_predicate(gamedata['predicate_library'][pred['name']])
-    elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
-                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE'):
-        pass
-    else:
-        raise Exception('unhandled upgrade requirement: %s' % repr(pred))
-    return 0
-
-# parse a predicate (list) for a minimum CC level requirement for level "level" of this object
-def get_cc_requirement(req, level):
-    if type(req) is not list: req = [req,]*level
-    cc_requirement = 0
-    for lev in xrange(1, level+1):
-        pred = req[lev-1]
-        pred_req = get_cc_requirement_predicate(pred)
-        if pred_req < 0: return -1
-        cc_requirement = max(cc_requirement, pred_req)
-    return cc_requirement
-
-# calculate max capacity of resource storage indexed by CC level
-def calc_max_storage_for_resource(gamedata, res):
-    ret = []
-    building_name = gamedata['resources'][res]['storage_building']
-
-    for cc_level in xrange(1, len(gamedata['buildings'][gamedata['townhall']]['build_time'])+1):
-        storage_spec = gamedata['buildings'][building_name]
-        num_storages = storage_spec['limit'][cc_level-1] if type(storage_spec['limit']) is list else storage_spec['limit']
-
-        storage_level = 1
-        while storage_level < len(storage_spec['build_time']):
-            if cc_level < get_cc_requirement(storage_spec['requires'], storage_level):
-                break
-            storage_level += 1
-
-        if 'storage_'+res in storage_spec:
-            ret.append(num_storages * storage_spec['storage_'+res][storage_level-1])
-        else:
-            ret.append(0)
-        #sys.stderr.write("HERE CC L%d num %d lev %d total %d\n" % (cc_level, num_storages, storage_level, ret[-1]))
-    return ret
-
-def calc_max_storage(gamedata):
-    return dict((resname, calc_max_storage_for_resource(gamedata, resname)) for resname in gamedata['resources'])
 
 def check_url(url, reason):
     if not url: return 0
@@ -266,7 +202,7 @@ def check_mandatory_fields(specname, spec, kind):
                 error |= 1; print 'gamedata.strings.modstats.stats is missing "%s"' % stat_key
 
     for lev in xrange(1,max_level+1):
-        cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
+        cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
         if spec['name'] == gamedata['townhall']:
             cc_requirement = max(cc_requirement, lev-1)
         for res in gamedata['resources']:
@@ -613,7 +549,7 @@ def check_tech(specname, keyname, spec, maxlevel):
     # check resource requirement vs CC level
     if verbose:
         for lev in xrange(1,len(spec['research_time'])+1):
-            cc_requirement = get_cc_requirement(spec['requires'], lev) if ('requires' in spec) else 0
+            cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
             for res in gamedata['resources']:
                 cost = spec['cost_'+res][lev-1] if isinstance(spec['cost_'+res],list) else spec['cost_'+res]
                 if cost > MAX_RESOURCE_COST:
@@ -656,8 +592,12 @@ def check_aura(auraname, spec, maxlevel):
     if spec['name'] != ':'.join(auraname.split(':')[1:]):
         error |= 1
         print '%s:name mismatch' % auraname
-    if ('icon' in spec):
+    if ('icon' in spec) and spec['icon'] != 'gamebucks_inventory_icon':
         error |= require_art_asset(spec['icon'], auraname+':icon')
+    if ('_sale' in spec['name']) or ('_contender' in spec['name']) or spec['name'] == 'damage_protection':
+        if spec.get('limited', True):
+            error |= 1
+            print '%s: should have "limited": 0' % (auraname)
     if ('affects_manufacture_category' in spec) and (spec['affects_manufacture_category'] not in ('ALL','rovers','transports','starcraft')):
         error |= 1
         print '%s:affects_manufacture_category is invalid (must be ALL, rovers, transports, or starcraft)' % (auraname)
@@ -673,6 +613,9 @@ def check_aura(auraname, spec, maxlevel):
         if not spec.get('server',False):
             error |= 1; print '%s: has on_apply but server != 1' % auraname
         error |= check_consequent(spec['on_apply'], reason = 'aura %s: on_apply' % auraname, context='aura')
+
+    if 'on_click' in spec:
+        error |= check_consequent(spec['on_click'], reason = 'aura %s: on_click' % auraname, context='aura')
 
     if 'code' in spec:
         replacement = 'unknown (ask Dan)'
@@ -710,7 +653,7 @@ def check_aura(auraname, spec, maxlevel):
 
     if 'ends_on' in spec:
         has_cons = False
-        if spec['ends_on'] not in ('session_change', 'battle_end', 'recalc_stattab'):
+        if spec['ends_on'] not in ('session_change', 'battle_end', 'recalc_stattab', 'damage_protection'):
             error |= 1; print '%s: invalid ends_on code' % auraname
         if spec['ends_on'] == 'battle_end':
             for outcome in ('defeat','victory'):
@@ -1169,6 +1112,11 @@ def check_item(itemname, spec):
                 elif spellname == 'CLIENT_CONSEQUENT':
                     error |= check_consequent(use['spellarg'], reason = 'item %s: use' % itemname, context = 'item')
 
+                # missiles
+                elif spellname in gamedata['spells'] and gamedata['spells'][spellname]['activation'] == 'targeted_area':
+                    if ('analytics_value' not in spec) and (gamedata['game_id'] in ('tr','dv')):
+                        error |= 1; print '%s: missile needs an "analytics_value"' % (itemname,)
+
             if 'consequent' in use:
                 error |= check_consequent(use, reason = 'item %s: use' % itemname, context = 'item')
 
@@ -1266,8 +1214,13 @@ def check_item(itemname, spec):
                 expect_absolute_time_end = {'origin': gamedata['matchmaking']['week_origin'], 'offset': 2*86400, 'interval': 7*86400}
                 if COND_CHAIN == 'force_expire_by':
                     for pred, val in spec[COND_CHAIN]:
-                        if ((val - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
-                            error |= 1; print '%s: incorrect force_expire_by time %d, must agree with %r' % (itemname, val, expect_absolute_time_end)
+                        if isinstance(val, int):
+                            if val > 1 and ((val - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
+                                error |= 1; print '%s: incorrect force_expire_by time %d, must agree with %r' % (itemname, val, expect_absolute_time_end)
+                        else:
+                            assert isinstance(val, dict)
+                            if not (('event_name' in val) or ('event_kind' in val)):
+                                error |= 1; print '%s: incorrect force_expire_by entry %r, missing event_name or event_kind' % (itemname, val)
 
             error |= check_cond_chain(spec[COND_CHAIN], reason = 'item %s: %s' % (itemname, COND_CHAIN), expect_absolute_time_end = expect_absolute_time_end)
 
@@ -1279,11 +1232,11 @@ def check_item(itemname, spec):
 
     return error
 
-MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'ice_effects', 'rate_of_fire',
+MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'weapon_range_pvp', 'ice_effects', 'rate_of_fire',
                                           'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
                                           'research_speed', 'crafting_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
-                    'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'travel_speed', 'deployable_unit_space',
+                    'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'loot_factor_tokens', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',
                                    'combat_time_scale'])}
 
@@ -1395,6 +1348,7 @@ def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_sl
                 error |= check_loot_table(item, reason = reason, expire_time = expire_time, duration = duration, is_toplevel = False)
         elif 'cond' in entry:
             for pred, loot in entry['cond']:
+                error |= check_predicate(pred, reason = reason + ':cond')
                 error |= check_loot_table(loot, reason = reason + ':' + repr(pred), expire_time = expire_time, duration = duration, is_toplevel = False)
         elif 'table' in entry:
             if entry['table'] not in gamedata['loot_tables']:
@@ -1420,7 +1374,7 @@ def check_cond_chain(chain, **kwargs):
 PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTORIAL_COMPLETE', 'ACCOUNT_CREATION_TIME',
                    'ALL_BUILDINGS_UNDAMAGED', 'OBJECT_UNDAMAGED', 'OBJECT_UNBUSY', 'BUILDING_DESTROYED', 'BUILDING_QUANTITY',
                    'BUILDING_LEVEL', 'UNIT_QUANTITY', 'TECH_LEVEL', 'QUEST_COMPLETED', 'COOLDOWN_ACTIVE', 'COOLDOWN_INACTIVE',
-                   'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY',
+                   'ABTEST', 'ANY_ABTEST', 'RANDOM', 'LIBRARY', 'AI_BASE_ACTIVE', 'AI_BASE_SHOWN', 'PLAYER_HISTORY', 'GAMEDATA_VAR',
                    'RETAINED', 'TIME_IN_GAME',
                    'ATTACKS_LAUNCHED', 'ATTACKS_VICTORY', 'CONQUESTS', 'UNITS_MANUFACTURED', 'LOGGED_IN_TIMES',
                    'RESOURCES_HARVESTED_TOTAL', 'RESOURCES_HARVESTED_AT_ONCE', 'FRIENDS_JOINED', 'FACEBOOK_APP_NAMESPACE', 'FACEBOOK_LIKES_SERVER',
@@ -1533,7 +1487,7 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred['name'] not in gamedata['predicate_library']:
             error |= 1
             print '%s: %s predicate refers to nonexistent library predicate "%s"' % (reason, pred['predicate'], pred['name'])
-        if expect_library_preds is not None and pred['name'] not in expect_library_preds:
+        if (expect_library_preds) is not None and (pred['name'] not in expect_library_preds) and (not pred['name'].endswith('_event_store_open')):
             error |= 1; print '%s: %s predicate refers to LIBRARY "%s" but is only allowed to refer to one of %s' % (reason, pred['predicate'], pred['name'], repr(expect_library_preds))
 
     elif pred['predicate'] == 'SELECTED':
@@ -1552,6 +1506,18 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         VALID_PLATFORMS = ('fb','kg','ag')
         if pred.get('platform',None) not in VALID_PLATFORMS:
             error |= 1; print '%s: FRAME_PLATFORM predicate needs a "platform" in %r' % (reason, VALID_PLATFORMS)
+    elif pred['predicate'] == 'GAMEDATA_VAR':
+        for mandatory in ('name', 'value'):
+            if mandatory not in pred: error |= 1; print '%s: %s predicate missing "%s"' % (reason, pred['predicate'], mandatory)
+        if 'method' in pred and pred['method'] not in ('==', 'in'):
+            error |= 1; print '%s: %s predicate has bad "method" %s' % (reason, pred['predicate'], pred['method'])
+        path = pred['name'].split('.')
+        v = gamedata
+        for elem in path:
+            if elem not in v:
+                error |= 1; print '%s: %s predicate has looks up undefined value "%s"' % (reason, pred['predicate'], pred['name'])
+                break
+            v = v[elem]
     elif pred['predicate'] == 'PLAYER_HISTORY':
         if 'key' not in pred: error |= 1; print '%s: %s predicate missing "key"' % (reason, pred['predicate'])
         else:
@@ -1605,11 +1571,11 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
                         'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS', 'FIND_AND_REPLACE_OBJECTS',
                         'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'START_AI_ATTACK',
-                        'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
+                        'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FOCUS_CHAT_GUI', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
-                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'TAKE_ITEMS',
+                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
                         'CHANGE_TITLE',
                    ])
@@ -1671,7 +1637,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         else:
             if type(cons['value']) in (str,unicode) and len(cons['value'])>=1 and cons['value'][0] == '$':
                 # check for valid context variables
-                if cons['value'] not in ('$n_battle_stars',):
+                if cons['value'] not in ('$n_battle_stars','$largest_purchase','$largest_purchase_gamebucks'):
                     error |= 1; print '%s: %s consequent has bad "value" context variable reference "%s"' % (reason, cons['consequent'], cons['value'])
 
         # try to catch common typos
@@ -1766,6 +1732,8 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] == 'DISPLAY_DAILY_TIP':
         if not any(tip['name'] == cons.get('name', '') for tip in gamedata['daily_tips']):
             error |= 1; print '%s: DISPLAY_DAILY_TIP refers to invalid daily tip %s' % (reason, cons.get('name', ''))
+    elif cons['consequent'] == 'INVOKE_OFFER_CHOICE':
+        error |= check_consequent(cons['then'], reason = reason, context = context, context_data = context_data)
     elif cons['consequent'] in ('GIVE_UNITS','TAKE_UNITS'):
         units = cons['units']
         for name, data in units.iteritems():
@@ -1810,7 +1778,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] in ['INVOKE_BLUEPRINT_CONGRATS', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET', 'SESSION_LOOT',
                                 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_MAP_DIALOG', 'MESSAGE_BOX',
                                 'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG',
-                                'TUTORIAL_ARROW', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_CHANGE_REGION_DIALOG',
+                                'TUTORIAL_ARROW', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_CHANGE_REGION_DIALOG',
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                                 'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'TAKE_ITEMS',
                                 'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
@@ -1919,11 +1887,11 @@ def range_overlap(a0, a1, b0, b1):
     return True
 
 # keep track of how many map bases are spawned by time interval
-# data structure is a list of [t,pop] pairs ("spawn count is 'pop' at time 't'")
-def spawn_pop_init(): return [[0,0]]
+# data structure is a list of [t,pop,templates] tuples ("spawn count is 'pop' at time 't'")
+def spawn_pop_init(): return [[0,0,[]]]
 
 # at time "when", add "incr" bases (may be negative to remove bases)
-def spawn_pop_update(pop, when, incr):
+def spawn_pop_update(pop, when, incr, ui_name):
     i = 0
     while i < len(pop):
         if pop[i][0] >= when:
@@ -1931,79 +1899,109 @@ def spawn_pop_update(pop, when, incr):
         i += 1
 
     if i >= len(pop) or pop[i][0] != when:
-        pop.insert(i, [when, pop[i-1][1]])
+        pop.insert(i, [when, pop[i-1][1], pop[i-1][2][:]])
 
     for j in xrange(i, len(pop)):
         pop[j][1] += incr
+        if incr > 0:
+            pop[j][2].append(ui_name)
+        elif incr < 0:
+            pop[j][2].remove(ui_name)
 
 if 0: # test code
     p = spawn_pop_init()
-    spawn_pop_update(p, 2, 100)
-    spawn_pop_update(p, 4, -100)
-    spawn_pop_update(p, 2, 100)
-    spawn_pop_update(p, 4, -100)
-    spawn_pop_update(p, 3, 50)
-    spawn_pop_update(p, 5, -50)
-    spawn_pop_update(p, 1, 50)
+    spawn_pop_update(p, 2, 100, "a")
+    spawn_pop_update(p, 4, -100, "a")
+    spawn_pop_update(p, 2, 100, "b")
+    spawn_pop_update(p, 4, -100, "b")
+    spawn_pop_update(p, 3, 50, "c")
+    spawn_pop_update(p, 5, -50, "c")
+    spawn_pop_update(p, 1, 50, "d")
     print p
-    assert p == [[0, 0], [1, 50], [2, 250], [3, 300], [4, 100], [5, 50]]
+    assert p == [[0, 0, []], [1, 50, ['d']], [2, 250, ['a','b','d']], [3, 300, ['a','b','c','d']], [4, 100, ['c','d']], [5, 50, ['d']]]
     sys.exit(0)
 
 
 def check_hives(hives):
     error = 0
-    max_region_pop = max(hives['region_pop'].values() + [1,])
-    spawn_pop = spawn_pop_init()
+    max_region_pop = max(hives.get('region_pop',{}).values() + [1,])
 
-    for spawn_name, spawn in [x for x in hives.iteritems() if x[0].startswith('spawn')]:
-        for item in spawn:
+    for spawn_array_name, spawn_array in filter(lambda k_v: k_v[0] == 'spawn' or k_v[0].startswith('spawn_for'), hives.iteritems()):
+        spawn_pop = spawn_pop_init()
+
+        # hack - instead of figuring out all the complex logic to handle infinitely-repeating events that mesh
+        # with once-only events, instead just make a fixed number of copies of repeats, and ignore problems that
+        # happen "far" in the future
+        future_limit = float('inf')
+        past_limit = time_now
+        repeat_copies = 5
+
+        if spawn_array_name == 'spawn':
+            region_id = 'ALL'
+        else:
+            region_id = spawn_array_name.split('_for_')[1]
+
+        for item in spawn_array:
             if item['template'] not in hives['templates']:
                 error |= 1
-                print 'hive %s: invalid template "%s"' % (spawn_name, item['template'])
+                print 'hive %s: invalid template "%s"' % (spawn_array_name, item['template'])
             # stupid N^2 algorithm to look for overlap
             id_start = item['id_start']
             id_end = id_start + int(max_region_pop * item['num'])
-            for other in spawn:
+            for other in spawn_array:
                 if other is item: continue
                 other_start = other['id_start']
                 other_end = other_start + int(max_region_pop * other['num'])
                 if range_overlap(id_start, id_end, other_start, other_end):
                     error |= 1
-                    print 'hive %s: these two templates have overlapping ID ranges (note: num can be multiplied by %.2f for max_region_pop)!\n%s\n%s' % (spawn_name, max_region_pop, repr(item), repr(other))
+                    print 'hive %s: these two templates have overlapping ID ranges (note: num can be multiplied by %.2f for max_region_pop)!\n%s\n%s' % (spawn_array_name, max_region_pop, repr(item), repr(other))
             if item.get('active', 1):
+                if (('start_time' in item) or ('end_time' in item)) and ('spawn_times' in item):
+                    error |= 1
+                    print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_array_name, repr(item))
+
                 if 'spawn_times' in item:
-                    for start_time, end_time in item['spawn_times']:
-                        spawn_pop_update(spawn_pop, start_time if start_time > 0 else 0, item['num']) # hives appear
-                        if end_time > 0:
-                            spawn_pop_update(spawn_pop, end_time, -item['num']) # hives disappear
-
-                    if ('start_time' in item) or ('end_time' in item):
-                        error |= 1
-                        print 'hive %s: this template has both spawn_times and start_time/end_time specified\n%s' % (spawn_name, repr(item))
+                    start_end_list = item['spawn_times']
                 else:
-                    start_time = item.get('start_time',-1)
-                    end_time = item.get('end_time',-1)
-                    spawn_pop_update(spawn_pop, start_time if start_time > 0 else 0, item['num']) # hives appear
-                    if end_time > 0:
-                        spawn_pop_update(spawn_pop, end_time, -item['num']) # hives disappear
+                    start_end_list = [[item.get('start_time',-1), item.get('end_time',-1)]]
 
-    # check future spawn population for abnormally low or high intervals
-    if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
-        i = 0
-        while spawn_pop[i+1][0] < time_now: # ignore intervals before curren ttime
-            i += 1
-        for j in xrange(i, len(spawn_pop)):
-            entry = spawn_pop[j]
-            warn = None
-            if entry[1] < 10:
-                warn  = 'LOW (%d)' % entry[1]
-            elif entry[1] >= 1000:
-                warn = 'HIGH (%d)' % entry[1]
-            if warn:
-                interval = [entry[0], spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
-                ui_interval = map(lambda x: time.strftime('%Y %b %d', time.gmtime(x)) if x > 0 else 'infinity', interval)
-                print 'warning:', warn, 'number of hives set to spawn in the interval %d,%d (%s -> %s)' % (interval[0], interval[1], ui_interval[0], ui_interval[1])
-        #print spawn_pop[i:]
+                repeat_interval = item.get('repeat_interval',0)
+                if repeat_interval > 0:
+                    # set time range we care about for checking hive populations
+
+                    # don't care about anything after the last simulated run of any scheduled repeating event
+                    future_limit = min(future_limit, start_end_list[-1][0] + (repeat_copies-1) * repeat_interval)
+                    # DO care about old repeating runs, even if before current time
+                    past_limit = min(past_limit, start_end_list[0][0])
+
+                    # for repeating events, duplicate the start_end entries repeat_copies times
+                    start_end_list = [[x[0] + repeat_interval*rep, x[1] + repeat_interval*rep] for rep in xrange(repeat_copies) for x in start_end_list]
+
+                for start, end in start_end_list:
+                    spawn_pop_update(spawn_pop, start if start > 0 else 0, item['num'], item['template']) # hives appear
+                    if end > 0:
+                        spawn_pop_update(spawn_pop, end, -item['num'], item['template']) # hives disappear
+
+        # check future spawn population for abnormally low or high intervals
+        if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
+            i = 0
+            while spawn_pop[i+1][0] <= past_limit: # ignore intervals before past_limit
+                i += 1
+
+            for j in xrange(i, len(spawn_pop)):
+                entry_t, pop, ui_names = spawn_pop[j]
+                if entry_t >= future_limit: # ignore intervals further in the future than we've computed out
+                    break
+                warn = None
+                if pop < 10:
+                    warn  = 'LOW (%d)' % pop
+                elif pop >= 1000:
+                    warn = 'HIGH (%d)' % pop
+                if warn:
+                    interval = [entry_t, spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
+                    ui_interval = map(lambda x: time.strftime('%Y %b %d', time.gmtime(x)) if x > 0 else 'infinity', interval)
+                    print 'warning:', warn, 'number of hives set to spawn in region %s in the interval %d,%d (%s -> %s): %r' % (region_id, interval[0], interval[1], ui_interval[0], ui_interval[1], ui_names)
+            #print spawn_pop[i:]
 
     for strid, data in hives['templates'].iteritems():
         error |= check_hive('hive:'+strid, data)
@@ -2723,6 +2721,9 @@ def check_achievement_name(name, context):
 
 def check_daily_tip(tip):
     error = 0
+    if ('repeat_interval' in tip) and (('start_time' not in tip) or ('end_time' not in tip)):
+        error |= 1
+        print 'daily tip/message %s needs start_time and end_time since it is using repeat_interval' % (tip['name'])
     if 'show_if' in tip:
         if check_predicate(tip['show_if'], reason='%s:show_if' % tip['name']):
             error |= 1
@@ -2740,6 +2741,13 @@ def check_daily_tip(tip):
 def check_daily_message(msg):
     error = 0
     error |= check_misspellings(msg, set(['show_if','attachments']), 'daily_message:%s' % msg['name'])
+    if ('repeat_interval' in msg):
+        if (('start_time' not in msg) or ('end_time' not in msg)):
+            error |= 1
+            print 'daily tip/message %s needs start_time and end_time since it is using repeat_interval' % (msg['name'])
+        if ('expire_at' in msg):
+            error |= 1
+            print 'daily tip/message %s is using repeat_interval, so change "expire_at" to "end_time"' % (msg['name'])
     if 'show_if' in msg:
         if check_predicate(msg['show_if'], reason='%s:show_if' % msg['name']):
             error |= 1
@@ -2782,7 +2790,7 @@ def check_events(events):
                                               'current_trophy_pve_challenge', # (obsolete) PvE trophy tournament
                                               'current_trophy_pvp_challenge', # PvP point tournament
                                               'current_stat_tournament', # Scores2 stat tournament
-                                              'facebook_sale'
+                                              'facebook_sale', 'bargain_sale'
                                               ):
             error |= 1; print 'event %s has invalid kind "%s"' % (key, data.get('kind','MISSING'))
         for ASSET in ('console_portrait', 'logo', 'icon'):
@@ -3031,7 +3039,17 @@ def check_store_sku(sku_name, sku):
                 if 'store_icon' not in item:
                     error |= 1
                     print 'store sku %s currency item "%s" needs a store_icon' % (sku_name, item_name)
-
+            elif sku['price_currency'].startswith('score:'):
+                stat_name = sku['price_currency'].split(':')[1]
+                if stat_name not in ('trophies_pvp', 'trophies_pvv'):
+                    error |= 1
+                    print 'store sku %s invalid currency stat "%s"' % (sku_name, stat_name)
+                if 'INSUFFICIENT_'+stat_name.upper() not in gamedata['errors']:
+                    error |= 1
+                    print 'store sku %s calls for INSUFFICIENT_'+stat_name.upper()+' which needs to be in errors_gamespecific.json' % (sku_name)
+                if ('score' not in gamedata['strings']['requirements_help']) or (stat_name not in gamedata['strings']['requirements_help']['score']):
+                    error |= 1
+                    print 'store sku %s calls for strings.json: requirements_help.score.%s' % (sku_name, stat_name)
     if 'jewel' in sku:
         if type(sku['jewel']) is list and (len(sku['jewel']) == 0 or type(sku['jewel'][0]) is dict):
             error |= 1; print 'store sku %s "jewel" must be single predicate' % (sku_name)
@@ -3287,7 +3305,7 @@ def main(args):
     gamedata['loading_screens'] = SpinJSON.load(open(args[8]))
 
     global MAX_STORAGE
-    MAX_STORAGE = calc_max_storage(gamedata)
+    MAX_STORAGE = dict((resname, GameDataUtil.calc_max_storage_for_resource(gamedata, resname)) for resname in gamedata['resources'])
 
     for name, data in gamedata['dialogs'].iteritems():
         error |= check_dialog('dialog:'+name, data)
@@ -3354,8 +3372,11 @@ def main(args):
     if type(gamedata['strings']['footer_linkbar_content']) is list:
         error |= check_cond_chain(gamedata['strings']['footer_linkbar_content'], reason = 'strings.footer_linkbar_content')
     error |= check_cond_or_literal(gamedata['continent_assignment'], reason = 'continent_assignment')
-    if type(gamedata['store']['payments_api']) is list:
-        error |= check_cond_chain(gamedata['store']['payments_api'], reason = 'store.payments_api')
+
+    # check some cond chains in the store
+    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency', 'ui_buy_gamebucks_warning'):
+        if type(gamedata['store'][checkable]) is list:
+            error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():
         if data.get('icon',None):
@@ -3504,6 +3525,11 @@ def main(args):
 
     for name, data in gamedata['loot_tables'].iteritems():
         error |= check_loot_table(data['loot'], reason = 'loot_tables:'+name)
+        if 'on_purchase' in data:
+            error |= check_consequent(data['on_purchase'], reason = 'loot_tables:'+name+':on_purchase')
+        for COND in 'ui_warning', 'metrics_description':
+            if COND in data:
+                error |= check_cond_chain(data[COND], reason = 'loot_tables:'+name+':'+COND)
 
     for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():
         error |= check_loot_table(loot, reason='lottery_slot_tables:'+name)

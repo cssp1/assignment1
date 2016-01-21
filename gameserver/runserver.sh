@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -26,10 +26,8 @@ if [[ "$DO_ART" == 1 ]]; then
         ./download-art.sh -q -f
 fi
 
-if [ -e ../.svn ]; then
-    echo "Running SVN maintenance..."
-    svn cleanup ..
-fi
+echo "Running SCM maintenance..."
+../scmtool.sh clean
 
 echo "Clearing gamedata build directories..."
 rm -f ../gamedata/*/built/*

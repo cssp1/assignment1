@@ -1,6 +1,6 @@
 goog.provide('Congrats');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -11,10 +11,8 @@ goog.provide('Congrats');
 goog.require('Predicates');
 goog.require('SPText');
 
-var Congrats = {
-    color_neutral: 'rgba(200,200,200,1)',
-    color_hi: 'rgba(255,255,255,1)'
-};
+Congrats.color_neutral = 'rgba(200,200,200,1)';
+Congrats.color_hi = 'rgba(255,255,255,1)';
 
 Congrats.props = { normal: {color:Congrats.color_neutral},
                    bold:   {color:Congrats.color_hi, style:'bold'},

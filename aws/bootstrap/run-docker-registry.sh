@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Ensure the S3-backed SpinPunch docker registry service is running on localhost
+# Ensure an S3-backed docker registry service is running on localhost
 
 if docker inspect spinpunch-docker-registry > /dev/null 2>&1; then
-    echo "SpinPunch local Docker registry service appears to be running already"
+    echo "Local Docker registry service appears to be running already"
     exit 0
 fi
 

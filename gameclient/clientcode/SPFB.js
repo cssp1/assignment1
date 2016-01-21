@@ -1,6 +1,6 @@
 goog.provide('SPFB');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -13,8 +13,7 @@ goog.provide('SPFB');
 
 // depends on client_time from main.js
 
-// global namespace
-SPFB = {};
+goog.require('goog.object');
 
 /** @param {Object} props
     @param {function(Object)|null=} callback */
@@ -34,17 +33,50 @@ SPFB.ui = function(props, callback) {
     return FB.ui(props, callback);
 };
 
-/** @param {string} url
-    @param {?} method
-    @param {Object=} props */
-SPFB.api = function(url, method, props) {
+/** Facebook wants (url, method, properties, callback) arguments,
+    but you can omit method or properties, "shifting" the other ones earlier. Ugly.
+   @param {string} url
+   @param {?} arg1
+   @param {?=} arg2
+   @param {?=} arg3 */
+SPFB.api = function(url, arg1, arg2, arg3) {
     if(typeof FB === 'undefined') {
         // note: calls back into main.js
         invoke_timeout_message('0650_client_died_from_facebook_api_error',
                                {'method':'api:'+url}, {});
         return null;
     }
-    return FB.api(url, method, props);
+    return FB.api(url, arg1, arg2, arg3);
+};
+
+/** @param {string} url
+    @param {string} method
+    @param {Object|null} props
+    @param {?} callback */
+SPFB.api_paged = function(url, method, props, callback) {
+    if(!props) { props = {}; }
+    var accumulator = {'data': []};
+    SPFB.api(url, method, props, goog.partial(SPFB._api_paged_handle_response, url, method, props, callback, accumulator));
+};
+/** @private
+    @param {string} url
+    @param {string} method
+    @param {Object} props
+    @param {function(Object)} callback
+    @param {Object.<string,?>} accumulator
+    @param {Object.<string,?>} response */
+SPFB._api_paged_handle_response = function(url, method, props, callback, accumulator, response) {
+    if(!response || response['error'] || !response['data']) {
+        throw Error(url+' returned invalid response');
+    }
+    accumulator['data'] = accumulator['data'].concat(response['data']);
+    if('paging' in response && ('next' in response['paging']) && ('cursors' in response['paging']) && ('after' in response['paging']['cursors'])) {
+        var new_props = goog.object.clone(props);
+        new_props['after'] = response['paging']['cursors']['after'];
+        SPFB.api(url, method, new_props, goog.partial(SPFB._api_paged_handle_response, url, method, props, callback, accumulator));
+    } else {
+        callback(accumulator);
+    }
 };
 
 /** @param {Function} cb
@@ -144,7 +176,7 @@ SPFB.api_version_number = function(feature) {
     if(s) {
         return parseFloat(s.slice(1, s.length-1));
     } else {
-        return 2.2; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
+        return 2.4; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
 };
 

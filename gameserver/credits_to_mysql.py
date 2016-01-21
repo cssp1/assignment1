@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -43,7 +43,11 @@ def credits_schema(sql_util):
              ('usd_receipts_cents', 'INT NOT NULL'),
              ('description', 'VARCHAR(255) NOT NULL'),
              ('gamebucks', 'INT'), # derived from description, may be NULL
-             ('quantity', 'INT')],
+             ('quantity', 'INT'),
+             ('last_purchase_time', 'INT8'),
+             ('prev_largest_usd_receipts_cents', 'INT'),
+             ('num_purchases', 'INT4'),
+             ],
             'indices': {'by_time': {'keys': [('time','ASC')]}}
             }
 def credits_summary_schema(sql_util, interval):
@@ -170,6 +174,8 @@ if __name__ == '__main__':
                     keyvals.append(('currency_amount', sign * row['currency_amount']))
 
                 keyvals.append(('usd_receipts_cents',sign * int(100*row['Billing Amount']+0.5)))
+                if 'prev_largest_purchase' in row:
+                    keyvals.append(('prev_largest_usd_receipts_cents', int(100*row['prev_largest_purchase']+0.5)))
 
                 if 'Billing Description' in row:
                     descr = row['Billing Description']
@@ -190,7 +196,8 @@ if __name__ == '__main__':
                     if found:
                         keyvals.append(('gamebucks', sign * int(found.groups()[0])))
 
-                for FIELD in ('quantity', 'payout_foreign_exchange_rate', 'tax_amount', 'tax_country'):
+                for FIELD in ('quantity', 'payout_foreign_exchange_rate', 'tax_amount', 'tax_country',
+                              'last_purchase_time', 'num_purchases'):
                     if FIELD in row:
                         keyvals.append((FIELD,row[FIELD]))
 

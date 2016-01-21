@@ -1,6 +1,6 @@
 goog.provide('AllianceCache');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -32,7 +32,7 @@ AllianceCache.init = function() {
 
 AllianceCache.turf_update = function(region_id, data) {
     // get rid of all entries for this region
-    AllianceCache.turf_cache = AllianceCache.turf_cache.filter(function(entry) { entry['region_id']!=region_id; });
+    AllianceCache.turf_cache = AllianceCache.turf_cache.filter(function(entry) { return entry['region_id'] !== region_id; });
     AllianceCache.turf_cache = AllianceCache.turf_cache.concat(data);
 };
 AllianceCache.turf_get_leader_by_region = function(region_id) {

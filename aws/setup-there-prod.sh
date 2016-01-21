@@ -3,8 +3,6 @@
 GAME_ID=$1
 GAME_ID_LONG=$2
 
-. ./setup-there-common.sh
-
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"
@@ -28,7 +26,6 @@ echo "GAME_ID=${GAME_ID}" > /tmp/spinpunch
 echo "GAME_ID_LONG=${GAME_ID_LONG}" >> /tmp/spinpunch
 echo "GAME_DIR=/home/ec2-user/${GAME_ID_LONG}" >> /tmp/spinpunch
 echo "GAME_MAIL_FROM=Alina" >> /tmp/spinpunch
-echo "GAME_MAIL_TO= # '[{\"name\":\"asdf\",\"email\":\"asdf@example.com\"},...]'" >> /tmp/spinpunch
 sudo mv /tmp/spinpunch /etc/spinpunch
 sudo chmod 0644 /etc/spinpunch
 
@@ -42,7 +39,7 @@ echo "SETUP(remote): Adjusting users, groups, and permissions..."
 #sudo chown mysql:mysql /media/ephemeral0/mysql
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && gunzip -c /home/ec2-user/overlay-prod.cpio.gz | sudo cpio -iuvd -R root:root)
+(cd / && sudo tar zxvf /home/ec2-user/overlay-prod.tar.gz)
 
 # fix permissions
 sudo chown -R root:root /etc
@@ -70,9 +67,6 @@ sudo newaliases
 
 echo "SETUP(remote): Mounting data EBS volumes..."
 sudo mount -a
-
-echo "SETUP(remote): Setting up ec2-send-memory-metrics.py..."
-sudo install ./ec2-send-memory-metrics.py /usr/local/bin/ec2-send-memory-metrics.py
 
 echo "SETUP(remote): (Re)starting munin-node..."
 sudo /etc/init.d/munin-node restart
@@ -121,8 +115,8 @@ echo "Apply gameserver/http.py.patchX to twisted/web/http.py wherever it is inst
 
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: git config --global user.name " # 'SpinPunch Deploy'
-echo "MISSING: GIT: git config --global user.email " # 'awstech@spinpunch.com'
+echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
 
 echo "game code checkout. symlink gameserver/logs to an ephemeral storage location (consider using xfs for efficiency with 100k+ small files)."
 
@@ -132,7 +126,9 @@ echo "AWS key /home/ec2-user/.ssh/host-awssecret"
 echo "SSL key /home/ec2-user/.ssh/spinpunch.com.key for SSL service."
 echo "    key /home/ec2-user/.ssh/hipchat.token for automated messages"
 echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game channel) for automated messages"
-echo "/home/ec2-user/.aws/credentials file with host awssecret for CloudWatch metrics"
+echo "    key /home/ec2-user/.ssh/mattermost-webhook-url for automated messages"
+echo "    key /home/ec2-user/.ssh/dropbox-access-token for tournament winner list uploads"
+echo "    key /home/ec2-user/.ssh/google-translate-api-key for PCHECK translation"
 
 # CUSTOMIZED PYTHON PACKAGES
 echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"

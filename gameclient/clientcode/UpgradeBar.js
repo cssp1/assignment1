@@ -1,6 +1,6 @@
 goog.provide('UpgradeBar');
 
-// Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+// Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
@@ -42,6 +42,7 @@ UpgradeBar.invoke = function(parent, kind, specname, new_level, obj_id) {
     parent.widgets['upgrade_bar'] = dialog;
     parent.add(dialog);
     UpgradeBar.update_contents(dialog, kind, specname, new_level, obj_id);
+    dialog.ondraw(dialog);
     return dialog;
 };
 UpgradeBar.scroll = function(dialog, incr) {
@@ -252,19 +253,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     };
 
     dialog.widgets['output'].clear_text();
-
-    // console.log(s);
-    if(0) {
-        // safe version, but not scrollable line-by-line
-        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(s, {}, click_handlers));
-    } else {
-        // break lines, protecting BBCode
-        var broken_s = SPUI.break_lines(s, dialog.widgets['output'].font, dialog.widgets['output'].wh, {bbcode:true})[0];
-        //console.log(broken_s.split('\n'));
-        goog.array.forEach(broken_s.split('\n'), function(line) {
-            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, {}, click_handlers));
-        });
-    }
+    dialog.widgets['output'].append_text_with_linebreaking_bbcode(s, {}, click_handlers);
 
     // if contents changed, then reset scroll
     if(kind != prev_kind || specname != prev_specname || new_level != prev_new_level || obj_id != prev_obj_id) {

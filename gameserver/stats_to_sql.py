@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2015 SpinPunch Studios. All rights reserved.
+# Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
@@ -12,6 +12,9 @@ import SpinJSON
 import SpinSQLUtil
 import SpinSingletonProcess
 import MySQLdb
+
+sys.path += ['../gamedata/'] # oh boy...
+import GameDataUtil
 
 stats_schema = {
     'fields': [('kind', 'VARCHAR(16) NOT NULL'),
@@ -166,17 +169,24 @@ if __name__ == '__main__':
             if type(min_per_cred) is dict:
                 min_per_cred = min_per_cred['default']
             bucks_per_min = float(gamedata['store']['gamebucks_per_fbcredit'])/min_per_cred
-            cur.execute("CREATE FUNCTION time_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * FLOOR(%f *ABS(amount)/60)+1)" % bucks_per_min)
+            cur.execute("CREATE FUNCTION time_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * (FLOOR(%f *ABS(amount)/60)+1))" % bucks_per_min)
 
             # RESOURCE PRICING FORMULAS
-            # returns the gamebucks price of an amount of fungible resources
+            # $RES_price returns the gamebucks price of an amount of fungible resources (as sold in the Store)
+            # ^ this is highly nonlinear, and not suitable for risk/reward calculations
+            # $RES_value returns the perceived gamebucks value of an amount of fungible resources to the player
+            # it depends on the player's townhall level, and is calculated as the gamebucks to speed up an
+            # equivalent amount of time to harvest that much resources with maxed-out harvesters.
 
             # these have to be created dynamically because gamedata.store influences the formulas
 
             cur.execute("DROP FUNCTION IF EXISTS iron_water_price") # obsolete
 
-            for res in gamedata['resources']:
-                cur.execute("DROP FUNCTION IF EXISTS "+res+"_price")
+            # create base iron/water formulas first, because the res3 formula depends on them
+            for res in sorted(gamedata['resources'].keys(),
+                              key = lambda x: -1 if x in ('iron','water') else 1):
+
+                # PRICE formula
                 def get_parameter(p, resname):
                     ret = gamedata['store'][p]
                     if type(ret) is dict:
@@ -192,21 +202,59 @@ if __name__ == '__main__':
                     func = ""
                     for i in xrange(1, len(points)):
                         slope = float(points[i][1] - points[i - 1][1]) / (points[i][0] - points[i - 1][0])
-                        seg = "%f * (%f + %f * (amount - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
+                        seg = "%f * (%f + %f * (ABS(amount) - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
                         if i != len(points) - 1:
-                            seg = "IF(amount < %f,%s," % (points[i][0], seg)
+                            seg = "IF(ABS(amount) < %f,%s," % (points[i][0], seg)
                         func += seg
                     func += ")" * (len(points)-2)
                 else:
                     raise Exception('unknown resource_price_formula '+formula)
-                final = "CREATE FUNCTION "+res+"_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))"
-                cur.execute(final)
+
+                cur.execute("DROP FUNCTION IF EXISTS "+res+"_price")
+                cur.execute("CREATE FUNCTION "+res+"_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+
+                # VALUE formula
+                if res == 'res3':
+                    # computed as a multiple of the iron value
+                    res3_to_iron_ratio = float(get_parameter('resource_price_formula_scale', 'res3')) / float(get_parameter('resource_price_formula_scale', 'iron'))
+                    func = "%f * iron_value(amount, townhall_level)" % res3_to_iron_ratio
+                elif res in ('iron','water'):
+                    func = ""
+                    townhall_spec = gamedata['buildings'][gamedata['townhall']]
+                    harv_spec = gamedata['buildings'][gamedata['resources'][res]['harvester_building']]
+                    townhall_levels = GameDataUtil.get_max_level(townhall_spec)
+                    harvest_rate = GameDataUtil.calc_max_harvest_rate_for_resource(gamedata, res)
+                    if verbose: print res, 'harvest_rates:', harvest_rate
+                    assert len(harvest_rate) == townhall_levels
+                    for i in xrange(1,townhall_levels+1):
+                        rate = harvest_rate[i-1]/3600.0
+                        seg = "time_price(ABS(amount)/%f)" % rate
+                        if i != townhall_levels:
+                            seg = "IF(townhall_level=%d, %s, " % (i, seg)
+                        func += seg
+                    func += ")" * (townhall_levels-1)
+                    if verbose: print res+'_value =', func
+                else:
+                    raise Exception('value formula not implemented for resource '+res)
+
+                cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
+                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
 
             # some tables have res3 columns even if the game itself doesn't have res3.
             # Create a dummy function to satisfy queries.
             if 'res3' not in gamedata['resources']:
-                cur.execute("DROP FUNCTION IF EXISTS res3_price")
-                cur.execute("CREATE FUNCTION res3_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
+                for FUNC in ('res3_price', 'res3_value'):
+                    cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym(FUNC))
+                    cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
+
+            # Special-case function for token (ONP) valuation, depending on player spend
+            # (empirically we find that spend correlates inversely with battle skill)
+            # gamebuck value of 1 token should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
+            # (this is based on ratio of tokens earned per gamebuck loss incurred in typical AI battles)
+            cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym('token_value'))
+            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, prev_receipts FLOAT) "+\
+                        "RETURNS INT8 DETERMINISTIC RETURN "+\
+                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.04,IF(prev_receipts>=100.0,0.03,IF(prev_receipts>=10.0,0.02,0.01)))))")
 
             filterwarnings('error', category = MySQLdb.Warning)
             con.commit()
