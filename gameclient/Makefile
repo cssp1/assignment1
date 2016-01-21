@@ -81,25 +81,7 @@ compiled-client.js: clientcode/*.js
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
 	@echo "${BUILD_DATE}" > $@.date
 
-check: clientcode/*.js
-# OBSOLETE Separate type-checking pass on main.js. Not used anymore, the regular build now uses reportUnknownTypes by default.
-# (with @suppress{reportUnknownTypes} to turn off warnings on a file-by-file bases).
-# Code kept here in case we want to experiment with other Closure compiler options.
-
-	@google/closure/bin/build/closurebuilder.py \
-		--root='google'	--root='clientcode' \
-		--namespace='SPINPUNCHGAME' \
-		--output_mode=compiled \
-		--compiler_jar=google/compiler.jar \
-		--compiler_flags='--js=google/closure/goog/deps.js' \
-		--compiler_flags='--externs=externs.js' \
-		--compiler_flags='--compilation_level=ADVANCED_OPTIMIZATIONS' \
-		--compiler_flags='--summary_detail_level=2' \
-		--compiler_flags='--warning_level=VERBOSE' \
-		--compiler_flags='--language_in=ECMASCRIPT6_STRICT' \
-		--compiler_flags='--language_out=ECMASCRIPT5' \
-		--output_file=/dev/null \
-		${CHECK_FLAGS} ${OPT_FLAGS}
+check: all
 
 # To find SpinPunch code that is not type-safe yet:
 # grep reportUnknownTypes.*XXX clientcode/*.js
