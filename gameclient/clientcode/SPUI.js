@@ -3250,7 +3250,7 @@ SPUI.ScrollingTextField.prototype.prepend_text_batch = function(text_list, user_
         // make new element
         var node = new SPUI.TextNode();
         node.text = text_list[i];
-        if(user_data[i]) { node.user_data = user_data[i]; }
+        if(user_data_list[i]) { node.user_data = user_data_list[i]; }
         this.buffer.unshift(node);
         ret.push(node);
     }
