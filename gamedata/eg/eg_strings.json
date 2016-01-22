@@ -240,6 +240,7 @@
 
         // channel welcome messages
         "welcome": ":: [color=#00ff00]%sender_name: Welcome to %channel_name chat! Please be respectful. Offensive behavior is not tolerated.[/color] ::\n",
+        "alliance_welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
 
         // system-wide announcements
         "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",

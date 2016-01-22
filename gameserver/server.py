@@ -3559,15 +3559,14 @@ class Session(object):
         self.alliance_chat_channel = 'a:%d' % alliance_id
 
         if chat_catchup:
+            self.do_chat_catchup(self.alliance_chat_channel, retmsg)
             txt = alliance_info.get('chat_motd', None)
             if not txt:
                 txt = "Welcome to \"%s\" chat!" % alliance_info.get('ui_name', 'unknown')
             self.chat_recv(self.alliance_chat_channel, None,
-                           {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'welcome',
-                            'time': server_time, 'facebook_id':'-1', 'user_id':-1},
+                           {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'alliance_welcome',
+                            'time': server_time, 'user_id':-1},
                            txt, retmsg = retmsg)
-
-            self.do_chat_catchup(self.alliance_chat_channel, retmsg)
 
         gamesite.chat_mgr.join(self, self.alliance_chat_channel)
         return alliance_info, alliance_membership
