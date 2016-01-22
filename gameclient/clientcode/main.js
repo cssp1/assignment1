@@ -14797,21 +14797,257 @@ ChatUnitDonationRequestInvalidation.prototype.apply = function(output, req, node
 };
 
 /** @param {!ChatModifier} modifier
-    @param {!SPUI.Dialog} tab */
+    @param {!SPUI.Dialog} tab
+    @return {boolean} persist after this? */
 function chat_tab_apply_modifier(modifier, tab) {
     if(modifier.target_message_id && modifier.target_message_id in tab.user_data['chat_messages_by_id']) {
         var node = tab.user_data['chat_messages_by_id'][modifier.target_message_id];
         modifier.apply(tab.widgets['output'], null, node);
+        return false; // done
     } else if(modifier.target_unit_donation_recipient_id) {
         // call on all outstanding requests for this recipient
+        // note: only used for invalidations
         goog.array.forEach(goog.object.getValues(tab.user_data['unit_donation_requests']), function(req) {
             if(req['recipient_id'] === modifier.target_unit_donation_recipient_id) {
                 modifier.apply(tab.widgets['output'], req, req['node'] || null);
             }
         });
+        return true; // always persist
     } else if(modifier.target_unit_donation_tag && modifier.target_unit_donation_tag in tab.user_data['unit_donation_requests']) {
         var req = tab.user_data['unit_donation_requests'][modifier.target_unit_donation_tag];
         modifier.apply(tab.widgets['output'], req, req['node'] || null);
+        return false; // done
+    }
+    return true; // persist
+}
+
+/** @param {!SPUI.Dialog} dialog
+    @param {string} channel_name
+    @param {!Object<string,?>} sender_info
+    @param {string} wrapped_body
+    @param {string|null} chat_msg_id */
+function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_body, chat_msg_id) {
+    /** @type {Array<!SPUI.Dialog>} */
+    var tablist = [];
+
+    if(channel_name == 'BROADCAST') {
+        // spam to all open channels
+        for(var i = 0; i < dialog.data['widgets']['tabs']['array'][0]; i++) {
+            tablist.push(dialog.widgets['tabs'+i]);
+        }
+    } else if(channel_name in dialog.user_data['channel_to_tab']) {
+        tablist.push(dialog.widgets['tabs'+dialog.user_data['channel_to_tab'][channel_name]]);
+    } else {
+        console.log("cannot find chat tab for channel "+channel_name+"!");
+        return;
+    }
+
+    /** some messages modify previous messages instad of appending something new
+        @type {ChatModifier|null} */
+    var modifier = null;
+
+    if(sender_info['type'] == 'message_hide') {
+        if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
+        modifier = new ChatHider(sender_info['target_message_id'], sender_info['new_type'] || null);
+    } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
+        if(sender_info['user_id'] == session.user_id) { return; } // don't invalidate own requests
+        modifier = new ChatUnitDonationRequestInvalidation(sender_info['user_id'], sender_info['new_tag'] || null);
+    } else if(sender_info['type'] == 'unit_donation') { // a donation to an existing request
+        if(!player.unit_donation_enabled()) { return; }
+        modifier = new ChatUnitDonation(sender_info['user_id'], sender_info['tag'] || null,
+                                        sender_info['cur_space'], sender_info['max_space'],
+                                        sender_info['xp_gained']);
+    }
+
+    if(modifier) {
+        goog.array.forEach(tablist, goog.partial(chat_tab_apply_modifier, modifier));
+        return;
+    }
+
+    // everything below appends a new message
+    goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id));
+}
+
+/** @param {string} channel_name
+    @param {!Object<string,?>} sender_info
+    @param {string} wrapped_body
+    @param {string|null} chat_msg_id
+    @param {!SPUI.Dialog} tab */
+function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, tab) {
+
+    if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
+        if(!player.unit_donation_enabled()) { return; }
+        if(sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
+            return; // request is stale
+        }
+        var tag = sender_info['tag'] || 0;
+
+        if(tag in tab.user_data['unit_donation_requests']) { return; } // already seen (?)
+        var req = tab.user_data['unit_donation_requests'][tag] = {'node':null, // updated below
+                                                                  'callback': null, // updated below
+                                                                  'tag':tag, 'cur_space': sender_info['cur_space'], 'max_space':sender_info['max_space'],
+                                                                  'i_donated':false, 'my_xp': 0, 'dialog': null,
+                                                                  'recipient_id': sender_info['user_id'],
+                                                                  'recipient_fbid': sender_info['facebook_id'],
+                                                                  'recipient_name': sender_info['chat_name']};
+        var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
+        var text;
+        if(req['recipient_id'] == session.user_id) {
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+        } else {
+            var kind = 'you_have_not_donated';
+            req['callback'] = (function (_req) { return function(w, mloc) {
+                change_selection_ui(null);
+                _req['dialog'] = invoke_unit_donation_dialog(_req);
+            }; })(req);
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
+        }
+        req['node'] = tab.widgets['output'].append_text(text);
+        req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
+            delete _tab.user_data['unit_donation_requests'][_req['tag']];
+        }; })(req, tab);
+
+    } else {
+        // normal chat message
+        if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
+           (sender_info['type'] != 'i_got_gagged') &&
+           (channel_name !== 'DEVELOPER')) { return; }
+
+        var body = SPHTTP.unwrap_string(wrapped_body);
+        var props = {};
+
+        if('muted' in sender_info) {
+            props.color = '#ff0000';
+        } else if(channel_name == 'BROADCAST') {
+            props.color = '#ffff00';
+        }
+
+        // check for special message types
+        var template = (sender_info['type'] && (sender_info['type'] in gamedata['strings']['chat_templates']) ? sender_info['type'] : 'default');
+
+        var bb_text = gamedata['strings']['chat_templates'][template];
+
+        // is this text reportable for abuse?
+        // note: for the onclick handlers below to work, report_args must be set up even if it's your own message, or a private channel
+        var report_args;
+        if(chat_msg_id && bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
+           ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
+            report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time'], chat_msg_id);
+        } else {
+            report_args = null;
+        }
+        var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
+
+        var bbcode_click_handlers = goog.object.clone(system_chat_bbcode_click_handlers);
+
+        // special override for player names
+        bbcode_click_handlers['player'] = { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
+            return function(w, mloc) {
+                if(!_suser_id) { return; }
+                var _user_id = parseInt(_suser_id,10);
+                if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
+
+                // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
+                if(!_report_args || (_user_id !== _report_args.user_id)) {
+                    _alliance_id = -1;
+                    _report_args = null;
+                }
+                invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
+            }; }; })(report_args, alliance_id)};
+
+        var base_props = {};
+        if('time' in sender_info) {
+            base_props.tooltip_func = (function (_send_time) { return function() {
+                return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
+            }; })(sender_info['time']);
+        }
+
+        // set up a default onclick handler for the entire blob of text
+        if(report_args) {
+            base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+        }
+
+        // replace alliance chat tag
+        if(bb_text.indexOf('%tag') != -1) {
+            if((channel_name != 'ALLIANCE') && ('alliance_tag' in sender_info) && ('alliance_id' in sender_info) && (sender_info['alliance_id'] >= 0) &&
+               player.get_any_abtest_value('enable_alliance_chat_tags', gamedata['client']['enable_alliance_chat_tags'])) {
+                bb_text = bb_text.replace('%tag', gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', sender_info['alliance_tag']).replace('%alliance_id', sender_info['alliance_id']));
+            } else {
+                bb_text = bb_text.replace('%tag', '');
+            }
+        }
+
+        // replace achievement name template
+        if(bb_text.indexOf('%achievement_name') != -1 && ('achievement_name' in sender_info)) { // check if the template has "%achievement_name in it" AND if the message includes an "achievement_name" property
+
+            // if global option is disabled, or global persist is disabled and message is from before login, do not show the message
+            if(!player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']) ||
+               ((sender_info['time'] < session.connect_time) &&
+                !player.get_any_abtest_value('chat_alliance_achievements_persist', gamedata['chat_alliance_achievements_persist']))) {
+                return; // ignore the message
+            }
+
+            var cheeve = gamedata['achievements'][sender_info['achievement_name']];
+            if(cheeve) {
+                if('chat_announce' in cheeve && !cheeve['chat_announce']) { return; } // disabled for this achievement
+                bb_text = bb_text.replace('%achievement_name', cheeve['ui_name']);
+                bb_text = bb_text.replace('%achievement_id', sender_info['achievement_name']);
+            }
+        }
+
+        // other text replacements
+        goog.object.forEach({'%sender_id': 'user_id',
+                             '%sender_id2': 'user_id',
+                             '%sender_name': 'chat_name',
+                             '%target_id': 'target_user_id',
+                             '%target_name': 'target_chat_name',
+                             '%target_role': 'target_role_ui_name',
+                             '%alliance_id': 'alliance_id',
+                             '%alliance_name': 'alliance_name',
+                             '%alliance_points': 'alliance_points',
+                             '%points_to_win': 'points_to_win',
+                             '%prev_alliance_id': 'prev_alliance_id',
+                             '%prev_alliance_name': 'prev_alliance_name',
+                             '%old_name': 'old_name',
+                             '%region_name': 'region_name',
+                             '%item_name': 'item_name'
+                            }, function(sender_key, repl_key) {
+                                if(bb_text.indexOf(repl_key) != -1 && (sender_key in sender_info)) {
+                                    bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
+                                }
+                            });
+
+        var text = SPText.cstring_to_ablocks_bbcode(bb_text, base_props, bbcode_click_handlers);
+
+        var disp_text, disp_user_data;
+
+        if(gamedata['strings']['chat_templates'][template].indexOf('%body') != -1) {
+            disp_user_data = {'prebody': text, 'unfiltered_body': body,
+                              // for later abuse_violated override
+                              'sender_name': ('chat_name' in sender_info ? SPText.bbcode_quote(sender_info['chat_name']) : 'Unknown')};
+            if(sender_info['home_region']) { disp_user_data['home_region'] = sender_info['home_region']; }
+            disp_text = display_user_chat_body_nodes(disp_user_data);
+        } else {
+            disp_text = text;
+            disp_user_data = null;
+        }
+
+        var node = tab.widgets['output'].append_text(disp_text, disp_user_data);
+        if(chat_msg_id) {
+            tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
+            node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
+                delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
+            }; })(tab, chat_msg_id);
+            if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+                tab.user_data['earliest_id'] = chat_msg_id;
+            }
+        }
+    }
+
+    // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
+    if(sender_info['user_id'] != session.user_id &&
+       !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
+        tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
     }
 }
 
@@ -45196,230 +45432,11 @@ function handle_server_message(data) {
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];
         var sender_info = data[2];
-        var wrapped_body = data[3];
+        var wrapped_body = data[3] || '';
         var chat_msg_id = (data.length >= 5 ? data[4] : null);
 
         if(!global_chat_frame) { return; }
-
-        var tablist = [];
-
-        if(channel_name == 'BROADCAST') {
-            // spam to all open channels
-            for(var i = 0; i < global_chat_frame.data['widgets']['tabs']['array'][0]; i++) {
-                tablist.push(global_chat_frame.widgets['tabs'+i]);
-            }
-        } else if(channel_name in global_chat_frame.user_data['channel_to_tab']) {
-            tablist.push(global_chat_frame.widgets['tabs'+global_chat_frame.user_data['channel_to_tab'][channel_name]]);
-        } else {
-            console.log("cannot find chat tab for channel "+channel_name+"!");
-            return;
-        }
-
-        // some messages modify previous messages instad of appending something new
-        /** @type {ChatModifier|null} */
-        var modifier = null;
-
-        if(sender_info['type'] == 'message_hide') {
-            if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
-            modifier = new ChatHider(sender_info['target_message_id'], sender_info['new_type'] || null);
-        } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
-            if(sender_info['user_id'] == session.user_id) { return; } // don't invalidate own requests
-            modifier = new ChatUnitDonationRequestInvalidation(sender_info['user_id'], sender_info['new_tag'] || null);
-        } else if(sender_info['type'] == 'unit_donation') { // a donation to an existing request
-            if(!player.unit_donation_enabled()) { return; }
-            modifier = new ChatUnitDonation(sender_info['user_id'], sender_info['tag'] || null,
-                                            sender_info['cur_space'], sender_info['max_space'],
-                                            sender_info['xp_gained']);
-        }
-
-        if(modifier) {
-            goog.array.forEach(tablist, goog.partial(chat_tab_apply_modifier, modifier));
-            return;
-        }
-
-        // everything below appends a new message
-
-        if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
-            if(!player.unit_donation_enabled()) { return; }
-            if(sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
-                return; // request is stale
-            }
-            var tag = sender_info['tag'] || 0;
-            goog.array.forEach(tablist, function(tab) {
-                if(tag in tab.user_data['unit_donation_requests']) { return; } // already seen (?)
-                var req = tab.user_data['unit_donation_requests'][tag] = {'node':null, // updated below
-                                                                          'callback': null, // updated below
-                                                                          'tag':tag, 'cur_space': sender_info['cur_space'], 'max_space':sender_info['max_space'],
-                                                                          'i_donated':false, 'my_xp': 0, 'dialog': null,
-                                                                          'recipient_id': sender_info['user_id'],
-                                                                          'recipient_fbid': sender_info['facebook_id'],
-                                                                          'recipient_name': sender_info['chat_name']};
-                var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
-                var text;
-                if(req['recipient_id'] == session.user_id) {
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
-                } else {
-                    var kind = 'you_have_not_donated';
-                    req['callback'] = (function (_req) { return function(w, mloc) {
-                        change_selection_ui(null);
-                        _req['dialog'] = invoke_unit_donation_dialog(_req);
-                    }; })(req);
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
-                }
-                req['node'] = tab.widgets['output'].append_text(text);
-                req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
-                    delete _tab.user_data['unit_donation_requests'][_req['tag']];
-                }; })(req, tab);
-            });
-
-        } else {
-            // normal chat message
-            if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
-               (sender_info['type'] != 'i_got_gagged') &&
-               (channel_name != 'DEVELOPER')) { return; }
-
-            var body = SPHTTP.unwrap_string(wrapped_body);
-            var props = {};
-
-            if('muted' in sender_info) {
-                props.color = '#ff0000';
-            } else if(channel_name == 'BROADCAST') {
-                props.color = '#ffff00';
-            }
-
-            // check for special message types
-            var template = (sender_info['type'] && (sender_info['type'] in gamedata['strings']['chat_templates']) ? sender_info['type'] : 'default');
-
-            var bb_text = gamedata['strings']['chat_templates'][template];
-
-            // is this text reportable for abuse?
-            // note: for the onclick handlers below to work, report_args must be set up even if it's your own message, or a private channel
-            var report_args;
-            if(bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
-               ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
-                report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time'], chat_msg_id);
-            } else {
-                report_args = null;
-            }
-            var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
-
-            var bbcode_click_handlers = goog.object.clone(system_chat_bbcode_click_handlers);
-
-            // special override for player names
-            bbcode_click_handlers['player'] = { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
-                return function(w, mloc) {
-                    if(!_suser_id) { return; }
-                    var _user_id = parseInt(_suser_id,10);
-                    if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
-
-                    // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
-                    if(!_report_args || (_user_id !== _report_args.user_id)) {
-                        _alliance_id = -1;
-                        _report_args = null;
-                    }
-                    invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
-                }; }; })(report_args, alliance_id)};
-
-            var base_props = {};
-            if('time' in sender_info) {
-                base_props.tooltip_func = (function (_send_time) { return function() {
-                    return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
-                }; })(sender_info['time']);
-            }
-
-            // set up a default onclick handler for the entire blob of text
-            if(report_args) {
-                base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
-            }
-
-            // replace alliance chat tag
-            if(bb_text.indexOf('%tag') != -1) {
-                if((channel_name != 'ALLIANCE') && ('alliance_tag' in sender_info) && ('alliance_id' in sender_info) && (sender_info['alliance_id'] >= 0) &&
-                   player.get_any_abtest_value('enable_alliance_chat_tags', gamedata['client']['enable_alliance_chat_tags'])) {
-                    bb_text = bb_text.replace('%tag', gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', sender_info['alliance_tag']).replace('%alliance_id', sender_info['alliance_id']));
-                } else {
-                    bb_text = bb_text.replace('%tag', '');
-                }
-            }
-
-            // replace achievement name template
-            if(bb_text.indexOf('%achievement_name') != -1 && ('achievement_name' in sender_info)) { // check if the template has "%achievement_name in it" AND if the message includes an "achievement_name" property
-
-                // if global option is disabled, or global persist is disabled and message is from before login, do not show the message
-                if(!player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']) ||
-                   ((sender_info['time'] < session.connect_time) &&
-                    !player.get_any_abtest_value('chat_alliance_achievements_persist', gamedata['chat_alliance_achievements_persist']))) {
-                    return; // ignore the message
-                }
-
-                var cheeve = gamedata['achievements'][sender_info['achievement_name']];
-                if(cheeve) {
-                    if('chat_announce' in cheeve && !cheeve['chat_announce']) { return; } // disabled for this achievement
-                    bb_text = bb_text.replace('%achievement_name', cheeve['ui_name']);
-                    bb_text = bb_text.replace('%achievement_id', sender_info['achievement_name']);
-                }
-            }
-
-            // other text replacements
-            goog.object.forEach({'%sender_id': 'user_id',
-                                 '%sender_id2': 'user_id',
-                                 '%sender_name': 'chat_name',
-                                 '%target_id': 'target_user_id',
-                                 '%target_name': 'target_chat_name',
-                                 '%target_role': 'target_role_ui_name',
-                                 '%alliance_id': 'alliance_id',
-                                 '%alliance_name': 'alliance_name',
-                                 '%alliance_points': 'alliance_points',
-                                 '%points_to_win': 'points_to_win',
-                                 '%prev_alliance_id': 'prev_alliance_id',
-                                 '%prev_alliance_name': 'prev_alliance_name',
-                                 '%old_name': 'old_name',
-                                 '%region_name': 'region_name',
-                                 '%item_name': 'item_name'
-                                }, function(sender_key, repl_key) {
-                if(bb_text.indexOf(repl_key) != -1 && (sender_key in sender_info)) {
-                    bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
-                }
-                                });
-
-            var text = SPText.cstring_to_ablocks_bbcode(bb_text, base_props, bbcode_click_handlers);
-
-            var disp_text, disp_user_data;
-
-            if(gamedata['strings']['chat_templates'][template].indexOf('%body') != -1) {
-                disp_user_data = {'prebody': text, 'unfiltered_body': body,
-                                  // for later abuse_violated override
-                                  'sender_name': ('chat_name' in sender_info ? SPText.bbcode_quote(sender_info['chat_name']) : 'Unknown')};
-                if(sender_info['home_region']) { disp_user_data['home_region'] = sender_info['home_region']; }
-                disp_text = display_user_chat_body_nodes(disp_user_data);
-            } else {
-                disp_text = text;
-                disp_user_data = null;
-            }
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                var node = tab.widgets['output'].append_text(disp_text, disp_user_data);
-                if(chat_msg_id) {
-                    tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
-                    node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
-                        delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
-                    }; })(tab, chat_msg_id);
-                    if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
-                        tab.user_data['earliest_id'] = chat_msg_id;
-                    }
-                }
-            }
-        }
-
-        // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
-        if(sender_info['user_id'] != session.user_id &&
-           !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
-            }
-        }
+        chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id);
 
     } else if(msg == "DONATE_UNITS_RESULT") {
         var success = data[1], error_reason = data[2];
