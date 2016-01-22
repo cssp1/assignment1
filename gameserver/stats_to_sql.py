@@ -233,9 +233,20 @@ if __name__ == '__main__':
                             seg = "IF(townhall_level=%d, %s, " % (i, seg)
                         func += seg
                     func += ")" * (townhall_levels-1)
-                    if verbose: print res+'_value =', func
                 else:
                     raise Exception('value formula not implemented for resource '+res)
+
+                # adjust iron/water value for payer/nonpayer status
+                # (nonpayers value X units of basic resources much less than payers)
+                # this is an empirical observation based on how nonpayers on average have much higher
+                # combat skill and can get large amounts of resources easily through battle.
+                # 0-9.99: 0.20x (0.15x DV 0.25x TR)
+                # 10.0-100.00: 0.66x
+                # 100.01+: 1.0x
+                if res in ('iron','water'):
+                    func = "IF(prev_receipts>100,1.0,IF(prev_receipts>=10,0.66,0.20))*"+func
+
+                if verbose: print res+'_value =', func
 
                 cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
                 cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
