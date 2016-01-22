@@ -14697,10 +14697,14 @@ function publish_ai_base(base) { manipulate_ai_base(base, "PUBLISH_AI_BASE", "pu
     a previous message (e.g. to hide it or update a unit donation request).
     Encapsulate the necessary modifications here.
     @constructor
+    @param {number} mod_time
+    @param {string|null} mod_message_id
     @param {string|null} target_message_id
     @param {string|null} target_unit_donation_tag
     @param {number|null} target_unit_donation_recipient_id */
-var ChatModifier = function(target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id) {
+var ChatModifier = function(mod_time, mod_message_id, target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id) {
+    this.mod_time = mod_time;
+    this.mod_message_id = mod_message_id;
     this.target_message_id = target_message_id;
     this.target_unit_donation_tag = target_unit_donation_tag;
     this.target_unit_donation_recipient_id = target_unit_donation_recipient_id;
@@ -14710,12 +14714,32 @@ var ChatModifier = function(target_message_id, target_unit_donation_tag, target_
     @param {!SPUI.TextNode} node - text node */
 ChatModifier.prototype.apply = goog.abstractMethod;
 
+/** Comparison operator for keeping modifiers in time-sorted order
+    @param {!ChatModifier} a
+    @param {!ChatModifier} b
+    @return {number} */
+ChatModifier.compare = function(a,b) {
+    if(a.mod_time < b.mod_time) {
+        return -1;
+    } else if(a.mod_time > b.mod_time) {
+        return 1;
+    } else if(a.mod_message_id < b.mod_message_id) {
+        return -1;
+    } else if(b.mod_message_id > a.mod_message_id) {
+        return 1;
+    } else {
+        return 0;
+    }
+};
+
 /** @constructor
     @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
     @param {string} target_message_id
     @param {string|null} new_type */
-var ChatHider = function(target_message_id, new_type) {
-    goog.base(this, target_message_id, null, null);
+var ChatHider = function(mod_time, mod_message_id, target_message_id, new_type) {
+    goog.base(this, mod_time, mod_message_id, target_message_id, null, null);
     this.new_type = new_type;
 };
 goog.inherits(ChatHider, ChatModifier);
@@ -14731,13 +14755,15 @@ ChatHider.prototype.apply = function(output, req, node) {
 
 /** @constructor
     @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
     @param {number} sender_user_id
     @param {string|null} tag
     @param {number} cur_space
     @param {number} max_space
     @param {number} xp_gained */
-var ChatUnitDonation = function(sender_user_id, tag, cur_space, max_space, xp_gained) {
-    goog.base(this, null, tag, null);
+var ChatUnitDonation = function(mod_time, mod_message_id, sender_user_id, tag, cur_space, max_space, xp_gained) {
+    goog.base(this, mod_time, mod_message_id, null, tag, null);
     this.sender_user_id = sender_user_id;
     this.cur_space = cur_space;
     this.max_space = max_space;
@@ -14771,10 +14797,12 @@ ChatUnitDonation.prototype.apply = function(output, req, node) {
 
 /** @constructor
     @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
     @param {number} sender_user_id
     @param {string|null} new_tag */
-var ChatUnitDonationRequestInvalidation = function(sender_user_id, new_tag) {
-    goog.base(this, null, null, sender_user_id);
+var ChatUnitDonationRequestInvalidation = function(mod_time, mod_message_id, sender_user_id, new_tag) {
+    goog.base(this, mod_time, mod_message_id, null, null, sender_user_id);
     this.new_tag = new_tag;
 };
 goog.inherits(ChatUnitDonationRequestInvalidation, ChatModifier);
@@ -14797,13 +14825,13 @@ ChatUnitDonationRequestInvalidation.prototype.apply = function(output, req, node
 };
 
 /** @param {!ChatModifier} modifier
-    @param {!SPUI.Dialog} tab
-    @return {boolean} persist after this? */
+    @param {!SPUI.Dialog} tab */
 function chat_tab_apply_modifier(modifier, tab) {
+    var persist = false; // whether we need to keep this modifier for use against any upcoming prepended messages
+
     if(modifier.target_message_id && modifier.target_message_id in tab.user_data['chat_messages_by_id']) {
         var node = tab.user_data['chat_messages_by_id'][modifier.target_message_id];
         modifier.apply(tab.widgets['output'], null, node);
-        return false; // done
     } else if(modifier.target_unit_donation_recipient_id) {
         // call on all outstanding requests for this recipient
         // note: only used for invalidations
@@ -14812,21 +14840,34 @@ function chat_tab_apply_modifier(modifier, tab) {
                 modifier.apply(tab.widgets['output'], req, req['node'] || null);
             }
         });
-        return true; // always persist
+        persist = true; // always persist
     } else if(modifier.target_unit_donation_tag && modifier.target_unit_donation_tag in tab.user_data['unit_donation_requests']) {
         var req = tab.user_data['unit_donation_requests'][modifier.target_unit_donation_tag];
         modifier.apply(tab.widgets['output'], req, req['node'] || null);
-        return false; // done
+    } else {
+        persist = true; // haven't seen the target yet
     }
-    return true; // persist
+
+    var index = goog.array.binarySearch(tab.user_data['pending_modifiers'], modifier, ChatModifier.compare);
+    if(persist) {
+        if(index < 0) { // add persistence
+            // keep sorted
+            goog.array.binaryInsert(tab.user_data['pending_modifiers'], modifier, ChatModifier.compare);
+        }
+    } else {
+        if(index >= 0) { // remove persistence
+            tab.user_data['pending_modifiers'].splice(index, 1);
+        }
+    }
 }
 
 /** @param {!SPUI.Dialog} dialog
     @param {string} channel_name
     @param {!Object<string,?>} sender_info
     @param {string} wrapped_body
-    @param {string|null} chat_msg_id */
-function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_body, chat_msg_id) {
+    @param {string|null} chat_msg_id
+    @param {boolean} is_prepend */
+function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend) {
     /** @type {Array<!SPUI.Dialog>} */
     var tablist = [];
 
@@ -14848,13 +14889,16 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
 
     if(sender_info['type'] == 'message_hide') {
         if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
-        modifier = new ChatHider(sender_info['target_message_id'], sender_info['new_type'] || null);
+        modifier = new ChatHider(sender_info['time']||0, chat_msg_id,
+                                 sender_info['target_message_id'], sender_info['new_type'] || null);
     } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
         if(sender_info['user_id'] == session.user_id) { return; } // don't invalidate own requests
-        modifier = new ChatUnitDonationRequestInvalidation(sender_info['user_id'], sender_info['new_tag'] || null);
+        modifier = new ChatUnitDonationRequestInvalidation(sender_info['time']||0, chat_msg_id,
+                                                           sender_info['user_id'], sender_info['new_tag'] || null);
     } else if(sender_info['type'] == 'unit_donation') { // a donation to an existing request
         if(!player.unit_donation_enabled()) { return; }
-        modifier = new ChatUnitDonation(sender_info['user_id'], sender_info['tag'] || null,
+        modifier = new ChatUnitDonation(sender_info['time']||0, chat_msg_id,
+                                        sender_info['user_id'], sender_info['tag'] || null,
                                         sender_info['cur_space'], sender_info['max_space'],
                                         sender_info['xp_gained']);
     }
@@ -14864,16 +14908,17 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
         return;
     }
 
-    // everything below appends a new message
-    goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id));
+    // everything below adds a new message
+    goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend||false));
 }
 
 /** @param {string} channel_name
     @param {!Object<string,?>} sender_info
     @param {string} wrapped_body
     @param {string|null} chat_msg_id
+    @param {boolean} is_prepend
     @param {!SPUI.Dialog} tab */
-function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, tab) {
+function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend, tab) {
 
     if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
         if(!player.unit_donation_enabled()) { return; }
@@ -14902,7 +14947,11 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             }; })(req);
             text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
         }
-        req['node'] = tab.widgets['output'].append_text(text);
+        if(is_prepend) {
+            req['node'] = tab.widgets['output'].prepend_text(text);
+        } else {
+            req['node'] = tab.widgets['output'].append_text(text);
+        }
         req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
             delete _tab.user_data['unit_donation_requests'][_req['tag']];
         }; })(req, tab);
@@ -15010,7 +15059,8 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                              '%prev_alliance_name': 'prev_alliance_name',
                              '%old_name': 'old_name',
                              '%region_name': 'region_name',
-                             '%item_name': 'item_name'
+                             '%item_name': 'item_name',
+                             '%channel_name': 'channel_name'
                             }, function(sender_key, repl_key) {
                                 if(bb_text.indexOf(repl_key) != -1 && (sender_key in sender_info)) {
                                     bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
@@ -15032,7 +15082,12 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             disp_user_data = null;
         }
 
-        var node = tab.widgets['output'].append_text(disp_text, disp_user_data);
+        var node;
+        if(is_prepend) {
+            node = tab.widgets['output'].prepend_text(disp_text, disp_user_data);
+        } else {
+            node = tab.widgets['output'].append_text(disp_text, disp_user_data);
+        }
         if(chat_msg_id) {
             tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
             node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
@@ -15042,12 +15097,21 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                 tab.user_data['earliest_id'] = chat_msg_id;
             }
         }
+        tab.user_data['earliest_timestamp'] = Math.min(tab.user_data['earliest_timestamp'], sender_info['time']);
     }
 
     // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
     if(sender_info['user_id'] != session.user_id &&
        !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
         tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
+    }
+
+    // see if any pending modifiers want to work on this message
+    if(is_prepend) {
+        // copy since the list may mutate
+        goog.array.forEach(goog.array.clone(tab.user_data['pending_modifiers']), function(mod) {
+            chat_tab_apply_modifier(mod, tab);
+        });
     }
 }
 
@@ -15231,6 +15295,8 @@ function update_chat_frame(dialog) {
         dialog.widgets['tab_jewel'+i].user_data['text'] = (unseen ? '!' : null);
         any_unseen |= unseen;
 
+        tab.widgets['loading_spinner'].show = (!!tab.widgets['output'].getmore_pending && (dialog.user_data['size'] == 'big'));
+
         // update state of Reinforcements button
         tab.widgets['request_donation_button'].show = ((dialog.user_data['size'] == 'big') && (channel_name=='ALLIANCE') && player.unit_donation_enabled());
 
@@ -15295,6 +15361,8 @@ function update_chat_frame(dialog) {
     }
 }
 
+var chat_getmore_receiver = new goog.events.EventTarget();
+
 function init_chat_frame() {
     var dialog_data = gamedata['dialogs']['chat_frame2'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -15342,10 +15410,28 @@ function init_chat_frame() {
         tab.user_data['last_timestamp'] = 0;
         tab.user_data['unit_donation_requests'] = {};
         tab.user_data['chat_messages_by_id'] = {};
+        tab.user_data['pending_modifiers'] = []; // for prepended text
         tab.user_data['earliest_id'] = null;
+        tab.user_data['earliest_timestamp'] = Infinity;
         var invert = !!tab.data['widgets']['output']['invert'];
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
+        tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
+            var tab = w.parent;
+            var tag = 'cgm'+(last_query_tag++).toString();
+            chat_getmore_receiver.listenOnce(tag, (function (_tab) { return function(event) {
+                goog.array.forEach(event.response, function(data) {
+                    var channel_name = data[1];
+                    var sender_info = data[2];
+                    var wrapped_body = data[3] || '';
+                    var chat_msg_id = data[4];
+                    var is_prepend = data[5];
+                    chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend);
+                });
+                tab.widgets['output'].getmore_responded(event.is_final);
+            }; })(tab));
+            send_to_server.func(["CHAT_GETMORE", tab.user_data['channel_name'], tab.user_data['earliest_timestamp']+60 /* fudge time */, tab.user_data['earliest_id'], tag]);
+        } : null);
         tab.widgets['output'].update_text();
         tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
         tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
@@ -45433,11 +45519,14 @@ function handle_server_message(data) {
         var channel_name = data[1];
         var sender_info = data[2];
         var wrapped_body = data[3] || '';
-        var chat_msg_id = (data.length >= 5 ? data[4] : null);
+        var chat_msg_id = data[4];
+        var is_prepend = data[5];
 
         if(!global_chat_frame) { return; }
-        chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id);
-
+        chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend);
+    } else if(msg == "CHAT_GETMORE_RESULT") {
+        var request_tag = data[1], response = data[2], is_final = data[3];
+        chat_getmore_receiver.dispatchEvent({type: request_tag, response: response, is_final: is_final});
     } else if(msg == "DONATE_UNITS_RESULT") {
         var success = data[1], error_reason = data[2];
         var dialog = find_dialog('unit_donation_dialog');

@@ -3238,6 +3238,22 @@ SPUI.ScrollingTextField.prototype.append_text = function(text, user_data) {
     return node;
 };
 
+/** @param {Array.<SPText.ABlock>} text
+    @param {Object=} user_data */
+SPUI.ScrollingTextField.prototype.prepend_text = function(text, user_data) {
+    if(this.max_lines >= 0 && this.buffer.length >= this.max_lines) {
+        return null; // no room in buffer
+    }
+
+    // make new element
+    var node = new SPUI.TextNode();
+    node.text = text;
+    if(user_data) { node.user_data = user_data; }
+    this.buffer.unshift(node);
+    this.update_text();
+    return node;
+};
+
 /** @param {Array.<Array.<SPText.ABlock>>} text_list
     @param {Array.<Object?>=} user_data_list */
 SPUI.ScrollingTextField.prototype.prepend_text_batch = function(text_list, user_data_list) {
@@ -3491,6 +3507,9 @@ SPUI.ScrollingTextField.prototype.scroll_up = function() {
             this.update_text();
         } else if(this.getmore_cb && !this.getmore_final && !this.getmore_pending) { // getmore
             this.getmore_pending = true;
+            if(this.scroll_up_button) {
+                this.scroll_up_button.state = 'disabled';
+            }
             this.getmore_cb(this);
         }
     }

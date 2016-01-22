@@ -805,19 +805,24 @@ class NoSQLClient (object):
             row['sender']['time'] = row['time']
         return row
 
-    def chat_catchup(self, channel, start_time = -1, end_time = -1, skip = 0, limit = -1, reason=''):
-        return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,skip,limit))
-    def _chat_catchup(self, channel, start_time, end_time, skip, limit):
+    CHAT_NEWEST_FIRST = -1
+    CHAT_OLDEST_FIRST = 1
+    def chat_catchup(self, channel, start_time = -1, end_time = -1, end_msg_id = None, skip = 0, limit = -1, order = CHAT_OLDEST_FIRST, reason=''):
+        return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,end_msg_id,skip,limit,order))
+    def _chat_catchup(self, channel, start_time, end_time, end_msg_id, skip, limit, order):
         props = {'channel':channel}
         if start_time > 0 or end_time > 0:
             props['time'] = {}
             if start_time > 0: props['time']['$gte'] = start_time
             if end_time > 0: props['time']['$lt'] = end_time
-        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING)])
+        if end_msg_id:
+            props['_id'] = {'$lt': self.encode_object_id(end_msg_id)}
+        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING),('_id',pymongo.DESCENDING)])
         if skip > 0: cur = cur.skip(skip)
         if limit > 0: cur = cur.limit(limit)
         ret = map(self.decode_chat_row, cur)
-        ret.reverse() # oldest messages first
+        if order == self.CHAT_OLDEST_FIRST:
+            ret.reverse() # oldest messages first
         return ret
 
     # retrieve up to 2*limit messages sent around center_time +/- time_limit

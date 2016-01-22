@@ -249,6 +249,8 @@
         "enable_alliance_role_gui": 1,
         "enable_alliance_battle_history": 1,
 
+        "enable_chat_getmore": 0, // enable loading previous chat messages from database
+
         "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
             {"predicate": "LIBRARY", "name": "quarry_requirement"},
             {"predicate":"HOME_REGION", "regions": ["ANY"]}]}, "REGION"],

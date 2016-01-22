@@ -3515,9 +3515,37 @@ class Session(object):
                 self.alliance_id_cache = -1; self.alliance_membership_cache = None
         return self.alliance_info_cache, self.alliance_membership_cache
 
+    # client uses generic chat channel names - translate to/from internal names
+    def decode_chat_channel_name(self, channel):
+        if channel == 'GLOBAL' and self.global_chat_channel:
+            return self.global_chat_channel
+        elif channel == 'REGION' and self.region_chat_channel:
+            return self.region_chat_channel
+        elif channel == 'ALLIANCE' and self.alliance_chat_channel:
+            return self.alliance_chat_channel
+        elif channel == 'DEVELOPER' and self.player.is_developer():
+            return channel
+        return None
+    def encode_chat_channel_name(self, channel):
+        if channel == self.global_chat_channel:
+            return 'GLOBAL'
+        elif channel == self.alliance_chat_channel:
+            return 'ALLIANCE'
+        elif channel == self.region_chat_channel:
+            return 'REGION'
+        return channel
+
     def do_chat_catchup(self, true_channel, retmsg):
-        for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory']):
+        for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory'], reason='catchup'):
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
+    def do_chat_getmore(self, true_channel, end_time, end_msg_id, retmsg):
+        msg_list = gamesite.nosql_client.chat_catchup(true_channel, end_time = end_time, end_msg_id = end_msg_id,
+                                                      order = SpinNoSQL.NoSQLClient.CHAT_NEWEST_FIRST,
+                                                      limit = gamedata['server']['chat_memory'],
+                                                      reason = 'getmore')
+        for x in msg_list:
+            self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg, is_prepend = True)
+        return len(msg_list) < gamedata['server']['chat_memory'] # is_final
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:
@@ -3923,20 +3951,15 @@ class Session(object):
                 gamesite.gameapi.complete_longpoll(request, self)
 
     # function for sending chat messages to the client
-    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None):
+    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None, is_prepend = False):
         if (not force) and (not self.user.chat_can_interact()):
             return
         # map channel
-        if channel == self.global_chat_channel:
-            channel = 'GLOBAL'
-        elif channel == self.alliance_chat_channel:
-            channel = 'ALLIANCE'
-        elif channel == self.region_chat_channel:
-            channel = 'REGION'
+        channel = self.encode_chat_channel_name(channel)
 
         # hide sender fields that clients should not know about (_sum table dimensions)
         sender_info_clean = dict((k,v) for k,v in sender_info.iteritems() if not k.startswith('_'))
-        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id]
+        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id, is_prepend]
         if retmsg is not None:
             retmsg.append(msg)
         else:
@@ -24964,6 +24987,16 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["QUERY_SCORE_LEADERS_RESULT", arg[1], period, result, tag])
 
+        elif arg[0] == "CHAT_GETMORE":
+            channel = arg[1]
+            end_time = arg[2]
+            end_msg_id = arg[3]
+            request_tag = arg[4]
+            # note: collect response manually, not in retmsg
+            response = []
+            is_final = session.do_chat_getmore(session.decode_chat_channel_name(channel), end_time, end_msg_id, response)
+            retmsg.append(["CHAT_GETMORE_RESULT", request_tag, response, is_final])
+
         elif arg[0] == "CHAT_SEND":
             channel = arg[1]
             text = SpinHTTP.unwrap_string(arg[2]).strip()
@@ -24979,7 +25012,7 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server'].get('log_ugly_chat', True):
                     gamesite.exception_log.event(server_time, 'Player %d stopped from sending ugly chat message: %r' % (session.player.user_id, text))
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None, False])
                 return
 
             success = True
@@ -24994,29 +25027,20 @@ class GAMEAPI(resource.Resource):
             if togo > 0:
                 success = False
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None, False])
 
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
             if success:
                 session.player.cooldown_trigger('CHAT_SEND', gamedata['chat_spam_cooldown'], add_stack = 1)
 
-                bypass_gag = True
+                bypass_gag = (channel not in ('GLOBAL','REGION'))
 
                 session.activity_classifier.sent_chat_message(channel)
 
                 # remap channel name from generic client-side names to specific server-side names
-                if channel == 'GLOBAL' and session.global_chat_channel:
-                    channel = session.global_chat_channel
-                    bypass_gag = False
-                elif channel == 'REGION' and session.region_chat_channel:
-                    channel = session.region_chat_channel
-                    bypass_gag = False
-                elif channel == 'ALLIANCE' and session.alliance_chat_channel:
-                    channel = session.alliance_chat_channel
-                elif channel == 'DEVELOPER' and session.player.is_developer():
-                    pass
-                else:
+                channel = session.decode_chat_channel_name(channel)
+                if not channel:
                     retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
                     return
 
