@@ -14693,6 +14693,128 @@ function load_ai_base(base) { manipulate_ai_base(base, "LOAD_AI_BASE", "loading"
 function save_ai_base(base) { flush_dirty_objects({}); manipulate_ai_base(base, "SAVE_AI_BASE", "saving"); }
 function publish_ai_base(base) { manipulate_ai_base(base, "PUBLISH_AI_BASE", "publishing"); }
 
+/** Sometimes chat messages from the server call for a modification to
+    a previous message (e.g. to hide it or update a unit donation request).
+    Encapsulate the necessary modifications here.
+    @constructor
+    @param {string|null} target_message_id
+    @param {string|null} target_unit_donation_tag
+    @param {number|null} target_unit_donation_recipient_id */
+var ChatModifier = function(target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id) {
+    this.target_message_id = target_message_id;
+    this.target_unit_donation_tag = target_unit_donation_tag;
+    this.target_unit_donation_recipient_id = target_unit_donation_recipient_id;
+};
+/** @param {!SPUI.ScrollingTextField} output - widget containing the text node
+    @param {!Object<string,?>|null} req - unit_donation_request entry from user_data of chat tab
+    @param {!SPUI.TextNode} node - text node */
+ChatModifier.prototype.apply = goog.abstractMethod;
+
+/** @constructor
+    @extends ChatModifier
+    @param {string} target_message_id
+    @param {string|null} new_type */
+var ChatHider = function(target_message_id, new_type) {
+    goog.base(this, target_message_id, null, null);
+    this.new_type = new_type;
+};
+goog.inherits(ChatHider, ChatModifier);
+/** @override */
+ChatHider.prototype.apply = function(output, req, node) {
+    // revise, or just delete the message?
+    if(this.new_type && node.user_data && (this.new_type in gamedata['strings']['chat_templates'])) {
+        output.revise_text(node, SPText.cstring_to_ablocks_bbcode(gamedata['strings']['chat_templates'][this.new_type].replace('%sender_name', node.user_data['sender_name'])));
+    } else {
+        output.remove_text(node);
+    }
+};
+
+/** @constructor
+    @extends ChatModifier
+    @param {number} sender_user_id
+    @param {string|null} tag
+    @param {number} cur_space
+    @param {number} max_space
+    @param {number} xp_gained */
+var ChatUnitDonation = function(sender_user_id, tag, cur_space, max_space, xp_gained) {
+    goog.base(this, null, tag, null);
+    this.sender_user_id = sender_user_id;
+    this.cur_space = cur_space;
+    this.max_space = max_space;
+    this.xp_gained = xp_gained;
+};
+goog.inherits(ChatUnitDonation, ChatModifier);
+/** @override */
+ChatUnitDonation.prototype.apply = function(output, req, node) {
+    if(this.sender_user_id === session.user_id) {
+        req['i_donated'] = true;
+        req['my_xp'] += this.xp_gained;
+    }
+
+    req['cur_space'] = this.cur_space;
+    req['max_space'] = this.max_space;
+
+    if(req['dialog']) { update_unit_donation_dialog(req['dialog']); }
+
+    var pct = (100.0*(this.cur_space/this.max_space)).toFixed(0);
+    var text;
+
+    if(req['recipient_id'] === session.user_id) {
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+    } else {
+        var kind = (req['i_donated'] ? 'you_have_donated' : 'you_have_not_donated');
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), req['callback'] ? {onclick:req['callback']} : null);
+    }
+
+    output.revise_text(node, text);
+};
+
+/** @constructor
+    @extends ChatModifier
+    @param {number} sender_user_id
+    @param {string|null} new_tag */
+var ChatUnitDonationRequestInvalidation = function(sender_user_id, new_tag) {
+    goog.base(this, null, null, sender_user_id);
+    this.new_tag = new_tag;
+};
+goog.inherits(ChatUnitDonationRequestInvalidation, ChatModifier);
+/** @override */
+ChatUnitDonationRequestInvalidation.prototype.apply = function(output, req, node) {
+    // do not apply invalidation to request matching the new_tag value - this can happen if
+    // the chat buffer re-orders the two messages that are sent with the same "time" value
+    if(req['tag'] !== this.new_tag) {
+        req['cur_space'] = req['max_space'];
+        if(node) {
+            var new_template = gamedata['strings']['unit_donation_chat']['other']['stale'];
+            if(new_template) {
+                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
+                output.revise_text(node, text);
+            } else {
+                output.remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
+            }
+        }
+    }
+};
+
+/** @param {!ChatModifier} modifier
+    @param {!SPUI.Dialog} tab */
+function chat_tab_apply_modifier(modifier, tab) {
+    if(modifier.target_message_id && modifier.target_message_id in tab.user_data['chat_messages_by_id']) {
+        var node = tab.user_data['chat_messages_by_id'][modifier.target_message_id];
+        modifier.apply(tab.widgets['output'], null, node);
+    } else if(modifier.target_unit_donation_recipient_id) {
+        // call on all outstanding requests for this recipient
+        goog.array.forEach(goog.object.getValues(tab.user_data['unit_donation_requests']), function(req) {
+            if(req['recipient_id'] === modifier.target_unit_donation_recipient_id) {
+                modifier.apply(tab.widgets['output'], req, req['node'] || null);
+            }
+        });
+    } else if(modifier.target_unit_donation_tag && modifier.target_unit_donation_tag in tab.user_data['unit_donation_requests']) {
+        var req = tab.user_data['unit_donation_requests'][modifier.target_unit_donation_tag];
+        modifier.apply(tab.widgets['output'], req, req['node'] || null);
+    }
+}
+
 function change_chat_tab(dialog, new_tab) {
     if(!new_tab) {
         // pick a default
@@ -45093,114 +45215,62 @@ function handle_server_message(data) {
             return;
         }
 
+        // some messages modify previous messages instad of appending something new
+        /** @type {ChatModifier|null} */
+        var modifier = null;
+
         if(sender_info['type'] == 'message_hide') {
             if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
-            goog.array.forEach(tablist, function(tab) {
-                if(sender_info['target_message_id'] in tab.user_data['chat_messages_by_id']) {
-                    var node = tab.user_data['chat_messages_by_id'][sender_info['target_message_id']];
-
-                    // revise, or just delete the message?
-                    var new_type = sender_info['new_type'] || null;
-                    if(new_type && node.user_data && (new_type in gamedata['strings']['chat_templates'])) {
-                        tab.widgets['output'].revise_text(node, SPText.cstring_to_ablocks_bbcode(gamedata['strings']['chat_templates'][new_type].replace('%sender_name', node.user_data['sender_name'])));
-                    } else {
-                        tab.widgets['output'].remove_text(node);
-                    }
-                }
-            });
+            modifier = new ChatHider(sender_info['target_message_id'], sender_info['new_type'] || null);
         } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
-            if(sender_info['user_id'] == session.user_id) { return; }
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                // invalidate any outstanding requests on this recipient_id
-                for(var t in tab.user_data['unit_donation_requests']) {
-                    var req = tab.user_data['unit_donation_requests'][t];
-                    if(req['recipient_id'] === sender_info['user_id'] &&
-                       // do not apply invalidation to request with the new_tag value - this can happen if
-                       // the chat buffer re-orders the two messages that are sent with the same "time" value
-                       (!('new_tag' in sender_info) || req['tag'] !== sender_info['new_tag'])) {
-                        req['cur_space'] = req['max_space'];
-                        var node = req['node'];
-                        if(node) {
-                            var new_template = gamedata['strings']['unit_donation_chat']['other']['stale'];
-                            if(new_template) {
-                                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
-                                tab.widgets['output'].revise_text(node, text);
-                            } else {
-                                tab.widgets['output'].remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
-                            }
-                        }
-                    }
-                }
-            }
-            return;
-
-        } else if(sender_info['type'] == 'unit_donation_request' ||
-                  sender_info['type'] == 'unit_donation') {
+            if(sender_info['user_id'] == session.user_id) { return; } // don't invalidate own requests
+            modifier = new ChatUnitDonationRequestInvalidation(sender_info['user_id'], sender_info['new_tag'] || null);
+        } else if(sender_info['type'] == 'unit_donation') { // a donation to an existing request
             if(!player.unit_donation_enabled()) { return; }
+            modifier = new ChatUnitDonation(sender_info['user_id'], sender_info['tag'] || null,
+                                            sender_info['cur_space'], sender_info['max_space'],
+                                            sender_info['xp_gained']);
+        }
 
-            if(sender_info['type'] == 'unit_donation_request' && sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
+        if(modifier) {
+            goog.array.forEach(tablist, goog.partial(chat_tab_apply_modifier, modifier));
+            return;
+        }
+
+        // everything below appends a new message
+
+        if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
+            if(!player.unit_donation_enabled()) { return; }
+            if(sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
                 return; // request is stale
             }
-
-            // handle unit donation messages
             var tag = sender_info['tag'] || 0;
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-
-                // search for existing request, or add new one if not found
-                var req, node;
-
-                if(tag in tab.user_data['unit_donation_requests']) {
-                    req = tab.user_data['unit_donation_requests'][tag];
-                    node = req['node'];
-                    if(sender_info['type'] == 'unit_donation' && sender_info['user_id'] == session.user_id) {
-                        req['i_donated'] = true;
-                        req['my_xp'] += sender_info['xp_gained'];
-                    }
-                } else if(sender_info['type'] == 'unit_donation_request') {
-                    node = tab.widgets['output'].append_text(SPText.cstring_to_ablocks(''));
-                    req = tab.user_data['unit_donation_requests'][tag] = {'node':node,
-                                                                          'tag':tag, 'cur_space':0, 'max_space':0,
+            goog.array.forEach(tablist, function(tab) {
+                if(tag in tab.user_data['unit_donation_requests']) { return; } // already seen (?)
+                var req = tab.user_data['unit_donation_requests'][tag] = {'node':null, // updated below
+                                                                          'callback': null, // updated below
+                                                                          'tag':tag, 'cur_space': sender_info['cur_space'], 'max_space':sender_info['max_space'],
                                                                           'i_donated':false, 'my_xp': 0, 'dialog': null,
                                                                           'recipient_id': sender_info['user_id'],
                                                                           'recipient_fbid': sender_info['facebook_id'],
                                                                           'recipient_name': sender_info['chat_name']};
-                    node.on_destroy = (function (_req, _tab) { return function(_node) {
-                        delete _tab.user_data['unit_donation_requests'][_req['tag']];
-                    }; })(req, tab);
-                } else {
-                    // it's a donation towards a request that we do not have - ignore it
-                    continue;
-                }
-
-                req['cur_space'] = sender_info['cur_space'];
-                req['max_space'] = sender_info['max_space'];
-
-                if(req['dialog']) { update_unit_donation_dialog(req['dialog']); }
-
-                var text;
-                var callback = null;
-
                 var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
-
+                var text;
                 if(req['recipient_id'] == session.user_id) {
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct), {onclick:callback});
+                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
                 } else {
-                    var kind = (req['i_donated'] ? 'you_have_donated' : 'you_have_not_donated');
-
-                    callback = (function () { return function(w, mloc) {
+                    var kind = 'you_have_not_donated';
+                    req['callback'] = (function (_req) { return function(w, mloc) {
                         change_selection_ui(null);
-                        req['dialog'] = invoke_unit_donation_dialog(req);
-                    }; })();
-
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:callback});
+                        _req['dialog'] = invoke_unit_donation_dialog(_req);
+                    }; })(req);
+                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
                 }
-
-                tab.widgets['output'].revise_text(node, text);
-            }
+                req['node'] = tab.widgets['output'].append_text(text);
+                req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
+                    delete _tab.user_data['unit_donation_requests'][_req['tag']];
+                }; })(req, tab);
+            });
 
         } else {
             // normal chat message
@@ -45347,7 +45417,7 @@ function handle_server_message(data) {
            !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
             for(var i = 0; i < tablist.length; i++) {
                 var tab = tablist[i];
-                tab.user_data['last_timestamp'] = sender_info['time'] || server_time;
+                tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
             }
         }
 
