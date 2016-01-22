@@ -265,7 +265,7 @@ if __name__ == '__main__':
             cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym('token_value'))
             cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, townhall_level INT4, prev_receipts FLOAT) "+\
                         "RETURNS INT8 DETERMINISTIC RETURN "+\
-                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.04,IF(prev_receipts>=100.0,0.03,IF(prev_receipts>=10.0,0.02,0.01)))))")
+                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.03,IF(prev_receipts>=100.0,0.025,IF(prev_receipts>=10.0,0.02,0.01)))))")
 
             filterwarnings('error', category = MySQLdb.Warning)
             con.commit()
