@@ -239,7 +239,7 @@
         "map_coords": "[color=#ffff00][u][map_coords=%region,%x,%y]%x,%y[/map_coords][/u][/color]",
 
         // channel welcome messages
-        "welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
+        "welcome": ":: [color=#00ff00]%sender_name: Welcome to %channel_name chat! Please be respectful. Offensive behavior is not tolerated.[/color] ::\n",
 
         // system-wide announcements
         "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",

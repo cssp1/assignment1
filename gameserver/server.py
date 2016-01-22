@@ -3581,14 +3581,14 @@ class Session(object):
         if divert:
             self.global_chat_channel += '_'+divert
 
-        # put welcome message into chat
-        self.chat_recv(self.global_chat_channel, None,
-                       {'chat_name': 'Global', 'type':'welcome', 'time': server_time, 'facebook_id': '-1', 'user_id': -1},
-                       'Welcome to Global chat! Please be respectful. Offensive behavior is not tolerated.',
-                       retmsg = retmsg)
-
         # stuff last few messages into chat and join
         self.do_chat_catchup(self.global_chat_channel, retmsg)
+        # put welcome message into chat
+        if gamedata['strings']['chat_templates'].get('welcome') and Predicates.read_predicate(gamedata['chat_welcome_if']).is_satisfied(self.player,None):
+            self.chat_recv(self.global_chat_channel, None,
+                           {'chat_name':'System', 'type':'welcome', 'channel_name': 'Global', 'time': server_time, 'user_id':-1},
+                           'Welcome',
+                           retmsg = retmsg)
         gamesite.chat_mgr.join(self, self.global_chat_channel)
 
     def init_region_chat(self, new_region, retmsg):
@@ -3598,14 +3598,15 @@ class Session(object):
         if (not new_region) or (new_region not in gamedata['regions']): return
         self.region_chat_channel = 'r:'+str(new_region)
 
-        ui_name = gamedata['regions'][new_region]['ui_name']
-        self.chat_recv(self.region_chat_channel, None,
-                       {'chat_name':'Region', 'type':'welcome', 'time': server_time, 'facebook_id':'-1', 'user_id':-1},
-                       "Welcome to %s region chat! Please be respectful. Offensive behavior is not tolerated." % ui_name,
-                       retmsg = retmsg)
-
         # stuff last few messages into chat and join
         self.do_chat_catchup(self.region_chat_channel, retmsg)
+        # put welcome message into chat
+        if gamedata['strings']['chat_templates'].get('welcome') and Predicates.read_predicate(gamedata['chat_welcome_if']).is_satisfied(self.player,None):
+            ui_name = gamedata['regions'][new_region]['ui_name']
+            self.chat_recv(self.region_chat_channel, None,
+                           {'chat_name':'System', 'type':'welcome', 'channel_name': '%s Region' % ui_name, 'time': server_time, 'user_id':-1},
+                           'Welcome',
+                           retmsg = retmsg)
         gamesite.chat_mgr.join(self, self.region_chat_channel)
 
     def shutdown(self):

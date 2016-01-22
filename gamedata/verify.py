@@ -3582,6 +3582,10 @@ def main(args):
 
     error |= check_starting_conditions(gamedata['starting_conditions'])
 
+    for name in ('chat_welcome_if',):
+        if name in gamedata:
+            error |= check_predicate(gamedata[name], reason='gamedata:'+name)
+
     for name, fx in gamedata['client']['vfx'].iteritems():
         error |= check_visual_effect('client_vfx:'+name, fx)
 
