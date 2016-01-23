@@ -5523,7 +5523,9 @@ class GameObjectSpec(Spec):
         ["crafting_speed", 1.0],
         ["crafting_queue_space", -1],
         ["manufacture_speed", 1.0],
+        ["manufacture_cost", 1.0],
         ["unit_repair_speed", 1.0],
+        ["unit_repair_cost", 1.0],
         ["track_level_in_player_history", False],
         ["history_category", None],
         ["defense_types", []],
@@ -5606,17 +5608,32 @@ class GameObjectSpec(Spec):
     # obj_id is needed to look up any building modstats that affect repair time
     # (XXXXXX this awkwardly reaches into player.stattab.modded_buildings - might need to fix later by passing the Building instance itself,
     # or a speed_factor, but that complicates DamageLog.finalize()...)
-    def cost_to_repair(self, level, hp_ratio, player, obj_id = None):
+    COST_MODE_REPAIR = 0
+    COST_MODE_RECYCLE = 1
+    COST_MODE_MANUFACTURE_CANCEL = 2
+    COST_MODE_MANUFACTURE = 3
+    def cost_to_repair(self, level, hp_ratio, player, obj_id = None, cost_mode = COST_MODE_REPAIR, builder = None):
         if self.kind == 'mobile':
-            if self.resurrectable or hp_ratio > 0:
+            if cost_mode == self.COST_MODE_MANUFACTURE_CANCEL: # note: legacy only - now queue entries store their own cost
+                cost_ratio = gamedata['manufacture_cancel_refund']
+                time_ratio = spd = 1
+            elif cost_mode == self.COST_MODE_RECYCLE:
+                cost_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
+                # note: do not bonus this, to avoid exploits where you increase the unit's cost after it's built, then recycle it
+                time_ratio = spd = 1
+            elif (cost_mode == self.COST_MODE_REPAIR) and (self.resurrectable or hp_ratio > 0):
                 cost_ratio = self.unit_repair_resources if self.unit_repair_resources >= 0 else player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources'])
                 time_ratio = self.unit_repair_time if self.unit_repair_time >= 0 else player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time'])
+                # XXX grab it from the building instead?
+                cost_ratio *= player.stattab.get_unit_stat(self.name, 'repair_cost', 1)
                 spd = player.stattab.get_unit_stat(self.name, 'repair_speed', 1)
             else:
-                # for destroyed, non-resurrectable units, treat the cost and time factors as 1.0x since the player must rebuild them from scratch
+                # treat destroyed, non-resurrectable units the same as manufacturing from scratch
                 cost_ratio = 1
                 time_ratio = 1
-                spd = 1 # should actually be manufacture_speed, but that needs to query the player's base factory buildings, ignore it for now
+                # XXX grab it from the building instead?
+                cost_ratio *= player.stattab.get_unit_stat(self.name, 'manufacture_cost', 1)
+                spd = player.stattab.get_unit_stat(self.name, 'manufacture_speed', 1)
 
             health_ratio = 1.0 - hp_ratio
             health_ratio = min(max(health_ratio, 0.0), 1.0)
@@ -5985,10 +6002,10 @@ class GameObject:
     def is_shooter(self): return self.get_auto_spell() is not None
     def is_invisible(self, session): return False
 
-    def cost_to_repair(self, player):
-        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id)
-    def time_to_repair(self, player):
-        return self.cost_to_repair(player)['time']
+    def cost_to_repair(self, player, builder = None):
+        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id, builder = builder)
+    def time_to_repair(self, player, builder = None):
+        return self.cost_to_repair(player, builder = builder)['time']
 
 class Mobile(GameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, temporary = None):
@@ -9887,6 +9904,13 @@ class Player(AbstractPlayer):
             obj.modstats[stat] = ModChain.add_mod(obj.modstats[stat], method, strength, kind, source, props)
             self.modded_buildings[obj.obj_id] = obj
 
+            # manufacturing-related stats need to flow through transitively to the units this building can work on
+            if obj.spec.manufacture_category and (stat in ('unit_repair_speed', 'unit_repair_cost',
+                                                           'manufacture_speed', 'manufacture_cost')):
+                self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, {'unit_repair_speed':'repair_speed',
+                                                                                           'unit_repair_cost':'repair_cost'}.get(stat,stat), method,
+                                                           strength, kind, source, props = props)
+
         # apply modstat to all units in a specific manufacture category
         # category can be "ALL" to apply to all (unlocked) units
         def apply_modstat_to_manufacture_category(self, category, stat, method, strength, kind, source, props = None):
@@ -10053,11 +10077,15 @@ class Player(AbstractPlayer):
                         self.total_space += obj.get_leveled_quantity(obj.spec.provides_total_space)
 
                     self.main_squad_space += obj.get_leveled_quantity(obj.spec.provides_space)
-                    if obj.spec.manufacture_category and obj.spec.unit_repair_speed:
-                        self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
-                                                                   obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)) - 1.0,
-                                                                   'building', obj.spec.name, {'level': obj.level})
-
+                    if obj.spec.manufacture_category:
+                        if obj.spec.unit_repair_speed:
+                            self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
+                                                                       obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)) - 1.0,
+                                                                       'building', obj.spec.name, {'level': obj.level})
+                        if obj.spec.manufacture_speed:
+                            self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'manufacture_speed', '*=(1+strength)',
+                                                                       obj.get_stat('manufacture_speed', obj.get_leveled_quantity(obj.spec.manufacture_speed)) - 1.0,
+                                                                       'building', obj.spec.name, {'level': obj.level})
                     self.quarry_control_limit += obj.get_leveled_quantity(obj.spec.provides_quarry_control)
 
                     self.total_foremen += obj.get_leveled_quantity(obj.spec.provides_foremen)
@@ -10682,12 +10710,8 @@ class Player(AbstractPlayer):
 
 
         if to_delete:
-            refund = dict((res,0) for res in gamedata['resources'])
             for obj in to_delete:
                 self.home_base_remove(obj)
-                for res in gamedata['resources']:
-                    refund[res] += obj.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res))
-            self.resources.gain_res(refund, reason='unit_migration_refund')
 
         # unit_repair_queue migration
         give_free_repair = False
@@ -19721,14 +19745,14 @@ class GAMEAPI(resource.Resource):
         if object.is_under_construction():
             retmsg.append(["ERROR", "FACTORY_UNDER_CONSTRUCTION"]); return
 
-        cost = {}
+        cost = spec.cost_to_repair(level, 0, session.player, cost_mode = spec.COST_MODE_MANUFACTURE, builder = object)
         for res in gamedata['resources']:
-            cost[res] = GameObjectSpec.get_leveled_quantity(getattr(spec, 'build_cost_'+res), level)
             if (not session.player.is_cheater) and (getattr(session.player.resources,res) < cost[res]):
                 retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), cost[res]])
                 return
 
-        build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, level)
+        build_time = cost['time']
+
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         # apply unit capacity constraint
@@ -19749,21 +19773,17 @@ class GAMEAPI(resource.Resource):
                     return
 
         # queue it up
-        negative_cost = dict((res,-cost[res]) for res in cost)
+        negative_cost = dict((res,-cost[res]) for res in cost if res != 'time')
         session.player.resources.gain_res(negative_cost, reason='unit_production')
         admin_stats.econ_flow_res(session.player, 'consumption', 'unit_manufacture', negative_cost)
 
-        # reduce build time by structure speed bonus
-        speed = object.get_stat('manufacture_speed', object.get_leveled_quantity(object.spec.manufacture_speed))
-        build_time = int(build_time / speed)
-        if build_time < 1:
-            build_time = 1
+        # note: structure speed bonus has already been applied via unit stat
 
         if len(object.manuf_queue) < 1:
             object.manuf_start_time = server_time
             object.manuf_done_time = 0
 
-        object.manuf_queue.append({'spec_name': spec_name, 'level': level, 'total_time': build_time})
+        object.manuf_queue.append({'spec_name': spec_name, 'level': level, 'total_time': build_time, 'cost': dict((res,cost[res]) for res in cost if res != 'time')})
         session.deferred_object_state_updates.add(object)
         session.deferred_player_state_update = True
         session.activity_classifier.manufactured_unit()
@@ -19787,7 +19807,10 @@ class GAMEAPI(resource.Resource):
         level = item['level']
 
         # how much resources and time was this construction going to take?
-        refund = dict((res, int(gamedata['manufacture_cancel_refund']*GameObjectSpec.get_leveled_quantity(getattr(spec, 'build_cost_'+res), level))) for res in gamedata['resources'])
+        if 'cost' in item:
+            refund = dict((res, int(gamedata['manufacture_cancel_refund']*amount)) for res, amount in item['cost'].iteritems())
+        else:
+            refund = spec.cost_to_repair(level, 0, session.player, cost_mode = spec.COST_MODE_MANUFACTURE_CANCEL, builder = object)
 
         # delete the item from the queue
         object.manuf_queue.pop(queue_index)
@@ -21724,11 +21747,11 @@ class GAMEAPI(resource.Resource):
         assert obj.owner is session.player
         assert obj.is_mobile()
 
-        recycle_ratio = session.player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
         health_ratio = float(obj.hp)/float(obj.max_hp)
         health_ratio = min(max(health_ratio, 0.0), 1.0)
 
-        refund = dict((res, max(0, int(recycle_ratio * health_ratio * obj.get_leveled_quantity(getattr(obj.spec,'build_cost_'+res))))) for res in gamedata['resources'])
+        # for better accounting, this should really be stored on the object itself
+        refund = dict((res, amount) for res, amount in obj.spec.cost_to_repair(obj.level, 1.0 - health_ratio, session.player, cost_mode = obj.spec.COST_MODE_RECYCLE).iteritems() if res != 'time')
 
         if session.has_object(id): session.rem_object(id)
         session.player.unit_repair_cancel(obj)
@@ -21808,13 +21831,7 @@ class GAMEAPI(resource.Resource):
             dict_increment(session.loot[loot_stat], obj.spec.name, 1)
 
             if owning_player:
-                if can_resurrect:
-                    res_factor = obj.spec.unit_repair_resources if obj.spec.unit_repair_resources >=0 else \
-                                 owning_player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources'])
-                else:
-                    res_factor = 1
-
-                cost = dict((res, int(res_factor * obj.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res)))) for res in gamedata['resources'])
+                cost = obj.spec.cost_to_repair(obj.level, 0, owning_player, cost_mode = obj.spec.COST_MODE_REPAIR)
                 for res in gamedata['resources']:
                     dict_increment(session.loot, loot_stat+'_'+res, cost[res])
 

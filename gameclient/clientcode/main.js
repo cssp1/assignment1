@@ -8366,14 +8366,48 @@ function get_auto_spell_for_item(item_spec) {
     return null;
 }
 
-function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player) {
-    var cost_ratio = ('unit_repair_resources' in spec ? spec['unit_repair_resources'] : player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources']));
-    var time_ratio = ('unit_repair_time' in spec ? spec['unit_repair_time'] : player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time']));
+/** @enum {number} Matches GameObjectSpec.COST_MODE_* on server */
+var COST_MODE = {
+    REPAIR : 0,
+    RECYCLE : 1,
+    MANUFACTURE_CANCEL : 2,
+    MANUFACTURE : 3
+};
+
+/** @param {!Object<string,?>} spec
+    @param {number} level
+    @param {number} cur_hp
+    @param {number} max_hp
+    @param {!Object} player
+    @param {number=} cost_mode
+    @param {GameObject|null=} builder */
+function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, builder) {
+    if(!cost_mode) { cost_mode = COST_MODE.REPAIR; }
+    var cost_ratio, time_ratio, spd;
+    if(cost_mode === COST_MODE.MANUFACTURE_CANCEL) { // note: legacy only - now queue entries store their own cost
+        cost_ratio = gamedata['manufacture_cancel_refund'];
+        time_ratio = spd = 1;
+    } else if(cost_mode === COST_MODE.RECYCLE) {
+        cost_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
+        // note: do not bonus this, to avoid exploits where you increase the unit's cost after it's built, then recycle it
+        time_ratio = spd = 1;
+    } else if(cost_mode === COST_MODE.REPAIR && (get_leveled_quantity(spec['resurrectable'], level) || cur_hp > 0)) {
+        cost_ratio = ('unit_repair_resources' in spec ? spec['unit_repair_resources'] : player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources']));
+        time_ratio = ('unit_repair_time' in spec ? spec['unit_repair_time'] : player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time']));
+        // XXX grab it from the building instead?
+        cost_ratio *= get_unit_stat(player.stattab, spec['name'], 'repair_cost', 1);
+        spd = get_unit_stat(player.stattab, spec['name'], 'repair_speed', 1);
+    } else {
+        // treat destroyed, non-resurrectable units the same as manufacturing from scratch
+        cost_ratio = 1;
+        time_ratio = 1;
+        // XXX grab it from the building instead?
+        cost_ratio *= get_unit_stat(player.stattab, spec['name'], 'manufacture_cost', 1);
+        spd = get_unit_stat(player.stattab, spec['name'], 'manufacture_speed', 1);
+    }
 
     var health_ratio = 1.0 - 1.0*cur_hp/max_hp;
-
     var cost_time = get_leveled_quantity(spec['build_time'], level);
-    var spd = get_unit_stat(player.stattab, spec['name'], 'repair_speed', 1);
     var rep_time = Math.max(1, Math.floor(time_ratio * health_ratio * cost_time / spd));
     var ret = {'time':rep_time};
 
@@ -16373,13 +16407,10 @@ function invoke_recycle_dialog(obj) {
     dialog.widgets['tip_text'].str = dialog.data['widgets']['tip_text']['ui_name'].replace('%s', gamedata['spells']['RECYCLE_UNIT']['ui_name']);
 
     // compute and display refund amounts
-    var recycle_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources']);
-    var health_ratio = (1.0*hp)/max_hp;
+    var cost = mobile_cost_to_repair(spec, level, max_hp - hp, max_hp, player, COST_MODE.RECYCLE, null);
     for(var res in gamedata['resources']) {
-        var cost = get_leveled_quantity(spec['build_cost_'+res]||0, level);
-        var refund = Math.max(0, Math.floor(recycle_ratio * health_ratio * cost));
         if('resource_bar_'+res+'_amount' in dialog.widgets) {
-            dialog.widgets['resource_bar_'+res+'_amount'].str = pretty_print_number(refund);
+            dialog.widgets['resource_bar_'+res+'_amount'].str = pretty_print_number(cost[res]);
         }
     }
     return dialog;
@@ -30866,11 +30897,11 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
     var manuf_queue = builder.start_client_prediction('manuf_queue', builder.manuf_queue);
     var spec = gamedata['units'][spec_name];
     var level = player.tech[spec['level_determined_by_tech']] || 1;
-    manuf_queue.splice(queue_slot,1);
-    goog.object.forEach(gamedata['resources'], function(res, resname) {
-        var cost = Math.floor(gamedata['manufacture_cancel_refund']*get_leveled_quantity(spec['build_cost_'+resname]||0, level));
-        player.resource_state[resname][1] += cost;
-    });
+    var entry = manuf_queue.splice(queue_slot,1)[0];
+    var cost = ('cost' in entry ? entry['cost'] : mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE_CANCEL, builder));
+    for(var res in gamedata['resources']) {
+        player.resource_state[res][1] += Math.floor(('cost' in entry ? gamedata['manufacture_cancel_refund'] : 1) * (cost[res] || 0));
+    }
 }
 
 /** Main per-frame update - takes care of grid buttons and status displays*/
@@ -30989,15 +31020,19 @@ function update_manufacture_dialog(dialog) {
                         // client-side predict what will happen
                         var spec = gamedata['units'][_spec_name];
                         var level = player.tech[spec['level_determined_by_tech']] || 1;
-                        var cost_time = Math.floor(get_leveled_quantity(spec['build_time'], level) / builder.get_stat('manufacture_speed', builder.get_leveled_quantity(builder.spec['manufacture_speed'] || 1.0)));
-                        manuf_queue.push({'spec_name':_spec_name,
-                                          'level':level,
-                                          'total_time':cost_time
-                                         });
-                        goog.object.forEach(gamedata['resources'], function(res, resname) {
-                            var cost = get_leveled_quantity(spec['build_cost_'+resname] || 0, level);
-                            player.resource_state[resname][1] -= cost;
-                        });
+                        var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
+                        var entry = {'spec_name':_spec_name,
+                                     'level':level,
+                                     'total_time':cost['time'],
+                                     'cost': {}
+                                    };
+                        for(var res in gamedata['resources']) {
+                            if(cost[res]) {
+                                player.resource_state[res][1] -= cost[res];
+                                entry['cost'][res] = cost[res];
+                            }
+                        }
+                        manuf_queue.push(entry);
 
                         // play different effect when starting manufacturing vs. subsequent queue appends
                         var fx_name = (manuf_queue.length == 1 ? 'unit_manufacture_start' : 'unit_manufacture_add_to_queue');
@@ -31014,11 +31049,11 @@ function update_manufacture_dialog(dialog) {
                     // check requirements
                     var spec = gamedata['units'][spec_name];
                     var cost_space = get_leveled_quantity(spec['consumes_space'], unlock_level);
-                    var cost_res = {}; var not_enough_res = null; // name of one needy resource
+                    var cost_res = mobile_cost_to_repair(spec, unlock_level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
+                    var not_enough_res = null; // name of one needy resource
                     var resources_needed = {};
 
                     for(var res in gamedata['resources']) {
-                        cost_res[res] = get_leveled_quantity(spec['build_cost_'+res]||0, unlock_level);
                         if(player.resource_state[res][1] < cost_res[res]) {
                             not_enough_res = res;
                             resources_needed[res] = cost_res[res] - player.resource_state[res][1];
@@ -31331,18 +31366,18 @@ function update_manufacture_dialog(dialog) {
         var level = unit_unlock_level(dialog.user_data['current_unit']);
         if(level < 1) { level = 1; }
 
+        var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
         for(var res in gamedata['resources']) {
             if('requirements_'+res+'_value' in dialog.widgets) {
-                var cost = get_leveled_quantity(spec['build_cost_'+res]||0, level);
-                if(cost > 0) {
+                if(cost[res] > 0) {
                     dialog.widgets['requirements_'+res+'_value'].show =
                         dialog.widgets['requirements_'+res+'_icon'].show = true;
-                    dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost);
+                    dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost[res]);
                     dialog.widgets['requirements_'+res+'_value'].tooltip.str = dialog.data['widgets']['requirements_'+res+'_value']['ui_tooltip'].replace('%RES', gamedata['resources'][res]['ui_name']).replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
-                    dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost ? SPUI.good_text_color : SPUI.error_text_color);
+                    dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost[res] ? SPUI.good_text_color : SPUI.error_text_color);
                     // don't show button for topup, since the main "Use Resources" button will take care of it
-                    if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost) {
-                        var helper = get_requirements_help(res, cost - player.resource_state[res][1]);
+                    if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost[res]) {
+                        var helper = get_requirements_help(res, cost[res] - player.resource_state[res][1]);
                         dialog.widgets['resource_'+res+'_button'].show = !!helper;
                         dialog.widgets['resource_'+res+'_button'].onclick = helper;
                     } else {
@@ -31374,11 +31409,8 @@ function update_manufacture_dialog(dialog) {
             dialog.widgets['resource_space_button'].show = false;
         }
 
-        var cost_time = get_leveled_quantity(spec['build_time'], level);
-        if(builder) {
-            var speed = builder.get_stat('manufacture_speed', builder.get_leveled_quantity(builder.spec['manufacture_speed'] || 1.0));
-            cost_time /= speed;
-        }
+        var cost_time = cost['time'];
+
         dialog.widgets['requirements_time_value'].str = pretty_print_time(cost_time);
         dialog.widgets['requirements_time_value'].tooltip.str = dialog.data['widgets']['requirements_time_value']['ui_tooltip'].replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
     }
@@ -49475,8 +49507,9 @@ Building.prototype.get_idle_state_advanced = function() {
                             }
                             if(pred_ok && player.stattab['total_space'] >= space_usage['ALL'] + get_leveled_quantity(spec['consumes_space'],level)) {
                                 var res_ok = true;
+                                var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, this);
                                 for(var res in gamedata['resources']) {
-                                    if(player.resource_state[res][1] < get_leveled_quantity(spec['build_cost_'+res] || 0, level)) {
+                                    if(player.resource_state[res][1] < cost[res]) {
                                         // cannot manufacture
                                         res_ok = false;
                                         break;
