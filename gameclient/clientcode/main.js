@@ -15464,7 +15464,7 @@ function init_chat_frame() {
                 });
                 tab.widgets['output'].getmore_responded(event.is_final);
             }; })(tab));
-            send_to_server.func(["CHAT_GETMORE", tab.user_data['channel_name'], tab.user_data['earliest_timestamp']+60 /* fudge time */, tab.user_data['earliest_id'], tag]);
+            send_to_server.func(["CHAT_GETMORE", tab.user_data['channel_name'], tab.user_data['earliest_timestamp']+5 /* fudge time */, tab.user_data['earliest_id'], tag]);
         } : null);
         tab.widgets['output'].update_text();
         tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };

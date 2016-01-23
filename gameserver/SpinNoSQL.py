@@ -817,7 +817,10 @@ class NoSQLClient (object):
             if end_time > 0: props['time']['$lt'] = end_time
         if end_msg_id:
             props['_id'] = {'$lt': self.encode_object_id(end_msg_id)}
-        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING),('_id',pymongo.DESCENDING)])
+        sorting = [('time',pymongo.DESCENDING),]
+        if end_msg_id and 0: # this makes the query much slower, and probably doesn't help correctness
+            sorting += [('_id',pymongo.DESCENDING),]
+        cur = self.chat_buffer_table().find(props).sort(sorting)
         if skip > 0: cur = cur.skip(skip)
         if limit > 0: cur = cur.limit(limit)
         ret = map(self.decode_chat_row, cur)
