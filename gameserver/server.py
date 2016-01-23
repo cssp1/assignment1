@@ -19811,6 +19811,7 @@ class GAMEAPI(resource.Resource):
             refund = dict((res, int(gamedata['manufacture_cancel_refund']*amount)) for res, amount in item['cost'].iteritems())
         else:
             refund = spec.cost_to_repair(level, 0, session.player, cost_mode = spec.COST_MODE_MANUFACTURE_CANCEL, builder = object)
+            refund = dict((res, amount) for res, amount in refund.iteritems() if res != 'time') # filter out time
 
         # delete the item from the queue
         object.manuf_queue.pop(queue_index)
