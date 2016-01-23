@@ -10441,7 +10441,7 @@ SPINPUNCHGAME.init = function() {
             // try webkit version
             fun = canvas['webkitRequestFullScreenWithKeys'] ||
                   canvas['webkitRequestFullScreen'];
-            if(fun) {
+            if(fun && (spin_demographics['browser_name'] !== 'Safari')) { // webkit fullscreen seems broken on Safari now!
                 event_name = 'webkitfullscreenchange';
                 // manually ensure keyboard input works
                 if(fun === canvas['webkitRequestFullScreen']) {
@@ -35261,7 +35261,8 @@ function invoke_fullscreen_instructions() {
         dialog.widgets['close_button'].onclick = function() { change_selection_ui(null); };
     if(spin_demographics['browser_OS'] === "Mac") {
         dialog.widgets['os'].str = dialog.data['widgets']['os']['ui_name'].replace('%s', 'Mac');
-        dialog.widgets['key'].str = '\u2318-Shift-F'; // Unicode for Mac command key
+        // note: Safari seems to ignore the keyboard shortcut now?
+        dialog.widgets['key'].str = (spin_demographics['browser_name'] === 'Safari' ? 'View Menu ->\nEnter Full Screen' : '\u2318-Shift-F'); // Unicode for Mac command key
     } else if(spin_demographics['browser_OS'] === "Windows") {
         dialog.widgets['os'].str = dialog.data['widgets']['os']['ui_name'].replace('%s', 'Windows');
         dialog.widgets['key'].str = 'F11';

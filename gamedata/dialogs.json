@@ -6471,7 +6471,7 @@
                         "text_hjustify": "left", "ui_name": "Play in\nFull Screen" },
             "description": { "kind": "TextField", "xy": [229,177], "dimensions": [210,53], "text_size": 15, "text_style": "normal",
                              "text_hjustify": "left", "text_vjustify": "top",
-                             "ui_name": "Use the following keyboard\nshortcut to maximize the size of\nthe game window:" },
+                             "ui_name": "Use the following command\nto maximize the size of\nthe game window:" },
             "os": { "kind": "TextField", "xy": [229,260], "dimensions": [210,44], "text_size": 15, "text_style": "normal",
                     "text_hjustify": "left", "text_vjustify": "top",
                     "ui_name": "%s web browsers:", "show": 0 },
