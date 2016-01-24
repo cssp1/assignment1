@@ -30898,7 +30898,7 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
     var spec = gamedata['units'][spec_name];
     var level = player.tech[spec['level_determined_by_tech']] || 1;
     var entry = manuf_queue.splice(queue_slot,1)[0];
-    var cost = ('cost' in entry ? entry['cost'] : mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE_CANCEL, builder));
+    var cost = ((entry && 'cost' in entry) ? entry['cost'] : mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE_CANCEL, builder));
     for(var res in gamedata['resources']) {
         player.resource_state[res][1] += Math.floor(('cost' in entry ? gamedata['manufacture_cancel_refund'] : 1) * (cost[res] || 0));
     }
