@@ -92,7 +92,7 @@ def do_task(task, dry_run = False):
                 deleted_bytes += delete_dirs(s3bucket, to_delete)
             else:
                 s3bucket.delete_keys(key.name for key in to_delete)
-                deleted_bytes += (key.size for key in to_delete)
+                deleted_bytes += sum((key.size for key in to_delete), 0)
 
     return {'seen_bytes': seen_bytes,
             'deleted_bytes': deleted_bytes}
