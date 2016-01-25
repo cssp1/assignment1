@@ -1567,7 +1567,7 @@ class NoSQLClient (object):
     def _get_map_feature_population(self, region, base_type):
         return self.region_table(region, 'map').find({'base_type':base_type}).count()
 
-    def get_map_features(self, region, updated_since, batch_size = None, reason=''):
+    def get_map_features(self, region, updated_since = -1, batch_size = None, reason=''):
         if updated_since <= 0:
             if batch_size is None: batch_size = 999999 # use a large batch size for full queries
             return self.instrument('get_map_features(%s,full)'%reason, self._query_map_features, (region,{},None,batch_size))
