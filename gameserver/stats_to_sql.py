@@ -254,9 +254,10 @@ if __name__ == '__main__':
             # some tables have res3 columns even if the game itself doesn't have res3.
             # Create a dummy function to satisfy queries.
             if 'res3' not in gamedata['resources']:
-                for FUNC in ('res3_price', 'res3_value'):
+                for FUNC, ARGS in (('res3_price', '(amount INT8)'),
+                                   ('res3_value', '(amount INT8, townhall_level INT4, prev_receipts FLOAT)')):
                     cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym(FUNC))
-                    cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
+                    cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" "+ARGS+" RETURNS INT8 DETERMINISTIC RETURN 0")
 
             # Special-case function for token (ONP) valuation, depending on player spend
             # (empirically we find that spend correlates inversely with battle skill)
