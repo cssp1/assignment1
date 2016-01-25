@@ -11234,7 +11234,7 @@ class LivePlayer(Player):
         army, map_features, mailbox_update = self.ping_squads(session, return_army = True, originator=originator, reason=reason)
         retmsg.append(["SQUADS_UPDATE", self.squads])
         retmsg.append(["PLAYER_ARMY_UPDATE_FULL", filter(lambda x: x is not None, map(self.strip_fields_for_army_update, army))])
-        if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features])
+        if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features, server_time])
         if mailbox_update: self.send_mailbox_update(retmsg)
 
     # used for processing untrusted requests from the client, checks to make sure there is an item in slot 'slot'
@@ -13748,16 +13748,16 @@ class CONTROLAPI(resource.Resource):
                                 'target_user_id': target_user_id,
                                 'target_message_id': message_id}, '', log = True)
         return SpinJSON.dumps({'result': 'ok'}, newline=True)
-    def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
+    def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None, map_time = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False)
+            self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False, map_time = map_time)
     def handle_broadcast_map_attack(self, request, msg = None, region_id = None, feature = None,
-                                    attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None):
+                                    attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None, map_time = None):
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
+            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False, map_time = map_time)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
         for session in iter_sessions():
             if session.player.home_region == region_id:
@@ -26495,7 +26495,7 @@ class GAMEAPI(resource.Resource):
                 success, affected_objects, map_features, error_code = session.player.squad_enter_map(squad_id, coords)
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_STEP':
@@ -26506,7 +26506,7 @@ class GAMEAPI(resource.Resource):
                 coords = spellargs[1][:max_steps] if spellargs[1] else None # may be null
                 success, affected_objects, map_features, error_code = session.player.squad_step(squad_id, coords)
                 if error_code: retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_EXIT_MAP':
@@ -26517,7 +26517,7 @@ class GAMEAPI(resource.Resource):
                 success, affected_objects, map_features, error_code = session.player.squad_exit_map(session, squad_id, originator = session.player.user_id, reason='SQUAD_EXIT_MAP')
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_REPAIR_CANCEL':
@@ -26770,13 +26770,13 @@ class GAMEAPI(resource.Resource):
 
         return
 
-    def broadcast_map_update(self, region_id, base_id, data, originator, send_to_net = True):
+    def broadcast_map_update(self, region_id, base_id, data, originator, send_to_net = True, map_time = None):
         assert region_id and base_id
         if data is None:
             data = {'base_id':base_id, 'DELETED':1}
         elif 'base_id' not in data:
             data['base_id'] = base_id
-        upd = ["REGION_MAP_UPDATES", region_id, [data]]
+        upd = ["REGION_MAP_UPDATES", region_id, [data], map_time or server_time]
 
         if base_id[0] == 's':
             squad_owner_id = int(base_id[1:].split('_')[0])
@@ -26799,13 +26799,16 @@ class GAMEAPI(resource.Resource):
                                                      'server':spin_server_name,
                                                      'method':'broadcast_map_update',
                                                      'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
+                                                               # note: time is boxed here in "args" since it refers to the region map update time,
+                                                               # which could conceivably be on a different clock than the chat message time
+                                                               'map_time': server_time,
                                                                'server': spin_server_name, 'originator': originator },
                                                      }, '', log = False)
 
-    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
+    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None, map_time = None):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
-        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info]
+        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info, map_time or server_time]
         for session in iter_sessions():
             if session.player.home_region == region_id:
                 if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
@@ -26819,6 +26822,9 @@ class GAMEAPI(resource.Resource):
                                                                'region_id': region_id, 'feature': feature,
                                                                'attacker_id': attacker_id, 'defender_id': defender_id,
                                                                'summary': summary, 'pcache_info': pcache_info,
+                                                               # note: time is boxed here in "args" since it refers to the region map update time,
+                                                               # which could conceivably be on a different clock than the chat message time
+                                                               'map_time': server_time,
                                                                'server': spin_server_name },
                                                      }, '', log = False)
 

@@ -45720,7 +45720,7 @@ function handle_server_message(data) {
         var region_id = data[1], updates = data[2];
         AllianceCache.turf_update(region_id, updates);
     } else if(msg == "REGION_MAP_UPDATES") {
-        var region_id = data[1], updates = data[2];
+        var region_id = data[1], updates = data[2], map_time = data[3];
         if(session.region.data && session.region.data['id'] == region_id) {
             goog.array.forEach(updates, function(update) { session.region.receive_feature_update(update); });
         } else {
@@ -45728,7 +45728,7 @@ function handle_server_message(data) {
             console.log('ignoring spurious REGION_MAP_UPDATES'); console.log(data[1]);
         }
     } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
-        var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
+        var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6], map_time = data[7];
 
         if(session.region.data && session.region.data['id'] == region_id) {
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)
