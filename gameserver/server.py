@@ -7,6 +7,7 @@
 # main game server
 
 import sys, os, time, base64, hmac, hashlib, urllib, urlparse, random, string, glob, traceback, signal, re
+import inspect
 import socket
 import functools
 import math
@@ -13641,10 +13642,26 @@ class CONTROLAPI(resource.Resource):
                 request.setResponseCode(http.BAD_REQUEST)
                 return 'badmethod\n'
 
+            self.trim_args(handler, args)
             ret = handler(request, **args)
 
         # note: can go asynchronous
         return ret if (ret is not None) else 'ok\n'
+
+    # for forwards-compatibity, prevent CONTROLAPI crashes when receiving unexpected keyword arguments from new code
+    warned_args = set()
+    def trim_args(self, handler, passed_args):
+        named_args, var_args, varkw, defaults = inspect.getargspec(handler)
+        if varkw: return passed_args # function accepts **kwargs
+        for p in passed_args.keys():
+            if p not in named_args:
+                key = (handler.__name__, p) # unique tuple to only warn once
+                if key not in self.warned_args:
+                    self.warned_args.add(key)
+                    gamesite.exception_log.event(server_time, '%s: Dropping unrecognized arg "%s"' % \
+                                                 (handler.__name__, p))
+                del passed_args[p]
+        return passed_args
 
     def handle_terminate_session(self, request, session_id = None):
         # remember that this ID is invalid, in case the client tries to use it again
