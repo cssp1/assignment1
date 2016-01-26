@@ -30,6 +30,8 @@ class S3Exception(Exception):
 
 class S3404Exception(S3Exception): pass
 
+class BadDataException(Exception): pass # to be wrapped inside an S3Exception
+
 # need retry logic since S3 sometimes throws errors
 MAX_RETRIES = 10
 RETRY_DELAY = 2.0 # number of seconds between retry attempts
@@ -95,6 +97,9 @@ def retry_logic(func_name, bucket, filename, policy_404, func, *args, **kwargs):
                 pass # retry
             else:
                 raise last_err # abort immediately
+        except BadDataException as e:
+            last_err = S3Exception(e, 'SpinS3.BadDataException', func_name, bucket, filename, attempt)
+            pass # retry
 
         attempt += 1
         time.sleep(RETRY_DELAY)
@@ -300,7 +305,9 @@ class S3 (object):
         response = self.requests_session.get(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
         buf = response.content
         if 'Content-Length' in response.headers:
-            assert len(buf) == int(response.headers['Content-Length'])
+            content_length = long(response.headers['Content-Length'])
+            if len(buf) != content_length:
+                raise BadDataException('Content-Length %d mismatches data size %d' % (len(buf), content_length))
         return response
 
     # synchronous DELETE
