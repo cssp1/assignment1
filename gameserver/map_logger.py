@@ -127,7 +127,10 @@ class MapLogger(object):
 
         tbl = self.log_table_name()
         if tbl:
-            nosql_client.log_record(tbl, map_time, {'feature_update':base_data}, log_ident = False)
+            log_entry = {'feature_update':base_data}
+            if incremental:
+                log_entry['incremental'] = 1
+            nosql_client.log_record(tbl, map_time, log_entry, log_ident = False)
 
         print base_id, ui_data
 
