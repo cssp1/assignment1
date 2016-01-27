@@ -1207,6 +1207,9 @@ function GameObject() {
     // cache for this.calc_draw_pos()
     this.draw_pos_cache = [[0,0],0];
 
+    // for graphics only, sprite scaling
+    this.cur_scale = [1,1];
+
     // for graphics only (fading-in/out effects), last object opacity
     /** @type {number} */
     this.cur_opacity = 1;
@@ -48577,6 +48580,9 @@ function do_draw() {
                 goog.array.forEach(phantom_objects, function(obj) {
                     obj.update_draw_pos();
                     draw_shadow(obj);
+                    if(obj.team === 'enemy') { // special case for enemy deployment markers
+                        draw_selection_highlight(obj, 'enemy');
+                    }
                 });
 
                 // draw selection
@@ -50437,10 +50443,19 @@ function draw_unit(unit) {
         unit.last_opacity_time = Math.max(client_time, unit.last_opacity_time);
     }
 
+    var scale = unit.cur_scale;
+
     if(sprite) {
-        if(alpha != 1) { ctx.save(); ctx.globalAlpha = alpha; }
-        GameArt.assets[sprite].draw(xy, unit.interpolate_facing(), client_time, state);
-        if(alpha != 1) { ctx.restore(); }
+        var has_state = ((alpha != 1) || (scale[0] != 1) || (scale[1] != 1));
+        var draw_xy = xy;
+        if(has_state) { ctx.save(); }
+        if(alpha != 1) { ctx.globalAlpha = alpha; }
+        if(scale[0] != 1 || scale[1] != 1) {
+            ctx.transform(scale[0], 0, 0, scale[1], xy[0], xy[1]);
+            draw_xy = [0,0];
+        }
+        GameArt.assets[sprite].draw(draw_xy, unit.interpolate_facing(), client_time, state);
+        if(has_state) { ctx.restore(); }
     }
 
     if(unit.hp > 0 && unit.spec['elite_marker_offset'] && (SPFX.detail < 2) && !player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx'])) {

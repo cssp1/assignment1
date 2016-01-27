@@ -1696,6 +1696,13 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.when = when;
     this.start_time = -1; // determined after "when"
     this.end_time = -1;
+    this.alpha = (('alpha' in data) ? /** @type {number} */ (data['alpha']) : 1);
+    this.pulse_period = (('pulse_period' in data) ? /** @type {number} */ (data['pulse_period']) : -1);
+    this.alpha_pulse_amplitude = (('alpha_pulse_amplitude' in data) ? /** @type {number} */ (data['alpha_pulse_amplitude']) : -1);
+    this.scale_pulse_amplitude = (('scale_pulse_amplitude' in data) ? /** @type {number} */ (data['scale_pulse_amplitude']) : -1);
+    this.pulse_phase = (('pulse_phase' in instance_data) ? /** @type {number} */ (instance_data['pulse_phase']) : 0);
+    this.sprite_scale = (instance_data && 'sprite_scale' in instance_data ? SPFX.get_vec_parameter(instance_data['sprite_scale']) : ((data && 'sprite_scale' in data) ? SPFX.get_vec_parameter(data['sprite_scale']) : [1,1]));
+
     this.duration = (!('duration' in data) || /** @type {number} */ (data['duration']) >= 0) ? (/** @type {number} */ (data['duration']) || 3.0) : -1;
     this.end_at_dest = (('end_at_dest' in data) ? /** @type {boolean} */ (data['end_at_dest']) : true);
 
@@ -1705,7 +1712,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.obj.spec = gamedata['units']['spec' in instance_data ? /** @type {string} */ (instance_data['spec']) : /** @type {string} */ (data['spec'])];
     this.obj.x = pos[0]; this.obj.y = pos[1];
     this.obj.hp = this.obj.max_hp = 0;
-    this.obj.team = 'none';
+    this.obj.team = ('team' in data ? /** @type {string} */ (data['team']) : 'none');
     this.obj.level = (instance_data ? /** @type {number|undefined} */ (instance_data['level']) : null) || 1;
     this.obj.update_stats();
     this.obj.combat_stats.maxvel *= /** @type {number|undefined} */ (data['maxvel']) || 1;
@@ -1794,19 +1801,37 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
         }
 
         // fade out after the specified duration or after reaching destination
+        var alpha = this.alpha;
+        var scale = this.sprite_scale;
+
+        if(this.pulse_period > 0) {
+            var pulse = Math.sin((SPFX.time/this.pulse_period + this.pulse_phase)*2*Math.PI);
+            if(this.alpha_pulse_amplitude > 0) {
+                alpha *= (1-this.alpha_pulse_amplitude) + this.alpha_pulse_amplitude * pulse;
+            }
+            if(this.scale_pulse_amplitude > 0) {
+                scale = vec_mul(scale, [1 + 0.5*this.scale_pulse_amplitude*(pulse+1),
+                                        1 + 0.5*this.scale_pulse_amplitude*(pulse+1)]);
+            }
+        }
+
+        this.obj.cur_scale = scale;
+
         if(this.end_time > 0) {
             this.obj.cur_opacity = 0;
-            this.obj.last_opacity = 1;
+            this.obj.last_opacity = alpha;
             this.obj.last_opacity_time = this.end_time - gamedata['client']['unit_fade_time'];
         } else if(this.end_at_dest && this.obj.dest && vec_equals(this.obj.pos, this.obj.dest)) {
             if(this.obj.cur_opacity != 0) {
                 this.obj.cur_opacity = 0;
-                this.obj.last_opacity = 1;
+                this.obj.last_opacity = alpha;
                 this.obj.last_opacity_time = client_time;
             } else if(this.obj.last_opacity == 0) {
                 // remove this because it's reached its destination and faded out
                 return null;
             }
+        } else {
+            this.obj.cur_opacity = alpha;
         }
     }
 
