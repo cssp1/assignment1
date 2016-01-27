@@ -20,6 +20,8 @@
 "battle_history_time_column": 1, // display "Time" in separate column instead of part of "attacker" (must be enabled together with show_attackability)
 "battle_history_location_column": 1, // display "Location" column
 
+"battle_history_deployment_markers": 1, // enable "Show where attacker deployed units against you"
+
 "combat_resource_bars_show_space": 1, // enable unit space display on combat resource bars
 "combat_resource_bars_show_time": 1, // enable attack time display on combat resource bars
 

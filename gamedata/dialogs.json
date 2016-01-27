@@ -5320,6 +5320,11 @@
             "friend_icon2": { "kind": "FriendIcon", "xy": [221, 230], "dimensions": [50,73], "state": "disabled" },
             //
 
+            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+                                     "bg_image_resizable": 1,
+                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
+                                     "ui_tooltip": "Show where the latest attacker deployed units","tooltip_delay": 0},
+
             "you_endured": { "kind": "TextField", "xy": [32,308], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                              "text_color": [0,0.85,0,1],
                              "text_hjustify": "left",
@@ -6375,6 +6380,12 @@
                        "text_hjustify": "left", "ui_name": "Battle Log" },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Battle Log"},
+
+            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [540,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+                                     "bg_image_resizable": 1,
+                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
+                                     "ui_tooltip": "Show where the attacker deployed units","tooltip_delay": 0},
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
@@ -8325,6 +8336,17 @@
             "close_button": { "kind": "ActionButton", "xy": [426,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "TextField", "xy": [108,38], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 15, "text_leading": 15,
                              "text_vjustify": "top", "ui_name": "Click and drag with the mouse to scroll the map." }
+        }
+    },
+
+    "deployment_markers_notice": {
+        "dimensions": [451, 88],
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,88], "asset": "tooltip_bg", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [8,9], "dimensions": [72,72], "clip_to": [12,11,65,67], "asset": "valentina_72x72" },
+            "close_button": { "kind": "ActionButton", "xy": [426,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "description": { "kind": "TextField", "xy": [108,0], "dimensions": [335,68], "text_hjustify": "left",  "text_size": 15,
+                             "text_vjustify": "center", "ui_name": "Showing where %attacker deployed units.\nClick \"X\" to close." }
         }
     },
 

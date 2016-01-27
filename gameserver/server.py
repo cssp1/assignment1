@@ -4791,6 +4791,7 @@ class Session(object):
             gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
             self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
 
+        self.deployed_units = {}
         self.has_attacked = True
         self.debug_log_action('deploy_ai_attack')
 
@@ -4899,6 +4900,7 @@ class Session(object):
                     retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
 
                 self.log_attack_unit(self.incoming_attack_id, obj, '3910_unit_deployed', props = {'method':'ai_attack'})
+                self.deployed_units[obj.spec.name] = self.deployed_units.get(obj.spec.name,0) + 1
                 if self.damage_log: self.damage_log.init(obj)
                 movecount += 1
 
@@ -16702,6 +16704,7 @@ class GAMEAPI(resource.Resource):
                                     summary[role+'_alliance_'+FIELD] = cache[FIELD]
                     if session.viewing_base.base_region: summary['base_region'] = session.viewing_base.base_region
                     if session.defending_squads: summary['defending_squads'] = session.defending_squads.keys()
+                    if session.deployed_units: summary['deployed_units'] = session.deployed_units.copy()
                     if session.deployable_squads: summary['deployable_squads'] = session.deployable_squads.keys()
                     if session.items_expended: summary['items_expended'] = copy.deepcopy(session.items_expended)
                     if session.damage_log:

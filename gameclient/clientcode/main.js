@@ -46,6 +46,7 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
+goog.require('DeploymentMarkers');
 goog.require('Dripper');
 goog.require('Bounce');
 goog.require('CombatEngine');
@@ -16013,6 +16014,26 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     if(gamedata['client']['auto_show_battle_log']) {
         notification_queue.push(function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); });
     }
+
+    var most_recent_summary = recent_attacks[recent_attacks.length-1];
+    if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
+        dialog.widgets['show_markers_button'].show = true;
+        dialog.widgets['show_markers_button'].onclick = (function (_summary) { return function(w) {
+            var locker = invoke_ui_locker_until_closed();
+            // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
+            // and is missing defender_id
+            get_battle_log(_summary['time'], _summary['attacker_user_id'], session.user_id,
+                           _summary['base_id'] || null,
+                           (function (__summary, _locker) { return function(result) {
+                               close_dialog(_locker);
+                               if(result) {
+                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result);
+                               } else {
+                                   invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['loading_text']['ui_name_unavailable'], '', {'dialog': 'message_dialog'});
+                               }
+                           }; })(_summary, locker));
+        }; })(most_recent_summary);
+    }
 };
 
 function test_you_were_attacked_dialog() {
@@ -26693,6 +26714,41 @@ function get_battle_log(battle_time, attacker_id, defender_id, base_id, cb) {
     send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, tag]);
 };
 
+// given a battle summary, determine if we can shot deployment markers
+function can_show_deployment_markers_for_battle_summary(summary) {
+    if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
+    return (summary['base_id'] === session.viewing_base.base_id &&
+            ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
+             vec_equals(summary['base_ncells'], (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
+            ('deployed_units' in summary) &&
+            goog.object.getCount(summary['deployed_units']) >= 1);
+}
+// given a battle log, turn on the deployment markers for it
+function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
+    // mimic normal unit deployment spread
+    var radius = player.get_any_abtest_value('unit_deploy_spread', gamedata['unit_deploy_spread']);
+    var ncells = session.viewing_base.ncells();
+
+    var deployments = [];
+    goog.array.forEach(log, function(e) {
+        if(e['event_name'] === '3910_unit_deployed' && e['user_id'] === attacker_id) {
+            var spec = gamedata['units'][e['unit_type']];
+            if(!spec) { return; }
+
+            var pos = [clamp(e['x']+radius*(Math.random()-0.5), 0, ncells[0]-1),
+                       clamp(e['y']+radius*(Math.random()-0.5), 0, ncells[1]-1)];
+
+            deployments.push({specname: e['unit_type'],
+                              level: e['level'],
+                              altitude: get_leveled_quantity(spec['altitude'] || 0, e['level']),
+                              pos: pos});
+        }
+    });
+    if(deployments.length < 1) { return; }
+    change_selection_ui(null);
+    DeploymentMarkers.invoke_gui(attacker_name, deployments);
+}
+
 function receive_battle_log_result(dialog, ret) {
     if(!ret) {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
@@ -26711,6 +26767,15 @@ function receive_battle_log_result(dialog, ret) {
         dialog.widgets['log'].max_lines = parsed.length+10;
         for(var line = 0; line < parsed.length; line++) {
             dialog.widgets['log'].append_text(parsed[line]);
+        }
+
+        // see if we can show deployment markers for this
+        var summary = dialog.user_data['summary'];
+        if(can_show_deployment_markers_for_battle_summary(summary)) {
+            dialog.widgets['show_markers_button'].show = true;
+            dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
+                show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
+            }; })(summary, ret);
         }
     }
     dialog.widgets['log'].scroll_to_top();
@@ -46850,7 +46915,9 @@ function do_on_mouseup(e) {
                       /* enable if not in combat (where "combat" explicitly excludes reinforcement mode at a friendly quarry/squad) */
                       (!session.has_attacked || (!session.home_base && session.viewing_user_id == session.user_id)) &&
                       (found.is_building() || found.is_inert()) &&
-                      (session.home_base || !found.spec['quarry_invul'] || found.is_producer())) {
+                      (session.home_base || !found.spec['quarry_invul'] || found.is_producer()) &&
+                      (!selection.ui || !selection.ui.user_data || selection.ui.user_data['dialog'] !== 'deployment_markers_notice')
+                     ) {
                 // naked click on a player's own building
                 change_selection(found);
                 var allow_invoke = true;
