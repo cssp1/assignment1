@@ -17482,6 +17482,8 @@ class GAMEAPI(resource.Resource):
         if pre_attack and (not cannot_spy): # immediately proceed with attack attempt
             do_attack_retmsg = [] # collect error messages separately
             attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
+            if not attack_success:
+                session.release_pre_locks() # drop any pre-attack locks immediately
 
             if pre_attack >= 2: # pre-auto-resolve
                 if attack_success:
