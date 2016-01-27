@@ -10636,7 +10636,9 @@ class Player(AbstractPlayer):
                 'attacker_level':summary['attacker_level'],
                 'defender_outcome':summary['defender_outcome'],
                 'base_id': summary['base_id'],
+                'base_ncells': summary['base_ncells'],
                 'base_damage': summary['base_damage'],
+                'deployed_units': summary.get('deployed_units',{}),
                 'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),
                 'killed_units':sum(summary['loot'].get('units_lost', {}).itervalues()),
                 'defender_xp':summary['loot'].get('defender_xp', 0),
@@ -17539,6 +17541,7 @@ class GAMEAPI(resource.Resource):
                              'facebook_friends',
                              'attacker_name', 'defender_name',
                              'attacker_level', 'defender_level',
+                             'deployed_units',
                              'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
 
     def query_battle_history(self, session, retmsg, arg):
