@@ -17173,7 +17173,13 @@ class GAMEAPI(resource.Resource):
                     # always permit hive destruction when CC is dead at the end of the fight
                     session.defender_cc_standing = True
 
-            session.pvp_balance = None
+            if session.viewing_player is not session.player and \
+               session.viewing_player.is_human() and \
+               gamedata['prevent_same_alliance_attacks'] and \
+               session.player.is_same_alliance(session.viewing_player.user_id):
+                session.pvp_balance = 'same_alliance'
+            else:
+                session.pvp_balance = None
 
             if gamesite.nosql_client:
                 spyee_lock_state = gamesite.nosql_client.map_feature_lock_get_state_batch(session.player.home_region, [session.viewing_base.base_id], reason = 'spy_quarry')[0][0]
