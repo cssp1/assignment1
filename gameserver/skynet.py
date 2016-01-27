@@ -765,13 +765,22 @@ def adstats_record(db, adgroup_list, time_range):
                'adgroup_id': str(adgroup['id']),
                # deliberately denormalize name, dtgt, campaign_id, and created_time into here so we can pull historical stats without relying on the source adgroups still being in the database
                'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(adgroup['adset_id']), 'created_time': adgroup['created_time'],
-               'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup)
+               'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup),
+               'clicks': 0
                }
 
         # copy the adstat counters and fields we want to store
-        if 'clicks' not in obj:
+
+        # note: as of API v2.5, the "clicks" field seems broken (it reports 0 instead of the actual data)
+        if 'actions' in stat:
+            if 'clicks' in stat: del stat['clicks'] # get rid of bad data
+            for a in stat['actions']:
+                if a['action_type'] == 'link_click':
+                    obj['clicks'] = a['value']
+
+        elif 'clicks' not in stat:
             # oh dear, Facebook made click counting really complicated now
-            obj['clicks'] = sum((obj.get(CLICK_TYPE, 0) for CLICK_TYPE in ('website_clicks','app_store_clicks','call_to_action_clicks','inline_link_clicks','deeplink_clicks')),
+            obj['clicks'] = sum((stat.get(CLICK_TYPE, 0) for CLICK_TYPE in ('website_clicks','app_store_clicks','call_to_action_clicks','inline_link_clicks','deeplink_clicks')),
                                 0)
 
         for FIELD in ADSTATS_COUNTERS:
