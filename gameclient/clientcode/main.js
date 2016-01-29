@@ -40345,6 +40345,7 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     dialog.user_data['unit'] = (preselect || selection.unit); // buildings only
     dialog.user_data['techname'] = techname;
     dialog.user_data['tech'] = (techname !== 'BUILDING' ? gamedata['tech'][techname] : null);
+    dialog.user_data['equip_slots_by_type'] = {};
     dialog.user_data['prev_dialog'] = prev_dialog;
     dialog.user_data['context'] = null;
     dialog.user_data['feature_scroll'] = 0;
