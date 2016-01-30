@@ -8,28 +8,29 @@
 
 # RESTORE INSTRUCTIONS
 
-# 1. get Tim Kay's aws script (from game/aws/aws)
-# 2. put an IAM key with spinpunch-backups read access in ~/.awssecret and chmod 0700
-# 3. download the files, (PUT THEM ON FAST SSD DRIVE!) e.g.:
-#      for F in `~/aws ls -1 spinpunch-backups/battlefrontmars-player-data-20140926/`; do if [ `echo $F | grep mongo` ]; then ~/aws get --progress spinpunch-backups/$F $F; fi; done
-# 4. untar
+# 1. Download the files (PUT THEM ON FAST SSD DRIVE!) e.g.:
+#      for F in `/usr/bin/aws s3 ls s3://spinpunch-backups/summonersgate-player-data-20160129/mongo | awk '{print $4;}'`; do /usr/bin/aws s3 cp s3://spinpunch-backups/summonersgate-player-data-20160129/${F} .; done
+# 2. untar
 #      for F in *.tar.gz; do tar zxvf $F; done
-# 5. start MongoDB with auth=false and with bind_ip=127.0.0.1
-# 6. restore admin database
-#      mongorestore --drop admin
-# 7. restore game databases
-#      for F in mfprod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop $F; done
-# 8. restart MongoDB with auth=true and bind_ip off
-# 9. if moving to new ephemeral storage, check that the SCRATCH_DIR exists!
+# 3. start MongoDB with auth=false and with bind_ip=127.0.0.1
+# 4. restore admin database
+#      mongorestore --drop -d admin admin
+# 5. restore game databases
+#      for F in ${GAMR_ID}prod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop -d $F $F; done
+# 6. restart MongoDB with auth=true and bind_ip off
+# 7. if moving to new ephemeral storage, check that the SCRATCH_DIR exists!
 
-# script to "catch up" new facebook_id_map entries to avoid losing accounts:
-# grep created_new_account longs/20140528-metrics.json > /tmp/z
+# script to "catch up" new facebook_id_map entries to avoid losing accounts (on game server):
+# (for F in  logs/201601{28,29,30}-metrics.json; do env grep created_new_account $F; done) > /tmp/z
+# import json
 # out = open('/tmp/cmds', 'w')
 # for line in open('/tmp/z'):
 #    data = json.loads(line)
-#    print >> out, 'var user_id = %d, fb_id = "%s"; db.mf_facebook_id_map.save({_id:fb_id, user_id:NumberInt(user_id)});' % (data['user_id'], data['social_id'][2:] if data['social_id'].startswith('fb') else data['social_id'])
+#    print >> out, 'var user_id = %d, fb_id = "%s"; db.${GAME_ID}_facebook_id_map.save({_id:fb_id, user_id:NumberInt(user_id)});' % (data['user_id'], data['social_id'][2:] if data['social_id'].startswith('fb') else data['social_id'])
+#
+# < /tmp/cmds ./mongo.py ${GAME_ID}
 #  to check for data loss:
-#    print >> out, 'var user_id = %d, fb_id = "%s"; printjson(db.mf_facebook_id_map.findOne({_id:fb_id}));' % (data['user_id'], data['social_id'][2:])
+#    print >> out, 'var user_id = %d, fb_id = "%s"; printjson(db.${GAME_ID}_facebook_id_map.findOne({_id:fb_id}));' % (data['user_id'], data['social_id'][2:])
 
 
 import sys, os, time, socket, getopt, subprocess

@@ -12,6 +12,11 @@ sudo chkconfig nscd on
 echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && sudo tar zxvf /home/ec2-user/overlay-mongo.tar.gz)
 
+sudo chmod 0777 /etc/init.d
+sudo chmod 0755 /etc/init.d/disable-transparent-hugepages
+sudo chkconfig --add disable-transparent-hugepages
+sudo /etc/init.d/disable-transparent-hugepages start
+
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools
 
