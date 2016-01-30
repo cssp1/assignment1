@@ -134,6 +134,27 @@ class NoSQLClient (object):
         assert len(ret) == 24
         return ret
 
+    # sometimes we need to know which of several unique indexes (on one collection) is responsible for a DuplicateKeyError.
+    # this function parses the error message to look for a matching collection/index name.
+    duplicate_key_re1 = re.compile('^E11000 duplicate key error index: [^\.]+\.([^\.]+)\.\$(\S+)')
+    duplicate_key_re2 = re.compile('^E11000 duplicate key error collection: [^\.]+\.([^\.]+) index: (\S+)')
+    @classmethod
+    def duplicate_key_error_is_for_index(cls, e, collection_name, index_name):
+        assert e.code == 11000 # sanity check
+
+        arg = e.args[0]
+
+        # MongoDB has used different syntaxes for this :(
+        # E11000 duplicate key error index: trtest_dan.trtest_alliances.$_id_  dup key: { : 1 }
+        # E11000 duplicate key error collection: sgprod_alliances.sg_alliances index: chat_tag_1 dup key: { : "IDS" }
+        match = cls.duplicate_key_re1.match(arg) or cls.duplicate_key_re2.match(arg)
+        if not match:
+            raise Exception('unrecognized DuplicateKeyError arg: %r' % arg)
+        match_collection, match_index = match.groups()
+        if match_collection.endswith(collection_name) and match_index.startswith(index_name):
+            return True
+        return False
+
     # must match dbserver.py and server.py definitions of these lock states
     LOCK_OPEN = 0
     LOCK_LOGGED_IN = 1
@@ -1005,13 +1026,14 @@ class NoSQLClient (object):
                     tbl.insert_one({'_id':socid, 'user_id':int(my_id)})
                     return my_id
                 except pymongo.errors.DuplicateKeyError as e:
-                    # E11000 duplicate key error index: trtest_dan.facebook_id_table.$user_id_1  dup key: { : 1 }
-                    if e.code == 11000 and ('facebook_id_table.$user_id_' in e.args[0]):
+                    if self.duplicate_key_error_is_for_index(e, 'facebook_id_map', 'user_id'):
                         # user_id race condition
                         continue
-                    else:
+                    elif self.duplicate_key_error_is_for_index(e, 'facebook_id_map', '_id'):
                         # _id duplication
                         return int(tbl.find_one({'_id':socid})['user_id'])
+                    else:
+                        raise
         else:
             return -1
 
@@ -1972,13 +1994,12 @@ class NoSQLClient (object):
                 tbl.insert_one(props)
                 break
             except pymongo.errors.DuplicateKeyError as e:
-                # E11000 duplicate key error index: trtest_dan.alliances.$_id_  dup key: { : 1 }
-                if ('alliances.$_id_' in e.args[0]):
+                if self.duplicate_key_error_is_for_index(e, 'alliances', '_id'):
                     # _id race condition
                     continue
-                elif ('alliances.$chat_tag_' in e.args[0]):
+                elif self.duplicate_key_error_is_for_index(e, 'alliances', 'chat_tag'):
                     return -1, "CANNOT_CREATE_ALLIANCE_TAG_IN_USE"
-                elif ('alliances.$ui_name_' in e.args[0]):
+                elif self.duplicate_key_error_is_for_index(e, 'alliances', 'ui_name'):
                     return -1, "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
                 else:
                     raise
@@ -2025,9 +2046,9 @@ class NoSQLClient (object):
             if ret.matched_count > 0:
                 return True, None
         except pymongo.errors.DuplicateKeyError as e:
-            if ('alliances.$chat_tag_' in e.args[0]):
+            if self.duplicate_key_error_is_for_index(e, 'alliances', 'chat_tag'):
                 return False, "CANNOT_CREATE_ALLIANCE_TAG_IN_USE"
-            elif ('alliances.$ui_name_' in e.args[0]):
+            if self.duplicate_key_error_is_for_index(e, 'alliances', 'ui_name'):
                 return False, "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
             else:
                 raise
@@ -2813,6 +2834,7 @@ if __name__ == '__main__':
         alliance_2 = client.create_alliance(u'Mars Federation', "We are cool", 'anyone', 1113, 'bullseye_tan', time_now, 'fb', chat_tag='123')[0]
         assert alliance_2 > 0
         assert client.create_alliance(u'Temp Alliance', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb')[0] > 0
+        assert client.create_alliance(u'Temp Alliance 2', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb', chat_tag = '123')[0] < 0 # duplicate chat tag
 
         print "ALLIANCE INFO (single)", client.get_alliance_info(alliance_2, reason = 'test')
         print "ALLIANCE INFO (single, with roles)", client.get_alliance_info(alliance_2, get_roles = True, reason = 'test')
@@ -2830,6 +2852,7 @@ if __name__ == '__main__':
         assert client.join_alliance(1113, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
 
         assert client.modify_alliance(alliance_1, 1112, ui_name = 'New Democratic Mars Union', chat_tag='ABC')[0]
+        assert not client.modify_alliance(alliance_1, 1112, chat_tag='123')[0] # duplicate chat tag
         assert not client.modify_alliance(alliance_1, 1119, ui_name = 'New Democratic Mars Union')[0] # permissions fail
         assert not client.modify_alliance(alliance_1, 1112, ui_name = 'Mars Federation')[0] # duplicate name
         assert not client.modify_alliance(alliance_2, 1113, chat_tag='ABC')[0] # duplicate tag
