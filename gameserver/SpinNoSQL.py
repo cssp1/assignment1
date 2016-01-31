@@ -136,17 +136,17 @@ class NoSQLClient (object):
 
     # sometimes we need to know which of several unique indexes (on one collection) is responsible for a DuplicateKeyError.
     # this function parses the error message to look for a matching collection/index name.
-    duplicate_key_re1 = re.compile('^E11000 duplicate key error index: [^\.]+\.([^\.]+)\.\$(\S+)')
-    duplicate_key_re2 = re.compile('^E11000 duplicate key error collection: [^\.]+\.([^\.]+) index: (\S+)')
+    duplicate_key_re1 = re.compile(r'^.*E11000 duplicate key error index: [^\.]+\.([^\.]+)\.\$(\S+)')
+    duplicate_key_re2 = re.compile(r'^.*E11000 duplicate key error collection: [^\.]+\.([^\.]+) index: (\S+)')
     @classmethod
     def duplicate_key_error_is_for_index(cls, e, collection_name, index_name):
         assert e.code == 11000 # sanity check
-
         arg = e.args[0]
 
-        # MongoDB has used different syntaxes for this :(
+        # MongoDB has used several different syntaxes for this error message :(
         # E11000 duplicate key error index: trtest_dan.trtest_alliances.$_id_  dup key: { : 1 }
         # E11000 duplicate key error collection: sgprod_alliances.sg_alliances index: chat_tag_1 dup key: { : "IDS" }
+        # insertDocument :: caused by :: 11000 E11000 duplicate key error index: mf2prod_alliances.mf2_alliances.$chat_tag_1 dup key: { : "TDB" }
         match = cls.duplicate_key_re1.match(arg) or cls.duplicate_key_re2.match(arg)
         if not match:
             raise Exception('unrecognized DuplicateKeyError arg: %r' % arg)
