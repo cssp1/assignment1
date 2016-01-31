@@ -2705,7 +2705,7 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
             agg_result_cursor = skynet_db.fb_adstats_hourly.aggregate([
                 {'$match': qs},
                 {'$group':{'_id':'ALL', 'spent':{'$sum':'$spent'}}}
-                ])['result']
+                ])
 
             total_spent = 0.0
             for agg_result in agg_result_cursor: # note: might have no data to iterate over
