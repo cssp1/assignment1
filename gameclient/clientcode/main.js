@@ -32028,7 +32028,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     var virtual_item = {'spec':leader_spec['name'], 'level': rec['level'] || 1};
     ItemDisplay.display_item(dialog.widgets['item'], virtual_item, {context_parent: dialog.parent});
 
-    //dialog.widgets['item'].widgets['frame'].tooltip.str = null;
+    /* old code to hide standard inventory tooltip when recipe ui_description is unique
     ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['item'].widgets['frame']);
 
     if(recipe_ui_description) { // manual override
@@ -32036,6 +32036,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     } else {
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
     }
+    */
 
     dialog.widgets['name'].str = recipe_ui_name || ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
     dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
