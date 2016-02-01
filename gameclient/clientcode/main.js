@@ -39115,7 +39115,8 @@ function update_new_store_sku(d) {
             if(((!('activation' in spell)) || spell['activation'] == 'instant')) {
                 if(d.user_data['should_confirm_purchase']) {
                     var ui_name = d.widgets['name'].str.replace(/\n/g, ' ');
-                    confirm_purchase(goog.partial(order_cb, null), ui_name, d.user_data['ui_price_str'], skudata['ui_purchase_confirm'] || spell['ui_purchase_confirm'] || null);
+                    confirm_purchase(goog.partial(order_cb, null), ui_name, d.user_data['ui_price_str'],
+                                     eval_cond_or_literal(skudata['ui_purchase_confirm'] || spell['ui_purchase_confirm'] || null, player, null));
                 } else {
                     order_cb(null);
                 }
