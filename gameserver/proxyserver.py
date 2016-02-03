@@ -2153,7 +2153,7 @@ class GameProxy(proxy.ReverseProxyResource):
                                 user_id = social_id_table.social_id_to_spinpunch('fb'+facebook_id, False)
 
                             # fallback - pull user_id from new request_id format
-                            if (not user_id) and len(response.get('request_id','').split('_'))==4:
+                            if (not user_id) and len(response.get('request_id','').split('_'))>=4:
                                 user_id = int(response['request_id'].split('_')[1])
 
                             if not user_id:
