@@ -1,10 +1,10 @@
 #!/bin/sh
 
-YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
-YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
+YUMPACKAGES="git munin-node nscd patch pinentry screen strace subversion xfsprogs"
+YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel openssl-devel"
 YUMPACKAGES+=" gcc autoconf automake libtool"
 YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres client + python libs only
-YUMPACKAGES+=" mysql MySQL-python" # note: MySQL server + client + python libs
+YUMPACKAGES+=" MySQL-python27" # note: MySQL client + python libs only
 YUMPACKAGES+=" mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools" # note: full MongoDB server
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
@@ -26,7 +26,7 @@ echo "SETUP(remote): Unpacking filesystem overlay..."
 
 # fix permissions
 sudo chown -R root:root /etc
-sudo chmod 0755 / /etc /etc/mail /etc/ssh /etc/security /etc/sysconfig
+sudo chmod 0755 / /etc /etc/ssh /etc/security /etc/sysconfig
 sudo chmod 0664 /etc/sysctl.conf
 sudo chmod 0644 /etc/security/limits.conf
 sudo chmod 0775 /etc/rc.d/rc.local
@@ -47,7 +47,6 @@ echo "SETUP(remote): analytics1 setup done!"
 
 echo "/etc/fstab"
 echo "/etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
-echo "fix-ec2-mail.py (requires hostname to be correct)"
 
 # PYTHON PACKAGES
 echo "switch /etc/alternatives/python,pip,python-config to v2.7"
@@ -58,9 +57,8 @@ echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade asana" # for Ship Schedule integration
-echo "pip install --upgrade tensorflow"
+echo "pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.5.0-cp27-none-linux_x86_64.whl"
 
-echo "MISSING: /etc/cron.spinpunch.mysql-daily/99-report-slow-queries.sh email"
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/analytics1.pem (also .ssh/config with Host/User/IdentityFile)"
@@ -90,4 +88,3 @@ echo "MISSING: mysql config for analytics (or RDS - if local, use /usr/bin/mysql
 # grant select, insert, drop, alter, create temporary tables, lock tables, execute, create view, show view on skynet.* to 'username'@'%';
 
 echo "MISSING: see setup-there-mongo.sh for MongoDB setup instructions"
-echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
