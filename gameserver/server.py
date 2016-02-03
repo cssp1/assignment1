@@ -15181,7 +15181,7 @@ class Store(object):
                         discovered_where = 'messages'
 
 
-                if 'metrics_description' in loot_table:
+                if ('metrics_description' in loot_table) and items:
                     extra_description = Predicates.eval_cond_or_literal(loot_table['metrics_description'], session, session.player)
                     if extra_description:
                         price_description.append(extra_description)
