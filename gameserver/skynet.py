@@ -1129,6 +1129,10 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     variable = 'actual_receipts'
                     variable_key = 'value'
                     variable_coeff = 100.0
+                elif stage['stage'] == 'A97 Made A Payment':
+                    variable = 'payers'
+                    variable_key = 'yes'
+                    variable_coeff = 1
                 else:
                     for NAME, VAR in [('A10 Mean 1-Day Receipts/User', 'actual_receipts_d1'),
                                       ('A11 Mean 3-Day Receipts/User', 'actual_receipts_d3'),
@@ -1377,9 +1381,9 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     else:
                         ui_tactical = ''
 
-                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s (E90 %s%s) Spent %9s Receipts %9s \"ROI\" %3.0f%% %s" % \
+                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s (E90 %s%s) Spent %9s Rcpt %9s (N=%3d) \"ROI\" %3.0f%% %s" % \
                           ((time_sample['ui_name']+' ') if time_sample['ui_name'] else '',
-                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, skynet_ltvs, final_ltvs, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), roi_pct, ui_tactical)
+                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, skynet_ltvs, final_ltvs, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), group['payers'], roi_pct, ui_tactical)
 
     if tactical_actions:
         print 'PLAN:\n' + '\n'.join(map(repr, tactical_actions))

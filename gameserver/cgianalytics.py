@@ -1816,6 +1816,8 @@ FUNNEL_BASIC = [
      'func': lambda user: skynet_ltv_estimate(user, use_post_install_data = 10) },
     {'name': 'A54 Actual 90-Day Total Receipts', 'aggregate': 'sum', 'mandatory_age': 90*24*60*60, 'func': lambda user: money_spent_within(user,90) },
 
+    {'name': 'A97 Made A Payment', 'func': lambda user: user.get('money_spent',0) > 0 },
+
     {'name': 'A98 Mean Receipts/User', 'aggregate': 'mean', 'func': lambda user: user.get('money_spent',0), },
     {'name': 'A99 Total Receipts', 'aggregate': 'sum', 'func': lambda user: user.get('money_spent',0) },
     ]
