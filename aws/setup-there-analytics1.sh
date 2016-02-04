@@ -14,16 +14,21 @@ YUMPACKAGES+=" libstdc++48" # for TensorFlow
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
 
+echo "SETUP(remote): Unpacking filesystem overlay..."
+(cd / && sudo tar zxvf /home/ec2-user/overlay-analytics1.tar.gz)
+
 sudo chkconfig munin-node on
 sudo chkconfig --add nscd
 sudo chkconfig nscd on
 sudo /etc/init.d/nscd start
 
+sudo chmod 0777 /etc/init.d
+sudo chmod 0755 /etc/init.d/disable-transparent-hugepages
+sudo chkconfig --add disable-transparent-hugepages
+sudo /etc/init.d/disable-transparent-hugepages start
+
 sudo chkconfig mongod on
 sudo chkconfig mysqld off # moved to RDS
-
-echo "SETUP(remote): Unpacking filesystem overlay..."
-(cd / && sudo tar zxvf /home/ec2-user/overlay-analytics1.tar.gz)
 
 # fix permissions
 sudo chown -R root:root /etc
