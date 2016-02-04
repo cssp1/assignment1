@@ -19,6 +19,7 @@ sudo chkconfig --add nscd
 sudo chkconfig nscd on
 sudo /etc/init.d/nscd start
 
+sudo chkconfig mongod on
 sudo chkconfig mysqld off # moved to RDS
 
 echo "SETUP(remote): Unpacking filesystem overlay..."
@@ -57,6 +58,7 @@ echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade asana" # for Ship Schedule integration
+echo "pip install --upgrade twisted" # for small dependencies (SpinHTTP.py - could be removed!)
 echo "pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.5.0-cp27-none-linux_x86_64.whl"
 
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"

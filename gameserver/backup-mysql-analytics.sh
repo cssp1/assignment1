@@ -8,7 +8,7 @@
 
 GAME_ID=`grep '"game_id":' config.json  | cut -d\" -f4 | sed 's/test//'`
 DBNAME=${GAME_ID}_upcache
-SAVE_DIR=/media/ephemeral0a/backup-scratch
+SAVE_DIR=/media/backup-scratch
 S3_PATH="spinpunch-backups/analytics"
 
 while getopts "d:" flag

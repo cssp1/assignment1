@@ -65,7 +65,7 @@ echo "    set readahead to 16kb on mongodb filesystems in /etc/udev/rules.d/85-e
 # blockdev --setra 32 /dev/xvdb # yes, 32 blocks means 16kb
 echo "    check /etc/mongod.conf and start server (use --quiet)"
 # MongoDB 2.4: db.addUser(), MongoDB 2.6: createUser()
-echo "    use admin; db.createUser({user:'root',pwd:'PASSWORD',roles:['dbAdminAnyDatabase','userAdminAnyDatabase','readWriteAnyDatabase','clusterAdmin']});"
+echo "    use admin; db.createUser({user:'root',pwd:'PASSWORD',roles:['root','dbAdminAnyDatabase','userAdminAnyDatabase','readWriteAnyDatabase','clusterAdmin']});"
 echo "after mongodb is set up: set --quiet flag in /etc/init.d/mongod OPTIONS; sudo chkconfig mongod on"
 echo "check fstab"
 echo "keys: /home/ec2-user/.ssh"

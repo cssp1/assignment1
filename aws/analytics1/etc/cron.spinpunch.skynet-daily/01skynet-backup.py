@@ -7,7 +7,7 @@ import boto.s3.connection
 import boto.s3.key
 
 ### HOST-SPECIFIC PARAMETERS
-SCRATCH_DIR = '/media/ephemeral0a/backup-scratch'
+SCRATCH_DIR = '/media/backup-scratch'
 mongo_root_password_filename = 'analytics1-mongo-root-password'
 backup_bucket = 'spinpunch-backups'
 backup_obj_prefix = 'skynet/$DATE-'
