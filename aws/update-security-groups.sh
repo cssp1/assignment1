@@ -13,7 +13,7 @@ function format_ip_list {
 
 function find_deletions {
     # find any existing ingress rules NOT in ip_list/port_list
-    GROUP_NAME=$1
+    GROUP_ID=$1
     export IP_LIST=$2
     export PORT_LIST=$3
     export GROUP_DESCR=$4
@@ -29,7 +29,7 @@ print json.dumps(deletions) if deletions else ''"
     }
 function find_additions {
     # find any new rules we need to add for ip_list/port_list
-    GROUP_NAME=$1
+    GROUP_ID=$1
     export IP_LIST=$2
     export PORT_LIST=$3
     export GROUP_DESCR=$4
@@ -54,20 +54,20 @@ print json.dumps(additions) if additions else ''"
     }
 function do_conform {
     # conform the security group to the correct ip_list/post_list
-    GROUP_NAME=$1
+    GROUP_ID=$1
     IP_LIST=$2
     PORT_LIST=$3
-    GROUP_DESCR=`aws ec2 describe-security-groups --group-name ${GROUP_NAME}`
-    DELETIONS=$(find_deletions "${GROUP_NAME}" "${IP_LIST}" "${PORT_LIST}" "${GROUP_DESCR}")
-    ADDITIONS=$(find_additions "${GROUP_NAME}" "${IP_LIST}" "${PORT_LIST}" "${GROUP_DESCR}")
+    GROUP_DESCR=`aws ec2 describe-security-groups --group-id ${GROUP_ID}`
+    DELETIONS=$(find_deletions "${GROUP_ID}" "${IP_LIST}" "${PORT_LIST}" "${GROUP_DESCR}")
+    ADDITIONS=$(find_additions "${GROUP_ID}" "${IP_LIST}" "${PORT_LIST}" "${GROUP_DESCR}")
 
     if [ "${DELETIONS}" != "" ]; then
-    echo "${GROUP_NAME} DELETE ${DELETIONS}"
-    aws ec2 revoke-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${DELETIONS}"
+    echo "${GROUP_ID} DELETE ${DELETIONS}"
+    aws ec2 revoke-security-group-ingress --group-id ${GROUP_ID} --ip-permissions "${DELETIONS}"
     fi
     if [ "${ADDITIONS}" != "" ]; then
-    echo "${GROUP_NAME} ADD ${ADDITIONS}"
-    aws ec2 authorize-security-group-ingress --group-name ${GROUP_NAME} --ip-permissions "${ADDITIONS}"
+    echo "${GROUP_ID} ADD ${ADDITIONS}"
+    aws ec2 authorize-security-group-ingress --group-id ${GROUP_ID} --ip-permissions "${ADDITIONS}"
     fi
 }
 
@@ -75,15 +75,18 @@ function do_conform {
 AWS_CLOUDFRONT_IPS=`curl -s https://ip-ranges.amazonaws.com/ip-ranges.json | \
     python -c 'import json, sys; print " ".join(x["ip_prefix"] for x in json.load(sys.stdin)["prefixes"] if x["service"] == "CLOUDFRONT")'`
 AWS_CLOUDFRONT_PORTS="80"
-do_conform "cloudfront" "${AWS_CLOUDFRONT_IPS}" "${AWS_CLOUDFRONT_PORTS}"
+do_conform "sg-584f7632" "${AWS_CLOUDFRONT_IPS}" "${AWS_CLOUDFRONT_PORTS}" # cloudfront
+do_conform "sg-7f070d06" "${AWS_CLOUDFRONT_IPS}" "${AWS_CLOUDFRONT_PORTS}" # cloudfront-vpc-sg
 
 # CloudFlare
 CLOUDFLARE_IPS=`curl -s https://www.cloudflare.com/ips-v4 | tr '\n' ' '`
 CLOUDFLARE_PORTS="80 443"
-do_conform "cloudflare" "${CLOUDFLARE_IPS}" "${CLOUDFLARE_PORTS}"
+do_conform "sg-d14a73bb" "${CLOUDFLARE_IPS}" "${CLOUDFLARE_PORTS}" # cloudflare
+do_conform "sg-a6060cdf" "${CLOUDFLARE_IPS}" "${CLOUDFLARE_PORTS}" # cloudflare-vpc-sg
 
 # Incapsula
 INCAPSULA_IPS=`curl -s --data "resp_format=text" https://my.incapsula.com/api/integration/v1/ips | grep -v '::' | tr '\n' ' '`
 INCAPSULA_PORTS="80 443"
-do_conform "incapsula" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}"
+do_conform "sg-e34f7689" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}" # incapsula
+do_conform "sg-54070d2d" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}" # incapsula-vpc-sg
 
