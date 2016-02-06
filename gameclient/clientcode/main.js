@@ -24797,6 +24797,37 @@ function friend_gift_dialog_setup_row(dialog, row, rowdata) {
 }
 
 function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, slot_n, ui_slot) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['equip_chooser']);
+    dialog.user_data['dialog'] = 'equip_chooser';
+    dialog.xy = [parent_widget.xy[0] + parent_widget.wh[0] + 10, parent_widget.xy[1] + parent_widget.wh[1] - dialog.wh[1]]; // - 60];
+    dialog.user_data['context'] = null;
+    dialog.user_data['scroll_pos'] = 0;
+    dialog.user_data['tech'] = tech;
+    dialog.user_data['unit'] = unit;
+    dialog.user_data['slot_type'] = slot_type;
+    dialog.user_data['slot_n'] = slot_n;
+    dialog.user_data['ui_slot'] = ui_slot;
+    dialog.modal = 0.5;
+
+    dialog.widgets['bg_close_button'].onclick =
+        dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    if(!update_equip_chooser(dialog)) { // didn't open
+        return null;
+    }
+
+    inv_dialog.add(dialog);
+    return dialog;
+}
+
+/** @return {boolean} false if the dialog is empty */
+function update_equip_chooser(dialog) {
+    var tech = dialog.user_data['tech'];
+    var unit = dialog.user_data['unit'];
+    var slot_type = dialog.user_data['slot_type'];
+    var slot_n = dialog.user_data['slot_n'];
+    var ui_slot = dialog.user_data['ui_slot'];
+
     var equip = null, host_spec = null;
     if(tech && ('associated_unit' in tech)) {
         // unit equipment
@@ -24873,38 +24904,30 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     // if no applicable equipment is available, give a help dialog
     if(items.length < 1 && !equipped_now_specname) {
         invoke_ingame_tip('no_equipment_tip', {frequency: GameTipFrequency.ALWAYS});
-        return null;
+        return false;
     }
 
-    // sort items by rarity
+    // sort items by level, then rarity
     items.sort(function(a, b) {
         var aspec = ItemDisplay.get_inventory_item_spec(a[1]['spec']), bspec = ItemDisplay.get_inventory_item_spec(b[1]['spec']);
+        var al = aspec['level'] || 1, bl = bspec['level'] || 1;
         var ar = aspec['rarity'] || 0, br = bspec['rarity'] || 0;
-        if(ar > br) {
+        if(al > bl) {
+            return -1;
+        } else if(al < bl) {
             return 1;
+        } else if(ar > br) {
+            return -1;
         } else if(ar < br) {
+            return 1;
+        } else if(aspec['name'] > bspec['name']) {
+            return 1;
+        } else if(aspec['name'] < bspec['name']) {
             return -1;
         } else {
             return 0;
         }
     });
-
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['equip_chooser']);
-    dialog.user_data['dialog'] = 'equip_chooser';
-    dialog.xy = [parent_widget.xy[0] + parent_widget.wh[0] + 10, parent_widget.xy[1] + parent_widget.wh[1] - dialog.wh[1]]; // - 60];
-    var extend = Math.max(items.length * dialog.data['widgets']['equip_item']['array_offset'][0], dialog.data['widgets']['bg']['min_extend']);
-    dialog.wh = [dialog.data['dimensions'][0] + extend, dialog.data['dimensions'][1]];
-    dialog.widgets['bg'].wh = vec_copy(dialog.wh);
-    dialog.widgets['close_button'].xy = vec_add(dialog.data['widgets']['close_button']['xy'], [extend,0]);
-    dialog.user_data['context'] = null;
-    dialog.modal = 0.5;
-
-    var go_away = (function(_inv_dialog) { return function(w) {
-        close_parent_dialog(w);
-    }; })(inv_dialog);
-
-    dialog.widgets['bg_close_button'].onclick =
-        dialog.widgets['close_button'].onclick = go_away;
 
     // handlers for the "equip nothing" button
     dialog.widgets['equip_nothing_frame'].state = 'normal';
@@ -24951,17 +24974,34 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
             }
         }
     } else {
-        dialog.widgets['equip_nothing_frame'].onclick = go_away;
+        dialog.widgets['equip_nothing_frame'].onclick = close_parent_dialog;
     }
 
-    for(var i = 0; i < items.length; i++) {
-        if(i >= dialog.data['widgets']['equip_item']['array'][0]) { break; }
-        var inv_slot = items[i][0], item = items[i][1], min_level = items[i][2], unique_conflict = items[i][3], failed_pred = items[i][4];
+    // scroll handling
+    dialog.user_data['scroll_pos'] = Math.max(Math.min(dialog.user_data['scroll_pos'], items.length - dialog.data['widgets']['equip_item']['array'][0]), 0);
+    dialog.widgets['scroll_left'].state = (dialog.user_data['scroll_pos'] > 0 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_pos'] < items.length - dialog.data['widgets']['equip_item']['array'][0] ? 'normal' : 'disabled');
+    dialog.widgets['scroll_left'].onclick = function(w) {
+        var dialog = w.parent; dialog.user_data['scroll_pos'] -= 1; update_equip_chooser(dialog);
+    };
+    dialog.widgets['scroll_right'].onclick = function(w) {
+        var dialog = w.parent; dialog.user_data['scroll_pos'] += 1; update_equip_chooser(dialog);
+    };
+
+    for(var i = 0; i < dialog.data['widgets']['equip_item']['array'][0]; i++) {
+        if(i + dialog.user_data['scroll_pos'] >= items.length) {
+            dialog.widgets['equip_frame'+i.toString()].show =
+                dialog.widgets['equip_stack'+i.toString()].show =
+                dialog.widgets['equip_item'+i.toString()].show = false;
+            continue;
+        }
+        var item_entry = items[i + dialog.user_data['scroll_pos']];
+        var inv_slot = item_entry[0], item = item_entry[1], min_level = item_entry[2], unique_conflict = item_entry[3], failed_pred = item_entry[4];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
-        dialog.widgets['equip_frame'+i].show =
-            dialog.widgets['equip_stack'+i].show =
-            dialog.widgets['equip_item'+i].show = true;
+        dialog.widgets['equip_frame'+i.toString()].show =
+            dialog.widgets['equip_stack'+i.toString()].show =
+            dialog.widgets['equip_item'+i.toString()].show = true;
         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+i], spec);
         ItemDisplay.set_inventory_item_stack(dialog.widgets['equip_stack'+i], spec, item);
 
@@ -24970,37 +25010,37 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
         if(min_level > 0) {
             // show red text saying that player needs to upgrade the building
-            dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled_clickable';
             context_props['error_text'] = gamedata['errors'][(tech ? 'EQUIP_TECH_LEVEL_TOO_LOW' : 'EQUIP_BUILDING_LEVEL_TOO_LOW')]['ui_name'].replace('%s', min_level.toString());
             var helper = get_requirements_help(read_predicate(tech ? {'predicate': 'TECH_LEVEL', 'tech': tech['name'], 'min_level': min_level} :
                                                 {'predicate': 'BUILDING_LEVEL', 'building_type': unit.spec['name'], 'trigger_level': min_level}), null);
-            dialog.widgets['equip_frame'+i].onclick = (function (_helper) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onclick = (function (_helper) { return function(w) {
                 if(helper) {
                     w.parent.widgets['close_button'].onclick(w.parent.widgets['close_button']);
                     helper();
                 }
             }; })(helper);
         } else if(unique_conflict) {
-            dialog.widgets['equip_frame'+i].state = 'disabled';
-            dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['equip_frame'+i].tooltip.str = gamedata['errors']['EQUIP_INVALID_UNIQUE']['ui_name'].replace('%s', ItemDisplay.get_inventory_item_spec(unique_conflict)['ui_name']);
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled';
+            dialog.widgets['equip_frame'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['equip_frame'+i.toString()].tooltip.str = gamedata['errors']['EQUIP_INVALID_UNIQUE']['ui_name'].replace('%s', ItemDisplay.get_inventory_item_spec(unique_conflict)['ui_name']);
         } else if(failed_pred) {
-            dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
-            dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['equip_frame'+i].tooltip.str = failed_pred.ui_describe(player);
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['equip_frame'+i.toString()].tooltip.str = failed_pred.ui_describe(player);
             var help_func = get_requirements_help(failed_pred);
             if(help_func) {
-                dialog.widgets['equip_frame'+i].onclick = (function (_help_func) { return function(w) {
+                dialog.widgets['equip_frame'+i.toString()].onclick = (function (_help_func) { return function(w) {
                     // need to close equip chooser because the game state might change in a way that re-enables this,
                     // and we are not updating after invoke()
                     close_parent_dialog(w);
                     _help_func();
                 }; })(help_func);
             } else {
-                dialog.widgets['equip_frame'+i].onclick = null;
+                dialog.widgets['equip_frame'+i.toString()].onclick = null;
             }
         } else {
-            dialog.widgets['equip_frame'+i].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
                 if(_tech) {
                     // unit equipment
                     if(!(_tech['associated_unit'] in player.unit_equipment)) { player.unit_equipment[tech['associated_unit']] = {}; }
@@ -25016,7 +25056,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         }
 
         if(!unique_conflict && !failed_pred) {
-            dialog.widgets['equip_frame'+i].onenter = (function (_inv_slot, _item, _context_props) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onenter = (function (_inv_slot, _item, _context_props) { return function(w) {
                 var dialog = w.parent;
                 if(dialog.user_data['context'] &&
                    dialog.user_data['context'].user_data['slot'] === _inv_slot) { return; }
@@ -25024,7 +25064,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                 invoke_inventory_context(w.parent, w, _inv_slot, _item, false, _context_props);
             }; })(inv_slot, item, context_props);
 
-            dialog.widgets['equip_frame'+i].onleave_cb = (function (_inv_slot, _item) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onleave_cb = (function (_inv_slot, _item) { return function(w) {
                 if(dialog.user_data['context'] &&
                    dialog.user_data['context'].user_data['slot'] === _inv_slot) {
                     invoke_inventory_context(w.parent, w, -1, null, false);
@@ -25033,9 +25073,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         }
     }
 
-    inv_dialog.user_data['equip_chooser'] = dialog;
-    inv_dialog.add(dialog);
-    return dialog;
+    return true;
 }
 
 function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {

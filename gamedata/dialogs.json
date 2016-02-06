@@ -2701,16 +2701,15 @@
     },
 
     "equip_chooser": {
-        "dimensions": [80,100], // note: this gets resized dynamically
+        "dimensions": [465,100], // note: this gets resized dynamically
         "clip_children": 0,
         "default_button": "close_button",
         "widgets": {
             // virtual widget that catches clicks outside the area, acts like close button
             "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
 
-            "bg": { "kind":"StaticImage", "xy":[0,0], "min_extend": 90, "dimensions": [80,100], "transparent_to_mouse": 0,
-                    "asset": "dialog_resizable", "bg_image_resizable": 1
-                  },
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [465,100], "transparent_to_mouse": 0,
+                    "asset": "dialog_resizable", "bg_image_resizable": 1 },
 
             "title": {"kind": "TextField", "xy":[12,12], "dimensions": [192,16],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                       "ui_name": "Choose Item:" },
@@ -2726,9 +2725,12 @@
                                      "tooltip_delay": 0, "fixed_tooltip_offset": [-20,101]
                                    },
 
-            "equip_item": { "kind": "StaticImage", "xy": [75,36], "dimensions": [50,50],
+            "scroll_left":  { "kind": "ActionButton", "xy": [75,34], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_left" },
+            "scroll_right": { "kind": "ActionButton", "xy": [445,34], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_right" },
+
+            "equip_item": { "kind": "StaticImage", "xy": [90,36], "dimensions": [50,50],
                             "show": 0, "array": [6,1], "array_offset": [60,0] },
-            "equip_stack": { "show": 0, "kind": "TextField", "xy": [95,64], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
+            "equip_stack": { "show": 0, "kind": "TextField", "xy": [110,64], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
                              "text_size_fungible3": 17,
                              "text_size_fungible4": 14,
                              "text_size_fungible5": 11,
@@ -2736,11 +2738,11 @@
                              "text_size_fungible7": 9,
                              "text_hjustify": "right",
                              "array": [6,1], "array_offset": [60,0] },
-            "equip_frame": { "kind": "ActionButton", "xy": [75,36], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "equip_frame": { "kind": "ActionButton", "xy": [90,36], "dimensions": [50,50], "bg_image": "inventory_frame",
                              "ui_tooltip": "", "tooltip_delay": 0,
                              "show": 0, "array": [6,1], "array_offset": [60,0] },
 
-            "close_button": { "show": 1, "kind": "ActionButton", "xy": [53,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
+            "close_button": { "show": 1, "kind": "ActionButton", "xy": [435,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
 
