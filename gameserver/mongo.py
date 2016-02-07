@@ -25,7 +25,7 @@ if __name__=='__main__':
 
     for whichdb in whichdb_list:
         conf = SpinConfig.get_mongodb_config(whichdb)
-        cmd_args = ['mongo', '-u', conf['username'], '-p', conf['password'], '--host', conf['host'], '--port', '%d' % conf['port'], conf['dbname']]
+        cmd_args = ['mongo', conf['connect_kwargs']['host']]
 
         if mode == 'size':
             cmd_args += ['--quiet','--eval','''db.getCollectionNames().forEach(function (x) { var stats = db.getCollection(x).stats(); if(!stats['ns'] || stats['size'] < 1) { return; }; print((stats['size']/(1024*1024)).toFixed(1) + ' MB, '+(stats['storageSize']/(1024*1024)).toFixed(1)+' MB on disk: '+stats['ns']); })''']

@@ -6,7 +6,7 @@
 
 # MongoDB adaptor API
 
-import time, sys, re, random
+import time, sys, re, random, copy
 import datetime, calendar
 import pymongo, bson # 3.0+ OK
 import SpinConfig
@@ -18,9 +18,9 @@ import SpinNoSQLId
 
 # connect to a MongoDB service (possibly multiple databases within it)
 class NoSQLService (object):
-    def __init__(self, host, port, username, password, socket_timeout = None):
-        self.host = host
-        self.port = port
+    def __init__(self, connect_args, connect_kwargs, username, password, socket_timeout = None):
+        self.connect_args = connect_args
+        self.connect_kwargs = connect_kwargs
         self.username = username
         self.password = password
         self.socket_timeout = socket_timeout if socket_timeout is not None else 120 # 120 sec timeout by default
@@ -28,14 +28,17 @@ class NoSQLService (object):
         self.seen_dbnames = None
     def connect(self):
         if not self.con:
-            # note: don't use standard connect_args/connect_kwargs because we the live gameserver connection
-            # needs special settings (maxPoolSize)
-            self.con = pymongo.MongoClient(host='mongodb://%s:%d' % (self.host, self.port),
-                                           maxPoolSize = None, # ?
-                                           socketTimeoutMS = self.socket_timeout*1000
-                                           )
-            # only use 1 socket since we never need concurrent requests, and it will mess up auth since
-            # authenticate() does not update other outstanding sockets.
+            # note: override connect_args/connect_kwargs with special settings for the live gameserver connection
+            connect_kwargs = copy.copy(self.connect_kwargs)
+
+            # disable pymongo connection pooling, since we are doing our own
+            # (we never need concurrent requests, and it will mess up auth since
+            # authenticate() does not update other outstanding sockets).
+            connect_kwargs['maxPoolSize'] = 1
+            connect_kwargs['socketTimeoutMS'] = self.socket_timeout*1000
+
+            self.con = pymongo.MongoClient(*self.connect_args, **connect_kwargs)
+
             self.seen_dbnames = {}
     def get_db(self, dbname):
         assert self.con
@@ -71,7 +74,7 @@ class NoSQLServicePool (object):
         password = dbconfig['password']
         key = (host, port, username, password) # if db sharing does not turn out to work, just add dbconfig['dbname'] to the key
         if key not in self.pool:
-            self.pool[key] = NoSQLService(host, port, username, password, socket_timeout = self.socket_timeout)
+            self.pool[key] = NoSQLService(dbconfig['connect_args'], dbconfig['connect_kwargs'], username, password, socket_timeout = self.socket_timeout)
         return self.pool[key]
 
 nosql_service_pool = NoSQLServicePool()
