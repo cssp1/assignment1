@@ -16,7 +16,7 @@
 # 4. restore admin database
 #      mongorestore --drop -d admin admin
 # 5. restore game databases
-#      for F in ${GAMR_ID}prod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop -d $F $F; done
+#      for F in ${GAME_ID}prod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop -d $F $F; done
 # 6. restart MongoDB with auth=true and bind_ip off
 # 7. if moving to new ephemeral storage, check that the SCRATCH_DIR exists!
 
