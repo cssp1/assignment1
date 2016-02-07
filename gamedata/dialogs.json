@@ -8341,6 +8341,59 @@
         }
     },
 
+    "region_map_replay_dialog": {
+        "dimensions": [736,423], "min_dimensions": [585,380],
+        "clip_children": 0, "transparent_to_mouse": 1,
+        "widgets": {
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [736,423], "asset": "dialog_resizable", "bg_image_resizable": 1, "transparent_to_mouse": 0 },
+            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1,
+                       "layout": { "resizable": 1 } },
+            "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "Replay" },
+
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1,
+                              "layout": { "hjustify": "right", "vjustify": "top" } },
+
+            "map": {"kind": "RegionMap", "xy": [42,72], "dimensions": [653, 280], "layout": { "hresizable":1, "vresizable": 1 } },
+
+            "bottom_bar": { "kind": "SolidRect", "xy": [42,352], "dimensions": [653,52], "color": [0,0,0,0.4],
+                            "layout": { "hresizable": 1, "vjustify": "bottom" } },
+
+            "progress": { "kind": "ProgressBar", "xy": [52, 362], "dimensions": [633,32], "outline_width": 1, "outline_color": [0.25,0.25,0.25,1],
+                          "full_color": [0.66,0.66,0.66,1],
+                          "layout": { "hresizable": 1, "vjustify": "bottom" } },
+
+            "region_info": { "kind": "TextField", "xy": [52,80], "dimensions": [100,20], "text_size": 21, "text_style": "thick", "drop_shadow": 1,
+                             "text_hjustify": "left", "text_color": [1,1,0.1,1], "ui_name": "%REGION - %UNIX - %DATE %CURSOR",
+                             "layout": { "hjustify": "left", "vjustify": "top" } },
+
+            "zoom_in_button": { "kind": "ActionButton", "xy": [662,285], "dimensions": [22,20], "bg_image": "map_plus_button", "push_bg_image": 1,
+                                "ui_tooltip": "Zoom in",
+                                "tooltip_delay": 0, "fixed_tooltip_offset": [646,318],
+                                "layout": { "hjustify": "right", "vjustify": "bottom" } },
+            "zoom_out_button": { "kind": "ActionButton", "xy": [662,315], "dimensions": [22,20], "bg_image": "map_minus_button", "push_bg_image": 1,
+                                 "ui_tooltip": "Zoom out",
+                                 "tooltip_delay": 0, "fixed_tooltip_offset": [644,348],
+                                 "layout": { "hjustify": "right", "vjustify": "bottom" } },
+            "zoom_label": { "show": 0,
+                            "kind": "TextField", "xy": [548,371], "dimensions": [100,20], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
+                            "text_hjustify": "right", "text_color": [0.8,0.8,0.8,1], "ui_name": "Use mouse wheel to zoom",
+                            "layout": { "hjustify": "right", "vjustify": "bottom" } },
+
+            "loading_rect": { "kind": "SolidRect",
+                              "xy": [42,72], "dimensions": [653, 280], // "xy": [205,150], "dimensions": [336,128],
+                              "color":[0,0,0,0.66], "show": 0,
+                              "layout": { //"hjustify": "center", "vjustify": "center",
+                                  "hresizable": 1, "vresizable": 1
+                              } },
+            "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 19, "text_style": "bold", "text_color":[1,1,1,1],
+                              "ui_name": "Loading...", "ui_name_progress": "Loading (%pct%)...", "show": 0,
+                              "layout": { "hjustify": "center", "vjustify": "center" } },
+            "loading_spinner": { "kind": "StaticImage", "xy":[270,204], "dimensions":[16,16], "asset":"loading_spinner", "show": 0,
+                                 "layout": { "hjustify": "center", "vjustify": "center" } }
+        }
+    },
+
     "deployment_markers_notice": {
         "dimensions": [451, 88],
         "clip_children": 0, "transparent_to_mouse": 1,

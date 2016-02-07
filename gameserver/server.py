@@ -17912,6 +17912,14 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
         return None # not async
 
+    def query_map_log(self, session, retmsg, arg):
+        region_id = arg[1]
+        time_range = arg[2]
+        tag = arg[3]
+        ret = list(gamesite.nosql_client.log_retrieve(gamesite.nosql_client.region_table_name(region_id, 'log'), time_range, reason='QUERY_MAP_LOG'))
+        retmsg.append(["QUERY_MAP_LOG_RESULT", tag, ret])
+        return None
+
     def do_complete_quest(self, session, retmsg, questname):
         quest = session.player.get_abtest_quest(questname)
         if quest.name in session.player.completed_quests:
@@ -24436,6 +24444,10 @@ class GAMEAPI(resource.Resource):
             return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
+        elif arg[0] == "QUERY_MAP_LOG":
+            if (not session.player.is_developer()):
+                retmsg.append(["ERROR", "SERVER_PROTOCOL"])
+            return self.query_map_log(session, retmsg, arg)
         elif arg[0] == "QUERY_ACHIEVEMENTS":
             return self.query_achievements(session, retmsg, arg)
 

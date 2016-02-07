@@ -57,6 +57,7 @@ goog.require('SquadManageDialog');
 goog.require('TurretHeadDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
+goog.require('RegionMapReplay');
 goog.require('RegionMap');
 goog.require('RegionMapIndex');
 goog.require('TeamMapAccelerator');
@@ -401,6 +402,14 @@ function pretty_print_time_very_brief(sec) {
 function pretty_print_date(ts) {
     var d = new Date(ts*1000);
     return d.getFullYear().toString()+' '+gamedata['strings']['months_short'][d.getMonth()]+' '+d.getDate().toString();
+}
+
+// "2013 Dec 9 01:23"
+function pretty_print_date_and_time(ts) {
+    var dt = ts % 86400;
+    var hours = Math.floor(dt/3600);
+    var minutes = Math.floor(dt/60) % 60;
+    return pretty_print_date(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
 }
 
 // pad a string with zeros until it is length 'n'
@@ -22122,6 +22131,15 @@ function update_map_dialog_header_buttons(dialog) {
         i += 1;
     }
 }
+
+var map_log_receiver = new goog.events.EventTarget();
+function query_map_log(region_id, time_range, callback) {
+    last_query_tag += 1;
+    var tag = 'qml'+last_query_tag.toString();
+    // need this adaptor to pull the .result property out of the event object
+    map_log_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
+    send_to_server.func(["QUERY_MAP_LOG", region_id, time_range, tag]);
+};
 
 function invoke_map_ladder_pvp() {
     var template = 'map_ladder_pvp_dialog';
@@ -45724,6 +45742,9 @@ function handle_server_message(data) {
         // stick pcache_data into PlayerCache
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
         battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final, is_error: is_error});
+    } else if(msg == "QUERY_MAP_LOG_RESULT") {
+        var tag = data[1], result = data[2];
+        map_log_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {
