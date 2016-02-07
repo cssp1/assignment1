@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 import re, os
-import time, calendar, urllib
+import time, calendar
 import SpinJSON
 
 
