@@ -17572,7 +17572,7 @@ class GAMEAPI(resource.Resource):
 
         # permission check
         if (not session.player.is_developer()):
-            # no peeking at others' battle histories unless you are a developer
+            # no peeking at others' battle histories unless you are a developer, or in the same alliance
             if (source > 0 and source != session.user.user_id) or \
                ((alliance_A > 0 or alliance_B > 0) and (session.get_alliance_id(reason='query_battle_history') < 0 or session.alliance_id_cache not in (alliance_A, alliance_B))):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
@@ -17591,7 +17591,7 @@ class GAMEAPI(resource.Resource):
                 battle_history = session.viewing_player.battle_history
             elif (alliance_A > 0) or (alliance_B > 0):
                 # alliance queries not supported from playerdb
-                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], None, True, 'offline'])
+                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], [], None, True, 'offline'])
                 return
 
         if battle_history_source in ('nosql','nosql/sql'):
@@ -17729,12 +17729,17 @@ class GAMEAPI(resource.Resource):
             ret = [dict((k,s[k]) for k in self.BATTLE_HISTORY_FIELDS if k in s) for s in summaries]
             latest_returned_time = max(s.get('time',-1) for s in summaries)
 
+            # sort summaries by time
+            ret.sort(key = lambda r: -r.get('time',-1))
+
         # update battle_history_seen
         if source and source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
             session.send([["NEW_BATTLE_HISTORIES", 0]])
 
-        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final, is_error]], flush_now = True)
+        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret,
+                       [self.sign_battle_history(r.get('time',-1), r.get('attacker_id',-1), r.get('defender_id',-1), r.get('base_id',None)) for r in ret],
+                       pcache_data, is_final, is_error]], flush_now = True)
 
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
@@ -17868,17 +17873,26 @@ class GAMEAPI(resource.Resource):
 
         return db_time, codec, z_result
 
+    def sign_battle_history(self, battle_time, attacker, defender, base_id):
+        tosign = AttackLog.base_name(battle_time, attacker, defender, base_id)
+        return base64.urlsafe_b64encode(hmac.new(str(SpinConfig.config['proxy_api_secret']), msg=tosign, digestmod=hashlib.sha256).digest())
+
     def get_battle_log3(self, session, retmsg, arg):
         battle_time = arg[1]
         attacker = arg[2]
         defender = arg[3]
         base_id = arg[4]
-        tag = arg[5]
+        client_sig = arg[5]
+        tag = arg[6]
 
-        # do not allow peeking at others' battles, unless you are a developer
-        if session.user.user_id != attacker and session.user.user_id != defender and (not session.player.is_developer()):
-            retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
-            return
+        # the battle log itself does not have sufficient information (attacker/defender alliance IDs) to determine
+        # access permission. So instead, we use a secure signature of the args from the battle history.
+        if not session.player.is_developer():
+            if session.user.user_id not in (attacker, defender) and \
+               client_sig != self.sign_battle_history(battle_time, attacker, defender, base_id):
+                retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, None])
+                return
 
         filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
         ret = None

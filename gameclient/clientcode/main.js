@@ -16032,7 +16032,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
             // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
             // and is missing defender_id
             get_battle_log(_summary['time'], _summary['attacker_user_id'], session.user_id,
-                           _summary['base_id'] || null,
+                           _summary['base_id'] || null, null,
                            (function (__summary, _locker) { return function(result) {
                                close_dialog(_locker);
                                if(result) {
@@ -26206,7 +26206,7 @@ function query_battle_history(target, source, alliance_A, alliance_B, ai_or_huma
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
-    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final, event.is_error); }; })(callback));
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.signatures, event.is_final, event.is_error); }; })(callback));
     send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, alliance_A, alliance_B, tag, ai_or_human, time_range]);
 }
 function query_recent_attackers(callback) {
@@ -26217,7 +26217,7 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
-function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, is_final, is_error) {
+function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, siglist, is_final, is_error) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
     var oldest = battle_history_oldest(dialog);
     if((oldest < 0 && q_time_range) || (oldest > 0 && (!q_time_range || q_time_range[0] != -1 || q_time_range[1] != oldest))) {
@@ -26226,25 +26226,18 @@ function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist,
 
     dialog.user_data['pending'] = false;
 
-    // sort summaries by age
-    var compare_by_time = function (a,b) {
-        if(a['time'] < b['time']) {
-            return 1;
-        } else if(a['time'] > b['time']) {
-            return -1;
-        } else {
-            return 0;
-        }
-    };
-    sumlist.sort(compare_by_time);
+    // note: assume summaries are already sorted by age by server
+
     dialog.user_data['sumlist_is_final'] = is_final;
     dialog.user_data['sumlist_is_error'] = is_error;
 
     if(dialog.user_data['sumlist'] !== null) {
         dialog.user_data['sumlist'] = dialog.user_data['sumlist'].concat(sumlist);
+        dialog.user_data['siglist'] = dialog.user_data['siglist'].concat(siglist);
         battle_history_change_page(dialog, dialog.user_data['page']);
     } else {
         dialog.user_data['sumlist'] = sumlist;
+        dialog.user_data['siglist'] = siglist;
         battle_history_change_page(dialog, 0);
     }
 };
@@ -26285,6 +26278,7 @@ function battle_history_change_page(dialog, page) {
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
+            var signature = dialog.user_data['siglist'][i];
 
             var myrole, opprole;
             if(summary['attacker_id'] == dialog.user_data['from_id']) {
@@ -26495,10 +26489,10 @@ function battle_history_change_page(dialog, page) {
                 friendly_id = dialog.user_data['from_id'];
             }
 
-            var callback = (function (_summary, _friendly_id) { return function() {
+            var callback = (function (_summary, _signature, _friendly_id) { return function() {
                 player.record_feature_use('battle_log');
-                invoke_battle_log_dialog(_summary, _friendly_id);
-            }; })(summary, friendly_id);
+                invoke_battle_log_dialog(_summary, _signature, _friendly_id);
+            }; })(summary, signature, friendly_id);
 
             dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
             dialog.widgets['row_log_button'+row].state = 'normal';
@@ -26645,7 +26639,7 @@ function update_battle_history_dialog(dialog) {
 
 /** @param {!Object} summary
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
-function invoke_battle_log_dialog(summary, friendly_id) {
+function invoke_battle_log_dialog(summary, signature, friendly_id) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_log_dialog']);
     dialog.user_data['dialog'] = 'battle_log_dialog';
     dialog.user_data['friendly_id'] = friendly_id;
@@ -26756,18 +26750,18 @@ function invoke_battle_log_dialog(summary, friendly_id) {
 
     battle_log_change_page(dialog, 0);
 
-    get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null,
+    get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null, signature,
                    (function (_dialog) { return function(result) { receive_battle_log_result(_dialog, result); }; })(dialog));
 
     return dialog;
 };
 
 var battle_log_receivers = {};
-function get_battle_log(battle_time, attacker_id, defender_id, base_id, cb) {
+function get_battle_log(battle_time, attacker_id, defender_id, base_id, signature, cb) {
     last_query_tag += 1;
     var tag = 'gbl'+last_query_tag.toString();
     battle_log_receivers[tag] = cb;
-    send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, tag]);
+    send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, signature, tag]);
 };
 
 // given a battle summary, determine if we can shot deployment markers
@@ -45737,11 +45731,14 @@ function handle_server_message(data) {
 
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
-    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT" || msg == "QUERY_RECENT_ATTACKERS_RESULT") {
-        var tag = data[1], result = data[2], pcache_data = data[3], is_final = (data.length >= 5 ? data[4] : true), is_error = (data.length >= 6 ? data[5] : false);
-        // stick pcache_data into PlayerCache
+    } else if(msg == "QUERY_RECENT_ATTACKERS_RESULT") {
+        var tag = data[1], result = data[2], pcache_data = data[3];
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final, is_error: is_error});
+        battle_history_receiver.dispatchEvent({type: tag, result: result, signatures: null, is_final: true, is_error: false});
+    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT") {
+        var tag = data[1], result = data[2], signatures = data[3], pcache_data = data[4], is_final = data[5], is_error = data[6];
+        if(pcache_data) { PlayerCache.update_batch(pcache_data); }
+        battle_history_receiver.dispatchEvent({type: tag, result: result, signatures: signatures, is_final: is_final, is_error: is_error});
     } else if(msg == "QUERY_MAP_LOG_RESULT") {
         var tag = data[1], result = data[2];
         map_log_receiver.dispatchEvent({type: tag, result:result});
