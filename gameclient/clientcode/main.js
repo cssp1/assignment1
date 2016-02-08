@@ -38493,7 +38493,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
 
         if('spell' in skudata) {
             var spell = gamedata['spells'][skudata['spell']];
-            d.widgets['name'].set_text_with_linebreaking(skudata['ui_name'] || spell['ui_new_store_name'] || spell['ui_name']);
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(skudata['ui_name'] || spell['ui_new_store_name'] || spell['ui_name']);
             d.widgets['icon'].asset = spell['new_store_icon'] || spell['icon'];
 
             if('new_store_tip_item' in spell) {
@@ -38513,7 +38513,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
 
             var fallback_name = ItemDisplay.get_inventory_item_stack_prefix(spec, stack) + ItemDisplay.get_inventory_item_ui_name(spec);
 
-            d.widgets['name'].set_text_with_linebreaking(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
             ItemDisplay.set_inventory_item_asset(d.widgets['icon'], spec);
             ItemDisplay.set_inventory_item_stack(d.widgets['icon_stack'], spec, tip_item);
         } else if('name' in skudata) {
@@ -38525,7 +38525,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
             d.widgets['name'].text_hjustify = d.widgets['name'].text_vjustify = 'center';
             d.widgets['name'].text_color = SPUI.make_colorv(d.data['widgets']['name']['text_color_category']);
             d.widgets['name'].font = SPUI.make_font(d.data['widgets']['name']['text_size_category'], d.data['widgets']['name']['text_size_category']+3, d.data['widgets']['name']['text_style']);
-            d.widgets['name'].set_text_with_linebreaking(skudata['ui_name']);
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(skudata['ui_name']);
             d.user_data['icon_assets'] = [];
             if('icon' in skudata) {
                 d.user_data['icon_assets'].push(skudata['icon']);
