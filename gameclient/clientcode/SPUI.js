@@ -1496,6 +1496,24 @@ SPUI.TextWidget.prototype.set_text_with_linebreaking = function(str) {
     }
 };
 
+// start with the current this.font, but shrink if necessary to fit all the text
+SPUI.TextWidget.prototype.set_text_with_linebreaking_and_shrink_font_to_fit = function(str) {
+    var size = this.font.size;
+    var leading = this.font.leading;
+    var style = this.font.style;
+    do {
+        var s_n = this.break_lines(str);
+        this.str = s_n[0];
+        if(s_n[1] * leading <= this.wh[1]) {
+            return; // fits!
+        }
+        // uh oh, doesn't fit, try smaller
+        size -= 2;
+        leading -= 2;
+        this.font = SPUI.make_font(size, leading, style);
+    } while(size > 9); // minimum size
+};
+
 // TextField
 
 /** @constructor
