@@ -1168,7 +1168,9 @@ class NoSQLClient (object):
                 raise Exception('unknown match_mode '+match_mode)
 
         qs['social_id'] = {'$ne': 'ai'} # no AIs
-        cur = self.player_cache().find(qs, {'_id':1}).sort([('player_level', pymongo.DESCENDING)])
+        # it's not strictly necessary to include player_level in the projection,
+        # but this makes the MongoDB query run much faster
+        cur = self.player_cache().find(qs, {'_id':1,'player_level':1}).sort([('player_level', pymongo.DESCENDING)])
         if limit >= 1:
             cur = cur.limit(limit)
         return [x['_id'] for x in cur]
