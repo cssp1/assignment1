@@ -159,9 +159,13 @@ BattleLog.compress = function(metlist) {
         var met = metlist[i];
 
         // ignore events pertaining to barriers, and debugging events
+        // ignore units already dead at start of battle
         if(met && (met['unit_type'] == 'barrier' ||
                    met['event_name'] == '3940_shot_fired' ||
-                   met['event_name'] == '3950_object_hurt')) { continue; }
+                   met['event_name'] == '3950_object_hurt' ||
+                   (met['event_name'] == '3900_unit_exists' && (met['hp']===0) || met['hp_ratio']===0))) { continue; }
+
+
 
         // check whether this event can be compressed together with the group
         // note: some of the met and group[0] fields below may be undefined,
@@ -326,6 +330,7 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         if(met['event_name'] == '3820_battle_start' || met['event_name'] == '3850_ai_attack_start') {
             // nothing
         } else if(met['event_name'] == '3900_unit_exists') {
+            if(met['hp'] === 0 || met['hp_ratio'] === 0) { continue; } // dead unit
             line.push(new SPText.ABlock(poss['defender']+' defenses: ', pr.normal));
             line.push(new SPText.ABlock(BattleLog.unit(met, myrole === 'defender'), pr.hi));
         } else if(met['event_name'] == '3901_player_auras') {
