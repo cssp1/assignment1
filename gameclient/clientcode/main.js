@@ -21159,6 +21159,9 @@ function toggle_region_map() {
 
 function update_region_map(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
+
+    dialog.widgets['map'].time = server_time;
+
     dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
     dialog.widgets['help_jewel'].user_data['count'] = (player.check_feature_use('region_map_help') ? 0 : 1);
 
