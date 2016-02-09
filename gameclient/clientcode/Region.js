@@ -235,7 +235,7 @@ Region.Region.prototype.feature_interpolate_pos = function(feature, t) {
         if(('base_map_path' in feature) && feature['base_map_path'] &&
            (feature['base_map_path'][0]['eta'] >= t)) {
             // hasn't started moving yet
-            return [feature['base_map_path'][0], feature['base_map_path'][0], 0];
+            return [feature['base_map_path'][0]['xy'], feature['base_map_path'][0]['xy'], 0];
         }
         return [feature['base_map_loc'], feature['base_map_loc'], 0];
     }
