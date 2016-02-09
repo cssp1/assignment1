@@ -2939,7 +2939,9 @@ SPUI.ProgressBar.prototype.on_mouseup = function(uv, offset, button) {
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) {
         // click is inside the area
         if(this.state === 'disabled') { return true; }
-        this.onclick(this, button);
+        // give the callback the progress % at the click location
+        var prog = (this.wh[0] > 0 ? (uv[0] - (this.xy[0]+offset[0])) / (this.wh[0]) : 0);
+        this.onclick(this, button, prog);
         return true;
     }
     return false;
