@@ -6,7 +6,7 @@ import SpinNoSQL
 import SpinJSON
 import traceback
 import time
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 
 nosql_client = None
 
@@ -44,12 +44,14 @@ def dict_diff(a, b):
     return ', '.join(ret)
 
 class MapLogger(object):
-    def __init__(self, region_id, record = False, debug = False, verbose = False):
+    def __init__(self, region_id, record = False, snapshot_interval = -1, debug = False, verbose = False):
         self.region_id = region_id
         self.state = None # map state
         self.snapshot_time = -1
         self.in_sync = False
         self.record = record
+        self.snapshot_interval = snapshot_interval
+        self.snapshot_task = None
         self.debug = debug
         self.verbose = verbose
 
@@ -71,6 +73,15 @@ class MapLogger(object):
         tbl = self.log_table_name()
         if tbl:
             nosql_client.log_record(tbl, self.snapshot_time, {'feature_snapshot':self.state}, log_ident = False)
+
+    # just dump the current state, without querying
+    def write_snapshot(self):
+        if not (self.state and self.in_sync): return # no or invalid data
+        tbl = self.log_table_name()
+        if tbl:
+            time_now = int(time.time()) # note: approximate!
+            if self.verbose: print 'writing snapshot at', time_now
+            nosql_client.log_record(tbl, time_now, {'feature_snapshot':self.state}, log_ident = False)
 
     def check(self):
         if not self.debug: return
@@ -97,6 +108,10 @@ class MapLogger(object):
             self.apply_update(update['base_id'], update, map_time)
         self.in_sync = True
         if self.verbose: print 'catchup done'
+
+        if self.snapshot_interval > 0 and self.record:
+            self.snapshot_task = task.LoopingCall(self.write_snapshot)
+            self.snapshot_task.start(self.snapshot_interval, now = False)
 
     def apply_update(self, base_id, base_data, map_time):
         if map_time is None: # legacy server didn't supply the time
@@ -169,15 +184,22 @@ if __name__ == '__main__':
     verbose = True
     debug = False
     record = False
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'qdr', ['record'])
+    snapshot_interval = 3600
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'qdrs:', ['record'])
     if len(args) < 1:
-        print 'usage: %s region_id' % sys.argv[0]
+        print '''usage: %s region_id
+options: -q quiet output
+         -r enable recording
+         -s [SECONDS] force snapshots every N seconds (-1 to disable)
+         -d enable debug integrity checks
+''' % sys.argv[0]
         sys.exit(1)
 
     for key, val in opts:
         if key == '-q': verbose = False
         elif key == '-d': debug = True
         elif key == '-r' or key == '--record': record = True
+        elif key == '-s': snapshot_interval = int(val)
 
     region_id = args[0]
 
@@ -193,7 +215,7 @@ if __name__ == '__main__':
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
                                          log_exception_func = lambda x: sys.stderr.write(x+'\n'))
 
-    logger = MapLogger(region_id, record = record, debug = debug, verbose = verbose)
+    logger = MapLogger(region_id, record = record, snapshot_interval = snapshot_interval, debug = debug, verbose = verbose)
     chat_client.listener = logger.recv
     logger.get_snapshot()
 
