@@ -8367,6 +8367,12 @@
                              "text_hjustify": "left", "text_color": [1,1,0.1,1], "ui_name": "%REGION - %UNIX - %DATE %CURSOR",
                              "layout": { "hjustify": "left", "vjustify": "top" } },
 
+            "play_button": { "kind": "ActionButton", "xy": [54,320], "dimensions": [23,23], "bg_image": "slowdown_button", "push_bg_image": 1,
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            "fast_button": { "kind": "ActionButton", "xy": [86,320], "dimensions": [23,23], "bg_image": "speedup_button", "push_bg_image": 1,
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
             "zoom_in_button": { "kind": "ActionButton", "xy": [662,285], "dimensions": [22,20], "bg_image": "map_plus_button", "push_bg_image": 1,
                                 "ui_tooltip": "Zoom in",
                                 "tooltip_delay": 0, "fixed_tooltip_offset": [646,318],

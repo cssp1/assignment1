@@ -27,6 +27,7 @@ RegionMapReplay.invoke = function(region_id, target_loc) {
     dialog.widgets['map'].set_region(region);
     dialog.widgets['map'].gfx_detail = SPFX.detail;
     dialog.widgets['map'].set_zoom_buttons(dialog.widgets['zoom_in_button'], dialog.widgets['zoom_out_button']);
+    dialog.widgets['map'].zoom_limits[0] = -3.1; // allow greater zoom out
 
     dialog.user_data['pending'] = true;
     dialog.user_data['play_speed'] = 0;
@@ -52,7 +53,24 @@ RegionMapReplay.invoke = function(region_id, target_loc) {
         RegionMapReplay.seek(dialog, t);
         dialog.user_data['play_speed'] = 0;
     };
-
+    dialog.widgets['play_button'].onclick = function(w) {
+        var dialog = w.parent;
+        if(dialog.user_data['time_range'] === null) { return; }
+        if(dialog.user_data['play_speed'] != 0) {
+            dialog.user_data['play_speed'] = 0;
+        } else {
+            dialog.user_data['play_speed'] = 1;
+        }
+    };
+    dialog.widgets['fast_button'].onclick = function(w) {
+        var dialog = w.parent;
+        if(dialog.user_data['time_range'] === null) { return; }
+        if(dialog.user_data['play_speed'] != 0) {
+            dialog.user_data['play_speed'] = Math.min(2*dialog.user_data['play_speed'], 128);
+        } else {
+            dialog.user_data['play_speed'] = 2;
+        }
+    };
     return dialog;
 };
 
@@ -96,11 +114,11 @@ RegionMapReplay.seek = function(dialog, new_t) {
                                                      return 0;
                                                  }
                                              });
-    console.log('search for '+new_t.toString()+' in '+JSON.stringify(goog.array.map(dialog.user_data['snapshots'], (entry) => entry['time']))+' returned '+snap_index.toString());
+    //console.log('search for '+new_t.toString()+' in '+JSON.stringify(goog.array.map(dialog.user_data['snapshots'], (entry) => entry['time']))+' returned '+snap_index.toString());
     if(snap_index < 0) { // no exact match
-        snap_index = Math.min(-(snap_index + 1), dialog.user_data['snapshots'].length-1);
+        snap_index = Math.max(0, Math.min(-(snap_index + 1) - 1, dialog.user_data['snapshots'].length-1));
     }
-    console.log('snap_index '+snap_index.toString());
+    //console.log('snap_index '+snap_index.toString());
 
     var region = dialog.widgets['map'].region;
     var snapshot = dialog.user_data['snapshots'][snap_index];
@@ -119,14 +137,14 @@ RegionMapReplay.seek = function(dialog, new_t) {
                                                               (a['_id'] > b['_id'] ? 1 :
                                                                0)))));
     cur_event_index += 1; // next event after the previous cur_event we just applied
-    console.log('cur_event_index '+cur_event_index.toString());
+    //console.log('cur_event_index '+cur_event_index.toString());
     while(cur_event_index < dialog.user_data['log'].length-1) {
         var event = dialog.user_data['log'][cur_event_index];
         if(event['time'] > new_t) { // in the future
             break;
         }
         // apply the event
-        console.log('applying event '+JSON.stringify(event));
+        //console.log('applying event '+JSON.stringify(event));
         if(event['feature_snapshot']) {
             region.receive_update(event['time'], goog.object.getValues(event['feature_snapshot']), -1);
         } else if(event['feature_update']) {
@@ -151,6 +169,9 @@ RegionMapReplay.update = function(dialog) {
 
     var t = dialog.user_data['time'];
     var time_range = dialog.user_data['time_range'];
+
+    // update map view time
+    dialog.widgets['map'].time = t;
 
     // update header/footer
     var region_name = dialog.widgets['map'].region.data['ui_name'];
