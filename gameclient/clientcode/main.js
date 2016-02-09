@@ -50758,6 +50758,7 @@ goog.exportSymbol('sprobe_run', sprobe_run);
 goog.exportSymbol('invoke_gift_prompt_dialog', invoke_gift_prompt_dialog);
 goog.exportSymbol('invoke_daily_tip', invoke_daily_tip);
 goog.exportSymbol('invoke_splash_message', invoke_splash_message);
+goog.exportSymbol('invoke_region_map_replay', RegionMapReplay.invoke);
 goog.exportSymbol('give_me_item', give_me_item);
 goog.exportSymbol('load_ai_base', load_ai_base);
 goog.exportSymbol('save_ai_base', save_ai_base);

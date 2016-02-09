@@ -13,8 +13,10 @@ goog.require('SPFX');
 goog.require('Region');
 goog.require('goog.object');
 
-/** @param {Array.<number>=} target_loc */
-RegionMapReplay.invoke = function(region_id, target_loc) {
+/** @param {string} region_id
+    @param {Array.<number>=} query_time_range
+    @param {Array.<number>=} target_loc */
+RegionMapReplay.invoke = function(region_id, query_time_range, target_loc) {
     var region = new Region.Region(gamedata['regions'][region_id]);
     var dialog = new SPUI.Dialog(gamedata['dialogs']['region_map_replay_dialog']);
     dialog.user_data['dialog'] = 'region_map_replay_dialog';
@@ -36,7 +38,8 @@ RegionMapReplay.invoke = function(region_id, target_loc) {
     dialog.user_data['log'] = null; // log events
     dialog.user_data['time_range'] = null; // [first,last] time viewable
     dialog.user_data['time'] = null;
-    query_map_log(region_id, [-1,-1], goog.partial(RegionMapReplay.receive_log, dialog));
+    query_map_log(region_id, (query_time_range ? query_time_range : [-1,-1]),
+                  goog.partial(RegionMapReplay.receive_log, dialog));
 
     dialog.ondraw = RegionMapReplay.update;
 
