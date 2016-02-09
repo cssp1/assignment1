@@ -203,18 +203,24 @@ Region.Region.prototype.feature_blocks_map = function(feature) {
     return (feature['base_type'] !== 'squad' || player.squad_block_mode() !== 'never');
 };
 
-// note: just checking for presence of base_map_path is not correct, because sometimes squads
-// get to where they're going, and the base_map_path on the server side disappears, but that
-// deletion does not make it out to the client, so we may see a stale value.
+/** note: just checking for presence of base_map_path is not correct, because sometimes squads
+    get to where they're going, and the base_map_path on the server side disappears, but that
+    deletion does not make it out to the client, so we may see a stale value.
+    @param {!Object} feature
+    @param {number=} t */
 Region.Region.prototype.feature_is_moving = function(feature, t) {
     if(!t) { t = server_time; }
-    return (('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > t));
+    return (('base_map_path' in feature) && feature['base_map_path'] &&
+            (feature['base_map_path'][0]['eta'] < t) &&
+            (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > t));
 };
 
-// returns [last_pos, next_pos, alpha] where "alpha" is the fraction of the way from last_pos to next_pos you've traveled
+/** returns [last_pos, next_pos, alpha] where "alpha" is the fraction of the way from last_pos to next_pos you've traveled
+    @param {!Object} feature
+    @param {number=} t */
 Region.Region.prototype.feature_interpolate_pos = function(feature, t) {
     if(!t) { t = server_time; }
-    if(this.feature_is_moving(feature)) {
+    if(this.feature_is_moving(feature, t)) {
         var path = feature['base_map_path'];
         var last_waypoint = path[0];
         for(var i = 1; i < path.length; i++) {
@@ -226,6 +232,11 @@ Region.Region.prototype.feature_interpolate_pos = function(feature, t) {
             last_waypoint = waypoint;
         }
     } else {
+        if(('base_map_path' in feature) && feature['base_map_path'] &&
+           (feature['base_map_path'][0]['eta'] >= t)) {
+            // hasn't started moving yet
+            return [feature['base_map_path'][0], feature['base_map_path'][0], 0];
+        }
         return [feature['base_map_loc'], feature['base_map_loc'], 0];
     }
 };
