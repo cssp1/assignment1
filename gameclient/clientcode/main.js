@@ -20906,6 +20906,11 @@ function update_region_map_feature_list_element(dialog, i, feature) {
     dialog.widgets['qicon'].show = dialog.widgets['qsize'].show = (feature['base_type']=='quarry');
 
     var coords = (feature['base_map_loc'] ? session.region.feature_interpolate_pos(feature)[0] : null);
+    if(coords) {
+        if(coords[0] === undefined || coords[1] === undefined) {
+            throw Error('bad feature_interpolate_pos: '+JSON.stringify(feature));
+        }
+    }
     dialog.user_data['coords'] = coords;
 
     dialog.widgets['coords'].str = (coords ? dialog.data['widgets']['coords']['ui_name'].replace('%x', coords[0].toString()).replace('%y', coords[1].toString()) : dialog.data['widgets']['coords']['ui_name_unknown']);
@@ -20926,6 +20931,9 @@ function update_region_map_feature_list_element(dialog, i, feature) {
 
     if(feature['base_type'] == 'squad') {
         var squad_id = parseInt(feature['base_id'].split('_')[1],10);
+        if(squad_id === undefined) {
+            throw Error('feature with base_type squad but non-squad id: '+(feature['base_id'] ? feature['base_id'] : 'undefined'));
+        }
         var squad_data = player.squads[squad_id.toString()] || {};
         var stats = player.get_squad_hp_and_space(squad_id);
         dialog.widgets['name'].str = (squad_data['ui_name'] ? squad_data['ui_name'] : gamedata['strings']['regional_map']['unknown_name']);
