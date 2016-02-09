@@ -675,8 +675,8 @@ class NoSQLClient (object):
         # convert time range to ObjectID range
         time_id_range = map(lambda x: bson.objectid.ObjectId(SpinNoSQLId.creation_time_id(x)) if x >= 0 else None, time_range)
         # intersection of both ranges
-        id_range[0] = time_id_range[0] if (id_range[0] is None) else max(id_range[0], time_id_range[0])
-        id_range[1] = time_id_range[1] if (id_range[1] is None) else min(id_range[1], time_id_range[1])
+        id_range[0] = time_id_range[0] if (id_range[0] is None) else (id_range[0] if time_id_range[0] is None else  max(id_range[0], time_id_range[0]))
+        id_range[1] = time_id_range[1] if (id_range[1] is None) else (id_range[1] if time_id_range[1] is None else min(id_range[1], time_id_range[1]))
         return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code, limit, sort_direction))
     def decode_log(self, x):
         if '_id' in x: x['_id'] = self.decode_object_id(x['_id']) # convert to plain strings
