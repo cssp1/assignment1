@@ -24,6 +24,7 @@ purchase_ui_schema = {
                ('event_name', 'VARCHAR(255) NOT NULL'),
 
                ('gui_version', 'INT4'),
+               ('gui_look', 'VARCHAR(64)'),
                ('sku', 'VARCHAR(255)'),
                ('method', 'VARCHAR(255)'),
                ('gamebucks', 'INT4'),
@@ -112,7 +113,7 @@ if __name__ == '__main__':
                 keyvals.append(('gui_version', gui_version))
 
             for FIELD in ('client_time', 'sku', 'method', 'gamebucks', 'currency_price', 'currency',
-                          'last_purchase_time','num_purchases',
+                          'last_purchase_time','num_purchases', 'gui_look',
                           'flash_sale_kind', 'flash_sale_duration', 'flash_sale_tag', 'max_inventory', 'cur_inventory'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))

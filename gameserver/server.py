@@ -15291,7 +15291,8 @@ class Store(object):
                                            'prev_largest_purchase': session.player.history.get('largest_purchase',0),
                                            'num_purchases': session.player.history.get('num_purchases',0),
                                            'gift_order': gift_order,
-                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player)
+                                           'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player),
+                                           'gui_look': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store'].get('buy_gamebucks_dialog_look',None)), session, session.player),
                                            }
                 for aura in session.player.player_auras:
                     if aura['spec'] in ('flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:

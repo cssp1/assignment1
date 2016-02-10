@@ -37077,6 +37077,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     dialog.modal = true;
     dialog.auto_center();
     dialog.user_data['ver'] = 2; // hard-coded for now
+    dialog.user_data['look'] = eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store']['buy_gamebucks_dialog_look'] || null), player, null);
     dialog.user_data['pending'] = false;
     dialog.user_data['any_sku_has_bonus'] = 1; // force "bonus text" mode
     dialog.user_data['expire_time'] = -1; // XXX does this need a per-sku override?
@@ -37107,6 +37108,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['buy_gamebucks_dialog'+ver.toString()]);
     dialog.user_data['ver'] = ver;
+    dialog.user_data['look'] = eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store']['buy_gamebucks_dialog_look'] || null), player, null);
     dialog.user_data['dialog'] = 'buy_gamebucks_dialog'+ver.toString();
     dialog.user_data['order'] = (order || null);
     dialog.user_data['pending'] = false;
@@ -37220,7 +37222,8 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_goal'] >= dialog.user_data['scroll_limits'][1] ? 'disabled' : 'normal');
         if(incr !== 0 && !dialog.user_data['scrolled']) {
             dialog.user_data['scrolled'] = true;
-            purchase_ui_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver']});
+            purchase_ui_event('4431_buy_gamebucks_dialog_scroll', {'gui_version': dialog.user_data['ver'],
+                                                                   'gui_look': dialog.user_data['look']});
         }
     }; };
 
@@ -37305,7 +37308,8 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     }
 
     var go_away = function(w) {
-        purchase_ui_event('4420_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver']});
+        purchase_ui_event('4420_buy_gamebucks_dialog_close', {'gui_version': w.parent.user_data['ver'],
+                                                              'gui_look': w.parent.user_data['look']});
         close_parent_dialog(w);
     };
 
@@ -37317,7 +37321,9 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     if((player.history['money_spent'] || 0) <= 0) {
         player.record_client_history('purchase_ui_opens_preftd', 1);
     }
-    purchase_ui_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'], 'method': reason});
+    purchase_ui_event('4410_buy_gamebucks_dialog_open', {'gui_version': dialog.user_data['ver'],
+                                                         'gui_look': dialog.user_data['look'],
+                                                         'method': reason});
     SPFB.AppEvents.logEvent('SP_PURCHASE_DIALOG_OPEN');
     return dialog;
 }
@@ -37427,6 +37433,8 @@ function update_buy_gamebucks_sku23(dialog) {
     var topup_bucks = (dialog.parent && ('topup_bucks' in dialog.parent.user_data) ? dialog.parent.user_data['topup_bucks'] : -1);
     var order = (dialog.parent && ('order' in dialog.parent.user_data) ? dialog.parent.user_data['order'] : null);
     dialog.user_data['ver'] = (dialog.parent && ('ver' in dialog.parent.user_data) ? dialog.parent.user_data['ver'] : -1);
+    dialog.user_data['look'] = (dialog.parent && ('look' in dialog.parent.user_data) ? dialog.parent.user_data['look'] :
+                                eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store']['buy_gamebucks_dialog_look'] || null), player, null));
 
     var spellname = dialog.user_data['spellname'];
     var spell = dialog.user_data['spell'];
@@ -37630,6 +37638,7 @@ function update_buy_gamebucks_sku23(dialog) {
                 descr += ','+extra_descr;
             }
             purchase_ui_event('4440_buy_gamebucks_init_payment', {'gui_version': dialog.user_data['ver'],
+                                                                  'gui_look': dialog.user_data['look'],
                                                                   'method': dialog.parent.user_data['dialog'],
                                                                   'sku': descr,
                                                                   'gamebucks': _alloy_qty,
