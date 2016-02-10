@@ -1,7 +1,5 @@
 #!/bin/bash
 
-exit 0 # XXX disabled by default - make executable
-
 # note: skynet queries should be run from the thunderrun sandbox
 GAME_DIR=/home/ec2-user/thunderrun
 

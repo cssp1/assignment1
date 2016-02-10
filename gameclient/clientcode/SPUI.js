@@ -1496,6 +1496,24 @@ SPUI.TextWidget.prototype.set_text_with_linebreaking = function(str) {
     }
 };
 
+// start with the current this.font, but shrink if necessary to fit all the text
+SPUI.TextWidget.prototype.set_text_with_linebreaking_and_shrink_font_to_fit = function(str) {
+    var size = this.font.size;
+    var leading = this.font.leading;
+    var style = this.font.style;
+    do {
+        var s_n = this.break_lines(str);
+        this.str = s_n[0];
+        if(s_n[1] * leading <= this.wh[1]) {
+            return; // fits!
+        }
+        // uh oh, doesn't fit, try smaller
+        size -= 2;
+        leading -= 2;
+        this.font = SPUI.make_font(size, leading, style);
+    } while(size > 9); // minimum size
+};
+
 // TextField
 
 /** @constructor
@@ -2921,7 +2939,9 @@ SPUI.ProgressBar.prototype.on_mouseup = function(uv, offset, button) {
        uv[1]  < this.xy[1]+offset[1]+this.wh[1]) {
         // click is inside the area
         if(this.state === 'disabled') { return true; }
-        this.onclick(this, button);
+        // give the callback the progress % at the click location
+        var prog = (this.wh[0] > 0 ? (uv[0] - (this.xy[0]+offset[0])) / (this.wh[0]) : 0);
+        this.onclick(this, button, prog);
         return true;
     }
     return false;
@@ -3098,23 +3118,20 @@ SPUI.set_keyboard_focus = function(newfocus) {
 // ScrollingTextField
 
 // vertically scrollable text field
-// uses a circular doubly-linked list to hold lines of text
+// uses a queue (optionally of limited length) to hold lines of text
 
 /** @constructor */
 SPUI.TextNode = function() {
     /** @type {Array.<SPText.ABlock>|null} */
     this.text = null;
-    /** @type {SPUI.TextNode|null} */
-    this.prev = null;
-    /** @type {SPUI.TextNode|null} */
-    this.next = null;
+
     /** @type {function(SPUI.TextNode)|null} */
     this.on_destroy = null;
     this.user_data = null;
 };
 SPUI.TextNode.prototype.destroy = function() {
     if(this.on_destroy) { this.on_destroy(this); }
-    this.text = this.prev = this.next = this.on_destroy = this.user_data = null;
+    this.text = this.on_destroy = this.user_data = null;
 };
 
 /** @constructor
@@ -3148,34 +3165,19 @@ SPUI.ScrollingTextField = function(data) {
     this.alpha = ('alpha' in data ? data['alpha'] : 1);
     this.clip_to = data['clip_to'] || null;
 
-    // XXXXXX the circular-buffer scrolling mechanics here are very confusing.
-    // this was originally designed "IRC client" style, with the window by default
-    // keeping up with the last-appended line ("head" pointer), and the beginning
-    // of the displayed text pointed to by "bot". But now the in-game chat window
-    // uses the "invert" option to invert the vertical display. Also, other parts
-    // if the GUI are using this to make a scrolling rich text widget, where the
-    // "IRC" scrolling style doesn't make sense. Need to clean this up sometime.
-
-    /** @type {SPUI.TextNode}
+    /** Holds all the text
+        @type {!Array<!SPUI.TextNode>}
         @private */
-    // sentinel element that represents the bottom of the scroll area
-    // new lines are added before this
-    this.head = new SPUI.TextNode();
-    this.head.next = this.head;
-    this.head.prev = this.head;
+    this.buffer = new Array();
+    /** Offset of current view boundary relative to the "bottom" (most recently added) piece of text
+        @type {number}  */
+    this.buf_offset = 0;
+    /* Offset of the other current view boundary relative to the "bottom"
+       Read-only, updated from update_text()
+       @tye {number} */
+    this.buf_top = 0;
 
-    /** @type {SPUI.TextNode}
-        @private */
-    // bot points to the bottom-most line currently being displayed
-    this.bot = this.head;
-
-    /** @type {SPUI.TextNode}
-        @private */
-    // top is read-only, updated only in update_text()
-    this.top = this.head;
-
-    this.n_lines = 0;
-    this.max_lines = data['scrollback_buffer'] || 50;
+    this.max_lines = ('scrollback_buffer' in data ? data['scrollback_buffer'] : 50);
     this.invert = data['invert'] || false; // show upside-down (newest at top)
 
     /** @type {Array.<Array.<SPText.RBlock>>|null} */
@@ -3188,6 +3190,12 @@ SPUI.ScrollingTextField = function(data) {
     } else {
         this.tooltip = null;
     }
+
+    // callback to retrieve earlier entries
+    /** @type {function(!SPUI.ScrollingTextField)|null} */
+    this.getmore_cb = null;
+    this.getmore_pending = false; // blocks further getmore requests
+    this.getmore_final = false; // becomes true when getmore returns nothing more
 
     // optional connections to scroll arrow widgets
     this.scroll_up_button = null;
@@ -3214,14 +3222,8 @@ SPUI.ScrollingTextField.prototype.append_text_with_linebreaking_bbcode = functio
 
 SPUI.ScrollingTextField.prototype.clear_text = function() {
     var next;
-    for(var node = this.head.next; node != this.head; node = next) {
-        next = node.next;
-        node.destroy();
-    }
-    this.bot = this.head;
-    this.top = this.head;
-    this.head.next = this.head.prev = this.head;
-    this.n_lines = 0;
+    goog.array.forEach(this.buffer, function(node) { node.destroy(); });
+    this.buffer = new Array();
     this.update_text();
 };
 
@@ -3234,76 +3236,111 @@ SPUI.ScrollingTextField.prototype.destroy = function() {
     @param {Object=} user_data */
 SPUI.ScrollingTextField.prototype.append_text = function(text, user_data) {
     var node;
-    if(this.n_lines >= this.max_lines) {
-        // reuse topmost element
-        node = this.head.next;
-        node.prev.next = node.next;
-        node.next.prev = node.prev;
+    if(this.max_lines >= 0 && this.buffer.length >= this.max_lines) {
+        // drop oldest element
+        node = this.buffer.shift();
         node.destroy();
+        // reuse the object
     } else {
         // make new element
         node = new SPUI.TextNode();
-        this.n_lines += 1;
+
+        // maintain current view position, if not stuck to the bottom
+        if(this.buf_offset != 0) {
+            this.buf_offset += 1;
+        }
     }
-    // prepend element before BOT
 
     node.text = text;
     if(user_data) { node.user_data = user_data; }
-    node.prev = this.head.prev;
-    node.next = this.head;
-    this.head.prev.next = node;
-    this.head.prev = node;
-
+    this.buffer.push(node);
     this.update_text();
     return node;
 };
 
+/** @param {Array.<SPText.ABlock>} text
+    @param {Object=} user_data */
+SPUI.ScrollingTextField.prototype.prepend_text = function(text, user_data) {
+    if(this.max_lines >= 0 && this.buffer.length >= this.max_lines) {
+        return null; // no room in buffer
+    }
+
+    // make new element
+    var node = new SPUI.TextNode();
+    node.text = text;
+    if(user_data) { node.user_data = user_data; }
+    this.buffer.unshift(node);
+    this.update_text();
+    return node;
+};
+
+/** @param {Array.<Array.<SPText.ABlock>>} text_list
+    @param {Array.<Object?>=} user_data_list */
+SPUI.ScrollingTextField.prototype.prepend_text_batch = function(text_list, user_data_list) {
+    var ret = [];
+    for(var i = 0; i < text_list.length; i++) {
+        if(this.max_lines >= 0 && this.buffer.length >= this.max_lines) {
+            break; // no room in buffer
+        }
+
+        // make new element
+        var node = new SPUI.TextNode();
+        node.text = text_list[i];
+        if(user_data_list[i]) { node.user_data = user_data_list[i]; }
+        this.buffer.unshift(node);
+        ret.push(node);
+    }
+    this.update_text();
+    return ret;
+};
+
 SPUI.ScrollingTextField.prototype.revise_text = function(node, text) {
-    if(!node.prev || !node.next) { throw Error('revise_text on bad node '+node.toString()); }
+    if(this.buffer.indexOf(node) < 0) { throw Error('revise_text on bad node '+node.toString()); }
     if(text === null) { throw Error('null text!'); }
     node.text = text;
     this.update_text();
     return node;
 };
 SPUI.ScrollingTextField.prototype.remove_text = function(node) {
-    if(!node.prev || !node.next) { throw Error('remove_text on bad node '+node.toString()); }
-    node.prev.next = node.next;
-    node.next.prev = node.prev;
+    var index = this.buffer.indexOf(node);
+    if(index < 0) { throw Error('remove_text on bad node '+node.toString()); }
+    this.buffer.splice(index, 1);
     node.destroy();
     this.update_text();
 };
 SPUI.ScrollingTextField.prototype.revise_all_text = function(mutator) {
-    for(var node = this.head.next; node != this.head; node = node.next) {
+    goog.array.forEach(this.buffer, function(node) {
         node.text = mutator(node.text, node.user_data);
         if(node.text === null) { throw Error('null text!'); }
-    }
+    });
     this.update_text();
 };
 
 SPUI.ScrollingTextField.prototype.update_text = function() {
+    // accumulate text lines to display, working backward from end minus buf_offset
+    if(this.buf_offset > this.buffer.length) {
+        this.buf_offset = this.buffer.length;
+    }
+    var index = this.buffer.length - 1 - this.buf_offset;
+
     // how many lines can fit on screen?
     var disp_lines = Math.floor(this.wh[1] / this.font.leading);
-    if(disp_lines < 1) { this.rtxt = null; return; }
-
-    // accumulate text lines upwards from 'bot'
-
-    var node = this.bot;
-    if(node === this.head) {
-        node = this.bot.prev;
+    if(disp_lines < 1) {
+        this.rtxt = null;
+        this.buf_top = this.buf_offset;
+        return;
     }
 
     SPUI.ctx.save();
     SPUI.ctx.font = this.font.str();
 
     var sblines = [];
-    while(sblines.length < disp_lines && node !== this.head) {
+    while(sblines.length < disp_lines) {
+        if(index < 0) { break; }
+        var node = this.buffer[index];
         if(node.text === null) { throw Error('encountered invalid text node'); }
 
         var s_n = SPText.break_lines(node.text, this.wh[0], this.font);
-        if(sblines.length + s_n.length > disp_lines) {
-            // can't fit
-            break;
-        }
 
         // If we have an empty text node, the intention is to insert a
         // carriage return. By default, break_lines() assumes empty
@@ -3313,10 +3350,28 @@ SPUI.ScrollingTextField.prototype.update_text = function() {
         if(s_n.length < 1) { s_n.push([]); }
 
         if(this.invert) { s_n.reverse(); }
-        sblines = s_n.concat(sblines);
-        node = node.prev;
-        this.top = node;
+
+        // concatenate as much of s_n as possible onto the front of sblines, starting from the BACK of s_n
+        // sblines = s_n.concat(sblines);
+        var truncated = false;
+        for(var j = 0; j < s_n.length; j++) {
+            if(sblines.length + 1 > disp_lines) {
+                // can't fit
+                truncated = true;
+                break;
+            }
+            sblines.unshift(s_n[s_n.length-1-j]);
+        }
+
+        // record where buf_top was
+        this.buf_top = this.buffer.length - index;
+        if(truncated) {
+            // if the topmost node was only partially displayed, allow scrolling up even more
+            this.buf_top -= 1;
+        }
+        index -= 1;
     }
+
     if(sblines.length > 0) {
         if(this.invert) { sblines.reverse(); }
         this.rtxt = SPText.layout_text(sblines, this.wh, this.text_hjustify, this.text_vjustify, this.font, this.text_offset);
@@ -3428,52 +3483,55 @@ SPUI.ScrollingTextField.prototype.onleave = function() {
     if(this.tooltip) { this.tooltip.onleave(); }
 };
 
+// scrolling "up" means going towards older text at the head of the buffer
+// scrolling "down" means going towards newer text at the tail of the buffer
+// OLD
+// buffer0
+// buffer1     buf_top = 5
+// buffer2
+// buffer3     UP
+// buffer4  <- buf_offset = 2
+// buffer5     DOWN
+// buffer6
+// NEW
 
 SPUI.ScrollingTextField.prototype.can_scroll_down = function() {
-    return (this.bot !== this.head);
+    return (this.buf_offset > 0);
 };
 SPUI.ScrollingTextField.prototype.can_scroll_up = function() {
-    return (this.bot.prev !== this.head && this.top != this.head);
+    return (this.buf_top < this.buffer.length) || (this.getmore_cb && !this.getmore_final && !this.getmore_pending);
 };
 
 /** return the number of times, after scroll_to_bottom(), you'd have to call scroll_up() to reach the current position
     @return {number} */
 SPUI.ScrollingTextField.prototype.get_scroll_pos_from_head_to_bot = function() {
-    if(this.bot === this.head) { return 0; }
-    var pos = 0;
-    var p = this.head.prev;
-    while(p != this.bot) {
-        pos += 1;
-        p = p.prev;
-    }
-    return pos;
+    return this.buf_offset;
 };
 
 SPUI.ScrollingTextField.prototype.scroll_down = function() {
     if(this.can_scroll_down()) {
-        this.bot = this.bot.next;
-        if(this.bot.next === this.head) {
-            // stick it to the bottom
-            this.bot = this.head;
-        }
+        this.buf_offset -= 1;
         this.update_text();
     }
 };
 
 SPUI.ScrollingTextField.prototype.scroll_to_bottom = function() {
-    this.bot = this.head;
+    this.buf_offset = 0;
     this.update_text();
 };
 
 SPUI.ScrollingTextField.prototype.scroll_up = function() {
     if(this.can_scroll_up()) {
-        if(this.bot === this.head) {
-            // lift if off the bottom
-            this.bot = this.bot.prev.prev;
-        } else {
-            this.bot = this.bot.prev;
+        if(this.buf_top < this.buffer.length) { // normal scrolling
+            this.buf_offset += 1;
+            this.update_text();
+        } else if(this.getmore_cb && !this.getmore_final && !this.getmore_pending) { // getmore
+            this.getmore_pending = true;
+            if(this.scroll_up_button) {
+                this.scroll_up_button.state = 'disabled';
+            }
+            this.getmore_cb(this);
         }
-        this.update_text();
     }
 };
 
@@ -3481,6 +3539,15 @@ SPUI.ScrollingTextField.prototype.scroll_to_top = function() {
     // XXX horrible performance, work on it later
     while(this.can_scroll_up()) { this.scroll_up(); }
 };
+
+/** The getmore_cb should call this (asynchronously) once the request has finished */
+SPUI.ScrollingTextField.prototype.getmore_responded = function(is_final) {
+    this.getmore_pending = false;
+    this.getmore_final = is_final;
+    this.scroll_up();
+};
+
+
 
 
 // SpellIcon (obsolete, this has been replaced by inventory slot/item/stack/frame plus CooldownClock)

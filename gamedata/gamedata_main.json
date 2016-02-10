@@ -247,7 +247,9 @@
         "enable_alliances": 1,
         "enable_alliance_chat_tags": 1,
         "enable_alliance_role_gui": 1,
-        "enable_alliance_battle_history": 0,
+        "enable_alliance_battle_history": 1,
+
+        "enable_chat_getmore": 1, // enable loading previous chat messages from database
 
         "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
             {"predicate": "LIBRARY", "name": "quarry_requirement"},
@@ -677,6 +679,9 @@
     // consequent executed when you are the recipient of a chat report
     "chat_report_recv_action": { "consequent": "APPLY_AURA", "aura_name": "chat_warned",
                                  "stack": 1, "stack_from_context": "report_stack", "aura_duration": 1800 }, // aura_duration should match chat_warn_duration above
+
+    // show chat channel welcome message to young players (account age under three weeks)
+    "chat_welcome_if": {"predicate": "ACCOUNT_CREATION_TIME", "age_range": [-1,1814400] },
 
     "repair_time": 5, // how long structures take to repair from full damage (NOT USED ANYMORE, see buildings.json for repair times)
 

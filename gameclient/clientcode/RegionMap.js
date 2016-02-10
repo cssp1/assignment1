@@ -463,6 +463,7 @@ RegionMap.RegionMap = function(data) {
     goog.base(this, data);
     this.gfx_detail = 99;
     this.region = null;
+    this.time = -1; // the caller should update this per-frame
     this.hstar_context = null;
 
     // input goes to zoom_linear but is then passed through exp() to control the actual zoom,
@@ -474,6 +475,8 @@ RegionMap.RegionMap = function(data) {
     this.pan = [0,0]; // location displayed at center of widget, in "field" coordinates
     this.pan_limits = [[0,0],[0,0]]; // in "field" coordinates
     this.pan_goal = null; // if non-null, goal for slow pan movement
+
+    this.zoom_limits = goog.array.clone(gamedata['territory']['zoom_limits']);
 
     this.selection_loc = null; // coordinates of selected cell
     this.selection_feature = null; // feature at selected cell
@@ -539,18 +542,18 @@ RegionMap.RegionMap.prototype.zoom_out = function() {
 RegionMap.RegionMap.prototype.set_zoom_linear = function(new_value) {
     this.set_popup(null);
     this.follow_travel = false;
-    this.zoom_linear = clamp(new_value, gamedata['territory']['zoom_limits'][0], gamedata['territory']['zoom_limits'][1]);
+    this.zoom_linear = clamp(new_value, this.zoom_limits[0], this.zoom_limits[1]);
     this.zoom = Math.exp(this.zoom_linear);
     //console.log('ZOOM '+this.zoom_linear+' -> '+this.zoom);
     this.set_zoom_button_states();
 };
 RegionMap.RegionMap.prototype.set_zoom_button_states = function() {
     if(!this.zoom_in_button || !this.zoom_out_button) { return; }
-    this.zoom_in_button.state = (this.zoom_linear >= gamedata['territory']['zoom_limits'][1] ? 'disabled' : 'normal');
-    this.zoom_out_button.state = (this.zoom_linear <= gamedata['territory']['zoom_limits'][0] ? 'disabled' : 'normal');
+    this.zoom_in_button.state = (this.zoom_linear >= this.zoom_limits[1] ? 'disabled' : 'normal');
+    this.zoom_out_button.state = (this.zoom_linear <= this.zoom_limits[0] ? 'disabled' : 'normal');
 };
 RegionMap.RegionMap.prototype.zoom_all_the_way_in = function() {
-    this.set_zoom_linear(gamedata['territory']['zoom_limits'][1]);
+    this.set_zoom_linear(this.zoom_limits[1]);
 };
 RegionMap.RegionMap.prototype.zoom_to_default = function() {
     this.set_zoom_linear(gamedata['territory']['default_zoom'+(this.region && this.region.data && this.region.data['storage'] == 'nosql' ? '_nosql' : '')]);
@@ -728,7 +731,7 @@ RegionMap.RegionMap.prototype.select_feature_at = function(loc) {
 
             // if there are only squads remaining, filter out moving ones
             if(!this.selection_feature) {
-                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f); }, this);
+                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f, this.time); }, this);
             }
         }
 
@@ -810,7 +813,7 @@ RegionMap.RegionMap.prototype.on_mousemove = function(uv, offset) {
 
             // if there are only squads remaining, filter out moving ones
             if(!feature) {
-                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f); }, this);
+                ls = goog.array.filter(ls, function(f) { return !this.region.feature_is_moving(f, this.time); }, this);
             }
         }
 
@@ -893,7 +896,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
 
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
-    var can_pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance;
+    var can_pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance && (info || is_ai_user_id_range(feature['base_landlord_id']));
     var squads_nearby = this.region.squads_nearby(feature['base_map_loc']);
 
     var will_lose_protection = can_pre_attack &&
@@ -904,7 +907,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
 
     var verb = gamedata['strings']['regional_map'][(feature['base_landlord_id'] == session.user_id ? (feature['base_type'] == 'quarry' ? 'instant_visit_quarry' : 'instant_visit_base') : 'spy')];
 
-    if(('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > server_time)) {
+    if(('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > this.time)) {
         return [[verb, (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
             var msg = gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD'];
@@ -1408,7 +1411,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
             } else {
                 fullness_state = 'empty';
                 for(var r = 0; r < TIMELEFT.length; r++) {
-                    if((feature['base_expire_time'] - server_time) >= TIMELEFT[r][0]) {
+                    if((feature['base_expire_time'] - mapwidget.time) >= TIMELEFT[r][0]) {
                         fullness_state = TIMELEFT[r][1];
                     } else { break; }
                 }
@@ -1551,12 +1554,12 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
             blink_list.push({'status':'home'});
         }
 
-    } else if(feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && mapwidget.region.feature_is_moving(feature)) {
+    } else if(feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && mapwidget.region.feature_is_moving(feature, mapwidget.time)) {
         blink_list.push({'status':'moving'});
 
     } else if(mapwidget.region.data['show_precise_quarry_expiration'] && feature['base_type'] == 'quarry' &&
               ('base_expire_time' in feature) && feature['base_expire_time'] > 0) {
-        var togo = feature['base_expire_time'] - server_time;
+        var togo = feature['base_expire_time'] - mapwidget.time;
         var stat, str;
         if(mapwidget.region.data['show_precise_quarry_expiration'] == 1 || togo < mapwidget.region.data['show_precise_quarry_expiration']) {
             if(togo <  gamedata['territory']['depletes_soon_time']) {
@@ -1574,21 +1577,21 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
 
     } else if(feature['base_landlord_id'] == session.user_id) {
         if(feature['base_last_conquer_time'] && feature['base_last_conquer_time'] > 0) {
-            blink_list.push({'status':'owned_since', 'str':pretty_print_time_brief(server_time - feature['base_last_conquer_time'])});
+            blink_list.push({'status':'owned_since', 'str':pretty_print_time_brief(mapwidget.time - feature['base_last_conquer_time'])});
         } else {
             blink_list.push({'status':'owned'});
         }
-    } else if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > server_time)) {
+    } else if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > mapwidget.time)) {
         blink_list.push({'status':'protection'});
     } else if(!player.is_cheater && feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
               ('activation' in gamedata['hives_client']['templates'][feature['base_template']]) &&
               !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
         blink_list.push({'status':'locked'});
     } else if(feature['base_type'] == 'hive' && ('base_expire_time' in feature) && (feature['base_expire_time'] > 0) &&
-              (feature['base_expire_time'] - server_time) < gamedata['territory']['escaping_soon_time']) {
+              (feature['base_expire_time'] - mapwidget.time) < gamedata['territory']['escaping_soon_time']) {
         blink_list.push({'status':'escaping_soon'});
     } else if(feature['base_last_conquer_time'] && feature['base_last_conquer_time'] > 0) {
-        blink_list.push({'status':'open_since', 'str':pretty_print_time_brief(server_time - feature['base_last_conquer_time'])});
+        blink_list.push({'status':'open_since', 'str':pretty_print_time_brief(mapwidget.time - feature['base_last_conquer_time'])});
     } else if(feature['base_type'] == 'home' && !is_ai_user_id_range(feature['base_landlord_id'])) {
         var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
         if(!out_of_level_range) {
@@ -1610,7 +1613,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         if(goog.array.contains(['home', 'protection', 'level_too_low', 'level_too_high'], blink_list[0]['status'])) {
             var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
             if(info && ('last_defense_time' in info) && (info['last_defense_time'] > 0)) {
-                blink_list.unshift({'status': 'home_last_defended', 'str': pretty_print_time_brief(server_time - info['last_defense_time'])});
+                blink_list.unshift({'status': 'home_last_defended', 'str': pretty_print_time_brief(mapwidget.time - info['last_defense_time'])});
             }
         }
     }
@@ -1633,7 +1636,7 @@ RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) {
     if(feature['base_landlord_id'] == session.user_id) { return 0; }
     if(feature['base_type'] != 'home') { return 0; }
     if(('LOCK_STATE' in feature) && feature['LOCK_STATE'] != 0) { return 0; }
-    if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > server_time)) { return 0; }
+    if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > this.time)) { return 0; }
     var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
     if(!info) { return 0; }
     var player_info = PlayerCache.query_sync_fetch(session.user_id);
@@ -1646,7 +1649,7 @@ RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) {
 //  if!(('trophies_pvp' in info)) { return 0; } ???
     if(!player.cooldown_active('ladder_fatigue:'+feature['base_landlord_id'].toString()) &&
        ('base_damage' in info) && info['base_damage'] < gamedata['matchmaking']['ladder_win_damage'] &&
-       (!('base_repair_time' in info) || info['base_repair_time'] < server_time) &&
+       (!('base_repair_time' in info) || info['base_repair_time'] < this.time) &&
        (!session.is_in_alliance() || (('alliance_id' in info) && info['alliance_id'] != session.alliance_id)) &&
        (!('alliance_id' in info) || !player.cooldown_active('alliance_sticky:'+info['alliance_id'].toString()))
       ) {
@@ -1783,10 +1786,10 @@ RegionMap.RegionMap.prototype.draw_travel = function() {
     var dest_pos = feature['base_map_loc'];
 
     var progress;
-    if(server_time > player.travel_state['end_time']) {
+    if(this.time > player.travel_state['end_time']) {
         progress = 1;
     } else {
-        progress = (server_time - player.travel_state['start_time'])/(player.travel_state['end_time']-player.travel_state['start_time']);
+        progress = (this.time - player.travel_state['start_time'])/(player.travel_state['end_time']-player.travel_state['start_time']);
     }
     var flash = false; // (progress < 1);
 
@@ -1813,7 +1816,7 @@ RegionMap.RegionMap.prototype.draw_travel = function() {
     SPUI.ctx.stroke();
 
     if(progress < 1) {
-        var txt = gamedata['strings']['regional_map']['arriving_in'].replace('%s', pretty_print_time_brief(player.travel_state['end_time'] - server_time));
+        var txt = gamedata['strings']['regional_map']['arriving_in'].replace('%s', pretty_print_time_brief(player.travel_state['end_time'] - this.time));
         var dims = SPUI.ctx.measureText(txt);
         var txy = [cur_xy[0]+gamedata['territory']['cell_size'][0]/2+10,
                    cur_xy[1]+gamedata['territory']['cell_size'][1]/2+42];
@@ -1997,7 +2000,7 @@ RegionMap.RegionMap.prototype.sort_features_for_draw = function(roi, feature_lis
         var owned = (feature['base_landlord_id'] === session.user_id);
 
         // also check current location against roi (for moving objects), and never cull own squads (because the movement trail line might cross the window)
-        var loc2 = (this.region.feature_is_moving(feature) ? this.region.feature_interpolate_pos(feature)[1] : null);
+        var loc2 = (this.region.feature_is_moving(feature, this.time) ? this.region.feature_interpolate_pos(feature, this.time)[1] : null);
 
         if((loc[0] >= roi[0][0] && loc[0] <= roi[1][0] && loc[1] >= roi[0][1] && loc[1] <= roi[1][1]) ||
            (loc2 && (loc2[0] >= roi[0][0] && loc2[0] <= roi[1][0] && loc2[1] >= roi[0][1] && loc2[1] <= roi[1][1])) ||
@@ -2036,7 +2039,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 
     if(1) {
         var base_xy = this.cell_to_field(loc);
-        var moving = this.region.feature_is_moving(feature);
+        var moving = this.region.feature_is_moving(feature, this.time);
         var moving_xy = null; // only valid if moving is true
         var selected = (this.selection_feature === feature); // (this.selection_loc && this.selection_loc[0] === loc[0] && this.selection_loc[1] === loc[1]);
 
@@ -2140,7 +2143,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 if(moving) {
                     SPUI.ctx.save();
 
-                    var last_next_progress = this.region.feature_interpolate_pos(feature);
+                    var last_next_progress = this.region.feature_interpolate_pos(feature, this.time);
                     // note: cell_to_field is nonlinear, so we have to do the interpolation after converting to field coordinates
                     var last_xy = this.cell_to_field(last_next_progress[0]);
                     var next_xy = this.cell_to_field(last_next_progress[1]);
@@ -2153,8 +2156,8 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         SPUI.ctx.lineWidth = 2;
                         var drawn_path = [];
                         for(var i = 0; i < feature['base_map_path'].length; i++) {
-                            if(i >= feature['base_map_path'].length-1 || feature['base_map_path'][i+1]['eta'] >= server_time) {
-                                if(feature['base_map_path'][i]['eta'] < server_time) {
+                            if(i >= feature['base_map_path'].length-1 || feature['base_map_path'][i+1]['eta'] >= this.time) {
+                                if(feature['base_map_path'][i]['eta'] < this.time) {
                                     drawn_path.push(moving_xy); // current segment
                                 } else {
                                     drawn_path.push(this.cell_to_field(feature['base_map_path'][i]['xy']));
@@ -2201,7 +2204,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 if(owned && moving && feature['base_map_path'] && feature['base_map_path'].length >= 1) {
                     // draw remaining travel time
                     var path = feature['base_map_path'];
-                    var togo = path[path.length-1]['eta'] - server_time;
+                    var togo = path[path.length-1]['eta'] - this.time;
                     if(togo > 1) {
                         var txt = pretty_print_time_brief(togo);
                         var size = 1.0;
@@ -2220,7 +2223,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     if(info &&
                        (!('show_base_damage' in this.region.data) || this.region.data['show_base_damage']) &&
                        ((('base_damage' in info) && info['base_damage'] >= gamedata['matchmaking']['ladder_win_damage']) ||
-                        (('base_repair_time' in info) && (info['base_repair_time'] >= server_time)))
+                        (('base_repair_time' in info) && (info['base_repair_time'] >= this.time)))
                       ) {
                         icon_type = 'base_destroyed';
                     } else {
@@ -2240,7 +2243,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             }
             if(feature['base_type'] == 'home' && ('protection_end_time' in feature)) {
                 // check protection status
-                if(feature['protection_end_time'] == 1 || feature['protection_end_time'] > server_time) {
+                if(feature['protection_end_time'] == 1 || feature['protection_end_time'] > this.time) {
                     show_bubble = true; // under protection
                 }
             }
@@ -2444,10 +2447,10 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
     var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
     var owned = (feature['base_landlord_id'] === session.user_id);
     var locked = (feature['LOCK_STATE'] && (feature['LOCK_STATE'] != 0)) ||
-        (feature['repeat_attack_cooldown_expire'] && feature['repeat_attack_cooldown_expire'] > server_time);
+        (feature['repeat_attack_cooldown_expire'] && feature['repeat_attack_cooldown_expire'] > this.time);
 
     if(!owned && feature['base_type'] == 'home') {
-        if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > server_time)) {
+        if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > this.time)) {
             locked = true;
         }
     }
@@ -2543,10 +2546,10 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
             //if(travel_feature === home_feature) { travel_feature = null; }
             if(travel_feature) {
                 var progress;
-                if(server_time > player.travel_state['end_time']) {
+                if(this.time > player.travel_state['end_time']) {
                     progress = 1;
                 } else {
-                    progress = (server_time - player.travel_state['start_time'])/(player.travel_state['end_time']-player.travel_state['start_time']);
+                    progress = (this.time - player.travel_state['start_time'])/(player.travel_state['end_time']-player.travel_state['start_time']);
                 }
 
                 var home_pos = home_feature['base_map_loc'];

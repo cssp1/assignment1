@@ -160,6 +160,20 @@ ModChain.make_chain = function(base_val, props) {
     return {'val':base_val, 'mods':[mod]};
 };
 
+/** @param {!ModChain.ModChain} chain
+    @return {!ModChain.ModChain} */
+ModChain.clone = function(chain) {
+    var ret = {};
+    for(var k in chain) {
+        if(k === 'mods') {
+            ret[k] = goog.array.clone(chain['mods']);
+        } else {
+            ret[k] = chain[k];
+        }
+    }
+    return ret;
+};
+
 /** Throw an exception if something is broken in the chain data structure
     @param {!ModChain.ModChain} chain */
 ModChain.check_chain = function(chain) {
@@ -189,6 +203,25 @@ ModChain.recompute_with_new_base_val = function(old_chain, new_base, new_base_le
     return new_chain;
 };
 
+/** Return copy of the chain but without the mod at index "index"
+    @param {!ModChain.ModChain} old_chain
+    @param {number} index
+    @return {!ModChain.ModChain} */
+ModChain.recompute_without_mod = function(old_chain, index) {
+    var new_chain = ModChain.make_chain(old_chain['mods'][0]['val'], old_chain['mods'][0]['level'] ? {'level': old_chain['mods'][0]['level']} : null);
+    // add each mod from the old chain
+    for(var i = 1; i < old_chain['mods'].length; i++) {
+        if(i === index) { continue; }
+        var mod = old_chain['mods'][i];
+        var props = {};
+        goog.array.forEach(ModChain.persistent_props, function(p) {
+            if(p in mod) { props[p] = mod[p]; }
+        });
+        ModChain.add_mod(new_chain, mod['method'], mod['strength'], mod['kind'], mod['source'], props);
+    }
+    ModChain.check_chain(new_chain);
+    return new_chain;
+};
 
 // OK to reference gamedata directly for GUI-only stuff
 

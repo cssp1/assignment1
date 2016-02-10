@@ -332,12 +332,18 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
 
     var descr = '';
 
-    if('max_level' in spec && !(opts && opts.hide_level)) {
+    if((('max_level' in spec) || ('level' in spec && 'max_ui_level' in spec)) && !(opts && opts.hide_level)) {
         var max_level = spec['max_level'];
         if('max_ui_level' in spec) { // allow override for items that can "morph" via crafting to child items with more levels
-            max_level = spec['max_ui_level'];
+            max_level = eval_cond_or_literal(spec['max_ui_level'], player, null);
         }
-        descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(level)).replace('%max',pretty_print_number(max_level))+'\n\n';
+        if(max_level) {
+            var ui_level = level;
+            if('level' in spec) {
+                ui_level = spec['level']; // note: spec level overrides here
+            }
+            descr += gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', pretty_print_number(ui_level)).replace('%max',pretty_print_number(max_level))+'\n\n';
+        }
     }
 
     descr += eval_cond_or_literal(spec['ui_description'], player, null);

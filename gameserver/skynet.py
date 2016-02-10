@@ -519,7 +519,8 @@ def encode_bid_type(t):
 
 def adgroup_get_bid(adgroup): return adgroup['bid_amount']
 
-def adgroup_encode_bid(bid_type, bid, app_id, conversion_pixels):
+def adgroup_encode_bid(tgt, bid, conversion_pixels = None):
+    bid_type = tgt['bid_type']
     ret = {}
     if bid_type == 'CPA' or bid_type.startswith('oCPM'):
         if bid_type == 'CPA' or bid_type == 'oCPM_INSTALL':
@@ -535,7 +536,10 @@ def adgroup_encode_bid(bid_type, bid, app_id, conversion_pixels):
             #ret['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
     elif bid_type == 'CPC':
         ret['billing_event'] = 'LINK_CLICKS'
-        ret['optimization_goal'] = 'LINK_CLICKS'
+        if True or not tgt.get('exclude_player_audience',True):
+            ret['optimization_goal'] = 'LINK_CLICKS' # reacquisition
+        else:
+            ret['optimization_goal'] = 'APP_INSTALLS' # new acquisition
     elif bid_type == 'CPM':
         ret['billing_event'] = 'IMPRESSIONS'
         ret['optimization_goal'] = 'IMPRESSIONS'
@@ -761,13 +765,22 @@ def adstats_record(db, adgroup_list, time_range):
                'adgroup_id': str(adgroup['id']),
                # deliberately denormalize name, dtgt, campaign_id, and created_time into here so we can pull historical stats without relying on the source adgroups still being in the database
                'adgroup_name': adgroup['name'], 'dtgt': stgt_to_dtgt(stgt), 'campaign_id': str(adgroup['adset_id']), 'created_time': adgroup['created_time'],
-               'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup)
+               'status': adgroup_decode_status(adgroup), 'bid': adgroup_get_bid(adgroup),
+               'clicks': 0
                }
 
         # copy the adstat counters and fields we want to store
-        if 'clicks' not in obj:
+
+        # note: as of API v2.5, the "clicks" field seems broken (it reports 0 instead of the actual data)
+        if 'actions' in stat:
+            if 'clicks' in stat: del stat['clicks'] # get rid of bad data
+            for a in stat['actions']:
+                if a['action_type'] == 'link_click':
+                    obj['clicks'] = a['value']
+
+        elif 'clicks' not in stat:
             # oh dear, Facebook made click counting really complicated now
-            obj['clicks'] = sum((obj.get(CLICK_TYPE, 0) for CLICK_TYPE in ('website_clicks','app_store_clicks','call_to_action_clicks','inline_link_clicks','deeplink_clicks')),
+            obj['clicks'] = sum((stat.get(CLICK_TYPE, 0) for CLICK_TYPE in ('website_clicks','app_store_clicks','call_to_action_clicks','inline_link_clicks','deeplink_clicks')),
                                 0)
 
         for FIELD in ADSTATS_COUNTERS:
@@ -1116,6 +1129,10 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     variable = 'actual_receipts'
                     variable_key = 'value'
                     variable_coeff = 100.0
+                elif stage['stage'] == 'A97 Made A Payment':
+                    variable = 'payers'
+                    variable_key = 'yes'
+                    variable_coeff = 1
                 else:
                     for NAME, VAR in [('A10 Mean 1-Day Receipts/User', 'actual_receipts_d1'),
                                       ('A11 Mean 3-Day Receipts/User', 'actual_receipts_d3'),
@@ -1364,9 +1381,9 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     else:
                         ui_tactical = ''
 
-                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s (E90 %s%s) Spent %9s Receipts %9s \"ROI\" %3.0f%% %s" % \
+                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s (E90 %s%s) Spent %9s Rcpt %9s (N=%3d) \"ROI\" %3.0f%% %s" % \
                           ((time_sample['ui_name']+' ') if time_sample['ui_name'] else '',
-                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, skynet_ltvs, final_ltvs, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), roi_pct, ui_tactical)
+                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, skynet_ltvs, final_ltvs, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), group['payers'], roi_pct, ui_tactical)
 
     if tactical_actions:
         print 'PLAN:\n' + '\n'.join(map(repr, tactical_actions))
@@ -1777,22 +1794,22 @@ def reachestimate_tgt(tgt):
 
 def reachestimate_decode(data):
     if not data: return False
+    data = data['data']
     return {'N': data['users'],
-            'cpc_min': data['bid_estimations'][0]['cpc_min'],
-            'cpc_median': data['bid_estimations'][0]['cpc_median'],
-            'cpc_max': data['bid_estimations'][0]['cpc_max'],
-            'cpm_min': data['bid_estimations'][0]['cpm_min'],
-            'cpm_median': data['bid_estimations'][0]['cpm_median'],
-            'cpm_max': data['bid_estimations'][0]['cpm_max'],
+            'bid_amount_min': data['bid_estimations'][0]['bid_amount_min'],
+            'bid_amount_median': data['bid_estimations'][0]['bid_amount_median'],
+            'bid_amount_max': data['bid_estimations'][0]['bid_amount_max'],
             }
 
-def reachestimate_get(ad_account_id, targeting):
+def reachestimate_get(db, ad_account_id, tgt):
     # main thing we want is data.users, data.bid_estimations.cpc_min/median/max
     return reachestimate_decode(fb_api(SpinFacebook.versioned_graph_endpoint('reachestimate', 'act_'+ad_account_id+'/reachestimate'),
-                                       url_params = {'currency': 'USD', 'targeting_spec': SpinJSON.dumps(targeting)}))
+                                       url_params = {'currency': 'USD',
+                                                      'optimize_for': adgroup_encode_bid(tgt, 0)['optimization_goal'],
+                                                     'targeting_spec': SpinJSON.dumps(adgroup_targeting(db, tgt))}))
 
 def reachestimate_store(db, stgt, targeting, data):
-    assert 'cpc_min' in data # make sure it's the right format
+    assert 'bid_amount_min' in data # make sure it's the right format
     data['time'] = time_now
     data['targeting_spec'] = mongo_enc(copy.deepcopy(targeting)) # since action specs have "." in them
     data['stgt'] = stgt
@@ -1809,7 +1826,7 @@ def reachestimate_get_and_store(db, ad_account_id, reach_tgt):
         #print "CACHE HIT", stgt
         return entry
 
-    data = reachestimate_get(ad_account_id, targeting)
+    data = reachestimate_get(db, ad_account_id, reach_tgt)
     if data:
         reachestimate_store(db, reach_stgt, targeting, data)
     return data
@@ -1823,7 +1840,9 @@ def reachestimate_ensure_cached(db, ad_account_id, tgt_list):
         query_list.append([stgt, targeting,
                            {'method':'GET',
                             'relative_url': 'act_'+ad_account_id+'/reachestimate?' + \
-                            urllib.urlencode({'currency':'USD', 'targeting_spec':SpinJSON.dumps(targeting)})}])
+                            urllib.urlencode({'currency':'USD',
+                                              'optimize_for': adgroup_encode_bid(tgt, 0)['optimization_goal'],
+                                              'targeting_spec':SpinJSON.dumps(targeting)})}])
     if not query_list: return
 
     i = 0
@@ -1852,7 +1871,7 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
                'redownload':1,
                'fields': AD_FIELDS
                }
-    #adgroup.update(adgroup_encode_bid(tgt['bid_type'], bid, game_data['app_id'], conversion_pixels))
+    #adgroup.update(adgroup_encode_bid(tgt, bid, conversion_pixels))
 
     return adgroup
 
@@ -1918,7 +1937,7 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
               'campaign_id': campaign_group_id, 'redownload':1}
     if call_to_action_type(tgt) == 'PLAY_GAME':
         params['promoted_object'] = SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
-    params.update(adgroup_encode_bid(tgt['bid_type'], bid, app_id, conversion_pixels))
+    params.update(adgroup_encode_bid(tgt, bid, conversion_pixels))
 
     result = fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
                     post_params = params)
@@ -1998,7 +2017,7 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reache
             cp = 'cpc'; CP = 'CPC'
 
         if reachestimate:
-            if explain: print '    reachestimate: %s %3d ... %3d ... %3d   N %10d' % (CP, reachestimate[cp+'_min'], reachestimate[cp+'_median'], reachestimate[cp+'_max'], reachestimate['N'])
+            if explain: print '    reachestimate: %s %3d ... %3d ... %3d   N %10d' % (CP, reachestimate['bid_amount_min'], reachestimate['bid_amount_median'], reachestimate['bid_amount_max'], reachestimate['N'])
             if reachestimate['N'] < 200 and ('custom_audiences' not in tgt):
                 if explain: print 'audience too small!'
                 return 1
@@ -2040,15 +2059,15 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reache
                     raise Exception('unhandled oCPM bid type '+bid_type)
 
                 # not sure if we should incorporate bid shade into caps?
-                cap_at = max(1, int(cap_coeff * factor * reachestimate[cp+'_'+cap_level]))
+                cap_at = max(1, int(cap_coeff * factor * reachestimate['bid_amount_'+cap_level]))
                 cap_ui = 'BID_CAP(%.2f)%s*%s_%s' % (cap_coeff,ui_factor,cp,cap_level)
-#              cap_at = max(1, int(factor * reachestimate[cp+'_'+cap_level]))
+#              cap_at = max(1, int(factor * reachestimate['bid_amount_'+cap_level]))
 #              cap_ui = '%s*%s_%s' % (ui_factor,cp,cap_level)
 
             else:
                 # for regular CPM and CPC bids, just reference against the median
-                cap_at = max(1, int(cap_coeff * reachestimate[cp+'_'+cap_level]))
-                cap_ui = ('%.2f*' % cap_coeff) + cp+'_'+cap_level
+                cap_at = max(1, int(cap_coeff * reachestimate['bid_amount_'+cap_level]))
+                cap_ui = ('%.2f*' % cap_coeff) + 'bid_amount_'+cap_level
 
             if bid > cap_at and ('custom_audiences' not in tgt):
                 bid = cap_at

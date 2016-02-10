@@ -2701,16 +2701,15 @@
     },
 
     "equip_chooser": {
-        "dimensions": [80,100], // note: this gets resized dynamically
+        "dimensions": [465,100], // note: this gets resized dynamically
         "clip_children": 0,
         "default_button": "close_button",
         "widgets": {
             // virtual widget that catches clicks outside the area, acts like close button
             "bg_close_button": { "kind": "ActionButton", "xy": [-1000,-1000], "dimensions": [2000,2000] },
 
-            "bg": { "kind":"StaticImage", "xy":[0,0], "min_extend": 90, "dimensions": [80,100], "transparent_to_mouse": 0,
-                    "asset": "dialog_resizable", "bg_image_resizable": 1
-                  },
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [465,100], "transparent_to_mouse": 0,
+                    "asset": "dialog_resizable", "bg_image_resizable": 1 },
 
             "title": {"kind": "TextField", "xy":[12,12], "dimensions": [192,16],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                       "ui_name": "Choose Item:" },
@@ -2726,9 +2725,12 @@
                                      "tooltip_delay": 0, "fixed_tooltip_offset": [-20,101]
                                    },
 
-            "equip_item": { "kind": "StaticImage", "xy": [75,36], "dimensions": [50,50],
+            "scroll_left":  { "kind": "ActionButton", "xy": [75,34], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_left" },
+            "scroll_right": { "kind": "ActionButton", "xy": [445,34], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_right" },
+
+            "equip_item": { "kind": "StaticImage", "xy": [90,36], "dimensions": [50,50],
                             "show": 0, "array": [6,1], "array_offset": [60,0] },
-            "equip_stack": { "show": 0, "kind": "TextField", "xy": [95,64], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
+            "equip_stack": { "show": 0, "kind": "TextField", "xy": [110,64], "dimensions": [24,19], "text_size": 17, "text_style": "thick", "drop_shadow": 1,
                              "text_size_fungible3": 17,
                              "text_size_fungible4": 14,
                              "text_size_fungible5": 11,
@@ -2736,11 +2738,11 @@
                              "text_size_fungible7": 9,
                              "text_hjustify": "right",
                              "array": [6,1], "array_offset": [60,0] },
-            "equip_frame": { "kind": "ActionButton", "xy": [75,36], "dimensions": [50,50], "bg_image": "inventory_frame",
+            "equip_frame": { "kind": "ActionButton", "xy": [90,36], "dimensions": [50,50], "bg_image": "inventory_frame",
                              "ui_tooltip": "", "tooltip_delay": 0,
                              "show": 0, "array": [6,1], "array_offset": [60,0] },
 
-            "close_button": { "show": 1, "kind": "ActionButton", "xy": [53,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
+            "close_button": { "show": 1, "kind": "ActionButton", "xy": [435,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
 
@@ -5036,12 +5038,12 @@
 
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,0], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[10,248], [33,225], [62,225], [13,273], [11,272], [10,270], [10,236]] },
-            "sale_label": { "show": 0, "kind": "TextField", "xy": [28,206], "dimensions": [20,100], "color": [1,1,1,1],
+            "sale_label": { "show": 0, "kind": "TextField", "xy": [29,206], "dimensions": [20,100], "color": [1,1,1,1],
                             "text_style": "bold", "text_size": 15, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE",
                             "tweaks": { "NEW": {"xy_shift": [0,-1] },
                                         "UPDATED": {"xy_shift": [2,5], "text_size": 10} } },
 
-            "jewel": { "kind": "Dialog", "xy": [182,20], "dimensions": [17,14], "dialog": "notification_jewel" }
+            "jewel": { "kind": "Dialog", "xy": [190,13], "dimensions": [17,14], "dialog": "notification_jewel" }
         }
     },
 
@@ -5319,6 +5321,11 @@
             "friend_icon1": { "kind": "FriendIcon", "xy": [138, 230], "dimensions": [50,73], "state": "disabled" },
             "friend_icon2": { "kind": "FriendIcon", "xy": [221, 230], "dimensions": [50,73], "state": "disabled" },
             //
+
+            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+                                     "bg_image_resizable": 1,
+                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
+                                     "ui_tooltip": "Show where the latest attacker deployed units","tooltip_delay": 0},
 
             "you_endured": { "kind": "TextField", "xy": [32,308], "dimensions": [277,22], "text_size": 13, "text_style": "normal",
                              "text_color": [0,0.85,0,1],
@@ -5710,10 +5717,12 @@
             "output": { "kind": "ScrollingTextField", "xy": [16,81], "dimensions": [282,155],
                         "clip_to": [16,81,287,155],
                         "text_size": 13, "text_hjustify": "left",
-                        "text_vjustify": "top", "scrollback_buffer": 100, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
+                        "text_vjustify": "top", "scrollback_buffer": -1, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
 
             "scroll_up": { "kind": "ActionButton", "xy": [306,75], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
-            "scroll_down": { "kind": "ActionButton", "xy": [306,120], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 }
+            "scroll_down": { "kind": "ActionButton", "xy": [306,120], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+            "loading_spinner": { "kind": "StaticImage", "xy":[311,160], "dimensions":[16,16], "asset":"loading_spinner" }
+
         }
     },
 
@@ -6286,7 +6295,9 @@
                                     "ui_tooltip": "Show battles against human rivals", "tooltip_delay": 0 },
             "alliance_button": { "kind": "ActionButton", "xy": [542,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Alliance",
-                                 "ui_tooltip": "Show multiplayer battles involving your alliance", "tooltip_delay": 0 },
+                                 "ui_tooltip": "Show multiplayer battles involving your alliance",
+                                 "ui_tooltip_no_alliance": "To join an alliance, use the\n\"A\" button at top of window.",
+                                 "tooltip_delay": 0 },
 
             "column_header_opponent": { "kind": "TextField", "xy": [67,79], "dimensions": [204,23],"text_size": 13, "text_style": "bold",
                                         "text_hjustify": "left", "ui_name": "Opponent" },
@@ -6371,6 +6382,12 @@
                        "text_hjustify": "left", "ui_name": "Battle Log" },
             "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Battle Log"},
+
+            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [540,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+                                     "bg_image_resizable": 1,
+                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
+                                     "ui_tooltip": "Show where the attacker deployed units","tooltip_delay": 0},
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
@@ -6467,7 +6484,7 @@
                         "text_hjustify": "left", "ui_name": "Play in\nFull Screen" },
             "description": { "kind": "TextField", "xy": [229,177], "dimensions": [210,53], "text_size": 15, "text_style": "normal",
                              "text_hjustify": "left", "text_vjustify": "top",
-                             "ui_name": "Use the following keyboard\nshortcut to maximize the size of\nthe game window:" },
+                             "ui_name": "Use the following command\nto maximize the size of\nthe game window:" },
             "os": { "kind": "TextField", "xy": [229,260], "dimensions": [210,44], "text_size": 15, "text_style": "normal",
                     "text_hjustify": "left", "text_vjustify": "top",
                     "ui_name": "%s web browsers:", "show": 0 },
@@ -8321,6 +8338,77 @@
             "close_button": { "kind": "ActionButton", "xy": [426,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "TextField", "xy": [108,38], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 15, "text_leading": 15,
                              "text_vjustify": "top", "ui_name": "Click and drag with the mouse to scroll the map." }
+        }
+    },
+
+    "region_map_replay_dialog": {
+        "dimensions": [736,423], "min_dimensions": [585,380],
+        "clip_children": 0, "transparent_to_mouse": 1,
+        "widgets": {
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [736,423], "asset": "dialog_resizable", "bg_image_resizable": 1, "transparent_to_mouse": 0 },
+            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1,
+                       "layout": { "resizable": 1 } },
+            "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "Replay" },
+
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1,
+                              "layout": { "hjustify": "right", "vjustify": "top" } },
+
+            "map": {"kind": "RegionMap", "xy": [42,72], "dimensions": [653, 280], "layout": { "hresizable":1, "vresizable": 1 } },
+
+            "bottom_bar": { "kind": "SolidRect", "xy": [42,352], "dimensions": [653,52], "color": [0,0,0,0.4],
+                            "layout": { "hresizable": 1, "vjustify": "bottom" } },
+
+            "progress": { "kind": "ProgressBar", "xy": [52, 362], "dimensions": [633,32], "outline_width": 1, "outline_color": [0.25,0.25,0.25,1],
+                          "full_color": [0.66,0.66,0.66,1],
+                          "layout": { "hresizable": 1, "vjustify": "bottom" } },
+
+            "region_info": { "kind": "TextField", "xy": [52,80], "dimensions": [100,20], "text_size": 21, "text_style": "thick", "drop_shadow": 1,
+                             "text_hjustify": "left", "text_color": [1,1,0.1,1], "ui_name": "%REGION - %UNIX - %DATE %CURSOR",
+                             "layout": { "hjustify": "left", "vjustify": "top" } },
+
+            "play_button": { "kind": "ActionButton", "xy": [54,320], "dimensions": [23,23], "bg_image": "slowdown_button", "push_bg_image": 1,
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            "fast_button": { "kind": "ActionButton", "xy": [86,320], "dimensions": [23,23], "bg_image": "speedup_button", "push_bg_image": 1,
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            "zoom_in_button": { "kind": "ActionButton", "xy": [662,285], "dimensions": [22,20], "bg_image": "map_plus_button", "push_bg_image": 1,
+                                "ui_tooltip": "Zoom in",
+                                "tooltip_delay": 0, "fixed_tooltip_offset": [646,318],
+                                "layout": { "hjustify": "right", "vjustify": "bottom" } },
+            "zoom_out_button": { "kind": "ActionButton", "xy": [662,315], "dimensions": [22,20], "bg_image": "map_minus_button", "push_bg_image": 1,
+                                 "ui_tooltip": "Zoom out",
+                                 "tooltip_delay": 0, "fixed_tooltip_offset": [644,348],
+                                 "layout": { "hjustify": "right", "vjustify": "bottom" } },
+            "zoom_label": { "show": 0,
+                            "kind": "TextField", "xy": [548,371], "dimensions": [100,20], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
+                            "text_hjustify": "right", "text_color": [0.8,0.8,0.8,1], "ui_name": "Use mouse wheel to zoom",
+                            "layout": { "hjustify": "right", "vjustify": "bottom" } },
+
+            "loading_rect": { "kind": "SolidRect",
+                              "xy": [42,72], "dimensions": [653, 280], // "xy": [205,150], "dimensions": [336,128],
+                              "color":[0,0,0,0.66], "show": 0,
+                              "layout": { //"hjustify": "center", "vjustify": "center",
+                                  "hresizable": 1, "vresizable": 1
+                              } },
+            "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 19, "text_style": "bold", "text_color":[1,1,1,1],
+                              "ui_name": "Loading...", "ui_name_progress": "Loading (%pct%)...", "show": 0,
+                              "layout": { "hjustify": "center", "vjustify": "center" } },
+            "loading_spinner": { "kind": "StaticImage", "xy":[270,204], "dimensions":[16,16], "asset":"loading_spinner", "show": 0,
+                                 "layout": { "hjustify": "center", "vjustify": "center" } }
+        }
+    },
+
+    "deployment_markers_notice": {
+        "dimensions": [451, 88],
+        "clip_children": 0, "transparent_to_mouse": 1,
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,88], "asset": "tooltip_bg", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [8,9], "dimensions": [72,72], "clip_to": [12,11,65,67], "asset": "valentina_72x72" },
+            "close_button": { "kind": "ActionButton", "xy": [426,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "description": { "kind": "TextField", "xy": [108,0], "dimensions": [335,68], "text_hjustify": "left",  "text_size": 15,
+                             "text_vjustify": "center", "ui_name": "Showing where %attacker deployed units.\nClick \"X\" to close." }
         }
     },
 

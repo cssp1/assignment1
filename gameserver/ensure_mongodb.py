@@ -64,8 +64,9 @@ if __name__ == '__main__':
 
         nosql_db = nosql_con[dbname]
 
-        if 'system.roles' in nosql_con['admin'].collection_names():
-            #print 'Using MongoDB 2.6+ user schema'
+        if (int(nosql_con.server_info()['version'].split('.')[0]) >= 3) or \
+           ('system.roles' in nosql_con['admin'].collection_names()):
+            print 'Using MongoDB 2.6+ user schema'
             result = nosql_db.command(bson.son.SON([('usersInfo', {'user': raw_conf['username'], 'db':dbname})]))
             if not result['users']:
                 print 'Creating missing user', raw_conf['username'], 'in', dbname, 'on', raw_conf['host'], '...'
@@ -81,7 +82,7 @@ if __name__ == '__main__':
                     nosql_db.command(bson.son.SON([('grantRolesToUser',raw_conf['username']), ('roles',['userAdmin'])]))
 
         else:
-            #print 'Using MongoDB 2.4 user schema'
+            print 'Using MongoDB 2.4 user schema'
             user = nosql_db['system.users'].find_one({'user': raw_conf['username']})
 
             if not user:

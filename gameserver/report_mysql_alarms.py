@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     # get the browser-issues data points
     cur.execute('''SELECT SUM(IF(event_name = '0660_asset_load_fail',1,0)) AS cdn_fails,
-                          SUM(IF(event_name NOT IN ('0660_asset_load_fail','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy'),1,0)) AS browser_fails
+                          SUM(IF(event_name NOT IN ('0660_asset_load_fail','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy','0673_client_cannot_log_in_under_attack'),1,0)) AS browser_fails
                    FROM %s WHERE time >= %%s AND time < %%s''' % sql_util.sym(client_trouble_table),
                 [last_valid_hour, last_valid_hour + 3600])
     rows = cur.fetchall()

@@ -7,6 +7,7 @@
 # main game server
 
 import sys, os, time, base64, hmac, hashlib, urllib, urlparse, random, string, glob, traceback, signal, re
+import inspect
 import socket
 import functools
 import math
@@ -3515,9 +3516,37 @@ class Session(object):
                 self.alliance_id_cache = -1; self.alliance_membership_cache = None
         return self.alliance_info_cache, self.alliance_membership_cache
 
+    # client uses generic chat channel names - translate to/from internal names
+    def decode_chat_channel_name(self, channel):
+        if channel == 'GLOBAL' and self.global_chat_channel:
+            return self.global_chat_channel
+        elif channel == 'REGION' and self.region_chat_channel:
+            return self.region_chat_channel
+        elif channel == 'ALLIANCE' and self.alliance_chat_channel:
+            return self.alliance_chat_channel
+        elif channel == 'DEVELOPER' and self.player.is_developer():
+            return channel
+        return None
+    def encode_chat_channel_name(self, channel):
+        if channel == self.global_chat_channel:
+            return 'GLOBAL'
+        elif channel == self.alliance_chat_channel:
+            return 'ALLIANCE'
+        elif channel == self.region_chat_channel:
+            return 'REGION'
+        return channel
+
     def do_chat_catchup(self, true_channel, retmsg):
-        for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory']):
+        for x in gamesite.nosql_client.chat_catchup(true_channel, limit = gamedata['server']['chat_memory'], reason='catchup'):
             self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg)
+    def do_chat_getmore(self, true_channel, end_time, end_msg_id, retmsg):
+        msg_list = gamesite.nosql_client.chat_catchup(true_channel, end_time = end_time, end_msg_id = end_msg_id,
+                                                      order = SpinNoSQL.NoSQLClient.CHAT_NEWEST_FIRST,
+                                                      limit = gamedata['server']['chat_memory'],
+                                                      reason = 'getmore')
+        for x in msg_list:
+            self.chat_recv(true_channel, x.get('id',None), x['sender'], x.get('text',''), retmsg = retmsg, is_prepend = True)
+        return len(msg_list) < gamedata['server']['chat_memory'] # is_final
 
     def init_alliance(self, retmsg, chat_catchup = True, reason = 'Session.init_alliance'):
         if self.alliance_chat_channel:
@@ -3531,15 +3560,14 @@ class Session(object):
         self.alliance_chat_channel = 'a:%d' % alliance_id
 
         if chat_catchup:
+            self.do_chat_catchup(self.alliance_chat_channel, retmsg)
             txt = alliance_info.get('chat_motd', None)
             if not txt:
                 txt = "Welcome to \"%s\" chat!" % alliance_info.get('ui_name', 'unknown')
             self.chat_recv(self.alliance_chat_channel, None,
-                           {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'welcome',
-                            'time': server_time, 'facebook_id':'-1', 'user_id':-1},
+                           {'chat_name': gamedata['strings']['alliance_chat_motd_sender'], 'type': 'alliance_welcome',
+                            'time': server_time, 'user_id':-1},
                            txt, retmsg = retmsg)
-
-            self.do_chat_catchup(self.alliance_chat_channel, retmsg)
 
         gamesite.chat_mgr.join(self, self.alliance_chat_channel)
         return alliance_info, alliance_membership
@@ -3553,14 +3581,14 @@ class Session(object):
         if divert:
             self.global_chat_channel += '_'+divert
 
-        # put welcome message into chat
-        self.chat_recv(self.global_chat_channel, None,
-                       {'chat_name': 'Global', 'type':'welcome', 'time': server_time, 'facebook_id': '-1', 'user_id': -1},
-                       'Welcome to Global chat! Please be respectful. Offensive behavior is not tolerated.',
-                       retmsg = retmsg)
-
         # stuff last few messages into chat and join
         self.do_chat_catchup(self.global_chat_channel, retmsg)
+        # put welcome message into chat
+        if gamedata['strings']['chat_templates'].get('welcome') and Predicates.read_predicate(gamedata['chat_welcome_if']).is_satisfied(self.player,None):
+            self.chat_recv(self.global_chat_channel, None,
+                           {'chat_name':'System', 'type':'welcome', 'channel_name': 'Global', 'time': server_time, 'user_id':-1},
+                           'Welcome',
+                           retmsg = retmsg)
         gamesite.chat_mgr.join(self, self.global_chat_channel)
 
     def init_region_chat(self, new_region, retmsg):
@@ -3570,14 +3598,15 @@ class Session(object):
         if (not new_region) or (new_region not in gamedata['regions']): return
         self.region_chat_channel = 'r:'+str(new_region)
 
-        ui_name = gamedata['regions'][new_region]['ui_name']
-        self.chat_recv(self.region_chat_channel, None,
-                       {'chat_name':'Region', 'type':'welcome', 'time': server_time, 'facebook_id':'-1', 'user_id':-1},
-                       "Welcome to %s region chat! Please be respectful. Offensive behavior is not tolerated." % ui_name,
-                       retmsg = retmsg)
-
         # stuff last few messages into chat and join
         self.do_chat_catchup(self.region_chat_channel, retmsg)
+        # put welcome message into chat
+        if gamedata['strings']['chat_templates'].get('welcome') and Predicates.read_predicate(gamedata['chat_welcome_if']).is_satisfied(self.player,None):
+            ui_name = gamedata['regions'][new_region]['ui_name']
+            self.chat_recv(self.region_chat_channel, None,
+                           {'chat_name':'System', 'type':'welcome', 'channel_name': '%s Region' % ui_name, 'time': server_time, 'user_id':-1},
+                           'Welcome',
+                           retmsg = retmsg)
         gamesite.chat_mgr.join(self, self.region_chat_channel)
 
     def shutdown(self):
@@ -3923,20 +3952,15 @@ class Session(object):
                 gamesite.gameapi.complete_longpoll(request, self)
 
     # function for sending chat messages to the client
-    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None):
+    def chat_recv(self, channel, id, sender_info, text, force = False, retmsg = None, is_prepend = False):
         if (not force) and (not self.user.chat_can_interact()):
             return
         # map channel
-        if channel == self.global_chat_channel:
-            channel = 'GLOBAL'
-        elif channel == self.alliance_chat_channel:
-            channel = 'ALLIANCE'
-        elif channel == self.region_chat_channel:
-            channel = 'REGION'
+        channel = self.encode_chat_channel_name(channel)
 
         # hide sender fields that clients should not know about (_sum table dimensions)
         sender_info_clean = dict((k,v) for k,v in sender_info.iteritems() if not k.startswith('_'))
-        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id]
+        msg = ["CHAT_RECV", channel, sender_info_clean, SpinHTTP.wrap_string(text), id, is_prepend]
         if retmsg is not None:
             retmsg.append(msg)
         else:
@@ -4767,6 +4791,7 @@ class Session(object):
             gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
             self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
 
+        self.deployed_units = {}
         self.has_attacked = True
         self.debug_log_action('deploy_ai_attack')
 
@@ -4875,6 +4900,7 @@ class Session(object):
                     retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
 
                 self.log_attack_unit(self.incoming_attack_id, obj, '3910_unit_deployed', props = {'method':'ai_attack'})
+                self.deployed_units[obj.spec.name] = self.deployed_units.get(obj.spec.name,0) + 1
                 if self.damage_log: self.damage_log.init(obj)
                 movecount += 1
 
@@ -5500,7 +5526,9 @@ class GameObjectSpec(Spec):
         ["crafting_speed", 1.0],
         ["crafting_queue_space", -1],
         ["manufacture_speed", 1.0],
+        ["manufacture_cost", 1.0],
         ["unit_repair_speed", 1.0],
+        ["unit_repair_cost", 1.0],
         ["track_level_in_player_history", False],
         ["history_category", None],
         ["defense_types", []],
@@ -5583,17 +5611,32 @@ class GameObjectSpec(Spec):
     # obj_id is needed to look up any building modstats that affect repair time
     # (XXXXXX this awkwardly reaches into player.stattab.modded_buildings - might need to fix later by passing the Building instance itself,
     # or a speed_factor, but that complicates DamageLog.finalize()...)
-    def cost_to_repair(self, level, hp_ratio, player, obj_id = None):
+    COST_MODE_REPAIR = 0
+    COST_MODE_RECYCLE = 1
+    COST_MODE_MANUFACTURE_CANCEL = 2
+    COST_MODE_MANUFACTURE = 3
+    def cost_to_repair(self, level, hp_ratio, player, obj_id = None, cost_mode = COST_MODE_REPAIR, builder = None):
         if self.kind == 'mobile':
-            if self.resurrectable or hp_ratio > 0:
+            if cost_mode == self.COST_MODE_MANUFACTURE_CANCEL: # note: legacy only - now queue entries store their own cost
+                cost_ratio = gamedata['manufacture_cancel_refund']
+                time_ratio = spd = 1
+            elif cost_mode == self.COST_MODE_RECYCLE:
+                cost_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
+                # note: do not bonus this, to avoid exploits where you increase the unit's cost after it's built, then recycle it
+                time_ratio = spd = 1
+            elif (cost_mode == self.COST_MODE_REPAIR) and (self.resurrectable or hp_ratio > 0):
                 cost_ratio = self.unit_repair_resources if self.unit_repair_resources >= 0 else player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources'])
                 time_ratio = self.unit_repair_time if self.unit_repair_time >= 0 else player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time'])
+                # XXX grab it from the building instead?
+                cost_ratio *= player.stattab.get_unit_stat(self.name, 'repair_cost', 1)
                 spd = player.stattab.get_unit_stat(self.name, 'repair_speed', 1)
             else:
-                # for destroyed, non-resurrectable units, treat the cost and time factors as 1.0x since the player must rebuild them from scratch
+                # treat destroyed, non-resurrectable units the same as manufacturing from scratch
                 cost_ratio = 1
                 time_ratio = 1
-                spd = 1 # should actually be manufacture_speed, but that needs to query the player's base factory buildings, ignore it for now
+                # XXX grab it from the building instead?
+                cost_ratio *= player.stattab.get_unit_stat(self.name, 'manufacture_cost', 1)
+                spd = player.stattab.get_unit_stat(self.name, 'manufacture_speed', 1)
 
             health_ratio = 1.0 - hp_ratio
             health_ratio = min(max(health_ratio, 0.0), 1.0)
@@ -5962,10 +6005,10 @@ class GameObject:
     def is_shooter(self): return self.get_auto_spell() is not None
     def is_invisible(self, session): return False
 
-    def cost_to_repair(self, player):
-        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id)
-    def time_to_repair(self, player):
-        return self.cost_to_repair(player)['time']
+    def cost_to_repair(self, player, builder = None):
+        return self.spec.cost_to_repair(self.level, self.hp/float(self.max_hp), player, self.obj_id, builder = builder)
+    def time_to_repair(self, player, builder = None):
+        return self.cost_to_repair(player, builder = builder)['time']
 
 class Mobile(GameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, temporary = None):
@@ -9864,6 +9907,13 @@ class Player(AbstractPlayer):
             obj.modstats[stat] = ModChain.add_mod(obj.modstats[stat], method, strength, kind, source, props)
             self.modded_buildings[obj.obj_id] = obj
 
+            # manufacturing-related stats need to flow through transitively to the units this building can work on
+            if obj.spec.manufacture_category and (stat in ('unit_repair_speed', 'unit_repair_cost',
+                                                           'manufacture_speed', 'manufacture_cost')):
+                self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, {'unit_repair_speed':'repair_speed',
+                                                                                           'unit_repair_cost':'repair_cost'}.get(stat,stat), method,
+                                                           strength, kind, source, props = props)
+
         # apply modstat to all units in a specific manufacture category
         # category can be "ALL" to apply to all (unlocked) units
         def apply_modstat_to_manufacture_category(self, category, stat, method, strength, kind, source, props = None):
@@ -10030,11 +10080,15 @@ class Player(AbstractPlayer):
                         self.total_space += obj.get_leveled_quantity(obj.spec.provides_total_space)
 
                     self.main_squad_space += obj.get_leveled_quantity(obj.spec.provides_space)
-                    if obj.spec.manufacture_category and obj.spec.unit_repair_speed:
-                        self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
-                                                                   obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)) - 1.0,
-                                                                   'building', obj.spec.name, {'level': obj.level})
-
+                    if obj.spec.manufacture_category:
+                        if obj.spec.unit_repair_speed:
+                            self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'repair_speed', '*=(1+strength)',
+                                                                       obj.get_stat('unit_repair_speed', obj.get_leveled_quantity(obj.spec.unit_repair_speed)) - 1.0,
+                                                                       'building', obj.spec.name, {'level': obj.level})
+                        if obj.spec.manufacture_speed:
+                            self.apply_modstat_to_manufacture_category(obj.spec.manufacture_category, 'manufacture_speed', '*=(1+strength)',
+                                                                       obj.get_stat('manufacture_speed', obj.get_leveled_quantity(obj.spec.manufacture_speed)) - 1.0,
+                                                                       'building', obj.spec.name, {'level': obj.level})
                     self.quarry_control_limit += obj.get_leveled_quantity(obj.spec.provides_quarry_control)
 
                     self.total_foremen += obj.get_leveled_quantity(obj.spec.provides_foremen)
@@ -10584,7 +10638,9 @@ class Player(AbstractPlayer):
                 'attacker_level':summary['attacker_level'],
                 'defender_outcome':summary['defender_outcome'],
                 'base_id': summary['base_id'],
+                'base_ncells': summary['base_ncells'],
                 'base_damage': summary['base_damage'],
+                'deployed_units': summary.get('deployed_units',{}),
                 'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),
                 'killed_units':sum(summary['loot'].get('units_lost', {}).itervalues()),
                 'defender_xp':summary['loot'].get('defender_xp', 0),
@@ -10659,12 +10715,8 @@ class Player(AbstractPlayer):
 
 
         if to_delete:
-            refund = dict((res,0) for res in gamedata['resources'])
             for obj in to_delete:
                 self.home_base_remove(obj)
-                for res in gamedata['resources']:
-                    refund[res] += obj.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res))
-            self.resources.gain_res(refund, reason='unit_migration_refund')
 
         # unit_repair_queue migration
         give_free_repair = False
@@ -11186,7 +11238,7 @@ class LivePlayer(Player):
         army, map_features, mailbox_update = self.ping_squads(session, return_army = True, originator=originator, reason=reason)
         retmsg.append(["SQUADS_UPDATE", self.squads])
         retmsg.append(["PLAYER_ARMY_UPDATE_FULL", filter(lambda x: x is not None, map(self.strip_fields_for_army_update, army))])
-        if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features])
+        if self.home_region and map_features: retmsg.append(["REGION_MAP_UPDATES", self.home_region, map_features, server_time])
         if mailbox_update: self.send_mailbox_update(retmsg)
 
     # used for processing untrusted requests from the client, checks to make sure there is an item in slot 'slot'
@@ -13594,10 +13646,26 @@ class CONTROLAPI(resource.Resource):
                 request.setResponseCode(http.BAD_REQUEST)
                 return 'badmethod\n'
 
+            self.trim_args(handler, args)
             ret = handler(request, **args)
 
         # note: can go asynchronous
         return ret if (ret is not None) else 'ok\n'
+
+    # for forwards-compatibity, prevent CONTROLAPI crashes when receiving unexpected keyword arguments from new code
+    warned_args = set()
+    def trim_args(self, handler, passed_args):
+        named_args, var_args, varkw, defaults = inspect.getargspec(handler)
+        if varkw: return passed_args # function accepts **kwargs
+        for p in passed_args.keys():
+            if p not in named_args:
+                key = (handler.__name__, p) # unique tuple to only warn once
+                if key not in self.warned_args:
+                    self.warned_args.add(key)
+                    gamesite.exception_log.event(server_time, '%s: Dropping unrecognized arg "%s"' % \
+                                                 (handler.__name__, p))
+                del passed_args[p]
+        return passed_args
 
     def handle_terminate_session(self, request, session_id = None):
         # remember that this ID is invalid, in case the client tries to use it again
@@ -13684,16 +13752,16 @@ class CONTROLAPI(resource.Resource):
                                 'target_user_id': target_user_id,
                                 'target_message_id': message_id}, '', log = True)
         return SpinJSON.dumps({'result': 'ok'}, newline=True)
-    def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None):
+    def handle_broadcast_map_update(self, request, region_id = None, base_id = None, data = None, server = None, originator = None, map_time = None):
         assert region_id and base_id and server
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False)
+            self.gameapi.broadcast_map_update(region_id, base_id, data, originator, send_to_net = False, map_time = map_time)
     def handle_broadcast_map_attack(self, request, msg = None, region_id = None, feature = None,
-                                    attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None):
+                                    attacker_id = None, defender_id = None, summary = None, pcache_info = None, server = None, map_time = None):
         # note: ignore our own broadcasts
         if server != spin_server_name:
-            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False)
+            self.gameapi.broadcast_map_attack(region_id, feature, attacker_id, defender_id, summary, pcache_info, msg = msg, send_to_net = False, map_time = map_time)
     def handle_broadcast_turf_update(self, request, region_id = None, data = None):
         for session in iter_sessions():
             if session.player.home_region == region_id:
@@ -15113,7 +15181,7 @@ class Store(object):
                         discovered_where = 'messages'
 
 
-                if 'metrics_description' in loot_table:
+                if ('metrics_description' in loot_table) and items:
                     extra_description = Predicates.eval_cond_or_literal(loot_table['metrics_description'], session, session.player)
                     if extra_description:
                         price_description.append(extra_description)
@@ -16636,6 +16704,7 @@ class GAMEAPI(resource.Resource):
                                     summary[role+'_alliance_'+FIELD] = cache[FIELD]
                     if session.viewing_base.base_region: summary['base_region'] = session.viewing_base.base_region
                     if session.defending_squads: summary['defending_squads'] = session.defending_squads.keys()
+                    if session.deployed_units: summary['deployed_units'] = session.deployed_units.copy()
                     if session.deployable_squads: summary['deployable_squads'] = session.deployable_squads.keys()
                     if session.items_expended: summary['items_expended'] = copy.deepcopy(session.items_expended)
                     if session.damage_log:
@@ -17104,7 +17173,13 @@ class GAMEAPI(resource.Resource):
                     # always permit hive destruction when CC is dead at the end of the fight
                     session.defender_cc_standing = True
 
-            session.pvp_balance = None
+            if session.viewing_player is not session.player and \
+               session.viewing_player.is_human() and \
+               gamedata['prevent_same_alliance_attacks'] and \
+               session.player.is_same_alliance(session.viewing_player.user_id):
+                session.pvp_balance = 'same_alliance'
+            else:
+                session.pvp_balance = None
 
             if gamesite.nosql_client:
                 spyee_lock_state = gamesite.nosql_client.map_feature_lock_get_state_batch(session.player.home_region, [session.viewing_base.base_id], reason = 'spy_quarry')[0][0]
@@ -17413,6 +17488,8 @@ class GAMEAPI(resource.Resource):
         if pre_attack and (not cannot_spy): # immediately proceed with attack attempt
             do_attack_retmsg = [] # collect error messages separately
             attack_success = self.do_attack(session, do_attack_retmsg, [None, []])
+            if not attack_success:
+                session.release_pre_locks() # drop any pre-attack locks immediately
 
             if pre_attack >= 2: # pre-auto-resolve
                 if attack_success:
@@ -17475,6 +17552,7 @@ class GAMEAPI(resource.Resource):
                              'facebook_friends',
                              'attacker_name', 'defender_name',
                              'attacker_level', 'defender_level',
+                             'deployed_units',
                              'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
 
     def query_battle_history(self, session, retmsg, arg):
@@ -17494,7 +17572,7 @@ class GAMEAPI(resource.Resource):
 
         # permission check
         if (not session.player.is_developer()):
-            # no peeking at others' battle histories unless you are a developer
+            # no peeking at others' battle histories unless you are a developer, or in the same alliance
             if (source > 0 and source != session.user.user_id) or \
                ((alliance_A > 0 or alliance_B > 0) and (session.get_alliance_id(reason='query_battle_history') < 0 or session.alliance_id_cache not in (alliance_A, alliance_B))):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
@@ -17513,7 +17591,7 @@ class GAMEAPI(resource.Resource):
                 battle_history = session.viewing_player.battle_history
             elif (alliance_A > 0) or (alliance_B > 0):
                 # alliance queries not supported from playerdb
-                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], None, True, 'offline'])
+                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], [], None, True, 'offline'])
                 return
 
         if battle_history_source in ('nosql','nosql/sql'):
@@ -17651,12 +17729,17 @@ class GAMEAPI(resource.Resource):
             ret = [dict((k,s[k]) for k in self.BATTLE_HISTORY_FIELDS if k in s) for s in summaries]
             latest_returned_time = max(s.get('time',-1) for s in summaries)
 
+            # sort summaries by time
+            ret.sort(key = lambda r: -r.get('time',-1))
+
         # update battle_history_seen
         if source and source == session.user.user_id:
             session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
             session.send([["NEW_BATTLE_HISTORIES", 0]])
 
-        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret, pcache_data, is_final, is_error]], flush_now = True)
+        session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret,
+                       [self.sign_battle_history(r.get('time',-1), r.get('attacker_id',-1), r.get('defender_id',-1), r.get('base_id',None)) for r in ret],
+                       pcache_data, is_final, is_error]], flush_now = True)
 
     def query_achievements(self, session, retmsg, arg):
         id = arg[1]; tag = arg[2]
@@ -17790,17 +17873,26 @@ class GAMEAPI(resource.Resource):
 
         return db_time, codec, z_result
 
+    def sign_battle_history(self, battle_time, attacker, defender, base_id):
+        tosign = AttackLog.base_name(battle_time, attacker, defender, base_id)
+        return base64.urlsafe_b64encode(hmac.new(str(SpinConfig.config['proxy_api_secret']), msg=tosign, digestmod=hashlib.sha256).digest())
+
     def get_battle_log3(self, session, retmsg, arg):
         battle_time = arg[1]
         attacker = arg[2]
         defender = arg[3]
         base_id = arg[4]
-        tag = arg[5]
+        client_sig = arg[5]
+        tag = arg[6]
 
-        # do not allow peeking at others' battles, unless you are a developer
-        if session.user.user_id != attacker and session.user.user_id != defender and (not session.player.is_developer()):
-            retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
-            return
+        # the battle log itself does not have sufficient information (attacker/defender alliance IDs) to determine
+        # access permission. So instead, we use a secure signature of the args from the battle history.
+        if not session.player.is_developer():
+            if session.user.user_id not in (attacker, defender) and \
+               client_sig != self.sign_battle_history(battle_time, attacker, defender, base_id):
+                retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, None])
+                return
 
         filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
         ret = None
@@ -17833,6 +17925,14 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
         return None # not async
+
+    def query_map_log(self, session, retmsg, arg):
+        region_id = arg[1]
+        time_range = arg[2]
+        tag = arg[3]
+        ret = list(gamesite.nosql_client.log_retrieve(gamesite.nosql_client.region_table_name(region_id, 'log'), time_range, reason='QUERY_MAP_LOG'))
+        retmsg.append(["QUERY_MAP_LOG_RESULT", tag, ret])
+        return None
 
     def do_complete_quest(self, session, retmsg, questname):
         quest = session.player.get_abtest_quest(questname)
@@ -19698,14 +19798,14 @@ class GAMEAPI(resource.Resource):
         if object.is_under_construction():
             retmsg.append(["ERROR", "FACTORY_UNDER_CONSTRUCTION"]); return
 
-        cost = {}
+        cost = spec.cost_to_repair(level, 0, session.player, cost_mode = spec.COST_MODE_MANUFACTURE, builder = object)
         for res in gamedata['resources']:
-            cost[res] = GameObjectSpec.get_leveled_quantity(getattr(spec, 'build_cost_'+res), level)
             if (not session.player.is_cheater) and (getattr(session.player.resources,res) < cost[res]):
                 retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), cost[res]])
                 return
 
-        build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, level)
+        build_time = cost['time']
+
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         # apply unit capacity constraint
@@ -19726,21 +19826,17 @@ class GAMEAPI(resource.Resource):
                     return
 
         # queue it up
-        negative_cost = dict((res,-cost[res]) for res in cost)
+        negative_cost = dict((res,-cost[res]) for res in cost if res != 'time')
         session.player.resources.gain_res(negative_cost, reason='unit_production')
         admin_stats.econ_flow_res(session.player, 'consumption', 'unit_manufacture', negative_cost)
 
-        # reduce build time by structure speed bonus
-        speed = object.get_stat('manufacture_speed', object.get_leveled_quantity(object.spec.manufacture_speed))
-        build_time = int(build_time / speed)
-        if build_time < 1:
-            build_time = 1
+        # note: structure speed bonus has already been applied via unit stat
 
         if len(object.manuf_queue) < 1:
             object.manuf_start_time = server_time
             object.manuf_done_time = 0
 
-        object.manuf_queue.append({'spec_name': spec_name, 'level': level, 'total_time': build_time})
+        object.manuf_queue.append({'spec_name': spec_name, 'level': level, 'total_time': build_time, 'cost': dict((res,cost[res]) for res in cost if res != 'time')})
         session.deferred_object_state_updates.add(object)
         session.deferred_player_state_update = True
         session.activity_classifier.manufactured_unit()
@@ -19764,7 +19860,11 @@ class GAMEAPI(resource.Resource):
         level = item['level']
 
         # how much resources and time was this construction going to take?
-        refund = dict((res, int(gamedata['manufacture_cancel_refund']*GameObjectSpec.get_leveled_quantity(getattr(spec, 'build_cost_'+res), level))) for res in gamedata['resources'])
+        if 'cost' in item:
+            refund = dict((res, int(gamedata['manufacture_cancel_refund']*amount)) for res, amount in item['cost'].iteritems())
+        else:
+            refund = spec.cost_to_repair(level, 0, session.player, cost_mode = spec.COST_MODE_MANUFACTURE_CANCEL, builder = object)
+            refund = dict((res, amount) for res, amount in refund.iteritems() if res != 'time') # filter out time
 
         # delete the item from the queue
         object.manuf_queue.pop(queue_index)
@@ -21701,11 +21801,11 @@ class GAMEAPI(resource.Resource):
         assert obj.owner is session.player
         assert obj.is_mobile()
 
-        recycle_ratio = session.player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
         health_ratio = float(obj.hp)/float(obj.max_hp)
         health_ratio = min(max(health_ratio, 0.0), 1.0)
 
-        refund = dict((res, max(0, int(recycle_ratio * health_ratio * obj.get_leveled_quantity(getattr(obj.spec,'build_cost_'+res))))) for res in gamedata['resources'])
+        # for better accounting, this should really be stored on the object itself
+        refund = dict((res, amount) for res, amount in obj.spec.cost_to_repair(obj.level, 1.0 - health_ratio, session.player, cost_mode = obj.spec.COST_MODE_RECYCLE).iteritems() if res != 'time')
 
         if session.has_object(id): session.rem_object(id)
         session.player.unit_repair_cancel(obj)
@@ -21785,13 +21885,7 @@ class GAMEAPI(resource.Resource):
             dict_increment(session.loot[loot_stat], obj.spec.name, 1)
 
             if owning_player:
-                if can_resurrect:
-                    res_factor = obj.spec.unit_repair_resources if obj.spec.unit_repair_resources >=0 else \
-                                 owning_player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources'])
-                else:
-                    res_factor = 1
-
-                cost = dict((res, int(res_factor * obj.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res)))) for res in gamedata['resources'])
+                cost = obj.spec.cost_to_repair(obj.level, 0, owning_player, cost_mode = obj.spec.COST_MODE_REPAIR)
                 for res in gamedata['resources']:
                     dict_increment(session.loot, loot_stat+'_'+res, cost[res])
 
@@ -24364,6 +24458,10 @@ class GAMEAPI(resource.Resource):
             return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
+        elif arg[0] == "QUERY_MAP_LOG":
+            if (not session.player.is_developer()):
+                retmsg.append(["ERROR", "SERVER_PROTOCOL"])
+            return self.query_map_log(session, retmsg, arg)
         elif arg[0] == "QUERY_ACHIEVEMENTS":
             return self.query_achievements(session, retmsg, arg)
 
@@ -24380,13 +24478,23 @@ class GAMEAPI(resource.Resource):
             search_terms = SpinHTTP.unwrap_string(arg[1]).strip()[0:64]
             tag = arg[2]
 
-            # these could be merged into one query if performance is bad
-            user_ids = gamesite.nosql_client.player_cache_search(search_terms.lower(),
-                                                                 limit = gamedata['search_player_list_limit'],
-                                                                 match_mode = gamedata['search_player_match_mode'],
-                                                                 name_field = 'ui_name_searchable',
-                                                                 case_sensitive = True,
-                                                                 reason = 'SEARCH_PLAYER_CACHE')
+            # first get a list of user_ids, then query the pcache info for that list
+
+            if not search_terms: # blank string
+                user_ids = []
+            else:
+                start_time = time.time()
+                user_ids = gamesite.nosql_client.player_cache_search(search_terms.lower(),
+                                                                     limit = gamedata['search_player_list_limit'],
+                                                                     match_mode = gamedata['search_player_match_mode'],
+                                                                     name_field = 'ui_name_searchable',
+                                                                     case_sensitive = True,
+                                                                     reason = 'SEARCH_PLAYER_CACHE')
+                end_time = time.time()
+                if end_time - start_time >= gamedata['server'].get('player_cache_search_slow_threshold', 4.0):
+                    gamesite.exception_log.event(server_time, 'slow player_cache_search(): terms = %r, limit = %r, match_mode = %r, name_field = \'ui_name_searchable\', case_sensitive = True' % \
+                                                 (search_terms.lower(), gamedata['search_player_list_limit'], gamedata['search_player_match_mode']))
+
             pcache_data = self.do_query_player_cache(session, user_ids, reason = 'SEARCH_PLAYER_CACHE') if user_ids else []
             retmsg.append(["SEARCH_PLAYER_CACHE_RESULT", user_ids, pcache_data, tag])
 
@@ -24964,6 +25072,16 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["QUERY_SCORE_LEADERS_RESULT", arg[1], period, result, tag])
 
+        elif arg[0] == "CHAT_GETMORE":
+            channel = arg[1]
+            end_time = arg[2]
+            end_msg_id = arg[3]
+            request_tag = arg[4]
+            # note: collect response manually, not in retmsg
+            response = []
+            is_final = session.do_chat_getmore(session.decode_chat_channel_name(channel), end_time, end_msg_id, response)
+            retmsg.append(["CHAT_GETMORE_RESULT", request_tag, response, is_final])
+
         elif arg[0] == "CHAT_SEND":
             channel = arg[1]
             text = SpinHTTP.unwrap_string(arg[2]).strip()
@@ -24979,7 +25097,7 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server'].get('log_ugly_chat', True):
                     gamesite.exception_log.event(server_time, 'Player %d stopped from sending ugly chat message: %r' % (session.player.user_id, text))
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_UGLY']['ui_name']), None, False])
                 return
 
             success = True
@@ -24994,29 +25112,20 @@ class GAMEAPI(resource.Resource):
             if togo > 0:
                 success = False
                 retmsg.append(["CHAT_RECV", channel, {'chat_name': 'System', 'time': server_time, 'facebook_id': -1, 'user_id': -1},
-                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None])
+                               SpinHTTP.wrap_string(gamedata['errors']['CHAT_THROTTLED']['ui_name'].replace('%d', str(togo))), None, False])
 
             retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
             if success:
                 session.player.cooldown_trigger('CHAT_SEND', gamedata['chat_spam_cooldown'], add_stack = 1)
 
-                bypass_gag = True
+                bypass_gag = (channel not in ('GLOBAL','REGION'))
 
                 session.activity_classifier.sent_chat_message(channel)
 
                 # remap channel name from generic client-side names to specific server-side names
-                if channel == 'GLOBAL' and session.global_chat_channel:
-                    channel = session.global_chat_channel
-                    bypass_gag = False
-                elif channel == 'REGION' and session.region_chat_channel:
-                    channel = session.region_chat_channel
-                    bypass_gag = False
-                elif channel == 'ALLIANCE' and session.alliance_chat_channel:
-                    channel = session.alliance_chat_channel
-                elif channel == 'DEVELOPER' and session.player.is_developer():
-                    pass
-                else:
+                channel = session.decode_chat_channel_name(channel)
+                if not channel:
                     retmsg.append(["ERROR", "INVALID_CHAT_CHANNEL"])
                     return
 
@@ -26436,7 +26545,7 @@ class GAMEAPI(resource.Resource):
                 success, affected_objects, map_features, error_code = session.player.squad_enter_map(squad_id, coords)
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_STEP':
@@ -26447,7 +26556,7 @@ class GAMEAPI(resource.Resource):
                 coords = spellargs[1][:max_steps] if spellargs[1] else None # may be null
                 success, affected_objects, map_features, error_code = session.player.squad_step(squad_id, coords)
                 if error_code: retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_EXIT_MAP':
@@ -26458,7 +26567,7 @@ class GAMEAPI(resource.Resource):
                 success, affected_objects, map_features, error_code = session.player.squad_exit_map(session, squad_id, originator = session.player.user_id, reason='SQUAD_EXIT_MAP')
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
-                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features])
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_REPAIR_CANCEL':
@@ -26711,13 +26820,13 @@ class GAMEAPI(resource.Resource):
 
         return
 
-    def broadcast_map_update(self, region_id, base_id, data, originator, send_to_net = True):
+    def broadcast_map_update(self, region_id, base_id, data, originator, send_to_net = True, map_time = None):
         assert region_id and base_id
         if data is None:
             data = {'base_id':base_id, 'DELETED':1}
         elif 'base_id' not in data:
             data['base_id'] = base_id
-        upd = ["REGION_MAP_UPDATES", region_id, [data]]
+        upd = ["REGION_MAP_UPDATES", region_id, [data], map_time or server_time]
 
         if base_id[0] == 's':
             squad_owner_id = int(base_id[1:].split('_')[0])
@@ -26740,13 +26849,16 @@ class GAMEAPI(resource.Resource):
                                                      'server':spin_server_name,
                                                      'method':'broadcast_map_update',
                                                      'args': { 'region_id': region_id, 'base_id': base_id, 'data': data,
+                                                               # note: time is boxed here in "args" since it refers to the region map update time,
+                                                               # which could conceivably be on a different clock than the chat message time
+                                                               'map_time': server_time,
                                                                'server': spin_server_name, 'originator': originator },
                                                      }, '', log = False)
 
-    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None):
+    def broadcast_map_attack(self, region_id, feature, attacker_id, defender_id, summary, pcache_info, send_to_net = True, msg = None, map_time = None):
         if msg is None:
             msg = "REGION_MAP_ATTACK_COMPLETE" if summary else "REGION_MAP_ATTACK_START" # legacy compatibility
-        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info]
+        upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info, map_time or server_time]
         for session in iter_sessions():
             if session.player.home_region == region_id:
                 if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
@@ -26760,6 +26872,9 @@ class GAMEAPI(resource.Resource):
                                                                'region_id': region_id, 'feature': feature,
                                                                'attacker_id': attacker_id, 'defender_id': defender_id,
                                                                'summary': summary, 'pcache_info': pcache_info,
+                                                               # note: time is boxed here in "args" since it refers to the region map update time,
+                                                               # which could conceivably be on a different clock than the chat message time
+                                                               'map_time': server_time,
                                                                'server': spin_server_name },
                                                      }, '', log = False)
 

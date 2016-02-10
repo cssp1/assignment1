@@ -1,0 +1,4 @@
+SPIN_TMPDIR=/media/backup-scratch
+
+# use RAM for size-bounded scratch space
+SPIN_SMALL_TMPDIR=/dev/shm

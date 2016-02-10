@@ -15,6 +15,7 @@
 /**
  * @fileoverview Datastructure: Queue.
  *
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * This file provides the implementation of a FIFO Queue structure.
  * API is similar to that of com.google.common.collect.IntQueue

@@ -75,7 +75,7 @@ done
 sudo chown -R ec2-user:ec2-user /home/ec2-user/.aws
 
 # set up cron-to-sns gateway
-sudo yum -y install python-boto
+sudo yum -y install python27-boto
 sudo install ./cron-mail-to-sns.py /usr/local/bin/cron-mail-to-sns.py
 sudo sh -c "/bin/cat > /etc/sysconfig/crond" <<EOF
 # send cron errors via SNS instead of system mail

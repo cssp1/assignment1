@@ -591,13 +591,28 @@ TurretHeadDialog._has_anti_missile = function(item_spec) {
     return has_it;
 };
 /** Create a new modchain with the item's anti-missile stats appended
-    @param {ModChain.ModChain} modchain
+    @param {!ModChain.ModChain} modchain
     @param {string} item_spec
+    @return {!ModChain.ModChain}
     @private */
 TurretHeadDialog._add_anti_missile_mod = function(modchain, item_spec) {
     goog.array.forEach(item_spec['equip']['effects'], function(effect) {
         if(effect['stat'] == 'anti_missile') {
+            modchain = ModChain.clone(modchain);
             modchain = ModChain.add_mod(modchain, effect['method'], effect['strength'], 'equipment', item_spec['name']);
+        }
+    });
+    return modchain;
+};
+
+/** Strip off an anti-missile modchain mod that comes from another turret head
+    @param {!ModChain.ModChain} modchain
+    @return {!ModChain.ModChain}
+    @private */
+TurretHeadDialog._remove_turret_head_anti_missile_mod = function(modchain) {
+    goog.array.forEach(modchain['mods'], function(mod, i) {
+        if(mod['kind'] == 'equipment' && mod['source'] in gamedata['items'] && gamedata['items'][mod['source']]['equip']['slot_type'] == 'turret_head') {
+            modchain = ModChain.recompute_without_mod(modchain, i);
         }
     });
     return modchain;
@@ -659,8 +674,11 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
             ModChain.display_label_widget(left, stat, spell, true);
 
             if(stat == 'anti_missile') { // needs special handling because it is a stat of the building, not the weapon spell
+                // strip off anti-missile mods from any other turret head (but leave alone mods from leader items etc)
+                modchain = TurretHeadDialog._remove_turret_head_anti_missile_mod(modchain);
                 modchain = TurretHeadDialog._add_anti_missile_mod(modchain, spec);
-                if(relative_to) {
+                if(relative_modchain) {
+                    relative_modchain = TurretHeadDialog._remove_turret_head_anti_missile_mod(relative_modchain);
                     relative_modchain = TurretHeadDialog._add_anti_missile_mod(relative_modchain, relative_spec);
                 }
             }

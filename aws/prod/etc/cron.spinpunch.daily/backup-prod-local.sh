@@ -1,6 +1,6 @@
 #!/bin/sh
 
-exit 0 # obsoleted by mongodb backup (XXXXXX but make sure to set it up!)
+exit 0 # obsoleted by mongodb backup (but make sure to set it up!)
 
 . /etc/spinpunch
 

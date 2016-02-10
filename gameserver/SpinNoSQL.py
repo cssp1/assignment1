@@ -6,7 +6,7 @@
 
 # MongoDB adaptor API
 
-import time, sys, re, random
+import time, sys, re, random, copy
 import datetime, calendar
 import pymongo, bson # 3.0+ OK
 import SpinConfig
@@ -18,9 +18,9 @@ import SpinNoSQLId
 
 # connect to a MongoDB service (possibly multiple databases within it)
 class NoSQLService (object):
-    def __init__(self, host, port, username, password, socket_timeout = None):
-        self.host = host
-        self.port = port
+    def __init__(self, connect_args, connect_kwargs, username, password, socket_timeout = None):
+        self.connect_args = connect_args
+        self.connect_kwargs = connect_kwargs
         self.username = username
         self.password = password
         self.socket_timeout = socket_timeout if socket_timeout is not None else 120 # 120 sec timeout by default
@@ -28,14 +28,17 @@ class NoSQLService (object):
         self.seen_dbnames = None
     def connect(self):
         if not self.con:
-            # note: don't use standard connect_args/connect_kwargs because we the live gameserver connection
-            # needs special settings (maxPoolSize)
-            self.con = pymongo.MongoClient(host='mongodb://%s:%d' % (self.host, self.port),
-                                           maxPoolSize = None, # ?
-                                           socketTimeoutMS = self.socket_timeout*1000
-                                           )
-            # only use 1 socket since we never need concurrent requests, and it will mess up auth since
-            # authenticate() does not update other outstanding sockets.
+            # note: override connect_args/connect_kwargs with special settings for the live gameserver connection
+            connect_kwargs = copy.copy(self.connect_kwargs)
+
+            # disable pymongo connection pooling, since we are doing our own
+            # (we never need concurrent requests, and it will mess up auth since
+            # authenticate() does not update other outstanding sockets).
+            connect_kwargs['maxPoolSize'] = 1
+            connect_kwargs['socketTimeoutMS'] = self.socket_timeout*1000
+
+            self.con = pymongo.MongoClient(*self.connect_args, **connect_kwargs)
+
             self.seen_dbnames = {}
     def get_db(self, dbname):
         assert self.con
@@ -71,7 +74,7 @@ class NoSQLServicePool (object):
         password = dbconfig['password']
         key = (host, port, username, password) # if db sharing does not turn out to work, just add dbconfig['dbname'] to the key
         if key not in self.pool:
-            self.pool[key] = NoSQLService(host, port, username, password, socket_timeout = self.socket_timeout)
+            self.pool[key] = NoSQLService(dbconfig['connect_args'], dbconfig['connect_kwargs'], username, password, socket_timeout = self.socket_timeout)
         return self.pool[key]
 
 nosql_service_pool = NoSQLServicePool()
@@ -133,6 +136,27 @@ class NoSQLClient (object):
         ret = str(oid)
         assert len(ret) == 24
         return ret
+
+    # sometimes we need to know which of several unique indexes (on one collection) is responsible for a DuplicateKeyError.
+    # this function parses the error message to look for a matching collection/index name.
+    duplicate_key_re1 = re.compile(r'^.*E11000 duplicate key error index: [^\.]+\.([^\.]+)\.\$(\S+)')
+    duplicate_key_re2 = re.compile(r'^.*E11000 duplicate key error collection: [^\.]+\.([^\.]+) index: (\S+)')
+    @classmethod
+    def duplicate_key_error_is_for_index(cls, e, collection_name, index_name):
+        assert e.code == 11000 # sanity check
+        arg = e.args[0]
+
+        # MongoDB has used several different syntaxes for this error message :(
+        # E11000 duplicate key error index: trtest_dan.trtest_alliances.$_id_  dup key: { : 1 }
+        # E11000 duplicate key error collection: sgprod_alliances.sg_alliances index: chat_tag_1 dup key: { : "IDS" }
+        # insertDocument :: caused by :: 11000 E11000 duplicate key error index: mf2prod_alliances.mf2_alliances.$chat_tag_1 dup key: { : "TDB" }
+        match = cls.duplicate_key_re1.match(arg) or cls.duplicate_key_re2.match(arg)
+        if not match:
+            raise Exception('unrecognized DuplicateKeyError arg: %r' % arg)
+        match_collection, match_index = match.groups()
+        if match_collection.endswith(collection_name) and match_index.startswith(index_name):
+            return True
+        return False
 
     # must match dbserver.py and server.py definitions of these lock states
     LOCK_OPEN = 0
@@ -651,8 +675,8 @@ class NoSQLClient (object):
         # convert time range to ObjectID range
         time_id_range = map(lambda x: bson.objectid.ObjectId(SpinNoSQLId.creation_time_id(x)) if x >= 0 else None, time_range)
         # intersection of both ranges
-        id_range[0] = time_id_range[0] if (id_range[0] is None) else max(id_range[0], time_id_range[0])
-        id_range[1] = time_id_range[1] if (id_range[1] is None) else min(id_range[1], time_id_range[1])
+        id_range[0] = time_id_range[0] if (id_range[0] is None) else (id_range[0] if time_id_range[0] is None else  max(id_range[0], time_id_range[0]))
+        id_range[1] = time_id_range[1] if (id_range[1] is None) else (id_range[1] if time_id_range[1] is None else min(id_range[1], time_id_range[1]))
         return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code, limit, sort_direction))
     def decode_log(self, x):
         if '_id' in x: x['_id'] = self.decode_object_id(x['_id']) # convert to plain strings
@@ -805,19 +829,27 @@ class NoSQLClient (object):
             row['sender']['time'] = row['time']
         return row
 
-    def chat_catchup(self, channel, start_time = -1, end_time = -1, skip = 0, limit = -1, reason=''):
-        return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,skip,limit))
-    def _chat_catchup(self, channel, start_time, end_time, skip, limit):
+    CHAT_NEWEST_FIRST = -1
+    CHAT_OLDEST_FIRST = 1
+    def chat_catchup(self, channel, start_time = -1, end_time = -1, end_msg_id = None, skip = 0, limit = -1, order = CHAT_OLDEST_FIRST, reason=''):
+        return self.instrument('chat_catchup(%s)'%reason, self._chat_catchup, (channel,start_time,end_time,end_msg_id,skip,limit,order))
+    def _chat_catchup(self, channel, start_time, end_time, end_msg_id, skip, limit, order):
         props = {'channel':channel}
         if start_time > 0 or end_time > 0:
             props['time'] = {}
             if start_time > 0: props['time']['$gte'] = start_time
             if end_time > 0: props['time']['$lt'] = end_time
-        cur = self.chat_buffer_table().find(props).sort([('time',pymongo.DESCENDING)])
+        if end_msg_id:
+            props['_id'] = {'$lt': self.encode_object_id(end_msg_id)}
+        sorting = [('time',pymongo.DESCENDING),]
+        if end_msg_id and 0: # this makes the query much slower, and probably doesn't help correctness
+            sorting += [('_id',pymongo.DESCENDING),]
+        cur = self.chat_buffer_table().find(props).sort(sorting)
         if skip > 0: cur = cur.skip(skip)
         if limit > 0: cur = cur.limit(limit)
         ret = map(self.decode_chat_row, cur)
-        ret.reverse() # oldest messages first
+        if order == self.CHAT_OLDEST_FIRST:
+            ret.reverse() # oldest messages first
         return ret
 
     # retrieve up to 2*limit messages sent around center_time +/- time_limit
@@ -997,13 +1029,14 @@ class NoSQLClient (object):
                     tbl.insert_one({'_id':socid, 'user_id':int(my_id)})
                     return my_id
                 except pymongo.errors.DuplicateKeyError as e:
-                    # E11000 duplicate key error index: trtest_dan.facebook_id_table.$user_id_1  dup key: { : 1 }
-                    if e.code == 11000 and ('facebook_id_table.$user_id_' in e.args[0]):
+                    if self.duplicate_key_error_is_for_index(e, 'facebook_id_map', 'user_id'):
                         # user_id race condition
                         continue
-                    else:
+                    elif self.duplicate_key_error_is_for_index(e, 'facebook_id_map', '_id'):
                         # _id duplication
                         return int(tbl.find_one({'_id':socid})['user_id'])
+                    else:
+                        raise
         else:
             return -1
 
@@ -1135,7 +1168,9 @@ class NoSQLClient (object):
                 raise Exception('unknown match_mode '+match_mode)
 
         qs['social_id'] = {'$ne': 'ai'} # no AIs
-        cur = self.player_cache().find(qs, {'_id':1}).sort([('player_level', pymongo.DESCENDING)])
+        # it's not strictly necessary to include player_level in the projection,
+        # but this makes the MongoDB query run much faster
+        cur = self.player_cache().find(qs, {'_id':1,'player_level':1}).sort([('player_level', pymongo.DESCENDING)])
         if limit >= 1:
             cur = cur.limit(limit)
         return [x['_id'] for x in cur]
@@ -1559,7 +1594,7 @@ class NoSQLClient (object):
     def _get_map_feature_population(self, region, base_type):
         return self.region_table(region, 'map').find({'base_type':base_type}).count()
 
-    def get_map_features(self, region, updated_since, batch_size = None, reason=''):
+    def get_map_features(self, region, updated_since = -1, batch_size = None, reason=''):
         if updated_since <= 0:
             if batch_size is None: batch_size = 999999 # use a large batch size for full queries
             return self.instrument('get_map_features(%s,full)'%reason, self._query_map_features, (region,{},None,batch_size))
@@ -1964,13 +1999,12 @@ class NoSQLClient (object):
                 tbl.insert_one(props)
                 break
             except pymongo.errors.DuplicateKeyError as e:
-                # E11000 duplicate key error index: trtest_dan.alliances.$_id_  dup key: { : 1 }
-                if ('alliances.$_id_' in e.args[0]):
+                if self.duplicate_key_error_is_for_index(e, 'alliances', '_id'):
                     # _id race condition
                     continue
-                elif ('alliances.$chat_tag_' in e.args[0]):
+                elif self.duplicate_key_error_is_for_index(e, 'alliances', 'chat_tag'):
                     return -1, "CANNOT_CREATE_ALLIANCE_TAG_IN_USE"
-                elif ('alliances.$ui_name_' in e.args[0]):
+                elif self.duplicate_key_error_is_for_index(e, 'alliances', 'ui_name'):
                     return -1, "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
                 else:
                     raise
@@ -2017,9 +2051,9 @@ class NoSQLClient (object):
             if ret.matched_count > 0:
                 return True, None
         except pymongo.errors.DuplicateKeyError as e:
-            if ('alliances.$chat_tag_' in e.args[0]):
+            if self.duplicate_key_error_is_for_index(e, 'alliances', 'chat_tag'):
                 return False, "CANNOT_CREATE_ALLIANCE_TAG_IN_USE"
-            elif ('alliances.$ui_name_' in e.args[0]):
+            if self.duplicate_key_error_is_for_index(e, 'alliances', 'ui_name'):
                 return False, "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
             else:
                 raise
@@ -2805,6 +2839,7 @@ if __name__ == '__main__':
         alliance_2 = client.create_alliance(u'Mars Federation', "We are cool", 'anyone', 1113, 'bullseye_tan', time_now, 'fb', chat_tag='123')[0]
         assert alliance_2 > 0
         assert client.create_alliance(u'Temp Alliance', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb')[0] > 0
+        assert client.create_alliance(u'Temp Alliance 2', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb', chat_tag = '123')[0] < 0 # duplicate chat tag
 
         print "ALLIANCE INFO (single)", client.get_alliance_info(alliance_2, reason = 'test')
         print "ALLIANCE INFO (single, with roles)", client.get_alliance_info(alliance_2, get_roles = True, reason = 'test')
@@ -2822,6 +2857,7 @@ if __name__ == '__main__':
         assert client.join_alliance(1113, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
 
         assert client.modify_alliance(alliance_1, 1112, ui_name = 'New Democratic Mars Union', chat_tag='ABC')[0]
+        assert not client.modify_alliance(alliance_1, 1112, chat_tag='123')[0] # duplicate chat tag
         assert not client.modify_alliance(alliance_1, 1119, ui_name = 'New Democratic Mars Union')[0] # permissions fail
         assert not client.modify_alliance(alliance_1, 1112, ui_name = 'Mars Federation')[0] # duplicate name
         assert not client.modify_alliance(alliance_2, 1113, chat_tag='ABC')[0] # duplicate tag

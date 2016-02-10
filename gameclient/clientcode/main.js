@@ -46,6 +46,7 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
+goog.require('DeploymentMarkers');
 goog.require('Dripper');
 goog.require('Bounce');
 goog.require('CombatEngine');
@@ -56,6 +57,8 @@ goog.require('SquadManageDialog');
 goog.require('TurretHeadDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
+goog.require('Region');
+goog.require('RegionMapReplay');
 goog.require('RegionMap');
 goog.require('RegionMapIndex');
 goog.require('TeamMapAccelerator');
@@ -400,6 +403,14 @@ function pretty_print_time_very_brief(sec) {
 function pretty_print_date(ts) {
     var d = new Date(ts*1000);
     return d.getFullYear().toString()+' '+gamedata['strings']['months_short'][d.getMonth()]+' '+d.getDate().toString();
+}
+
+// "2013 Dec 9 01:23"
+function pretty_print_date_and_time(ts) {
+    var dt = ts % 86400;
+    var hours = Math.floor(dt/3600);
+    var minutes = Math.floor(dt/60) % 60;
+    return pretty_print_date(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
 }
 
 // pad a string with zeros until it is length 'n'
@@ -1206,6 +1217,9 @@ function GameObject() {
 
     // cache for this.calc_draw_pos()
     this.draw_pos_cache = [[0,0],0];
+
+    // for graphics only, sprite scaling
+    this.cur_scale = [1,1];
 
     // for graphics only (fading-in/out effects), last object opacity
     /** @type {number} */
@@ -8797,14 +8811,48 @@ function get_auto_spell_for_item(item_spec) {
     return null;
 }
 
-function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player) {
-    var cost_ratio = ('unit_repair_resources' in spec ? spec['unit_repair_resources'] : player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources']));
-    var time_ratio = ('unit_repair_time' in spec ? spec['unit_repair_time'] : player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time']));
+/** @enum {number} Matches GameObjectSpec.COST_MODE_* on server */
+var COST_MODE = {
+    REPAIR : 0,
+    RECYCLE : 1,
+    MANUFACTURE_CANCEL : 2,
+    MANUFACTURE : 3
+};
+
+/** @param {!Object<string,?>} spec
+    @param {number} level
+    @param {number} cur_hp
+    @param {number} max_hp
+    @param {!Object} player
+    @param {number=} cost_mode
+    @param {GameObject|null=} builder */
+function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, builder) {
+    if(!cost_mode) { cost_mode = COST_MODE.REPAIR; }
+    var cost_ratio, time_ratio, spd;
+    if(cost_mode === COST_MODE.MANUFACTURE_CANCEL) { // note: legacy only - now queue entries store their own cost
+        cost_ratio = gamedata['manufacture_cancel_refund'];
+        time_ratio = spd = 1;
+    } else if(cost_mode === COST_MODE.RECYCLE) {
+        cost_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
+        // note: do not bonus this, to avoid exploits where you increase the unit's cost after it's built, then recycle it
+        time_ratio = spd = 1;
+    } else if(cost_mode === COST_MODE.REPAIR && (get_leveled_quantity(spec['resurrectable'], level) || cur_hp > 0)) {
+        cost_ratio = ('unit_repair_resources' in spec ? spec['unit_repair_resources'] : player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources']));
+        time_ratio = ('unit_repair_time' in spec ? spec['unit_repair_time'] : player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time']));
+        // XXX grab it from the building instead?
+        cost_ratio *= get_unit_stat(player.stattab, spec['name'], 'repair_cost', 1);
+        spd = get_unit_stat(player.stattab, spec['name'], 'repair_speed', 1);
+    } else {
+        // treat destroyed, non-resurrectable units the same as manufacturing from scratch
+        cost_ratio = 1;
+        time_ratio = 1;
+        // XXX grab it from the building instead?
+        cost_ratio *= get_unit_stat(player.stattab, spec['name'], 'manufacture_cost', 1);
+        spd = get_unit_stat(player.stattab, spec['name'], 'manufacture_speed', 1);
+    }
 
     var health_ratio = 1.0 - 1.0*cur_hp/max_hp;
-
     var cost_time = get_leveled_quantity(spec['build_time'], level);
-    var spd = get_unit_stat(player.stattab, spec['name'], 'repair_speed', 1);
     var rep_time = Math.max(1, Math.floor(time_ratio * health_ratio * cost_time / spd));
     var ret = {'time':rep_time};
 
@@ -10872,7 +10920,7 @@ SPINPUNCHGAME.init = function() {
             // try webkit version
             fun = canvas['webkitRequestFullScreenWithKeys'] ||
                   canvas['webkitRequestFullScreen'];
-            if(fun) {
+            if(fun && (spin_demographics['browser_name'] !== 'Safari')) { // webkit fullscreen seems broken on Safari now!
                 event_name = 'webkitfullscreenchange';
                 // manually ensure keyboard input works
                 if(fun === canvas['webkitRequestFullScreen']) {
@@ -15124,6 +15172,428 @@ function load_ai_base(base) { manipulate_ai_base(base, "LOAD_AI_BASE", "loading"
 function save_ai_base(base) { flush_dirty_objects({}); manipulate_ai_base(base, "SAVE_AI_BASE", "saving"); }
 function publish_ai_base(base) { manipulate_ai_base(base, "PUBLISH_AI_BASE", "publishing"); }
 
+/** Sometimes chat messages from the server call for a modification to
+    a previous message (e.g. to hide it or update a unit donation request).
+    Encapsulate the necessary modifications here.
+    @constructor
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {string|null} target_message_id
+    @param {string|null} target_unit_donation_tag
+    @param {number|null} target_unit_donation_recipient_id */
+var ChatModifier = function(mod_time, mod_message_id, target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id) {
+    this.mod_time = mod_time;
+    this.mod_message_id = mod_message_id;
+    this.target_message_id = target_message_id;
+    this.target_unit_donation_tag = target_unit_donation_tag;
+    this.target_unit_donation_recipient_id = target_unit_donation_recipient_id;
+};
+/** @param {!SPUI.ScrollingTextField} output - widget containing the text node
+    @param {!Object<string,?>|null} req - unit_donation_request entry from user_data of chat tab
+    @param {!SPUI.TextNode} node - text node */
+ChatModifier.prototype.apply = goog.abstractMethod;
+
+/** Comparison operator for keeping modifiers in time-sorted order
+    @param {!ChatModifier} a
+    @param {!ChatModifier} b
+    @return {number} */
+ChatModifier.compare = function(a,b) {
+    if(a.mod_time < b.mod_time) {
+        return -1;
+    } else if(a.mod_time > b.mod_time) {
+        return 1;
+    } else if(a.mod_message_id < b.mod_message_id) {
+        return -1;
+    } else if(b.mod_message_id > a.mod_message_id) {
+        return 1;
+    } else {
+        return 0;
+    }
+};
+
+/** @constructor
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {string} target_message_id
+    @param {string|null} new_type */
+var ChatHider = function(mod_time, mod_message_id, target_message_id, new_type) {
+    goog.base(this, mod_time, mod_message_id, target_message_id, null, null);
+    this.new_type = new_type;
+};
+goog.inherits(ChatHider, ChatModifier);
+/** @override */
+ChatHider.prototype.apply = function(output, req, node) {
+    // revise, or just delete the message?
+    if(this.new_type && node.user_data && (this.new_type in gamedata['strings']['chat_templates'])) {
+        output.revise_text(node, SPText.cstring_to_ablocks_bbcode(gamedata['strings']['chat_templates'][this.new_type].replace('%sender_name', node.user_data['sender_name'])));
+    } else {
+        output.remove_text(node);
+    }
+};
+
+/** @constructor
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {number} sender_user_id
+    @param {string|null} tag
+    @param {number} cur_space
+    @param {number} max_space
+    @param {number} xp_gained */
+var ChatUnitDonation = function(mod_time, mod_message_id, sender_user_id, tag, cur_space, max_space, xp_gained) {
+    goog.base(this, mod_time, mod_message_id, null, tag, null);
+    this.sender_user_id = sender_user_id;
+    this.cur_space = cur_space;
+    this.max_space = max_space;
+    this.xp_gained = xp_gained;
+};
+goog.inherits(ChatUnitDonation, ChatModifier);
+/** @override */
+ChatUnitDonation.prototype.apply = function(output, req, node) {
+    if(this.sender_user_id === session.user_id) {
+        req['i_donated'] = true;
+        req['my_xp'] += this.xp_gained;
+    }
+
+    req['cur_space'] = this.cur_space;
+    req['max_space'] = this.max_space;
+
+    if(req['dialog']) { update_unit_donation_dialog(req['dialog']); }
+
+    var pct = (100.0*(this.cur_space/this.max_space)).toFixed(0);
+    var text;
+
+    if(req['recipient_id'] === session.user_id) {
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+    } else {
+        var kind = (req['i_donated'] ? 'you_have_donated' : 'you_have_not_donated');
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), req['callback'] ? {onclick:req['callback']} : null);
+    }
+
+    output.revise_text(node, text);
+};
+
+/** @constructor
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {number} sender_user_id
+    @param {string|null} new_tag */
+var ChatUnitDonationRequestInvalidation = function(mod_time, mod_message_id, sender_user_id, new_tag) {
+    goog.base(this, mod_time, mod_message_id, null, null, sender_user_id);
+    this.new_tag = new_tag;
+};
+goog.inherits(ChatUnitDonationRequestInvalidation, ChatModifier);
+/** @override */
+ChatUnitDonationRequestInvalidation.prototype.apply = function(output, req, node) {
+    // do not apply invalidation to request matching the new_tag value - this can happen if
+    // the chat buffer re-orders the two messages that are sent with the same "time" value
+    if(req['tag'] !== this.new_tag) {
+        req['cur_space'] = req['max_space'];
+        if(node) {
+            var new_template = gamedata['strings']['unit_donation_chat']['other']['stale'];
+            if(new_template) {
+                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
+                output.revise_text(node, text);
+            } else {
+                output.remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
+            }
+        }
+    }
+};
+
+/** @param {!ChatModifier} modifier
+    @param {!SPUI.Dialog} tab */
+function chat_tab_apply_modifier(modifier, tab) {
+    var persist = false; // whether we need to keep this modifier for use against any upcoming prepended messages
+
+    if(modifier.target_message_id && modifier.target_message_id in tab.user_data['chat_messages_by_id']) {
+        var node = tab.user_data['chat_messages_by_id'][modifier.target_message_id];
+        modifier.apply(tab.widgets['output'], null, node);
+    } else if(modifier.target_unit_donation_recipient_id) {
+        // call on all outstanding requests for this recipient
+        // note: only used for invalidations
+        goog.array.forEach(goog.object.getValues(tab.user_data['unit_donation_requests']), function(req) {
+            if(req['recipient_id'] === modifier.target_unit_donation_recipient_id) {
+                modifier.apply(tab.widgets['output'], req, req['node'] || null);
+            }
+        });
+        persist = true; // always persist
+    } else if(modifier.target_unit_donation_tag && modifier.target_unit_donation_tag in tab.user_data['unit_donation_requests']) {
+        var req = tab.user_data['unit_donation_requests'][modifier.target_unit_donation_tag];
+        modifier.apply(tab.widgets['output'], req, req['node'] || null);
+    } else {
+        persist = true; // haven't seen the target yet
+    }
+
+    var index = goog.array.binarySearch(tab.user_data['pending_modifiers'], modifier, ChatModifier.compare);
+    if(persist) {
+        if(index < 0) { // add persistence
+            // keep sorted
+            goog.array.binaryInsert(tab.user_data['pending_modifiers'], modifier, ChatModifier.compare);
+        }
+    } else {
+        if(index >= 0) { // remove persistence
+            tab.user_data['pending_modifiers'].splice(index, 1);
+        }
+    }
+}
+
+/** @param {!SPUI.Dialog} dialog
+    @param {string} channel_name
+    @param {!Object<string,?>} sender_info
+    @param {string} wrapped_body
+    @param {string|null} chat_msg_id
+    @param {boolean} is_prepend */
+function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend) {
+    /** @type {Array<!SPUI.Dialog>} */
+    var tablist = [];
+
+    if(channel_name == 'BROADCAST') {
+        // spam to all open channels
+        for(var i = 0; i < dialog.data['widgets']['tabs']['array'][0]; i++) {
+            tablist.push(dialog.widgets['tabs'+i]);
+        }
+    } else if(channel_name in dialog.user_data['channel_to_tab']) {
+        tablist.push(dialog.widgets['tabs'+dialog.user_data['channel_to_tab'][channel_name]]);
+    } else {
+        console.log("cannot find chat tab for channel "+channel_name+"!");
+        return;
+    }
+
+    /** some messages modify previous messages instad of appending something new
+        @type {ChatModifier|null} */
+    var modifier = null;
+
+    if(sender_info['type'] == 'message_hide') {
+        if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
+        modifier = new ChatHider(sender_info['time']||0, chat_msg_id,
+                                 sender_info['target_message_id'], sender_info['new_type'] || null);
+    } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
+        if(sender_info['user_id'] == session.user_id) { return; } // don't invalidate own requests
+        modifier = new ChatUnitDonationRequestInvalidation(sender_info['time']||0, chat_msg_id,
+                                                           sender_info['user_id'], sender_info['new_tag'] || null);
+    } else if(sender_info['type'] == 'unit_donation') { // a donation to an existing request
+        if(!player.unit_donation_enabled()) { return; }
+        modifier = new ChatUnitDonation(sender_info['time']||0, chat_msg_id,
+                                        sender_info['user_id'], sender_info['tag'] || null,
+                                        sender_info['cur_space'], sender_info['max_space'],
+                                        sender_info['xp_gained']);
+    }
+
+    if(modifier) {
+        goog.array.forEach(tablist, goog.partial(chat_tab_apply_modifier, modifier));
+        return;
+    }
+
+    // everything below adds a new message
+    goog.array.forEach(tablist, goog.partial(chat_tab_accept_message, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend||false));
+}
+
+/** @param {string} channel_name
+    @param {!Object<string,?>} sender_info
+    @param {string} wrapped_body
+    @param {string|null} chat_msg_id
+    @param {boolean} is_prepend
+    @param {!SPUI.Dialog} tab */
+function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend, tab) {
+
+    if(sender_info['type'] == 'unit_donation_request') { // new unit donation request
+        if(!player.unit_donation_enabled()) { return; }
+        if(sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
+            return; // request is stale
+        }
+        var tag = sender_info['tag'] || 0;
+
+        if(tag in tab.user_data['unit_donation_requests']) { return; } // already seen (?)
+        var req = tab.user_data['unit_donation_requests'][tag] = {'node':null, // updated below
+                                                                  'callback': null, // updated below
+                                                                  'tag':tag, 'cur_space': sender_info['cur_space'], 'max_space':sender_info['max_space'],
+                                                                  'i_donated':false, 'my_xp': 0, 'dialog': null,
+                                                                  'recipient_id': sender_info['user_id'],
+                                                                  'recipient_fbid': sender_info['facebook_id'],
+                                                                  'recipient_name': sender_info['chat_name']};
+        var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
+        var text;
+        if(req['recipient_id'] == session.user_id) {
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+        } else {
+            var kind = 'you_have_not_donated';
+            req['callback'] = (function (_req) { return function(w, mloc) {
+                change_selection_ui(null);
+                _req['dialog'] = invoke_unit_donation_dialog(_req);
+            }; })(req);
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
+        }
+        if(is_prepend) {
+            req['node'] = tab.widgets['output'].prepend_text(text);
+        } else {
+            req['node'] = tab.widgets['output'].append_text(text);
+        }
+        req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
+            delete _tab.user_data['unit_donation_requests'][_req['tag']];
+        }; })(req, tab);
+
+    } else {
+        // normal chat message
+        if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
+           (sender_info['type'] != 'i_got_gagged') &&
+           (channel_name !== 'DEVELOPER')) { return; }
+
+        var body = SPHTTP.unwrap_string(wrapped_body);
+        var props = {};
+
+        if('muted' in sender_info) {
+            props.color = '#ff0000';
+        } else if(channel_name == 'BROADCAST') {
+            props.color = '#ffff00';
+        }
+
+        // check for special message types
+        var template = (sender_info['type'] && (sender_info['type'] in gamedata['strings']['chat_templates']) ? sender_info['type'] : 'default');
+
+        var bb_text = gamedata['strings']['chat_templates'][template];
+
+        // is this text reportable for abuse?
+        // note: for the onclick handlers below to work, report_args must be set up even if it's your own message, or a private channel
+        var report_args;
+        if(chat_msg_id && bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
+           ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
+            report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time'], chat_msg_id);
+        } else {
+            report_args = null;
+        }
+        var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
+
+        var bbcode_click_handlers = goog.object.clone(system_chat_bbcode_click_handlers);
+
+        // special override for player names
+        bbcode_click_handlers['player'] = { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
+            return function(w, mloc) {
+                if(!_suser_id) { return; }
+                var _user_id = parseInt(_suser_id,10);
+                if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
+
+                // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
+                if(!_report_args || (_user_id !== _report_args.user_id)) {
+                    _alliance_id = -1;
+                    _report_args = null;
+                }
+                invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
+            }; }; })(report_args, alliance_id)};
+
+        var base_props = {};
+        if('time' in sender_info) {
+            base_props.tooltip_func = (function (_send_time) { return function() {
+                return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
+            }; })(sender_info['time']);
+        }
+
+        // set up a default onclick handler for the entire blob of text
+        if(report_args) {
+            base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
+        }
+
+        // replace alliance chat tag
+        if(bb_text.indexOf('%tag') != -1) {
+            if((channel_name != 'ALLIANCE') && ('alliance_tag' in sender_info) && ('alliance_id' in sender_info) && (sender_info['alliance_id'] >= 0) &&
+               player.get_any_abtest_value('enable_alliance_chat_tags', gamedata['client']['enable_alliance_chat_tags'])) {
+                bb_text = bb_text.replace('%tag', gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', sender_info['alliance_tag']).replace('%alliance_id', sender_info['alliance_id']));
+            } else {
+                bb_text = bb_text.replace('%tag', '');
+            }
+        }
+
+        // replace achievement name template
+        if(bb_text.indexOf('%achievement_name') != -1 && ('achievement_name' in sender_info)) { // check if the template has "%achievement_name in it" AND if the message includes an "achievement_name" property
+
+            // if global option is disabled, or global persist is disabled and message is from before login, do not show the message
+            if(!player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']) ||
+               ((sender_info['time'] < session.connect_time) &&
+                !player.get_any_abtest_value('chat_alliance_achievements_persist', gamedata['chat_alliance_achievements_persist']))) {
+                return; // ignore the message
+            }
+
+            var cheeve = gamedata['achievements'][sender_info['achievement_name']];
+            if(cheeve) {
+                if('chat_announce' in cheeve && !cheeve['chat_announce']) { return; } // disabled for this achievement
+                bb_text = bb_text.replace('%achievement_name', cheeve['ui_name']);
+                bb_text = bb_text.replace('%achievement_id', sender_info['achievement_name']);
+            }
+        }
+
+        // other text replacements
+        goog.object.forEach({'%sender_id': 'user_id',
+                             '%sender_id2': 'user_id',
+                             '%sender_name': 'chat_name',
+                             '%target_id': 'target_user_id',
+                             '%target_name': 'target_chat_name',
+                             '%target_role': 'target_role_ui_name',
+                             '%alliance_id': 'alliance_id',
+                             '%alliance_name': 'alliance_name',
+                             '%alliance_points': 'alliance_points',
+                             '%points_to_win': 'points_to_win',
+                             '%prev_alliance_id': 'prev_alliance_id',
+                             '%prev_alliance_name': 'prev_alliance_name',
+                             '%old_name': 'old_name',
+                             '%region_name': 'region_name',
+                             '%item_name': 'item_name',
+                             '%channel_name': 'channel_name'
+                            }, function(sender_key, repl_key) {
+                                if(bb_text.indexOf(repl_key) != -1 && (sender_key in sender_info)) {
+                                    bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
+                                }
+                            });
+
+        var text = SPText.cstring_to_ablocks_bbcode(bb_text, base_props, bbcode_click_handlers);
+
+        var disp_text, disp_user_data;
+
+        if(gamedata['strings']['chat_templates'][template].indexOf('%body') != -1) {
+            disp_user_data = {'prebody': text, 'unfiltered_body': body,
+                              // for later abuse_violated override
+                              'sender_name': ('chat_name' in sender_info ? SPText.bbcode_quote(sender_info['chat_name']) : 'Unknown')};
+            if(sender_info['home_region']) { disp_user_data['home_region'] = sender_info['home_region']; }
+            disp_text = display_user_chat_body_nodes(disp_user_data);
+        } else {
+            disp_text = text;
+            disp_user_data = null;
+        }
+
+        var node;
+        if(is_prepend) {
+            node = tab.widgets['output'].prepend_text(disp_text, disp_user_data);
+        } else {
+            node = tab.widgets['output'].append_text(disp_text, disp_user_data);
+        }
+        if(chat_msg_id) {
+            tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
+            node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
+                delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
+            }; })(tab, chat_msg_id);
+            if(tab.user_data['earliest_id'] === null || chat_msg_id < tab.user_data['earliest_id']) {
+                tab.user_data['earliest_id'] = chat_msg_id;
+            }
+        }
+        tab.user_data['earliest_timestamp'] = Math.min(tab.user_data['earliest_timestamp'], sender_info['time']);
+    }
+
+    // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
+    if(sender_info['user_id'] != session.user_id &&
+       !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
+        tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
+    }
+
+    // see if any pending modifiers want to work on this message
+    if(is_prepend) {
+        // copy since the list may mutate
+        goog.array.forEach(goog.array.clone(tab.user_data['pending_modifiers']), function(mod) {
+            chat_tab_apply_modifier(mod, tab);
+        });
+    }
+}
+
 function change_chat_tab(dialog, new_tab) {
     if(!new_tab) {
         // pick a default
@@ -15304,6 +15774,8 @@ function update_chat_frame(dialog) {
         dialog.widgets['tab_jewel'+i].user_data['text'] = (unseen ? '!' : null);
         any_unseen |= unseen;
 
+        tab.widgets['loading_spinner'].show = (!!tab.widgets['output'].getmore_pending && (dialog.user_data['size'] == 'big'));
+
         // update state of Reinforcements button
         tab.widgets['request_donation_button'].show = ((dialog.user_data['size'] == 'big') && (channel_name=='ALLIANCE') && player.unit_donation_enabled());
 
@@ -15368,6 +15840,8 @@ function update_chat_frame(dialog) {
     }
 }
 
+var chat_getmore_receiver = new goog.events.EventTarget();
+
 function init_chat_frame() {
     var dialog_data = gamedata['dialogs']['chat_frame2'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -15415,9 +15889,28 @@ function init_chat_frame() {
         tab.user_data['last_timestamp'] = 0;
         tab.user_data['unit_donation_requests'] = {};
         tab.user_data['chat_messages_by_id'] = {};
+        tab.user_data['pending_modifiers'] = []; // for prepended text
+        tab.user_data['earliest_id'] = null;
+        tab.user_data['earliest_timestamp'] = Infinity;
         var invert = !!tab.data['widgets']['output']['invert'];
         tab.widgets['output'].scroll_up_button = tab.widgets[(invert ? 'scroll_down' : 'scroll_up')];
         tab.widgets['output'].scroll_down_button = tab.widgets[(invert ? 'scroll_up' : 'scroll_down')];
+        tab.widgets['output'].getmore_cb = (gamedata['client']['enable_chat_getmore'] ? function(w) {
+            var tab = w.parent;
+            var tag = 'cgm'+(last_query_tag++).toString();
+            chat_getmore_receiver.listenOnce(tag, (function (_tab) { return function(event) {
+                goog.array.forEach(event.response, function(data) {
+                    var channel_name = data[1];
+                    var sender_info = data[2];
+                    var wrapped_body = data[3] || '';
+                    var chat_msg_id = data[4];
+                    var is_prepend = data[5];
+                    chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend);
+                });
+                tab.widgets['output'].getmore_responded(event.is_final);
+            }; })(tab));
+            send_to_server.func(["CHAT_GETMORE", tab.user_data['channel_name'], tab.user_data['earliest_timestamp']+5 /* fudge time */, tab.user_data['earliest_id'], tag]);
+        } : null);
         tab.widgets['output'].update_text();
         tab.widgets[(invert ? 'scroll_down' : 'scroll_up')].onclick = function(w) { w.parent.widgets['output'].scroll_up(); };
         tab.widgets[(invert ? 'scroll_up' : 'scroll_down')].onclick = function(w) { w.parent.widgets['output'].scroll_down(); };
@@ -15962,6 +16455,26 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     if(gamedata['client']['auto_show_battle_log']) {
         notification_queue.push(function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); });
     }
+
+    var most_recent_summary = recent_attacks[recent_attacks.length-1];
+    if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
+        dialog.widgets['show_markers_button'].show = true;
+        dialog.widgets['show_markers_button'].onclick = (function (_summary) { return function(w) {
+            var locker = invoke_ui_locker_until_closed();
+            // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
+            // and is missing defender_id
+            get_battle_log(_summary['time'], _summary['attacker_user_id'], session.user_id,
+                           _summary['base_id'] || null, null,
+                           (function (__summary, _locker) { return function(result) {
+                               close_dialog(_locker);
+                               if(result) {
+                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result);
+                               } else {
+                                   invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['loading_text']['ui_name_unavailable'], '', {'dialog': 'message_dialog'});
+                               }
+                           }; })(_summary, locker));
+        }; })(most_recent_summary);
+    }
 };
 
 function test_you_were_attacked_dialog() {
@@ -16359,13 +16872,10 @@ function invoke_recycle_dialog(obj) {
     dialog.widgets['tip_text'].str = dialog.data['widgets']['tip_text']['ui_name'].replace('%s', gamedata['spells']['RECYCLE_UNIT']['ui_name']);
 
     // compute and display refund amounts
-    var recycle_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources']);
-    var health_ratio = (1.0*hp)/max_hp;
+    var cost = mobile_cost_to_repair(spec, level, max_hp - hp, max_hp, player, COST_MODE.RECYCLE, null);
     for(var res in gamedata['resources']) {
-        var cost = get_leveled_quantity(spec['build_cost_'+res]||0, level);
-        var refund = Math.max(0, Math.floor(recycle_ratio * health_ratio * cost));
         if('resource_bar_'+res+'_amount' in dialog.widgets) {
-            dialog.widgets['resource_bar_'+res+'_amount'].str = pretty_print_number(refund);
+            dialog.widgets['resource_bar_'+res+'_amount'].str = pretty_print_number(cost[res]);
         }
     }
     return dialog;
@@ -20774,555 +21284,6 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
     return dialog;
 }
 
-/** @constructor */
-function Region(data) {
-    this.data = data;
-    this.dirty = true;
-    this.refresh_time = -1;
-    this.features = [];
-
-    var terrain_func = (function (_this) { return function(xy) { return _this.obstructs_squads(xy); }; })(this);
-
-    /** @type {?AStar.AStarHexMap} used for pathfinding and collision detection */
-    this.occupancy = (data ? new AStar.AStarHexMap(data['dimensions'], terrain_func) : null);
-    /** @type {?AStar.AStarContext} used for pathfinding and collision detection */
-    this.hstar_context = (data ? new AStar.AStarContext(this.occupancy, {heuristic_name:'manhattan'}) : null);
-
-    /** @type {?RegionMapIndex.RegionMapIndex} used for feature queries */
-    this.map_index = (data ? new RegionMapIndex.RegionMapIndex(data['dimensions']) : null);
-
-    this.fresh_cbs = [];
-    /** @type {?AJAXMessageQueue} for last server query */
-    this.refresh_msg = null;
-    this.terrain = (data ? gamedata['region_terrain'][data['terrain']] : null);
-    this.contest_rank = null;
-}
-
-Region.prototype.map_enabled = function() {
-    return this.data && (!('enable_map' in this.data) || this.data['enable_map']);
-};
-
-Region.prototype.pvp_level_gap_enabled = function() {
-    if(this.data && ('enable_pvp_level_gap' in this.data) && !this.data['enable_pvp_level_gap']) { return false; }
-    return true;
-};
-
-Region.prototype.turf_points_to_win = function() {
-    var total_turf_points = 0;
-    this.for_each_feature(function(feature) {
-        if(feature['base_type'] == 'quarry') {
-            var template = gamedata['quarries_client']['templates'][feature['base_template']];
-            if(template && template['turf_points']) {
-                total_turf_points += template['turf_points'];
-            }
-        }
-    }, this);
-    if(total_turf_points < 1) { // no strongpoints
-        return -1;
-    }
-    return Math.floor(total_turf_points/2.0)+1;
-};
-
-Region.prototype.display_turf_standings = function(ui_data) {
-    var total_turf_points = 0;
-    var points_by_alliance = {};
-    var has_all_alliances = true;
-    this.for_each_feature(function(feature) {
-        if(feature['base_type'] == 'quarry') {
-            var template = gamedata['quarries_client']['templates'][feature['base_template']];
-            if(template && template['turf_points']) {
-                total_turf_points += template['turf_points'];
-                if(feature['base_landlord_id'] > 0 && !is_ai_user_id_range(feature['base_landlord_id'])) {
-                    var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
-                    if(info) {
-                        if (('alliance_id' in info) && info['alliance_id'] >= 0) {
-                            points_by_alliance[info['alliance_id']] = (points_by_alliance[info['alliance_id']]||0) + template['turf_points'];
-                        }
-                    } else {
-                        has_all_alliances = false; // still querying players
-                    }
-                }
-            }
-        }
-    }, this);
-    if(total_turf_points < 1) { return null; }
-    if(!has_all_alliances) {
-        return ui_data['ui_name_loading'];
-    }
-
-    // Google Closure is too smart for its own good, and assumes the return value from getKeys() is always an array of strings
-    var alliance_id_list = /** @type {Array.<number>} */ (goog.object.getKeys(points_by_alliance));
-
-    alliance_id_list.sort(function(a,b) {
-        var a_rank = points_by_alliance[a], b_rank = points_by_alliance[b];
-        if(a_rank > b_rank) {
-            return -1;
-        } else if(a_rank < b_rank) {
-            return 1;
-        } else {
-            return 0;
-        }
-    });
-
-    var my_alliance_seen = false;
-    var display_list = [];
-    var cur_rank = -1, last_points = -1;
-    for(var i = 0; i < Math.min(3, alliance_id_list.length); i++) {
-        var alliance_id = alliance_id_list[i];
-        var points = points_by_alliance[alliance_id];
-        var tied = false;
-        if(points != last_points) {
-            cur_rank += 1;
-        } else {
-            tied = true;
-        }
-        if(i < (Math.min(3, alliance_id_list.length) - 1) && points_by_alliance[alliance_id_list[i+1]] == points) {
-            tied = true;
-        }
-        if(alliance_id == session.alliance_id) { my_alliance_seen = true; }
-        var alliance_info = AllianceCache.query_info(alliance_id, null);
-        if(!alliance_info) { return ui_data['ui_name_loading']; }
-        display_list.push(ui_data['ui_name'].replace('%rank', (cur_rank+1).toString()).replace('%tied', (tied ? ui_data['ui_name_tie'] : '')).replace('%alliance', alliance_display_name(alliance_info)).replace('%cur', points.toString()).replace('%max', total_turf_points.toString()));
-        last_points = points;
-    }
-
-    if(!my_alliance_seen && session.is_in_alliance()) {
-        var my_points = points_by_alliance[session.alliance_id] || 0;
-        var alliance_info = AllianceCache.query_info_sync(session.alliance_id);
-        if(alliance_info) {
-            display_list.push(ui_data['ui_name_separator']);
-            display_list.push(ui_data['ui_name'].replace('%rank','-').replace('%tied','').replace('%alliance', alliance_display_name(alliance_info)).replace('%cur',my_points.toString()).replace('%max', total_turf_points.toString()));
-        }
-    }
-    return display_list.join('\n');
-};
-
-Region.prototype.ping_contest_rank = function() {
-    if(!this.data) { return; }
-    if(!player.get_event_time('current_event', 'event_quarry_contest', 'inprogress')) { return; }
-
-    query_player_scores([session.user_id], [['quarry_resources','week']],
-                        (function (_region) { return function(ids, results) {
-                            var result = results[0];
-                            if(result) {
-                                _region.contest_rank = result[0];
-                            }
-                        }; })(this), {get_rank:1});
-};
-
-Region.prototype.read_terrain = function(xy) {
-    var index = xy[1]*this.data['dimensions'][0] + xy[0];
-    var enc = this.terrain.charCodeAt(index);
-    var raw = enc - 65;
-    return raw;
-};
-Region.prototype.read_climate = function(xy) {
-    return gamedata['climates'][gamedata['territory']['tiles'][this.read_terrain(xy)]['climate']];
-};
-Region.prototype.obstructs_squads = function(xy) {
-    return !!this.read_climate(xy)['obstructs_squads'];
-};
-
-Region.prototype.in_bounds = function(xy) {
-    var dimensions = this.data['dimensions'];
-    return (xy[0] >= 0 && xy[0] < dimensions[0] &&
-            xy[1] >= 0 && xy[1] < dimensions[1]);
-};
-Region.prototype.get_neighbors = function(xy) {
-    var odd = (xy[1]%2) > 0;
-    var ret = [];
-    goog.array.forEach([[xy[0]-1,xy[1]], // left
-                        [xy[0]+1,xy[1]], // right
-                        [xy[0]+odd-1,xy[1]-1], // upper-left
-                        [xy[0]+odd,xy[1]-1], // upper-right
-                        [xy[0]+odd-1,xy[1]+1], // lower-left
-                        [xy[0]+odd,xy[1]+1]],
-                       function(loc) {
-                           if(this.in_bounds(loc)) {
-                               ret.push(loc);
-                           }
-                       }, this);
-    return ret;
-};
-
-/** @param {function(Object)} cb
-    @param {?=} cb_this */
-Region.prototype.for_each_feature = function(cb, cb_this) {
-    if(!this.features) { return; }
-    goog.array.forEach(this.features, cb, cb_this);
-};
-
-Region.prototype.feature_shown = function(feature) {
-    if(!('base_map_loc' in feature)) { return false; }
-    if(feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
-       ('show_if' in gamedata['hives_client']['templates'][feature['base_template']]) &&
-       !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['show_if']).is_satisfied(player,null)) {
-        return false;
-    }
-    return true;
-};
-
-/** @return {boolean} */
-Region.prototype.feature_blocks_map = function(feature) {
-    return (feature['base_type'] !== 'squad' || player.squad_block_mode() !== 'never');
-};
-
-// note: just checking for presence of base_map_path is not correct, because sometimes squads
-// get to where they're going, and the base_map_path on the server side disappears, but that
-// deletion does not make it out to the client, so we may see a stale value.
-Region.prototype.feature_is_moving = function(feature) {
-    return (('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > server_time));
-};
-
-// returns [last_pos, next_pos, alpha] where "alpha" is the fraction of the way from last_pos to next_pos you've traveled
-Region.prototype.feature_interpolate_pos = function(feature) {
-    if(this.feature_is_moving(feature)) {
-        var path = feature['base_map_path'];
-        var last_waypoint = path[0];
-        for(var i = 1; i < path.length; i++) {
-            var waypoint = path[i];
-            if(waypoint['eta'] > server_time) {
-                var delta = vec_sub(waypoint['xy'], last_waypoint['xy']);
-                return [last_waypoint['xy'], waypoint['xy'], (server_time-last_waypoint['eta'])/(waypoint['eta']-last_waypoint['eta'])];
-            }
-            last_waypoint = waypoint;
-        }
-    } else {
-        return [feature['base_map_loc'], feature['base_map_loc'], 0];
-    }
-};
-
-Region.prototype.find_own_features_by_type = function(want_type) {
-    var ret = [];
-    goog.array.forEach(this.features, function(feature) {
-        if(feature['base_landlord_id'] == session.user_id && feature['base_type'] == want_type) {
-            ret.push(feature);
-        }
-    }, this);
-    return ret;
-};
-
-Region.prototype.find_feature_by_id = function(base_id) {
-    return this.map_index.get_by_base_id(base_id);
-};
-Region.prototype.find_home_feature = function() { return this.find_feature_by_id(player.home_base_id); };
-Region.prototype.num_quarries_owned = function() {
-    return this.find_own_features_by_type('quarry').length;
-};
-
-// heuristic only - looks for a feature with same ID and name
-Region.prototype.feature_exists = function(base_id, base_ui_name) {
-    var feature = this.find_feature_by_id(base_id);
-    if(feature && feature['base_ui_name'] == base_ui_name) { return feature; }
-    return null;
-};
-Region.prototype.feature_exists_at = function(base_id, base_ui_name, loc) {
-    var feature = this.feature_exists(base_id, base_ui_name);
-    if(feature && 'base_map_loc' in feature && feature['base_map_loc'][0] == loc[0] && feature['base_map_loc'][1] == loc[1]) { return feature; }
-    return null;
-}
-
-/** @param {Array.<number>} cell
-  * @param {{include_moving_squads:(boolean|undefined)}} options */
-Region.prototype.find_features_at_coords = function(cell, options) {
-    var feature_list = [];
-    if(cell) {
-        /*
-        for(var i = 0; i < this.features.length; i++) {
-            var f = this.features[i];
-            if(!this.feature_shown(f)) { continue; }
-            if(!f['base_map_loc']) { continue; }
-            if(f['base_map_loc'][0] == cell[0] && f['base_map_loc'][1] == cell[1]) {
-                feature_list.push(f);
-            }
-        }
-        */
-        feature_list = goog.array.filter(this.map_index.get_by_loc(cell), this.feature_shown, this);
-    }
-
-    // special case for player's own moving squads
-    if(options && options.include_moving_squads) {
-        goog.object.forEach(player.squads, function(squad_data) {
-            if(player.squad_is_moving(squad_data['id'])) {
-                var feature = this.find_feature_by_id(player.squad_base_id(squad_data['id']));
-                if(feature) {
-                    var last_next_progress = this.feature_interpolate_pos(feature);
-                    // check "last" and "next"
-                    for(var i = 0; i < 2; i++) {
-                        if(last_next_progress[i][0] == cell[0] && last_next_progress[i][1] == cell[1]) {
-                            feature_list.push(feature);
-                            break;
-                        }
-                    }
-                }
-            }
-        }, this);
-    }
-
-    return feature_list;
-};
-
-// find the "primary" feature at this cell
-/** @param {Array.<number>} cell
-  * @param {{include_moving_squads:(boolean|undefined)}} options */
-
-Region.prototype.find_feature_at_coords = function(cell, options) {
-    var ls = this.find_features_at_coords(cell, options);
-    if(ls.length < 1) {
-        return null;
-    } else if(ls.length == 1) {
-        return ls[0];
-    } else {
-        // prefer anything (quarries) over squads
-        var ret = ls[0];
-        for(var i = 1; i < ls.length; i++) {
-            if(ls[i]['base_type'] != 'squad') {
-                ret = ls[i];
-            }
-        }
-        return ret;
-    }
-};
-
-/** Return list of squads neighboring "cell" that can attack into it
-    @param {!Array.<number>} cell
-    @return {!Array.<number>} */
-Region.prototype.squads_nearby = function(cell) {
-    var ls = [];
-
-    // special rules for attacking cell neighboring your home base
-    if(hex_distance(player.home_base_loc, cell) == 1) {
-        goog.object.forEach(player.squads, function(squad) {
-            if(SQUAD_IDS.is_mobile_squad_id(squad['id'])) {
-                if(!player.squad_is_deployed(squad['id'])) {
-                    ls.push(squad['id']);
-                } else if(hex_distance(squad['map_loc'], cell) == 1 &&
-                          !player.squad_is_moving(squad['id'])) {
-                    ls.push(squad['id']);
-                }
-            } else if(squad['id'] === SQUAD_IDS.BASE_DEFENDERS && gamedata['territory']['base_defenders_can_attack_neighbors']) {
-                ls.push(squad['id']);
-            }
-        });
-    } else {
-        goog.object.forEach(player.squads, function(squad) {
-            if(SQUAD_IDS.is_mobile_squad_id(squad['id']) &&
-               player.squad_is_deployed(squad['id']) &&
-               hex_distance(squad['map_loc'], cell) == 1 &&
-               !player.squad_is_moving(squad['id'])) {
-                ls.push(squad['id']);
-            }
-        });
-    }
-
-    return ls;
-};
-
-/** Make sure all features are blocking map properly
- * @param {string} where this was called from */
-Region.prototype.check_map_integrity = function(where) {
-    var error_count = 0;
-    var report_err = function(s, cell, feature) {
-        error_count += 1;
-        console.log('Map integrity problem ('+where+'): '+s+' : '+
-                    ' cell '+(cell ? cell.pos[0].toString()+','+cell.pos[1].toString() : 'null')+
-                    ' feature '+(feature ? feature['base_id']+':'+(feature['base_map_loc'] ? feature['base_map_loc'][0].toString()+','+feature['base_map_loc'][1].toString() : 'null') : 'null'));
-    };
-
-    this.for_each_feature((function (_this) { return function(feature) {
-        if(feature['base_map_loc']) {
-            if(_this.feature_is_moving(feature)) {
-                var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
-                if(!vec_equals(last_waypoint['xy'], feature['base_map_loc'])) {
-                    report_err('feature base_map_path endpoint '+last_waypoint['xy'][0].toString()+','+last_waypoint['xy'][1].toString()+' does not match location', null, feature);
-                }
-            }
-            var cell = _this.occupancy.cell(feature['base_map_loc']);
-            if(cell.block_count < 1) {
-                report_err('feature present but cell.block_count < 1', cell, feature);
-            }
-            if(!cell.blockers || !goog.array.contains(cell.blockers, feature)) {
-                report_err('feature present but cell.blockers does not contain it', cell, feature);
-            }
-        }
-    }; })(this));
-    var seen = {};
-
-    this.occupancy.for_each_cell((function (_this) { return function(cell) {
-        if(cell.block_count != (cell.blockers ? cell.blockers.length : 0)) {
-            report_err('cell block_count '+cell.block_count.toString()+' does not match blockers.length '+cell.blockers.length.toString(), cell, null);
-        }
-        if(cell.blockers) {
-            for(var b = 0; b < cell.blockers.length; b++) {
-                var feature = cell.blockers[b];
-                if(feature['base_id'] in seen) {
-                    var other = seen[feature['base_id']];
-                    report_err('feature appears twice in occupancy (also cell '+other.pos[0].toString()+','+other.pos[1].toString()+')', cell, feature);
-                    continue;
-                }
-                seen[feature['base_id']] = cell;
-                if(!vec_equals(feature['base_map_loc'], cell.pos)) {
-                    report_err('feature listed as blocker but base_map_loc is not here', cell, feature);
-                }
-                if(feature != _this.map_index.get_by_base_id(feature['base_id'])) {
-                    report_err('feature listed as blocker but not found in index!', cell, feature);
-                }
-                if(!goog.array.contains(_this.features, feature)) {
-                    report_err('feature listed as blocker but not found in this.features!', cell, feature);
-                }
-            }
-        }
-    }; })(this));
-
-    if(!error_count) { console.log('integrity check OK! ('+where+')'); }
-};
-
-Region.prototype.receive_feature_update = function(res) {
-    var incremental = false;
-    if(res['preserve_locks']) {
-        incremental = true;
-        delete res['preserve_locks'];
-    }
-
-    var feature = /** @type {Object|null} */ (this.map_index.get_by_base_id(res['base_id']));
-
-    if(feature) {
-        // update or delete feature we already know about
-        if(res['DELETED']) {
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, DELETED, enter'); }
-
-            if(feature['base_map_loc']) {
-                // unblock, but do so carefully, because it may never have been blocked in the first place
-                this.occupancy.unblock_hex_maybe(feature['base_map_loc'], feature);
-            }
-            this.map_index.remove(feature['base_id'], feature['base_map_loc']||null, feature);
-            goog.array.remove(this.features, feature);
-
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, DELETED, exit'); }
-
-        } else {
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, enter'); }
-            var do_block = this.feature_blocks_map(feature);
-
-            var cur_loc = feature['base_map_loc'] || null, new_loc = ('base_map_loc' in res ? res['base_map_loc'] : cur_loc);
-
-            if(!incremental) { // full replacement of all properties
-                goog.object.clear(feature);
-                feature['base_id'] = res['base_id'];
-            }
-
-            if((!cur_loc && new_loc) ||
-               (cur_loc && (!new_loc || cur_loc[0] != new_loc[0] || cur_loc[1] != new_loc[1]))) {
-
-                // XXXXXX check if block_hex assumed invariant still fails sometimes
-                if(cur_loc && do_block) {
-                    this.occupancy.unblock_hex_maybe(cur_loc, feature);
-                    //this.occupancy.block_hex(cur_loc, -1, feature);
-                }
-                this.map_index.remove(feature['base_id'], cur_loc||null, feature);
-
-                if(new_loc && do_block) {
-                    this.occupancy.block_hex(new_loc, 1, feature);
-                }
-                this.map_index.insert(feature['base_id'], new_loc||null, feature);
-            }
-
-            for(var propname in res) {
-                if(res[propname] !== null) {
-                    feature[propname] = res[propname];
-                } else if(propname in feature) { // delete if null?
-                    delete feature[propname];
-                }
-            }
-
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, existing, update, exit'); }
-        }
-    } else { // no record of this feature yet
-        if(res['DELETED']) {
-            // could be due to a base that is added and removed before we see it the first time
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, DELETED'); }
-        } else {
-            if(incremental) { return; }
-
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, enter'); }
-            this.features.push(res);
-            if(res['base_map_loc']) {
-                if(this.feature_blocks_map(res)) {
-                    this.occupancy.block_hex(res['base_map_loc'],1,res);
-                }
-            } else {
-                //throw Error('received a feature update without base_map_loc! region '+(this.data ? this.data['id'] : 'NULL!')+' base_id '+res['base_id'].toString());
-            }
-            this.map_index.insert(res['base_id'], res['base_map_loc']||null,res);
-            if(gamedata['territory']['check_map_integrity'] >= 2) { this.check_map_integrity('receive_feature_update, new, exit'); }
-        }
-    }
-};
-
-// receive QUARRY_QUERY_RESULT
-Region.prototype.receive_update = function(db_time, result, last_db_time) {
-    this.dirty = false;
-    this.refresh_time = db_time;
-    this.refresh_msg = null;
-
-    if(last_db_time > 0) { // incremental result
-        for(var i = 0; i < result.length; i++) {
-            this.receive_feature_update(result[i]);
-        }
-        if(gamedata['territory']['check_map_integrity'] >= 1) { this.check_map_integrity('receive_update incremental'); }
-    } else {
-        // make sure there weren't any incremental updates mixed in here
-        goog.array.forEach(result, function(feature) {
-            if(feature['preserve_locks']) { throw Error('got non-incremental feature with preserve_locks: '+feature['base_id']); }
-        });
-
-        this.features = result;
-        this.occupancy.clear();
-        this.map_index.clear();
-        this.for_each_feature((function (_this) { return function(feature) {
-            if(feature['base_map_loc']) {
-                if(_this.feature_blocks_map(feature)) {
-                    _this.occupancy.block_hex(feature['base_map_loc'],1,feature);
-                }
-            } else {
-                throw Error('received a feature without base_map_loc! region '+(_this.data ? _this.data['id'] : 'NULL')+' base_id '+feature['base_id'].toString());
-            }
-            _this.map_index.insert(feature['base_id'], feature['base_map_loc']||null, feature);
-        }; })(this));
-        if(gamedata['territory']['check_map_integrity'] >= 1) { this.check_map_integrity('receive_update full'); }
-    }
-
-    var cblist = this.fresh_cbs;
-    this.fresh_cbs = [];
-    for(var i = 0; i < cblist.length; i++) {
-        cblist[i](this);
-    }
-};
-
-Region.prototype.refresh = function() {
-    if(!this.dirty) { return; }
-    if(!this.data) { return; }
-    if(query_quarries(null, this.refresh_time)) {
-        this.refresh_msg = message_queue; // store reference to the outgoing AJAX message
-    }
-};
-Region.prototype.refresh_progress = function() {
-    if(this.refresh_msg) {
-        return this.refresh_msg.recv_progress;
-    }
-    return -1;
-};
-Region.prototype.call_when_fresh = function(cb) {
-    if(!this.dirty) {
-        cb(this);
-        return true;
-    } else {
-        this.fresh_cbs.push(cb);
-        this.refresh();
-        return false;
-    }
-};
-
 // mode is "squads" or "quarries"
 function setup_region_map_feature_list_header(dialog, mode) {
     dialog.user_data['mode'] = mode;
@@ -21376,6 +21337,11 @@ function update_region_map_feature_list_element(dialog, i, feature) {
     dialog.widgets['qicon'].show = dialog.widgets['qsize'].show = (feature['base_type']=='quarry');
 
     var coords = (feature['base_map_loc'] ? session.region.feature_interpolate_pos(feature)[0] : null);
+    if(coords) {
+        if(coords[0] === undefined || coords[1] === undefined) {
+            throw Error('bad feature_interpolate_pos: '+JSON.stringify(feature));
+        }
+    }
     dialog.user_data['coords'] = coords;
 
     dialog.widgets['coords'].str = (coords ? dialog.data['widgets']['coords']['ui_name'].replace('%x', coords[0].toString()).replace('%y', coords[1].toString()) : dialog.data['widgets']['coords']['ui_name_unknown']);
@@ -21396,6 +21362,9 @@ function update_region_map_feature_list_element(dialog, i, feature) {
 
     if(feature['base_type'] == 'squad') {
         var squad_id = parseInt(feature['base_id'].split('_')[1],10);
+        if(squad_id === undefined) {
+            throw Error('feature with base_type squad but non-squad id: '+(feature['base_id'] ? feature['base_id'] : 'undefined'));
+        }
         var squad_data = player.squads[squad_id.toString()] || {};
         var stats = player.get_squad_hp_and_space(squad_id);
         dialog.widgets['name'].str = (squad_data['ui_name'] ? squad_data['ui_name'] : gamedata['strings']['regional_map']['unknown_name']);
@@ -21629,6 +21598,9 @@ function toggle_region_map() {
 
 function update_region_map(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
+
+    dialog.widgets['map'].time = server_time;
+
     dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
     dialog.widgets['help_jewel'].user_data['count'] = (player.check_feature_use('region_map_help') ? 0 : 1);
 
@@ -22053,6 +22025,15 @@ function update_map_dialog_header_buttons(dialog) {
         i += 1;
     }
 }
+
+var map_log_receiver = new goog.events.EventTarget();
+function query_map_log(region_id, time_range, callback) {
+    last_query_tag += 1;
+    var tag = 'qml'+last_query_tag.toString();
+    // need this adaptor to pull the .result property out of the event object
+    map_log_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
+    send_to_server.func(["QUERY_MAP_LOG", region_id, time_range, tag]);
+};
 
 function invoke_map_ladder_pvp() {
     var template = 'map_ladder_pvp_dialog';
@@ -24728,6 +24709,37 @@ function friend_gift_dialog_setup_row(dialog, row, rowdata) {
 }
 
 function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, slot_n, ui_slot) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['equip_chooser']);
+    dialog.user_data['dialog'] = 'equip_chooser';
+    dialog.xy = [parent_widget.xy[0] + parent_widget.wh[0] + 10, parent_widget.xy[1] + parent_widget.wh[1] - dialog.wh[1]]; // - 60];
+    dialog.user_data['context'] = null;
+    dialog.user_data['scroll_pos'] = 0;
+    dialog.user_data['tech'] = tech;
+    dialog.user_data['unit'] = unit;
+    dialog.user_data['slot_type'] = slot_type;
+    dialog.user_data['slot_n'] = slot_n;
+    dialog.user_data['ui_slot'] = ui_slot;
+    dialog.modal = 0.5;
+
+    dialog.widgets['bg_close_button'].onclick =
+        dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    if(!update_equip_chooser(dialog)) { // didn't open
+        return null;
+    }
+
+    inv_dialog.add(dialog);
+    return dialog;
+}
+
+/** @return {boolean} false if the dialog is empty */
+function update_equip_chooser(dialog) {
+    var tech = dialog.user_data['tech'];
+    var unit = dialog.user_data['unit'];
+    var slot_type = dialog.user_data['slot_type'];
+    var slot_n = dialog.user_data['slot_n'];
+    var ui_slot = dialog.user_data['ui_slot'];
+
     var equip = null, host_spec = null;
     if(tech && ('associated_unit' in tech)) {
         // unit equipment
@@ -24804,38 +24816,30 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
     // if no applicable equipment is available, give a help dialog
     if(items.length < 1 && !equipped_now_specname) {
         invoke_ingame_tip('no_equipment_tip', {frequency: GameTipFrequency.ALWAYS});
-        return null;
+        return false;
     }
 
-    // sort items by rarity
+    // sort items by level, then rarity
     items.sort(function(a, b) {
         var aspec = ItemDisplay.get_inventory_item_spec(a[1]['spec']), bspec = ItemDisplay.get_inventory_item_spec(b[1]['spec']);
+        var al = aspec['level'] || 1, bl = bspec['level'] || 1;
         var ar = aspec['rarity'] || 0, br = bspec['rarity'] || 0;
-        if(ar > br) {
+        if(al > bl) {
+            return -1;
+        } else if(al < bl) {
             return 1;
+        } else if(ar > br) {
+            return -1;
         } else if(ar < br) {
+            return 1;
+        } else if(aspec['name'] > bspec['name']) {
+            return 1;
+        } else if(aspec['name'] < bspec['name']) {
             return -1;
         } else {
             return 0;
         }
     });
-
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['equip_chooser']);
-    dialog.user_data['dialog'] = 'equip_chooser';
-    dialog.xy = [parent_widget.xy[0] + parent_widget.wh[0] + 10, parent_widget.xy[1] + parent_widget.wh[1] - dialog.wh[1]]; // - 60];
-    var extend = Math.max(items.length * dialog.data['widgets']['equip_item']['array_offset'][0], dialog.data['widgets']['bg']['min_extend']);
-    dialog.wh = [dialog.data['dimensions'][0] + extend, dialog.data['dimensions'][1]];
-    dialog.widgets['bg'].wh = vec_copy(dialog.wh);
-    dialog.widgets['close_button'].xy = vec_add(dialog.data['widgets']['close_button']['xy'], [extend,0]);
-    dialog.user_data['context'] = null;
-    dialog.modal = 0.5;
-
-    var go_away = (function(_inv_dialog) { return function(w) {
-        close_parent_dialog(w);
-    }; })(inv_dialog);
-
-    dialog.widgets['bg_close_button'].onclick =
-        dialog.widgets['close_button'].onclick = go_away;
 
     // handlers for the "equip nothing" button
     dialog.widgets['equip_nothing_frame'].state = 'normal';
@@ -24882,17 +24886,34 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
             }
         }
     } else {
-        dialog.widgets['equip_nothing_frame'].onclick = go_away;
+        dialog.widgets['equip_nothing_frame'].onclick = close_parent_dialog;
     }
 
-    for(var i = 0; i < items.length; i++) {
-        if(i >= dialog.data['widgets']['equip_item']['array'][0]) { break; }
-        var inv_slot = items[i][0], item = items[i][1], min_level = items[i][2], unique_conflict = items[i][3], failed_pred = items[i][4];
+    // scroll handling
+    dialog.user_data['scroll_pos'] = Math.max(Math.min(dialog.user_data['scroll_pos'], items.length - dialog.data['widgets']['equip_item']['array'][0]), 0);
+    dialog.widgets['scroll_left'].state = (dialog.user_data['scroll_pos'] > 0 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_right'].state = (dialog.user_data['scroll_pos'] < items.length - dialog.data['widgets']['equip_item']['array'][0] ? 'normal' : 'disabled');
+    dialog.widgets['scroll_left'].onclick = function(w) {
+        var dialog = w.parent; dialog.user_data['scroll_pos'] -= 1; update_equip_chooser(dialog);
+    };
+    dialog.widgets['scroll_right'].onclick = function(w) {
+        var dialog = w.parent; dialog.user_data['scroll_pos'] += 1; update_equip_chooser(dialog);
+    };
+
+    for(var i = 0; i < dialog.data['widgets']['equip_item']['array'][0]; i++) {
+        if(i + dialog.user_data['scroll_pos'] >= items.length) {
+            dialog.widgets['equip_frame'+i.toString()].show =
+                dialog.widgets['equip_stack'+i.toString()].show =
+                dialog.widgets['equip_item'+i.toString()].show = false;
+            continue;
+        }
+        var item_entry = items[i + dialog.user_data['scroll_pos']];
+        var inv_slot = item_entry[0], item = item_entry[1], min_level = item_entry[2], unique_conflict = item_entry[3], failed_pred = item_entry[4];
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
-        dialog.widgets['equip_frame'+i].show =
-            dialog.widgets['equip_stack'+i].show =
-            dialog.widgets['equip_item'+i].show = true;
+        dialog.widgets['equip_frame'+i.toString()].show =
+            dialog.widgets['equip_stack'+i.toString()].show =
+            dialog.widgets['equip_item'+i.toString()].show = true;
         ItemDisplay.set_inventory_item_asset(dialog.widgets['equip_item'+i], spec);
         ItemDisplay.set_inventory_item_stack(dialog.widgets['equip_stack'+i], spec, item);
 
@@ -24901,37 +24922,37 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
 
         if(min_level > 0) {
             // show red text saying that player needs to upgrade the building
-            dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled_clickable';
             context_props['error_text'] = gamedata['errors'][(tech ? 'EQUIP_TECH_LEVEL_TOO_LOW' : 'EQUIP_BUILDING_LEVEL_TOO_LOW')]['ui_name'].replace('%s', min_level.toString());
             var helper = get_requirements_help(read_predicate(tech ? {'predicate': 'TECH_LEVEL', 'tech': tech['name'], 'min_level': min_level} :
                                                 {'predicate': 'BUILDING_LEVEL', 'building_type': unit.spec['name'], 'trigger_level': min_level}), null);
-            dialog.widgets['equip_frame'+i].onclick = (function (_helper) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onclick = (function (_helper) { return function(w) {
                 if(helper) {
                     w.parent.widgets['close_button'].onclick(w.parent.widgets['close_button']);
                     helper();
                 }
             }; })(helper);
         } else if(unique_conflict) {
-            dialog.widgets['equip_frame'+i].state = 'disabled';
-            dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['equip_frame'+i].tooltip.str = gamedata['errors']['EQUIP_INVALID_UNIQUE']['ui_name'].replace('%s', ItemDisplay.get_inventory_item_spec(unique_conflict)['ui_name']);
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled';
+            dialog.widgets['equip_frame'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['equip_frame'+i.toString()].tooltip.str = gamedata['errors']['EQUIP_INVALID_UNIQUE']['ui_name'].replace('%s', ItemDisplay.get_inventory_item_spec(unique_conflict)['ui_name']);
         } else if(failed_pred) {
-            dialog.widgets['equip_frame'+i].state = 'disabled_clickable';
-            dialog.widgets['equip_frame'+i].tooltip.text_color = SPUI.error_text_color;
-            dialog.widgets['equip_frame'+i].tooltip.str = failed_pred.ui_describe(player);
+            dialog.widgets['equip_frame'+i.toString()].state = 'disabled_clickable';
+            dialog.widgets['equip_frame'+i.toString()].tooltip.text_color = SPUI.error_text_color;
+            dialog.widgets['equip_frame'+i.toString()].tooltip.str = failed_pred.ui_describe(player);
             var help_func = get_requirements_help(failed_pred);
             if(help_func) {
-                dialog.widgets['equip_frame'+i].onclick = (function (_help_func) { return function(w) {
+                dialog.widgets['equip_frame'+i.toString()].onclick = (function (_help_func) { return function(w) {
                     // need to close equip chooser because the game state might change in a way that re-enables this,
                     // and we are not updating after invoke()
                     close_parent_dialog(w);
                     _help_func();
                 }; })(help_func);
             } else {
-                dialog.widgets['equip_frame'+i].onclick = null;
+                dialog.widgets['equip_frame'+i.toString()].onclick = null;
             }
         } else {
-            dialog.widgets['equip_frame'+i].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onclick = (function (_inv_slot, _item, _tech, _unit, _slot_type, _slot_n, _ui_slot, _equipped_now) { return function(w) {
                 if(_tech) {
                     // unit equipment
                     if(!(_tech['associated_unit'] in player.unit_equipment)) { player.unit_equipment[tech['associated_unit']] = {}; }
@@ -24947,7 +24968,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         }
 
         if(!unique_conflict && !failed_pred) {
-            dialog.widgets['equip_frame'+i].onenter = (function (_inv_slot, _item, _context_props) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onenter = (function (_inv_slot, _item, _context_props) { return function(w) {
                 var dialog = w.parent;
                 if(dialog.user_data['context'] &&
                    dialog.user_data['context'].user_data['slot'] === _inv_slot) { return; }
@@ -24955,7 +24976,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
                 invoke_inventory_context(w.parent, w, _inv_slot, _item, false, _context_props);
             }; })(inv_slot, item, context_props);
 
-            dialog.widgets['equip_frame'+i].onleave_cb = (function (_inv_slot, _item) { return function(w) {
+            dialog.widgets['equip_frame'+i.toString()].onleave_cb = (function (_inv_slot, _item) { return function(w) {
                 if(dialog.user_data['context'] &&
                    dialog.user_data['context'].user_data['slot'] === _inv_slot) {
                     invoke_inventory_context(w.parent, w, -1, null, false);
@@ -24964,9 +24985,7 @@ function invoke_equip_chooser(inv_dialog, parent_widget, tech, unit, slot_type, 
         }
     }
 
-    inv_dialog.user_data['equip_chooser'] = dialog;
-    inv_dialog.add(dialog);
-    return dialog;
+    return true;
 }
 
 function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
@@ -25017,19 +25036,19 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     // DESCRIPTION
     var descr = spec['ui_description' + (('stack' in aura) && (aura['stack'] > 1) && ('ui_description_plural' in spec) ? '_plural' : '')];
     var strength = ('strength' in aura ? aura['strength'] : 1);
-    if(descr.indexOf('%abspct') >= 0) {
+    while(descr.indexOf('%abspct') >= 0) {
         descr = descr.replace('%abspct', ((1.0+strength)*100.0).toFixed(0));
     }
-    if(descr.indexOf('%pct') >= 0) {
+    while(descr.indexOf('%pct') >= 0) {
         descr = descr.replace('%pct', ((strength)*100.0).toFixed(0));
     }
-    if(descr.indexOf('%oneminuspct') >= 0) {
+    while(descr.indexOf('%oneminuspct') >= 0) {
         descr = descr.replace('%oneminuspct', ((1.0-strength)*100.0).toFixed(0));
     }
-    if(descr.indexOf('%price') != -1) {
+    while(descr.indexOf('%price') != -1) {
         descr = descr.replace('%price', Store.display_user_currency_amount(Store.convert_credit_price_to_user_currency(strength), 'full'));
     }
-    if(descr.indexOf('%secteam') != -1) {
+    while(descr.indexOf('%secteam') != -1) {
         var unit_dic = strength[0]['units'];
         var ls = [];
         goog.object.forEach(unit_dic, function(qty, specname) {
@@ -25037,19 +25056,19 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         });
         descr = descr.replace("%secteam", ls.join(', '));
     }
-    if(descr.indexOf('%stack') != -1) {
+    while(descr.indexOf('%stack') != -1) {
         descr = descr.replace('%stack', pretty_print_number(('stack' in aura ? aura['stack'] : 1)));
     }
     if('extra_ui_description' in aura) {
         descr += aura['extra_ui_description'];
     }
-    if(descr.indexOf('%level') >= 0) {
+    while(descr.indexOf('%level') >= 0) {
         descr = descr.replace('%level', pretty_print_number(level));
     }
     while(descr.indexOf('%gamebucks') >= 0) {
         descr = descr.replace('%gamebucks', player.get_any_abtest_value('gamebucks_ui_name', gamedata['store']['gamebucks_ui_name']));
     }
-    if(descr.indexOf('%modstats') >= 0) {
+    while(descr.indexOf('%modstats') >= 0) {
         var ui_modstat_buff_list = [], ui_modstat_nerf_list = [];
         goog.array.forEach(spec['effects'], function(eff) {
             var ui_effect = ModChain.display_modstat_effect(eff, level);
@@ -26027,7 +26046,7 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.user_data['chapter'] = chapter;
     dialog.widgets['single_player_button'].state = (chapter === 'ai' ? 'active' : 'normal');
     dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
-    dialog.widgets['alliance_button'].state = (chapter === 'alliance' ? 'active' : 'normal');
+    dialog.widgets['alliance_button'].state = (chapter === 'alliance' ? 'active' : (dialog.user_data['from_alliance'] >= 0 ? 'normal' : 'disabled'));
 
     dialog.user_data['page'] = -1;
     dialog.user_data['pending'] = false;
@@ -26081,7 +26100,7 @@ function query_battle_history(target, source, alliance_A, alliance_B, ai_or_huma
     last_query_tag += 1;
     var tag = 'qbh'+last_query_tag.toString();
     // need this adaptor to pull the .result property out of the event object
-    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.is_final, event.is_error); }; })(callback));
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result, event.signatures, event.is_final, event.is_error); }; })(callback));
     send_to_server.func(["QUERY_BATTLE_HISTORY", target, source, alliance_A, alliance_B, tag, ai_or_human, time_range]);
 }
 function query_recent_attackers(callback) {
@@ -26092,7 +26111,7 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 
-function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, is_final, is_error) {
+function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, siglist, is_final, is_error) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
     var oldest = battle_history_oldest(dialog);
     if((oldest < 0 && q_time_range) || (oldest > 0 && (!q_time_range || q_time_range[0] != -1 || q_time_range[1] != oldest))) {
@@ -26101,25 +26120,18 @@ function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist,
 
     dialog.user_data['pending'] = false;
 
-    // sort summaries by age
-    var compare_by_time = function (a,b) {
-        if(a['time'] < b['time']) {
-            return 1;
-        } else if(a['time'] > b['time']) {
-            return -1;
-        } else {
-            return 0;
-        }
-    };
-    sumlist.sort(compare_by_time);
+    // note: assume summaries are already sorted by age by server
+
     dialog.user_data['sumlist_is_final'] = is_final;
     dialog.user_data['sumlist_is_error'] = is_error;
 
     if(dialog.user_data['sumlist'] !== null) {
         dialog.user_data['sumlist'] = dialog.user_data['sumlist'].concat(sumlist);
+        dialog.user_data['siglist'] = dialog.user_data['siglist'].concat(siglist);
         battle_history_change_page(dialog, dialog.user_data['page']);
     } else {
         dialog.user_data['sumlist'] = sumlist;
+        dialog.user_data['siglist'] = siglist;
         battle_history_change_page(dialog, 0);
     }
 };
@@ -26132,7 +26144,11 @@ function battle_history_change_page(dialog, page) {
 
     dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
     dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
-    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0);
+    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id);
+    if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
+        // for the player, who is not in an alliance
+        dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
+    }
 
     // need to get more from server?
     // note: send query on the page before the data ends, so we never show an incomplete page, unless it's the final one.
@@ -26156,6 +26172,7 @@ function battle_history_change_page(dialog, page) {
 
         for(var i = first_on_page; i <= last_on_page; i++) {
             var summary = dialog.user_data['sumlist'][i];
+            var signature = dialog.user_data['siglist'][i];
 
             var myrole, opprole;
             if(summary['attacker_id'] == dialog.user_data['from_id']) {
@@ -26366,10 +26383,10 @@ function battle_history_change_page(dialog, page) {
                 friendly_id = dialog.user_data['from_id'];
             }
 
-            var callback = (function (_summary, _friendly_id) { return function() {
+            var callback = (function (_summary, _signature, _friendly_id) { return function() {
                 player.record_feature_use('battle_log');
-                invoke_battle_log_dialog(_summary, _friendly_id);
-            }; })(summary, friendly_id);
+                invoke_battle_log_dialog(_summary, _signature, _friendly_id);
+            }; })(summary, signature, friendly_id);
 
             dialog.widgets['row_log_button'+row].show = (player.is_developer() || player.get_any_abtest_value('enable_battle_logs',true));
             dialog.widgets['row_log_button'+row].state = 'normal';
@@ -26516,7 +26533,7 @@ function update_battle_history_dialog(dialog) {
 
 /** @param {!Object} summary
     @param {number} friendly_id - the "good guy" in this battle - not necessarily the viewing player */
-function invoke_battle_log_dialog(summary, friendly_id) {
+function invoke_battle_log_dialog(summary, signature, friendly_id) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['battle_log_dialog']);
     dialog.user_data['dialog'] = 'battle_log_dialog';
     dialog.user_data['friendly_id'] = friendly_id;
@@ -26627,19 +26644,54 @@ function invoke_battle_log_dialog(summary, friendly_id) {
 
     battle_log_change_page(dialog, 0);
 
-    get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null,
+    get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null, signature,
                    (function (_dialog) { return function(result) { receive_battle_log_result(_dialog, result); }; })(dialog));
 
     return dialog;
 };
 
 var battle_log_receivers = {};
-function get_battle_log(battle_time, attacker_id, defender_id, base_id, cb) {
+function get_battle_log(battle_time, attacker_id, defender_id, base_id, signature, cb) {
     last_query_tag += 1;
     var tag = 'gbl'+last_query_tag.toString();
     battle_log_receivers[tag] = cb;
-    send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, tag]);
+    send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, signature, tag]);
 };
+
+// given a battle summary, determine if we can shot deployment markers
+function can_show_deployment_markers_for_battle_summary(summary) {
+    if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
+    return (summary['base_id'] === session.viewing_base.base_id &&
+            ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
+             vec_equals(summary['base_ncells'], (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
+            ('deployed_units' in summary) &&
+            goog.object.getCount(summary['deployed_units']) >= 1);
+}
+// given a battle log, turn on the deployment markers for it
+function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
+    // mimic normal unit deployment spread
+    var radius = player.get_any_abtest_value('unit_deploy_spread', gamedata['unit_deploy_spread']);
+    var ncells = session.viewing_base.ncells();
+
+    var deployments = [];
+    goog.array.forEach(log, function(e) {
+        if(e['event_name'] === '3910_unit_deployed' && e['user_id'] === attacker_id) {
+            var spec = gamedata['units'][e['unit_type']];
+            if(!spec) { return; }
+
+            var pos = [clamp(e['x']+radius*(Math.random()-0.5), 0, ncells[0]-1),
+                       clamp(e['y']+radius*(Math.random()-0.5), 0, ncells[1]-1)];
+
+            deployments.push({specname: e['unit_type'],
+                              level: e['level'],
+                              altitude: get_leveled_quantity(spec['altitude'] || 0, e['level']),
+                              pos: pos});
+        }
+    });
+    if(deployments.length < 1) { return; }
+    change_selection_ui(null);
+    DeploymentMarkers.invoke_gui(attacker_name, deployments);
+}
 
 function receive_battle_log_result(dialog, ret) {
     if(!ret) {
@@ -26659,6 +26711,15 @@ function receive_battle_log_result(dialog, ret) {
         dialog.widgets['log'].max_lines = parsed.length+10;
         for(var line = 0; line < parsed.length; line++) {
             dialog.widgets['log'].append_text(parsed[line]);
+        }
+
+        // see if we can show deployment markers for this
+        var summary = dialog.user_data['summary'];
+        if(can_show_deployment_markers_for_battle_summary(summary)) {
+            dialog.widgets['show_markers_button'].show = true;
+            dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
+                show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
+            }; })(summary, ret);
         }
     }
     dialog.widgets['log'].scroll_to_top();
@@ -30848,11 +30909,11 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
     var manuf_queue = builder.start_client_prediction('manuf_queue', builder.manuf_queue);
     var spec = gamedata['units'][spec_name];
     var level = player.tech[spec['level_determined_by_tech']] || 1;
-    manuf_queue.splice(queue_slot,1);
-    goog.object.forEach(gamedata['resources'], function(res, resname) {
-        var cost = Math.floor(gamedata['manufacture_cancel_refund']*get_leveled_quantity(spec['build_cost_'+resname]||0, level));
-        player.resource_state[resname][1] += cost;
-    });
+    var entry = manuf_queue.splice(queue_slot,1)[0];
+    var cost = ((entry && 'cost' in entry) ? entry['cost'] : mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE_CANCEL, builder));
+    for(var res in gamedata['resources']) {
+        player.resource_state[res][1] += Math.floor(((entry && 'cost' in entry) ? gamedata['manufacture_cancel_refund'] : 1) * (cost[res] || 0));
+    }
 }
 
 /** Main per-frame update - takes care of grid buttons and status displays*/
@@ -30971,15 +31032,19 @@ function update_manufacture_dialog(dialog) {
                         // client-side predict what will happen
                         var spec = gamedata['units'][_spec_name];
                         var level = player.tech[spec['level_determined_by_tech']] || 1;
-                        var cost_time = Math.floor(get_leveled_quantity(spec['build_time'], level) / builder.get_stat('manufacture_speed', builder.get_leveled_quantity(builder.spec['manufacture_speed'] || 1.0)));
-                        manuf_queue.push({'spec_name':_spec_name,
-                                          'level':level,
-                                          'total_time':cost_time
-                                         });
-                        goog.object.forEach(gamedata['resources'], function(res, resname) {
-                            var cost = get_leveled_quantity(spec['build_cost_'+resname] || 0, level);
-                            player.resource_state[resname][1] -= cost;
-                        });
+                        var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
+                        var entry = {'spec_name':_spec_name,
+                                     'level':level,
+                                     'total_time':cost['time'],
+                                     'cost': {}
+                                    };
+                        for(var res in gamedata['resources']) {
+                            if(cost[res]) {
+                                player.resource_state[res][1] -= cost[res];
+                                entry['cost'][res] = cost[res];
+                            }
+                        }
+                        manuf_queue.push(entry);
 
                         // play different effect when starting manufacturing vs. subsequent queue appends
                         var fx_name = (manuf_queue.length == 1 ? 'unit_manufacture_start' : 'unit_manufacture_add_to_queue');
@@ -30996,11 +31061,11 @@ function update_manufacture_dialog(dialog) {
                     // check requirements
                     var spec = gamedata['units'][spec_name];
                     var cost_space = get_leveled_quantity(spec['consumes_space'], unlock_level);
-                    var cost_res = {}; var not_enough_res = null; // name of one needy resource
+                    var cost_res = mobile_cost_to_repair(spec, unlock_level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
+                    var not_enough_res = null; // name of one needy resource
                     var resources_needed = {};
 
                     for(var res in gamedata['resources']) {
-                        cost_res[res] = get_leveled_quantity(spec['build_cost_'+res]||0, unlock_level);
                         if(player.resource_state[res][1] < cost_res[res]) {
                             not_enough_res = res;
                             resources_needed[res] = cost_res[res] - player.resource_state[res][1];
@@ -31313,18 +31378,18 @@ function update_manufacture_dialog(dialog) {
         var level = unit_unlock_level(dialog.user_data['current_unit']);
         if(level < 1) { level = 1; }
 
+        var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, builder);
         for(var res in gamedata['resources']) {
             if('requirements_'+res+'_value' in dialog.widgets) {
-                var cost = get_leveled_quantity(spec['build_cost_'+res]||0, level);
-                if(cost > 0) {
+                if(cost[res] > 0) {
                     dialog.widgets['requirements_'+res+'_value'].show =
                         dialog.widgets['requirements_'+res+'_icon'].show = true;
-                    dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost);
+                    dialog.widgets['requirements_'+res+'_value'].str = pretty_print_number(cost[res]);
                     dialog.widgets['requirements_'+res+'_value'].tooltip.str = dialog.data['widgets']['requirements_'+res+'_value']['ui_tooltip'].replace('%RES', gamedata['resources'][res]['ui_name']).replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
-                    dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost ? SPUI.good_text_color : SPUI.error_text_color);
+                    dialog.widgets['requirements_'+res+'_value'].text_color = (player.resource_state[res][1] >= cost[res] ? SPUI.good_text_color : SPUI.error_text_color);
                     // don't show button for topup, since the main "Use Resources" button will take care of it
-                    if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost) {
-                        var helper = get_requirements_help(res, cost - player.resource_state[res][1]);
+                    if(!gamedata['resources'][res]['allow_topup'] && player.resource_state[res][1] < cost[res]) {
+                        var helper = get_requirements_help(res, cost[res] - player.resource_state[res][1]);
                         dialog.widgets['resource_'+res+'_button'].show = !!helper;
                         dialog.widgets['resource_'+res+'_button'].onclick = helper;
                     } else {
@@ -31356,11 +31421,8 @@ function update_manufacture_dialog(dialog) {
             dialog.widgets['resource_space_button'].show = false;
         }
 
-        var cost_time = get_leveled_quantity(spec['build_time'], level);
-        if(builder) {
-            var speed = builder.get_stat('manufacture_speed', builder.get_leveled_quantity(builder.spec['manufacture_speed'] || 1.0));
-            cost_time /= speed;
-        }
+        var cost_time = cost['time'];
+
         dialog.widgets['requirements_time_value'].str = pretty_print_time(cost_time);
         dialog.widgets['requirements_time_value'].tooltip.str = dialog.data['widgets']['requirements_time_value']['ui_tooltip'].replace('%VERB', gamedata['spells']['MAKE_DROIDS']['ui_name'].toLowerCase());
     }
@@ -31910,7 +31972,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     var virtual_item = {'spec':leader_spec['name'], 'level': rec['level'] || 1};
     ItemDisplay.display_item(dialog.widgets['item'], virtual_item, {context_parent: dialog.parent});
 
-    //dialog.widgets['item'].widgets['frame'].tooltip.str = null;
+    /* old code to hide standard inventory tooltip when recipe ui_description is unique
     ItemDisplay.remove_inventory_item_tooltip(dialog.widgets['item'].widgets['frame']);
 
     if(recipe_ui_description) { // manual override
@@ -31918,6 +31980,7 @@ function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
     } else {
         ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['item'].widgets['frame'], virtual_item, dialog.parent);
     }
+    */
 
     dialog.widgets['name'].str = recipe_ui_name || ItemDisplay.get_inventory_item_ui_name_long(leader_spec);
     dialog.widgets['name'].text_color = ItemDisplay.get_inventory_item_color(leader_spec);
@@ -35243,7 +35306,8 @@ function invoke_fullscreen_instructions() {
         dialog.widgets['close_button'].onclick = function() { change_selection_ui(null); };
     if(spin_demographics['browser_OS'] === "Mac") {
         dialog.widgets['os'].str = dialog.data['widgets']['os']['ui_name'].replace('%s', 'Mac');
-        dialog.widgets['key'].str = '\u2318-Shift-F'; // Unicode for Mac command key
+        // note: Safari seems to ignore the keyboard shortcut now?
+        dialog.widgets['key'].str = (spin_demographics['browser_name'] === 'Safari' ? 'View Menu ->\nEnter Full Screen' : '\u2318-Shift-F'); // Unicode for Mac command key
     } else if(spin_demographics['browser_OS'] === "Windows") {
         dialog.widgets['os'].str = dialog.data['widgets']['os']['ui_name'].replace('%s', 'Windows');
         dialog.widgets['key'].str = 'F11';
@@ -38323,7 +38387,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
 
         if('spell' in skudata) {
             var spell = gamedata['spells'][skudata['spell']];
-            d.widgets['name'].set_text_with_linebreaking(skudata['ui_name'] || spell['ui_new_store_name'] || spell['ui_name']);
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(skudata['ui_name'] || spell['ui_new_store_name'] || spell['ui_name']);
             d.widgets['icon'].asset = spell['new_store_icon'] || spell['icon'];
 
             if('new_store_tip_item' in spell) {
@@ -38343,7 +38407,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
 
             var fallback_name = ItemDisplay.get_inventory_item_stack_prefix(spec, stack) + ItemDisplay.get_inventory_item_ui_name(spec);
 
-            d.widgets['name'].set_text_with_linebreaking(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
             ItemDisplay.set_inventory_item_asset(d.widgets['icon'], spec);
             ItemDisplay.set_inventory_item_stack(d.widgets['icon_stack'], spec, tip_item);
         } else if('name' in skudata) {
@@ -38355,7 +38419,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
             d.widgets['name'].text_hjustify = d.widgets['name'].text_vjustify = 'center';
             d.widgets['name'].text_color = SPUI.make_colorv(d.data['widgets']['name']['text_color_category']);
             d.widgets['name'].font = SPUI.make_font(d.data['widgets']['name']['text_size_category'], d.data['widgets']['name']['text_size_category']+3, d.data['widgets']['name']['text_style']);
-            d.widgets['name'].set_text_with_linebreaking(skudata['ui_name']);
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(skudata['ui_name']);
             d.user_data['icon_assets'] = [];
             if('icon' in skudata) {
                 d.user_data['icon_assets'].push(skudata['icon']);
@@ -38996,7 +39060,8 @@ function update_new_store_sku(d) {
             if(((!('activation' in spell)) || spell['activation'] == 'instant')) {
                 if(d.user_data['should_confirm_purchase']) {
                     var ui_name = d.widgets['name'].str.replace(/\n/g, ' ');
-                    confirm_purchase(goog.partial(order_cb, null), ui_name, d.user_data['ui_price_str'], skudata['ui_purchase_confirm'] || spell['ui_purchase_confirm'] || null);
+                    confirm_purchase(goog.partial(order_cb, null), ui_name, d.user_data['ui_price_str'],
+                                     eval_cond_or_literal(skudata['ui_purchase_confirm'] || spell['ui_purchase_confirm'] || null, player, null));
                 } else {
                     order_cb(null);
                 }
@@ -40226,6 +40291,7 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     dialog.user_data['unit'] = (preselect || selection.unit); // buildings only
     dialog.user_data['techname'] = techname;
     dialog.user_data['tech'] = (techname !== 'BUILDING' ? gamedata['tech'][techname] : null);
+    dialog.user_data['equip_slots_by_type'] = {};
     dialog.user_data['prev_dialog'] = prev_dialog;
     dialog.user_data['context'] = null;
     dialog.user_data['feature_scroll'] = 0;
@@ -43862,7 +43928,7 @@ function handle_server_message(data) {
 
         ChatFilter.init(gamedata['client']['chat_filter']);
 
-        session.region = new Region(null); // note: start with "blank" region, updated later
+        session.region = new Region.Region(null); // note: start with "blank" region, updated later
 
         session.connect_time = client_time;
         session.client_hello_packet = null;
@@ -44024,7 +44090,7 @@ function handle_server_message(data) {
         change_region_pending = null;
         var new_region_id = data[1];
         var during_login = data[3];
-        session.region = new Region(gamedata['regions'][new_region_id] || null);
+        session.region = new Region.Region(gamedata['regions'][new_region_id] || null);
         player.home_base_loc = data[2];
         if(session.home_base && session.viewing_base) { session.viewing_base.base_map_loc = player.home_base_loc; }
         session.region.ping_contest_rank();
@@ -45507,280 +45573,15 @@ function handle_server_message(data) {
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];
         var sender_info = data[2];
-        var wrapped_body = data[3];
-        var chat_msg_id = (data.length >= 5 ? data[4] : null);
+        var wrapped_body = data[3] || '';
+        var chat_msg_id = data[4];
+        var is_prepend = data[5];
 
         if(!global_chat_frame) { return; }
-
-        var tablist = [];
-
-        if(channel_name == 'BROADCAST') {
-            // spam to all open channels
-            for(var i = 0; i < global_chat_frame.data['widgets']['tabs']['array'][0]; i++) {
-                tablist.push(global_chat_frame.widgets['tabs'+i]);
-            }
-        } else if(channel_name in global_chat_frame.user_data['channel_to_tab']) {
-            tablist.push(global_chat_frame.widgets['tabs'+global_chat_frame.user_data['channel_to_tab'][channel_name]]);
-        } else {
-            console.log("cannot find chat tab for channel "+channel_name+"!");
-            return;
-        }
-
-        if(sender_info['type'] == 'message_hide') {
-            if(sender_info['target_user_id'] == session.user_id) { return; } // keep showing to original sender
-            goog.array.forEach(tablist, function(tab) {
-                if(sender_info['target_message_id'] in tab.user_data['chat_messages_by_id']) {
-                    var node = tab.user_data['chat_messages_by_id'][sender_info['target_message_id']];
-
-                    // revise, or just delete the message?
-                    var new_type = sender_info['new_type'] || null;
-                    if(new_type && node.user_data && (new_type in gamedata['strings']['chat_templates'])) {
-                        tab.widgets['output'].revise_text(node, SPText.cstring_to_ablocks_bbcode(gamedata['strings']['chat_templates'][new_type].replace('%sender_name', node.user_data['sender_name'])));
-                    } else {
-                        tab.widgets['output'].remove_text(node);
-                    }
-                }
-            });
-        } else if(sender_info['type'] == 'unit_donation_request_invalidation') {
-            if(sender_info['user_id'] == session.user_id) { return; }
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                // invalidate any outstanding requests on this recipient_id
-                for(var t in tab.user_data['unit_donation_requests']) {
-                    var req = tab.user_data['unit_donation_requests'][t];
-                    if(req['recipient_id'] === sender_info['user_id'] &&
-                       // do not apply invalidation to request with the new_tag value - this can happen if
-                       // the chat buffer re-orders the two messages that are sent with the same "time" value
-                       (!('new_tag' in sender_info) || req['tag'] !== sender_info['new_tag'])) {
-                        req['cur_space'] = req['max_space'];
-                        var node = req['node'];
-                        if(node) {
-                            var new_template = gamedata['strings']['unit_donation_chat']['other']['stale'];
-                            if(new_template) {
-                                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
-                                tab.widgets['output'].revise_text(node, text);
-                            } else {
-                                tab.widgets['output'].remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
-                            }
-                        }
-                    }
-                }
-            }
-            return;
-
-        } else if(sender_info['type'] == 'unit_donation_request' ||
-                  sender_info['type'] == 'unit_donation') {
-            if(!player.unit_donation_enabled()) { return; }
-
-            if(sender_info['type'] == 'unit_donation_request' && sender_info['time'] < server_time - gamedata['unit_donation_max_age']) {
-                return; // request is stale
-            }
-
-            // handle unit donation messages
-            var tag = sender_info['tag'] || 0;
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-
-                // search for existing request, or add new one if not found
-                var req, node;
-
-                if(tag in tab.user_data['unit_donation_requests']) {
-                    req = tab.user_data['unit_donation_requests'][tag];
-                    node = req['node'];
-                    if(sender_info['type'] == 'unit_donation' && sender_info['user_id'] == session.user_id) {
-                        req['i_donated'] = true;
-                        req['my_xp'] += sender_info['xp_gained'];
-                    }
-                } else if(sender_info['type'] == 'unit_donation_request') {
-                    node = tab.widgets['output'].append_text(SPText.cstring_to_ablocks(''));
-                    req = tab.user_data['unit_donation_requests'][tag] = {'node':node,
-                                                                          'tag':tag, 'cur_space':0, 'max_space':0,
-                                                                          'i_donated':false, 'my_xp': 0, 'dialog': null,
-                                                                          'recipient_id': sender_info['user_id'],
-                                                                          'recipient_fbid': sender_info['facebook_id'],
-                                                                          'recipient_name': sender_info['chat_name']};
-                    node.on_destroy = (function (_req, _tab) { return function(_node) {
-                        delete _tab.user_data['unit_donation_requests'][_req['tag']];
-                    }; })(req, tab);
-                } else {
-                    // it's a donation towards a request that we do not have - ignore it
-                    continue;
-                }
-
-                req['cur_space'] = sender_info['cur_space'];
-                req['max_space'] = sender_info['max_space'];
-
-                if(req['dialog']) { update_unit_donation_dialog(req['dialog']); }
-
-                var text;
-                var callback = null;
-
-                var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
-
-                if(req['recipient_id'] == session.user_id) {
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct), {onclick:callback});
-                } else {
-                    var kind = (req['i_donated'] ? 'you_have_donated' : 'you_have_not_donated');
-
-                    callback = (function () { return function(w, mloc) {
-                        change_selection_ui(null);
-                        req['dialog'] = invoke_unit_donation_dialog(req);
-                    }; })();
-
-                    text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:callback});
-                }
-
-                tab.widgets['output'].revise_text(node, text);
-            }
-
-        } else {
-            // normal chat message
-            if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
-               (sender_info['type'] != 'i_got_gagged') &&
-               (channel_name != 'DEVELOPER')) { return; }
-
-            var body = SPHTTP.unwrap_string(wrapped_body);
-            var props = {};
-
-            if('muted' in sender_info) {
-                props.color = '#ff0000';
-            } else if(channel_name == 'BROADCAST') {
-                props.color = '#ffff00';
-            }
-
-            // check for special message types
-            var template = (sender_info['type'] && (sender_info['type'] in gamedata['strings']['chat_templates']) ? sender_info['type'] : 'default');
-
-            var bb_text = gamedata['strings']['chat_templates'][template];
-
-            // is this text reportable for abuse?
-            // note: for the onclick handlers below to work, report_args must be set up even if it's your own message, or a private channel
-            var report_args;
-            if(bb_text.indexOf('%body') >= 0 && ('time' in sender_info) && ('chat_name' in sender_info) &&
-               ('user_id' in sender_info) && sender_info['user_id'] > 0 && !is_ai_user_id_range(sender_info['user_id'])) {
-                report_args = new AdvancedChatReportArgs(sender_info['user_id'], channel_name, sender_info['chat_name'], body, sender_info['time'], chat_msg_id);
-            } else {
-                report_args = null;
-            }
-            var alliance_id = ('alliance_id' in sender_info ? sender_info['alliance_id'] : -1);
-
-            var bbcode_click_handlers = goog.object.clone(system_chat_bbcode_click_handlers);
-
-            // special override for player names
-            bbcode_click_handlers['player'] = { 'onclick': (function (_report_args, _alliance_id) { return function (_suser_id, _ui_name) {
-                return function(w, mloc) {
-                    if(!_suser_id) { return; }
-                    var _user_id = parseInt(_suser_id,10);
-                    if(!_user_id || is_ai_user_id_range(_user_id) || _user_id < 0) { return; }
-
-                    // note: this might refer to a DIFFERENT player than the main message - if so, ignore report_args and alliance_id
-                    if(!_report_args || (_user_id !== _report_args.user_id)) {
-                        _alliance_id = -1;
-                        _report_args = null;
-                    }
-                    invoke_chat_player_context_menu(_user_id, _alliance_id, _ui_name, _report_args, mloc);
-                }; }; })(report_args, alliance_id)};
-
-            var base_props = {};
-            if('time' in sender_info) {
-                base_props.tooltip_func = (function (_send_time) { return function() {
-                    return gamedata['strings']['chat_age'].replace('%s', pretty_print_time(server_time - _send_time));
-                }; })(sender_info['time']);
-            }
-
-            // set up a default onclick handler for the entire blob of text
-            if(report_args) {
-                base_props.onclick = bbcode_click_handlers['player']['onclick'](report_args.user_id.toString(), report_args.ui_name);
-            }
-
-            // replace alliance chat tag
-            if(bb_text.indexOf('%tag') != -1) {
-                if((channel_name != 'ALLIANCE') && ('alliance_tag' in sender_info) && ('alliance_id' in sender_info) && (sender_info['alliance_id'] >= 0) &&
-                   player.get_any_abtest_value('enable_alliance_chat_tags', gamedata['client']['enable_alliance_chat_tags'])) {
-                    bb_text = bb_text.replace('%tag', gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', sender_info['alliance_tag']).replace('%alliance_id', sender_info['alliance_id']));
-                } else {
-                    bb_text = bb_text.replace('%tag', '');
-                }
-            }
-
-            // replace achievement name template
-            if(bb_text.indexOf('%achievement_name') != -1 && ('achievement_name' in sender_info)) { // check if the template has "%achievement_name in it" AND if the message includes an "achievement_name" property
-
-                // if global option is disabled, or global persist is disabled and message is from before login, do not show the message
-                if(!player.get_any_abtest_value('chat_alliance_achievements', gamedata['chat_alliance_achievements']) ||
-                   ((sender_info['time'] < session.connect_time) &&
-                    !player.get_any_abtest_value('chat_alliance_achievements_persist', gamedata['chat_alliance_achievements_persist']))) {
-                    return; // ignore the message
-                }
-
-                var cheeve = gamedata['achievements'][sender_info['achievement_name']];
-                if(cheeve) {
-                    if('chat_announce' in cheeve && !cheeve['chat_announce']) { return; } // disabled for this achievement
-                    bb_text = bb_text.replace('%achievement_name', cheeve['ui_name']);
-                    bb_text = bb_text.replace('%achievement_id', sender_info['achievement_name']);
-                }
-            }
-
-            // other text replacements
-            goog.object.forEach({'%sender_id': 'user_id',
-                                 '%sender_id2': 'user_id',
-                                 '%sender_name': 'chat_name',
-                                 '%target_id': 'target_user_id',
-                                 '%target_name': 'target_chat_name',
-                                 '%target_role': 'target_role_ui_name',
-                                 '%alliance_id': 'alliance_id',
-                                 '%alliance_name': 'alliance_name',
-                                 '%alliance_points': 'alliance_points',
-                                 '%points_to_win': 'points_to_win',
-                                 '%prev_alliance_id': 'prev_alliance_id',
-                                 '%prev_alliance_name': 'prev_alliance_name',
-                                 '%old_name': 'old_name',
-                                 '%region_name': 'region_name',
-                                 '%item_name': 'item_name'
-                                }, function(sender_key, repl_key) {
-                if(bb_text.indexOf(repl_key) != -1 && (sender_key in sender_info)) {
-                    bb_text = bb_text.replace(repl_key, SPText.bbcode_quote(sender_info[sender_key].toString()));
-                }
-                                });
-
-            var text = SPText.cstring_to_ablocks_bbcode(bb_text, base_props, bbcode_click_handlers);
-
-            var disp_text, disp_user_data;
-
-            if(gamedata['strings']['chat_templates'][template].indexOf('%body') != -1) {
-                disp_user_data = {'prebody': text, 'unfiltered_body': body,
-                                  // for later abuse_violated override
-                                  'sender_name': ('chat_name' in sender_info ? SPText.bbcode_quote(sender_info['chat_name']) : 'Unknown')};
-                if(sender_info['home_region']) { disp_user_data['home_region'] = sender_info['home_region']; }
-                disp_text = display_user_chat_body_nodes(disp_user_data);
-            } else {
-                disp_text = text;
-                disp_user_data = null;
-            }
-
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                var node = tab.widgets['output'].append_text(disp_text, disp_user_data);
-                if(chat_msg_id) {
-                    tab.user_data['chat_messages_by_id'][chat_msg_id] = node;
-                    node.on_destroy = (function (_tab, _chat_msg_id) { return function(_node) {
-                        delete _tab.user_data['chat_messages_by_id'][_chat_msg_id];
-                    }; })(tab, chat_msg_id);
-                }
-            }
-        }
-
-        // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
-        if(sender_info['user_id'] != session.user_id &&
-           !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
-            for(var i = 0; i < tablist.length; i++) {
-                var tab = tablist[i];
-                tab.user_data['last_timestamp'] = sender_info['time'] || server_time;
-            }
-        }
-
+        chat_frame_accept_message(global_chat_frame, channel_name, sender_info, wrapped_body, chat_msg_id, is_prepend);
+    } else if(msg == "CHAT_GETMORE_RESULT") {
+        var request_tag = data[1], response = data[2], is_final = data[3];
+        chat_getmore_receiver.dispatchEvent({type: request_tag, response: response, is_final: is_final});
     } else if(msg == "DONATE_UNITS_RESULT") {
         var success = data[1], error_reason = data[2];
         var dialog = find_dialog('unit_donation_dialog');
@@ -45831,11 +45632,17 @@ function handle_server_message(data) {
 
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
-    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT" || msg == "QUERY_RECENT_ATTACKERS_RESULT") {
-        var tag = data[1], result = data[2], pcache_data = data[3], is_final = (data.length >= 5 ? data[4] : true), is_error = (data.length >= 6 ? data[5] : false);
-        // stick pcache_data into PlayerCache
+    } else if(msg == "QUERY_RECENT_ATTACKERS_RESULT") {
+        var tag = data[1], result = data[2], pcache_data = data[3];
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        battle_history_receiver.dispatchEvent({type: tag, result: result, is_final: is_final, is_error: is_error});
+        battle_history_receiver.dispatchEvent({type: tag, result: result, signatures: null, is_final: true, is_error: false});
+    } else if(msg == "QUERY_BATTLE_HISTORY_RESULT") {
+        var tag = data[1], result = data[2], signatures = data[3], pcache_data = data[4], is_final = data[5], is_error = data[6];
+        if(pcache_data) { PlayerCache.update_batch(pcache_data); }
+        battle_history_receiver.dispatchEvent({type: tag, result: result, signatures: signatures, is_final: is_final, is_error: is_error});
+    } else if(msg == "QUERY_MAP_LOG_RESULT") {
+        var tag = data[1], result = data[2];
+        map_log_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {
@@ -45941,7 +45748,7 @@ function handle_server_message(data) {
         var region_id = data[1], updates = data[2];
         AllianceCache.turf_update(region_id, updates);
     } else if(msg == "REGION_MAP_UPDATES") {
-        var region_id = data[1], updates = data[2];
+        var region_id = data[1], updates = data[2], map_time = data[3];
         if(session.region.data && session.region.data['id'] == region_id) {
             goog.array.forEach(updates, function(update) { session.region.receive_feature_update(update); });
         } else {
@@ -45949,7 +45756,7 @@ function handle_server_message(data) {
             console.log('ignoring spurious REGION_MAP_UPDATES'); console.log(data[1]);
         }
     } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
-        var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6];
+        var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6], map_time = data[7];
 
         if(session.region.data && session.region.data['id'] == region_id) {
             if(feature && ('base_map_loc' in feature)) { // note: exclude features where all we know is the lock state (regional map isn't loaded)
@@ -47068,7 +46875,9 @@ function do_on_mouseup(e) {
                       /* enable if not in combat (where "combat" explicitly excludes reinforcement mode at a friendly quarry/squad) */
                       (!session.has_attacked || (!session.home_base && session.viewing_user_id == session.user_id)) &&
                       (found.is_building() || found.is_inert()) &&
-                      (session.home_base || !found.spec['quarry_invul'] || found.is_producer())) {
+                      (session.home_base || !found.spec['quarry_invul'] || found.is_producer()) &&
+                      (!selection.ui || !selection.ui.user_data || selection.ui.user_data['dialog'] !== 'deployment_markers_notice')
+                     ) {
                 // naked click on a player's own building
                 change_selection(found);
                 var allow_invoke = true;
@@ -48798,6 +48607,9 @@ function do_draw() {
                 goog.array.forEach(phantom_objects, function(obj) {
                     obj.update_draw_pos();
                     draw_shadow(obj);
+                    if(obj.team === 'enemy') { // special case for enemy deployment markers
+                        draw_selection_highlight(obj, 'enemy');
+                    }
                 });
 
                 // draw selection
@@ -49729,8 +49541,9 @@ Building.prototype.get_idle_state_advanced = function() {
                             }
                             if(pred_ok && player.stattab['total_space'] >= space_usage['ALL'] + get_leveled_quantity(spec['consumes_space'],level)) {
                                 var res_ok = true;
+                                var cost = mobile_cost_to_repair(spec, level, 0, 1, player, COST_MODE.MANUFACTURE, this);
                                 for(var res in gamedata['resources']) {
-                                    if(player.resource_state[res][1] < get_leveled_quantity(spec['build_cost_'+res] || 0, level)) {
+                                    if(player.resource_state[res][1] < cost[res]) {
                                         // cannot manufacture
                                         res_ok = false;
                                         break;
@@ -50658,10 +50471,19 @@ function draw_unit(unit) {
         unit.last_opacity_time = Math.max(client_time, unit.last_opacity_time);
     }
 
+    var scale = unit.cur_scale;
+
     if(sprite) {
-        if(alpha != 1) { ctx.save(); ctx.globalAlpha = alpha; }
-        GameArt.assets[sprite].draw(xy, unit.interpolate_facing(), client_time, state);
-        if(alpha != 1) { ctx.restore(); }
+        var has_state = ((alpha != 1) || (scale[0] != 1) || (scale[1] != 1));
+        var draw_xy = xy;
+        if(has_state) { ctx.save(); }
+        if(alpha != 1) { ctx.globalAlpha = alpha; }
+        if(scale[0] != 1 || scale[1] != 1) {
+            ctx.transform(scale[0], 0, 0, scale[1], xy[0], xy[1]);
+            draw_xy = [0,0];
+        }
+        GameArt.assets[sprite].draw(draw_xy, unit.interpolate_facing(), client_time, state);
+        if(has_state) { ctx.restore(); }
     }
 
     if(unit.hp > 0 && unit.spec['elite_marker_offset'] && (SPFX.detail < 2) && !player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx'])) {
@@ -51383,6 +51205,7 @@ goog.exportSymbol('sprobe_run', sprobe_run);
 goog.exportSymbol('invoke_gift_prompt_dialog', invoke_gift_prompt_dialog);
 goog.exportSymbol('invoke_daily_tip', invoke_daily_tip);
 goog.exportSymbol('invoke_splash_message', invoke_splash_message);
+goog.exportSymbol('invoke_region_map_replay', RegionMapReplay.invoke);
 goog.exportSymbol('give_me_item', give_me_item);
 goog.exportSymbol('load_ai_base', load_ai_base);
 goog.exportSymbol('save_ai_base', save_ai_base);

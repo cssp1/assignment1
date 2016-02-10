@@ -12,6 +12,11 @@ sudo chkconfig nscd on
 echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && sudo tar zxvf /home/ec2-user/overlay-mongo.tar.gz)
 
+sudo chmod 0777 /etc/init.d
+sudo chmod 0755 /etc/init.d/disable-transparent-hugepages
+sudo chkconfig --add disable-transparent-hugepages
+sudo /etc/init.d/disable-transparent-hugepages start
+
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools
 
@@ -60,7 +65,7 @@ echo "    set readahead to 16kb on mongodb filesystems in /etc/udev/rules.d/85-e
 # blockdev --setra 32 /dev/xvdb # yes, 32 blocks means 16kb
 echo "    check /etc/mongod.conf and start server (use --quiet)"
 # MongoDB 2.4: db.addUser(), MongoDB 2.6: createUser()
-echo "    use admin; db.createUser({user:'root',pwd:'PASSWORD',roles:['dbAdminAnyDatabase','userAdminAnyDatabase','readWriteAnyDatabase','clusterAdmin']});"
+echo "    use admin; db.createUser({user:'root',pwd:'PASSWORD',roles:['root','dbAdminAnyDatabase','userAdminAnyDatabase','readWriteAnyDatabase','clusterAdmin']});"
 echo "after mongodb is set up: set --quiet flag in /etc/init.d/mongod OPTIONS; sudo chkconfig mongod on"
 echo "check fstab"
 echo "keys: /home/ec2-user/.ssh"

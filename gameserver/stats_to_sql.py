@@ -215,9 +215,9 @@ if __name__ == '__main__':
 
                 # VALUE formula
                 if res == 'res3':
-                    # computed as a multiple of the iron value
+                    # computed as a multiple of the iron value (at high prev_receipts)
                     res3_to_iron_ratio = float(get_parameter('resource_price_formula_scale', 'res3')) / float(get_parameter('resource_price_formula_scale', 'iron'))
-                    func = "%f * iron_value(amount, townhall_level)" % res3_to_iron_ratio
+                    func = "%f * iron_value(amount, townhall_level, 1000)" % res3_to_iron_ratio
                 elif res in ('iron','water'):
                     func = ""
                     townhall_spec = gamedata['buildings'][gamedata['townhall']]
@@ -233,28 +233,40 @@ if __name__ == '__main__':
                             seg = "IF(townhall_level=%d, %s, " % (i, seg)
                         func += seg
                     func += ")" * (townhall_levels-1)
-                    if verbose: print res+'_value =', func
                 else:
                     raise Exception('value formula not implemented for resource '+res)
 
+                # adjust iron/water value for payer/nonpayer status
+                # (nonpayers value X units of basic resources much less than payers)
+                # this is an empirical observation based on how nonpayers on average have much higher
+                # combat skill and can get large amounts of resources easily through battle.
+                # 0-9.99: 0.20x (0.15x DV 0.25x TR)
+                # 10.0-100.00: 0.66x
+                # 100.01+: 1.0x
+                if res in ('iron','water'):
+                    func = "IF(prev_receipts>100,1.0,IF(prev_receipts>=10,0.66,0.20))*"+func
+
+                if verbose: print res+'_value =', func
+
                 cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
-                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
 
             # some tables have res3 columns even if the game itself doesn't have res3.
             # Create a dummy function to satisfy queries.
             if 'res3' not in gamedata['resources']:
-                for FUNC in ('res3_price', 'res3_value'):
+                for FUNC, ARGS in (('res3_price', '(amount INT8)'),
+                                   ('res3_value', '(amount INT8, townhall_level INT4, prev_receipts FLOAT)')):
                     cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym(FUNC))
-                    cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" (amount INT8) RETURNS INT8 DETERMINISTIC RETURN 0")
+                    cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" "+ARGS+" RETURNS INT8 DETERMINISTIC RETURN 0")
 
             # Special-case function for token (ONP) valuation, depending on player spend
             # (empirically we find that spend correlates inversely with battle skill)
             # gamebuck value of 1 token should be ~0.04 for low-skill ultrafans, ~0.01 for high-skill non-payers
             # (this is based on ratio of tokens earned per gamebuck loss incurred in typical AI battles)
             cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym('token_value'))
-            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, prev_receipts FLOAT) "+\
+            cur.execute("CREATE FUNCTION "+sql_util.sym('token_value')+" (amount INT8, townhall_level INT4, prev_receipts FLOAT) "+\
                         "RETURNS INT8 DETERMINISTIC RETURN "+\
-                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.04,IF(prev_receipts>=100.0,0.03,IF(prev_receipts>=10.0,0.02,0.01)))))")
+                        "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.03,IF(prev_receipts>=100.0,0.025,IF(prev_receipts>=10.0,0.02,0.01)))))")
 
             filterwarnings('error', category = MySQLdb.Warning)
             con.commit()

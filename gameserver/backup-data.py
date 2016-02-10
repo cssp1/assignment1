@@ -29,25 +29,53 @@ s3_key_file_for_backups = SpinConfig.aws_key_file()
 class NullFD(object):
     def write(self, stuff): pass
 
+SUBPART_PATTERN = '.%05d' # appended to the part00of99 archive name for subparts
+
+# since we have to back up an entire S3 directory at once, we might want to break the archive into
+# multiple subparts, to avoid the size of any one subpart growing without bound. This is the
+# max size of uncompressed input data to put in a subpart. Note, playerdb files typically compress about 10x with gzip.
+SIZE_BREAK = 50*1024*1024 # needs ~50MB of scratch space per parallel process
+
+def ship_subpart(msg_fd, backup_con, backup_bucket, td, prefix, backup_obj_prefix, title, subpart_num):
+    print >> msg_fd, title, ': archiving subpart %d...' % subpart_num
+    # name of the compressed archive to create
+    tf = tempfile.NamedTemporaryFile(prefix='prodbackup-'+title+(SUBPART_PATTERN % subpart_num), suffix='.cpio.gz')
+    # cpio/gzip it
+    subprocess.check_call('(cd %s && find . | cpio -oL --quiet | gzip -c > %s)' % (td, tf.name), shell = True)
+    objname = backup_obj_prefix + title + (SUBPART_PATTERN % subpart_num) + '.cpio.gz'
+    # upload it to S3
+    print >> msg_fd, title, ': uploading', tf.name, '->', objname, '...'
+    backup_con.put_file(backup_bucket, objname, tf.name)
+
+    # now clean out td (but leave the parent td directory, to be reused for next subpart)
+    print >> msg_fd, title, ': subpart %d done, clearing temp directory...' % subpart_num
+    subprocess.check_call('rm -r %s/*' % (td,), shell = True)
+    if prefix: # recreate the subdirectory mirroring the prefix in S3
+        os.mkdir(os.path.join(td, prefix))
+
 def backup_s3_dir(title, bucket_name, prefix = '', ignore_errors = False, verbose = False):
-    # back up from S3 (either an entire bucket or one subdirectory) to one cpio.gz archive
+    # back up from S3 (either an entire bucket or one subdirectory) to one (or multiple) cpio.gz archive(s)
     msg_fd = sys.stderr if verbose else NullFD()
 
     db_con = SpinS3.S3(s3_key_file_for_db)
     backup_con = SpinS3.S3(s3_key_file_for_backups)
 
     print >> msg_fd, title, ':'
-    td = tempfile.mkdtemp(prefix='prodbackup-'+title)
+    td = tempfile.mkdtemp(prefix=game_id+'-prodbackup-'+title)
     try:
-        counter = 0
+        s3_object_count = 0
+        s3_total_size = 0
+        s3_subpart_size = 0
+        s3_subpart_count = 0
+
         print >> msg_fd, title, ': listing bucket...'
-        if prefix:
+        if prefix: # create a subdirectory mirroring the prefix in S3
             os.mkdir(os.path.join(td, prefix))
         for data in db_con.list_bucket(bucket_name, prefix = (prefix+'/' if prefix else '')):
             objname = data['name']
             filename = os.path.join(td, objname)
-            if verbose: # counter % 1 == 0:
-                print >> msg_fd, title, ': getting %s/%s -> %s (%d)...' % (bucket_name, objname, filename, counter)
+            if verbose: # s3_object_count % 1 == 0:
+                print >> msg_fd, title, ': getting %s/%s -> %s (%d subpart %d)...' % (bucket_name, objname, filename, s3_object_count, s3_subpart_count)
 
             attempt = 0
             MAX_ATTEMPTS = 3
@@ -69,18 +97,21 @@ def backup_s3_dir(title, bucket_name, prefix = '', ignore_errors = False, verbos
                 if success:
                     break
 
-            counter += 1
+            s3_object_count += 1
+            s3_total_size += data['size']
+            s3_subpart_size += data['size']
 
-            #if counter >= 50: break
+            if s3_subpart_size >= SIZE_BREAK:
+                # ship this subpart
+                ship_subpart(msg_fd, backup_con, backup_bucket, td, prefix, backup_obj_prefix, title, s3_subpart_count)
+                s3_subpart_count += 1
+                s3_subpart_size = 0
 
-        print >> msg_fd, title, ': downloaded %d files' % counter
-        print >> msg_fd, title, ': collecting archive...'
-        tf = tempfile.NamedTemporaryFile(prefix='prodbackup-'+title, suffix='.cpio.gz')
-        subprocess.check_call('(cd %s && find . | cpio -oL --quiet | gzip -c > %s)' % (td, tf.name), shell = True)
-        objname = backup_obj_prefix + title + '.cpio.gz'
-        print >> msg_fd, title, ': uploading', tf.name, '->', objname, '...'
-        backup_con.put_file(backup_bucket, objname, tf.name)
-        print >> msg_fd, title, ': done'
+        # ship final subpart
+        if s3_subpart_size > 0:
+            ship_subpart(msg_fd, backup_con, backup_bucket, td, prefix, backup_obj_prefix, title, s3_subpart_count)
+
+        print >> msg_fd, title, ': done: %d files %d bytes in %d subparts' % (s3_object_count, s3_total_size, s3_subpart_count)
     finally:
         print >> msg_fd, title, ': CLEANUP', td
         shutil.rmtree(td, True)

@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 import re, os
-import time, calendar, urllib
+import time, calendar
 import SpinJSON
 
 
@@ -347,17 +347,33 @@ def parse_mongodb_config(dbname, cfg, parent = None):
     else:
         username = cfg.get('username', parent.get('username', None))
         password = cfg.get('password', parent.get('password', None))
-    host = cfg.get('host', parent.get('host', None))
-    port = cfg.get('port', parent.get('port', 27017))
+    replica_set = cfg.get('replica_set', parent.get('replica_set', None))
+    if replica_set:
+        host_string = cfg.get('hosts', parent.get('hosts', None))
+        if not host_string: raise Exception('replica_set needs "hosts" list of "host0:port0,host1:port1,..."')
+        # use first host for backwards-compatibility
+        hostport = host_string.split(',')[0]
+        host = hostport.split(':')[0]
+        port = int(hostport.split(':')[1])
+    else:
+        host = cfg.get('host', parent.get('host', None))
+        port = cfg.get('port', parent.get('port', 27017))
+        host_string = '%s:%d' % (host, port)
+
     if not (host and username and (password is not None)):
         raise Exception('invalid mongodb config for "%s": %s' % (dbname, repr(cfg)))
 
     table_prefix = cfg.get('table_prefix', parent.get('table_prefix', ''))
-    connect_url = 'mongodb://%s:%s@%s:%s/%s' % tuple([urllib.quote(x, '') for x in [username,password,host,str(port),dbname]])
-    return {'connect_args':[], 'connect_kwargs':{'host':connect_url},
-            'connect_uri':connect_url,
-            'host':host, 'port':port, 'username':username, 'password':password,
-            'dbname': dbname, 'table_prefix': table_prefix, 'delegate_tables':cfg.get('delegate_tables',parent.get('delegate_tables', {})),
+    connect_url = 'mongodb://%s:%s@%s/%s' % (username,password,host_string,dbname)
+    connect_args = []
+    connect_kwargs = {'host':connect_url}
+    if replica_set:
+        connect_kwargs['replicaSet'] = replica_set
+    return {'connect_args': connect_args, 'connect_kwargs': connect_kwargs,
+            'connect_uri': connect_url,
+            'host': host, 'port': port, 'username': username, 'password': password,
+            'dbname': dbname, 'table_prefix': table_prefix,
+            'delegate_tables': cfg.get('delegate_tables',parent.get('delegate_tables', {})),
             'maintenance_window': cfg.get('maintenance_window',None)}
 
 def get_mysql_config(dbname):

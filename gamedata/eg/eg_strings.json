@@ -239,7 +239,8 @@
         "map_coords": "[color=#ffff00][u][map_coords=%region,%x,%y]%x,%y[/map_coords][/u][/color]",
 
         // channel welcome messages
-        "welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
+        "welcome": ":: [color=#00ff00]%sender_name: Welcome to %channel_name chat! Please be respectful. Offensive behavior is not tolerated.[/color] ::\n",
+        "alliance_welcome": ":: [color=#00ff00]%sender_name: %body[/color] ::\n",
 
         // system-wide announcements
         "system": "\n[color=#fff000]*** %sender_name: %body ***[/color]\n\n",
@@ -1365,9 +1366,13 @@
             // for GUI only - rebased version of provides_space
             "deployable_unit_space": { "ui_name": "Attack Size", "ui_tooltip": "Unit space that can be deployed into battle at once", "display": "integer" },
 
-            // properties of the FACTORY
+            // property shared by the FACTORY and the UNIT (applied factory -> unit)
             "manufacture_speed": { "ui_name": "Train Speed", "ui_tooltip": "Bonus to unit production speed", "display": "pct.1" },
+            "manufacture_cost": { "ui_name": "Train Cost", "ui_tooltip": "Change to unit production resource cost", "display": "pct.1", "better": -1 },
+
+            // properties of the FACTORY
             "unit_repair_speed": { "ui_name": "Healing Speed", "ui_tooltip": "Bonus to unit healing/repair speed", "display": "pct.1" },
+            "unit_repair_cost": { "ui_name": "Healing Cost", "ui_tooltip": "Change to unit healing/repair resource cost", "display": "pct.1", "better": -1 },
             "crafting_speed": { "ui_name": "Production Rate", "ui_tooltip": "Bonus to item production speed", "display": "pct.1" },
 
             // properties of the UNIT or BUILDING itself

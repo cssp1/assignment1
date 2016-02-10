@@ -49,11 +49,16 @@ if [[ "$FREQ" == "daily" ]]; then
 
   run_it ./ai_bases_to_mysql.py -q
   run_it ./battles_to_mysql.py -q --prune
-  run_it ./battle_risk_reward_to_sql.py -q # requires battles, store (gamebucks), stats
+
+  # RISK/REWARD requires: battles, store (gamebucks), stats
+  # safe to be highly parallel since most of the load is on the database server, not us.
+  run_it ./battle_risk_reward_to_sql.py -q --prune --parallel 16
 
   # send SpinReminder notification
-  ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
-             --recipients "`./SpinConfig.py --getvar server_status_recipients`"
+  if [[ "${GAME_ID}" == "tr" || "${GAME_ID}" == "dv" ]]; then
+      ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
+                         --recipients "`./SpinConfig.py --getvar server_status_recipients`"
+  fi
 
   # things needed for analytics-views, with sessions last
   run_it ./metrics_to_mysql.py -q --prune

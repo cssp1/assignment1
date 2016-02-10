@@ -1105,7 +1105,7 @@ def check_item(itemname, spec):
                             affects = spellarg[0]
                             if ('affects' in aura):
                                 affects = aura['affects']
-                            elif ('affects_unit' in aura) or ('affects_manufacture_category' in aura) or ('affects_kind' in aura):
+                            elif ('affects_unit' in aura) or ('affects_manufacture_category' in aura) or ('affects_kind' in aura) or ('affects_building' in aura):
                                 affects = None
 
                             error |= check_modstat(temp, itemname, affects = affects)
@@ -1233,7 +1233,8 @@ def check_item(itemname, spec):
     return error
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'weapon_range_pvp', 'ice_effects', 'rate_of_fire',
-                                          'damage_taken', 'armor', 'unit_repair_speed', 'repair_speed', 'swamp_effects',
+                                          'damage_taken', 'armor', 'unit_repair_speed', 'unit_repair_cost',
+                                          'manufacture_speed', 'manufacture_cost', 'repair_speed', 'swamp_effects',
                                           'research_speed', 'crafting_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
                                           'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
                     'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'loot_factor_tokens', 'travel_speed', 'deployable_unit_space',
@@ -3581,6 +3582,10 @@ def main(args):
         error |= check_battle_stars(gamedata['battle_stars'])
 
     error |= check_starting_conditions(gamedata['starting_conditions'])
+
+    for name in ('chat_welcome_if',):
+        if name in gamedata:
+            error |= check_predicate(gamedata[name], reason='gamedata:'+name)
 
     for name, fx in gamedata['client']['vfx'].iteritems():
         error |= check_visual_effect('client_vfx:'+name, fx)
