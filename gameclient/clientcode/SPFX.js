@@ -1244,6 +1244,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
 
     SPFX.ctx.save();
 
+    /*
     if(0) {
         //console.log(this.from[0]+','+t+' '+height+','+this.shot_vel[0]);
         SPFX.ctx.strokeStyle = 'rgba(255,200,50,0.1)';
@@ -1253,6 +1254,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
         SPFX.ctx.lineTo(stroke_end[0], stroke_end[1]);
         SPFX.ctx.stroke();
     }
+    */
 
     // quantize to pixels
     quantize_streak(stroke_start, stroke_end);
