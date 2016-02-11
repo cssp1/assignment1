@@ -1,4 +1,5 @@
-OBSOLETE - For historical reference only.
+OBSOLETE - For historical reference only. Shows how to disable unwanted warnings
+from the Google Closure Compiler.
 
 diff --git a/src/com/google/javascript/jscomp/DiagnosticGroups.java b/src/com/google/javascript/jscomp/DiagnosticGroups.java
 index 98549bd..00b2371 100644

@@ -1,3 +1,5 @@
+Silence unnecessary output from closurebuilder.py
+
 --- closure/bin/build/closurebuilder.py.orig	2015-11-12 11:25:11.000000000 +0100
 +++ closure/bin/build/closurebuilder.py	2015-11-12 11:25:21.000000000 +0100
 @@ -195,7 +195,7 @@

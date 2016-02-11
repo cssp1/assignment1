@@ -1,0 +1,12 @@
+google/ is the contents of the Google Closure Library (https://github.com/google/closure-library)
+plus compiler.jar for the compiler.
+
+SpinPunch customization patches are in this directory.
+
+To update Closure:
+1. Unpack new Closure Library files into google/
+    - Make a clean copy elsewhere for diffing against!
+2. Apply customization patches.
+3. If updating the compiler, also replace compiler.jar.
+4. Test game and fix any bugs.
+5. Re-generate the customization patches by diffing against clean copy.

@@ -1,0 +1,500 @@
+diff -ruN google-clean/closure/goog/array/array.js google/closure/goog/array/array.js
+--- google-clean/closure/goog/array/array.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/array/array.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,7 +14,7 @@
+ 
+ /**
+  * @fileoverview Utilities for manipulating arrays.
+- *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
+  */
+ 
+diff -ruN google-clean/closure/goog/asserts/asserts.js google/closure/goog/asserts/asserts.js
+--- google-clean/closure/goog/asserts/asserts.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/asserts/asserts.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,8 @@
+  * @fileoverview Utilities to check the preconditions, postconditions and
+  * invariants runtime.
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++ *
+  * Methods in this package should be given special treatment by the compiler
+  * for type-inference. For example, <code>goog.asserts.assert(foo)</code>
+  * will restrict <code>foo</code> to a truthy value.
+diff -ruN google-clean/closure/goog/async/freelist.js google/closure/goog/async/freelist.js
+--- google-clean/closure/goog/async/freelist.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/async/freelist.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Simple freelist.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * An anterative to goog.structs.SimplePool, it imposes the requirement that the
+  * objects in the list contain a "next" property that can be used to maintain
+diff -ruN google-clean/closure/goog/async/nexttick.js google/closure/goog/async/nexttick.js
+--- google-clean/closure/goog/async/nexttick.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/async/nexttick.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview Provides a function to schedule running a function as soon
+  * as possible after the current JS execution stops and yields to the event
+  * loop.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  */
+ 
+diff -ruN google-clean/closure/goog/async/run.js google/closure/goog/async/run.js
+--- google-clean/closure/goog/async/run.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/async/run.js	2016-02-11 14:25:37.000000000 -0600
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++ */
++
+ goog.provide('goog.async.run');
+ 
+ goog.require('goog.async.WorkQueue');
+diff -ruN google-clean/closure/goog/async/workqueue.js google/closure/goog/async/workqueue.js
+--- google-clean/closure/goog/async/workqueue.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/async/workqueue.js	2016-02-11 14:25:37.000000000 -0600
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++ */
++
+ goog.provide('goog.async.WorkItem');
+ goog.provide('goog.async.WorkQueue');
+ 
+diff -ruN google-clean/closure/goog/base.js google/closure/goog/base.js
+--- google-clean/closure/goog/base.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/base.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Bootstrap for the Google JS Library (Closure).
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * In uncompiled mode base.js will write out Closure's deps file, unless the
+  * global <code>CLOSURE_NO_DEPS</code> is set to true.  This allows projects to
+diff -ruN google-clean/closure/goog/crypt/base64.js google/closure/goog/crypt/base64.js
+--- google-clean/closure/goog/crypt/base64.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/crypt/base64.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview Base64 en/decoding. Not much to say here except that we
+  * work with decoded values in arrays of bytes. By "byte" I mean a number
+  * in [0, 255].
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author doughtie@google.com (Gavin Doughtie)
+  */
+diff -ruN google-clean/closure/goog/crypt/crypt.js google/closure/goog/crypt/crypt.js
+--- google-clean/closure/goog/crypt/crypt.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/crypt/crypt.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Namespace with crypto related helper functions.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.crypt');
+diff -ruN google-clean/closure/goog/debug/debug.js google/closure/goog/debug/debug.js
+--- google-clean/closure/goog/debug/debug.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/debug/debug.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Logging and debugging utilities.
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * @see ../demos/debug.html
+  */
+diff -ruN google-clean/closure/goog/debug/logbuffer.js google/closure/goog/debug/logbuffer.js
+--- google-clean/closure/goog/debug/logbuffer.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/debug/logbuffer.js	2016-02-11 14:25:37.000000000 -0600
+@@ -20,6 +20,7 @@
+  * log records and expect that they are not overwriten at a later point.
+  *
+  * @author agrieve@google.com (Andrew Grieve)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.debug.LogBuffer');
+diff -ruN google-clean/closure/goog/debug/logger.js google/closure/goog/debug/logger.js
+--- google-clean/closure/goog/debug/logger.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/debug/logger.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview Definition of the Logger class. Please minimize dependencies
+  * this file has on other closure classes as any dependency it takes won't be
+  * able to use the logging infrastructure.
++ * @suppress {reportUnknownTypes,es5Strict} DJM/SpinPunch
+  *
+  * @see ../demos/debug.html
+  */
+diff -ruN google-clean/closure/goog/disposable/disposable.js google/closure/goog/disposable/disposable.js
+--- google-clean/closure/goog/disposable/disposable.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/disposable/disposable.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview Implements the disposable interface. The dispose method is used
+  * to clean up references and resources.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN google-clean/closure/goog/events/browserevent.js google/closure/goog/events/browserevent.js
+--- google-clean/closure/goog/events/browserevent.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/browserevent.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview A patched, standardized event object for browser events.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * <pre>
+  * The patched event object contains the following members:
+diff -ruN google-clean/closure/goog/events/browserfeature.js google/closure/goog/events/browserfeature.js
+--- google-clean/closure/goog/events/browserfeature.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/browserfeature.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Browser capability checks for the events package.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  */
+ 
+diff -ruN google-clean/closure/goog/events/events.js google/closure/goog/events/events.js
+--- google-clean/closure/goog/events/events.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/events.js	2016-02-11 14:25:37.000000000 -0600
+@@ -17,6 +17,7 @@
+  * targets and custom JavaScript event targets
+  * ({@code goog.events.Listenable}). This provides an abstraction
+  * over browsers' event systems.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * It also provides a simulation of W3C event model's capture phase in
+  * Internet Explorer (IE 8 and below). Caveat: the simulation does not
+diff -ruN google-clean/closure/goog/events/eventtarget.js google/closure/goog/events/eventtarget.js
+--- google-clean/closure/goog/events/eventtarget.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/eventtarget.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview A disposable implementation of a custom
+  * listenable/event target. See also: documentation for
+  * {@code goog.events.Listenable}.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson) [Original implementation]
+  * @see ../demos/eventtarget.html
+diff -ruN google-clean/closure/goog/events/listenable.js google/closure/goog/events/listenable.js
+--- google-clean/closure/goog/events/listenable.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/listenable.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview An interface for a listenable JavaScript object.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author chrishenry@google.com (Chris Henry)
+  */
+ 
+diff -ruN google-clean/closure/goog/events/listenermap.js google/closure/goog/events/listenermap.js
+--- google-clean/closure/goog/events/listenermap.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/events/listenermap.js	2016-02-11 14:25:37.000000000 -0600
+@@ -16,6 +16,7 @@
+  * @fileoverview A map of listeners that provides utility functions to
+  * deal with listeners on an event target. Used by
+  * {@code goog.events.EventTarget}.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * WARNING: Do not use this class from outside goog.events package.
+  *
+diff -ruN google-clean/closure/goog/functions/functions.js google/closure/goog/functions/functions.js
+--- google-clean/closure/goog/functions/functions.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/functions/functions.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Utilities for creating functions. Loosely inspired by the
+  * java classes: http://goo.gl/GM0Hmu and http://goo.gl/6k7nI8.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author nicksantos@google.com (Nick Santos)
+  */
+diff -ruN google-clean/closure/goog/gears/database.js google/closure/goog/gears/database.js
+--- google-clean/closure/goog/gears/database.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/gears/database.js	2016-02-11 14:34:32.000000000 -0600
+@@ -253,7 +253,7 @@
+  * Returns a single value from the results (first column in first row).
+  *
+  * @param {GearsResultSet} rs the result set returned by execute.
+- * @return {(number,string,null)} The first item in the first row of the
++ * @return {(number|string|null)} The first item in the first row of the
+  *     result set. Returns null if there are no matching rows.
+  */
+ goog.gears.Database.resultSetToValue = function(rs) {
+@@ -389,7 +389,7 @@
+  *     passed to the execute method.
+  * @param {number} startIndex Where to start getting the query params from
+  *     params.
+- * @return {(Object,number,string,boolean,undefined,null)} whatever 'f'
++ * @return {(Object|number|string|boolean|undefined|null)} whatever 'f'
+  *     returns, which could be any type.
+  */
+ goog.gears.Database.prototype.queryObject_ = function(sql,
+@@ -459,11 +459,11 @@
+  *
+  * @param {string} sql SQL statement.
+  * @param {...*} var_args query params. An array or multiple arguments.
+- * @return {(number,string,null)} The first value in
++ * @return {(number|string|null)} The first value in
+  *     the first row.
+  */
+ goog.gears.Database.prototype.queryValue = function(sql, var_args) {
+-  return /** @type {(number,string,null)} */ (this.queryObject_(sql,
++  return /** @type {(number|string|null)} */ (this.queryObject_(sql,
+       goog.gears.Database.resultSetToValue,
+       arguments,
+       1));
+diff -ruN google-clean/closure/goog/html/safehtml.js google/closure/goog/html/safehtml.js
+--- google-clean/closure/goog/html/safehtml.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/html/safehtml.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ 
+ /**
+  * @fileoverview The SafeHtml type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN google-clean/closure/goog/html/safestyle.js google/closure/goog/html/safestyle.js
+--- google-clean/closure/goog/html/safestyle.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/html/safestyle.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview The SafeStyle type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN google-clean/closure/goog/html/safestylesheet.js google/closure/goog/html/safestylesheet.js
+--- google-clean/closure/goog/html/safestylesheet.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/html/safestylesheet.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview The SafeStyleSheet type and its builders.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * TODO(xtof): Link to document stating type contract.
+  */
+diff -ruN google-clean/closure/goog/iter/iter.js google/closure/goog/iter/iter.js
+--- google-clean/closure/goog/iter/iter.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/iter/iter.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Python style iteration utilities.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN google-clean/closure/goog/json/json.js google/closure/goog/json/json.js
+--- google-clean/closure/goog/json/json.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/json/json.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview JSON utility functions.
+  * @author arv@google.com (Erik Arvidsson)
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ 
+diff -ruN google-clean/closure/goog/labs/useragent/browser.js google/closure/goog/labs/useragent/browser.js
+--- google-clean/closure/goog/labs/useragent/browser.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/labs/useragent/browser.js	2016-02-11 14:25:37.000000000 -0600
+@@ -19,6 +19,7 @@
+  * sub-namespaces in goog.labs.userAgent, goog.labs.userAgent.platform,
+  * goog.labs.userAgent.device respectively.)
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author martone@google.com (Andy Martone)
+  */
+ 
+diff -ruN google-clean/closure/goog/math/math.js google/closure/goog/math/math.js
+--- google-clean/closure/goog/math/math.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/math/math.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Additional mathematical functions.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  */
+ 
+ goog.provide('goog.math');
+diff -ruN google-clean/closure/goog/net/xhrio.js google/closure/goog/net/xhrio.js
+--- google-clean/closure/goog/net/xhrio.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/net/xhrio.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Wrapper class for handling XmlHttpRequests.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * One off requests can be sent through goog.net.XhrIo.send() or an
+  * instance can be created to send multiple requests.  Each request uses its
+diff -ruN google-clean/closure/goog/net/xmlhttp.js google/closure/goog/net/xmlhttp.js
+--- google-clean/closure/goog/net/xmlhttp.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/net/xmlhttp.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Low level handling of XMLHttpRequest.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
+  * @author dbk@google.com (David Barrett-Kahn)
+  */
+diff -ruN google-clean/closure/goog/object/object.js google/closure/goog/object/object.js
+--- google-clean/closure/goog/object/object.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/object/object.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Utilities for manipulating objects/maps/hashes.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
+  */
+ 
+diff -ruN google-clean/closure/goog/promise/promise.js google/closure/goog/promise/promise.js
+--- google-clean/closure/goog/promise/promise.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/promise/promise.js	2016-02-11 14:25:37.000000000 -0600
+@@ -12,6 +12,10 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++*/
++
+ goog.provide('goog.Promise');
+ 
+ goog.require('goog.Thenable');
+diff -ruN google-clean/closure/goog/promise/thenable.js google/closure/goog/promise/thenable.js
+--- google-clean/closure/goog/promise/thenable.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/promise/thenable.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,7 +14,9 @@
+ 
+ goog.provide('goog.Thenable');
+ 
+-
++/** @fileoverview
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
++*/
+ 
+ /**
+  * Provides a more strict interface for Thenables in terms of
+diff -ruN google-clean/closure/goog/reflect/reflect.js google/closure/goog/reflect/reflect.js
+--- google-clean/closure/goog/reflect/reflect.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/reflect/reflect.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Useful compiler idioms.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author johnlenz@google.com (John Lenz)
+  */
+diff -ruN google-clean/closure/goog/string/string.js google/closure/goog/string/string.js
+--- google-clean/closure/goog/string/string.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/string/string.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Utilities for string manipulation.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @author arv@google.com (Erik Arvidsson)
+  */
+ 
+diff -ruN google-clean/closure/goog/structs/map.js google/closure/goog/structs/map.js
+--- google-clean/closure/goog/structs/map.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/structs/map.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Datastructure: Hash Map.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  *
+diff -ruN google-clean/closure/goog/structs/queue.js google/closure/goog/structs/queue.js
+--- google-clean/closure/goog/structs/queue.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/structs/queue.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview Datastructure: Queue.
+  *
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * This file provides the implementation of a FIFO Queue structure.
+  * API is similar to that of com.google.common.collect.IntQueue
+diff -ruN google-clean/closure/goog/structs/set.js google/closure/goog/structs/set.js
+--- google-clean/closure/goog/structs/set.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/structs/set.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Datastructure: Set.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  *
+diff -ruN google-clean/closure/goog/structs/structs.js google/closure/goog/structs/structs.js
+--- google-clean/closure/goog/structs/structs.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/structs/structs.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Generics method for collection-like classes and objects.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @author arv@google.com (Erik Arvidsson)
+  *
+diff -ruN google-clean/closure/goog/timer/timer.js google/closure/goog/timer/timer.js
+--- google-clean/closure/goog/timer/timer.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/timer/timer.js	2016-02-11 14:25:37.000000000 -0600
+@@ -15,6 +15,7 @@
+ /**
+  * @fileoverview A timer class to which other classes and objects can listen on.
+  * This is only an abstraction above {@code setInterval}.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * @see ../demos/timers.html
+  */
+diff -ruN google-clean/closure/goog/uri/utils.js google/closure/goog/uri/utils.js
+--- google-clean/closure/goog/uri/utils.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/uri/utils.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Simple utilities for dealing with URI strings.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * This is intended to be a lightweight alternative to constructing goog.Uri
+  * objects.  Whereas goog.Uri adds several kilobytes to the binary regardless
+diff -ruN google-clean/closure/goog/useragent/useragent.js google/closure/goog/useragent/useragent.js
+--- google-clean/closure/goog/useragent/useragent.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/useragent/useragent.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Rendering engine detection.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  * @see <a href="http://www.useragentstring.com/">User agent strings</a>
+  * For information on the browser brand (such as Safari versus Chrome), see
+  * goog.userAgent.product.

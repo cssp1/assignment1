@@ -120,7 +120,7 @@ goog.labs.userAgent.browser.matchIosWebview_ = function() {
  */
 goog.labs.userAgent.browser.matchChrome_ = function() {
   return (goog.labs.userAgent.util.matchUserAgent('Chrome') ||
-      goog.labs.userAgent.util.matchUserAgent('CriOS')) &&
+          goog.labs.userAgent.util.matchUserAgent('CriOS')) &&
       !goog.labs.userAgent.browser.matchOpera_() &&
       !goog.labs.userAgent.browser.matchEdge_();
 };
@@ -169,16 +169,14 @@ goog.labs.userAgent.browser.isFirefox =
 /**
  * @return {boolean} Whether the user's browser is Safari.
  */
-goog.labs.userAgent.browser.isSafari =
-    goog.labs.userAgent.browser.matchSafari_;
+goog.labs.userAgent.browser.isSafari = goog.labs.userAgent.browser.matchSafari_;
 
 
 /**
  * @return {boolean} Whether the user's browser is Coast (Opera's Webkit-based
  *     iOS browser).
  */
-goog.labs.userAgent.browser.isCoast =
-    goog.labs.userAgent.browser.matchCoast_;
+goog.labs.userAgent.browser.isCoast = goog.labs.userAgent.browser.matchCoast_;
 
 
 /**
@@ -191,8 +189,7 @@ goog.labs.userAgent.browser.isIosWebview =
 /**
  * @return {boolean} Whether the user's browser is Chrome.
  */
-goog.labs.userAgent.browser.isChrome =
-    goog.labs.userAgent.browser.matchChrome_;
+goog.labs.userAgent.browser.isChrome = goog.labs.userAgent.browser.matchChrome_;
 
 
 /**
@@ -229,8 +226,8 @@ goog.labs.userAgent.browser.getVersion = function() {
     return goog.labs.userAgent.browser.getIEVersion_(userAgentString);
   }
 
-  var versionTuples = goog.labs.userAgent.util.extractVersionTuples(
-      userAgentString);
+  var versionTuples =
+      goog.labs.userAgent.util.extractVersionTuples(userAgentString);
 
   // Construct a map for easy lookup.
   var versionMap = {};
@@ -281,8 +278,8 @@ goog.labs.userAgent.browser.getVersion = function() {
  *     given version.
  */
 goog.labs.userAgent.browser.isVersionOrHigher = function(version) {
-  return goog.string.compareVersions(goog.labs.userAgent.browser.getVersion(),
-                                     version) >= 0;
+  return goog.string.compareVersions(
+             goog.labs.userAgent.browser.getVersion(), version) >= 0;
 };
 
 

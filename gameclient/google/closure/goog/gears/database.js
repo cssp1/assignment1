@@ -253,7 +253,7 @@ goog.gears.Database.resultSetToValueArray = function(rs) {
  * Returns a single value from the results (first column in first row).
  *
  * @param {GearsResultSet} rs the result set returned by execute.
- * @return {(number,string,null)} The first item in the first row of the
+ * @return {(number|string|null)} The first item in the first row of the
  *     result set. Returns null if there are no matching rows.
  */
 goog.gears.Database.resultSetToValue = function(rs) {
@@ -389,7 +389,7 @@ goog.gears.Database.prototype.executeVarArgs_ = function(sql, params,
  *     passed to the execute method.
  * @param {number} startIndex Where to start getting the query params from
  *     params.
- * @return {(Object,number,string,boolean,undefined,null)} whatever 'f'
+ * @return {(Object|number|string|boolean|undefined|null)} whatever 'f'
  *     returns, which could be any type.
  */
 goog.gears.Database.prototype.queryObject_ = function(sql,
@@ -459,11 +459,11 @@ goog.gears.Database.prototype.queryValueArray = function(sql, var_args) {
  *
  * @param {string} sql SQL statement.
  * @param {...*} var_args query params. An array or multiple arguments.
- * @return {(number,string,null)} The first value in
+ * @return {(number|string|null)} The first value in
  *     the first row.
  */
 goog.gears.Database.prototype.queryValue = function(sql, var_args) {
-  return /** @type {(number,string,null)} */ (this.queryObject_(sql,
+  return /** @type {(number|string|null)} */ (this.queryObject_(sql,
       goog.gears.Database.resultSetToValue,
       arguments,
       1));

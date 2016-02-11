@@ -81,12 +81,9 @@ goog.define('goog.userAgent.ASSUME_ANY_VERSION', false);
  * @type {boolean}
  * @private
  */
-goog.userAgent.BROWSER_KNOWN_ =
-    goog.userAgent.ASSUME_IE ||
-    goog.userAgent.ASSUME_EDGE ||
-    goog.userAgent.ASSUME_GECKO ||
-    goog.userAgent.ASSUME_MOBILE_WEBKIT ||
-    goog.userAgent.ASSUME_WEBKIT ||
+goog.userAgent.BROWSER_KNOWN_ = goog.userAgent.ASSUME_IE ||
+    goog.userAgent.ASSUME_EDGE || goog.userAgent.ASSUME_GECKO ||
+    goog.userAgent.ASSUME_MOBILE_WEBKIT || goog.userAgent.ASSUME_WEBKIT ||
     goog.userAgent.ASSUME_OPERA;
 
 
@@ -178,7 +175,7 @@ goog.userAgent.WEBKIT = goog.userAgent.BROWSER_KNOWN_ ?
  */
 goog.userAgent.isMobile_ = function() {
   return goog.userAgent.WEBKIT &&
-         goog.labs.userAgent.util.matchUserAgent('Mobile');
+      goog.labs.userAgent.util.matchUserAgent('Mobile');
 };
 
 
@@ -190,8 +187,8 @@ goog.userAgent.isMobile_ = function() {
  *
  * @type {boolean}
  */
-goog.userAgent.MOBILE = goog.userAgent.ASSUME_MOBILE_WEBKIT ||
-                        goog.userAgent.isMobile_();
+goog.userAgent.MOBILE =
+    goog.userAgent.ASSUME_MOBILE_WEBKIT || goog.userAgent.isMobile_();
 
 
 /**
@@ -274,14 +271,10 @@ goog.define('goog.userAgent.ASSUME_IPAD', false);
  * @type {boolean}
  * @private
  */
-goog.userAgent.PLATFORM_KNOWN_ =
-    goog.userAgent.ASSUME_MAC ||
-    goog.userAgent.ASSUME_WINDOWS ||
-    goog.userAgent.ASSUME_LINUX ||
-    goog.userAgent.ASSUME_X11 ||
-    goog.userAgent.ASSUME_ANDROID ||
-    goog.userAgent.ASSUME_IPHONE ||
-    goog.userAgent.ASSUME_IPAD;
+goog.userAgent.PLATFORM_KNOWN_ = goog.userAgent.ASSUME_MAC ||
+    goog.userAgent.ASSUME_WINDOWS || goog.userAgent.ASSUME_LINUX ||
+    goog.userAgent.ASSUME_X11 || goog.userAgent.ASSUME_ANDROID ||
+    goog.userAgent.ASSUME_IPHONE || goog.userAgent.ASSUME_IPAD;
 
 
 /**
@@ -289,7 +282,8 @@ goog.userAgent.PLATFORM_KNOWN_ =
  * @type {boolean}
  */
 goog.userAgent.MAC = goog.userAgent.PLATFORM_KNOWN_ ?
-    goog.userAgent.ASSUME_MAC : goog.labs.userAgent.platform.isMacintosh();
+    goog.userAgent.ASSUME_MAC :
+    goog.labs.userAgent.platform.isMacintosh();
 
 
 /**
@@ -378,32 +372,11 @@ goog.userAgent.IPAD = goog.userAgent.PLATFORM_KNOWN_ ?
 /**
  * @return {string} The string that describes the version number of the user
  *     agent.
- * Assumes user agent is opera.
- * @private
- */
-goog.userAgent.operaVersion_ = function() {
-  var version = goog.global.opera.version;
-  try {
-    return version();
-  } catch (e) {
-    return version;
-  }
-};
-
-
-/**
- * @return {string} The string that describes the version number of the user
- *     agent.
  * @private
  */
 goog.userAgent.determineVersion_ = function() {
   // All browsers have different ways to detect the version and they all have
   // different naming schemes.
-
-  if (goog.userAgent.OPERA && goog.global['opera']) {
-    return goog.userAgent.operaVersion_();
-  }
-
   // version is a string rather than a number because it may contain 'b', 'a',
   // and so on.
   var version = '';
@@ -419,7 +392,7 @@ goog.userAgent.determineVersion_ = function() {
     // It is recommended to set the X-UA-Compatible header to ensure that IE9
     // uses documentMode 9.
     var docMode = goog.userAgent.getDocumentMode_();
-    if (docMode > parseFloat(version)) {
+    if (docMode != null && docMode > parseFloat(version)) {
       return String(docMode);
     }
   }
@@ -429,7 +402,7 @@ goog.userAgent.determineVersion_ = function() {
 
 
 /**
- * @return {Array|undefined} The version regex matches from parsing the user
+ * @return {?Array|undefined} The version regex matches from parsing the user
  *     agent string. These regex statements must be executed inline so they can
  *     be compiled out by the closure compiler with the rest of the useragent
  *     detection logic when ASSUME_* is specified.
@@ -450,6 +423,12 @@ goog.userAgent.getVersionRegexResult_ = function() {
     // WebKit/125.4
     return /WebKit\/(\S+)/.exec(userAgent);
   }
+  if (goog.userAgent.OPERA) {
+    // If none of the above browsers were detected but the browser is Opera, the
+    // only string that is of interest is 'Version/<number>'.
+    return /(?:Version)[ \/]?(\S+)/.exec(userAgent);
+  }
+  return undefined;
 };
 
 
@@ -516,7 +495,7 @@ goog.userAgent.isVersionOrHigher = function(version) {
   return goog.userAgent.ASSUME_ANY_VERSION ||
       goog.userAgent.isVersionOrHigherCache_[version] ||
       (goog.userAgent.isVersionOrHigherCache_[version] =
-          goog.string.compareVersions(goog.userAgent.VERSION, version) >= 0);
+           goog.string.compareVersions(goog.userAgent.VERSION, version) >= 0);
 };
 
 
@@ -540,7 +519,7 @@ goog.userAgent.isVersion = goog.userAgent.isVersionOrHigher;
  *     same as the given version.
  */
 goog.userAgent.isDocumentModeOrHigher = function(documentMode) {
-  return goog.userAgent.DOCUMENT_MODE >= documentMode;
+  return Number(goog.userAgent.DOCUMENT_MODE) >= documentMode;
 };
 
 
@@ -569,5 +548,6 @@ goog.userAgent.DOCUMENT_MODE = (function() {
     return undefined;
   }
   return mode || (doc['compatMode'] == 'CSS1Compat' ?
-      parseInt(goog.userAgent.VERSION, 10) : 5);
+                      parseInt(goog.userAgent.VERSION, 10) :
+                      5);
 })();

@@ -71,8 +71,8 @@ goog.Thenable = function() {};
  *  =:
  *
  */
-goog.Thenable.prototype.then = function(opt_onFulfilled, opt_onRejected,
-    opt_context) {};
+goog.Thenable.prototype.then = function(
+    opt_onFulfilled, opt_onRejected, opt_context) {};
 
 
 /**
@@ -108,7 +108,7 @@ goog.Thenable.addImplementation = function(ctor) {
 
 
 /**
- * @param {*} object
+ * @param {?} object
  * @return {boolean} Whether a given instance implements {@code goog.Thenable}.
  *     The class/superclass of the instance must call {@code addImplementation}.
  */

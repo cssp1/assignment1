@@ -46,11 +46,6 @@ goog.require('goog.html.legacyconversions');
  * values are allowed. {@code goog.ui.media.MediaRenderer} checks whether the
  * values are available before creating DOMs for them.
  *
- * TODO(user): support asynchronous data models by subclassing
- * {@link goog.events.EventTarget} or {@link goog.ds.DataNode}. Understand why
- * {@link http://goto/datanode} is not available in closure. Add setters to
- * MediaModel once this is supported.
- *
  * @param {string=} opt_url An optional URL of the media.
  * @param {string=} opt_caption An optional caption of the media.
  * @param {string=} opt_description An optional description of the media.
@@ -61,14 +56,9 @@ goog.require('goog.html.legacyconversions');
  * @param {number=} opt_height The height of the media in pixels.
  * @constructor
  */
-goog.ui.media.MediaModel = function(opt_url,
-                                    opt_caption,
-                                    opt_description,
-                                    opt_type,
-                                    opt_medium,
-                                    opt_duration,
-                                    opt_width,
-                                    opt_height) {
+goog.ui.media.MediaModel = function(
+    opt_url, opt_caption, opt_description, opt_type, opt_medium, opt_duration,
+    opt_width, opt_height) {
   /**
    * The URL of the media.
    * @type {string|undefined}
@@ -462,9 +452,8 @@ goog.ui.media.MediaModel.prototype.setCredits = function(credits) {
  *     with the given role. May be empty.
  */
 goog.ui.media.MediaModel.prototype.findCreditsWithRole = function(role) {
-  var credits = goog.array.filter(this.credits_, function(credit) {
-    return role == credit.getRole();
-  });
+  var credits = goog.array.filter(
+      this.credits_, function(credit) { return role == credit.getRole(); });
   return /** @type {!Array<!goog.ui.media.MediaModel.Credit>} */ (credits);
 };
 
@@ -573,7 +562,8 @@ goog.ui.media.MediaModel.Player = function(url, opt_vars, opt_size) {
    * @type {!goog.html.TrustedResourceUrl}
    * @private
    */
-  this.trustedResourceUrl_ = url instanceof goog.html.TrustedResourceUrl ? url :
+  this.trustedResourceUrl_ = url instanceof goog.html.TrustedResourceUrl ?
+      url :
       goog.html.legacyconversions.trustedResourceUrlFromString(url);
 
   /**
@@ -617,7 +607,8 @@ goog.ui.media.MediaModel.Player.prototype.getUrl = function() {
  *     chaining.
  */
 goog.ui.media.MediaModel.Player.prototype.setUrl = function(url) {
-  this.trustedResourceUrl_ = url instanceof goog.html.TrustedResourceUrl ? url :
+  this.trustedResourceUrl_ = url instanceof goog.html.TrustedResourceUrl ?
+      url :
       goog.html.legacyconversions.trustedResourceUrlFromString(url);
   return this;
 };
