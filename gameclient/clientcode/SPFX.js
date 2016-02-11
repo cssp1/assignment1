@@ -423,11 +423,11 @@ SPFX.CoverScreen.prototype.draw = function() {
 
 /** @constructor
   * @extends SPFX.Effect
-  * @param {Array.<SPFX.Effect>=} effects */
+  * @param {Array.<SPFX.FXObject>=} effects */
 SPFX.CombineEffect = function(effects) {
     goog.base(this, null);
 
-    /** @type {!Array.<!SPFX.Effect>} */
+    /** @type {!Array.<!SPFX.FXObject>} */
     this.effects = effects || [];
 };
 goog.inherits(SPFX.CombineEffect, SPFX.Effect);

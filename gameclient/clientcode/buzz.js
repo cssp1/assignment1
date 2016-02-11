@@ -617,10 +617,8 @@ var buzz = {
             this.sound = /** @type {!HTMLAudioElement} */ (document.createElement( 'audio' ));
 
             if ( src instanceof Array ) {
-                for( var j in src ) {
-                  if(src.hasOwnProperty(j)) {
+                for(var j = 0; j < src.length; j++) {
                     addSource( this.sound, src[ j ] );
-                  }
                 }
             } else if ( options.formats.length ) {
                 for( var k in options.formats ) {

@@ -103,7 +103,7 @@ Iuppiter.bytes_to_string = function(input) {
 Iuppiter.compress = function(sstart) {
     var dstart = [], slen,
         src = 0, dst = 0,
-        cpy, copymap,
+        cpy, copymap = 0,
         copymask = 1 << (Iuppiter.NBBY - 1),
         mlen, offset, hp;
     var lempel = new Array(Iuppiter.LEMPEL_SIZE);

@@ -887,7 +887,7 @@ GameArt.Sprite.prototype.duration = function() {
 
 // return the Image within images[] for the frame corresponding to this facing and time
 GameArt.Sprite.prototype.select_image = function(facing, time) {
-    var index;
+    var index = 0;
     if(this.style === 'compass') {
         // choose sprite based on facing direction
         while(facing < 0) { facing += 2*Math.PI; }
