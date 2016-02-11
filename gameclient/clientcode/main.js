@@ -36568,7 +36568,8 @@ player.gift_orders_enabled = function() {
     @param {Object=} extra_props */
 function purchase_ui_event(event_name, extra_props) {
     // filter down to important events
-    if(!goog.array.contains(['4440_buy_gamebucks_init_payment'], event_name)) { return; }
+    if(!goog.array.contains(['4410_buy_gamebucks_dialog_open',
+                             '4440_buy_gamebucks_init_payment'], event_name)) { return; }
 
     var props = {'purchase_ui_event': true, 'api':SPay.api, 'client_time': Math.floor(client_time)};
 
@@ -37596,8 +37597,6 @@ function update_buy_gamebucks_sku23(dialog) {
         }
     }
 
-    update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg);
-
     if('warning_text' in dialog.widgets) {
         dialog.widgets['warning_text'].str = buy_gamebucks_sku2_ui_warning(spell, spellarg);
         goog.array.forEach(['buy_text','price_display'], function(wname) {
@@ -37701,6 +37700,40 @@ function update_buy_gamebucks_sku23(dialog) {
         dialog.widgets['bg'].state = 'disabled';
         dialog.widgets['bg'].onclick = null;
     }
+
+    // apply look
+    var enable_attachment_pulsing = false;
+    if('buy_gamebucks_dialog_looks' in gamedata['store']) {
+        var look = dialog.user_data['look'] || 'default';
+        var look_data = gamedata['store']['buy_gamebucks_dialog_looks'][look] || {'widgets':{}};
+        if(look_data['enable_attachment_pulsing']) {
+            enable_attachment_pulsing = true;
+        }
+        for(var wname in look_data['widgets']) {
+            if(wname in dialog.widgets) {
+                var w = dialog.widgets[wname];
+                var props = look_data['widgets'][wname];
+                if('ui_name' in props) {
+                    w.str = props['ui_name'];
+                }
+                if('text_style' in props) {
+                    w.font = SPUI.make_font(w.font.size, w.font.leading, props['text_style']);
+                }
+                if('text_color' in props) {
+                    w.text_color = SPUI.make_colorv(props['text_color']);
+                }
+                if('color' in props) {
+                    w.color = SPUI.make_colorv(props['color']);
+                }
+                if('gradient_color' in props) {
+                    w.gradient_color = SPUI.make_colorv(props['gradient_color']);
+                }
+            }
+        }
+    }
+
+    update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing);
+
 }
 
 // return list of attachments, not including bonus gamebucks
@@ -37754,7 +37787,7 @@ function collapse_item_list(ls) {
     return ret
 };
 
-function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
+function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
 
@@ -37768,6 +37801,13 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
     }
     item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
 
+    if(!('attachment_phases' in dialog.user_data) || dialog.user_data['attachment_phases'].length < item_list.length) {
+        dialog.user_data['attachment_phases'] = Array(item_list.length);
+        for(var i = 0; i < item_list.length; i++) {
+            dialog.user_data['attachment_phases'][i] = Math.random();
+        }
+    }
+
     var visible_rows = dialog.data['widgets']['attachments']['array'][0] * dialog.data['widgets']['attachments']['array'][1];
     var pages = Math.floor((item_list.length + visible_rows - 1) / visible_rows);
     var cur_page = (pages > 1 ? Math.floor(client_time % pages) : 0);
@@ -37777,10 +37817,18 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
             var item = item_list[index];
             var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var item_level = ('level' in item ? item['level'] : 1);
+            var rarity = (item['spec'] === 'gamebucks' ? 4 : ('rarity' in item_spec ? item_spec['rarity'] : 1));
+
             var attach = dialog.widgets['attachments'+row.toString()];
             attach.show = true;
             dialog.widgets['dividers'+row.toString()].show = (row != visible_rows - 1); // hide under last row
             ItemDisplay.set_inventory_item_asset(attach.widgets['icon'], item_spec);
+            var outline_color = SPUI.make_colorv(gamedata['client']['loot_rarity_colors'][Math.min(Math.max(rarity+1, 0), gamedata['client']['loot_rarity_colors'].length-1)]);
+            // reduce garishness
+            if(enable_attachment_pulsing) {
+                outline_color.a = 0.5;
+            }
+            attach.widgets['icon_frame'].outline_color = outline_color;
             var stack = ('stack' in item ? item['stack'] : 1);
             var ui_quantity;
             if(item['spec'] === 'gamebucks') {
@@ -37832,6 +37880,20 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg) {
                     invoke_inventory_context(context_parent, w, -1, null, false);
                 }
             }; })(slot, item);
+
+            // set up pulsing rarity halo
+            if(enable_attachment_pulsing && 'asset_rarity'+rarity.toString() in attach.data['widgets']['rarity']) {
+                attach.widgets['rarity'].show = true;
+                attach.widgets['rarity'].asset = attach.data['widgets']['rarity']['asset_rarity'+rarity.toString()];
+                var amp = attach.data['widgets']['rarity']['pulse_amplitude'];
+                var period = attach.data['widgets']['rarity']['pulse_period'];
+                var phase = dialog.user_data['attachment_phases'][index];
+                var alpha = (1-amp) + amp * Math.sin((client_time/period + phase)*2*Math.PI);
+                attach.widgets['rarity'].alpha = alpha;
+            } else {
+                attach.widgets['rarity'].show = false;
+            }
+
         } else {
             dialog.widgets['attachments'+row.toString()].show =
                 dialog.widgets['dividers'+row.toString()].show = false;

@@ -1529,9 +1529,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if 'value' not in pred: error |= 1; print '%s: %s predicate missing "value"' % (reason, pred['predicate'])
         if expect_player_history_keys is not None and pred['key'] not in expect_player_history_keys:
             error |= 1; print '%s: %s predicate refers to key %s but is only allowed to use keys in %s' % (reason, pred['predicate'], pred['key'], repr(expect_player_history_keys))
-        if 'method' in pred:
-            if pred['method'] not in ('==', '>=', '<', 'count_samples'):
-                error |= 1; print '%s: PLAYER_HISTORY predicate has bad "method" %s' % (reason, pred['method'])
+        method = pred.get('method','MISSING')
+        if method not in ('==', '>=', '<', 'count_samples'):
+                error |= 1; print '%s: PLAYER_HISTORY predicate has bad "method" %s' % (reason, method)
     elif pred['predicate'] == 'RETAINED':
         if ('age_range' not in pred) and ('duration' not in pred): # note: duration is obsolete since it is not time-windowed
             error |= 1; print '%s: %s predicate missing "age_range"' % (reason, pred['predicate'])
@@ -3375,8 +3375,8 @@ def main(args):
     error |= check_cond_or_literal(gamedata['continent_assignment'], reason = 'continent_assignment')
 
     # check some cond chains in the store
-    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency', 'ui_buy_gamebucks_warning'):
-        if type(gamedata['store'][checkable]) is list:
+    for checkable in ('payments_api', 'buy_gamebucks_sku_kind', 'buy_gamebucks_sku_currency', 'ui_buy_gamebucks_warning', 'buy_gamebucks_dialog_look'):
+        if checkable in gamedata['store'] and type(gamedata['store'][checkable]) is list:
             error |= check_cond_chain(gamedata['store'][checkable], reason = 'store.'+checkable)
 
     for name, data in gamedata['strings']['idle_buildings'].iteritems():

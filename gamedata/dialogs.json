@@ -7560,6 +7560,14 @@
     "buy_gamebucks_sku2_attachment": {
         "dimensions": [191,29],
         "widgets": {
+            "rarity": { "show": 0, "kind": "StaticImage", "xy": [-4,-7], "dimensions": [84,84],
+                        "pulse_period": 2.7, "pulse_amplitude": 0.3,
+                        "asset": "dialog_glow_thin_resizable",
+                        //"asset_rarity2": "dialog_glow_thin_rare",
+                        "asset_rarity3": "dialog_glow_thin_epic",
+                        "asset_rarity4": "dialog_glow_thin_legendary",
+                        "bg_image_resizable": 1, "composite_mode": "lighter",
+                        "transform": [0.5,0,0,0.5,0,0] },
             "icon": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_unknown",
                       "transform": [0.5,0,0,0.5,0,0] },
             "icon_frame": { "kind": "SolidRect", "xy": [5,2], "dimensions": [25,25],
