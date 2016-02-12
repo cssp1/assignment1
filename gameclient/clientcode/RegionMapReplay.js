@@ -77,7 +77,17 @@ RegionMapReplay.invoke = function(region_id, query_time_range, target_loc) {
     return dialog;
 };
 
+// note: compare only on _id, not time!
+RegionMapReplay.compare_events = function(a,b) {
+    /*(a['time'] < b['time'] ? -1 :
+      (a['time'] > b['time'] ? 1 : */
+    return (a['_id'] < b['_id'] ? -1 : (a['_id'] > b['_id'] ? 1 : 0));
+};
+
 RegionMapReplay.receive_log = function(dialog, log) {
+    // should already be sorted by _id by the server, but just in case...
+    log.sort(RegionMapReplay.compare_events);
+
     // trim off everything before the first snapshot
     var snap_i = goog.array.findIndex(log, (event) => ('feature_snapshot' in event));
     if(snap_i < 0) {
@@ -133,16 +143,20 @@ RegionMapReplay.seek = function(dialog, new_t) {
     }
 
     // apply events following the snapshot
+
+    // error case with the sector400 replay when sorting by time before _id:
+    // t=1455015749.040432
+    // cur_snapshot=56b9c68eb51119266726db77 t=1455015566
+    // cur_event=56b9c745b51119266726dc3c t=1455015748
+
     var cur_event_index = goog.array.binarySearch(dialog.user_data['log'], dialog.user_data['cur_event'],
-                                                  (a,b) => (a['time'] < b['time'] ? -1 :
-                                                            (a['time'] > b['time'] ? 1 :
-                                                             (a['_id'] < b['_id'] ? -1 :
-                                                              (a['_id'] > b['_id'] ? 1 :
-                                                               0)))));
+                                                  RegionMapReplay.compare_events);
+
     cur_event_index += 1; // next event after the previous cur_event we just applied
     //console.log('cur_event_index '+cur_event_index.toString());
     while(cur_event_index < dialog.user_data['log'].length-1) {
         var event = dialog.user_data['log'][cur_event_index];
+        if(!event) { throw Error("invalid cur_event_index "+cur_event_index.toString()+" for time "+new_t.toString()); }
         if(event['time'] > new_t) { // in the future
             break;
         }
