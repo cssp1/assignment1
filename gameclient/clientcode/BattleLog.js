@@ -267,8 +267,6 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
     names[opprole] = names[summary[opprole+'_id']] = BattleLog.format_name_for_display(summary[opprole+'_name'], is_ai_user_id_range(summary[opprole+'_id']), viewer_id === summary[opprole+'_id']);
     poss[opprole] = poss[summary[opprole+'_id']] = BattleLog.make_possessive(names[opprole], viewer_id === summary[opprole+'_id']);
 
-    console.log(names);
-
     var color_good = 'rgba(0,180,0,1)';
     var color_good_hi = 'rgba(100,255,100,1)';
     var color_bad = 'rgba(240,0,0,1)';
