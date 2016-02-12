@@ -22,6 +22,7 @@ goog.provide('Citizens');
 goog.require('SPFX');
 goog.require('AStar');
 goog.require('GameData');
+goog.require('Base');
 goog.require('goog.array');
 goog.require('goog.object');
 
@@ -173,7 +174,7 @@ Citizens.Citizen.prototype.get_random_pos_from = function(src) {
 
 /** @constructor
     @struct
-    @param {Base} base is the session.viewing_base
+    @param {Base.Base} base is the session.viewing_base
     @param {AStar.CachedAStarContext} astar_context is the map for pathfinding */
 Citizens.Context = function(base, astar_context) {
     this.base = base;
