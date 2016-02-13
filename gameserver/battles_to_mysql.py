@@ -208,8 +208,8 @@ if __name__ == '__main__':
 
     # load some server-side-only pieces of gamedata for AI base parsing
     gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = game_id)))
-    gamedata['quarries'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_compiled.json', override_game_id = game_id)))
-    gamedata['hives'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_compiled.json', override_game_id = game_id)))
+    gamedata['quarries_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_server.json', override_game_id = game_id)))
+    gamedata['hives_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_server.json', override_game_id = game_id)))
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()

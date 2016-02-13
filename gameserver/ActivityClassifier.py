@@ -77,7 +77,7 @@ class ActivityClassifier(object):
 
     def get_ai_props(self, hive_template, ai_id):
         if hive_template:
-            hive = self.gamedata['hives']['templates'][hive_template]
+            hive = self.gamedata['hives_server']['templates'][hive_template]
             if 'analytics_tag' in hive:
                 return {'tag': hive['analytics_tag']}
             else:

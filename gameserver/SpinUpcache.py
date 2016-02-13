@@ -596,8 +596,8 @@ def ai_base_timings(gamedata, base): # return list of [start_time, end_time, res
 # utility function to parse AI hive JSON to obtain list of [start_time, end_time, reset_interval, repeat_interval] for this template
 def hive_timings(gamedata, template):
     start_end_times = []
-    max_duration = gamedata['hives']['duration'] # extend hive end_time by the max duration, since spawned hives can last that long
-    for entry in gamedata['hives']['spawn']:
+    max_duration = gamedata['hives_server']['duration'] # extend hive end_time by the max duration, since spawned hives can last that long
+    for entry in gamedata['hives_server']['spawn']:
         if entry['template'] == template:
             if not entry.get('active',True): continue
             if 'spawn_times' in entry:
@@ -631,15 +631,15 @@ def classify_ai_base(gamedata, ai_id):
     return 'pve_unknown'
 
 def classify_hive(gamedata, template):
-    if (template in gamedata['hives_client']['templates']) and \
-       gamedata['hives_client']['templates'][template].get('ui_tokens',None):
+    if (template in gamedata['hives_server']['templates']) and \
+       gamedata['hives_server']['templates'][template].get('ui_tokens',None):
         return 'pve_event_hive'
     else:
         return 'pve_immortal_hive'
 
 def classify_quarry(gamedata, template):
-    if template and (template in gamedata['quarries_client']['templates']) and \
-       gamedata['quarries_client']['templates'][template].get('turf_points',None):
+    if template and (template in gamedata['quarries_server']['templates']) and \
+       gamedata['quarries_server']['templates'][template].get('turf_points',None):
         return 'pvp_quarry_strongpoint'
     else:
         return 'pvp_quarry_nonstrongpoint'

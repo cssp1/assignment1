@@ -45,14 +45,20 @@ ${BUILT}/${GAME_ID}_loading_screens_compiled.json: ${GAME_ID}/${GAME_ID}_loading
 	@echo "    ${GAME_ID}_loading_screens_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_server_compiled.json: ${GAME_ID}/${GAME_ID}_server.json
 	@echo "    ${GAME_ID}_server_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
-${BUILT}/${GAME_ID}_ai_bases_compiled.json: ${GAME_ID}/${GAME_ID}_ai_bases.json
-	@echo "    ${GAME_ID}_ai_bases_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_ai_attacks_compiled.json: ${GAME_ID}/${GAME_ID}_ai_attacks.json
 	@echo "    ${GAME_ID}_ai_attacks_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_ai_bases_compiled.json: ${GAME_ID}/${GAME_ID}_ai_bases.json
+	@echo "    ${GAME_ID}_ai_bases_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_ai_bases_server.json: ${GAMEDATA}/make_ai_bases.py ${BUILT}/${GAME_ID}_ai_bases_compiled.json
+	@echo "    ${GAME_ID}_ai_bases_server.json..." && ${GAMEDATA}/make_ai_bases.py --server ${BUILT}/${GAME_ID}_ai_bases_compiled.json $@
 ${BUILT}/${GAME_ID}_hives_compiled.json: ${GAME_ID}/${GAME_ID}_hives.json
 	@echo "    ${GAME_ID}_hives_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_hives_server.json: ${GAMEDATA}/make_hives.py ${BUILT}/${GAME_ID}_hives_compiled.json
+	@echo "    ${GAME_ID}_hives_server.json..." && ${GAMEDATA}/make_hives.py --server ${BUILT}/${GAME_ID}_hives_compiled.json $@
 ${BUILT}/${GAME_ID}_quarries_compiled.json: ${GAME_ID}/${GAME_ID}_quarries.json
 	@echo "    ${GAME_ID}_quarries_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_quarries_server.json: ${GAMEDATA}/make_quarries.py ${BUILT}/${GAME_ID}_quarries_compiled.json
+	@echo "    ${GAME_ID}_quarries_server.json..." && ${GAMEDATA}/make_quarries.py --server ${BUILT}/${GAME_ID}_quarries_compiled.json $@
 ${BUILT}/${GAME_ID}_tech_compiled.json: ${GAME_ID}/${GAME_ID}_tech.json # just for invert_requirements.py, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_tech_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_crafting_compiled.json: ${GAME_ID}/${GAME_ID}_crafting.json # just for invert_requirements.py, NOT actually incorprated into gamedata
@@ -61,12 +67,10 @@ ${BUILT}/${GAME_ID}_crafting_compiled.json: ${GAME_ID}/${GAME_ID}_crafting.json 
 # client versions of non-shipped JSON
 ${BUILT}/${GAME_ID}_ai_bases_client.json: ${GAMEDATA}/make_ai_bases.py ${BUILT}/${GAME_ID}_ai_bases_compiled.json
 	@echo "    ${GAME_ID}_ai_bases_client.json..." && ${GAMEDATA}/make_ai_bases.py --client ${BUILT}/${GAME_ID}_ai_bases_compiled.json $@
-${BUILT}/${GAME_ID}_ai_bases_server.json: ${GAMEDATA}/make_ai_bases.py ${BUILT}/${GAME_ID}_ai_bases_compiled.json
-	@echo "    ${GAME_ID}_ai_bases_server.json..." && ${GAMEDATA}/make_ai_bases.py --server ${BUILT}/${GAME_ID}_ai_bases_compiled.json $@
-${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives_client.py ${BUILT}/${GAME_ID}_hives_compiled.json
-	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives_client.py ${BUILT}/${GAME_ID}_hives_compiled.json $@
-${BUILT}/${GAME_ID}_quarries_client.json: ${GAMEDATA}/make_quarries_client.py ${BUILT}/${GAME_ID}_quarries_compiled.json
-	@echo "    ${GAME_ID}_quarries_client.json..." && ${GAMEDATA}/make_quarries_client.py ${BUILT}/${GAME_ID}_quarries_compiled.json $@
+${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives.py ${BUILT}/${GAME_ID}_hives_compiled.json
+	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives.py --client ${BUILT}/${GAME_ID}_hives_compiled.json $@
+${BUILT}/${GAME_ID}_quarries_client.json: ${GAMEDATA}/make_quarries.py ${BUILT}/${GAME_ID}_quarries_compiled.json
+	@echo "    ${GAME_ID}_quarries_client.json..." && ${GAMEDATA}/make_quarries.py --client ${BUILT}/${GAME_ID}_quarries_compiled.json $@
 
 # needs the gamebucks SKUs to detect item bundles
 ${BUILT}/${GAME_ID}_loot_tables_client.json: ${GAMEDATA}/make_loot_tables_client.py ${BUILT}/${GAME_ID}_loot_tables.json \
@@ -132,7 +136,9 @@ all: ${BUILT}/gamedata-${GAME_ID}.json \
 	${BUILT}/${GAME_ID}_ai_bases_server.json \
 	${BUILT}/${GAME_ID}_ai_attacks_compiled.json \
 	${BUILT}/${GAME_ID}_hives_compiled.json \
-	${BUILT}/${GAME_ID}_quarries_compiled.json
+	${BUILT}/${GAME_ID}_hives_server.json \
+	${BUILT}/${GAME_ID}_quarries_compiled.json \
+	${BUILT}/${GAME_ID}_quarries_server.json
 
 # create a localized .json from the main compiled gamedata.json
 .PRECIOUS: ${BUILT}/gamedata-${GAME_ID}-%.json

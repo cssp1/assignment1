@@ -109,8 +109,8 @@ if __name__ == '__main__':
 
     # load some server-side-only pieces of gamedata for AI base parsing
     gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = game_id)))
-    gamedata['quarries'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_compiled.json', override_game_id = game_id)))
-    gamedata['hives'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_compiled.json', override_game_id = game_id)))
+    gamedata['quarries_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_server.json', override_game_id = game_id)))
+    gamedata['hives_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_server.json', override_game_id = game_id)))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id)))
 
     sql_util = SpinSQLUtil.MySQLUtil()
@@ -171,7 +171,7 @@ if __name__ == '__main__':
                 if start_end_times:
                     apply_timing_info(info, start_end_times)
 
-        for kind, dir in (('quarry', 'quarries'), ('hive', 'hives')):
+        for kind, dir in (('quarry', 'quarries_server'), ('hive', 'hives_server')):
             for name, data in gamedata[dir]['templates'].iteritems():
                 owner_id = data.get('owner_id', None)
                 owner_base = gamedata['ai_bases_server']['bases'].get(str(owner_id), None) if owner_id else None

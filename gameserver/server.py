@@ -410,8 +410,10 @@ def reload_gamedata():
         # XXX ugly hack - the file should be prepared separately for the client
         if 'ai_bases_client' in newdata: del newdata['ai_bases_client']
         newdata['ai_attacks'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_attacks_compiled.json"))
-        newdata['hives'] = SpinConfig.load(SpinConfig.gamedata_component_filename("hives_compiled.json"))
-        newdata['quarries'] = SpinConfig.load(SpinConfig.gamedata_component_filename("quarries_compiled.json"))
+        newdata['hives_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("hives_server.json"))
+        if 'hives_client' in newdata: del newdata['hives_client']
+        newdata['quarries_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("quarries_server.json"))
+        if 'quarries_client' in newdata: del newdata['quarries_client']
         newdata['offers'] = SpinConfig.load(SpinConfig.gamedata_component_filename("offers.json"))
         newdata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename("loot_tables.json"))
         newdata['promo_codes'] = SpinConfig.load(SpinConfig.gamedata_component_filename("promo_codes_compiled.json"))
@@ -2988,8 +2990,8 @@ class BaseTable:
         base.base_generation = jsonobj.get('LOCK_GENERATION',-1) # set generation manually based on value written on last release
 
         # *override* base's own base_richness with current value from hive template, if found
-        if base.base_type == 'hive' and base.base_template and base.base_template in gamedata['hives']['templates']:
-            base.base_richness = gamedata['hives']['templates'][base.base_template].get('base_richness', base.base_richness)
+        if base.base_type == 'hive' and base.base_template and base.base_template in gamedata['hives_server']['templates']:
+            base.base_richness = gamedata['hives_server']['templates'][base.base_template].get('base_richness', base.base_richness)
 
         base.init_production(landlord)
 
@@ -7226,8 +7228,8 @@ class Base(object):
         self.base_last_landlord_id = self.base_landlord_id
         self.base_last_conquer_time = server_time
 
-        if self.base_template in gamedata['quarries']['templates']:
-            self.base_landlord_id = gamedata['quarries']['templates'][self.base_template]['default_landlord_id']
+        if self.base_template in gamedata['quarries_server']['templates']:
+            self.base_landlord_id = gamedata['quarries_server']['templates'][self.base_template]['default_landlord_id']
         else:
             self.base_landlord_id = gamedata['territory']['default_quarry_landlord_id']
 
@@ -7528,7 +7530,7 @@ def spawn_units(owner, base, units, temporary = False,
 
             # per-base setting
             if base.base_type == 'hive':
-                template = gamedata['hives']['templates'].get(base.base_template, None)
+                template = gamedata['hives_server']['templates'].get(base.base_template, None)
                 if template and template.get('persist_temporary_units', False):
                     persist_temporary_units = True
 
@@ -16366,7 +16368,7 @@ class GAMEAPI(resource.Resource):
                                                                                            'last_landlord_id': session.viewing_player.user_id})
 
                         # check if a strongpoint was conquered
-                        template = gamedata['quarries']['templates'][session.viewing_base.base_template]
+                        template = gamedata['quarries_server']['templates'][session.viewing_base.base_template]
                         if template.get('turf_points',0) > 0:
                             session.increment_player_metric('strongpoints_conquered', 1, time_series = False)
 
@@ -16401,7 +16403,7 @@ class GAMEAPI(resource.Resource):
                                     gamesite.nosql_client.drop_map_feature(session.player.home_region, feature['base_id'])
 
                 elif session.viewing_base.base_type == 'hive':
-                    template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+                    template = gamedata['hives_server']['templates'].get(session.viewing_base.base_template, None)
 
                     if outcome == 'victory':
                         # AI hive was defeated
@@ -17002,7 +17004,7 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
 
         if dest_base and dest_base.base_type == 'hive':
-            template = gamedata['hives']['templates'].get(dest_base.base_template, None)
+            template = gamedata['hives_server']['templates'].get(dest_base.base_template, None)
             if template and ('activation' in template) and (not session.player.is_cheater):
                 if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
                     retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
@@ -17485,7 +17487,7 @@ class GAMEAPI(resource.Resource):
                 if base and ('on_visit' in base):
                     on_visit_consequent = base['on_visit']
             elif session.viewing_base.base_type == 'hive':
-                template = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+                template = gamedata['hives_server']['templates'].get(session.viewing_base.base_template, None)
                 if template and ('on_visit' in template):
                     on_visit_consequent = template['on_visit']
 
@@ -20803,7 +20805,7 @@ class GAMEAPI(resource.Resource):
             if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
                 ai_data = gamedata['ai_bases_server']['bases'].get(str(session.viewing_player.user_id), None)
             elif session.viewing_base.base_type == 'hive':
-                ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
+                ai_data = gamedata['hives_server']['templates'].get(session.viewing_base.base_template, None)
             else:
                 ai_data = None
 
@@ -22019,8 +22021,8 @@ class GAMEAPI(resource.Resource):
                             'produce_start_time':state.get('produce_start_time',-1), 'produce_rate': state.get('produce_rate',-1)}
                 gamesite.nosql_client.update_fixed_object(region_id, newstate, partial = True, reason='QUARRY_COLLECT')
                 yield_factor = session.player.stattab.get_player_stat('quarry_yield_bonus')
-                if base_info and base_info['base_template'] and (base_info['base_template'] in gamedata['quarries']['templates']):
-                    template = gamedata['quarries']['templates'][base_info['base_template']]
+                if base_info and base_info['base_template'] and (base_info['base_template'] in gamedata['quarries_server']['templates']):
+                    template = gamedata['quarries_server']['templates'][base_info['base_template']]
                     if template.get('turf_points',0) > 0:
                         yield_factor *= session.player.stattab.get_player_stat('turf_quarry_yield_bonus')
                 if yield_factor > 1:
@@ -22051,8 +22053,8 @@ class GAMEAPI(resource.Resource):
 
             if base_type == 'quarry' and region_id:
                 session.player.modify_scores({'quarry_resources': harvested+bonus}, reason = 'QUARRY_COLLECT(do_harvest_one)')
-                if base_info and base_info['base_template'] and (base_info['base_template'] in gamedata['quarries']['templates']):
-                    template = gamedata['quarries']['templates'][base_info['base_template']]
+                if base_info and base_info['base_template'] and (base_info['base_template'] in gamedata['quarries_server']['templates']):
+                    template = gamedata['quarries_server']['templates'][base_info['base_template']]
                     if template.get('turf_points',0) > 0:
                         session.player.modify_scores({'strongpoint_resources': harvested+bonus}, reason = 'QUARRY_COLLECT(do_harvest_one)')
 
