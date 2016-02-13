@@ -39,7 +39,7 @@ if __name__ == "__main__":
         game_id = sys.argv[sys.argv.index('-g')+1]
 
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
-gamedata['ai_bases'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename("ai_bases_compiled.json", override_game_id = game_id)))
+gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename("ai_bases_server.json", override_game_id = game_id)))
 gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename("loot_tables.json", override_game_id = game_id)))
 
 logs_dir = 'prodlogs' if os.path.exists('prodlogs') else 'logs'

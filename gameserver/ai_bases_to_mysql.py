@@ -108,7 +108,7 @@ if __name__ == '__main__':
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
 
     # load some server-side-only pieces of gamedata for AI base parsing
-    gamedata['ai_bases'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_compiled.json', override_game_id = game_id)))
+    gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = game_id)))
     gamedata['quarries'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_compiled.json', override_game_id = game_id)))
     gamedata['hives'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_compiled.json', override_game_id = game_id)))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id)))
@@ -142,7 +142,7 @@ if __name__ == '__main__':
         ai_bases_rows = []
         ai_base_templates_rows = []
         analytics_tag_info = {} # indexed by tag
-        for sid, data in gamedata['ai_bases']['bases'].iteritems():
+        for sid, data in gamedata['ai_bases_server']['bases'].iteritems():
             tag = data.get('analytics_tag', None)
             klass = SpinUpcache.classify_ai_base(gamedata, int(sid))
             ui_difficulty = data.get('ui_difficulty', 'Normal')
@@ -174,7 +174,7 @@ if __name__ == '__main__':
         for kind, dir in (('quarry', 'quarries'), ('hive', 'hives')):
             for name, data in gamedata[dir]['templates'].iteritems():
                 owner_id = data.get('owner_id', None)
-                owner_base = gamedata['ai_bases']['bases'].get(str(owner_id), None) if owner_id else None
+                owner_base = gamedata['ai_bases_server']['bases'].get(str(owner_id), None) if owner_id else None
                 tag = data.get('analytics_tag', owner_base.get('analytics_tag',None) if owner_base else None)
                 klass = {'quarry': SpinUpcache.classify_quarry,
                          'hive': SpinUpcache.classify_hive}[kind](gamedata, name)
@@ -230,7 +230,7 @@ if __name__ == '__main__':
                 start_end_times = entry['start_end_times']
 
                 for base_id in entry['base_ids']:
-                    base = gamedata['ai_bases']['bases'][str(base_id)]
+                    base = gamedata['ai_bases_server']['bases'][str(base_id)]
                     if 'ui_progress' in base:
                         difficulty_step = base['ui_progress']['cur']
                         if 'overall_cur' in base['ui_progress']: # detect updated events

@@ -611,13 +611,11 @@ def hive_timings(gamedata, template):
 # utility functions to classify the type of an AI base, hive, or quarry for analytics purposes
 
 def classify_ai_base(gamedata, ai_id):
-    if str(ai_id) in gamedata['ai_bases']['bases']:
-        base = gamedata['ai_bases']['bases'][str(ai_id)]
+    if str(ai_id) in gamedata['ai_bases_server']['bases']:
+        base = gamedata['ai_bases_server']['bases'][str(ai_id)]
 
         # detect dummy hive owner bases
         if (base.get('kind',None) != 'ai_attack') and \
-           ('buildings' in base) and \
-           len(base['buildings']) == 1 and \
            ('activation' in base) and \
            base['activation']['predicate'] == 'ALWAYS_FALSE':
             return 'pve_dummy'
@@ -650,7 +648,7 @@ def classify_quarry(gamedata, template):
 # returns a simplified version of the player history "activity" sample
 # as a dictionary, or None if the sample is totally uninteresting
 def classify_activity(gamedata, data):
-    assert ('ai_bases' in gamedata) and ('loot_tables' in gamedata) # ensure some server-side stuff we need is loaded
+    assert ('ai_bases_server' in gamedata) and ('loot_tables' in gamedata) # ensure some server-side stuff we need is loaded
     state = data['state']
     if state in ('idle', 'harvest'): return None
 

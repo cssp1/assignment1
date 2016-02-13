@@ -83,14 +83,14 @@ class ActivityClassifier(object):
             else:
                 ai_id = hive['owner_id'] # fall through
 
-        base = self.gamedata['ai_bases']['bases'][str(ai_id)]
+        base = self.gamedata['ai_bases_server']['bases'][str(ai_id)]
         if 'analytics_tag' in base:
             return {'tag': base['analytics_tag']}
         else:
             return {'ui_name': base['ui_name']}
 
     def suffered_ai_attack(self, attacker_id):
-        if str(attacker_id) not in self.gamedata['ai_bases']['bases']: return # probably a tutorial or older attack
+        if str(attacker_id) not in self.gamedata['ai_bases_server']['bases']: return # probably a tutorial or older attack
         props = {'attacker_id': attacker_id}
         props.update(self.get_ai_props(None, attacker_id))
         self.did_action('pve_defense', props)

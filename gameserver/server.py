@@ -406,7 +406,9 @@ def reload_gamedata():
 
         # load private pieces of gamedata that are not included in the main client download
         newdata['server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("server_compiled.json"))
-        newdata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
+        newdata['ai_bases_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_server.json"))
+        # XXX ugly hack - the file should be prepared separately for the client
+        if 'ai_bases_client' in newdata: del newdata['ai_bases_client']
         newdata['ai_attacks'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_attacks_compiled.json"))
         newdata['hives'] = SpinConfig.load(SpinConfig.gamedata_component_filename("hives_compiled.json"))
         newdata['quarries'] = SpinConfig.load(SpinConfig.gamedata_component_filename("quarries_compiled.json"))
@@ -1491,7 +1493,7 @@ class User:
 
         ai_list = set()
 
-        for strid, base in gamedata['ai_bases']['bases'].iteritems():
+        for strid, base in gamedata['ai_bases_server']['bases'].iteritems():
             if not base.get('enable',1): continue
             if 'activation' not in base: continue
 
@@ -1516,7 +1518,7 @@ class User:
         for id in ai_list.difference(self.client_ai_friends):
             self.client_ai_friends.add(id)
             self.client_friends.add(id)
-            base = gamedata['ai_bases']['bases'][str(id)]
+            base = gamedata['ai_bases_server']['bases'][str(id)]
             friend_name = base['ui_name']
             friend_level = base['resources']['player_level']
 
@@ -2915,7 +2917,7 @@ class AIInstanceTable:
 
     # perform any necessary one-time initialization the first time a fresh AI instance is created for a player
     def init_fresh_instance(self, ai_player, observer):
-        base_data = gamedata['ai_bases']['bases'][str(ai_player.user_id)]
+        base_data = gamedata['ai_bases_server']['bases'][str(ai_player.user_id)]
 
         # perform auto-leveling of AI base buildings and units
         if base_data.get('auto_level', False):
@@ -4391,8 +4393,8 @@ class Session(object):
         elif reason == 'ai_attack':
             discovered_where = 'messages'
             ai_id = self.incoming_attack_id
-            if str(ai_id) in gamedata['ai_bases']['bases']:
-                base = gamedata['ai_bases']['bases'][str(ai_id)]
+            if str(ai_id) in gamedata['ai_bases_server']['bases']:
+                base = gamedata['ai_bases_server']['bases'][str(ai_id)]
                 player.send_loot_mail(base['ui_name'], base['resources']['player_level'],
                                       loot, retmsg, mail_template = mail_template)
             else:
@@ -4706,8 +4708,8 @@ class Session(object):
                 if (not self.player.is_cheater) and (not Predicates.read_predicate(gamedata['ai_attacks']['attack_types'][attack_type]['activation']).is_satisfied(self.player,None)):
                     retmsg.append(["ERROR", "CANNOT_CALL_INVALID_AI_ATTACK"])
                     return
-        elif str(attack_type) in gamedata['ai_bases']['bases']:
-            if (not self.player.is_cheater) and (not Predicates.read_predicate(gamedata['ai_bases']['bases'][str(attack_type)]['activation']).is_satisfied(self.player,None)):
+        elif str(attack_type) in gamedata['ai_bases_server']['bases']:
+            if (not self.player.is_cheater) and (not Predicates.read_predicate(gamedata['ai_bases_server']['bases'][str(attack_type)]['activation']).is_satisfied(self.player,None)):
                 retmsg.append(["ERROR", "CANNOT_CALL_INVALID_AI_ATTACK"])
                 return
         else:
@@ -4737,8 +4739,8 @@ class Session(object):
             if self.incoming_attack_type in gamedata['ai_attacks']['attack_types']:
                 self.incoming_attack_data = gamedata['ai_attacks']['attack_types'][self.incoming_attack_type]
                 self.incoming_attack_id = self.incoming_attack_data['attacker_id']
-            elif str(self.incoming_attack_type) in gamedata['ai_bases']['bases']:
-                self.incoming_attack_data = gamedata['ai_bases']['bases'][str(self.incoming_attack_type)]
+            elif str(self.incoming_attack_type) in gamedata['ai_bases_server']['bases']:
+                self.incoming_attack_data = gamedata['ai_bases_server']['bases'][str(self.incoming_attack_type)]
                 self.incoming_attack_id = int(self.incoming_attack_type)
 
             flavor_text_index = 0 + int(random.random()*(len(gamedata['ai_attacks_client']['flavor_text'])))
@@ -4756,7 +4758,7 @@ class Session(object):
         retmsg.append(["AI_ATTACK_WARNING",
                        self.incoming_attack_time,
                        copy.deepcopy(self.incoming_attack_units), # copy AGAIN since deploy_ai_attack() will modify it!
-                       gamedata['ai_bases']['bases'][str(self.incoming_attack_id)]['ui_name'],
+                       gamedata['ai_bases_server']['bases'][str(self.incoming_attack_id)]['ui_name'],
                        flavor_text_index,
                        self.incoming_attack_direction,
                        attack_warning_time,
@@ -9198,7 +9200,7 @@ class Player(AbstractPlayer):
     def get_abtest_region(self, name):
         return gamedata['regions'].get(name, None)
     def get_abtest_ai_base(self, user_id):
-        return gamedata['ai_bases']['bases'].get(str(user_id), None)
+        return gamedata['ai_bases_server']['bases'].get(str(user_id), None)
     def get_abtest_title(self, name):
         return gamedata['titles'].get(name, None)
     def get_gamedata_var(self, name): # similar to get_abtest(), for use by Predicates, but does not support overrides
@@ -9660,7 +9662,7 @@ class Player(AbstractPlayer):
         else:
             if (other_player and other_player.is_ai()):
                 tbl = gamedata['matchmaking']['ladder_point_incr_ai']
-                for entry in gamedata['ai_bases']['ladder_pvp_bases']:
+                for entry in gamedata['ai_bases_server']['ladder_pvp_bases']:
                     if entry['base_id'] == other_id:
                         tbl = entry.get('ladder_point_incr', tbl)
                         break
@@ -10288,8 +10290,8 @@ class Player(AbstractPlayer):
 
             # check for this type of building in the ai_bases.json:auto_level tables
             # if found, then use the level from the table
-            if obj.spec.name in gamedata['ai_bases']['auto_level']:
-                ls = gamedata['ai_bases']['auto_level'][obj.spec.name]
+            if obj.spec.name in gamedata['ai_bases_server']['auto_level']:
+                ls = gamedata['ai_bases_server']['auto_level'][obj.spec.name]
                 # note: table is indexed by the AI's "player_level"
                 index = min(self.resources.player_level-1, len(ls)-1)
                 level = ls[index]
@@ -12926,7 +12928,7 @@ def setup_test_user(facebook_id, user_id, ui_name):
 # the async stores, so pace it out by doing them a few at a time
 
 def setup_ai_bases():
-    strid_list = [strid for strid, data in gamedata['ai_bases']['bases'].iteritems() if data.get('enable',1)]
+    strid_list = [strid for strid, data in gamedata['ai_bases_server']['bases'].iteritems() if data.get('enable',1)]
     for i in xrange(10):
         setup_next_ai_base(strid_list)
 
@@ -12937,6 +12939,10 @@ def setup_next_ai_base(strid_list):
     setup_ai_base(strid, functools.partial(setup_next_ai_base, strid_list))
 
 def setup_ai_base(strid, cb):
+    if 'ai_bases' not in gamedata:
+        gamesite.exception_log.event(server_time, 'Loading full ai_bases data...')
+        gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
+
     data = gamedata['ai_bases']['bases'][strid]
     kind = data.get('kind', 'ai_base')
 
@@ -12962,7 +12968,7 @@ def setup_ai_base(strid, cb):
     if 'base_ncells' in data: player.my_home.base_ncells = data['base_ncells']
     if 'base_resource_loot' in data: player.my_home.base_resource_loot = data['base_resource_loot']
 
-    player.tech = copy.copy(gamedata['ai_bases']['ai_starting_conditions']['tech'])
+    player.tech = copy.copy(gamedata['ai_bases_server']['ai_starting_conditions']['tech'])
     for techname, techlevel in data.get('tech',{}).iteritems():
         player.tech[techname] = techlevel
     if 'unit_equipment' in data:
@@ -13015,7 +13021,7 @@ def setup_ai_base(strid, cb):
 def ai_base_source_file(id):
     if type(id) is int:
         # look in AI bases
-        source_file = gamedata['ai_bases']['bases'][str(id)]['base_source_file']
+        source_file = gamedata['ai_bases_server']['bases'][str(id)]['base_source_file']
         source_file = source_file.replace('$GAME_ID', SpinConfig.game()) # not game_id, because we want to strip 'test' suffix if present
         return SpinConfig.gamedata_component_filename(source_file)
         #return '../gamedata/'+source_file
@@ -13262,7 +13268,7 @@ class OGPAPI(resource.Resource):
 
         elif type == OGPAPI.object_type('base'):
             user_id = int(request.args['user_id'][0])
-            base = gamedata['ai_bases']['bases'][str(user_id)]
+            base = gamedata['ai_bases_server']['bases'][str(user_id)]
             #art_asset_file =gamedata['art'][base['portrait']]['states']['normal']['images'][0]
             my_url = self.get_object_endpoint({'type':type,'user_id':user_id})
             if 'fb_open_graph' in base:
@@ -16442,7 +16448,7 @@ class GAMEAPI(resource.Resource):
 
 
             elif session.viewing_player.is_ai():
-                base = gamedata['ai_bases']['bases'][str(session.viewing_user.user_id)]
+                base = gamedata['ai_bases_server']['bases'][str(session.viewing_user.user_id)]
                 if outcome == 'victory' and (('completion' in base) or session.is_ladder_battle()):
                     # "story" base - use Consequent system
                     completion_consequent = base.get('completion', None)
@@ -16648,7 +16654,7 @@ class GAMEAPI(resource.Resource):
 
             # update player's battle history
             if session.incoming_attack_id > 0:
-                if str(session.incoming_attack_id) not in gamedata['ai_bases']['bases']:
+                if str(session.incoming_attack_id) not in gamedata['ai_bases_server']['bases']:
                     gamesite.exception_log.event(server_time, '%d defense %s (against %s) - cannot find incoming_attack_id %s in ai_bases!' % \
                                                  (session.player.user_id, outcome, repr(session.incoming_attack_type), repr(session.incoming_attack_id)))
                 else:
@@ -16660,9 +16666,9 @@ class GAMEAPI(resource.Resource):
                                 'attacker_id': session.incoming_attack_id,
                                 'attacker_type': 'ai',
                                 'attack_type': session.incoming_attack_type,
-                                'attacker_name': gamedata['ai_bases']['bases'][str(session.incoming_attack_id)]['ui_name'],
+                                'attacker_name': gamedata['ai_bases_server']['bases'][str(session.incoming_attack_id)]['ui_name'],
                                 'attacker_facebook_id': -1,
-                                'attacker_level': gamedata['ai_bases']['bases'][str(session.incoming_attack_id)]['resources']['player_level'],
+                                'attacker_level': gamedata['ai_bases_server']['bases'][str(session.incoming_attack_id)]['resources']['player_level'],
                                 'attacker_is_ai': True,
                                 'ladder_state': copy.deepcopy(session.ladder_state),
                                 'home_base': session.home_base,
@@ -17475,7 +17481,7 @@ class GAMEAPI(resource.Resource):
 
             if (session.viewing_base is session.viewing_player.my_home) and \
                session.viewing_player.is_ai():
-                base = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+                base = gamedata['ai_bases_server']['bases'].get(str(session.viewing_player.user_id), None)
                 if base and ('on_visit' in base):
                     on_visit_consequent = base['on_visit']
             elif session.viewing_base.base_type == 'hive':
@@ -20795,7 +20801,7 @@ class GAMEAPI(resource.Resource):
 
             # look up AI base or hive
             if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
-                ai_data = gamedata['ai_bases']['bases'].get(str(session.viewing_player.user_id), None)
+                ai_data = gamedata['ai_bases_server']['bases'].get(str(session.viewing_player.user_id), None)
             elif session.viewing_base.base_type == 'hive':
                 ai_data = gamedata['hives']['templates'].get(session.viewing_base.base_template, None)
             else:
@@ -23630,8 +23636,8 @@ class GAMEAPI(resource.Resource):
 
                         if force_ai:
                             # only allow force_ai if there is an actual AI base you can attack
-                            min_level = min([x.get('min_level',-1) for x in gamedata['ai_bases']['ladder_pvp_bases']])
-                            max_level = max([x.get('max_level',999) for x in gamedata['ai_bases']['ladder_pvp_bases']])
+                            min_level = min([x.get('min_level',-1) for x in gamedata['ai_bases_server']['ladder_pvp_bases']])
+                            max_level = max([x.get('max_level',999) for x in gamedata['ai_bases_server']['ladder_pvp_bases']])
                             if session.player.resources.player_level < min_level or session.player.resources.player_level > max_level:
                                 force_ai = False # no available AI bases
 
@@ -23647,7 +23653,7 @@ class GAMEAPI(resource.Resource):
                         if force_ai or ((not session.player.ladder_match) and gamedata['matchmaking']['ladder_match_ai_fallback']):
                             # assign AI opponent
                             candidates = []
-                            for entry in gamedata['ai_bases']['ladder_pvp_bases']:
+                            for entry in gamedata['ai_bases_server']['ladder_pvp_bases']:
                                 if session.player.resources.player_level < entry.get('min_level',-1) or \
                                    session.player.resources.player_level > entry.get('max_level',999) or \
                                    ('activation' in entry and not Predicates.read_predicate(entry['activation']).is_satisfied(session.player, None)): continue # out of level range
@@ -23655,7 +23661,7 @@ class GAMEAPI(resource.Resource):
                                 id = entry['base_id']
                                 if id in exclude_user_ids: continue
 
-                                base = gamedata['ai_bases']['bases'].get(str(id),None)
+                                base = gamedata['ai_bases_server']['bases'].get(str(id),None)
                                 if not base:
                                     gamesite.exception_log.event(server_time, 'invalid ladder_pvp AI base: %d' % id)
                                     continue
@@ -23683,7 +23689,7 @@ class GAMEAPI(resource.Resource):
 
                         # append to history and truncate
                         # (option: for AIs, only append a generic -1, and thus allow max_exclude to be greater than the number of AIs available?)
-                        # (session.player.ladder_match if str(session.player.ladder_match) not in gamedata['ai_bases']['bases'] else -1)
+                        # (session.player.ladder_match if str(session.player.ladder_match) not in gamedata['ai_bases_server']['bases'] else -1)
                         session.player.ladder_match_history.append(session.player.ladder_match)
                         session.player.prune_ladder_match_history(session)
 
@@ -23711,13 +23717,13 @@ class GAMEAPI(resource.Resource):
 
                 # check AI destination eligibility
                 if is_ai_user_id_range(dest_id):
-                    if (str(dest_id) not in gamedata['ai_bases']['bases']) or \
-                       gamedata['ai_bases']['bases'][str(dest_id)].get('kind','ai_base') != 'ai_base':
+                    if (str(dest_id) not in gamedata['ai_bases_server']['bases']) or \
+                       gamedata['ai_bases_server']['bases'][str(dest_id)].get('kind','ai_base') != 'ai_base':
                         # dangling reference to removed AI base, or attempt to spy on an attack wave
                         retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI", dest_id])
                         return
 
-                    base = gamedata['ai_bases']['bases'][str(dest_id)]
+                    base = gamedata['ai_bases_server']['bases'][str(dest_id)]
                     if ('activation' in base) and \
                        (not Predicates.read_predicate(base['activation']).is_satisfied(session.player,None)) and \
                        (not session.player.is_cheater):
@@ -26211,7 +26217,7 @@ class GAMEAPI(resource.Resource):
                     error_msg = None
                     idnum = spellargs[0]
                     try:
-                        if (type(idnum) is not int) or (str(idnum) not in gamedata['ai_bases']['bases']):
+                        if (type(idnum) is not int) or (str(idnum) not in gamedata['ai_bases_server']['bases']):
                             success = False
                             error_msg = "Invalid base ID %s" % idnum
 
@@ -27903,7 +27909,7 @@ class AdminResource(resource.Resource):
                 battle += '%d' % session.viewing_user.user_id
                 if is_ai_user_id_range(session.viewing_user.user_id):
                     sid = str(session.viewing_user.user_id)
-                    base = gamedata['ai_bases']['bases'].get(sid,None)
+                    base = gamedata['ai_bases_server']['bases'].get(sid,None)
                     if base:
                         battle += ' (%s L%d)' % (base['ui_name'], base['resources']['player_level'])
                 if session.viewing_base is not session.viewing_player.my_home:

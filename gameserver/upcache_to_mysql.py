@@ -209,7 +209,7 @@ def do_slave(input):
     total = 0
 
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = input['game_id'])))
-    gamedata['ai_bases'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_compiled.json', override_game_id = input['game_id'])))
+    gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = input['game_id'])))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = input['game_id'])))
 
     time_now = input['time_now']

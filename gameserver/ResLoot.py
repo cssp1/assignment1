@@ -153,9 +153,9 @@ class SpecificPvEResLoot(BaseResLoot):
         BaseResLoot.__init__(self, gamedata, session, player, base)
 
         self.modifier = 1.0
-        self.modifier *= session.player.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases']['loot_scale']
+        self.modifier *= session.player.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases_server']['loot_scale']
 
-        # ALSO NOTE: gamedata['ai_bases']['loot_randomness'] IS NOT APPLIED!
+        # ALSO NOTE: gamedata['ai_bases_server']['loot_randomness'] IS NOT APPLIED!
         # Doing this would be complicated since we need to "freeze"
         # its value upon first Spy of the base, meaning it'd have to
         # be stored in AIInstanceTable or in a cooldown or random
@@ -271,11 +271,11 @@ class TablePvEResLoot(BaseResLoot):
         looted = {}
         lost = {}
 
-        loot_table = gamedata['ai_bases']['loot_table'].get(obj.spec.history_category, [0])
+        loot_table = gamedata['ai_bases_server']['loot_table'].get(obj.spec.history_category, [0])
 
         # PvE-specific loot table modifiers
-        loot_table_modifier = (1.0 + gamedata['ai_bases']['loot_randomness']*(2*random.random()-1))
-        loot_table_modifier *= session.player.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases']['loot_scale'])
+        loot_table_modifier = (1.0 + gamedata['ai_bases_server']['loot_randomness']*(2*random.random()-1))
+        loot_table_modifier *= session.player.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases_server']['loot_scale'])
         loot_table_modifier *= session.player.stattab.get_player_stat('loot_factor_pve')
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             loot_table_modifier *= self.base.base_richness

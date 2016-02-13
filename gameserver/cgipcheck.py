@@ -83,6 +83,7 @@ def item_is_giveable(gamedata, spec):
 def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
+    gamedata['ai_bases_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_server.json"))
 
     ssl_available = SpinConfig.config.get('ssl_crt_file','') and os.path.exists(SpinConfig.config['ssl_crt_file'])
     replacements = {
@@ -103,7 +104,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
         '$GAMEBUCKS_ITEM$': 'alloy' if SpinConfig.game() == 'mf' else 'gamebucks',
         '$SPIN_GIVEABLE_ITEMS$': SpinJSON.dumps(sorted([{'name':name, 'ui_name':data['ui_name']} for name, data in gamedata['items'].iteritems() if item_is_giveable(gamedata, data)], key = lambda x: x['ui_name'])),
         '$SPIN_REGIONS$': SpinJSON.dumps(get_regions(gamedata)),
-        '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_client']['bases'].iterkeys()])),
+        '$SPIN_AI_BASE_IDS$': SpinJSON.dumps(sorted([int(strid) for strid in gamedata['ai_bases_server']['bases'].iterkeys()])),
         '$SPIN_SSL_AVAILABLE$': 'true' if ssl_available else 'false',
         '$SPIN_WSS_AVAILABLE$': 'true' if ssl_available else 'false',
         '$SPIN_PUBLIC_S3_BUCKET$': SpinConfig.config['public_s3_bucket'],
