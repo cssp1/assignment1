@@ -20756,14 +20756,29 @@ class GAMEAPI(resource.Resource):
                 session.open_attack_log(-1,-1)
             else:
                 session.open_attack_log(session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
-                session.attack_event(session.user.user_id, '3820_battle_start', {'attacker_user_id': session.user.user_id,
-                                                                                 'attacker_level': session.player.resources.player_level,
-                                                                                 'attacker_deployable_squads': session.deployable_squads.copy(),
-                                                                                 'base_id': session.viewing_base.base_id,
-                                                                                 'starting_base_damage': session.starting_base_damage,
-                                                                                 'opponent_user_id':session.viewing_user.user_id,
-                                                                                 'opponent_level':session.viewing_player.resources.player_level,
-                                                                                 'opponent_type':session.viewing_player.ai_or_human()})
+                props_3820 =  {'attacker_user_id': session.user.user_id,
+                               'attacker_level': session.player.resources.player_level,
+                               'attacker_deployable_squads': session.deployable_squads.copy(),
+                               'base_id': session.viewing_base.base_id,
+                               'starting_base_damage': session.starting_base_damage,
+                               'opponent_user_id':session.viewing_user.user_id,
+                               'opponent_level':session.viewing_player.resources.player_level,
+                               'opponent_type':session.viewing_player.ai_or_human()}
+                if session.alliance_id_cache >= 0:
+                    props_3820['attacker_alliance_id'] = session.alliance_id_cache
+                if session.viewing_alliance_id_cache >= 0 and ((not session.viewing_player.is_ai()) or session.is_ladder_battle()):
+                    props_3820['opponent_alliance_id'] = session.viewing_alliance_id_cache
+
+                if gamedata['server'].get('log_battles',1) >= 2:
+                    # add enough extra info to fully reconstruct the base on the client
+                    props_3820['base'] = session.viewing_base.get_cache_props()
+                    # note: these fields are not part of the cache_props but are needed to reconstruct the base
+                    props_3820['base_region'] = session.viewing_base.base_region
+                    props_3820['base_power_state'] = session.viewing_base.get_power_state()
+                    props_3820['base_objects'] = [obj.serialize_state() for obj in session.viewing_base.iter_objects()]
+
+                session.attack_event(session.user.user_id, '3820_battle_start', props_3820)
+
                 if session.is_ladder_battle() and ((not session.using_squad_deployment()) or gamedata['server'].get('log_ladder_pvp_on_map',False)):
                     session.player.record_ladder_pvp_event('3305_ladder_attack_start', {'defender_id': session.viewing_player.user_id,
                                                                                         'attacker_pts': session.player.ladder_points(),
