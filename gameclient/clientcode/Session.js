@@ -10,7 +10,6 @@ goog.provide('Session');
 
 goog.require('Base');
 goog.require('GameTypes');
-goog.require('CombatEngine');
 goog.require('GameObjectCollection');
 goog.require('World');
 goog.require('goog.object');
@@ -33,7 +32,7 @@ Session.Session = function() {
     this.alliance_id = -1; // player's current alliance ID, <= 0 is invalid
     this.alliance_membership = null; // player's current alliance membership info (alliance_members row), null for no membership
     this.region = null; // world map region we are connected to
-    this.cur_objects = new GameObjectCollection.GameObjectCollection();
+    this.cur_objects = new GameObjectCollection.GameObjectCollection(); // XXXXXX use references to world instead
     this.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
     this.minefield_tags_by_tag = {}; // mapping from tag to obj_id
     this.factory_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
@@ -73,9 +72,6 @@ Session.Session = function() {
     this.quarry_harvest_sync_marker = Synchronizer.INIT; // synchronizer used for showing Loading... while harvesting quarries
     this.deployable_squads = [];
     this.defending_squads = [];
-
-    /** @type {CombatEngine.CombatEngine|null} */
-    this.combat_engine = null;
 
     // pre/post_deploy_units are dictionaries of "army_unit" structures, indexed by obj_id
     // {'123456': {'obj_id': '123456', 'spec': 'asdf', 'level': 1},
@@ -118,7 +114,8 @@ Session.Session.prototype.push_world = function(new_world) { return this.world_s
 /** @return {!World.World} world at top of stack that should be drawn */
 Session.Session.prototype.get_draw_world = function() { return this.world_stack[this.world_stack.length-1]; };
 
-/** @return {!World.World} the "real" world the player is connected to */
+/** @return {!World.World} the "real" world the player is connected to
+    @const */
 Session.Session.prototype.get_real_world = function() { return this.world_stack[0]; };
 
 Session.Session.prototype.incoming_attack_pending = function() { return (this.incoming_attack_time > server_time); };

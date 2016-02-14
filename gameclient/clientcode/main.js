@@ -741,6 +741,8 @@ var LION_STONE_ID = 1002; // hard-coded Lion Stone base ID for rails tutorial
 /** @const */
 var cellsize = [20,10]; // 64 32
 
+// XXXXXX for legacy code only - references to these globals should be redirected to World
+
 /** @type {?AStar.AStarRectMap} current A* map for playfield movement queries */
 var astar_map = null;
 
@@ -913,9 +915,9 @@ Aura.prototype.apply = function(obj) {
             var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
             // apply effect every N ticks
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
-            if(n_ticks <= 1 || (((session.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
+            if(n_ticks <= 1 || (((session.get_real_world().combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.combat_engine.cur_tick, client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
+                session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.get_real_world().combat_engine.cur_tick, client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1348,7 +1350,7 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
 GameObject.prototype.update_and_apply_auras = function() {
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
+        if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
             continue;
@@ -1368,7 +1370,7 @@ GameObject.prototype.update_stats = function() {
 /** @param {string} key
     @return {boolean} */
 GameObject.prototype.get_cooldown = function(key) {
-    if(key in this.cooldowns && GameTypes.TickCount.lte(session.combat_engine.cur_tick, this.cooldowns[key].expire_tick)) {
+    if(key in this.cooldowns && GameTypes.TickCount.lte(session.get_real_world().combat_engine.cur_tick, this.cooldowns[key].expire_tick)) {
         // old timer is still active
         return false;
     } else {
@@ -1386,7 +1388,7 @@ GameObject.prototype.receive_auras_update = function(alist) {
     // remove all permanent and expired auras
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(session.combat_engine.cur_tick, a.expire_tick)) {
+        if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
             continue;
@@ -1820,15 +1822,15 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
-                var death_tick = GameTypes.TickCount.add(session.combat_engine.cur_tick,
+                var death_tick = GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick,
                                                             relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+                session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(session.combat_engine.cur_tick, client_time, this, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(session.get_real_world().combat_engine.cur_tick, client_time, this, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -1839,18 +1841,18 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                                                     this.get_leveled_quantity(imp_aura['range'] || 0),
                                                     spell['damage_vs'] || {}, imp_aura['duration_vs'] || {},
                                                     spell['always_friendly_fire'] || false);
-                    session.combat_engine.damage_effect_queue.push(effect);
+                    session.get_real_world().combat_engine.damage_effect_queue.push(effect);
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(session.combat_engine.cur_tick, client_time, this, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(session.get_real_world().combat_engine.cur_tick, client_time, this, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
                                               this.get_leveled_quantity(spell['splash_falloff'] || 'linear'),
                                               damage, spell['damage_vs'] || {},
                                               spell['always_friendly_fire'] || false);
-            session.combat_engine.damage_effect_queue.push(effect);
+            session.get_real_world().combat_engine.damage_effect_queue.push(effect);
 
             // note: use both muzzle_flash and impact, because impact location is the object's own location
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
@@ -1867,7 +1869,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                 if(dist > range) {
                     return false;
                 }
-                this.fire_projectile(session.combat_engine.cur_tick, client_time, null, -1, spell, this.level, target, location, 0); // use object level for the spell
+                this.fire_projectile(session.get_real_world().combat_engine.cur_tick, client_time, null, -1, spell, this.level, target, location, 0); // use object level for the spell
             } else {
                 throw Error('projectile_attack with no location from '+this.spec['name']);
             }
@@ -1882,7 +1884,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
-        this.set_cooldown(spell_name, session.combat_engine.cur_tick, GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
+        this.set_cooldown(spell_name, session.get_real_world().combat_engine.cur_tick, GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
     }
 
     if(global_spell_icon && global_spell_icon.unit === this) {
@@ -1905,7 +1907,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
     if(duration.is_infinite()) {
         end_tick = GameTypes.TickCount.infinity; // infinite
     } else {
-        end_tick = GameTypes.TickCount.add(session.combat_engine.cur_tick, duration);
+        end_tick = GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick, duration);
     }
 
     var i;
@@ -1916,7 +1918,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
             if(this.auras[i].spec === aura_spec) {
                 this.auras[i].strength = Math.max(this.auras[i].strength, strength);
                 this.auras[i].range = Math.max(this.auras[i].range, range);
-                this.auras[i].start_tick = session.combat_engine.cur_tick;
+                this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
                 this.auras[i].source = creator;
                 if(!this.auras[i].expire_tick.is_infinite()) {
                     this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
@@ -1930,7 +1932,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
 
     if(i >= this.auras.length) {
         // no existing applications, create one
-        this.auras.push(new Aura(creator, aura_spec, strength, range, session.combat_engine.cur_tick, end_tick, vs_table));
+        this.auras.push(new Aura(creator, aura_spec, strength, range, session.get_real_world().combat_engine.cur_tick, end_tick, vs_table));
     }
 };
 
@@ -1944,7 +1946,7 @@ GameObject.prototype.speak = function(name) {
 };
 
 function apply_queued_damage_effects() {
-    var any_left = session.combat_engine.apply_queued_damage_effects(COMBAT_ENGINE_USE_TICKS);
+    var any_left = session.get_real_world().combat_engine.apply_queued_damage_effects(COMBAT_ENGINE_USE_TICKS);
     if(!any_left && session.no_more_units) {
         session.no_more_units = false;
         session.set_battle_outcome_dirty();
@@ -2074,7 +2076,7 @@ function hurt_object(target, damage, vs_table, source) {
                                      target.is_flying() ? target.altitude : 0,
                                      pretty_print_number(Math.abs(damage)),
                                      (damage >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
-                                     (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, session.combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
+                                     (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, session.get_real_world().combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
                                      1.0, {drop_shadow:true}));
     }
 
@@ -2381,7 +2383,7 @@ function calculate_battle_outcome() {
         }
 
         // check for inbound missiles and damage over time effects
-        if(defeat && session.combat_engine.damage_effect_queue.length > 0) {
+        if(defeat && session.get_real_world().combat_engine.damage_effect_queue.length > 0) {
             defeat = false;
             session.no_more_units = true;
         }
@@ -2483,8 +2485,8 @@ GameObject.prototype.run_control = function() {
                 // trigger non-auto-attack cooldown
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
                 var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
-                this.set_cooldown(spell['cooldown_name'], session.combat_engine.cur_tick,
-                                  GameTypes.TickCount.add(session.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
+                this.set_cooldown(spell['cooldown_name'], session.get_real_world().combat_engine.cur_tick,
+                                  GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
             }
 
             var target_pos, target_height;
@@ -2497,7 +2499,7 @@ GameObject.prototype.run_control = function() {
                 target_height = target.is_flying() ? target.altitude : 0;
             }
 
-            this.fire_projectile(session.combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
+            this.fire_projectile(session.get_real_world().combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
         }
     } else if(this.control_state === control_states.CONTROL_STOP) {
 
@@ -2907,7 +2909,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     }
 
     for(var i = 0; i < effects.length; i++) {
-        session.combat_engine.damage_effect_queue.push(effects[i]);
+        session.get_real_world().combat_engine.damage_effect_queue.push(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
@@ -3320,7 +3322,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
     }
 
     for(var i = 0; i < effects.length; i++) {
-        session.combat_engine.damage_effect_queue.push(effects[i]);
+        session.get_real_world().combat_engine.damage_effect_queue.push(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
@@ -3391,7 +3393,7 @@ GameObject.prototype.fire_projectile = function(fire_tick, fire_time, force_hit_
             death_client_time += spell['kills_self_delay'];
         }
 
-        session.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+        session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
@@ -4359,6 +4361,7 @@ MapBlockingGameObject.prototype.update_map = function(old_xy, was_destroyed, rea
             this.block_map(1, reason);
         }
 
+        var wall_mgr = session.get_real_world().wall_mgr;
         if(wall_mgr && wall_mgr.spec === this.spec) { wall_mgr.dirty = true; }
     }
 };
@@ -7496,22 +7499,9 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
     return ret;
 }
 
+// XXXXXX legacy pointers
 var voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator([0,0], 1);
 var team_map_accel = new TeamMapAccelerator.TeamMapAccelerator();
-
-// stats tracking for map queries
-var MAP_DEBUG = 0;
-var map_queries_by_tag = {'ticks':0};
-function map_query_stats() {
-    console.log("MAP QUERIES:");
-    for(var k in map_queries_by_tag) {
-        if(k == 'ticks') { continue; }
-        var msec = 1000.0*map_queries_by_tag[k]/(1.0*map_queries_by_tag['ticks']);
-        if(msec >= 0.1) {
-            console.log(k + ' ' + msec.toFixed(1) + 'ms per tick');
-        }
-    }
-}
 
 // NEW object query function
 // params:
@@ -7559,7 +7549,7 @@ function query_objects_within_distance(loc, dist, params) {
     if(params.nearest_only) { debug_tag += '_nearest_only'; }
     if(params.only_team) { debug_tag += '_one_team'; } else { debug_tag += '_any_team'; }
     var start_time;
-    if(MAP_DEBUG) {
+    if(session.get_real_world().MAP_DEBUG) {
         start_time = (new Date()).getTime();
     }
 
@@ -7575,7 +7565,7 @@ function query_objects_within_distance(loc, dist, params) {
         debug_tag += ':LOCAL';
         // TEMPORARY - duplicated code
         var bounds = voxel_map_accel.get_circle_bounds_xy_st(loc, dist);
-        if(MAP_DEBUG >= 2) {
+        if(session.get_real_world().MAP_DEBUG >= 2) {
             var area_s = (bounds[1][1]-bounds[1][0]);
             var area_t = (bounds[0][1]-bounds[0][0]);
             debug_tag += '('+area_s.toString()+','+area_t.toString()+')';
@@ -7657,10 +7647,10 @@ function query_objects_within_distance(loc, dist, params) {
         }
     }
 
-    if(MAP_DEBUG) {
+    if(session.get_real_world().MAP_DEBUG) {
         var end_time = (new Date()).getTime();
         var secs = (end_time - start_time)/1000;
-        map_queries_by_tag[debug_tag] = (map_queries_by_tag[debug_tag] || 0) + secs;
+        session.get_real_world().map_queries_by_tag[debug_tag] = (session.get_real_world().map_queries_by_tag[debug_tag] || 0) + secs;
     }
 
     if(params.nearest_only) {
@@ -7787,7 +7777,7 @@ var last_tick_time = 0; // client_time at which last unit simulation tick was ru
     @return {!GameTypes.TickCount} */
 function absolute_time_to_tick(t) {
     var delta = t - client_time;
-    return new GameTypes.TickCount(session.combat_engine.cur_tick.get() + Math.floor(delta/TICK_INTERVAL + 0.5));
+    return new GameTypes.TickCount(session.get_real_world().combat_engine.cur_tick.get() + Math.floor(delta/TICK_INTERVAL + 0.5));
 };
 /** @param {number} t
     @return {!GameTypes.TickCount} */
@@ -7822,80 +7812,6 @@ var last_loot_text_time = 0;
 var last_loot_text_count = 0;
 var last_loot_text_pos = null;
 
-/** The "Wall Manager" adjusts the neighbor values of Buildings representing linkable walls
-    to create or close collision gaps as necessary. Updated lazily at the beginning of the
-    next combat tick after any change to neighbor state.
-    @constructor
-    @struct
-    @param {!Array.<number>} size - map size, in grid cells
-    @param {!Object} spec - for the barrier object
-*/
-var WallManager = function(size, spec) {
-    this.spec = spec; // of the barrier object
-    this.gs = spec['unit_collision_gridsize'];
-    this.size = size; // xy dimensions in map cell units
-    for(var axis = 0; axis < 2; axis++) {
-        if(this.size[axis] % this.gs[axis] !== 0) {
-            throw Error('size is not a multiple of '+this.spec['name']+' unit_collision_gridsize');
-        }
-    }
-    this.chunk = [this.size[0]/this.gs[0], this.size[1]/this.gs[1]]; // xy dimensions of the bitmap (coarseness is the collision gridsize)
-    this.bitmap = new Array(this.chunk[0]*this.chunk[1]);
-    this.dirty = true;
-};
-
-/** Update neighbor states
-    @param {!Object.<string,GameObject>} obj_dict - the current objects in the session */
-WallManager.prototype.refresh = function(obj_dict) {
-    if(!this.dirty) { return; }
-    this.dirty = false;
-
-    // clear bitmap
-    for(var i = 0; i < this.chunk[0]*this.chunk[1]; i++) {
-        this.bitmap[i] = 0;
-    }
-
-    // pass 1: find barriers and build bitmap
-    var obj_list = [];
-    for(var id in obj_dict) {
-        var obj = obj_dict[id];
-        if(obj.spec !== this.spec || obj.is_destroyed()) { continue; }
-        obj_list.push(obj);
-
-        // add to bitmap
-        var y = Math.floor(obj.y / this.gs[1]);
-        var x = Math.floor(obj.x / this.gs[0]);
-        this.bitmap[this.chunk[0]*y + x] = 1;
-    }
-
-    // pass 2: set up new neighbor states
-    var DIRECTIONS = [[0,-1],[1,0],[0,1],[-1,0]]; // NESW offsets
-    goog.array.forEach(obj_list, function(obj) {
-        var neighbors = [-1,-1,-1,-1]; // shrink inward by 1 unit, unless a neighbor is found
-        for(var i = 0; i < DIRECTIONS.length; i++) {
-            var xy = vec_add([Math.floor(obj.x/this.gs[0]), Math.floor(obj.y/this.gs[1])], DIRECTIONS[i]);
-            if(xy[0] >= 0 && xy[0] < this.chunk[0] && xy[1] >= 0 && xy[1] < this.chunk[1]) {
-                if(this.bitmap[this.chunk[0]*xy[1] + xy[0]]) {
-                    neighbors[i] = 0;
-                }
-            }
-        }
-        obj.set_neighbors(neighbors);
-    }, this);
-};
-
-/** @type {WallManager|null} */
-var wall_mgr = null;
-
-/** @param {!Array.<number>} ncells of the playfield map */
-var init_wall_mgr = function(ncells) {
-    var spec = gamedata['buildings']['barrier'];
-    if(spec && (spec['collide_as_wall'] || player.get_any_abtest_value('enable_wall_manager', gamedata['client']['enable_wall_manager']))) {
-        return new WallManager(ncells, spec);
-    }
-    return null;
-};
-
 var tick_astar_queries_left = 0;
 
 function run_unit_ticks() {
@@ -7903,7 +7819,8 @@ function run_unit_ticks() {
         // record time at which this tick was computed
         last_tick_time = client_time;
 
-        if(wall_mgr) { wall_mgr.refresh(session.cur_objects.objects); }
+        var world = session.get_real_world();
+        if(world.wall_mgr) { world.wall_mgr.refresh(world.objects); }
 
         ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
 
@@ -7937,7 +7854,7 @@ function run_unit_ticks() {
         // rebuild map query acceleration data structure
         voxel_map_accel.clear();
         team_map_accel.clear();
-        map_queries_by_tag['ticks'] += 1;
+        session.get_real_world().map_queries_by_tag['ticks'] += 1;
         if(obj_list[0] !== null) {
             for(i = 0; i < obj_list.length; i++) {
                 var obj = obj_list[i];
@@ -7967,7 +7884,7 @@ function run_unit_ticks() {
 
         apply_queued_damage_effects();
         flush_dirty_objects({urgent_only:true, skip_check:true});
-        session.combat_engine.cur_tick = new GameTypes.TickCount(session.combat_engine.cur_tick.get()+1);
+        session.get_real_world().combat_engine.cur_tick = new GameTypes.TickCount(session.get_real_world().combat_engine.cur_tick.get()+1);
     }
 }
 
@@ -9988,7 +9905,7 @@ function log_exception(e, where) {
     }
 
     // show in JS console
-    var ui_tick = (session.combat_engine ? session.combat_engine.cur_tick.get() : -1);
+    var ui_tick = (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick.get() : -1);
     console.log('Exception thrown in '+where+' at tick '+ui_tick.toString()+':\n'+msg);
 
     if(player.is_developer()) {
@@ -17061,7 +16978,7 @@ function surrender_to_ai_attack() {
                 obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
 
                 if('explosion_effect' in obj.spec) {
-                    SPFX.add_visual_effect_at_tick(obj.interpolate_pos(), 0, [0,1,0], session.combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
+                    SPFX.add_visual_effect_at_tick(obj.interpolate_pos(), 0, [0,1,0], session.get_real_world().combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
                 }
             }
         }
@@ -43250,7 +43167,7 @@ function recv_message_bundle(serial, clock, messages, kind) {
         server_time_offset = clock - (new Date()).getTime()/1000;
         update_client_and_server_time();
         SPUI.time = client_time;
-        SPFX.set_time(client_time, (session.combat_engine ? session.combat_engine.cur_tick : new GameTypes.TickCount(0)));
+        SPFX.set_time(client_time, (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick : new GameTypes.TickCount(0)));
 
         GameArt.sync_time(client_time);
     }
@@ -43838,8 +43755,6 @@ function handle_server_message(data) {
             PlayerCache.update(session.viewing_user_id, viewing_trophy_data, false);
         }
 
-        session.combat_engine = new CombatEngine.CombatEngine();
-
         // set physics properties
         SPFX.global_gravity = (('gravity' in session.viewing_base.base_climate_data) ? session.viewing_base.base_climate_data['gravity'] : 1);
         SPFX.global_ground_plane = (('ground_plane' in session.viewing_base.base_climate_data) ? session.viewing_base.base_climate_data['ground_plane'] : 0);
@@ -43857,14 +43772,11 @@ function handle_server_message(data) {
         // set up game map
         var ncells = session.viewing_base.ncells();
 
-        astar_map = new AStar.AStarRectMap(ncells, null, ('allow_diagonal_passage' in gamedata['map'] ? gamedata['map']['allow_diagonal_passage'] : true));
-        astar_context = new AStar.CachedAStarContext(astar_map, {heuristic_name:gamedata['client']['astar_heuristic'],
-                                                                 iter_limit:gamedata['client']['astar_iter_limit'][session.viewing_ai ? 'pve':'pvp'],
-                                                                 use_connectivity:(!!gamedata['client']['astar_use_connectivity'])});
-        voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator(ncells, gamedata['client']['map_accel_chunk']);
-        team_map_accel = new TeamMapAccelerator.TeamMapAccelerator();
-        map_queries_by_tag = {'ticks':0};
-        wall_mgr = init_wall_mgr(ncells);
+        //legacy pointers
+        astar_map = session.get_real_world().astar_map;
+        astar_context = session.get_real_world().astar_context;
+        voxel_map_accel = session.get_real_world().voxel_map_accel;
+        team_map_accel = session.get_real_world().team_map_accel;
 
         // read object state from server
         session.cur_objects.clear();
@@ -44365,7 +44277,7 @@ function handle_server_message(data) {
                             // missile effect
                             var hit_tick, hit_time;
                             if(COMBAT_ENGINE_USE_TICKS) {
-                                hit_tick = do_fire_projectile_ticks(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, session.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
+                                hit_tick = do_fire_projectile_ticks(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, session.get_real_world().combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
                                 hit_time = -1;
                             } else {
                                 hit_time = do_fire_projectile_time(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
@@ -47570,7 +47482,7 @@ function draw() {
     // update world time
     update_client_and_server_time();
     SPUI.time = client_time;
-    SPFX.set_time(client_time, (session.combat_engine ? session.combat_engine.cur_tick : new GameTypes.TickCount(0)));
+    SPFX.set_time(client_time, (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick : new GameTypes.TickCount(0)));
     GameArt.sync_time(client_time);
 
     //console.log('frame at '+client_time+' last_draw_time '+last_draw_time);
@@ -48171,7 +48083,7 @@ function do_draw() {
                     lines.push("using window.setTimeout("+LAST_ANIM_FRAME_TIMEOUT.toFixed(0)+"ms)");
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
-                lines.push('Combat tick: '+session.combat_engine.cur_tick.get().toString());
+                lines.push('Combat tick: '+session.get_real_world().combat_engine.cur_tick.get().toString());
                 ctx.save();
                 var fsize = 21;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();
@@ -49571,9 +49483,9 @@ function draw_aura(xy, indicator_xy, aura) {
     @param {!GameTypes.TickCount} start_tick
     @param {!GameTypes.TickCount} end_tick */
 function draw_clock(xy, color, start_tick, end_tick) {
-    if(GameTypes.TickCount.lt(session.combat_engine.cur_tick, start_tick) ||
-       GameTypes.TickCount.gt(session.combat_engine.cur_tick, end_tick)) { return; }
-    var client_tick_smooth = session.combat_engine.cur_tick.get() + (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale());
+    if(GameTypes.TickCount.lt(session.get_real_world().combat_engine.cur_tick, start_tick) ||
+       GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, end_tick)) { return; }
+    var client_tick_smooth = session.get_real_world().combat_engine.cur_tick.get() + (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale());
     var progress;
     if(end_tick.get() - start_tick.get() > 1.5/TICK_INTERVAL) {
         progress = (client_tick_smooth - start_tick.get()) / (end_tick.get() - start_tick.get());
@@ -50174,7 +50086,6 @@ goog.exportSymbol('publish_ai_base', publish_ai_base);
 goog.exportSymbol('do_visit_base', do_visit_base);
 goog.exportSymbol('enable_muffins', enable_muffins);
 goog.exportSymbol('anon_mode', anon_mode);
-goog.exportSymbol('MAP_DEBUG', MAP_DEBUG);
 goog.exportSymbol('FORCE_BASE_DAMAGE_PING', FORCE_BASE_DAMAGE_PING);
 goog.exportSymbol('metric_event', metric_event); // for calling by spin_header_content/spin_footer_content
 
