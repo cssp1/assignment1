@@ -22,12 +22,14 @@ goog.require('Predicates');
 goog.require('Consequents');
 goog.require('PlayerCache');
 goog.require('AllianceCache');
+goog.require('Backdrop');
 goog.require('BattleLog');
 goog.require('BattleReplay');
 goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
 goog.require('GameTypes');
+goog.require('GameObjectCollection');
 goog.require('LootTable');
 goog.require('SPUI');
 goog.require('SPText');
@@ -5183,33 +5185,6 @@ MapBlockingGameObject.prototype.playfield_xy = function() {
     return vec_floor(ortho_to_playfield(vec_add([this.x, this.y], odd_shift)));
 };
 
-
-// ObjectCollection
-
-// note: unlike in the server (where ObjectCollection assigns id numbers), in the client we assume
-// that incoming objects added to the collection already have their id fields set (usually by receive_state()).
-
-// We manually set ids of deleted objects to -1 so that any other reference-holders can know that the
-// object isn't valid anymore.
-
-/** @constructor */
-function ObjectCollection() {
-    this.objects = {};
-}
-ObjectCollection.prototype.add_object = function(obj) { this.objects[obj.id] = obj; };
-ObjectCollection.prototype.has_object = function(id) { return (id in this.objects); };
-ObjectCollection.prototype.get_object = function(id) { return this.objects[id]; };
-ObjectCollection.prototype.rem_object = function(obj) {
-    delete this.objects[obj.id];
-    obj.id = GameObject.DEAD_ID;
-};
-ObjectCollection.prototype.clear = function() {
-    for(var id in this.objects) {
-        this.objects[id].id = GameObject.DEAD_ID;
-    }
-    this.objects = {};
-};
-
 /** Functions for working with climates
     @constructor */
 var Climate = function(data) {
@@ -5322,7 +5297,7 @@ session.session_id = spin_session_id; // unique ID for this connection to the se
 session.alliance_id = -1; // player's current alliance ID, <= 0 is invalid
 session.alliance_membership = null; // player's current alliance membership info (alliance_members row), null for no membership
 session.region = null; // world map region we are connected to
-session.cur_objects = new ObjectCollection();
+session.cur_objects = new GameObjectCollection.GameObjectCollection();
 session.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
 session.minefield_tags_by_tag = {}; // mapping from tag to obj_id
 session.factory_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
@@ -5551,6 +5526,11 @@ session.quarry_victory_satisfied = function() {
 // add new object to session
 session.add_object = function(obj) {
     session.cur_objects.add_object(obj);
+
+    // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
+    if(session.home_base && session.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {
+        session.incoming_attack_units_total += 1;
+    }
 
     // add to minefield tag index
     // XXX does this need to remain sorted?
@@ -9181,11 +9161,6 @@ function create_object(data, is_deploying) {
         if(!obj.is_destroyed() && player.unit_micro_enabled()) {
             add_unit_to_selection(obj);
         }
-    }
-
-    // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
-    if(session.home_base && session.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {
-        session.incoming_attack_units_total += 1;
     }
 
     last_created_object = obj;
@@ -48353,7 +48328,18 @@ function do_draw() {
             }
 
             // draw backdrop
-            draw_backdrop(draw_playfield_objects);
+            if(get_query_string('nobackdrop') === '1') {
+                Backdrop.draw_blank();
+                if(session.viewing_base) {
+                    Backdrop.draw_area_bounds(session.viewing_base.ncells());
+                }
+            } else {
+                Backdrop.draw(session.viewing_base,
+                              session.cur_objects,
+                              session.home_base,
+                              (session.viewing_base && (session.viewing_base.base_landlord_id === session.user_id)),
+                              draw_playfield_objects);
+            }
 
             // draw map grid
             if(PLAYFIELD_DEBUG_DRAW) {
@@ -48586,463 +48572,6 @@ function do_draw() {
     if(SPINPUNCHGAME.watchdog_timer) {
         window.clearTimeout(SPINPUNCHGAME.watchdog_timer);
         SPINPUNCHGAME.watchdog_timer = null;
-    }
-}
-
-function draw_backdrop_area_bounds() {
-    var ncells = session.viewing_base.ncells();
-    var xy;
-    ctx.beginPath();
-    xy = ortho_to_draw([0,0]);
-    ctx.moveTo(xy[0],xy[1]);
-    xy = ortho_to_draw([ncells[0],0]);
-    ctx.lineTo(xy[0],xy[1]);
-    xy = ortho_to_draw([ncells[0],ncells[1]]);
-    ctx.lineTo(xy[0],xy[1]);
-    xy = ortho_to_draw([0,ncells[1]]);
-    ctx.lineTo(xy[0],xy[1]);
-    ctx.closePath();
-    ctx.stroke();
-}
-function draw_backdrop_scenery() {
-    // draw scenery objects
-    var obj_list = [];
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj.spec['is_scenery'] && obj.spec['draw_flat'] && (SPFX.detail >= 0 || obj.spec['is_debris'])) {
-            obj.update_draw_pos();
-            obj_list.push(obj);
-        }
-    }
-    // do some Z-sorting
-    obj_list.sort(sort_scene_objects);
-    goog.array.forEach(obj_list, function(obj) { draw_building_or_inert(obj,1); });
-
-    // draw building bases
-    if(SPFX.detail >= 2) {
-        var climate_data = (session.viewing_base && goog.object.getCount(session.viewing_base.base_climate_data)>0 ? session.viewing_base.base_climate_data : gamedata['climates'][gamedata['default_climate']]);
-        if('building_bases' in climate_data) {
-            var base_list = [];
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
-                if(obj.is_building()) {
-                    var key = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
-                    if(key in climate_data['building_bases']) {
-                        obj.update_draw_pos();
-                        base_list.push(obj);
-                    }
-                }
-            }
-            base_list.sort(sort_scene_objects);
-            goog.array.forEach(base_list, function(obj) {
-                var key = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
-                var sprite = GameArt.assets[climate_data['building_bases'][key]];
-                var xy = vec_floor(ortho_to_draw([obj.x, obj.y]));
-                if(!sprite.prep_for_draw(xy, 0, client_time, 'normal')) {
-                    return; // not ready yet, no gray box
-                }
-                sprite.draw(xy, 0, client_time, 'normal');
-            });
-        }
-    }
-}
-function draw_backdrop_blank() {
-    ctx.save();
-    set_default_canvas_transform(ctx); // undo playfield transform
-    ctx.fillStyle = '#202020';
-    ctx.fillRect(0,0,canvas_width,canvas_height);
-    ctx.restore();
-}
-
-function draw_backdrop_tiled(data) {
-    var assetname = data[(session.home_base || session.viewing_base.base_landlord_id === session.user_id ? 'friendly' : 'hostile')];
-
-    var asset = GameArt.assets[assetname];
-    var main_sprite = GameArt.assets[assetname].states['fullleft'];
-    var main_image = main_sprite.images[0];
-    if(!main_image.data_loaded) {
-        // start it loading
-        main_image.prep_for_draw();
-        // but draw blank for now
-        draw_backdrop_blank();
-        return false;
-    }
-
-    ctx.save();
-    set_default_canvas_transform(ctx); // undo playfield transform
-
-    // [2,1]*tilesize must evenly divide nells*cellsize/2 in order for the edge tiles to line up
-    // tilesize must be even
-    if(!main_sprite.wh) { throw Error('background sprite needs specific dimensions'); }
-    var tilesize = (view_is_zoomed() ? vec_scale(view_zoom, main_sprite.wh) : main_sprite.wh); // size of a bg tile in pixels
-    var ncells = session.viewing_base.ncells();
-    var maptiles = vec_div(vec_mul(ncells,vec_div(cellsize,[2,2])), main_sprite.wh);
-    if(!vec_equals(vec_mod(vec_mul([0.5,1],maptiles), 1), [0,0])) {
-        throw Error('background tilesize does not evenly divide '+(ncells[0]*cellsize[0]).toString()+'x'+(ncells[1]*cellsize[1]).toString());
-    }
-    if(!vec_equals(vec_mod(main_sprite.wh, 2), [0,0])) {
-        throw Error('background tilesize is not even: '+tilesize[0]+'x'+tilesize[1]);
-    }
-    maptiles = vec_floor(maptiles);
-    //console.log('maptiles '+maptiles[0]+'x'+maptiles[1]);
-
-    // pixel coordinates of top-left of view relative to game field's [0,0] origin
-    // subtract [0,tilesize[1]] to shift the tiles up one-half-height vs the playfield (see TILES photoshop layer to visualize why)
-    //var start = vec_sub(vec_sub(view_pos, vec_sub(view_pos, vec_scale(view_zoom, [canvas_width_half,canvas_height_half])), [0,tilesize[1]/2]);
-    var start = vec_sub(vec_sub(vec_scale(view_zoom, view_pos), [canvas_width_half, canvas_height_half]), [0, tilesize[1]/2]);
-    var end = vec_add(start, [canvas_width, canvas_height]);
-
-    var istart = Math.floor(start[1]/tilesize[1]);
-    var iend = Math.floor(end[1]/tilesize[1]);
-    var jstart =  Math.floor(start[0]/tilesize[0]);
-    var jend = Math.floor(end[0]/tilesize[0]);
-
-    //console.log('jstart '+jstart+' istart '+istart);
-
-    for(var i = istart; i <= iend; i++) {
-        for(var j = jstart; j <= jend; j++) {
-            var x = j*tilesize[0] - start[0];
-            var y = i*tilesize[1] - start[1];
-
-            // 16 possible cases for the tile!
-            var state;
-            var debug_color = '#ffffff';
-
-            if(j >= 0) {
-                // right side
-                if(i < 0) {
-                    // top
-                    if(i < -maptiles[0]+j-1) {
-                        state = 'empty';
-                    } else if(i == -maptiles[0]+j-1) {
-                        if(j == 0) {
-                            state = 'corner_nwright'; debug_color='#ff0000';
-                        } else if(j == maptiles[0]) {
-                            state = 'corner_neright'; debug_color='#ff0000';
-                        } else {
-                            state = 'edge_nright'; debug_color='#880000';
-                        }
-                    } else if(i == -maptiles[0]+j) {
-                        if(j == maptiles[0]-1) {
-                            state = 'corner_neleft'; debug_color='#ff0000';
-                        } else {
-                            state = 'edge_nleft';  debug_color='#880000';
-                        }
-                    } else {
-                        state = 'full';
-                    }
-                } else {
-                    // bottom
-                    if(i < maptiles[0]-j-2) {
-                        state = 'full';
-                    } else if(i == maptiles[0]-j-2) {
-                        state = 'edge_eleft';  debug_color='#008800';
-                    } else if(i == maptiles[0]-j-1) {
-                        if(j == 0) {
-                            state = 'corner_seright'; debug_color='#00ff00';
-                        } else {
-                            state = 'edge_eright'; debug_color='#008800';
-                        }
-                    } else {
-                        state = 'empty';
-                    }
-                }
-            } else {
-                // left side
-                if(i < 0) {
-                    // top
-                    if(i < -maptiles[0]-j-2) {
-                        state = 'empty';
-                    } else if(i == -maptiles[0]-j-2) {
-                        if(j == -1) {
-                            state = 'corner_nwleft'; debug_color='#ff0000';
-                        } else if(j == -maptiles[0]-1) {
-                            state = 'corner_swleft'; debug_color='#ff00ff';
-                        } else {
-                            state = 'edge_wleft'; debug_color='#000088';
-                        }
-                    } else if(i == -maptiles[0]-j-1) {
-                        if(j == -maptiles[0]) {
-                            state = 'corner_swright'; debug_color='#0000ff';
-                        } else {
-                            state = 'edge_wright'; debug_color='#000088';
-                        }
-                    } else {
-                        state = 'full';
-                    }
-                } else {
-                    // bottom
-                    if(i < maptiles[0]+j-1) {
-                        state = 'full';
-                    } else if(i == maptiles[0]+j-1) {
-                        state = 'edge_sright'; debug_color='#888800';
-                    } else if(i == maptiles[0]+j) {
-                        if(j == -1) {
-                            state = 'corner_seleft'; debug_color='#ffff00';
-                        } else {
-                            state = 'edge_sleft'; debug_color='#888800';
-                        }
-                    } else {
-                        state = 'empty';
-                    }
-                }
-            }
-
-            if(state == 'full') { // alternate left/right
-                state = (((i+j)&1) ? 'fullright' : 'fullleft');
-                // make use of alternate left/right sprites if available
-                if('fullleft3' in asset.states) {
-                    var mod = (i+Math.floor((i+j)/2)+maptiles[0]+5)%4;
-                    if(mod > 0) {
-                        state += mod.toString();
-                    }
-                }
-            }
-
-            if(!(state in asset.states)) {
-                console.log("bad backdrop state "+state);
-                state = 'fullleft';
-            }
-
-            var image = asset.states[state].images[0];
-            var w = tilesize[0], h = tilesize[1];
-            var sx = 0, sy = 0, sw = main_sprite.wh[0], sh = main_sprite.wh[1];
-
-            if(!view_is_zoomed()) {
-                // perform clipping
-                // left
-                if(x < 0) {
-                    sx = -x;
-                    w += x;
-                    sw += x;
-                    x = 0;
-                }
-                // top
-                if(y < 0) {
-                    sy = -y;
-                    h += y;
-                    sh += y;
-                    y = 0;
-                }
-                // right
-                if((x+w) >= canvas_width) {
-                    w = canvas_width-x;
-                    sw = canvas_width-x;
-                }
-                // bottom
-                if((y+h) >= canvas_height) {
-                    h = canvas_height-y;
-                    sh = canvas_height-y;
-                }
-            }
-
-            if(w > 0 && h > 0) {
-                if(view_is_zoomed()) {
-                    // enlarge source texture coordinates to hide interpolated pixel seams at the edges
-                    var incr = gamedata['client']['view_zoom_tile_border'][view_zoom >= 1.0 ? 1 : 0];
-                    sx += incr/view_zoom;
-                    sy += incr/view_zoom;
-                    sw -= (2/view_zoom)*incr;
-                    sh -= (2/view_zoom)*incr;
-                }
-                image.drawSubImage([sx,sy],[sw,sh],[x,y],[w,h]);
-                if(PLAYFIELD_DEBUG && w>2 && h>2) {
-                    ctx.strokeStyle = debug_color;
-                    ctx.strokeRect(x+1,y+1,w-2,h-2);
-                    ctx.fillText('j='+j.toString()+' i='+i.toString()+' '+state, x+13, y+17);
-                }
-            }
-        }
-    }
-    ctx.restore(); // redo playfield transform
-    return true;
-}
-
-function draw_backdrop_whole(assetname) {
-    var backdrop_sprite = GameArt.assets[assetname].states[(session.home_base ? 'home':'other')];
-    if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
-
-    var backdrop_image = backdrop_sprite.images[0];
-
-    if(!backdrop_image.data_loaded || !session.viewing_base) {
-        // start it loading
-        backdrop_image.prep_for_draw();
-        // but draw blank for now
-        draw_backdrop_blank();
-        return false;
-    } else {
-        ctx.save();
-        set_default_canvas_transform(ctx); // undo playfield transform
-
-        var ncells = session.viewing_base.ncells();
-
-        // pixel coordinates of the subpart of the whole image that will land at the top left of the canvas
-        // = 0.5*sprite.wh + view_pos + (1/zoom)*(-canvas_half)
-        var start = vec_add(vec_scale(0.5, backdrop_sprite.wh), vec_add(view_pos, vec_scale(1/view_zoom, [-canvas_width_half, -canvas_height_half])));
-
-        // add source pixel size of the subpart of the whole image that will fill the canvas
-        var end = vec_add(start, vec_scale(1/view_zoom, [canvas_width, canvas_height]));
-
-        var dest_area = [canvas_width, canvas_height];
-        if(view_is_zoomed()) {
-            // draw one extra pixel at right/bottom to avoid seams
-            dest_area = vec_add(dest_area, [1/view_zoom,1/view_zoom]);
-        } else {
-            start = vec_floor(start);
-            end = vec_floor(end);
-        }
-        backdrop_image.drawSubImage_clipped(start, vec_sub(end, start), [0,0], dest_area);
-
-        // if the image doesn't fill the entire canvas, draw black borders around the edges
-        // with optional gradient fringe
-        var fringe = gamedata['client']['backdrop_whole_fringe']*view_zoom;
-        var edges = [];
-        if(start[0] < 0) {
-            edges.push({x:0, y:0, w:-start[0]*view_zoom, h:dest_area[1], v:[1,0]});
-        }
-        if(start[1] < 0) {
-            edges.push({x:0, y:0, w:dest_area[0], h:-start[1]*view_zoom, v:[0,1]});
-        }
-        if(end[0] >= backdrop_sprite.wh[0]) {
-            var w = (end[0]-backdrop_sprite.wh[0])*view_zoom, h = dest_area[1];
-            edges.push({x:dest_area[0]-w-0.5, y:0, w:w, h:dest_area[1], v:[-1,0]});
-        }
-        if(end[1] >= backdrop_sprite.wh[1]) {
-            var h = (end[1]-backdrop_sprite.wh[1])*view_zoom;
-            edges.push({x:0, y:dest_area[1]-h-0.5, w:dest_area[0], h:h, v:[0,-1]});
-        }
-
-        if(edges.length > 0) {
-            ctx.fillStyle = '#000000';
-            goog.array.forEach(edges, function(edge) {
-                ctx.fillRect(Math.floor(edge.x), Math.floor(edge.y), Math.floor(edge.w+0.5), Math.floor(edge.h+0.5));
-            });
-            goog.array.forEach(edges, function(edge) {
-                // firefox doesn't do a great job of clipping very thin gradients, so don't draw if too narrow
-                if(fringe > 0 && Math.min(edge.w, edge.h) >= 2) {
-                    var grd = ctx.createLinearGradient(Math.floor(edge.x+edge.v[0]*(edge.v[0] > 0 ? edge.w : 0)),
-                                                       Math.floor(edge.y+edge.v[1]*(edge.v[1] > 0 ? edge.h : 0)),
-                                                       Math.floor(edge.x+edge.v[0]*(edge.v[0] > 0 ? (edge.w+fringe) : fringe)),
-                                                       Math.floor(edge.y+edge.v[1]*(edge.v[1] > 0 ? (edge.h+fringe) : fringe)));
-                    grd.addColorStop(0, 'rgba(0,0,0,1)');
-                    grd.addColorStop(1, 'rgba(0,0,0,0)');
-                    ctx.fillStyle = grd;
-                    //ctx.fillStyle = '#00ff00'; // for debugging
-
-                    ctx.fillRect(Math.floor(edge.x+edge.v[0]*(edge.v[0] > 0 ? edge.w : fringe)),
-                                 Math.floor(edge.y+edge.v[1]*(edge.v[1] > 0 ? edge.h : fringe)),
-                                 Math.floor((1-Math.abs(edge.v[0]))*edge.w + Math.abs(edge.v[0])*fringe + 1.5),
-                                 Math.floor((1-Math.abs(edge.v[1]))*edge.h + Math.abs(edge.v[1])*fringe + 1.5));
-                }
-            });
-        }
-
-        ctx.restore(); // redo playfield transform
-    }
-    return true;
-}
-
-function draw_backdrop_simple(assetname) {
-    var backdrop_sprite = GameArt.assets[assetname].states[(session.home_base ? 'home':'other')];
-    if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
-
-    var backdrop_image = backdrop_sprite.images[0];
-
-    if(!backdrop_image.data_loaded) {
-        // start it loading
-        backdrop_image.prep_for_draw();
-        // but draw blank for now
-        draw_backdrop_blank();
-        return false;
-    } else {
-        ctx.save();
-        set_default_canvas_transform(ctx); // undo playfield transform
-        var tilesize = view_is_zoomed() ? vec_scale(view_zoom, backdrop_sprite.wh) : backdrop_sprite.wh;
-        var start = [view_pos[0]*view_zoom - canvas_width_half, view_pos[1]*view_zoom - canvas_height_half];
-        var end = [start[0]+canvas_width, start[1]+canvas_height];
-
-        var istart = Math.floor(start[1]/tilesize[1]);
-        var iend = Math.floor(end[1]/tilesize[1]);
-        var jstart =  Math.floor(start[0]/tilesize[0]);
-        var jend = Math.floor(end[0]/tilesize[0]);
-
-        for(var i = istart; i <= iend; i++) {
-            for(var j = jstart; j <= jend; j++) {
-                var x = Math.floor(j*tilesize[0] - start[0]);
-                var y = Math.floor(i*tilesize[1] - start[1]);
-                var w = tilesize[0], h = tilesize[1];
-                var sx = 0, sy = 0, sw = backdrop_sprite.wh[0], sh = backdrop_sprite.wh[1];
-
-                // perform clipping
-                if(!view_is_zoomed()) {
-                    // left
-                    if(x < 0) {
-                        sx = -x;
-                        sw += x;
-                        w += x;
-                        x = 0;
-                    }
-                    // top
-                    if(y < 0) {
-                        sy = -y;
-                        sh += y;
-                        h += y;
-                        y = 0;
-                    }
-                    // right
-                    if((x+w) >= canvas_width) {
-                        w = canvas_width-x;
-                        sw = w;
-                    }
-                    // bottom
-                    if((y+h) >= canvas_height) {
-                        h = canvas_height-y;
-                        sh = h;
-                    }
-                }
-                if(w > 0 && h > 0) {
-                    if(view_is_zoomed()) {
-                        // draw one extra pixel at left/bottom to avoid seams
-                        w += 1/view_zoom; h += 1/view_zoom;
-                    }
-                    backdrop_image.drawSubImage([sx,sy],[sw,sh],[x,y],[w,h]);
-                }
-            }
-        }
-        ctx.restore(); // redo playfield transform
-    }
-    return true;
-}
-
-function draw_backdrop(want_scenery) {
-    var show_backdrop = (get_query_string('nobackdrop') != '1');
-    if(!show_backdrop) {
-        draw_backdrop_blank();
-        draw_backdrop_area_bounds();
-        return;
-    }
-    var climate_data = (session.viewing_base && goog.object.getCount(session.viewing_base.base_climate_data)>0 ? session.viewing_base.base_climate_data : gamedata['climates'][gamedata['default_climate']]);
-    var ncells = (session.viewing_base ? session.viewing_base.ncells() : null);
-
-    if(('backdrop_whole' in climate_data) && ncells && (ncells[0].toString()+'x'+ncells[1].toString() in climate_data['backdrop_whole'])) {
-        var drawn = draw_backdrop_whole(climate_data['backdrop_whole'][ncells[0].toString()+'x'+ncells[1].toString()]);
-        if(drawn && want_scenery) { draw_backdrop_scenery(); }
-        if(session.viewing_base && (!drawn || PLAYFIELD_DEBUG)) { draw_backdrop_area_bounds(); }
-    } else if('backdrop_tiles' in climate_data && (SPFX.detail >= 2)) {
-        var drawn = draw_backdrop_tiled(climate_data['backdrop_tiles']);
-        if(drawn && want_scenery) { draw_backdrop_scenery(); }
-        if(session.viewing_base && (!drawn || PLAYFIELD_DEBUG)) { draw_backdrop_area_bounds(); }
-    } else {
-        var drawn = draw_backdrop_simple(climate_data['backdrop']);
-        if(drawn && want_scenery) { draw_backdrop_scenery(); }
-        if(session.viewing_base) { draw_backdrop_area_bounds(); }
-    }
-
-    if(session.viewing_base &&
-       ((!session.home_base && session.viewing_base.base_landlord_id !== session.user_id) || player.is_cheater) &&
-       /* session.viewing_base.deployment_buffer && */
-       selection.unit !== player.virtual_units["DEPLOYER"]) {
-        session.viewing_base.draw_base_perimeter('pre_deploy');
     }
 }
 
