@@ -45,8 +45,11 @@ CombatEngine.Pos2D.sub = function(a, b) {
 };
 
 /** @constructor
-    @struct */
-CombatEngine.CombatEngine = function() {
+    @param {!World.World} world */
+CombatEngine.CombatEngine = function(world) {
+    /** @type {!World.World} */
+    this.world = world;
+
     /** @type {!GameTypes.TickCount} */
     this.cur_tick = new GameTypes.TickCount(0);
 
@@ -58,7 +61,6 @@ CombatEngine.CombatEngine = function() {
 // DamageEffects
 
 /** @constructor
-    @struct
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObject|null} source
@@ -72,6 +74,7 @@ CombatEngine.DamageEffect = function(tick, client_time_hack, source, amount, vs_
     this.amount = amount;
     this.vs_table = vs_table;
 }
+/** @param {!World.World} world */
 CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
 
 
@@ -84,7 +87,7 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(use_t
                      (client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
-            effect.apply();
+            effect.apply(this.world);
         }
     }
     return this.damage_effect_queue.length > 0;
@@ -93,7 +96,6 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(use_t
 
 /** KillDamageEffect removes the object directly WITHOUT running on-death spells
     @constructor
-    @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -105,7 +107,8 @@ CombatEngine.KillDamageEffect = function(tick, client_time_hack, source, target_
     this.target_obj = target_obj;
 }
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
-CombatEngine.KillDamageEffect.prototype.apply = function() {
+/** @override */
+CombatEngine.KillDamageEffect.prototype.apply = function(world) {
     // ensure the destroy_object message is sent only once, but do allow it to be sent even if target_obj.hp == 0
     if(!this.target_obj.id || (this.target_obj.id === GameObject.DEAD_ID)) { return; }
 
@@ -123,7 +126,6 @@ CombatEngine.KillDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
-    @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -137,7 +139,8 @@ CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source, tar
     this.target_obj = target_obj;
 }
 goog.inherits(CombatEngine.TargetedDamageEffect, CombatEngine.DamageEffect);
-CombatEngine.TargetedDamageEffect.prototype.apply = function() {
+/** @override */
+CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
     if(this.target_obj.is_destroyed()) {
         // target is already dead
         return;
@@ -146,7 +149,6 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
-    @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -168,7 +170,8 @@ CombatEngine.TargetedAuraEffect = function(tick, client_time_hack, source, targe
     this.duration_vs_table = duration_vs_table;
 }
 goog.inherits(CombatEngine.TargetedAuraEffect, CombatEngine.DamageEffect);
-CombatEngine.TargetedAuraEffect.prototype.apply = function() {
+/** @override */
+CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     if(this.target_obj.is_destroyed()) {
         // target is already dead
         return;
@@ -182,7 +185,6 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function() {
 };
 
 /** @constructor
-    @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -207,12 +209,13 @@ CombatEngine.AreaDamageEffect = function(tick, client_time_hack, source, target_
 }
 goog.inherits(CombatEngine.AreaDamageEffect, CombatEngine.DamageEffect);
 
-CombatEngine.AreaDamageEffect.prototype.apply = function() {
+/** @override */
+CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
     // hurt all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, this.radius,
-                                                 { exclude_invul: true,
-                                                   exclude_flying: !this.hit_air,
-                                                   flying_only: (this.hit_air && !this.hit_ground) });
+    var obj_list = world.query_objects_within_distance(this.target_location, this.radius,
+                                                       { exclude_invul: true,
+                                                         exclude_flying: !this.hit_air,
+                                                         flying_only: (this.hit_air && !this.hit_ground) });
     goog.array.forEach(obj_list, function(result) {
         var obj = result.obj;
         var dist = result.dist;
@@ -240,7 +243,6 @@ CombatEngine.AreaDamageEffect.prototype.apply = function() {
 };
 
 /** @constructor
-    @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -275,7 +277,7 @@ CombatEngine.AreaAuraEffect = function(tick, client_time_hack, source, target_lo
 }
 goog.inherits(CombatEngine.AreaAuraEffect, CombatEngine.DamageEffect);
 /** @override */
-CombatEngine.AreaAuraEffect.prototype.apply = function() {
+CombatEngine.AreaAuraEffect.prototype.apply = function(world) {
     var query_r;
     if(this.radius_rect) {
         // query the max possible distance away a unit could be and still be within the rectangle
@@ -287,10 +289,10 @@ CombatEngine.AreaAuraEffect.prototype.apply = function() {
     }
 
     // apply aura to all objects within radius
-    var obj_list = query_objects_within_distance(this.target_location, query_r,
-                                                 { exclude_invul: true,
-                                                   exclude_flying: !this.hit_air,
-                                                   flying_only: (this.hit_air && !this.hit_ground) });
+    var obj_list = world.query_objects_within_distance(this.target_location, query_r,
+                                                       { exclude_invul: true,
+                                                         exclude_flying: !this.hit_air,
+                                                         flying_only: (this.hit_air && !this.hit_ground) });
     goog.array.forEach(obj_list, function(result) {
         var obj = result.obj, dist = result.dist, pos = result.pos;
 

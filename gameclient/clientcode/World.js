@@ -58,7 +58,7 @@ World.World = function(base, objects) {
     }
 
     /** @type {CombatEngine.CombatEngine|null} */
-    this.combat_engine = (base ? new CombatEngine.CombatEngine() : null);
+    this.combat_engine = (base ? new CombatEngine.CombatEngine(this) : null);
 
     /** @type {Citizens.Context|null} */
     this.citizens = null; // army units walking around the base
@@ -99,5 +99,163 @@ World.World.prototype.map_query_stats = function() {
         if(msec >= 0.1) {
             console.log(k + ' ' + msec.toFixed(1) + 'ms per tick');
         }
+    }
+};
+
+
+/** NEW object query function
+    param meanings:
+    ignore_object = ignore this single object
+    exlude_barriers = do not return any barrier objects
+    include_collidable_inerts = include objects that are inert
+    only_team = only return objects on this team
+    mobile_only = only return mobile units
+    exclude_flying = exclude flying mobile units
+    flying_only = only return flying mobile units
+    exclude_invisible_to = ignore objects that are not visible to this team
+
+    @param {!Array.<number>} loc
+    @param {number} dist
+    @param {{nearest_only:(boolean|undefined),
+             tag:(string|undefined),
+             only_team:(string|null|undefined),
+             ignore_object:(Object|undefined),
+             exclude_barriers:(boolean|undefined),
+             exclude_invul:(boolean|undefined),
+             include_collidable_inerts:(boolean|undefined),
+             include_destroyed:(boolean|undefined),
+             exclude_full_health:(boolean|undefined),
+             mobile_only:(boolean|undefined),
+             exclude_flying:(boolean|undefined),
+             flying_only:(boolean|undefined),
+             exclude_invisible_to:(string|null|undefined)}} params
+    @return {!Array.<!GameTypes.GameObjectQueryResult>}
+*/
+World.World.prototype.query_objects_within_distance = function(loc, dist, params) {
+    if(dist <= 0) {
+        return [];
+    }
+    if(params.include_destroyed) {
+        throw Error('include_destroyed not supported'); // since they are not added to the accelerators
+    }
+
+    /** @type {!Array.<!GameTypes.GameObjectQueryResult>} */
+    var ret = [];
+    var neardist = 99999999;
+    var nearest = null; // obj/dist/pos tuple representing nearest object
+
+    // log it
+    var debug_tag = 'tag:' + (params.tag || 'UNKNOWN');
+    if(params.nearest_only) { debug_tag += '_nearest_only'; }
+    if(params.only_team) { debug_tag += '_one_team'; } else { debug_tag += '_any_team'; }
+    var start_time;
+    if(this.MAP_DEBUG) {
+        start_time = (new Date()).getTime();
+    }
+
+    var use_accel = gamedata['client']['use_map_accel'];
+
+    if(use_accel && params.only_team && !this.voxel_map_accel.has_any_of_team(params.only_team)) {
+        // no objects exist
+        debug_tag += ':EMPTY';
+    } else if(use_accel && (dist < gamedata['client']['map_accel_limit'])) {
+        // do not use map accelerator for very large query radii, since it results in lots of unnecessary extra work
+        // due to big objects overlapping many cells
+        var filter = (params.only_team || 'ALL');
+        debug_tag += ':LOCAL';
+        // TEMPORARY - duplicated code
+        var bounds = this.voxel_map_accel.get_circle_bounds_xy_st(loc, dist);
+        if(this.MAP_DEBUG >= 2) {
+            var area_s = (bounds[1][1]-bounds[1][0]);
+            var area_t = (bounds[0][1]-bounds[0][0]);
+            debug_tag += '('+area_s.toString()+','+area_t.toString()+')';
+        }
+        var seen_ids = {};
+        //console.log(" Y "+bounds[1][0]+"-"+bounds[1][1]+" X "+bounds[0][0]+"-"+bounds[0][1]);
+        for(var t = bounds[1][0]; t < bounds[1][1]; t++) {
+            for(var s = bounds[0][0]; s < bounds[0][1]; s++) {
+                var objlist = this.voxel_map_accel.objects_at_st([s,t], filter);
+                if(!objlist) { continue; }
+                for(var i = 0, len = objlist.length; i < len; i++) {
+                    var temp = objlist[i];
+
+                    if(temp.id in seen_ids) { continue; }
+                    seen_ids[temp.id] = 1;
+
+                    if(params.ignore_object && temp === params.ignore_object) { continue; }
+                    if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
+                    if(params.exclude_invul && temp.is_invul()) { continue; }
+                    if(temp.is_inert() && (!params.include_collidable_inerts || !temp.spec['unit_collision_gridsize'][0])) { continue; }
+                    if(params.only_team && params.only_team !== temp.team) { continue; }
+                    if(!params.include_destroyed && temp.is_destroyed()) { continue; }
+                    if(params.exclude_full_health && !temp.is_damaged()) { continue; }
+                    if(params.mobile_only && !temp.is_mobile()) { continue; }
+                    if(params.exclude_flying && temp.is_flying()) { continue; }
+                    if(params.flying_only &&!temp.is_flying()) { continue; }
+                    if(params.exclude_invisible_to && temp.is_invisible() && (temp.team !== params.exclude_invisible_to)) { continue; }
+
+
+
+                    // note: it is OK to use the quantized combat-sim position of the unit here, as long as this is only called
+                    // from combat-sim step functions
+                    var xy = temp.raw_pos();
+                    var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
+                    if(temp_dist < dist) {
+                        var r = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
+                        ret.push(r);
+                        if(temp_dist < neardist) {
+                            nearest = r;
+                            neardist = temp_dist;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // big O(N) query
+        debug_tag += ':GLOBAL';
+        var filter = (params.only_team || 'ALL');
+        var objlist = this.team_map_accel.objects_on_team(filter);
+        if(objlist) {
+            for(var i = 0, len = objlist.length; i < len; i++) {
+                temp = objlist[i];
+                if(params.ignore_object && temp === params.ignore_object) { continue; }
+                if(params.only_team && params.only_team !== temp.team) { continue; }
+                if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
+                if(params.exclude_invul && temp.is_invul()) { continue; }
+                if(temp.is_inert() && (!params.include_collidable_inerts || !temp.spec['unit_collision_gridsize'][0])) { continue; }
+                if(!params.include_destroyed && temp.is_destroyed()) { continue; }
+                if(params.exclude_full_health && !temp.is_damaged()) { continue; }
+                if(params.mobile_only && !temp.is_mobile()) { continue; }
+                if(params.exclude_flying && temp.is_flying()) { continue; }
+                if(params.flying_only &&!temp.is_flying()) { continue; }
+                if(params.exclude_invisible_to && temp.is_invisible() && (temp.team !== params.exclude_invisible_to)) { continue; }
+
+                // note: it is OK to use the "retarded" combat-sim position of the unit here, as long as this is only called
+                // from combat-sim step functions
+                var xy = temp.raw_pos(); // temp.interpolate_pos();
+                var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
+                if(temp_dist < dist) {
+                    var r2 = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
+                    ret.push(r2);
+                    if(temp_dist < neardist) {
+                        nearest = r2;
+                        neardist = temp_dist;
+                    }
+                }
+            }
+        }
+    }
+
+    if(this.MAP_DEBUG) {
+        var end_time = (new Date()).getTime();
+        var secs = (end_time - start_time)/1000;
+        this.map_queries_by_tag[debug_tag] = (this.map_queries_by_tag[debug_tag] || 0) + secs;
+    }
+
+    if(params.nearest_only) {
+        return (!!nearest ? [/** @type {!GameTypes.GameObjectQueryResult} */ (nearest)] : []);
+    } else {
+        return ret;
     }
 };

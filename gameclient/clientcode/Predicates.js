@@ -1523,7 +1523,7 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
     if(obj.ai_target) {
         return vec_distance(obj.interpolate_pos(), obj.ai_target.interpolate_pos()) < this.data['distance'];
     }
-    var obj_list = query_objects_within_distance(obj.interpolate_pos(), this.data['distance'],
+    var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(), this.data['distance'],
                                                  { ignore_object: obj,
                                                    exclude_invul: true,
                                                    only_team: (obj.team == 'enemy' ? 'player' : 'enemy'),

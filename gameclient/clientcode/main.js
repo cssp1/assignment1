@@ -886,18 +886,18 @@ Aura.prototype.apply = function(obj) {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code === 'defense_booster') {
             // apply the defense_boosted aura to this and nearby units
-            var obj_list = query_objects_within_distance(obj.interpolate_pos(),
-                                                         gamedata['map']['range_conversion'] * this.range,
-                                                         { only_team: obj.team, mobile_only: true });
+            var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(),
+                                                                                  gamedata['map']['range_conversion'] * this.range,
+                                                                                  { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
                 o.create_aura(obj, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
-            var obj_list = query_objects_within_distance(obj.interpolate_pos(),
-                                                         gamedata['map']['range_conversion'] * this.range,
-                                                         { only_team: obj.team, mobile_only: true });
+            var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(),
+                                                                                  gamedata['map']['range_conversion'] * this.range,
+                                                                                  { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
                 o2.create_aura(obj, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
@@ -3598,7 +3598,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
         exclude_barriers = (this.team === 'player' && (get_preference_setting(player.preferences, 'auto_unit_control') || !get_preference_setting(player.preferences, 'target_barriers')));
     }
 
-    var obj_list = query_objects_within_distance(my_pos, shoot_range,
+    var obj_list = session.get_real_world().query_objects_within_distance(my_pos, shoot_range,
                                                  { ignore_object: this,
                                                    exclude_invul: true,
                                                    only_team: target_team,
@@ -3885,7 +3885,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
     // It would probably be faster that way.
     for(var j = 0; j < straight_path.length; j++) {
         // XXX note: this will return slightly different results depending on map_accel_chunk!
-        var blocker_list = voxel_map_accel.objects_near_xy(straight_path[j], target_team);
+        var blocker_list = session.get_real_world().voxel_map_accel.objects_near_xy(straight_path[j], target_team);
         if(!blocker_list) { continue; }
         var min_blocker_dist = Infinity; // use minimum distance from us to blocker to break ties
         for(var k = 0; k < blocker_list.length; k++) {
@@ -7499,167 +7499,6 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
     return ret;
 }
 
-// XXXXXX legacy pointers
-var voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator([0,0], 1);
-var team_map_accel = new TeamMapAccelerator.TeamMapAccelerator();
-
-// NEW object query function
-// params:
-// ignore_object = ignore this single object
-// exlude_barriers = do not return any barrier objects
-// include_collidable_inerts = include objects that are inert
-// only_team = only return objects on this team
-// mobile_only = only return mobile units
-// exclude_flying = exclude flying mobile units
-// flying_only = only return flying mobile units
-// exclude_invisible_to = ignore objects that are not visible to this team
-
-/** @param {!Array.<number>} loc
- *  @param {number} dist
- *  @param {{nearest_only:(boolean|undefined),
- *           tag:(string|undefined),
- *           only_team:(string|null|undefined),
- *           ignore_object:(Object|undefined),
- *           exclude_barriers:(boolean|undefined),
- *           exclude_invul:(boolean|undefined),
- *           include_collidable_inerts:(boolean|undefined),
- *           include_destroyed:(boolean|undefined),
- *           exclude_full_health:(boolean|undefined),
- *           mobile_only:(boolean|undefined),
- *           exclude_flying:(boolean|undefined),
- *           flying_only:(boolean|undefined),
- *           exclude_invisible_to:(string|null|undefined)}} params
- * @return {!Array.<!GameTypes.GameObjectQueryResult>}
- */
-function query_objects_within_distance(loc, dist, params) {
-    if(dist <= 0) {
-        return [];
-    }
-    if(params.include_destroyed) {
-        throw Error('include_destroyed not supported'); // since they are not added to the accelerators
-    }
-
-    /** @type {!Array.<!GameTypes.GameObjectQueryResult>} */
-    var ret = [];
-    var neardist = 99999999;
-    var nearest = null; // obj/dist/pos tuple representing nearest object
-
-    // log it
-    var debug_tag = 'tag:' + (params.tag || 'UNKNOWN');
-    if(params.nearest_only) { debug_tag += '_nearest_only'; }
-    if(params.only_team) { debug_tag += '_one_team'; } else { debug_tag += '_any_team'; }
-    var start_time;
-    if(session.get_real_world().MAP_DEBUG) {
-        start_time = (new Date()).getTime();
-    }
-
-    var use_accel = gamedata['client']['use_map_accel'];
-
-    if(use_accel && params.only_team && !voxel_map_accel.has_any_of_team(params.only_team)) {
-        // no objects exist
-        debug_tag += ':EMPTY';
-    } else if(use_accel && (dist < gamedata['client']['map_accel_limit'])) {
-        // do not use map accelerator for very large query radii, since it results in lots of unnecessary extra work
-        // due to big objects overlapping many cells
-        var filter = (params.only_team || 'ALL');
-        debug_tag += ':LOCAL';
-        // TEMPORARY - duplicated code
-        var bounds = voxel_map_accel.get_circle_bounds_xy_st(loc, dist);
-        if(session.get_real_world().MAP_DEBUG >= 2) {
-            var area_s = (bounds[1][1]-bounds[1][0]);
-            var area_t = (bounds[0][1]-bounds[0][0]);
-            debug_tag += '('+area_s.toString()+','+area_t.toString()+')';
-        }
-        var seen_ids = {};
-        //console.log(" Y "+bounds[1][0]+"-"+bounds[1][1]+" X "+bounds[0][0]+"-"+bounds[0][1]);
-        for(var t = bounds[1][0]; t < bounds[1][1]; t++) {
-            for(var s = bounds[0][0]; s < bounds[0][1]; s++) {
-                var objlist = voxel_map_accel.objects_at_st([s,t], filter);
-                if(!objlist) { continue; }
-                for(var i = 0, len = objlist.length; i < len; i++) {
-                    var temp = objlist[i];
-
-                    if(temp.id in seen_ids) { continue; }
-                    seen_ids[temp.id] = 1;
-
-                    if(params.ignore_object && temp === params.ignore_object) { continue; }
-                    if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
-                    if(params.exclude_invul && temp.is_invul()) { continue; }
-                    if(temp.is_inert() && (!params.include_collidable_inerts || !temp.spec['unit_collision_gridsize'][0])) { continue; }
-                    if(params.only_team && params.only_team !== temp.team) { continue; }
-                    if(!params.include_destroyed && temp.is_destroyed()) { continue; }
-                    if(params.exclude_full_health && !temp.is_damaged()) { continue; }
-                    if(params.mobile_only && !temp.is_mobile()) { continue; }
-                    if(params.exclude_flying && temp.is_flying()) { continue; }
-                    if(params.flying_only &&!temp.is_flying()) { continue; }
-                    if(params.exclude_invisible_to && temp.is_invisible() && (temp.team !== params.exclude_invisible_to)) { continue; }
-
-
-
-                    // note: it is OK to use the quantized combat-sim position of the unit here, as long as this is only called
-                    // from combat-sim step functions
-                    var xy = temp.raw_pos();
-                    var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
-                    if(temp_dist < dist) {
-                        var r = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
-                        ret.push(r);
-                        if(temp_dist < neardist) {
-                            nearest = r;
-                            neardist = temp_dist;
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        // big O(N) query
-        debug_tag += ':GLOBAL';
-        var filter = (params.only_team || 'ALL');
-        var objlist = team_map_accel.objects_on_team(filter);
-        if(objlist) {
-            for(var i = 0, len = objlist.length; i < len; i++) {
-                temp = objlist[i];
-                if(params.ignore_object && temp === params.ignore_object) { continue; }
-                if(params.only_team && params.only_team !== temp.team) { continue; }
-                if(params.exclude_barriers && temp.spec['name'] === 'barrier') { continue; }
-                if(params.exclude_invul && temp.is_invul()) { continue; }
-                if(temp.is_inert() && (!params.include_collidable_inerts || !temp.spec['unit_collision_gridsize'][0])) { continue; }
-                if(!params.include_destroyed && temp.is_destroyed()) { continue; }
-                if(params.exclude_full_health && !temp.is_damaged()) { continue; }
-                if(params.mobile_only && !temp.is_mobile()) { continue; }
-                if(params.exclude_flying && temp.is_flying()) { continue; }
-                if(params.flying_only &&!temp.is_flying()) { continue; }
-                if(params.exclude_invisible_to && temp.is_invisible() && (temp.team !== params.exclude_invisible_to)) { continue; }
-
-                // note: it is OK to use the "retarded" combat-sim position of the unit here, as long as this is only called
-                // from combat-sim step functions
-                var xy = temp.raw_pos(); // temp.interpolate_pos();
-                var temp_dist = vec_distance(loc, xy) - temp.hit_radius();
-                if(temp_dist < dist) {
-                    var r2 = new GameTypes.GameObjectQueryResult(temp, temp_dist, xy);
-                    ret.push(r2);
-                    if(temp_dist < neardist) {
-                        nearest = r2;
-                        neardist = temp_dist;
-                    }
-                }
-            }
-        }
-    }
-
-    if(session.get_real_world().MAP_DEBUG) {
-        var end_time = (new Date()).getTime();
-        var secs = (end_time - start_time)/1000;
-        session.get_real_world().map_queries_by_tag[debug_tag] = (session.get_real_world().map_queries_by_tag[debug_tag] || 0) + secs;
-    }
-
-    if(params.nearest_only) {
-        return (!!nearest ? [/** @type {!GameTypes.GameObjectQueryResult} */ (nearest)] : []);
-    } else {
-        return ret;
-    }
-}
-
 // update resource_state from server protocol message
 var update_resources_is_first_call = true;
 function update_resources(data, init) {
@@ -7852,8 +7691,8 @@ function run_unit_ticks() {
         }
 
         // rebuild map query acceleration data structure
-        voxel_map_accel.clear();
-        team_map_accel.clear();
+        session.get_real_world().voxel_map_accel.clear();
+        session.get_real_world().team_map_accel.clear();
         session.get_real_world().map_queries_by_tag['ticks'] += 1;
         if(obj_list[0] !== null) {
             for(i = 0; i < obj_list.length; i++) {
@@ -7866,8 +7705,8 @@ function run_unit_ticks() {
 
                 if(!obj.is_destroyed()) {
                     // don't bother adding destroyed objects, since no users of query_objects_within_distance() look for destroyed things
-                    team_map_accel.add_object(obj);
-                    voxel_map_accel.add_object(obj);
+                    session.get_real_world().team_map_accel.add_object(obj);
+                    session.get_real_world().voxel_map_accel.add_object(obj);
                 }
             }
             for(i = 0; i < obj_list.length; i++) {
@@ -8364,7 +8203,7 @@ Mobile.prototype.run_ai = function() {
         // it would be better to use a particle-cell model and accumulate unit density in a grid
         // data structure.
 
-        var objlist = query_objects_within_distance(pos, declump_radius,
+        var objlist = session.get_real_world().query_objects_within_distance(pos, declump_radius,
                                                     { ignore_object: this,
                                                       // should this also look at inerts? not sure...
                                                       // but, collidable inerts generally have a big extent, so I'm not sure
@@ -43775,8 +43614,6 @@ function handle_server_message(data) {
         //legacy pointers
         astar_map = session.get_real_world().astar_map;
         astar_context = session.get_real_world().astar_context;
-        voxel_map_accel = session.get_real_world().voxel_map_accel;
-        team_map_accel = session.get_real_world().team_map_accel;
 
         // read object state from server
         session.cur_objects.clear();
@@ -48815,7 +48652,7 @@ function draw_building_or_inert(obj, powerfac) {
                       ];
 
         for(var i = 0; i < OFFSETS.length; i++) {
-            var objlist = voxel_map_accel.objects_near_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
+            var objlist = session.get_draw_world().voxel_map_accel.objects_near_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
             if(objlist) {
                 for(var j = 0; j < objlist.length; j++) {
                     var o = objlist[j];
