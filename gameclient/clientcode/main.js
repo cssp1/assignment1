@@ -7990,7 +7990,7 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
         invalidate_defender_threatlists();
         if(unit_deployment_latency_high()) {
             // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
-            add_unit_deployment_vfx('post_deploy', this.interpolate_pos(), this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
+            add_unit_deployment_vfx('post_deploy', this.pos, this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
         }
     }
 };
