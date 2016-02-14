@@ -40,9 +40,12 @@ GameObjectCollection.GameObjectCollection.prototype.clear = function() {
     this.objects = {};
 };
 
-/** @param {function(!GameObjectId, !GameObject)} func */
-GameObjectCollection.GameObjectCollection.prototype.for_each = function(func) {
+/** @param {function(this: T, !GameObjectId, !GameObject) : ?} func
+    @param {T=} opt_obj
+    @suppress {reportUnknownTypes}
+    @template T */
+GameObjectCollection.GameObjectCollection.prototype.for_each = function(func, opt_obj) {
     for(var id in this.objects) {
-        func(id, this.objects[id]);
+        func.call(opt_obj, id, this.objects[id]);
     }
 };

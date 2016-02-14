@@ -9,6 +9,7 @@ goog.provide('BattleReplay');
 */
 
 goog.require('Base');
+goog.require('GameObjectCollection');
 
 BattleReplay.invoke = function(log) {
     if(!log || log.length < 1 || log[0]['event_name'] !== '3820_battle_start' ||
@@ -19,8 +20,9 @@ BattleReplay.invoke = function(log) {
     var props_3820 = log[0];
 
     var base = new Base.Base(props_3820['base_id'], props_3820['base']);
+    var objects = new GameObjectCollection.GameObjectCollection();
     goog.array.forEach(props_3820['base_objects'], function(state) {
         var obj = create_object(state, false);
-        session.add_object(obj); // XXXXXX
+        objects.add_object(obj);
     });
 };
