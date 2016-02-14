@@ -183,6 +183,7 @@ def is_valid_alliance_descr(name):
     for c in name:
         if c in descr_disallowed_chars: return False
     if chat_filter.is_bad(name): return False
+    if chat_filter.is_ugly(name): return False
     return True
 
 def is_valid_alliance_name(name):
@@ -211,6 +212,7 @@ def is_valid_alias(name):
     for c in name:
         if c in alias_disallowed_chars: return False
     if chat_filter.is_bad(name): return False
+    if chat_filter.is_graphical(name): return False
     if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
     return True

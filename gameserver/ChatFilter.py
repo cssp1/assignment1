@@ -150,19 +150,22 @@ class ChatFilter(object):
 
         return False
 
-    # block abuse of Unicode special characters to create "ugly" text
+    # scan for non-letter "graphics" like smiley faces
+    def is_graphical(self, input):
+        for i in xrange(len(input)):
+            codepoint = ord(input[i])
+            # see https://en.wikipedia.org/wiki/Unicode_block
+            if codepoint >= 0x2100 and codepoint <= 0x2bff:
+                return True
+        return False
+
+    # scan for abuse of Unicode special characters to create text that renders improperly
     def is_ugly(self, input):
         nonspacing_run = 0 # don't allow very long runs of nonspacing characters
 
         for i in xrange(len(input)):
             codepoint = ord(input[i])
             next_codepoint = ord(input[i+1]) if i < len(input)-1 else None
-
-            # disallow some Unicode special characters
-            # see https://en.wikipedia.org/wiki/Unicode_block
-            if codepoint >= 0x2100 and codepoint <= 0x2bff and \
-               codepoint not in (0x263a,0x263b,0x2665): # allow a select few smiley faces that players like
-                return True
 
             # disallow nonsense duplications of nonspacing marks (e.g. Arabic diacritics)
             if self.is_diacritic(codepoint):
@@ -226,7 +229,8 @@ if __name__ == '__main__':
     assert not cf.is_spammy('65645645')
 
     assert not cf.is_ugly(u'aaabcd')
-    assert cf.is_ugly(u'aa\u21f0aa')
+    assert not cf.is_graphical(u'aaabcd')
+    assert cf.is_graphical(u'aa\u21f0aa')
     assert cf.is_ugly(u'abc\u0627\u0651\u0651\u0651\u0651\u0651\u0651')
     assert cf.is_ugly(u'abc\u0627\u0651\u0652\u0651\u0652\u0651\u0652\u0651')
     assert not cf.is_ugly(u'abc\u0627\u0651\u0652\u0653\u0654abcd')
