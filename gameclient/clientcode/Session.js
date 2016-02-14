@@ -256,9 +256,11 @@ Session.Session.prototype.quarry_victory_satisfied = function() {
     return true;
 };
 
-// add new object to session
+// add new object to session (implicitly, to the real world)
 Session.Session.prototype.add_object = function(obj) {
-    this.cur_objects.add_object(obj);
+    var world = this.get_real_world();
+    world.objects.add_object(obj);
+    obj.world = world;
 
     // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
     if(this.home_base && this.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {

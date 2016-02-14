@@ -28,6 +28,7 @@ World.World = function(base, objects) {
 
     /** @type {GameObjectCollection.GameObjectCollection|null} */
     this.objects = objects;
+    if(objects) { objects.for_each(function(obj) { obj.world = this; }, this); }
 
     /** @type {?AStar.AStarRectMap} current A* map for playfield movement queries */
     this.astar_map = (base ? new AStar.AStarRectMap(base.ncells(), null, ('allow_diagonal_passage' in gamedata['map'] ? gamedata['map']['allow_diagonal_passage'] : true)) : null);
@@ -59,6 +60,9 @@ World.World = function(base, objects) {
 
     /** @type {CombatEngine.CombatEngine|null} */
     this.combat_engine = (base ? new CombatEngine.CombatEngine(this) : null);
+
+    /** @type {number} client_time at which last unit simulation tick was run */
+    this.last_tick_time = 0;
 
     /** @type {Citizens.Context|null} */
     this.citizens = null; // army units walking around the base
@@ -257,5 +261,78 @@ World.World.prototype.query_objects_within_distance = function(loc, dist, params
         return (!!nearest ? [/** @type {!GameTypes.GameObjectQueryResult} */ (nearest)] : []);
     } else {
         return ret;
+    }
+};
+
+World.World.prototype.run_unit_ticks = function() {
+    if(client_time - this.last_tick_time > TICK_INTERVAL/combat_time_scale()) {
+        // record time at which this tick was computed
+        this.last_tick_time = client_time;
+
+        if(this.wall_mgr && this.objects) { this.wall_mgr.refresh(this.objects); }
+
+        ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
+
+        if(astar_map) {
+            astar_map.cleanup();
+        }
+
+        // Limit the number of A* path queries that can be run per
+        // unit tick. Massive numbers of units re-targeting at the same time often
+        // causes performance glitches
+        tick_astar_queries_left = gamedata['client']['astar_max_queries_per_tick'];
+
+        // randomly permute the order of objects each tick, so we don't starve
+        // out objects waiting for A*
+        // http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        // (note: will need to be deterministically seeded if we want deterministic combat)
+
+        var obj_list = [null];
+        var i = 0;
+        for(var id in session.cur_objects.objects) {
+            var obj = session.cur_objects.objects[id];
+            // ignore inerts with no auras or contiuously-casting spells on them
+            if(obj.is_inert() && obj.auras.length === 0 && !('continuous_cast' in obj.spec)) { continue; }
+
+            var j = Math.floor(Math.random()*(i+1));
+            obj_list[i] = obj_list[j];
+            obj_list[j] = obj;
+            i++;
+        }
+
+        // rebuild map query acceleration data structure
+        this.voxel_map_accel.clear();
+        this.team_map_accel.clear();
+        this.map_queries_by_tag['ticks'] += 1;
+        if(obj_list[0] !== null) {
+            for(i = 0; i < obj_list.length; i++) {
+                var obj = obj_list[i];
+
+                // check for any objects in blocked areas
+                if(PLAYFIELD_DEBUG && obj.is_mobile() && !obj.is_destroyed()) {
+                    playfield_check_path([obj.pos, obj.next_pos], 'pos->next_pos at beginning of tick');
+                }
+
+                if(!obj.is_destroyed()) {
+                    // don't bother adding destroyed objects, since no users of query_objects_within_distance() look for destroyed things
+                    this.team_map_accel.add_object(obj);
+                    this.voxel_map_accel.add_object(obj);
+                }
+            }
+            for(i = 0; i < obj_list.length; i++) {
+                obj_list[i].run_tick();
+            }
+        }
+
+        // run phantom unit controllers
+        tick_astar_queries_left = -1; // should not disturb actual unit control
+        goog.array.forEach(SPFX.get_phantom_objects(this), function(obj) {
+            obj.run_control();
+            obj.update_facing();
+        });
+
+        apply_queued_damage_effects();
+        flush_dirty_objects({urgent_only:true, skip_check:true});
+        this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
     }
 };

@@ -32,7 +32,7 @@ WallManager.WallManager = function(size, spec) {
 };
 
 /** Update neighbor states
-    @param {!Object.<string,GameObject>} obj_dict - the current objects in the session */
+    @param {!GameObjectCollection.GameObjectCollection} obj_dict - the current objects in the session */
 WallManager.WallManager.prototype.refresh = function(obj_dict) {
     if(!this.dirty) { return; }
     this.dirty = false;
@@ -44,16 +44,15 @@ WallManager.WallManager.prototype.refresh = function(obj_dict) {
 
     // pass 1: find barriers and build bitmap
     var obj_list = [];
-    for(var id in obj_dict) {
-        var obj = obj_dict[id];
-        if(obj.spec !== this.spec || obj.is_destroyed()) { continue; }
+    obj_dict.for_each(function(obj) {
+        if(obj.spec !== this.spec || obj.is_destroyed()) { return; }
         obj_list.push(obj);
 
         // add to bitmap
         var y = Math.floor(obj.y / this.gs[1]);
         var x = Math.floor(obj.x / this.gs[0]);
         this.bitmap[this.chunk[0]*y + x] = 1;
-    }
+    }, this);
 
     // pass 2: set up new neighbor states
     var DIRECTIONS = [[0,-1],[1,0],[0,1],[-1,0]]; // NESW offsets

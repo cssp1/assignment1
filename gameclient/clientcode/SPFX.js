@@ -248,13 +248,15 @@ SPFX.draw_ui = function() {
         SPFX.current_ui[id].draw();
     }
 };
-SPFX.get_phantom_objects = function() {
+/** @param {!World.World} world - XXX this should come from the SPFX world parent instead */
+SPFX.get_phantom_objects = function(world) {
     var ret = [];
     goog.array.forEach(goog.object.getValues(SPFX.current_phantoms), function(fx) {
         var obj = (/** @type {SPFX.PhantomUnit} */ (fx)).get_phantom_object(); // will throw if it's not a SPFX.PhantomUnit
         if(obj === null) { // done
             SPFX.remove(fx);
         } else {
+            obj.world = world;
             ret.push(obj);
         }
     });

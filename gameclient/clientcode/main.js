@@ -1120,6 +1120,10 @@ var TeamId = {};
 
 /** @constructor */
 function GameObject() {
+    /** @type {World.World|null} - undesirable to have a backreference
+     * here, maybe try to eliminate it once the combat/AI code moves to World? */
+    this.world = null;
+
     /** @type {GameObjectId} */
     this.id = 'DEAD'; // = DEAD_ID if the object is "dead" or otherwise not part of the game world
 
@@ -7608,8 +7612,8 @@ var LAST_ANIM_FRAME_TIMEOUT = 0;
 
 var COMBAT_ENGINE_USE_TICKS = false;
 
+/** @const */
 var TICK_INTERVAL = 0.25; // # of seconds between unit simulation ticks
-var last_tick_time = 0; // client_time at which last unit simulation tick was run
 
 // temporary bridge until entire combat engine is converted to ticks
 /** @param {number} t
@@ -7652,80 +7656,6 @@ var last_loot_text_count = 0;
 var last_loot_text_pos = null;
 
 var tick_astar_queries_left = 0;
-
-function run_unit_ticks() {
-    if(client_time - last_tick_time > TICK_INTERVAL/combat_time_scale()) {
-        // record time at which this tick was computed
-        last_tick_time = client_time;
-
-        var world = session.get_real_world();
-        if(world.wall_mgr) { world.wall_mgr.refresh(world.objects); }
-
-        ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
-
-        if(astar_map) {
-            astar_map.cleanup();
-        }
-
-        // Limit the number of A* path queries that can be run per
-        // unit tick. Massive numbers of units re-targeting at the same time often
-        // causes performance glitches
-        tick_astar_queries_left = gamedata['client']['astar_max_queries_per_tick'];
-
-        // randomly permute the order of objects each tick, so we don't starve
-        // out objects waiting for A*
-        // http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-        // (note: will need to be deterministically seeded if we want deterministic combat)
-
-        var obj_list = [null];
-        var i = 0;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            // ignore inerts with no auras or contiuously-casting spells on them
-            if(obj.is_inert() && obj.auras.length === 0 && !('continuous_cast' in obj.spec)) { continue; }
-
-            var j = Math.floor(Math.random()*(i+1));
-            obj_list[i] = obj_list[j];
-            obj_list[j] = obj;
-            i++;
-        }
-
-        // rebuild map query acceleration data structure
-        session.get_real_world().voxel_map_accel.clear();
-        session.get_real_world().team_map_accel.clear();
-        session.get_real_world().map_queries_by_tag['ticks'] += 1;
-        if(obj_list[0] !== null) {
-            for(i = 0; i < obj_list.length; i++) {
-                var obj = obj_list[i];
-
-                // check for any objects in blocked areas
-                if(PLAYFIELD_DEBUG && obj.is_mobile() && !obj.is_destroyed()) {
-                    playfield_check_path([obj.pos, obj.next_pos], 'pos->next_pos at beginning of tick');
-                }
-
-                if(!obj.is_destroyed()) {
-                    // don't bother adding destroyed objects, since no users of query_objects_within_distance() look for destroyed things
-                    session.get_real_world().team_map_accel.add_object(obj);
-                    session.get_real_world().voxel_map_accel.add_object(obj);
-                }
-            }
-            for(i = 0; i < obj_list.length; i++) {
-                obj_list[i].run_tick();
-            }
-        }
-
-        // run phantom unit controllers
-        tick_astar_queries_left = -1; // should not disturb actual unit control
-        goog.array.forEach(SPFX.get_phantom_objects(), function(obj) {
-            obj.run_control();
-            obj.update_facing();
-        });
-
-        apply_queued_damage_effects();
-        flush_dirty_objects({urgent_only:true, skip_check:true});
-        session.get_real_world().combat_engine.cur_tick = new GameTypes.TickCount(session.get_real_world().combat_engine.cur_tick.get()+1);
-    }
-}
 
 // cause all defending units/turrets to recalculate their threatlists
 // called when new attacking units are spawned
@@ -8130,7 +8060,7 @@ Mobile.prototype.raw_pos = function() { return this.pos; };
 
 // interpolated location at current client_time
 Mobile.prototype.interpolate_pos = function () {
-    var progress = (visit_base_pending ? 1 : (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    var progress = (visit_base_pending ? 1 : (client_time - this.world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
     return vec_add(this.pos, vec_scale(progress, vec_sub(this.next_pos, this.pos)));
 };
 
@@ -8144,7 +8074,7 @@ Mobile.prototype.interpolate_pos_for_draw = function() {
 };
 
 GameObject.prototype.interpolate_facing = function() {
-    var progress = (visit_base_pending ? 1 : (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    var progress = (visit_base_pending ? 1 : (client_time - this.world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
     return this.cur_facing + progress*(this.next_facing - this.cur_facing);
 };
 
@@ -47516,7 +47446,7 @@ function do_draw() {
         session.get_real_world().do_update_citizens(player);
 
         // run game simulation tick, if enough time has elapsed since last tick
-        run_unit_ticks();
+        session.get_draw_world().run_unit_ticks();
 
         // if enough time has elapsed, save combat damage states to server
         if(client_time - last_combat_save > gamedata['client']['combat_state_save_interval']) {
@@ -47771,7 +47701,7 @@ function do_draw() {
                 world.objects.for_each(draw_shadow);
 
                 // prepare phantom objects for drawing and draw shadows if necessary
-                var phantom_objects = SPFX.get_phantom_objects();
+                var phantom_objects = SPFX.get_phantom_objects(world);
                 goog.array.forEach(phantom_objects, function(obj) {
                     obj.update_draw_pos();
                     draw_shadow(obj);
@@ -49096,7 +49026,7 @@ function draw_unit(unit) {
             // melee strikes
             var spell = gamedata['spells'][unit.control_spellname];
             // seconds remaining before next strike initiation
-            var remaining_cooldown = unit.control_cooldown * TICK_INTERVAL - (client_time - last_tick_time);
+            var remaining_cooldown = unit.control_cooldown * TICK_INTERVAL - (client_time - unit.world.last_tick_time);
 
             // calculate the spell's final cooldown value, accounting for things like unit rate of fire and power loss
             var cooldown = unit.get_leveled_quantity(spell['cooldown']);
@@ -49320,9 +49250,10 @@ function draw_aura(xy, indicator_xy, aura) {
     @param {!GameTypes.TickCount} start_tick
     @param {!GameTypes.TickCount} end_tick */
 function draw_clock(xy, color, start_tick, end_tick) {
-    if(GameTypes.TickCount.lt(session.get_real_world().combat_engine.cur_tick, start_tick) ||
-       GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, end_tick)) { return; }
-    var client_tick_smooth = session.get_real_world().combat_engine.cur_tick.get() + (client_time - last_tick_time)/(TICK_INTERVAL/combat_time_scale());
+    var world = session.get_draw_world();
+    if(GameTypes.TickCount.lt(world.combat_engine.cur_tick, start_tick) ||
+       GameTypes.TickCount.gt(world.combat_engine.cur_tick, end_tick)) { return; }
+    var client_tick_smooth = world.combat_engine.cur_tick.get() + (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale());
     var progress;
     if(end_tick.get() - start_tick.get() > 1.5/TICK_INTERVAL) {
         progress = (client_tick_smooth - start_tick.get()) / (end_tick.get() - start_tick.get());
