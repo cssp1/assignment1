@@ -34,7 +34,7 @@ Backdrop.draw_area_bounds = function(ncells) {
 Backdrop.draw_scenery = function(base, cur_objects) {
     // draw scenery objects
     var obj_list = [];
-    cur_objects.for_each(function(id, obj) {
+    cur_objects.for_each(function(obj) {
         if(obj.spec['is_scenery'] && obj.spec['draw_flat'] && (SPFX.detail >= 0 || obj.spec['is_debris'])) {
             obj.update_draw_pos();
             obj_list.push(obj);
@@ -49,7 +49,7 @@ Backdrop.draw_scenery = function(base, cur_objects) {
         var climate_data = (base && goog.object.getCount(base.base_climate_data)>0 ? base.base_climate_data : gamedata['climates'][gamedata['default_climate']]);
         if('building_bases' in climate_data) {
             var base_list = [];
-            cur_objects.for_each(function(id, obj) {
+            cur_objects.for_each(function(obj) {
                 if(obj.is_building()) {
                     var key = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
                     if(key in climate_data['building_bases']) {
