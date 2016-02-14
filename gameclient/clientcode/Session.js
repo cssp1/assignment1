@@ -11,8 +11,8 @@ goog.provide('Session');
 goog.require('Base');
 goog.require('GameTypes');
 goog.require('CombatEngine');
-goog.require('Citizens');
 goog.require('GameObjectCollection');
+goog.require('World');
 goog.require('goog.object');
 goog.require('goog.array');
 
@@ -99,31 +99,27 @@ Session.Session = function() {
     this.viewing_isolate_pvp = 0; // isolate_pvp flag of base being viewed
     this.repeat_attack_cooldown_expire = 0; // repeat attack cooldown expiration time of base being viewed
 
-    /** @type Citizens.Context */
-    this.citizens = null; // army units walking around the base
-    this.citizens_dirty = false;
+    /** @type {!Array<!World.World>}
+        Bottom-most element is the "real" world, replays push a "virtual" world on top */
+    this.world_stack = [];
+    this.set_viewing_base(null);
 };
 
-Session.Session.prototype.lazy_update_citizens = function() { this.citizens_dirty = true; };
-Session.Session.prototype.do_update_citizens = function() {
-    if(this.citizens) {
-        var data_list;
-        if(this.citizens_dirty) { // need to tell Citizens about changes to army contents
-            this.citizens_dirty = false;
-            data_list = [];
-            goog.object.forEach(player.my_army, function(obj) {
-                if((obj['squad_id']||0) == SQUAD_IDS.BASE_DEFENDERS) {
-                    data_list.push(new Citizens.UnitData(obj['obj_id'], obj['spec'], obj['level']||1, ('hp_ratio' in obj ? obj['hp_ratio'] : 1)));
-                }
-            }, this);
-        } else {
-            data_list = null; // no update to army contents
-        }
-        this.citizens.update(data_list);
-    }
+/** @param {Base.Base|null} new_base */
+Session.Session.prototype.set_viewing_base = function(new_base) {
+    this.viewing_base = new_base;
+    // reinitialize world stack
+    goog.array.forEach(this.world_stack, function(world) { world.dispose(); });
+    this.world_stack = [new World.World(this.viewing_base, this.cur_objects)];
 };
+/** @param {!World.World} new_world */
+Session.Session.prototype.push_world = function(new_world) { return this.world_stack.push(new_world); };
 
+/** @return {!World.World} world at top of stack that should be drawn */
+Session.Session.prototype.get_draw_world = function() { return this.world_stack[this.world_stack.length-1]; };
 
+/** @return {!World.World} the "real" world the player is connected to */
+Session.Session.prototype.get_real_world = function() { return this.world_stack[0]; };
 
 Session.Session.prototype.incoming_attack_pending = function() { return (this.incoming_attack_time > server_time); };
 Session.Session.prototype.connected = function() { return this.connect_time > 0; };

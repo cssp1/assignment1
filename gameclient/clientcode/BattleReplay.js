@@ -10,6 +10,7 @@ goog.provide('BattleReplay');
 
 goog.require('Base');
 goog.require('GameObjectCollection');
+goog.require('Session');
 
 BattleReplay.invoke = function(log) {
     if(!log || log.length < 1 || log[0]['event_name'] !== '3820_battle_start' ||
@@ -25,4 +26,7 @@ BattleReplay.invoke = function(log) {
         var obj = create_object(state, false);
         objects.add_object(obj);
     });
+
+    var world = new World.World(base, objects);
+    session.push_world(world);
 };

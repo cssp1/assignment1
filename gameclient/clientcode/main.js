@@ -16177,7 +16177,7 @@ function invoke_recycle_dialog(obj) {
                 // snoop update into my_army
                 if(_obj['obj_id'] in player.my_army) {
                     delete player.my_army[_obj['obj_id']];
-                    session.lazy_update_citizens();
+                    session.get_real_world().lazy_update_citizens();
                 }
                 if(_obj['obj_id'] in session.cur_objects.objects) {
                     remove_object(session.cur_objects.objects[_obj['obj_id']]);
@@ -16191,7 +16191,7 @@ function invoke_recycle_dialog(obj) {
                 // snoop update into my_army
                 if(_obj.id in player.my_army) {
                     delete player.my_army[_obj.id];
-                    session.lazy_update_citizens();
+                    session.get_real_world().lazy_update_citizens();
                 }
                 remove_object(_obj);
                 session.clear_building_idle_state_caches();
@@ -24630,7 +24630,7 @@ function invoke_unit_donation_dialog(req) {
                     // snoop update into my_army
                     if(obj_id in player.my_army) {
                         delete player.my_army[obj_id];
-                        session.lazy_update_citizens();
+                        session.get_real_world().lazy_update_citizens();
                     }
                     // remove from session
                     if(obj_id in session.cur_objects.objects) {
@@ -43492,11 +43492,11 @@ function handle_server_message(data) {
         goog.array.forEach(data[1], function(state) {
             player.my_army[state['obj_id']] = state;
         });
-        session.lazy_update_citizens();
+        session.get_real_world().lazy_update_citizens();
     } else if(msg == "PLAYER_ARMY_UPDATE_DESTROYED") {
         var obj_id = data[1];
         if(obj_id in player.my_army) { delete player.my_army[obj_id]; }
-        session.lazy_update_citizens();
+        session.get_real_world().lazy_update_citizens();
     } else if(msg == "REGION_CHANGE") {
         change_region_pending = null;
         var new_region_id = data[1];
@@ -43740,10 +43740,7 @@ function handle_server_message(data) {
 
         // blow away the old session
         change_selection(null);
-        if(session.citizens) {
-            session.citizens.dispose();
-            session.citizens = null;
-        }
+
         SPFX.clear();
         offscreen_unit_arrow = null;
         visit_base_pending = false;
@@ -43788,16 +43785,16 @@ function handle_server_message(data) {
         session.viewing_isolate_pvp = data[13];
         session.repeat_attack_cooldown_expire = data[14];
 
-        session.viewing_base = new Base.Base(data[16], // viewing_base_id
-                                             {'deployment_buffer': data[15],
-                                              'base_landlord_id': data[17],
-                                              'base_climate': data[18],
-                                              'base_map_loc': data[19],
-                                              'base_expire_time': data[20],
-                                              'base_ui_name': data[21],
-                                              'base_type': data[22],
-                                              'base_ncells': data[23],
-                                              'base_last_attack_time': data[27] || -1});
+        session.set_viewing_base(new Base.Base(data[16], // viewing_base_id
+                                               {'deployment_buffer': data[15],
+                                                'base_landlord_id': data[17],
+                                                'base_climate': data[18],
+                                                'base_map_loc': data[19],
+                                                'base_expire_time': data[20],
+                                                'base_ui_name': data[21],
+                                                'base_type': data[22],
+                                                'base_ncells': data[23],
+                                                'base_last_attack_time': data[27] || -1}));
 
         session.viewing_player_home_base_id = data[24];
         session.viewing_player_home_region = data[25];
@@ -43917,9 +43914,10 @@ function handle_server_message(data) {
         enemy.stattab = {'player':{},'units':{},'buildings':{},'INIT':'enemy'};
         enemy.player_auras = [];
 
+        // XXXXXX move to set_viewing_base()
         if(session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens'])) {
-            session.citizens = new Citizens.Context(session.viewing_base, astar_context);
-            session.lazy_update_citizens();
+            session.get_real_world().citizens = new Citizens.Context(session.viewing_base, astar_context);
+            session.get_real_world().lazy_update_citizens();
         }
 
         init_desktop_dialogs();
@@ -47766,7 +47764,7 @@ function do_draw() {
         mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]); // pass current cursor location
 
         // run deferred citizens update
-        session.do_update_citizens();
+        session.get_real_world().do_update_citizens(player);
 
         // run game simulation tick, if enough time has elapsed since last tick
         run_unit_ticks();
@@ -47941,6 +47939,8 @@ function do_draw() {
 
         } // END only do these if actually running, not timed out or waiting for session change
 
+        var world = session.get_draw_world();
+
         var powerfac = (session.viewing_base ? session.viewing_base.power_factor() : 1);
 
         if(mouse_state.hovering_over && mouse_tooltip) {
@@ -47994,14 +47994,14 @@ function do_draw() {
             // draw backdrop
             if(get_query_string('nobackdrop') === '1') {
                 Backdrop.draw_blank();
-                if(session.viewing_base) {
-                    Backdrop.draw_area_bounds(session.viewing_base.ncells());
+                if(world.base) {
+                    Backdrop.draw_area_bounds(world.base.ncells());
                 }
             } else {
-                Backdrop.draw(session.viewing_base,
-                              session.cur_objects,
-                              session.home_base,
-                              (session.viewing_base && (session.viewing_base.base_landlord_id === session.user_id)),
+                Backdrop.draw(world.base,
+                              world.objects,
+                              (world.base === null || world.base.base_id === player.home_base_id),
+                              (world.base && (world.base.base_landlord_id === session.user_id)),
                               draw_playfield_objects);
             }
 
@@ -48019,9 +48019,7 @@ function do_draw() {
                 SPFX.draw_under();
 
                 // draw flying unit shadows
-                for(var id in session.cur_objects.objects) {
-                    draw_shadow(session.cur_objects.objects[id]);
-                }
+                world.objects.for_each(draw_shadow);
 
                 // prepare phantom objects for drawing and draw shadows if necessary
                 var phantom_objects = SPFX.get_phantom_objects();
@@ -48046,13 +48044,12 @@ function do_draw() {
                 }
 
                 if(gamedata['client']['highlight_enemy_units'] && session.has_attacked) {
-                    for(var id in session.cur_objects.objects) {
-                        var obj = session.cur_objects.objects[id];
+                    world.objects.for_each(function(obj) {
                         if(obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
                            (!obj.spec['cloaked'] || !obj.is_invisible())) {
                             draw_selection_highlight(obj);
                         }
-                    }
+                    });
                 }
 
                 if(!selection.ui && !session.has_attacked && mouse_state.hovering_over && mouse_state.hovering_over.is_building() && mouse_state.hovering_over.team == 'player') {
@@ -48074,13 +48071,12 @@ function do_draw() {
                 // draw units and buildings in sorted Z-order
                 var scene = [];
 
-                for(var id in session.cur_objects.objects) {
-                    var obj = session.cur_objects.objects[id];
+                world.objects.for_each(function(obj) {
                     if(!obj.spec['is_scenery'] || !obj.spec['draw_flat']) {
                         obj.update_draw_pos();
                         scene.push(obj);
                     }
-                }
+                });
                 goog.array.forEach(phantom_objects, function(obj) {
                     scene.push(obj);
                 });
@@ -48124,9 +48120,9 @@ function do_draw() {
         draw_drag_selection();
 
         // draw a transparent black rect over the screen to simulate darkened lighting
-        if(session.viewing_base && ('light_level' in session.viewing_base.base_climate_data) && (SPFX.detail >= 2) && draw_playfield_objects) {
+        if(world.base && ('light_level' in world.base.base_climate_data) && (SPFX.detail >= 2) && draw_playfield_objects) {
             ctx.save();
-            ctx.fillStyle = 'rgba(0,0,0,'+(1-session.viewing_base.base_climate_data['light_level']).toString()+')';
+            ctx.fillStyle = 'rgba(0,0,0,'+(1-world.base.base_climate_data['light_level']).toString()+')';
             ctx.fillRect(0,0,canvas_width,canvas_height);
             ctx.restore();
         }
@@ -48139,7 +48135,7 @@ function do_draw() {
         } else if(session.incoming_attack_pending() && session.incoming_attack_direction && session.incoming_attack_direction != 'tutorial') {
             var spawn_location = gamedata['ai_attacks_client']['directions'][session.incoming_attack_direction];
             // exaggerate spawn_location's distance from the middle of the map in order to force it offscreen
-            var ncells = session.viewing_base.ncells();
+            var ncells = world.base.ncells();
             arrow_pos = [ncells[0]*(5*(spawn_location[0]-0.5)+0.5), ncells[1]*(5*(spawn_location[1]-0.5)+0.5)];
         } else if(player.quest_landscape_arrow) {
             // show white arrow pointing towards the tutorial arrow
