@@ -21866,8 +21866,6 @@ class GAMEAPI(resource.Resource):
         # only mobile units get destroyed permanently
         assert obj.is_mobile()
 
-        session.rem_object(id)
-
         original_hp = obj.hp
         xp = 0
         xp_reason = ''
@@ -21922,6 +21920,12 @@ class GAMEAPI(resource.Resource):
                 for res in gamedata['resources']:
                     dict_increment(session.loot, loot_stat+'_'+res, cost[res])
 
+        # must come before rem_object() since it needs obj.team
+        session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed', fake_xy = death_location, killer_info = killer_info)
+
+        # note: this invalidates obj.team
+        session.rem_object(id)
+
         if owning_player:
             owning_player.unit_repair_cancel(obj)
             if is_home_object:
@@ -21970,7 +21974,6 @@ class GAMEAPI(resource.Resource):
 
         # client initiated the removal - do not send OBJECT_REMOVED
 
-        session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed', fake_xy = death_location, killer_info = killer_info)
         if session.damage_log: session.damage_log.record(obj) # record immediately since it may leave the session and/or bases
 
         on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
