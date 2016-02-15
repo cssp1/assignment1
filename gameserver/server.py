@@ -17559,7 +17559,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["QUERY_RECENT_ATTACKERS_RESULT", tag, list(attacker_id_set), None])
 
     # fields we care about for battle history (summary) queries
-    BATTLE_HISTORY_FIELDS = ('time', 'duration', 'ladder_state',
+    BATTLE_HISTORY_FIELDS = ('time', 'duration', 'battle_type', 'ladder_state',
                              'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
                              'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
                              'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',

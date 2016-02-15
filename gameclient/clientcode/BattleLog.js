@@ -288,7 +288,17 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
     // show unit casualties
     if('loot' in summary) {
         var casualties_shown = false;
-        goog.array.forEach([{loot_key: 'units_killed', role: 'defender'}, {loot_key: 'units_lost', role: 'attacker'}], function(entry) {
+        // note: the sense of units_killed/units_lost is inverted for AI attacks
+        var defender_losses_key, attacker_losses_key;
+        if(summary['battle_type'] === 'defense') {
+            attacker_losses_key = 'units_killed';
+            defender_losses_key = 'units_lost';
+        } else {
+            defender_losses_key = 'units_killed';
+            attacker_losses_key = 'units_lost';
+        }
+
+        goog.array.forEach([{loot_key: defender_losses_key, role: 'defender'}, {loot_key: attacker_losses_key, role: 'attacker'}], function(entry) {
             if(entry.loot_key in summary['loot']) {
 
                 // create units-only version of the killed/lost dictionaries (that include buildings)
