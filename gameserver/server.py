@@ -4065,6 +4065,9 @@ class Session(object):
         props['hp'] = obj.hp
         props['obj_id'] = obj.obj_id
 
+        if gamedata['server'].get('log_battles',1) >= 2:
+            props['state'] = obj.serialize_state()
+
         # record turret head info
         if obj.is_building():
             for item in Equipment.equip_iter(obj.equipment):

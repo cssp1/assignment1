@@ -27,6 +27,16 @@ BattleReplay.invoke = function(log) {
         objects.add_object(obj);
     });
 
+    // 3900_unit_exists always comes in one big block
+    goog.array.forEach(log, function(event) {
+        if(event['event_name'] === '3900_unit_exists') {
+            if(objects.has_object(event['obj_id'])) { return; } // already in base
+            if(!('state' in event)) { throw Error('incompatible battle log: no state in 3900_unit_exists'); }
+            var obj = create_object(event['state'], false);
+            objects.add_object(obj);
+        }
+    });
+
     var world = new World.World(base, objects);
     session.push_world(world);
 };
