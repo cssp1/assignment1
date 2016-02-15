@@ -3060,6 +3060,11 @@ def check_store_sku(sku_name, sku):
     if 'ui_banner' in sku:
         if type(sku['ui_banner']) is list:
             error |= check_cond_chain(sku['ui_banner'], reason = 'sku %s: ui_banner' % sku_name)
+
+    if 'ui_name' in sku:
+        if '\n' in sku['ui_name']:
+            error |= 1; print 'store sku %s: ui_name should not have "\\n" in it (spacing is now handled automatically by shrinking the font)' % (sku_name)
+
     return error
 
 def check_starting_conditions(starting_conditions):
