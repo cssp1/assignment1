@@ -6232,7 +6232,7 @@
                             "ui_tooltip": "", "tooltip_delay": 0, "ui_tooltip_other_region": "Player is in a different region: %REGION"
                           },
             "battles_button": { "kind": "ActionButton", "xy": [551,118], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
-                                "bg_image": "action_button_134px", "ui_name": "Battle History" },
+                                "bg_image": "action_button_134px", "ui_name": "Battle History", "show": 0 },
 
             // fbpage/message are mutually exclusive (since you can't message a non-friend)
             "fbpage_button": { "kind": "ActionButton", "xy": [551,153], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
@@ -6313,6 +6313,8 @@
             "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
             "scroll_right": { "kind": "ActionButton", "xy": [706,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right" },
             "scroll_text": { "show": 0, "kind": "TextField", "xy": [56,383], "dimensions": [181,19], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1]},
+
+            "alliancemate_note": { "kind": "TextField", "xy": [56,383], "dimensions": [625,19], "text_size": 13, "text_hjustify": "right", "ui_name": "* Only showing battles that occurred while this player was in your Alliance.", "text_color": [0.5,0.5,0.5,1]},
 
             "row_portrait": {"kind": "FriendPortrait", "xy":[48,105], "dimensions": [50,50], "push_bg_image": 1, "array": [1,5], "array_offset": [0,56],
                              "ui_tooltip": "", "tooltip_delay": 0},

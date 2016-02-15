@@ -25128,6 +25128,8 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
+    // flag that we're looking at another player's personal battles (only allowed if they are in the same alliance)
+    dialog.user_data['alliancemate_flag'] = (!player.is_developer() && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
     dialog.user_data['sumlist'] = null;
     dialog.user_data['first_on_page'] = []; // index of first shown summary in sumlist
     dialog.user_data['chapter'] = null;
@@ -25142,7 +25144,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.widgets['alliance_button'].onclick = function(w) { battle_history_change_chapter(w.parent, 'alliance'); };
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    var dev_str = (from_id != session.user_id ? ' (DEV As '+from_id.toString()+') ' : '');
+    var dev_str = (from_id !== session.user_id && from_alliance !== session.alliance_id ? ' (As '+from_id.toString()+') ' : '');
     if(user_id > 0) {
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_vs'].replace('%s', name.split(' ')[0] + ' (L'+ level.toString()+')') + dev_str;
     } else {
@@ -25167,6 +25169,8 @@ function battle_history_change_chapter(dialog, chapter) {
     dialog.widgets['single_player_button'].state = (chapter === 'ai' ? 'active' : 'normal');
     dialog.widgets['multiplayer_button'].state = (chapter === 'human' ? 'active' : 'normal');
     dialog.widgets['alliance_button'].state = (chapter === 'alliance' ? 'active' : (dialog.user_data['from_alliance'] >= 0 ? 'normal' : 'disabled'));
+
+    dialog.widgets['alliancemate_note'].show = (chapter !== 'alliance' && dialog.user_data['alliancemate_flag']);
 
     dialog.user_data['page'] = -1;
     dialog.user_data['pending'] = false;
@@ -25209,7 +25213,7 @@ function send_battle_history_query(dialog) {
     var time_range = (oldest > 0 ? [-1, oldest] : null);
     query_battle_history(dialog.user_data['user_id'], // target of battles
                          (dialog.user_data['chapter'] === 'alliance' ? -1 : dialog.user_data['from_id']), // source of battles
-                         (dialog.user_data['chapter'] === 'alliance' ? dialog.user_data['from_alliance'] : -1), -1, // involved alliances
+                         (dialog.user_data['chapter'] === 'alliance' || dialog.user_data['alliancemate_flag'] ? dialog.user_data['from_alliance'] : -1), -1, // involved alliances
                          (dialog.user_data['chapter'] === 'alliance' ? 'human' : dialog.user_data['chapter']), // human/ai filter
                          time_range,
                          goog.partial(receive_battle_history_result, dialog, dialog.user_data['chapter'], time_range));
@@ -25262,7 +25266,9 @@ function battle_history_change_page(dialog, page) {
     var chapter_battles = (dialog.user_data['sumlist'] !== null ? dialog.user_data['sumlist'].length : 0)
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
 
-    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
+    // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
+    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'];
+
     dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
     dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id);
     if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {

@@ -17585,11 +17585,15 @@ class GAMEAPI(resource.Resource):
         assert (source > 0) or (alliance_A > 0) or (alliance_B > 0)
 
         # permission check
-        if (not session.player.is_developer()):
+        if source != session.user.user_id and (not session.player.is_developer()):
             # no peeking at others' battle histories unless you are a developer, or in the same alliance
-            if (source > 0 and source != session.user.user_id) or \
-               ((alliance_A > 0 or alliance_B > 0) and (session.get_alliance_id(reason='query_battle_history') < 0 or session.alliance_id_cache not in (alliance_A, alliance_B))):
+            is_same_alliance = ((alliance_A > 0 or alliance_B > 0) and \
+                                session.get_alliance_id(reason='query_battle_history') >= 0 and \
+                                session.alliance_id_cache in (alliance_A, alliance_B))
+
+            if (not is_same_alliance):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                retmsg.append(["QUERY_BATTLE_HISTORY_RESULT", tag, [], [], None, True, 'illegal'])
                 return
 
         # "nosql" for hot-only, "nosql/sql" for hot/cold, or "playerdb" (obsolete)

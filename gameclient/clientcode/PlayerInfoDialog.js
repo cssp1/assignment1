@@ -584,7 +584,6 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         // looking at yourself
         dialog.widgets['spy_button'].show = false;
         dialog.widgets['friend_icon'].state = 'disabled';
-        dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); };
     } else {
         dialog.widgets['spy_button'].onclick = (function(uid) { return function() {
             visit_base(uid);
@@ -596,13 +595,8 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
             if(spy.show && spy.state != 'disabled') { spy.onclick(spy); }
         };
 
-        // see battles from MY perspective against this opponent
-        dialog.widgets['battles_button'].onclick = (function(_uid, _name, _level) { return function() {
-            invoke_battle_history_dialog(session.user_id, _uid, -1, _name, _level);
-        }; })(user_id, PlayerCache.get_ui_name(knowledge), knowledge['player_level'] || 1);
-
         // see all battles from OPPONENT'S perspective (developer only)
-        dialog.widgets['dev_battles_button'].show = (player.is_developer() && (session.viewing_user_id == user_id));
+        dialog.widgets['dev_battles_button'].show = player.is_developer();
         dialog.widgets['dev_battles_button'].onclick = (function(_uid) { return function() {
             invoke_battle_history_dialog(_uid, -1, -1, '(DEV-ALL)', -1);
         }; })(user_id);
@@ -741,6 +735,24 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
                         // different region - leave button disabled, change tooltip
                         dialog.widgets['spy_button'].tooltip.str = dialog.data['widgets']['spy_button']['ui_tooltip_other_region'].replace('%REGION', dialog.widgets['home_region_value'].str);
                     }
+                }
+            }
+
+            // BATTLE HISTORY button
+            dialog.widgets['battles_button'].show = true;
+            if(user_id === session.user_id) {
+                dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); };
+            } else {
+                if(session.is_in_alliance() && session.alliance_id === r['alliance_id']) {
+                    // same alliance: see battles involving this player (while they were in the alliance)
+                    dialog.widgets['battles_button'].onclick = (function(_uid, _name, _level) { return function() {
+                        invoke_battle_history_dialog(_uid, -1, session.alliance_id, _name, _level);
+                    }; })(user_id, PlayerCache.get_ui_name(r), r['player_level'] || 1);
+                } else {
+                    // not same alliance: see battles from MY perspective against this opponent
+                    dialog.widgets['battles_button'].onclick = (function(_uid, _name, _level) { return function() {
+                        invoke_battle_history_dialog(session.user_id, _uid, -1, _name, _level);
+                    }; })(user_id, PlayerCache.get_ui_name(r), r['player_level'] || 1);
                 }
             }
 

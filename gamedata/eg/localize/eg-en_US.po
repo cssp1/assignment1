@@ -15709,3 +15709,7 @@ msgstr "Clan Info"
 
 msgid "Show multiplayer battles involving your alliance"
 msgstr "Show multiplayer battles involving your Clan"
+
+msgid "* Only showing battles that occurred while this player was in your Alliance."
+msgstr "* Only showing battles that occurred while this player was in your Clan."
+
