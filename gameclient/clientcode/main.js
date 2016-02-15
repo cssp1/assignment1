@@ -72,6 +72,34 @@ goog.require('buzz');
 goog.require('Traceback');
 goog.require('Citizens');
 
+function deepcopy(x) {
+    if(x === undefined) {
+        throw Error('attempt to deepcopy() undefined');
+    } else if(x === null) {
+        return null;
+    } else if(x instanceof Array) {
+        return deepcopy_array(x);
+    } else if(typeof(x) === 'object') {
+        return deepcopy_obj(x);
+    } else {
+        return x;
+    };
+}
+function deepcopy_obj(obj) {
+    var ret = {};
+    for(var k in obj) {
+        ret[k] = deepcopy(obj[k]);
+    }
+    return ret;
+};
+function deepcopy_array(x) {
+    var ret = Array(x.length);
+    for(var i = 0; i < x.length; i++) {
+        ret[i] = deepcopy(x[i]);
+    }
+    return ret;
+};
+
 // detect whether browser has touch-screen events
 var touch_modes = {
     NONE : 0,
@@ -820,7 +848,6 @@ function force_scroll_eval() {
 // Auras
 
 /** @constructor
-    @struct
     @param {GameObject|null} source object
     @param {Object} spec
     @param {?} strength
@@ -842,6 +869,19 @@ function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) 
     this.vs_table = vs_table || null;
     this.visual_effect = null;
 };
+
+/** @return {!Object<string,?>} */
+Aura.prototype.serialize = function() {
+    return {'source': this.source ? this.source.id : null,
+            'spec': this.spec['name'],
+            'strength': this.strength,
+            'range': this.range,
+            'start_tick': this.start_tick.get(),
+            'expire_tick': this.expire_tick.get(),
+            'stacks': this.stacks,
+            'vs_table': this.vs_table};
+};
+
 /** @param {!GameObject} obj */
 Aura.prototype.apply = function(obj) {
     if('client' in this.spec && !this.spec['client']) { return; }
@@ -1250,6 +1290,27 @@ function GameObject() {
     /** @type {SPFX.FXObject|null} */
     this.permanent_effect = null;
 }
+
+/** @return {!Object<string,?>} */
+GameObject.prototype.serialize = function() {
+    return {'obj_id': this.id,
+            'spec': this.spec['name'],
+            'x': this.x,
+            'y': this.y,
+            'hp': this.hp,
+            'max_hp': this.max_hp,
+            'owner': (this.team === 'player' ? session.user_id : -1),
+            'level': this.level,
+            'equipment': this.equipment ? deepcopy_obj(this.equipment) : null,
+            'ai_state': this.ai_state,
+            'combat_stats': deepcopy_obj(this.combat_stats),
+            'auras': goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this),
+            'cooldowns': deepcopy_obj(this.cooldowns),
+            'cur_facing': this.cur_facing,
+            'next_facing': this.next_facing,
+            'target_facing': this.target_facing
+    };
+};
 
 /** @const
     @type {GameObjectId} */
@@ -4485,6 +4546,12 @@ Inert.prototype.receive_state = function(data, init, is_deploying) {
     goog.base(this, 'receive_state', data, init, is_deploying);
     this.metadata = data.shift();
 };
+/** @override */
+Inert.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['metadata'] = deepcopy(this.metadata);
+    return ret;
+};
 // as a special case, "flat" inert objects are pushed backwards in Z order
 Inert.prototype.calc_draw_pos = function() {
     if(this.spec['draw_flat']) {
@@ -4548,6 +4615,14 @@ function Building() {
     this.idle_state_cache_valid_until = -1;
 }
 goog.inherits(Building, MapBlockingGameObject);
+
+/** @override */
+Building.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['disarmed'] = this.disarmed;
+    ret['modstats'] = deepcopy_obj(this.modstats); // ?
+    return ret;
+};
 
 Building.prototype.request_sync = function() { this.sync_marker = synchronizer.request_sync(); return this.sync_marker; };
 Building.prototype.is_in_sync = function() { return synchronizer.is_in_sync(this.sync_marker); };
@@ -7755,6 +7830,25 @@ function Mobile() {
 }
 
 goog.inherits(Mobile, GameObject);
+
+/** @override */
+Mobile.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['orders'] = deepcopy_array(this.orders);
+    ret['patrol'] = this.patrol;
+    ret['temporary'] = this.temporary;
+    ret['squad_id'] = this.squad_id;
+    ret['ai_dest'] = this.ai_dest;
+    ret['ai_aggressive'] = this.ai_aggressive;
+    ret['pos'] = this.pos;
+    ret['vel'] = this.vel;
+    ret['next_pos'] = this.next_pos;
+    ret['dest'] = this.dest;
+    ret['path_valid'] = this.path_valid;
+    ret['path'] = deepcopy_array(this.path);
+    ret['stuck_loc'] = this.stuck_loc;
+    return ret;
+};
 
 Mobile.prototype.is_temporary = function() { return !!this.temporary; };
 Mobile.prototype.is_flying = function() { return this.spec['flying'] || false; };

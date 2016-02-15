@@ -336,3 +336,11 @@ World.World.prototype.run_unit_ticks = function() {
         this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
     }
 };
+
+/** @return {!Object<string,?>} */
+World.World.prototype.serialize = function() {
+    return {'base': this.base.serialize(),
+            'combat_engine': this.combat_engine.serialize(),
+            'objects': this.objects.serialize()
+           };
+};

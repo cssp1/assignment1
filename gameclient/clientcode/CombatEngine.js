@@ -5,6 +5,7 @@ goog.provide('CombatEngine');
 // found in the LICENSE file.
 
 goog.require('GameTypes');
+goog.require('goog.array');
 
 // numeric types - eventually will need to become fixed-point
 
@@ -58,6 +59,12 @@ CombatEngine.CombatEngine = function(world) {
     this.damage_effect_queue = [];
 };
 
+/** @return {!Object<string,?>} */
+CombatEngine.CombatEngine.prototype.serialize = function() {
+    return {'cur_tick': this.cur_tick.get(),
+            'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this)};
+};
+
 // DamageEffects
 
 /** @constructor
@@ -77,6 +84,17 @@ CombatEngine.DamageEffect = function(tick, client_time_hack, source, amount, vs_
 /** @param {!World.World} world */
 CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
 
+/** @return {!Object<string,?>} */
+CombatEngine.DamageEffect.prototype.serialize = function() {
+    /** @type {!Object<string,?>} */
+    var ret;
+    ret = {'tick': this.tick.get(),
+           'client_time_hack': this.client_time_hack,
+           'source': (this.source ? this.source.id : null),
+           'amount': this.amount,
+           'vs_table': this.vs_table};
+    return ret;
+};
 
 /** @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
@@ -107,6 +125,14 @@ CombatEngine.KillDamageEffect = function(tick, client_time_hack, source, target_
     this.target_obj = target_obj;
 }
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
+/** @override */
+CombatEngine.KillDamageEffect.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['kind'] = 'KillDamageEffect';
+    ret['target_obj'] = this.target_obj.id;
+    return ret;
+};
+
 /** @override */
 CombatEngine.KillDamageEffect.prototype.apply = function(world) {
     // ensure the destroy_object message is sent only once, but do allow it to be sent even if target_obj.hp == 0
@@ -140,6 +166,14 @@ CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source, tar
 }
 goog.inherits(CombatEngine.TargetedDamageEffect, CombatEngine.DamageEffect);
 /** @override */
+CombatEngine.TargetedDamageEffect.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['kind'] = 'TargetedDamageEffect';
+    ret['target_obj'] = this.target_obj.id;
+    return ret;
+};
+
+/** @override */
 CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
     if(this.target_obj.is_destroyed()) {
         // target is already dead
@@ -170,6 +204,18 @@ CombatEngine.TargetedAuraEffect = function(tick, client_time_hack, source, targe
     this.duration_vs_table = duration_vs_table;
 }
 goog.inherits(CombatEngine.TargetedAuraEffect, CombatEngine.DamageEffect);
+/** @override */
+CombatEngine.TargetedAuraEffect.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['kind'] = 'TargetedAuraEffect';
+    ret['target_obj'] = this.target_obj.id;
+    ret['aura_name'] = this.aura_name;
+    ret['aura_duration'] = this.aura_duration.get();
+    ret['aura_range'] = this.aura_range;
+    ret['duration_vs_table'] = this.duration_vs_table;
+    return ret;
+};
+
 /** @override */
 CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     if(this.target_obj.is_destroyed()) {
@@ -208,6 +254,18 @@ CombatEngine.AreaDamageEffect = function(tick, client_time_hack, source, target_
     this.allow_ff = allow_ff;
 }
 goog.inherits(CombatEngine.AreaDamageEffect, CombatEngine.DamageEffect);
+/** @override */
+CombatEngine.AreaDamageEffect.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['kind'] = 'AreaDamageEffect';
+    ret['target_location'] = this.target_location;
+    ret['hit_ground'] = this.hit_ground;
+    ret['hit_air'] = this.hit_air;
+    ret['radius'] = this.radius;
+    ret['falloff'] = this.falloff;
+    ret['allow_ff'] = this.allow_ff;
+    return ret;
+};
 
 /** @override */
 CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
@@ -276,6 +334,24 @@ CombatEngine.AreaAuraEffect = function(tick, client_time_hack, source, target_lo
     this.allow_ff = allow_ff;
 }
 goog.inherits(CombatEngine.AreaAuraEffect, CombatEngine.DamageEffect);
+/** @override */
+CombatEngine.AreaAuraEffect.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['target_location'] = this.target_location;
+    ret['kind'] = 'AreaAuraEffect';
+    ret['hit_ground'] = this.hit_ground;
+    ret['hit_air'] = this.hit_air;
+    ret['radius'] = this.radius;
+    ret['radius_rect'] = this.radius_rect;
+    ret['falloff'] = this.falloff;
+    ret['aura_name'] = this.aura_name;
+    ret['aura_duration'] = this.aura_duration.get();
+    ret['aura_range'] = this.aura_range;
+    ret['duration_vs_table'] = this.duration_vs_table;
+    ret['allow_ff'] = this.allow_ff;
+    return ret;
+};
+
 /** @override */
 CombatEngine.AreaAuraEffect.prototype.apply = function(world) {
     var query_r;

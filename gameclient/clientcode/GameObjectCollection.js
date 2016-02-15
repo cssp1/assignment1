@@ -49,3 +49,12 @@ GameObjectCollection.GameObjectCollection.prototype.for_each = function(func, op
         func.call(opt_obj, this.objects[id], id);
     }
 };
+
+/** @return {!Array<!Object<string,?>>} */
+GameObjectCollection.GameObjectCollection.prototype.serialize = function() {
+    var ret = [];
+    for(var id in this.objects) {
+        ret.push(this.objects[id].serialize());
+    }
+    return ret;
+};

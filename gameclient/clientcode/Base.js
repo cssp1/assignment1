@@ -58,6 +58,18 @@ Base.Base.prototype.receive_state = function(base_data) {
     this.base_ncells = ('base_ncells' in base_data ? base_data['base_ncells'] : null);
     this.base_last_attack_time = base_data['base_last_attack_time'] || -1;
 };
+/** @return {!Object<string,?>} */
+Base.Base.prototype.serialize = function() {
+    return {'deployment_buffer': this.deployment_buffer,
+            'base_landlord_id': this.base_landlord_id,
+            'base_climate': this.base_climate,
+            'base_map_loc': this.base_map_loc,
+            'base_expire_time': this.base_expire_time,
+            'base_ui_name': this.base_ui_name,
+            'base_type': this.base_type,
+            'base_ncells': this.base_ncells,
+            'base_last_attack_time': this.base_last_attack_time};
+};
 
 Base.Base.prototype.ncells = function() {
     if(this.base_ncells !== null) { return this.base_ncells; }
