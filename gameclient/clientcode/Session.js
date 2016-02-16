@@ -113,11 +113,17 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
 Session.Session.prototype.push_world = function(new_world) { return this.world_stack.push(new_world); };
 
 /** @return {!World.World} world at top of stack that should be drawn */
-Session.Session.prototype.get_draw_world = function() { return this.world_stack[this.world_stack.length-1]; };
+Session.Session.prototype.get_draw_world = function() {
+    if(this.world_stack.length < 1) { throw Error('no world'); }
+    return this.world_stack[this.world_stack.length-1];
+};
 
 /** @return {!World.World} the "real" world the player is connected to
     @const */
-Session.Session.prototype.get_real_world = function() { return this.world_stack[0]; };
+Session.Session.prototype.get_real_world = function() {
+    if(this.world_stack.length < 1) { throw Error('no world'); }
+    return this.world_stack[0];
+};
 
 Session.Session.prototype.incoming_attack_pending = function() { return (this.incoming_attack_time > server_time); };
 Session.Session.prototype.connected = function() { return this.connect_time > 0; };

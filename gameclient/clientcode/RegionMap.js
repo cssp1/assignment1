@@ -493,6 +493,9 @@ RegionMap.RegionMap = function(data, fxworld) {
     this.font = SPUI.make_font(14, 17, 'thick');
     this.cursor = null;
 
+    if(!fxworld) {
+        throw Error('constructed RegionMap with bad fxworld');
+    }
     this.fxworld = fxworld;
     this.spfx_list = [];
 
