@@ -626,15 +626,17 @@ def send_proxyserver_status_notification(status_json):
     scm_version_root = scm_version_root.strip()[0:8] # truncate git checksum
     scm_version_gamedata = yield utils.getProcessOutput('../scmtool.sh', args=['git-version', 'gamedata/%s' % SpinConfig.game().encode('ascii')], env=os.environ)
     scm_version_gamedata = scm_version_gamedata.strip()[0:8] # truncate git checksum
+    scm_message = yield utils.getProcessOutput('../scmtool.sh', args=['last-commit-message'], env=os.environ)
     exe = './SpinReminders.py'
     args = ['--from', '%s proxyserver' % SpinConfig.game_id_long(),
             '--subject', '%s Update deployed' % SpinConfig.game_id_long().upper(),
-            '--body', 'Now serving engine version %s, %s gamedata version %s (builds: gamedata "%s" gameclient "%s")' % \
+            '--body', 'Now serving engine version %s, %s gamedata version %s (builds: gamedata "%s" gameclient "%s")\nLast commit:\n%s' % \
             (scm_version_root,
              SpinConfig.game().upper().encode('ascii'),
              scm_version_gamedata,
              status_json['gamedata_build'].encode('ascii'),
-             status_json['gameclient_build'].encode('ascii')),
+             status_json['gameclient_build'].encode('ascii'),
+             scm_message),
             '--recipients', SpinJSON.dumps(SpinConfig.config['server_status_recipients'])]
     ret = yield utils.getProcessValue(exe, args=args, env=os.environ)
     defer.returnValue(ret)

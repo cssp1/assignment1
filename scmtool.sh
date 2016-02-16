@@ -65,6 +65,9 @@ function do_force_up_svn {
 function do_version_svn {
     (cd "$ROOT" && svn info | grep Revision | cut -d' ' -f 2)
 }
+function do_last_commit_message_svn {
+    (cd "$ROOT" && svn log -l 1 | tail -n+4 | head -n+1)
+}
 function do_git_version_svn {
     SUBPATH="$2" # optional - path underneath the root to query the version for
     (cd "${ROOT}/${SUBPATH}" && cat 'git-sync.txt')
@@ -155,6 +158,16 @@ function do_version_git {
     SUBPATH="$2" # optional - path underneath the root to query the version for
     (cd "${ROOT}/${SUBPATH}" && git rev-parse HEAD)
 }
+function do_last_commit_message_git {
+    SUBPATH="$2" # optional - path underneath the root to query the version for
+    if [ "$SUBPATH" != "" ]; then
+	(cd "${ROOT}/${SUBPATH}" && git log --oneline -1 HEAD)
+    else
+	for dir in $GIT_DIRS; do
+	    (cd $dir && git log --oneline -1 HEAD)
+	done
+    fi
+}
 function do_stat_git {
     for dir in $GIT_DIRS; do
         (cd $dir && git status -s | sed "s|^|$dir |")
@@ -207,10 +220,13 @@ else
                 ;;
             version)
                 do_version_git $@
+		;;
+            last-commit-message)
+                do_last_commit_message_git $@
                 ;;
-        clean)
-        do_clean_git $@
-        ;;
+            clean)
+                do_clean_git $@
+                ;;
             git-version)
                 do_version_git $@
                 ;;
@@ -252,6 +268,9 @@ else
                 ;;
             git-version)
                 do_git_version_svn $@
+                ;;
+            last-commit-message)
+                do_last_commit_message_svn $@
                 ;;
             stat)
                 do_stat_svn $@
