@@ -8068,15 +8068,6 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
         obj['hp_ratio'] = this.hp/this.max_hp;
         obj['level'] = this.level;
     }
-
-    if(is_deploying) {
-        invalidate_defender_threatlists();
-        if(unit_deployment_latency_high()) {
-            // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
-            add_unit_deployment_vfx(/** @type {!SPFX.FXWorld} */ (this.world.fxworld), // XXXXXX blank world
-                'post_deploy', this.pos, this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
-        }
-    }
 };
 
 Mobile.prototype.apply_orders = function() {
@@ -43827,6 +43818,16 @@ function handle_server_message(data) {
         var state = data[1];
         var obj = create_object(state, true);
         session.add_object(obj);
+
+        if(obj.is_mobile()) {
+            invalidate_defender_threatlists();
+            if(unit_deployment_latency_high()) {
+                // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
+                add_unit_deployment_vfx(world.fxworld, 'post_deploy', obj.pos, obj.spec, obj.level,
+                                        2 * gamedata['client']['ajax_min_flush_interval']);
+            }
+        }
+
         if(msg == "OBJECT_CREATED") {
             // OBJECT_CREATED2 does not include player state
             update_resources(data[2], false);
