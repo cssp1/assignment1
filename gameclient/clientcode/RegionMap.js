@@ -458,8 +458,9 @@ RegionMap.RelocateCursor.prototype.on_mouseup = function(cell, button) {
 // the field->widget transform is done on the Canvas transform stack
 
 /** @constructor
-  * @extends SPUI.DialogWidget */
-RegionMap.RegionMap = function(data) {
+    @extends SPUI.DialogWidget
+    @param {!SPFX.FXWorld} fxworld */
+RegionMap.RegionMap = function(data, fxworld) {
     goog.base(this, data);
     this.gfx_detail = 99;
     this.region = null;
@@ -492,6 +493,7 @@ RegionMap.RegionMap = function(data) {
     this.font = SPUI.make_font(14, 17, 'thick');
     this.cursor = null;
 
+    this.fxworld = fxworld;
     this.spfx_list = [];
 
     this.zoom_to_default();
@@ -501,7 +503,7 @@ goog.inherits(RegionMap.RegionMap, SPUI.DialogWidget);
 /** @override */
 RegionMap.RegionMap.prototype.destroy = function() {
     // kill any ongoing SPFX instances
-    goog.array.forEach(this.spfx_list, function(fx) { SPFX.remove(fx); } );
+    goog.array.forEach(this.spfx_list, function(fx) { this.fxworld.remove(fx); }, this);
 };
 
 // save/restore state, for reloading the map after session changes
@@ -2533,7 +2535,7 @@ RegionMap.RegionMap.prototype.trigger_spfx_at = function(vfx_data, loc) {
     }
     var absolute_xy = vec_add(wxy, this.get_absolute_xy());
     // XXX leaks - find a way to delete when obsolete
-    this.spfx_list.push(SPFX.add_visual_effect_at_time(absolute_xy, 0, [0,1,0], client_time, vfx_data, false /* no sound */, {'is_ui': true, 'sprite_scale': [this.zoom,this.zoom]}));
+    this.spfx_list.push(this.fxworld.add_visual_effect_at_time(absolute_xy, 0, [0,1,0], client_time, vfx_data, false /* no sound */, {'is_ui': true, 'sprite_scale': [this.zoom,this.zoom]}));
 };
 
 RegionMap.RegionMap.prototype.draw = function(offset) {

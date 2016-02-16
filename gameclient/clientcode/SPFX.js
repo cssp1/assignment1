@@ -18,33 +18,10 @@ goog.require('ShakeSynth');
 
 // all coordinates here are in game map cell units (not quantized, fractions OK)
 
-// global namespace
-
-/** @type {?CanvasRenderingContext2D} */
-SPFX.ctx = null;
-
-/** @type {number}
-    @private */
-SPFX.time = 0;
-
-/** @type {number}
-    @private */
-SPFX.last_tick_time = 0;
-
-/** @type {!GameTypes.TickCount}
-    @private */
-SPFX.tick = new GameTypes.TickCount(0);
-
-/** @type {!GameTypes.TickCount}
-    @private */
-SPFX.last_tick = new GameTypes.TickCount(0);
-
-
 /** Some effects want to fire at specific client_times and others want
  to fire at specific combat ticks. This type encapsulates both cases.
  @constructor
- @struct
- @param {number|null} time - compared against SPFX.time (client_time)
+ @param {number|null} time - compared against fxworld.time (client_time)
  @param {GameTypes.TickCount|null} tick - compared against current combat tick count
  @param {number|null=} tick_delay - additional real-time delay (seconds) AFTER tick is reached
 */
@@ -67,42 +44,80 @@ SPFX.When.equal = function(a, b) {
     throw Error('bad When values');
 };
 
+/** @typedef {{when: !SPFX.When, amplitude: number, falloff: number, started_at: number}} */
+SPFX.ShakeImpulse;
+
+/** @type {?CanvasRenderingContext2D} */
+SPFX.ctx = null;
+
+/** only allow non-default compositing modes when detail > 1
+    @param {string} mode */
+SPFX.set_composite_mode = function(mode) {
+    if(SPFX.detail > 1) {
+        SPFX.ctx.globalCompositeOperation = mode;
+    }
+};
+
 /** @type {number} */
 SPFX.last_id = 0;
 
 /** @type {number} */
 SPFX.detail = 1;
 
-SPFX.global_gravity = 1;
-SPFX.global_ground_plane = 0;
+/** @constructor
+    @param {number} gravity
+    @param {number} ground_plane */
+SPFX.FXWorld = function(gravity, ground_plane) {
+    /** @type {number}
+        @private */
+    this.time = 0;
 
-// hack to fake z-ordering - there are several "layers" of effects
+    /** @type {number}
+        @private */
+    this.last_tick_time = 0;
 
-/** @type {!Object.<string,!SPFX.Effect>} */
-SPFX.current_under = {}; // underneath units/buildings
+    /** @type {!GameTypes.TickCount}
+        @private */
+    this.tick = new GameTypes.TickCount(0);
 
-/** @type {!Object.<string,!SPFX.PhantomUnit>} */
-SPFX.current_phantoms = {}; // phantom units/buildings managed by SPFX
+    /** @type {!GameTypes.TickCount}
+        @private */
+    this.last_tick = new GameTypes.TickCount(0);
 
-/** @type {!Object.<string,!SPFX.Effect>} */
-SPFX.current_over = {}; // on top of units/buildings, below UI
+    // hack to fake z-ordering - there are several "layers" of effects
 
-/** @type {!Object.<string,!SPFX.Effect>} */
-SPFX.current_ui = {}; // on top of UI
+    /** @type {!Object.<string,!SPFX.Effect>} */
+    this.current_under = {}; // underneath units/buildings
 
-/** @type {!Object.<string,!SPFX.Field>} */
-SPFX.fields = {}; // force fields only
+    /** @type {!Object.<string,!SPFX.PhantomUnit>}
+        @private */
+    this.current_phantoms = {}; // phantom units/buildings managed by SPFX
 
-/** @typedef {{when: !SPFX.When, amplitude: number, falloff: number, started_at: number}} */
-SPFX.ShakeImpulse;
+    /** @type {!Object.<string,!SPFX.Effect>}
+        @private */
+    this.current_over = {}; // on top of units/buildings, below UI
 
-/** @type {Array.<!SPFX.ShakeImpulse>} */
-SPFX.shake_impulses = [];
+    /** @type {!Object.<string,!SPFX.Effect>}
+        @private */
+    this.current_ui = {}; // on top of UI
 
-/** @type {?ShakeSynth.Shake} */
-SPFX.shake_synth = null;
+    /** @type {!Object.<string,!SPFX.Field>}
+        @private */
+    this.fields = {}; // force fields only
 
-SPFX.shake_origin_time = -1;
+    this.global_gravity = gravity;
+    this.global_ground_plane = ground_plane;
+
+    /** @type {Array.<!SPFX.ShakeImpulse>} */
+    this.shake_impulses = [];
+
+    this.shake_synth = new ShakeSynth.Shake(0);
+
+    this.shake_origin_time = -1;
+};
+
+/** @return {!SPFX.When} conveniently grab the current continuous time */
+SPFX.FXWorld.prototype.now_time = function() { return new SPFX.When(this.time, null); };
 
 // SPFX
 
@@ -111,11 +126,6 @@ SPFX.shake_origin_time = -1;
     @param {boolean} use_high_gfx */
 SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     SPFX.ctx = ctx;
-    SPFX.time = 0;
-    SPFX.tick = new GameTypes.TickCount(0);
-    SPFX.last_tick = new GameTypes.TickCount(0);
-    SPFX.last_tick_time = 0;
-
     SPFX.last_id = 0;
 
     // turn down number of particles/sprites for higher performance
@@ -128,171 +138,159 @@ SPFX.init = function(ctx, use_low_gfx, use_high_gfx) {
     }
 
     if('sound_throttle' in gamedata['client']) { SPFX.sound_throttle = /** @type {number} */ (gamedata['client']['sound_throttle']); }
-
-    SPFX.clear();
-
-    SPFX.shake_synth = new ShakeSynth.Shake(0);
-    SPFX.shake_origin_time = SPFX.time;
 };
 
 /** @param {number} time
     @param {!GameTypes.TickCount} tick */
-SPFX.set_time = function(time, tick) {
-    SPFX.time = time;
-    SPFX.tick = tick;
-    if(GameTypes.TickCount.gt(SPFX.tick, SPFX.last_tick)) {
-        SPFX.last_tick = SPFX.tick;
-        SPFX.last_tick_time = SPFX.time;
+SPFX.FXWorld.prototype.set_time = function(time, tick) {
+    this.time = time;
+    this.tick = tick;
+    if(GameTypes.TickCount.gt(this.tick, this.last_tick)) {
+        this.last_tick = this.tick;
+        this.last_tick_time = this.time;
     }
 };
 
 /** @param {!SPFX.When} t
     @return {boolean} */
-SPFX.time_lt = function(t) {
+SPFX.FXWorld.prototype.time_lt = function(t) {
     if(t.tick) {
-        if(GameTypes.TickCount.lt(SPFX.tick, t.tick)) {
+        if(GameTypes.TickCount.lt(this.tick, t.tick)) {
             return true;
         }
         // we've reached the tick. Do we need an additional delay?
         if(t.tick_delay > 0) {
-            if(GameTypes.TickCount.equal(SPFX.tick, t.tick)) {
+            if(GameTypes.TickCount.equal(this.tick, t.tick)) {
                 // MUTATE t to a time value tick_delay into the future
-                t.time = SPFX.last_tick_time + t.tick_delay;
+                t.time = this.last_tick_time + t.tick_delay;
                 t.tick = null;
-                return SPFX.time < t.time;
+                return this.time < t.time;
             } else {
                 return false; // we skipped a tick - fire immediately
             }
         }
         return false;
     } else {
-        return SPFX.time < t.time;
+        return this.time < t.time;
     }
 };
 
 /** @param {!SPFX.When} t
     @return {boolean} */
-SPFX.time_gte = function(t) { return !SPFX.time_lt(t); };
-
-/** only allow non-default compositing modes when detail > 1
-    @param {string} mode */
-SPFX.set_composite_mode = function(mode) {
-    if(SPFX.detail > 1) {
-        SPFX.ctx.globalCompositeOperation = mode;
-    }
-};
+SPFX.FXWorld.prototype.time_gte = function(t) { return !this.time_lt(t); };
 
 /** @private
     @param {!Object.<string, !SPFX.FXObject>} layer
     @param {!SPFX.FXObject} effect */
-SPFX.do_add = function(layer, effect) {
-    effect.id = SPFX.last_id.toString();
-    SPFX.last_id += 1;
+SPFX.FXWorld.prototype.do_add = function(layer, effect) {
     layer[effect.id] = effect;
 };
 
-/** @param {!SPFX.Effect} effect
-    @return {!SPFX.Effect} */
-SPFX.add = function(effect) { SPFX.do_add(SPFX.current_over, effect); return effect; };
+/** @param {!SPFX.FXObject} effect
+    @return {!SPFX.FXObject} */
+SPFX.FXWorld.prototype.add = function(effect) { this.do_add(this.current_over, effect); return effect; };
 /** @param {!SPFX.PhantomUnit} effect
     @return {!SPFX.PhantomUnit} */
-SPFX.add_phantom = function(effect) { SPFX.do_add(SPFX.current_phantoms, effect); return effect; };
-/** @param {!SPFX.Effect} effect
-    @return {!SPFX.Effect} */
-SPFX.add_under = function(effect) { SPFX.do_add(SPFX.current_under, effect); return effect; };
-/** @param {!SPFX.Effect} effect
-    @return {!SPFX.Effect} */
-SPFX.add_ui = function(effect) { SPFX.do_add(SPFX.current_ui, effect); return effect; };
+SPFX.FXWorld.prototype.add_phantom = function(effect) { this.do_add(this.current_phantoms, effect); return effect;
+};
+/** @param {!SPFX.FXObject} effect
+    @return {!SPFX.FXObject} */
+SPFX.FXWorld.prototype.add_under = function(effect) { this.do_add(this.current_under, effect); return effect; };
+/** @param {!SPFX.FXObject} effect
+    @return {!SPFX.FXObject} */
+SPFX.FXWorld.prototype.add_ui = function(effect) { this.do_add(this.current_ui, effect); return effect; };
 /** @param {!SPFX.Field} effect
     @return {!SPFX.Field} */
-SPFX.add_field = function(effect) { SPFX.do_add(SPFX.fields, effect); return effect; };
+SPFX.FXWorld.prototype.add_field = function(effect) { this.do_add(this.fields, effect); return effect; };
 
 /** @param {!SPFX.FXObject} effect */
-SPFX.remove = function(effect) {
-    effect.dispose();
+SPFX.FXWorld.prototype.remove = function(effect) {
+    effect.dispose(this);
 
-    if(effect.id in SPFX.current_over) {
-        delete SPFX.current_over[effect.id];
-    } else if(effect.id in SPFX.current_phantoms) {
-        delete SPFX.current_phantoms[effect.id];
-    } else if(effect.id in SPFX.current_under) {
-        delete SPFX.current_under[effect.id];
-    } else if(effect.id in SPFX.current_ui) {
-        delete SPFX.current_ui[effect.id];
-    } else if(effect.id in SPFX.fields) {
-        delete SPFX.fields[effect.id];
+    if(effect.id in this.current_over) {
+        delete this.current_over[effect.id];
+    } else if(effect.id in this.current_phantoms) {
+        delete this.current_phantoms[effect.id];
+    } else if(effect.id in this.current_under) {
+        delete this.current_under[effect.id];
+    } else if(effect.id in this.current_ui) {
+        delete this.current_ui[effect.id];
+    } else if(effect.id in this.fields) {
+        delete this.fields[effect.id];
     }
-};
-
-SPFX.clear = function() {
-    SPFX.current_over = {};
-    SPFX.current_under = {};
-    SPFX.current_phantoms = {};
-    SPFX.current_ui = {};
-    SPFX.fields = {};
-    SPFX.shake_impulses = [];
 };
 
-SPFX.draw_over = function() {
-    for(var id in SPFX.current_over) {
-        SPFX.current_over[id].draw();
+SPFX.FXWorld.prototype.clear = function() {
+    this.current_over = {};
+    this.current_under = {};
+    this.current_phantoms = {};
+    this.current_ui = {};
+    this.fields = {};
+    this.shake_impulses = [];
+};
+
+SPFX.FXWorld.prototype.draw_over = function() {
+    for(var id in this.current_over) {
+        this.current_over[id].draw(this);
     }
 };
-SPFX.draw_under = function() {
-    for(var id in SPFX.current_under) {
-        SPFX.current_under[id].draw();
+SPFX.FXWorld.prototype.draw_under = function() {
+    for(var id in this.current_under) {
+        this.current_under[id].draw(this);
     }
 };
-SPFX.draw_ui = function() {
-    for(var id in SPFX.current_ui) {
-        SPFX.current_ui[id].draw();
+SPFX.FXWorld.prototype.draw_ui = function() {
+    for(var id in this.current_ui) {
+        this.current_ui[id].draw(this);
     }
 };
+
 /** @param {!World.World} world - XXX this should come from the SPFX world parent instead */
-SPFX.get_phantom_objects = function(world) {
+SPFX.FXWorld.prototype.get_phantom_objects = function(world) {
+    if(world.fxworld !== this) { throw Error('phantom object world != this'); }
     var ret = [];
-    goog.array.forEach(goog.object.getValues(SPFX.current_phantoms), function(fx) {
-        var obj = (/** @type {SPFX.PhantomUnit} */ (fx)).get_phantom_object(); // will throw if it's not a SPFX.PhantomUnit
+    goog.array.forEach(goog.object.getValues(this.current_phantoms), function(fx) {
+        var obj = (/** @type {SPFX.PhantomUnit} */ (fx)).get_phantom_object(this); // will throw if it's not a SPFX.PhantomUnit
         if(obj === null) { // done
-            SPFX.remove(fx);
+            this.remove(fx);
         } else {
             obj.world = world;
             ret.push(obj);
         }
-    });
+    }, this);
     return ret;
 };
 
-SPFX.get_camera_shake = function() {
-    if(SPFX.shake_impulses.length < 1) { return [0,0,0]; }
+SPFX.FXWorld.prototype.get_camera_shake = function() {
+    if(this.shake_impulses.length < 1) { return [0,0,0]; }
 
-    if(SPFX.shake_origin_time < 0) {
-        SPFX.shake_origin_time = SPFX.time + 10.0*Math.random();
+    if(this.shake_origin_time < 0) {
+        this.shake_origin_time = this.time + 10.0*Math.random();
     }
 
     // sum impulse response
     var total_amp = 0.0;
-    for(var i = 0; i < SPFX.shake_impulses.length; i++) {
-        var imp = SPFX.shake_impulses[i];
+    for(var i = 0; i < this.shake_impulses.length; i++) {
+        var imp = this.shake_impulses[i];
 
         if(imp.started_at < 0) { // check for start time/tick
-            if(SPFX.time_gte(imp.when)) {
+            if(this.time_gte(imp.when)) {
                 // once the shake starts, use time only
-                imp.started_at = SPFX.time;
+                imp.started_at = this.time;
             }
         }
 
         if(imp.started_at > 0) {
-            var exponent = (SPFX.time-imp.started_at)/imp.falloff;
+            var exponent = (this.time-imp.started_at)/imp.falloff;
             if(exponent > 4.0) { // too late, no longer needed
-                SPFX.shake_impulses.splice(i, 1);
+                this.shake_impulses.splice(i, 1);
                 continue;
             }
             total_amp += imp.amplitude * Math.exp(-exponent);
         }
     }
     if(Math.abs(total_amp) >= 0.0001) {
-        var v = SPFX.shake_synth.evaluate(24.0*(SPFX.time-SPFX.shake_origin_time));
+        var v = this.shake_synth.evaluate(24.0*(this.time-this.shake_origin_time));
         return [total_amp*v[0], total_amp*v[1], total_amp*v[2]];
     }
     return [0,0,0];
@@ -301,25 +299,25 @@ SPFX.get_camera_shake = function() {
 /** @param {!SPFX.When} when
     @param {number} amplitude
     @param {number} falloff */
-SPFX.shake_camera = function(when, amplitude, falloff) {
-    SPFX.shake_impulses.push({when:when, amplitude: gamedata['client']['camera_shake_scale']*amplitude, falloff:falloff, started_at: -1});
+SPFX.FXWorld.prototype.shake_camera = function(when, amplitude, falloff) {
+    this.shake_impulses.push({when:when, amplitude: gamedata['client']['camera_shake_scale']*amplitude, falloff:falloff, started_at: -1});
 };
 
-/** @constructor
-    @struct */
+/** @constructor */
 SPFX.FXObject = function() {
     /** @type {string} */
-    this.id = '';
+    this.id = (SPFX.last_id++).toString();
 };
+
 /** Repositions this object in the game world. Useful when attaching effects to a moving object.
     @param {!Array.<number>} xyz
     @param {number=} rotation */
 SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
-/** Called by SPFX.remove to perform any work needed to cleanly remove this object. */
-SPFX.FXObject.prototype.dispose = function() {};
+/** Called by remove() to perform any work needed to cleanly remove this object.
+    @param {!SPFX.FXWorld} fxworld */
+SPFX.FXObject.prototype.dispose = function(fxworld) {};
 
 /** @constructor
-    @struct
     @extends SPFX.FXObject
     @param {?string=} charge */
 SPFX.Field = function(charge) {
@@ -335,7 +333,6 @@ SPFX.Field.prototype.eval_field = goog.abstractMethod;
 
 // MagnetField
 /** @constructor
-    @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -372,7 +369,6 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
 };
 
 /** @constructor
-    @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -395,7 +391,6 @@ SPFX.DragField.prototype.eval_field = function(pos, vel) {
 // Effect
 
 /** @constructor
-    @struct
     @param {Object|null=} data
     @extends SPFX.FXObject */
 SPFX.Effect = function(data) {
@@ -405,17 +400,20 @@ SPFX.Effect = function(data) {
 };
 goog.inherits(SPFX.Effect, SPFX.FXObject);
 
-SPFX.Effect.prototype.draw = function() {};
+/** @param {!SPFX.FXWorld} fxworld */
+SPFX.Effect.prototype.draw = function(fxworld) {};
 
 // CoverScreen
 /** @constructor
-    @struct
+    @extends SPFX.Effect
     @param {string} color_str
 */
 SPFX.CoverScreen = function(color_str) {
     this.color_str = color_str;
 };
+goog.inherits(SPFX.CoverScreen, SPFX.Effect);
 
+/** @override */
 SPFX.CoverScreen.prototype.draw = function() {
     SPFX.ctx.save();
     SPFX.ctx.fillStyle = this.color_str;
@@ -434,6 +432,7 @@ SPFX.CombineEffect = function(effects) {
 };
 goog.inherits(SPFX.CombineEffect, SPFX.Effect);
 
+/** @override */
 SPFX.CombineEffect.prototype.draw = function() {
     // SPFX maintains handles to each child effect so we don't need to draw them here
 };
@@ -448,10 +447,11 @@ SPFX.CombineEffect.prototype.reposition = function(xyz, rotation) {
     }
 };
 
-SPFX.CombineEffect.prototype.dispose = function() {
+/** @override */
+SPFX.CombineEffect.prototype.dispose = function(fxworld) {
     var len = this.effects.length;
     for(var i = 0; i < len; i++) {
-        SPFX.remove(this.effects[i]);
+        fxworld.remove(this.effects[i]);
     }
 };
 
@@ -459,13 +459,14 @@ SPFX.CombineEffect.prototype.dispose = function() {
 
 /** @constructor
   * @extends SPFX.Effect
+  * @param {!SPFX.FXWorld} fxworld
   * @param {Array.<number>|null} spawn_pos
   * @param {!SPFX.When} when
   * @param {number} duration
   * @param {Object} data
   * @param {Object=} instance_data
   */
-SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
+SPFX.Particles = function(fxworld, spawn_pos, when, duration, data, instance_data) {
     goog.base(this, data);
     this.spawn_pos = v3_add(spawn_pos || [0, 0, 0], (data && 'offset' in data) ? /** @type {!Array.<number>} */ (data['offset']) : [0, 0, 0]);
     this.spawn_radius = (instance_data && 'radius' in instance_data ? /** @type {number} */ (instance_data['radius']) : 1) * (('radius' in this.data ? /** @type {number} */ (this.data['radius']) : 0));
@@ -503,7 +504,7 @@ SPFX.Particles = function(spawn_pos, when, duration, data, instance_data) {
 
     this.color = new SPUI.Color(col[0],col[1],col[2],col[3]);
     this.accel = [0,
-                  SPFX.global_gravity * ('gravity' in data ? /** @type {number} */ (data['gravity']) : -25),
+                  ('gravity' in data ? /** @type {number} */ (data['gravity']) : -25),
                   0];
     this.collide_ground = ('collide_ground' in data ? /** @type {boolean} */ (data['collide_ground']) : true);
     this.elasticity = ('elasticity' in data ? /** @type {number} */ (data['elasticity']) : 0.5);
@@ -556,13 +557,14 @@ SPFX.Particles.prototype.reposition = function(xyz, rotation) {
     }
 };
 
-/** @param {!Array.<number>} pos
+/** @param {!SPFX.FXWorld} fxworld
+    @param {!Array.<number>} pos
     @param {number} dpos
     @param {!Array.<number>} vel
     @param {number} dvel
     @param {!Array.<number>} dvel_scale
     @param {number} count */
-SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, count) {
+SPFX.Particles.prototype.spawn = function(fxworld, pos, dpos, vel, dvel, dvel_scale, count) {
     if(this.spawn_count > 0) {
         // if particles are spawned more than once, it means the age is no longer global, so we have to turn on pp_age
         this.pp_age = true;
@@ -624,7 +626,7 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
                 props = {'rotation': (180.0/Math.PI)*an, 'rotate_speed': (180.0/Math.PI)*anv};
             }
             // note: c may be null
-            c = SPFX.add_visual_effect_at_time([p[0],p[2]], p[1], [0,1,0], SPFX.time, this.child_data, true, props);
+            c = fxworld.add_visual_effect_at_time([p[0],p[2]], p[1], [0,1,0], fxworld.time, this.child_data, true, props);
         }
 
         if(this.pos.length < this.nmax) {
@@ -651,17 +653,18 @@ SPFX.Particles.prototype.spawn = function(pos, dpos, vel, dvel, dvel_scale, coun
         }
     }
 };
-SPFX.Particles.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) { return; }
+/** @override */
+SPFX.Particles.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) { return; }
     if(this.start_time < 0) {
-        this.start_time = this.last_time = SPFX.time;
+        this.start_time = this.last_time = fxworld.time;
         this.end_time = (this.emit_continuous_for >= 0 ? (this.start_time + this.duration + this.max_age + this.emit_continuous_for) : -1);
     }
 
-    if(this.end_time >= 0 && SPFX.time > this.end_time) { SPFX.remove(this); return; }
+    if(this.end_time >= 0 && fxworld.time > this.end_time) { fxworld.remove(this); return; }
 
     if(!this.emit_instant_done && ('emit_instant' in this.data) && /** @type {number} */ (this.data['emit_instant']) > 0) {
-        this.spawn(this.spawn_pos,
+        this.spawn(fxworld, this.spawn_pos,
                    this.spawn_radius,
                    v3_scale(this.data['speed'], ('emit_orient' in this.data ? /** @type {!Array.<number>} */ (this.data['emit_orient']) : [0,1,0])),
                    ('speed_random' in this.data ? /** @type {number} */ (this.data['speed_random']) : ('speed' in this.data ? /** @type {number} */ (this.data['speed']) : 0)),
@@ -670,11 +673,11 @@ SPFX.Particles.prototype.draw = function() {
         this.emit_instant_done = true;
     }
 
-    var dt = SPFX.time - this.last_time;
-    this.run_physics(dt);
-    this.last_time = SPFX.time;
+    var dt = fxworld.time - this.last_time;
+    this.run_physics(fxworld, dt);
+    this.last_time = fxworld.time;
 
-    if(this.emit_continuous_rate > 0 && (this.emit_continuous_for < 0 || SPFX.time - this.start_time < this.emit_continuous_for)) {
+    if(this.emit_continuous_rate > 0 && (this.emit_continuous_for < 0 || fxworld.time - this.start_time < this.emit_continuous_for)) {
         // continuous particle emission
         var num_to_emit = this.emit_continuous_rate*dt;
         num_to_emit = Math.min(SPFX.detail, 1)*num_to_emit;
@@ -692,7 +695,7 @@ SPFX.Particles.prototype.draw = function() {
             }
         }
         if(num_to_emit >= 1) {
-            this.spawn(this.spawn_pos,
+            this.spawn(fxworld, this.spawn_pos,
                        this.spawn_radius,
                        v3_scale(this.data['speed'], ('emit_orient' in this.data ? /** @type {!Array.<number>} */ (this.data['emit_orient']) : [0,1,0])),
                        ('speed_random' in this.data ? /** @type {number} */ (this.data['speed_random']) : ('speed' in this.data ? /** @type {number} */ (this.data['speed']) : 0)),
@@ -719,7 +722,7 @@ SPFX.Particles.prototype.draw = function() {
         if(this.opacity < 1 || !this.pp_age) {
             var op = this.opacity;
             if(!this.pp_age) {
-                op *= Math.pow(1.0 - (SPFX.time - this.start_time) / this.max_age, this.fade_power);
+                op *= Math.pow(1.0 - (fxworld.time - this.start_time) / this.max_age, this.fade_power);
             }
             op = Math.min(Math.max(op, 0), 1);
             SPFX.ctx.globalAlpha = op;
@@ -790,15 +793,16 @@ SPFX.Particles.prototype.draw = function() {
     }
 };
 
-/** @param {number} dt - time delta since last step */
-SPFX.Particles.prototype.run_physics = function(dt) {
+/** @param {!SPFX.FXWorld} fxworld
+    @param {number} dt - time delta since last step */
+SPFX.Particles.prototype.run_physics = function(fxworld, dt) {
     if(dt <= 0) { return; }
 
     for(var i = 0; i < this.pos.length; i++) {
         if(this.age[i] > this.max_age) { continue; }
 
         // bounce off the ground
-        if(this.collide_ground && this.pos[i][1] < SPFX.global_ground_plane) {
+        if(this.collide_ground && this.pos[i][1] < fxworld.global_ground_plane) {
             this.pos[i][1] = 0.001;
             this.vel[i][0] *= this.elasticity;
             this.vel[i][1] *= -this.elasticity;
@@ -808,9 +812,9 @@ SPFX.Particles.prototype.run_physics = function(dt) {
             }
         }
 
-        var forces = this.accel;
-        for(var id in SPFX.fields) {
-            var field = SPFX.fields[id];
+        var forces = v3_mul([1, fxworld.global_gravity, 1], this.accel);
+        for(var id in fxworld.fields) {
+            var field = fxworld.fields[id];
             if(field.charge !== this.charge) { continue; }
             forces = v3_add(forces, field.eval_field(this.pos[i], this.vel[i])); /* times mass, of course */
         }
@@ -833,8 +837,8 @@ SPFX.Particles.prototype.run_physics = function(dt) {
 // TimeProjectile
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
+    @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} from
     @param {number} from_height
     @param {!Array.<number>} to
@@ -851,7 +855,7 @@ SPFX.Particles.prototype.run_physics = function(dt) {
     @param {number} glow
     @param {string|null} asset
 */
-SPFX.TimeProjectile = function(from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
+SPFX.TimeProjectile = function(fxworld, from, from_height, to, to_height, launch_time, impact_time, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
     goog.base(this, null);
     this.from = from;
     this.to = to;
@@ -883,19 +887,20 @@ SPFX.TimeProjectile = function(from, from_height, to, to_height, launch_time, im
 
     if(exhaust) {
         // exhaust particles
-        this.particles = new SPFX.Particles(null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
+        this.particles = new SPFX.Particles(fxworld, null, new SPFX.When(launch_time, null), impact_time - launch_time, exhaust); // should_be_tick
         this.exhaust_speed = ('speed' in exhaust ? /** @type {number} */ (exhaust['speed']) : 0);
         this.exhaust_dvel = ('randomize_vel' in exhaust ? /** @type {number} */ (exhaust['randomize_vel']) : 0) * this.exhaust_speed;
         this.exhaust_vel = vec_scale(-this.exhaust_speed, shot_dir);
         this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * ('emit_rate' in exhaust ? /** @type {number} */ (exhaust['emit_rate']) : 60));
-        SPFX.add(this.particles);
+        fxworld.add(this.particles);
     } else {
         this.particles = null;
     }
 };
 goog.inherits(SPFX.TimeProjectile, SPFX.Effect);
 
-SPFX.TimeProjectile.prototype.draw_beam = function() {
+/** @param {!SPFX.FXWorld} fxworld */
+SPFX.TimeProjectile.prototype.draw_beam = function(fxworld) {
     var stroke_start = ortho_to_draw_3d([this.from[0], this.launch_height, this.from[1]]);
     var stroke_end = ortho_to_draw_3d([this.to[0], this.to_height, this.to[1]]);
 
@@ -904,7 +909,7 @@ SPFX.TimeProjectile.prototype.draw_beam = function() {
 
     var fade = 1;
     if(this.fade_time > 0) {
-        fade = 1 - (SPFX.time - this.launch_time) / this.fade_time;
+        fade = 1 - (fxworld.time - this.launch_time) / this.fade_time;
         if(fade <= 0) {
             return;
         }
@@ -926,23 +931,24 @@ SPFX.TimeProjectile.prototype.draw_beam = function() {
     SPFX.ctx.restore();
 };
 
-SPFX.TimeProjectile.prototype.draw = function() {
-    if(SPFX.time < this.launch_time) {
+/** @override */
+SPFX.TimeProjectile.prototype.draw = function(fxworld) {
+    if(fxworld.time < this.launch_time) {
         return;
     }
 
-    if(SPFX.time > this.impact_time + this.fade_time) {
-        SPFX.remove(this);
+    if(fxworld.time > this.impact_time + this.fade_time) {
+        fxworld.remove(this);
         return;
     }
 
     if(this.min_length > 100.0) {
         // draw as solid beam instead of projectile
-        return this.draw_beam();
+        return this.draw_beam(fxworld);
     }
 
-    var t = SPFX.time - this.launch_time;
-    var dt = SPFX.time - this.last_time;
+    var t = fxworld.time - this.launch_time;
+    var dt = fxworld.time - this.last_time;
 
     // compute x,y ground position
     var pos = vec_mad(this.from, t, this.shot_vel);
@@ -971,7 +977,7 @@ SPFX.TimeProjectile.prototype.draw = function() {
                     spawn_loc[i] += this.particles.spawn_radius * (2*Math.random()-1);
                 }
             }
-            this.particles.spawn(spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
+            this.particles.spawn(fxworld, spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
         }
     }
 
@@ -1021,7 +1027,7 @@ SPFX.TimeProjectile.prototype.draw = function() {
 
     if(this.asset) {
         var sprite = GameArt.assets[this.asset].states['normal'];
-        sprite.draw(stroke_start, 0, SPFX.time);
+        sprite.draw(stroke_start, 0, fxworld.time);
     } else {
         SPFX.ctx.strokeStyle = this.color_str;
         SPFX.ctx.lineWidth = this.line_width;
@@ -1034,14 +1040,14 @@ SPFX.TimeProjectile.prototype.draw = function() {
 
     SPFX.ctx.restore();
 
-    this.last_time = SPFX.time;
+    this.last_time = fxworld.time;
 };
 
 // TicksProjectile
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
+    @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} from
     @param {number} from_height
     @param {!Array.<number>} to
@@ -1059,7 +1065,7 @@ SPFX.TimeProjectile.prototype.draw = function() {
     @param {number} glow
     @param {string|null} asset
 */
-SPFX.TicksProjectile = function(from, from_height, to, to_height, launch_tick, impact_tick, tick_delay, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
+SPFX.TicksProjectile = function(fxworld, from, from_height, to, to_height, launch_tick, impact_tick, tick_delay, max_height, color, exhaust, line_width, min_length, fade_time, comp_mode, glow, asset) {
     goog.base(this, null);
 
     if(SPFX.TicksProjectile.DEBUG) {
@@ -1083,7 +1089,7 @@ SPFX.TicksProjectile = function(from, from_height, to, to_height, launch_tick, i
 
     this.start_time = -1; // set upon launch_tick
     this.end_time = -1; // set upon impact_tick
-    this.last_time = -1; // SPFX.time of last computation
+    this.last_time = -1; // fxworld.time of last computation
     this.last_progress = -1;
 
     this.color_str = (new SPUI.Color(color[0], color[1], color[2], 1.0)).str();
@@ -1094,7 +1100,7 @@ SPFX.TicksProjectile = function(from, from_height, to, to_height, launch_tick, i
 
     if(exhaust) {
         // exhaust particles
-        this.particles = new SPFX.Particles(null, new SPFX.When(null, launch_tick),
+        this.particles = new SPFX.Particles(fxworld, null, new SPFX.When(null, launch_tick),
                                             // duration gets converted to seconds immediately here, for graphics only
                                             (impact_tick.get() - launch_tick.get()) * TICK_INTERVAL/combat_time_scale(),
                                             exhaust);
@@ -1102,7 +1108,7 @@ SPFX.TicksProjectile = function(from, from_height, to, to_height, launch_tick, i
         this.exhaust_dvel = ('randomize_vel' in exhaust ? /** @type {number} */ (exhaust['randomize_vel']) : 0) * this.exhaust_speed;
         this.exhaust_vel = vec_scale(-this.exhaust_speed, this.shot_dir);
         this.exhaust_rate = Math.floor(Math.min(SPFX.detail, 1) * ('emit_rate' in exhaust ? /** @type {number} */ (exhaust['emit_rate']) : 60));
-        SPFX.add(this.particles);
+        fxworld.add(this.particles);
     } else {
         this.particles = null;
     }
@@ -1111,7 +1117,8 @@ goog.inherits(SPFX.TicksProjectile, SPFX.Effect);
 
 SPFX.TicksProjectile.DEBUG = false;
 
-SPFX.TicksProjectile.prototype.draw_beam = function() {
+/** @param {!SPFX.FXWorld} fxworld */
+SPFX.TicksProjectile.prototype.draw_beam = function(fxworld) {
     var stroke_start = ortho_to_draw_3d([this.from[0], this.launch_height, this.from[1]]);
     var stroke_end = ortho_to_draw_3d([this.to[0], this.to_height, this.to[1]]);
 
@@ -1120,7 +1127,7 @@ SPFX.TicksProjectile.prototype.draw_beam = function() {
 
     var fade = 1;
     if(this.fade_time > 0) {
-        fade = 1 - (SPFX.time - this.start_time) / this.fade_time;
+        fade = 1 - (fxworld.time - this.start_time) / this.fade_time;
         if(fade <= 0) {
             return;
         }
@@ -1142,47 +1149,48 @@ SPFX.TicksProjectile.prototype.draw_beam = function() {
     SPFX.ctx.restore();
 };
 
-SPFX.TicksProjectile.prototype.draw = function() {
+/** @override */
+SPFX.TicksProjectile.prototype.draw = function(fxworld) {
     var shot_ticks = this.impact_tick.get() - this.launch_tick.get();
 
-    if(GameTypes.TickCount.lt(SPFX.tick, this.launch_tick)) {
+    if(GameTypes.TickCount.lt(fxworld.tick, this.launch_tick)) {
         return;
     } else if(this.start_time < 0) {
-        this.start_time = SPFX.last_tick_time + this.tick_delay;
+        this.start_time = fxworld.last_tick_time + this.tick_delay;
         this.last_time = this.start_time;
     }
-    if(SPFX.time < this.start_time) {
+    if(fxworld.time < this.start_time) {
         if(SPFX.TicksProjectile.DEBUG) {
-            console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - before start_time');
+            console.log(fxworld.tick.get().toString()+' '+this.id+' cancelled - before start_time');
         }
         return;
     }
 
-    if(GameTypes.TickCount.gte(SPFX.tick, this.impact_tick)) {
+    if(GameTypes.TickCount.gte(fxworld.tick, this.impact_tick)) {
         if(this.end_time < 0) {
-            this.end_time = SPFX.last_tick_time + this.tick_delay;
+            this.end_time = fxworld.last_tick_time + this.tick_delay;
             if(shot_ticks < 1) { this.end_time += TICK_INTERVAL/combat_time_scale(); }
         }
-        if(SPFX.time > this.end_time + this.fade_time) {
+        if(fxworld.time > this.end_time + this.fade_time) {
             if(SPFX.TicksProjectile.DEBUG) {
-                console.log(SPFX.tick.get().toString()+' '+this.id+' cancelled - after end_time');
+                console.log(fxworld.tick.get().toString()+' '+this.id+' cancelled - after end_time');
             }
-            SPFX.remove(this);
+            fxworld.remove(this);
             return;
         }
     }
 
     if(this.min_length > 100.0) {
         // draw as solid beam instead of projectile
-        return this.draw_beam();
+        return this.draw_beam(fxworld);
     }
 
     // 0 = launch, 1 = impact
     // works for shot_ticks = 0!
-    var progress = (SPFX.tick.get() - this.launch_tick.get()) / Math.max(shot_ticks, 1);
+    var progress = (fxworld.tick.get() - this.launch_tick.get()) / Math.max(shot_ticks, 1);
 
     // add time since last tick
-    progress += ((SPFX.time-SPFX.last_tick_time-this.tick_delay)/(TICK_INTERVAL/combat_time_scale())) / Math.max(shot_ticks, 1);
+    progress += ((fxworld.time-fxworld.last_tick_time-this.tick_delay)/(TICK_INTERVAL/combat_time_scale())) / Math.max(shot_ticks, 1);
     var dprogress_dt = (1/(TICK_INTERVAL/combat_time_scale())) / Math.max(shot_ticks, 1);
 
     //progress = Math.max(progress, 0);
@@ -1191,7 +1199,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
 
     // delta since last draw
     var dprogress = (this.last_progress < 0 ? dprogress_dt : progress - this.last_progress);
-    var dt = SPFX.time - this.last_time;
+    var dt = fxworld.time - this.last_time;
 
     // compute x,y ground position
     var pos = vec_lerp(this.from, this.to, progress);
@@ -1220,7 +1228,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
                     spawn_loc[i] += this.particles.spawn_radius * (2*Math.random()-1);
                 }
             }
-            this.particles.spawn(spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
+            this.particles.spawn(fxworld, spawn_loc, 0, [vel[0], 0, vel[1]], this.exhaust_dvel, [1,1,1], 1);
         }
     }
 
@@ -1229,7 +1237,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
     var sdprogress = 0.5 * Math.min(dprogress, 0.05);
 
     if(SPFX.TicksProjectile.DEBUG) {
-        console.log('tick '+SPFX.tick.get().toString()+' progress '+progress.toString()+' dprogress '+dprogress.toString());
+        console.log('tick '+fxworld.tick.get().toString()+' progress '+progress.toString()+' dprogress '+dprogress.toString());
     }
 
     var stroke_start = ortho_to_draw_3d([pos[0], height, pos[1]]);
@@ -1286,7 +1294,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
 
     if(this.asset) {
         var sprite = GameArt.assets[this.asset].states['normal'];
-        sprite.draw(stroke_start, 0, SPFX.time);
+        sprite.draw(stroke_start, 0, fxworld.time);
     } else {
         SPFX.ctx.strokeStyle = this.color_str;
         SPFX.ctx.lineWidth = this.line_width;
@@ -1299,7 +1307,7 @@ SPFX.TicksProjectile.prototype.draw = function() {
 
     SPFX.ctx.restore();
 
-    this.last_time = SPFX.time;
+    this.last_time = fxworld.time;
     this.last_progress = progress;
 };
 
@@ -1326,7 +1334,6 @@ SPFX.cue_tracker = {};
 SPFX.sound_throttle = 0.3;
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
     @param {!Object} data
     @param {!SPFX.When} when
@@ -1364,11 +1371,12 @@ SPFX.SoundCue = function(data, when) {
     }
 };
 goog.inherits(SPFX.SoundCue, SPFX.Effect);
-SPFX.SoundCue.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) { return; }
+/** @override */
+SPFX.SoundCue.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) { return; }
 
     if(this.start_time < 0) {
-        this.start_time = SPFX.time;
+        this.start_time = fxworld.time;
     }
 
     // start at a random place in the list
@@ -1379,16 +1387,16 @@ SPFX.SoundCue.prototype.draw = function() {
         var s = this.sprites[(i + idx) % this.sprites.length];
         var audio = s.get_audio();
         var key = audio.filename;
-        if(key in SPFX.cue_tracker && (SPFX.time - SPFX.cue_tracker[key]) < SPFX.sound_throttle) {
+        if(key in SPFX.cue_tracker && (fxworld.time - SPFX.cue_tracker[key]) < SPFX.sound_throttle) {
             continue;
         }
 
-        if(audio.play(SPFX.time)) {
-            SPFX.cue_tracker[key] = SPFX.time;
+        if(audio.play(fxworld.time)) {
+            SPFX.cue_tracker[key] = fxworld.time;
             break;
         }
     }
-    SPFX.remove(this);
+    fxworld.remove(this);
 }
 
 // Explosion
@@ -1406,7 +1414,7 @@ SPFX.get_vec_parameter = function(param) {
 
 /** @constructor
     @extends SPFX.Effect
-    @struct
+    @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} where
     @param {number} height
     @param {string} assetname
@@ -1415,7 +1423,7 @@ SPFX.get_vec_parameter = function(param) {
     @param {!Object} data
     @param {Object|null} instance_data
   */
-SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, instance_data) {
+SPFX.Explosion = function(fxworld, where, height, assetname, when, enable_audio, data, instance_data) {
     goog.base(this, data);
 
     if(instance_data) {
@@ -1476,8 +1484,8 @@ SPFX.Explosion = function(where, height, assetname, when, enable_audio, data, in
 
     var old_data = /** @type {!Object} */ (gamedata['art'][assetname]['states']['normal']);
     if('particles' in old_data) {
-        var particles = new SPFX.Particles([this.where[0], this.height, this.where[1]], when, this.duration, /** @type {!Object} */ (old_data['particles']));
-        SPFX.add(particles);
+        var particles = new SPFX.Particles(fxworld, [this.where[0], this.height, this.where[1]], when, this.duration, /** @type {!Object} */ (old_data['particles']));
+        fxworld.add(particles);
     }
 
     /** @type {HTMLImageElement|null} alternate HTML5 Image object used for tinting effects
@@ -1510,31 +1518,31 @@ SPFX.Explosion.prototype.reposition = function(xyz, rotation) {
 };
 
 /** @override */
-SPFX.Explosion.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) { return; }
+SPFX.Explosion.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) { return; }
     if(this.start_time < 0) {
-        this.start_time = SPFX.time;
+        this.start_time = fxworld.time;
         if(this.duration >= 0) {
             this.end_time = this.start_time + this.duration;
         }
     }
 
     if(this.enable_audio && !this.audio_started && this.sprite.get_audio()) {
-        this.sprite.get_audio().play(SPFX.time);
+        this.sprite.get_audio().play(fxworld.time);
         this.audio_started = true;
     }
 
-    if(this.end_time >= 0 && SPFX.time >= this.end_time) {
-        SPFX.remove(this);
+    if(this.end_time >= 0 && fxworld.time >= this.end_time) {
+        fxworld.remove(this);
         return;
     }
 
-    var t = (SPFX.time - this.start_time) / (this.end_time-this.start_time);
+    var t = (fxworld.time - this.start_time) / (this.end_time-this.start_time);
 
     /** @type {!Array.<number>} */
     var xyz = [this.where[0], this.height, this.where[1]];
     var scale = [this.sprite_scale[0], this.sprite_scale[1]];
-    var rot = this.rotation + this.rotate_speed*(SPFX.time-this.start_time);
+    var rot = this.rotation + this.rotate_speed*(fxworld.time-this.start_time);
 
     if(this.motion == 'starfall') {
         if(t < 0.5) {
@@ -1556,10 +1564,10 @@ SPFX.Explosion.prototype.draw = function() {
     var opacity = this.opacity;
     if(this.fade) {
         var fade_t = 1;
-        if (SPFX.time - this.start_time < this.fade_duration) {
-            fade_t = (SPFX.time - this.start_time) / this.fade_duration;
-        } else if (this.end_time - SPFX.time < this.fade_duration) {
-            fade_t = (this.end_time - SPFX.time) / this.fade_duration;
+        if (fxworld.time - this.start_time < this.fade_duration) {
+            fade_t = (fxworld.time - this.start_time) / this.fade_duration;
+        } else if (this.end_time - fxworld.time < this.fade_duration) {
+            fade_t = (this.end_time - fxworld.time) / this.fade_duration;
         }
         opacity *= Math.pow(1 - Math.abs(fade_t - 1), 2.0);
     }
@@ -1592,7 +1600,7 @@ SPFX.Explosion.prototype.draw = function() {
         }
         SPFX.ctx.drawImage(this.special_img, xy[0], xy[1]);
     } else {
-        this.sprite.draw(xy, 0, (SPFX.time - this.start_time));
+        this.sprite.draw(xy, 0, (fxworld.time - this.start_time));
     }
 
     if(has_state) {
@@ -1603,7 +1611,6 @@ SPFX.Explosion.prototype.draw = function() {
 // Debris
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
     @param {!Array.<number>} where
     @param {string} assetname
@@ -1621,6 +1628,7 @@ SPFX.Debris = function(where, assetname, facing) {
     this.facing = facing;
 };
 goog.inherits(SPFX.Debris, SPFX.Effect);
+/** @override */
 SPFX.Debris.prototype.draw = function() {
     if(!this.show) { return; }
     var xy = ortho_to_draw(this.where);
@@ -1658,7 +1666,8 @@ SPFX.OffscreenArrow_data = [
     {min_angle: 15*Math.PI/8, max_angle: 2*Math.PI, sprite: 'n', draw_location: [0.5, 0.1]}
 ];
 
-SPFX.OffscreenArrow.prototype.draw = function() {
+/** @override */
+SPFX.OffscreenArrow.prototype.draw = function(fxworld) {
     if(!this.where) { return; }
 
     var xy = ortho_to_draw(this.where);
@@ -1706,7 +1715,7 @@ SPFX.OffscreenArrow.prototype.draw = function() {
     set_default_canvas_transform(SPFX.ctx); // reset to null transform
 
     // blinking arrow
-    if(Math.floor(2.0*SPFX.time) % 2 === 0) {
+    if(Math.floor(2.0*fxworld.time) % 2 === 0) {
         sprite.draw(draw_quantize([draw_loc[0]*canvas_width,
                                    draw_loc[1]*canvas_height]), 0, 0);
     }
@@ -1727,7 +1736,7 @@ SPFX.OffscreenArrow.prototype.draw = function() {
  @param {number} altitude
  @param {string} str
  @param {!Array.<number>} col
- @param {SPFX.When|null} when - null means "right now"
+ @param {!SPFX.When} when
  @param {number} duration
  @param {{solid_for: (number|undefined),
           rise_speed: (number|undefined),
@@ -1743,7 +1752,7 @@ SPFX.CombatText = function(where, altitude, str, col, when, duration, props) {
     this.solid_for = props.solid_for || 0.4; // alpha remains 1 for this portion of the start-end interval
     this.color = SPUI.make_colorv(SPUI.low_fonts ? [1,1,0,1] : col);
     this.shadow_color = new SPUI.Color(0, 0, 0, col[3]);
-    this.when = when || new SPFX.When(SPFX.time, null);
+    this.when = when;
     this.duration = duration;
     this.start_time = this.end_time = -1; // figured out after "when"
     this.speed = props.rise_speed || 40; // pixels per second
@@ -1752,20 +1761,21 @@ SPFX.CombatText = function(where, altitude, str, col, when, duration, props) {
     this.is_ui = props.is_ui || false; // "is_ui" means "this is a UI dialog effect, not a 3D playfield effect"
 };
 goog.inherits(SPFX.CombatText, SPFX.Effect);
-SPFX.CombatText.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) { return; }
+/** @override */
+SPFX.CombatText.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) { return; }
     if(this.start_time < 0) {
-        this.start_time = SPFX.time;
+        this.start_time = fxworld.time;
         this.end_time = this.start_time + this.duration;
     }
 
-    if(SPFX.time > this.end_time) {
-        SPFX.remove(this);
+    if(fxworld.time > this.end_time) {
+        fxworld.remove(this);
         return;
     }
 
     var interval = this.end_time - this.start_time;
-    this.color.a = 1 - (SPFX.time - this.start_time - this.solid_for*interval) / ((1-this.solid_for)*interval);
+    this.color.a = 1 - (fxworld.time - this.start_time - this.solid_for*interval) / ((1-this.solid_for)*interval);
     this.color.a = Math.min(Math.max(this.color.a, 0), 1);
     this.shadow_color.a = this.color.a;
 
@@ -1783,7 +1793,7 @@ SPFX.CombatText.prototype.draw = function() {
 
     var dims = SPFX.ctx.measureText(this.str);
     xy[0] = xy[0] - dims.width/2;
-    xy[1] = xy[1] - (15 + this.speed*(SPFX.time - this.start_time));
+    xy[1] = xy[1] - (15 + this.speed*(fxworld.time - this.start_time));
 
     // don't let it go off-screen horizontally
     if(xy[0] > roi[1][0] - dims.width) {
@@ -1804,7 +1814,6 @@ SPFX.CombatText.prototype.draw = function() {
 
 /** Unit movement/attack feedback
     @constructor
-    @struct
     @extends SPFX.Effect
     @param {!Array.<number>} col
     @param {!SPFX.When} when
@@ -1819,39 +1828,41 @@ SPFX.FeedbackEffect = function(col, when, duration) {
     this.start = this.end = -1;
 };
 goog.inherits(SPFX.FeedbackEffect, SPFX.Effect);
+/** @param {!SPFX.FXWorld} fxworld */
 SPFX.FeedbackEffect.prototype.do_draw = goog.abstractMethod;
-SPFX.FeedbackEffect.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) { return; }
+/** @override */
+SPFX.FeedbackEffect.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) { return; }
     if(this.start < 0) {
-        this.start = SPFX.time;
+        this.start = fxworld.time;
         this.end = this.start + this.duration;
     }
-    if(SPFX.time > this.end) {
-        SPFX.remove(this);
+    if(fxworld.time > this.end) {
+        fxworld.remove(this);
         return;
     }
 
-    var fade = (SPFX.time - this.start) / (this.end - this.start);
+    var fade = (fxworld.time - this.start) / (this.end - this.start);
     this.color.a = this.base_col[3] * (1 - fade*fade);
-    this.do_draw();
+    this.do_draw(fxworld);
 };
 
 /** @constructor
-    @struct
     @extends SPFX.FeedbackEffect
     @param {!Array.<number>} pos
     @param {!Array.<number>} col
+    @param {!SPFX.When} when
     @param {number} duration
   */
-SPFX.ClickFeedback = function(pos, col, duration) {
-    goog.base(this, col, new SPFX.When(SPFX.time, null), duration);
+SPFX.ClickFeedback = function(pos, col, when, duration) {
+    goog.base(this, col, when, duration);
     this.pos = vec_copy(pos);
 };
 goog.inherits(SPFX.ClickFeedback, SPFX.FeedbackEffect);
 
 /** @override */
-SPFX.ClickFeedback.prototype.do_draw = function() {
-    var radius = 20.0 * (SPFX.time - this.start) / (this.end - this.start);
+SPFX.ClickFeedback.prototype.do_draw = function(fxworld) {
+    var radius = 20.0 * (fxworld.time - this.start) / (this.end - this.start);
 
     SPFX.ctx.save();
     SPFX.ctx.strokeStyle = this.color.str();
@@ -1867,7 +1878,6 @@ SPFX.ClickFeedback.prototype.do_draw = function() {
 };
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
     @param {!Array.<number>} where (2D)
     @param {number} altitude
@@ -1895,22 +1905,23 @@ SPFX.Shockwave = function(where, altitude, when, data) {
 };
 goog.inherits(SPFX.Shockwave, SPFX.Effect);
 
-SPFX.Shockwave.prototype.draw = function() {
-    if(SPFX.time_lt(this.when)) {
+/** @override */
+SPFX.Shockwave.prototype.draw = function(fxworld) {
+    if(fxworld.time_lt(this.when)) {
         return;
     }
 
     if(this.start_time < 0) {
-        this.start_time = SPFX.time;
+        this.start_time = fxworld.time;
         this.end_time = this.start_time + Math.max(/** @type {number|undefined} */ (this.data['duration']) || 0.5, 0.0);
     }
 
-    if(SPFX.time > this.end_time) {
-        SPFX.remove(this);
+    if(fxworld.time > this.end_time) {
+        fxworld.remove(this);
         return;
     }
 
-    var t = SPFX.time - this.start_time;
+    var t = fxworld.time - this.start_time;
     var u = t / (this.end_time - this.start_time);
 
     var xy = draw_quantize(ortho_to_draw_3d([this.where[0], this.altitude, this.where[1]]));
@@ -1941,12 +1952,11 @@ SPFX.Shockwave.prototype.draw = function() {
 
 
 /** @constructor
-    @struct
     @extends SPFX.Effect
     @param {!Array.<number>} pos
     @param {number} altitude
     @param {!Array.<number>} orient
-    @param {SPFX.When|null} when - null means "right now"
+    @param {!SPFX.When} when
     @param {!Object} data
     @param {Object|null} instance_data
   */
@@ -1959,10 +1969,6 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     // since the phantom will appear at the NEXT combat tick
     if('my_next_pos' in instance_data && 'tick_offset' in instance_data) {
         pos = vec_add(pos, vec_scale(instance_data['tick_offset'], vec_sub(instance_data['my_next_pos'], pos)));
-    }
-
-    if(!when) {
-        when = new SPFX.When(SPFX.time, null);
     }
 
     this.when = when;
@@ -2029,9 +2035,11 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.obj.altitude = altitude;
 };
 goog.inherits(SPFX.PhantomUnit, SPFX.Effect);
-SPFX.PhantomUnit.prototype.dispose = function() {
+
+/** @override */
+SPFX.PhantomUnit.prototype.dispose = function(fxworld) {
     if(this.obj.permanent_effect) {
-        SPFX.remove(this.obj.permanent_effect);
+        fxworld.remove(this.obj.permanent_effect);
     }
 };
 
@@ -2051,24 +2059,26 @@ SPFX.PhantomUnit.prototype.set_dest = function(new_dest) {
     this.obj.ai_move_towards(new_dest, null, 'SPFX.PhantomUnit.set_dest');
 };
 
+/** @override */
 SPFX.PhantomUnit.prototype.draw = function() { throw Error('should not be called'); };
 
-/** @return {Mobile|null} */
-SPFX.PhantomUnit.prototype.get_phantom_object = function() {
-    if(this.end_time >= 0 && SPFX.time >= this.end_time) { return null; } // timed out
+/** @param {!SPFX.FXWorld} fxworld
+    @return {Mobile|null} */
+SPFX.PhantomUnit.prototype.get_phantom_object = function(fxworld) {
+    if(this.end_time >= 0 && fxworld.time >= this.end_time) { return null; } // timed out
 
-    if(SPFX.time_lt(this.when)) {
+    if(fxworld.time_lt(this.when)) {
         this.obj.cur_opacity = 0;
         this.obj.last_opacity = 0;
     } else {
         if(this.start_time < 0) {
-            this.start_time = SPFX.time;
+            this.start_time = fxworld.time;
             if(this.duration >= 0) {
                 this.end_time = this.start_time + this.duration;
             }
         }
 
-        if(this.start_halted && (SPFX.time - this.start_time) > this.start_halted) { // get moving now
+        if(this.start_halted && (fxworld.time - this.start_time) > this.start_halted) { // get moving now
             this.obj.control_state = control_states.CONTROL_MOVING;
         }
 
@@ -2077,7 +2087,7 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
         var scale = this.sprite_scale;
 
         if(this.pulse_period > 0) {
-            var pulse = Math.sin((SPFX.time/this.pulse_period + this.pulse_phase)*2*Math.PI);
+            var pulse = Math.sin((fxworld.time/this.pulse_period + this.pulse_phase)*2*Math.PI);
             if(this.alpha_pulse_amplitude > 0) {
                 alpha *= (1-this.alpha_pulse_amplitude) + this.alpha_pulse_amplitude * pulse;
             }
@@ -2120,8 +2130,8 @@ SPFX.PhantomUnit.prototype.get_phantom_object = function() {
    @param {Object|null} instance_data
    @return {SPFX.FXObject|null}
    */
-SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
-    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(time, null), data, allow_sound, instance_data);
+SPFX.FXWorld.prototype.add_visual_effect_at_time = function(pos, altitude, orient, time, data, allow_sound, instance_data) {
+    return this._add_visual_effect(pos, altitude, orient, new SPFX.When(time, null), data, allow_sound, instance_data);
 };
 
 /**
@@ -2135,8 +2145,8 @@ SPFX.add_visual_effect_at_time = function(pos, altitude, orient, time, data, all
    @param {Object|null} instance_data
    @return {SPFX.FXObject|null}
    */
-SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, tick_delay, data, allow_sound, instance_data) {
-    return SPFX._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick, tick_delay), data, allow_sound, instance_data);
+SPFX.FXWorld.prototype.add_visual_effect_at_tick = function(pos, altitude, orient, tick, tick_delay, data, allow_sound, instance_data) {
+    return this._add_visual_effect(pos, altitude, orient, new SPFX.When(null, tick, tick_delay), data, allow_sound, instance_data);
 };
 
 /**
@@ -2150,7 +2160,7 @@ SPFX.add_visual_effect_at_tick = function(pos, altitude, orient, tick, tick_dela
    @return {SPFX.FXObject|null}
    @private
    */
-SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_sound, instance_data) {
+SPFX.FXWorld.prototype._add_visual_effect = function(pos, altitude, orient, when, data, allow_sound, instance_data) {
     if(/** @type {number} */ (data['require_detail']) > SPFX.detail) { return null; }
     if(('max_detail' in data) && SPFX.detail >= /** @type {number} */ (data['max_detail'])) { return null; }
 
@@ -2167,27 +2177,22 @@ SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_soun
 
     if('translate' in data) { pos = v3_add(pos, /** @type {!Array.<number>} */ (data['translate'])); }
 
-    /** @type {function(!SPFX.Effect): !SPFX.Effect} */
-    var add_func = SPFX.add;
-
-    if(effect_layer === 'under') {
-        add_func = SPFX.add_under;
-    } else if(effect_layer === 'ui') {
-        add_func = SPFX.add_ui;
-    }
+    /** @type {SPFX.FXObject|null} */
+    var ret = null;
+    var do_add = true;
 
     if(effect_type === 'shockwave') {
-        return add_func(new SPFX.Shockwave(pos, altitude, when, data));
+        ret = new SPFX.Shockwave(pos, altitude, when, data);
     } else if(effect_type === 'combine') {
-        var ret = new SPFX.CombineEffect();
+        ret = new SPFX.CombineEffect();
         var effects = /** @type {!Array.<!Object>|undefined} */ (data['effects']) || [];
         for(var i = 0; i < effects.length; i++) {
-            var child = SPFX._add_visual_effect(pos, altitude, orient, when, effects[i], allow_sound, instance_data);
+            var child = this._add_visual_effect(pos, altitude, orient, when, effects[i], allow_sound, instance_data);
             if(child) {
                 ret.effects.push(child);
             }
         }
-        return ret;
+        do_add = false; // do not add the combineeffect itself
     } else if(effect_type === 'random') {
         /** @type {!Array.<!Object>} */
         var effects = /** @type {Array.<!Object>|undefined} */ (data['effects']) || [];
@@ -2202,48 +2207,62 @@ SPFX._add_visual_effect = function(pos, altitude, orient, when, data, allow_soun
             });
             var r = Math.random() * total_weight;
             var index = -goog.array.binarySearch(breakpoints, r) - 1;
-            return SPFX._add_visual_effect(pos, altitude, orient, when, effects[index], allow_sound, instance_data);
+            ret = this._add_visual_effect(pos, altitude, orient, when, effects[index], allow_sound, instance_data);
+            do_add = false; // already added
         }
     } else if(effect_type === 'library') {
         var ref = /** @type {!Object} */ (gamedata['client']['vfx'][data['name']]);
-        return SPFX._add_visual_effect(pos, altitude, orient, when, ref, allow_sound, instance_data);
+        ret = this._add_visual_effect(pos, altitude, orient, when, ref, allow_sound, instance_data);
+        do_add = false; // already added
     } else if(effect_type === 'explosion') {
-        return add_func(new SPFX.Explosion(pos, altitude, /** @type {string} */ (data['sprite']), when, false, data, instance_data));
+        ret = new SPFX.Explosion(this, pos, altitude, /** @type {string} */ (data['sprite']), when, false, data, instance_data);
     } else if(effect_type === 'particles') {
-        var particles = new SPFX.Particles([pos[0], altitude, pos[1]], when,
-                                           /** @type {number|undefined} */ (data['max_age']) || 1.0,
-                                           data, instance_data);
-        return add_func(particles);
+        ret = new SPFX.Particles(this, [pos[0], altitude, pos[1]], when,
+                                 /** @type {number|undefined} */ (data['max_age']) || 1.0,
+                                 data, instance_data);
     } else if(effect_type === 'particle_magnet') {
-        return SPFX.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], data, instance_data));
+        ret = this.add_field(new SPFX.MagnetField([pos[0], altitude, pos[1]], data, instance_data));
+        do_add = false;
     } else if(effect_type === 'drag_field') {
-        return SPFX.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], data, instance_data));
+        ret = this.add_field(new SPFX.DragField([pos[0], altitude, pos[1]], data, instance_data));
+        do_add = false;
     } else if(effect_type === 'camera_shake') {
-        SPFX.shake_camera(when,
+        this.shake_camera(when,
                           /** @type {number|undefined} */ (data['amplitude']) || 100,
                           /** @type {number|undefined} */ (data['decay_time']) || 0.4);
-        return null;
+        // return null
     } else if(effect_type === 'combat_text') {
-        return add_func(new SPFX.CombatText(pos, 0, /** @type {string} */ (data['ui_name']),
-                                            /** @type {!Array.<number>|undefined} */ (data['text_color']) || [1,1,1],
-                                            when,
-                                            /** @type {number|undefined} */ (data['duration']) || 3,
-                                            {drop_shadow: !!data['drop_shadow'],
-                                             font_size: /** @type {number|undefined} */ (data['font_size']) || 20,
-                                             text_style: /** @type {string|undefined} */ (data['text_style']) || 'thick'}));
+        ret = new SPFX.CombatText(pos, 0, /** @type {string} */ (data['ui_name']),
+                                  /** @type {!Array.<number>|undefined} */ (data['text_color']) || [1,1,1],
+                                  when,
+                                  /** @type {number|undefined} */ (data['duration']) || 3,
+                                  {drop_shadow: !!data['drop_shadow'],
+                                   font_size: /** @type {number|undefined} */ (data['font_size']) || 20,
+                                   text_style: /** @type {string|undefined} */ (data['text_style']) || 'thick'});
     } else if(effect_type === 'sound') {
         if(allow_sound) {
-            return add_func(new SPFX.SoundCue(data, when));
-        } else {
-            return null;
+            ret = new SPFX.SoundCue(data, when);
         }
     } else if(effect_type === 'phantom_unit') {
         if(instance_data && ('dest' in instance_data) && instance_data['dest'] === null) {
-            return null; // inhibit spawning
+            ret = null; // inhibit spawning
+        } else {
+            ret = this.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
+            do_add = false;
         }
-        return SPFX.add_phantom(new SPFX.PhantomUnit(pos, altitude, orient, when, data, instance_data));
     } else {
         console.log('unhandled visual effect type "'+effect_type+'"!');
     }
-    return null;
+
+    if(ret && do_add) {
+        if(effect_layer === 'under') {
+            this.add_under(ret);
+        } else if(effect_layer === 'ui') {
+            this.add_ui(ret);
+        } else {
+            this.add(ret);
+        }
+    }
+
+    return ret;
 };

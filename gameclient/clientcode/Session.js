@@ -98,15 +98,16 @@ Session.Session = function() {
     /** @type {!Array<!World.World>}
         Bottom-most element is the "real" world, replays push a "virtual" world on top */
     this.world_stack = [];
-    this.set_viewing_base(null);
+    this.set_viewing_base(null, false);
 };
 
-/** @param {Base.Base|null} new_base */
-Session.Session.prototype.set_viewing_base = function(new_base) {
+/** @param {Base.Base|null} new_base
+    @param {boolean} enable_citizens */
+Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens) {
     this.viewing_base = new_base;
     // reinitialize world stack
     goog.array.forEach(this.world_stack, function(world) { world.dispose(); });
-    this.world_stack = [new World.World(this.viewing_base, this.cur_objects)];
+    this.world_stack = [new World.World(this.viewing_base, this.cur_objects, enable_citizens)];
 };
 /** @param {!World.World} new_world */
 Session.Session.prototype.push_world = function(new_world) { return this.world_stack.push(new_world); };
@@ -359,4 +360,10 @@ Session.Session.prototype.ui_attack_time_togo = function() {
         return 0;
     }
     return this.attack_finish_time - server_time;
+};
+
+Session.Session.prototype.persist_debris = function() {
+    if(this.has_deployed) {
+        this.get_real_world().persist_debris();
+    }
 };

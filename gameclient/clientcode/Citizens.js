@@ -28,7 +28,6 @@ goog.require('goog.object');
 
 /** State for one displayed citizen
     @constructor
-    @struct
     @param {Citizens.Context} context
     @param {string} obj_id
     @param {GameData.UnitSpec} spec
@@ -68,12 +67,13 @@ Citizens.Citizen.prototype.update = function() {
         } else {
             instance_data['path'] = path;
         }
-        this.fx = new SPFX.PhantomUnit(path[0], this.spec.flying ? this.spec.altitude : 0, [1, 0, 1], null,
+        this.fx = new SPFX.PhantomUnit(path[0], this.spec.flying ? this.spec.altitude : 0, [1, 0, 1],
+                                       new SPFX.When(this.context.fxworld.time, null),
                                        {'duration': -1, 'end_at_dest': false,
                                         'maxvel':0.5 // move more slowly than normal to look less "hurried"
                                        }, instance_data);
 
-        SPFX.add_phantom(this.fx);
+        this.context.fxworld.add_phantom(this.fx);
         if(gamedata['client']['citizens_astar']) {
             this.fx.set_dest(path[path.length-1]);
         }
@@ -173,12 +173,13 @@ Citizens.Citizen.prototype.get_random_pos_from = function(src) {
 //
 
 /** @constructor
-    @struct
     @param {Base.Base} base is the session.viewing_base
-    @param {AStar.CachedAStarContext} astar_context is the map for pathfinding */
-Citizens.Context = function(base, astar_context) {
+    @param {AStar.CachedAStarContext} astar_context is the map for pathfinding
+    @param {!SPFX.FXWorld} fxworld in which to put the phantom units */
+Citizens.Context = function(base, astar_context, fxworld) {
     this.base = base;
     this.astar_context = astar_context;
+    this.fxworld = fxworld;
 
     /** @type {Object.<string, Citizens.Citizen>} */
     this.by_id = {}; // to keep track of our citizens
@@ -186,7 +187,6 @@ Citizens.Context = function(base, astar_context) {
 
 /** Just a data structure for passing input to Context.update()
     @constructor
-    @struct
     @param {string} obj_id
     @param {string} specname
     @param {number} level

@@ -14,13 +14,15 @@ goog.provide('DeploymentMarkers');
 goog.require('goog.array');
 goog.require('SPFX');
 
-/** @constructor */
-DeploymentMarkers.MarkerList = function() {
+/** @constructor
+    @param {!SPFX.FXWorld} fxworld */
+DeploymentMarkers.MarkerList = function(fxworld) {
+    this.fxworld = fxworld;
     /** @type {!Array<!SPFX.PhantomUnit>} */
     this.markers = [];
 };
 DeploymentMarkers.MarkerList.prototype.clear = function() {
-    goog.array.forEach(this.markers, goog.partial(SPFX.remove));
+    goog.array.forEach(this.markers, function(marker) { this.fxworld.remove(marker); }, this);
     this.markers = [];
 };
 
@@ -30,7 +32,7 @@ DeploymentMarkers.MarkerList.prototype.clear = function() {
     @param {number} level */
 DeploymentMarkers.MarkerList.prototype.add_marker = function(pos, altitude, specname, level) {
     var phantom = new SPFX.PhantomUnit(pos, altitude, [0,1,0],
-                                       null, // show immediately
+                                       this.fxworld.now_time(),
                                        {'duration':-1, 'team':'enemy',
                                         'pulse_period': 1.7,
                                         'sprite_scale': 1.2,
@@ -40,16 +42,17 @@ DeploymentMarkers.MarkerList.prototype.add_marker = function(pos, altitude, spec
                                         'end_at_dest':false},
                                        {'spec':specname, 'level':level,
                                         'path':[vec_copy(pos),vec_add(pos,[1,1])]});
-    phantom = SPFX.add_phantom(phantom);
+    phantom = this.fxworld.add_phantom(phantom);
     if(phantom) {
         this.markers.push(phantom);
     }
 };
 
-/** @param {string} attacker_ui_name
+/** @param {!SPFX.FXWorld} fxworld
+    @param {string} attacker_ui_name
     @param {!Array.<{pos:!Array.<number>, altitude:number, specname:string, level:number}>} unit_data */
-DeploymentMarkers.invoke_gui = function(attacker_ui_name, unit_data) {
-    var markers = new DeploymentMarkers.MarkerList();
+DeploymentMarkers.invoke_gui = function(fxworld, attacker_ui_name, unit_data) {
+    var markers = new DeploymentMarkers.MarkerList(fxworld);
     goog.array.forEach(unit_data, function(data) {
         markers.add_marker(data.pos, data.altitude, data.specname, data.level);
     });

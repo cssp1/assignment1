@@ -731,7 +731,7 @@ SPUI.instantiate_widget = function(wdata) {
         // not prevent mouse events from reaching sibling widgets
         widget.transparent_to_mouse = true;
     } else if(wdata['kind'] === 'RegionMap') {
-        widget = new RegionMap.RegionMap(wdata);
+        widget = new RegionMap.RegionMap(wdata, session.get_draw_world()); // ugh
     } else {
         throw Error('unknown widget kind '+wdata['kind']);
     }

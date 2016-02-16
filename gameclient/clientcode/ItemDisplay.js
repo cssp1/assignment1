@@ -174,15 +174,16 @@ ItemDisplay._set_inventory_item_stack = function(widget, spec, stack) {
 ItemDisplay.set_inventory_item_stack = function(widget, spec, item) { ItemDisplay._set_inventory_item_stack(widget, spec, item['stack'] || 1); };
 
 /** add a SPFX.CombatText effect to show result of actions on an inventory item widget
+    @param {!SPFX.FXWorld} fxworld
     @param {SPUI.DialogWidget} widget
     @param {string} str
     @param {!Array.<number>} color */
-ItemDisplay.add_inventory_item_effect = function(widget, str, color) {
+ItemDisplay.add_inventory_item_effect = function(fxworld, widget, str, color) {
     var abspos = [25,25];
-    SPFX.add_ui(new SPFX.CombatText(vec_add(abspos, widget.get_absolute_xy()),
-                                    0, str,
-                                    color, null, 3.0,
-                                    {drop_shadow: true, font_size: 15, text_style: "thick", is_ui: true}));
+    fxworld.add_ui(new SPFX.CombatText(vec_add(abspos, widget.get_absolute_xy()),
+                                       0, str,
+                                       color, fxworld.now_time(), 3.0,
+                                       {drop_shadow: true, font_size: 15, text_style: "thick", is_ui: true}));
 };
 
 /** return displayable name for item of given spec

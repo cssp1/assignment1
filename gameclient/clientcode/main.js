@@ -974,7 +974,7 @@ Aura.prototype.apply = function(obj) {
     if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (obj.team != 'enemy' || !obj.is_invisible())) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
-        this.visual_effect = SPFX.add_visual_effect_at_time(obj.interpolate_pos(), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
+        this.visual_effect = obj.world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
     }
 };
 
@@ -1923,7 +1923,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
                 var vfx_props = {'dest': null}; // special case: inhibit PhantomUnits from spawning (since this is a self-destruct, not an offensive shot)
-                SPFX.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
+                this.world.fxworld.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
             }
         } else if(code === 'projectile_attack') {
             // make sure we are in range
@@ -2033,7 +2033,7 @@ function create_debris(target, pos) {
 
     var debris = new SPFX.Debris(pos, inertspec['art_asset'], target.interpolate_facing())
     debris.show = (!('show_debris' in session.viewing_base.base_climate_data) || session.viewing_base.base_climate_data['show_debris']);
-    SPFX.add_under(debris);
+    target.world.fxworld.add_under(debris);
 
     var tooltip = target.spec['ui_name'] + ' ' + inertspec['ui_name'];
     if(target.team === 'player') {
@@ -2052,19 +2052,6 @@ function create_debris(target, pos) {
                          'spec': inertspec['name'],
                          'pos': vec_floor(pos),
                          'metadata': {'facing':target.interpolate_facing(), 'tooltip': tooltip} };
-}
-
-function persist_debris() {
-    if(!session.has_deployed) { return; }
-    if(('show_debris' in session.viewing_base.base_climate_data) && !session.viewing_base.base_climate_data['show_debris']) { return; }
-    for(var id in SPFX.current_under) {
-        var effect = SPFX.current_under[id];
-        if(effect.user_data && effect.user_data['persist'] === 'debris') {
-            send_to_server.func(["CREATE_INERT", effect.user_data['spec'], effect.user_data['pos'], effect.user_data['metadata']]);
-            effect.user_data = null;
-            SPFX.remove(effect);
-        }
-    }
 }
 
 /** Modify damage by vs_table coefficients
@@ -2137,11 +2124,11 @@ function hurt_object(target, damage, vs_table, source) {
 
     if(COMBAT_DEBUG) {
         // Damage text
-        SPFX.add(new SPFX.CombatText(pos,
+        target.world.fxworld.add(new SPFX.CombatText(pos,
                                      target.is_flying() ? target.altitude : 0,
                                      pretty_print_number(Math.abs(damage)),
                                      (damage >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
-                                     (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, session.get_real_world().combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
+                                     (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, target.world.combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
                                      1.0, {drop_shadow:true}));
     }
 
@@ -2254,7 +2241,7 @@ function hurt_object(target, damage, vs_table, source) {
         }
 
         if(fx_data) {
-            SPFX.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, fx_data, true, null);
+            target.world.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, fx_data, true, null);
         }
 
         target.update_permanent_effect();
@@ -2306,7 +2293,7 @@ function hurt_object(target, damage, vs_table, source) {
         }
 
         if('damaged_effect' in target.spec) {
-            SPFX.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
+            target.world.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
         }
     }
 
@@ -2708,7 +2695,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
     var use_lead = get_leveled_quantity(spell['lead_target'] || 0, my_level);
     var lead_applied = false;
-    var arc = SPFX.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
+    var arc = session.get_real_world().fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
     var copies = get_leveled_quantity(spell['projectile_burst_size'] || 1, my_level);
     if(SPFX.detail < 1) {
         copies = Math.min(Math.max(Math.floor(SPFX.detail * copies), 1), 2);
@@ -2853,17 +2840,18 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
         // visual projectile effect
         if(color !== null && my_muzzle_pos) {
-            SPFX.add(new SPFX.TimeProjectile(my_muzzle_pos, my_height,
-                                             impact_pos, impact_height,
-                                             muzzle_time+prefire_delay, impact_time,
-                                             shot_height, color, (exhaust ? exhaust : null),
-                                             get_leveled_quantity(spell['projectile_size'] || 2, my_level),
-                                             get_leveled_quantity(spell['projectile_min_length'] || 0, my_level),
-                                             get_leveled_quantity(spell['projectile_fade_time'] || 0, my_level),
-                                             (spell['projectile_composite_mode'] || null),
-                                             (spell['projectile_glow'] || 0),
-                                             (spell['projectile_asset'] || null)
-                                            ));
+            var fxworld = session.get_real_world().fxworld;
+            fxworld.add(new SPFX.TimeProjectile(fxworld, my_muzzle_pos, my_height,
+                                                impact_pos, impact_height,
+                                                muzzle_time+prefire_delay, impact_time,
+                                                shot_height, color, (exhaust ? exhaust : null),
+                                                get_leveled_quantity(spell['projectile_size'] || 2, my_level),
+                                                get_leveled_quantity(spell['projectile_min_length'] || 0, my_level),
+                                                get_leveled_quantity(spell['projectile_fade_time'] || 0, my_level),
+                                                (spell['projectile_composite_mode'] || null),
+                                                (spell['projectile_glow'] || 0),
+                                                (spell['projectile_asset'] || null)
+                                               ));
         }
 
         // visual weapon impact effect
@@ -2890,7 +2878,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
         }
 
         if(impact_vfx) {
-            SPFX.add_visual_effect_at_time(impact_pos, impact_height, [0,1,0],
+            session.get_real_world().fxworld.add_visual_effect_at_time(impact_pos, impact_height, [0,1,0],
                                            impact_time,
                                            impact_vfx, (i == 0), vfx_props); // only play audio for first impact
         }
@@ -2907,7 +2895,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && my_muzzle_pos && (i == 0)) {
-            SPFX.add_visual_effect_at_time(my_muzzle_pos, my_height,
+            session.get_real_world().fxworld.add_visual_effect_at_time(my_muzzle_pos, my_height,
                                            v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
                                            muzzle_time,
                                            muzzle_vfx, true, vfx_props);
@@ -2979,7 +2967,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
     if(miss && COMBAT_DEBUG) {
         // "Miss" alert text
-        SPFX.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], null, 1.0, {drop_shadow:true}));
+        session.get_real_world().fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], session.get_real_world().fxworld.now_time(), 1.0, {drop_shadow:true}));
     }
 
     }
@@ -3087,7 +3075,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
     var use_lead = get_leveled_quantity(spell['lead_target'] || 0, my_level);
     var lead_applied = false;
-    var arc = SPFX.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
+    var arc = session.get_real_world().fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
     var copies = get_leveled_quantity(spell['projectile_burst_size'] || 1, my_level);
     if(SPFX.detail < 1) {
         copies = Math.min(Math.max(Math.floor(SPFX.detail * copies), 1), 2);
@@ -3264,19 +3252,20 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
                 my_impact_tick = new GameTypes.TickCount(my_impact_tick.get() + whole_ticks);
             }
 
-            SPFX.add(new SPFX.TicksProjectile(my_muzzle_pos, my_height,
-                                              impact_pos, impact_height,
-                                              my_fire_tick,
-                                              my_impact_tick,
-                                              tick_delay,
-                                              shot_height, color, (exhaust ? exhaust : null),
-                                              get_leveled_quantity(spell['projectile_size'] || 2, my_level),
-                                              get_leveled_quantity(spell['projectile_min_length'] || 0, my_level),
-                                              get_leveled_quantity(spell['projectile_fade_time'] || 0, my_level),
-                                              (spell['projectile_composite_mode'] || null),
-                                              (spell['projectile_glow'] || 0),
-                                              (spell['projectile_asset'] || null)
-                                             ));
+            var fxworld = session.get_real_world().fxworld;
+            fxworld.add(new SPFX.TicksProjectile(fxworld, my_muzzle_pos, my_height,
+                                                 impact_pos, impact_height,
+                                                 my_fire_tick,
+                                                 my_impact_tick,
+                                                 tick_delay,
+                                                 shot_height, color, (exhaust ? exhaust : null),
+                                                 get_leveled_quantity(spell['projectile_size'] || 2, my_level),
+                                                 get_leveled_quantity(spell['projectile_min_length'] || 0, my_level),
+                                                 get_leveled_quantity(spell['projectile_fade_time'] || 0, my_level),
+                                                 (spell['projectile_composite_mode'] || null),
+                                                 (spell['projectile_glow'] || 0),
+                                                 (spell['projectile_asset'] || null)
+                                                ));
         }
 
         // visual weapon impact effect
@@ -3303,7 +3292,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
         }
 
         if(impact_vfx) {
-            SPFX.add_visual_effect_at_tick(impact_pos, impact_height, [0,1,0],
+            session.get_real_world().fxworld.add_visual_effect_at_tick(impact_pos, impact_height, [0,1,0],
                                            impact_tick, i*interval + time_offset,
                                            impact_vfx, (i == 0), vfx_props); // only play audio for first impact
         }
@@ -3320,7 +3309,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && my_muzzle_pos && (i == 0)) {
-            SPFX.add_visual_effect_at_tick(my_muzzle_pos, my_height,
+            session.get_real_world().fxworld.add_visual_effect_at_tick(my_muzzle_pos, my_height,
                                            v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
                                            fire_tick, i*interval + time_offset,
                                            muzzle_vfx, true, vfx_props);
@@ -3392,7 +3381,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
 
     if(miss && COMBAT_DEBUG) {
         // "Miss" alert text
-        SPFX.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], null, 1.0, {drop_shadow:true}));
+        session.get_real_world().fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], session.get_real_world().fxworld.now_time(), 1.0, {drop_shadow:true}));
     }
 
     }
@@ -4367,7 +4356,7 @@ GameObject.prototype.update_permanent_effect = function() {
         this.permanent_effect.reposition([pos[0], this.altitude || 0, pos[1]]);
     } else {
         // create new effect
-        this.permanent_effect = SPFX.add_visual_effect_at_time(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
+        this.permanent_effect = this.world.fxworld.add_visual_effect_at_time(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
         this.permanent_effect_source = fx;
     }
 };
@@ -4377,7 +4366,7 @@ GameObject.prototype.update_permanent_effect = function() {
  */
 GameObject.prototype.remove_permanent_effect = function() {
     if(this.permanent_effect) {
-        SPFX.remove(this.permanent_effect);
+        this.world.fxworld.remove(this.permanent_effect);
         this.permanent_effect = null;
         this.permanent_effect_source = null;
     }
@@ -4743,7 +4732,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
                            this.spec['upgrade_finish_effect'] :
                            gamedata['client']['vfx']['building_upgrade_finish']);
             if(fx_data) {
-                SPFX.add_visual_effect_at_time([this.x,this.y], 0, [0,1,0], client_time, fx_data,
+                this.world.fxworld.add_visual_effect_at_time([this.x,this.y], 0, [0,1,0], client_time, fx_data,
                                                !this.spec['worth_less_xp'], // no sound for barrier upgrades
                                                { '%OBJECT_SPRITE': this.get_leveled_quantity(this.spec['art_asset'])});
             }
@@ -8084,7 +8073,8 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
         invalidate_defender_threatlists();
         if(unit_deployment_latency_high()) {
             // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
-            add_unit_deployment_vfx('post_deploy', this.pos, this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
+            add_unit_deployment_vfx(/** @type {!SPFX.FXWorld} */ (this.world.fxworld), // XXXXXX blank world
+                'post_deploy', this.pos, this.spec, this.level, 2 * gamedata['client']['ajax_min_flush_interval']);
         }
     }
 };
@@ -8553,7 +8543,7 @@ Mobile.prototype.run_control = function() {
         }
 
         if('movement_effect' in this.spec) {
-            SPFX.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
+            this.world.fxworld.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
         }
     } // END control_moving
 
@@ -10129,7 +10119,6 @@ SPINPUNCHGAME.init = function() {
     }
 
     SPUI.time = client_time = (new Date()).getTime()/1000;
-    SPFX.set_time(client_time, new GameTypes.TickCount(0));
     ctx.font = SPUI.desktop_font.str();
 
     // set up permanent UI elements
@@ -11063,10 +11052,10 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
                 if(!dialog.user_data[res+'_magnet']) {
                     var props = goog.object.clone(gamedata['client']['vfx']['resource_burst_magnet']);
                     props['charge'] = res;
-                    dialog.user_data[res+'_magnet'] = SPFX.add_visual_effect_at_time([0,0],0,[0,1,0],client_time, props, false, null);
+                    dialog.user_data[res+'_magnet'] = session.get_draw_world().fxworld.add_visual_effect_at_time([0,0],0,[0,1,0],client_time, props, false, null);
                     props = goog.object.clone(gamedata['client']['vfx']['resource_burst_drag']);
                     props['charge'] = res;
-                    dialog.user_data[res+'_drag'] = SPFX.add_visual_effect_at_time([0,0],0,[0,1,0],client_time, props, false, null);
+                    dialog.user_data[res+'_drag'] = session.get_draw_world().fxworld.add_visual_effect_at_time([0,0],0,[0,1,0],client_time, props, false, null);
                 }
                 var magnet_pos_canvas = vec_add(dialog.xy, vec_add(dialog.widgets['resource_bar_'+res+'_prog'].xy, vec_scale(0.5, dialog.widgets['resource_bar_'+res+'_prog'].wh)));
                 var magnet_pos_ortho = screen_to_ortho(magnet_pos_canvas); // projection of point at altitude=0
@@ -11429,13 +11418,6 @@ function update_combat_damage_bar(dialog) {
                     // server says we have it now, announce it if we haven't announced it yet
                     if(!dialog.user_data['battle_star_'+name+'_announced']) {
                         dialog.user_data['battle_star_'+name+'_announced'] = client_time;
-                        // no longer need the awkward text
-                        /*
-                        SPFX.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), dialog.data['widgets']['damage_prog']['battle_stars_text_offset']), 0,
-                                                        '\u2605 '+ gamedata['battle_stars'][name]['ui_name'],
-                                                        [1,1,0], client_time, client_time + 3.0,
-                                                        {drop_shadow: true, font_size: 19, text_style: "thick", is_ui: true}));
-                        */
                         do_sound = true;
                     }
                     // apply animation to the battle star
@@ -11529,18 +11511,18 @@ function update_combat_damage_bar(dialog) {
                 points = Math.max(points, min_win);
             }
 
-            SPFX.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['victory_text_offset'])), 0,
+            session.get_real_world().fxworld.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['victory_text_offset'])), 0,
                                             gamedata['strings']['combat_messages']['ladder_victory'+(points==1 ? '':'_plural')].replace('%d', points.toString()),
-                                            [1,1,0], null, 3.0,
+                                            [1,1,0], session.get_real_world().fxworld.now_time(), 3.0,
                                             {drop_shadow: true, font_size: 21, text_style: "thick", is_ui: true}));
             do_sound = true;
         } else if((dialog.user_data['base_damage_server_flags']['ladder_win_points']||0) >
                   (dialog.user_data['base_damage_client_flags']['ladder_win_points']||0)) {
             var points = dialog.user_data['base_damage_server_flags']['ladder_win_points'] - (dialog.user_data['base_damage_client_flags']['ladder_win_points']||0);
             dialog.user_data['base_damage_client_flags']['ladder_win_points'] = dialog.user_data['base_damage_server_flags']['ladder_win_points'];
-            SPFX.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['victory_text_offset'])), 0,
+            session.get_real_world().fxworld.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['victory_text_offset'])), 0,
                                             gamedata['strings']['combat_messages']['ladder_victory_bonus'+(points==1 ? '':'_plural')].replace('%d', points.toString()),
-                                            [1,1,0], null, 3.0,
+                                            [1,1,0], session.get_real_world().fxworld.now_time(), 3.0,
                                             {drop_shadow: true, font_size: 21, text_style: "thick", is_ui: true}));
             do_sound = true;
         }
@@ -11549,9 +11531,9 @@ function update_combat_damage_bar(dialog) {
            (dialog.user_data['base_damage_client_flags']['ladder_protection']||0)) {
             dialog.user_data['base_damage_client_flags']['ladder_protection'] = dialog.user_data['base_damage_server_flags']['ladder_protection'];
             var hours = dialog.user_data['base_damage_server_flags']['ladder_protection']/3600;
-            SPFX.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['protection_text_offset'])), 0,
+            session.get_real_world().fxworld.add_ui(new SPFX.CombatText(vec_add(vec_add(dialog.xy, dialog.widgets['damage_prog'].xy), transform_text_offset(dialog.data['widgets']['damage_prog']['protection_text_offset'])), 0,
                                             gamedata['strings']['combat_messages']['ladder_protection_granted'].replace('%s', hours.toFixed(0)),
-                                            [1,1,0], null, 3.0,
+                                            [1,1,0], session.get_real_world().fxworld.now_time(), 3.0,
                                             {drop_shadow: true, font_size: 19, text_style: "thick", is_ui: true}));
             do_sound = true;
         }
@@ -13919,7 +13901,7 @@ function do_build(ji) {
                            spec['upgrade_start_effect'] :
                            gamedata['client']['vfx']['building_upgrade_start']);
             if(fx_data) {
-                SPFX.add_visual_effect_at_time(ji, 0, [0,1,0], client_time, fx_data,
+                session.get_real_world().fxworld.add_visual_effect_at_time(ji, 0, [0,1,0], client_time, fx_data,
                                                true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
                                                { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], 1)});
             }
@@ -14070,7 +14052,13 @@ DeployUICursor.prototype.draw = function(offset) {
     }
 };
 
-function add_unit_deployment_vfx(kind, ji, spec, level, time_spread) {
+/** @param {!SPFX.FXWorld} fxworld
+    @param {string} kind
+    @param {!Array<number>} ji
+    @param {!Object} spec
+    @param {number} level
+    @param {number} time_spread */
+function add_unit_deployment_vfx(fxworld, kind, ji, spec, level, time_spread) {
     var vfx;
 
     if(kind+'_effect' in spec) { // is there a per-unit override?
@@ -14083,15 +14071,15 @@ function add_unit_deployment_vfx(kind, ji, spec, level, time_spread) {
     // base some characteristics of the pre_deploy effect on the first unit that is being deployed
     var height = spec['flying'] ? spec['altitude'] : 0;
     var instance_data = { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level) };
-    SPFX.add_visual_effect_at_time(ji, height, [0,0,0],
-                                   // spread out the effect time
-                                   client_time + Math.random() * time_spread,
-                                   vfx, true, instance_data);
+    fxworld.add_visual_effect_at_time(ji, height, [0,0,0],
+                                      // spread out the effect time
+                                      client_time + Math.random() * time_spread,
+                                      vfx, true, instance_data);
 }
 
 function unit_deployment_latency_high() { return (-2*server_time_offset) > gamedata['client']['unit_deployment_effect_latency_threshold']; };
 
-/** @param {Array.<number>} ji
+/** @param {!Array.<number>} ji
     @param {Array.<Object>} objs_to_deploy (list of values in same format as values of session.pre_deploy_units) */
 function do_deploy(ji, objs_to_deploy) {
     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "DEPLOY_UNITS", ji, objs_to_deploy]);
@@ -14102,7 +14090,7 @@ function do_deploy(ji, objs_to_deploy) {
         var fx_specname = army_unit['spec'];
         var fx_level = ('level' in army_unit ? army_unit['level'] : 1);
         // this is evaluated at high frequency, so only spread by TICK_INTERVAL
-        add_unit_deployment_vfx(
+        add_unit_deployment_vfx(session.get_real_world().fxworld,
             // only use pre_deploy effect in high-latency environment - otherwise skip right to post_deploy
             unit_deployment_latency_high() ? 'pre_deploy' : 'post_deploy',
             ji, gamedata['units'][fx_specname], fx_level, TICK_INTERVAL);
@@ -16841,7 +16829,7 @@ function surrender_to_ai_attack() {
                 obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
 
                 if('explosion_effect' in obj.spec) {
-                    SPFX.add_visual_effect_at_tick(obj.interpolate_pos(), 0, [0,1,0], session.get_real_world().combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
+                    obj.world.fxworld.add_visual_effect_at_tick(obj.interpolate_pos(), 0, [0,1,0], session.get_real_world().combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
                 }
             }
         }
@@ -19460,7 +19448,7 @@ function apply_animation(dialog, wname, widget, anim_data, anim_time, anim) {
         if(!(wname in dialog.user_data['spfx'])) {
             // SPFX wants time in terms of "start time", not "time relative to start", so invert the sense of time delays
             var spfx_start_time = client_time + (client_time-anim_time);
-            dialog.user_data['spfx'][wname] = SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], spfx_start_time, anim['effect'], true, {'is_ui':true});
+            dialog.user_data['spfx'][wname] = session.get_draw_world().fxworld.add_visual_effect_at_time(pos, 0, [0,1,0], spfx_start_time, anim['effect'], true, {'is_ui':true});
         }
         //dialog.user_data['spfx'][wname].where = pos; // XXX how to track moving UI objects?
     } else {
@@ -19934,10 +19922,10 @@ function invoke_building_context_menu(mouse_xy) {
                         }
                         if(1) {
                             // show rising "Reinforcements Requested" text message
-                            SPFX.add(new SPFX.CombatText([_obj.x,_obj.y], 0,
+                            session.get_real_world().fxworld.add(new SPFX.CombatText([_obj.x,_obj.y], 0,
                                                          gamedata['strings']['combat_messages']['reinforcement_request_sent'],
                                                          [1,1,0.3],
-                                                         null, 3.0,
+                                                         session.get_real_world().fxworld.now_time(), 3.0,
                                                          { drop_shadow: true, font_size: 20, text_style: 'thick' }));
                         }
                     }; })(obj)});
@@ -22471,7 +22459,7 @@ function invoke_loot_dialog(msg) {
     change_selection_unit(warehouse);
 
     if(msg) {
-        ItemDisplay.add_inventory_item_effect(dialog.widgets['loot_item0,0'], msg, [1,1,0.3]);
+        ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, dialog.widgets['loot_item0,0'], msg, [1,1,0.3]);
     }
 
     dialog.ondraw(dialog);
@@ -22648,7 +22636,7 @@ function update_loot_dialog(dialog) {
                     send_to_server.func(["LOOT_BUFFER_TAKE", player.loot_buffer, _slot]);
                     _item['pending'] = 1;
                     if(ItemDisplay.get_inventory_item_spec(item['spec'])['fungible']) {
-                        ItemDisplay.add_inventory_item_effect(w, gamedata['strings']['combat_messages']["collected"], [1,1,0.3,1]);
+                        ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, w, gamedata['strings']['combat_messages']["collected"], [1,1,0.3,1]);
                     } else {
                         _d.user_data['anim_data'][wname] = make_loot_dialog_anim_data(_d, w, _asset);
                     }
@@ -22737,7 +22725,7 @@ function update_loot_dialog(dialog) {
                         var item = player.loot_buffer[slot];
 
                         if(ItemDisplay.get_inventory_item_spec(item['spec'])['fungible']) {
-                            ItemDisplay.add_inventory_item_effect(w, gamedata['strings']['combat_messages']["collected"], [1,1,0.3,1]);
+                            ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, w, gamedata['strings']['combat_messages']["collected"], [1,1,0.3,1]);
                         } else {
                             _dialog.user_data['anim_data'][wname] = make_loot_dialog_anim_data(_dialog, w, w.asset);
                         }
@@ -24997,7 +24985,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                     _lottery_dialog.widgets['glow'].show = true; _lottery_dialog.widgets['glow'].reset_fx();
 
                     if(gamedata['client']['vfx']['lottery_scan']) {
-                        SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
+                        session.get_draw_world().fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
                     }
 
                     send_to_server.func(["CAST_SPELL", _lottery_dialog.user_data['scanner'].id, "LOTTERY_SCAN", _spellarg]);
@@ -25027,7 +25015,7 @@ function update_lottery_dialog_buttons(dialog, lottery_dialog) {
                         _lottery_dialog.user_data['scan_pending'] = client_time;
                         _lottery_dialog.widgets['glow'].show = true; _lottery_dialog.widgets['glow'].reset_fx();
                         if(gamedata['client']['vfx']['lottery_scan']) {
-                            SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
+                            session.get_draw_world().fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
                         }
 
                         lottery_dialog_refresh_slate(_lottery_dialog);
@@ -25816,7 +25804,7 @@ function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
     });
     if(deployments.length < 1) { return; }
     change_selection_ui(null);
-    DeploymentMarkers.invoke_gui(attacker_name, deployments);
+    DeploymentMarkers.invoke_gui(session.get_real_world().fxworld, attacker_name, deployments);
 }
 
 function receive_battle_log_result(dialog, ret) {
@@ -30176,7 +30164,7 @@ function update_manufacture_dialog(dialog) {
                         var fx_name = (manuf_queue.length == 1 ? 'unit_manufacture_start' : 'unit_manufacture_add_to_queue');
                         var fx_data = gamedata['client']['vfx'][fx_name];
                         if(fx_data) {
-                            SPFX.add_visual_effect_at_time([builder.x,builder.y], 0, [0,1,0], client_time, fx_data,
+                            builder.world.fxworld.add_visual_effect_at_time([builder.x,builder.y], 0, [0,1,0], client_time, fx_data,
                                                            true,
                                                            { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level)});
                         }
@@ -31524,7 +31512,7 @@ function start_crafting(_builder, _build_recipe_spec, extra_params) {
     });
 
     if('start_effect' in _build_recipe_spec) {
-        SPFX.add_visual_effect_at_time(_builder.interpolate_pos(), 0, [0,1,0], client_time, _build_recipe_spec['start_effect'], true, null);
+        _builder.world.fxworld.add_visual_effect_at_time(_builder.interpolate_pos(), 0, [0,1,0], client_time, _build_recipe_spec['start_effect'], true, null);
     }
     return ui_tag;
 }
@@ -32413,7 +32401,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
             });
             if(is_fungible) {
                 var str = gamedata['strings']['combat_messages']['adding_to_storage'];
-                ItemDisplay.add_inventory_item_effect(dialog.widgets['reward_item0'].widgets['frame'], str, [1,1,1,1]);
+                ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, dialog.widgets['reward_item0'].widgets['frame'], str, [1,1,1,1]);
             }
         }
     } else {
@@ -37675,7 +37663,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
                 if(dialog.user_data['sound_start'] < client_time - 1) {
                     dialog.user_data['sound_start'] = client_time;
                     if('mouseover_effect' in _skudata) {
-                        SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, _skudata['mouseover_effect'], true, null);
+                        session.get_draw_world().fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, _skudata['mouseover_effect'], true, null);
                     } else {
                         var assetname = ('mouseover_sound' in _skudata ? _skudata['mouseover_sound'] : 'mouseover_button_sound');
                         GameArt.assets[assetname].states['normal'].audio.play(client_time);
@@ -38221,7 +38209,7 @@ function update_new_store_sku(d) {
                 if(!player.get_any_abtest_value('modal_looting', gamedata['modal_looting'])) {
                     var floating_msg = (spell ? ('ui_new_store_activated' in spell ? spell['ui_new_store_activated'] : gamedata['strings']['combat_messages']['purchased']) : gamedata['strings']['combat_messages']['sent_to_messages']);
                     if(floating_msg.length > 0) {
-                        ItemDisplay.add_inventory_item_effect(_d.widgets['icon'], floating_msg, [1,1,0.3]);
+                        ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, _d.widgets['icon'], floating_msg, [1,1,0.3]);
                     }
                 }
             }; })(d, w);
@@ -40488,7 +40476,7 @@ function update_upgrade_dialog(dialog) {
                                __unit.spec['upgrade_start_effect'] :
                                gamedata['client']['vfx']['building_upgrade_start']);
                 if(fx_data) {
-                    SPFX.add_visual_effect_at_time([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
+                    __unit.world.fxworld.add_visual_effect_at_time([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
                                                    true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
                                                    { '%OBJECT_SPRITE': __unit.get_leveled_quantity(__unit.spec['art_asset'])});
                 }
@@ -43036,8 +43024,6 @@ function recv_message_bundle(serial, clock, messages, kind) {
         server_time_offset = clock - (new Date()).getTime()/1000;
         update_client_and_server_time();
         SPUI.time = client_time;
-        SPFX.set_time(client_time, (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick : new GameTypes.TickCount(0)));
-
         GameArt.sync_time(client_time);
     }
 
@@ -43085,6 +43071,9 @@ var debug_session_change_history = [];
 
 function handle_server_message(data) {
     var msg = data[0];
+
+    // presumably everything that happens in here affects the "real" world.
+    var world = session.get_real_world();
 
     if(msg == "SERVER_HELLO") {
         var server_gamedata_version = data[1];
@@ -43278,11 +43267,11 @@ function handle_server_message(data) {
         goog.array.forEach(data[1], function(state) {
             player.my_army[state['obj_id']] = state;
         });
-        session.get_real_world().lazy_update_citizens();
+        world.lazy_update_citizens();
     } else if(msg == "PLAYER_ARMY_UPDATE_DESTROYED") {
         var obj_id = data[1];
         if(obj_id in player.my_army) { delete player.my_army[obj_id]; }
-        session.get_real_world().lazy_update_citizens();
+        world.lazy_update_citizens();
     } else if(msg == "REGION_CHANGE") {
         change_region_pending = null;
         var new_region_id = data[1];
@@ -43527,7 +43516,6 @@ function handle_server_message(data) {
         // blow away the old session
         change_selection(null);
 
-        SPFX.clear();
         offscreen_unit_arrow = null;
         visit_base_pending = false;
 
@@ -43580,7 +43568,9 @@ function handle_server_message(data) {
                                                 'base_ui_name': data[21],
                                                 'base_type': data[22],
                                                 'base_ncells': data[23],
-                                                'base_last_attack_time': data[27] || -1}));
+                                                'base_last_attack_time': data[27] || -1}),
+                                 session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens']) // enable_citizens
+                                );
 
         session.viewing_player_home_base_id = data[24];
         session.viewing_player_home_region = data[25];
@@ -43623,10 +43613,6 @@ function handle_server_message(data) {
         if(viewing_trophy_data) {
             PlayerCache.update(session.viewing_user_id, viewing_trophy_data, false);
         }
-
-        // set physics properties
-        SPFX.global_gravity = (('gravity' in session.viewing_base.base_climate_data) ? session.viewing_base.base_climate_data['gravity'] : 1);
-        SPFX.global_ground_plane = (('ground_plane' in session.viewing_base.base_climate_data) ? session.viewing_base.base_climate_data['ground_plane'] : 0);
 
         // see if the fbid is in our friend list
         for(var i = 0; i < player.friends.length; i++) {
@@ -43692,12 +43678,6 @@ function handle_server_message(data) {
         enemy.instance_expiration_time = data[8];
         enemy.stattab = {'player':{},'units':{},'buildings':{},'INIT':'enemy'};
         enemy.player_auras = [];
-
-        // XXXXXX move to set_viewing_base()
-        if(session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens'])) {
-            session.get_real_world().citizens = new Citizens.Context(session.viewing_base, astar_context);
-            session.get_real_world().lazy_update_citizens();
-        }
 
         init_desktop_dialogs();
         set_view_zoom(get_preference_setting(player.preferences, 'playfield_zoom'));
@@ -43954,9 +43934,9 @@ function handle_server_message(data) {
                 var unit = tech['associated_unit'] || tech['affects_unit'] || null;
                 var asset = (unit ? get_leveled_quantity(gamedata['units'][unit]['art_asset'], Math.max(1,player.tech[unit['level_determined_by_tech']])) : lab.get_leveled_quantity(lab.spec['art_asset']));
                 var instance_data = { '%OBJECT_SPRITE': asset };
-                SPFX.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
-                                               true,
-                                               instance_data);
+                world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
+                                                        true,
+                                                        instance_data);
                 // hold notification until animation finishes
                 notification_queue.hold_until(client_time + 2.9);
             }
@@ -44043,7 +44023,7 @@ function handle_server_message(data) {
                 // make little rising text
                 var framenum = slot - (selection.ui.user_data['attach_page']*selection.ui.data['widgets']['attach_frame']['array'][0]);
                 var ui_msg = gamedata['strings']['combat_messages'][(fungible ? "collected" : "added_to_warehouse")];
-                ItemDisplay.add_inventory_item_effect(selection.ui.widgets['attach_frame'+framenum.toString()], ui_msg, [1,1,0.3,1]);
+                ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, selection.ui.widgets['attach_frame'+framenum.toString()], ui_msg, [1,1,0.3,1]);
             }
             var old_page = selection.ui.user_data['attach_page'];
             // reset state of mail dialog
@@ -44099,10 +44079,10 @@ function handle_server_message(data) {
                 // check for null separately from checking if the effect exists so we can use a null effect
                 // in the item spec to disable the game-wide effect
                 if(spec['use_effect']) {
-                    SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, spec['use_effect'], true, null);
+                    world.fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, spec['use_effect'], true, null);
                 }
             } else if(gamedata['client']['vfx']['item_use']) {
-                SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['item_use'], true, null);
+                world.fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['item_use'], true, null);
             }
 
             if('use' in spec) {
@@ -44144,7 +44124,7 @@ function handle_server_message(data) {
                             // missile effect
                             var hit_tick, hit_time;
                             if(COMBAT_ENGINE_USE_TICKS) {
-                                hit_tick = do_fire_projectile_ticks(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, session.get_real_world().combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
+                                hit_tick = do_fire_projectile_ticks(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, world.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
                                 hit_time = -1;
                             } else {
                                 hit_time = do_fire_projectile_time(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
@@ -44187,7 +44167,7 @@ function handle_server_message(data) {
                         str += ' '+gamedata['strings']['combat_messages']['activated'];
                         color = [1,1,0.3,1];
                     }
-                    ItemDisplay.add_inventory_item_effect(selection.ui.widgets['slot'+x.toString()+','+y.toString()], str, color);
+                    ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, selection.ui.widgets['slot'+x.toString()+','+y.toString()], str, color);
                 }
             }
         }
@@ -44218,7 +44198,7 @@ function handle_server_message(data) {
                     dialog.widgets['equip_glow'+ui_slot].show = true;
                     dialog.widgets['equip_glow'+ui_slot].reset_fx();
                 }
-                ItemDisplay.add_inventory_item_effect(dialog.widgets['equip_frame'+ui_slot], str, color);
+                ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, dialog.widgets['equip_frame'+ui_slot], str, color);
                 player.claim_achievements();
             }
         }
@@ -44239,7 +44219,7 @@ function handle_server_message(data) {
                 dialog.widgets['equip_glow'+ui_slot].show = true;
                 dialog.widgets['equip_glow'+ui_slot].reset_fx();
             }
-            ItemDisplay.add_inventory_item_effect(dialog.widgets['equip_frame'+ui_slot], str, color);
+            ItemDisplay.add_inventory_item_effect(session.get_draw_world().fxworld, dialog.widgets['equip_frame'+ui_slot], str, color);
             player.claim_achievements();
         }
 
@@ -44467,7 +44447,7 @@ function handle_server_message(data) {
                        pos && pos[0] >= 0 && pos[1] >= 0) {
                         var props = goog.object.clone(gamedata['resources'][resname]['loot_effect']);
                         //props['emit_instant'] = props['max_count'] = (res[resname] >= props['res_big'] ? props['count_big'] : (res[resname] >= props['res_med'] ? props['count_med'] : props['count_small']));
-                        SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, props, true, null);
+                        world.fxworld.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, props, true, null);
                     }
                 }
             }
@@ -44499,10 +44479,10 @@ function handle_server_message(data) {
                 text_props.font_size = (text[i]['size'] || 20);
                 var left_right_offset = 7 * (text_props.font_size/20);
                 var rise_time = (text[i]['rise_time'] || default_rise_time);
-                SPFX.add(new SPFX.CombatText([pos[0]-4 + (i-center)*left_right_offset,pos[1]-4 - (i-center)*left_right_offset], 0,
-                                             text[i]['str'], text[i]['color'],
-                                             new SPFX.When(client_time + text_delay, null), rise_time,
-                                             text_props));
+                world.fxworld.add(new SPFX.CombatText([pos[0]-4 + (i-center)*left_right_offset,pos[1]-4 - (i-center)*left_right_offset], 0,
+                                                      text[i]['str'], text[i]['color'],
+                                                      new SPFX.When(client_time + text_delay, null), rise_time,
+                                                      text_props));
             }
         } else {
             last_loot_text_count = 0;
@@ -44517,7 +44497,7 @@ function handle_server_message(data) {
             for(var resname in gamedata['resources']) {
                 if((res[resname]||0) > 0) {
                     if(gamedata['resources'][resname]['harvest_effect']) {
-                        SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, gamedata['resources'][resname]['harvest_effect'], !has_sound, null);
+                        world.fxworld.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, gamedata['resources'][resname]['harvest_effect'], !has_sound, null);
                         has_sound = true;
                     } else {
                         need_glow_effect = true;
@@ -44568,7 +44548,7 @@ function handle_server_message(data) {
         // "ding" sound for gamebucks
         if(res['gamebucks'] > 0) {
             if(gamedata['client']['vfx']['gamebucks_harvest_effect']) {
-                SPFX.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, gamedata['client']['vfx']['gamebucks_harvest_effect'], true, null);
+                world.fxworld.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, gamedata['client']['vfx']['gamebucks_harvest_effect'], true, null);
             } else {
                 GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time);
             }
@@ -44631,7 +44611,7 @@ function handle_server_message(data) {
             var text_props_boring = { drop_shadow: false, font_size: 14, text_style: 'normal' };
             var text_props = flashy ? text_props_flashy : text_props_boring;
 
-            SPFX.add(new SPFX.CombatText([pos[0]+off[0],pos[1]+off[1]], 0, str, [1, 0.2, 1, 1], null, 3.0, text_props));
+            world.fxworld.add(new SPFX.CombatText([pos[0]+off[0],pos[1]+off[1]], 0, str, [1, 0.2, 1, 1], world.fxworld.now_time(), 3.0, text_props));
         }
 
         GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
@@ -44666,8 +44646,8 @@ function handle_server_message(data) {
             clr = [1,0.0,0.0,1];
             str = gamedata['strings']['craft_fizzled'];
         }
-        SPFX.add(new SPFX.CombatText(vec_add(pos, off), 0, str, clr, null, 3.0,
-                                     { drop_shadow: true, font_size: 20, text_style: 'thick' }));
+        world.fxworld.add(new SPFX.CombatText(vec_add(pos, off), 0, str, clr, world.fxworld.now_time(), 3.0,
+                                              { drop_shadow: true, font_size: 20, text_style: 'thick' }));
     } else if(msg == "ADD_FRIEND") {
         var user_id = data[1];
         var is_real_friend = data[2]
@@ -45235,7 +45215,7 @@ function handle_server_message(data) {
                     var delay = TICK_INTERVAL * i;
 
                     if(spec['noclip'] || spec['flying']) {
-                        SPFX.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
+                        world.fxworld.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
                                 gamedata['client']['vfx']['unit_manufactured'], true,
                                 {'spec': unit['spec'], 'level': unit['level'], 'path': [start_pos, end_pos], 'start_halted': delay});
                     } else {
@@ -45251,14 +45231,14 @@ function handle_server_message(data) {
 
                         if(path && path.length > 0) {
                             // only show phantoms for ground units if we have at least a partial path to the squad building
-                            SPFX.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
+                            session.get_real_world().fxworld.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
                                     gamedata['client']['vfx']['unit_manufactured'], true,
                                     {'spec': unit['spec'], 'level': unit['level'], 'path': path.slice(0), 'start_halted': delay});
                         }
                     }
                 }
             } else {
-                SPFX.add_visual_effect_at_time(manufacturer.interpolate_pos(), 0, [0, 1, 0], client_time, gamedata['client']['vfx']['unit_manufactured'], true, null);
+                session.get_real_world().fxworld.add_visual_effect_at_time(manufacturer.interpolate_pos(), 0, [0, 1, 0], client_time, gamedata['client']['vfx']['unit_manufactured'], true, null);
             }
         }
     } else if(msg == "ERROR") {
@@ -45664,7 +45644,7 @@ function do_visit_base(uid, options) {
     if(1) {
         apply_queued_damage_effects();
         flush_dirty_objects({});
-        persist_debris();
+        session.persist_debris();
     }
 
     if(uid > 0 || options.base_id || options.ladder_battle) {
@@ -45939,7 +45919,7 @@ function do_on_mouseup(e) {
                     }
                 }
                 if(success) {
-                    SPFX.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], 0.15));
+                    session.get_draw_world().fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], session.get_draw_world().fxworld.now_time(), 0.15));
                 }
             } else if(selection.item) {
                 var spec = gamedata['items'][selection.item['spec']];
@@ -45947,13 +45927,14 @@ function do_on_mouseup(e) {
 
                 inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [[j,i]], {trigger_gcd: session.has_deployed}); // trigger GCD during combat only
 
-                SPFX.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], 0.15));
+                var fxworld = session.get_draw_world().fxworld;
+                fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], fxworld.now_time(), 0.15));
                 if('ui_activation' in spell) {
-                    SPFX.add(new SPFX.CombatText([j,i], 0,
-                                                 spec['ui_name'] + " " + spell['ui_activation'],
-                                                 [1,1,0.3],
-                                                 null, 3.0,
-                                                 { drop_shadow: true, font_size: 20, text_style: 'thick' }));
+                    fxworld.add(new SPFX.CombatText([j,i], 0,
+                                                    spec['ui_name'] + " " + spell['ui_activation'],
+                                                    [1,1,0.3],
+                                                    fxworld.now_time(), 3.0,
+                                                    { drop_shadow: true, font_size: 20, text_style: 'thick' }));
                 }
             }
             APMCounter.record_action();
@@ -46002,7 +45983,7 @@ function do_on_mouseup(e) {
                 tutorial_step_move_rover_action_command();
             }
 
-            SPFX.add_under(new SPFX.ClickFeedback(found.interpolate_pos(), [1,0,0,1], 0.15));
+            found.world.fxworld.add_under(new SPFX.ClickFeedback(found.interpolate_pos(), [1,0,0,1], found.world.fxworld.now_time(), 0.15));
             APMCounter.record_action();
 
         } else {
@@ -46851,7 +46832,7 @@ function unit_command_make_aggressive() {
 function unit_command_move(j, i, use_amove, add_waypoint) {
     if(!selection.unit || !selection.unit.is_mobile()) { return; }
 
-    SPFX.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], 0.15));
+    selection.unit.world.fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], selection.unit.world.fxworld.now_time(), 0.15));
 
     if(!add_waypoint || selection.unit.orders.length < 2) {
         selection.unit.speak('destination');
@@ -47349,7 +47330,6 @@ function draw() {
     // update world time
     update_client_and_server_time();
     SPUI.time = client_time;
-    SPFX.set_time(client_time, (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick : new GameTypes.TickCount(0)));
     GameArt.sync_time(client_time);
 
     //console.log('frame at '+client_time+' last_draw_time '+last_draw_time);
@@ -47466,6 +47446,11 @@ function do_draw() {
     ctx.lineWidth = 1;
     set_default_canvas_transform(ctx);
 
+    var world = (session.viewing_base ? session.get_draw_world() : null);
+    if(world) {
+        world.fxworld.set_time(client_time, (world.combat_engine ? world.combat_engine.cur_tick : new GameTypes.TickCount(0)));
+    }
+
     if(client_state == client_states.UNABLE_TO_LOGIN || SPINPUNCHGAME.client_death_sent) { // TIMED_OUT gets handled below
         kill_loading_screen();
 
@@ -47543,10 +47528,10 @@ function do_draw() {
         mouse_state.dripper.activate(client_time, [mouse_state.last_x, mouse_state.last_y]); // pass current cursor location
 
         // run deferred citizens update
-        session.get_real_world().do_update_citizens(player);
+        world.do_update_citizens(player);
 
         // run game simulation tick, if enough time has elapsed since last tick
-        session.get_draw_world().run_unit_ticks();
+        world.run_unit_ticks();
 
         // if enough time has elapsed, save combat damage states to server
         if(client_time - last_combat_save > gamedata['client']['combat_state_save_interval']) {
@@ -47718,8 +47703,6 @@ function do_draw() {
 
         } // END only do these if actually running, not timed out or waiting for session change
 
-        var world = session.get_draw_world();
-
         var powerfac = (session.viewing_base ? session.viewing_base.power_factor() : 1);
 
         if(mouse_state.hovering_over && mouse_tooltip) {
@@ -47730,7 +47713,7 @@ function do_draw() {
         force_scroll_eval();
 
         // adjust view_pos according to shake
-        var shake = SPFX.get_camera_shake();
+        var shake = world.fxworld.get_camera_shake();
         var dx = shake[0], dy = shake[1];
         if(dx != 0 || dy != 0) {
             view_pos[0] += shake[0]/view_zoom;
@@ -47795,13 +47778,13 @@ function do_draw() {
 
             if(draw_playfield_objects) {
                 // draw special effects
-                SPFX.draw_under();
+                world.fxworld.draw_under();
 
                 // draw flying unit shadows
                 world.objects.for_each(draw_shadow);
 
                 // prepare phantom objects for drawing and draw shadows if necessary
-                var phantom_objects = SPFX.get_phantom_objects(world);
+                var phantom_objects = world.fxworld.get_phantom_objects(world);
                 goog.array.forEach(phantom_objects, function(obj) {
                     obj.update_draw_pos();
                     draw_shadow(obj);
@@ -47882,7 +47865,7 @@ function do_draw() {
                 }
 
                 // draw special effects
-                SPFX.draw_over();
+                world.fxworld.draw_over();
 
                 draw_playfield_text(playfield_text_list);
 
@@ -47924,7 +47907,7 @@ function do_draw() {
 
         if(!offscreen_unit_arrow) {
             offscreen_unit_arrow = new SPFX.OffscreenArrow();
-            SPFX.add(offscreen_unit_arrow);
+            world.fxworld.add(offscreen_unit_arrow);
         }
         offscreen_unit_arrow.reset(arrow_pos);
 
@@ -47978,7 +47961,7 @@ function do_draw() {
         tutorial_root.draw([0,0]);
 
         // draw UI special effects
-        SPFX.draw_ui();
+        world.fxworld.draw_ui();
 
         // draw active tooltip on top of everything else
         SPUI.draw_active_tooltip();
