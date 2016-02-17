@@ -4237,6 +4237,13 @@ class Session(object):
 
         current = player.tech.get(tech_name, 0)
         if current >= level: return
+
+        # cancel any ongoing research of this tech
+        for obj in player.home_base_iter():
+            if obj.is_building() and obj.is_researcher():
+                if obj.research_item == tech_name:
+                    gamesite.gameapi.do_cancel_research(self, retmsg, obj)
+
         player.tech[tech_name] = level
         player.recalc_stattab(self.player)
         player.update_unit_levels(self.player, tech_name, self, retmsg)
@@ -15076,11 +15083,8 @@ class Store(object):
 
             lab = None # identify which lab was responsible for the research
 
-            # cancel any ongoing research of this tech
             for obj in session.player.home_base_iter():
                 if obj.is_building() and obj.is_researcher():
-                    if obj.research_item == techname:
-                        gameapi.do_cancel_research(session, retmsg, obj)
                     if tech.research_category in obj.spec.get_research_categories(session.player):
                         lab = obj
 
@@ -19078,8 +19082,10 @@ class GAMEAPI(resource.Resource):
         else:
             current = 0
 
+        level_under_research = min(current + 1, spec.maxlevel)
+
         # figure out how many resources to return to player
-        refund = dict((res, int(gamedata['research_cancel_refund']*TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res),current+1))) for res in gamedata['resources'])
+        refund = dict((res, int(gamedata['research_cancel_refund']*TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res),level_under_research))) for res in gamedata['resources'])
 
         object.research_item = ''
         object.research_total_time = -1
