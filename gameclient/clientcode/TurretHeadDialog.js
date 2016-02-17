@@ -579,7 +579,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 };
 
 /** Does this item apply any anti_missile modstats?
-    @param {string} item_spec
+    @param {!Object} item_spec
     @private */
 TurretHeadDialog._has_anti_missile = function(item_spec) {
     var has_it = false;
@@ -592,7 +592,7 @@ TurretHeadDialog._has_anti_missile = function(item_spec) {
 };
 /** Create a new modchain with the item's anti-missile stats appended
     @param {!ModChain.ModChain} modchain
-    @param {string} item_spec
+    @param {!Object} item_spec
     @return {!ModChain.ModChain}
     @private */
 TurretHeadDialog._add_anti_missile_mod = function(modchain, item_spec) {

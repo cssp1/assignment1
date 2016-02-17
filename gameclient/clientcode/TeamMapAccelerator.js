@@ -9,13 +9,13 @@ goog.provide('TeamMapAccelerator');
 /** @constructor
     @struct */
 TeamMapAccelerator.TeamMapAccelerator = function() {
-    /** @type {Object.<!TeamId, !Array.<!GameObject>>} */
+    /** @type {!Object.<!TeamId, !Array.<!GameObject>>} */
     this.teams = {'ALL':[]}; // list of objects by team, with 'ALL' as well
 };
 
 /** reset to blank state */
 TeamMapAccelerator.TeamMapAccelerator.prototype.clear = function() {
-    /** @type {Object.<!TeamId, !Array.<!GameObject>>} */
+    /** @type {!Object.<!TeamId, !Array.<!GameObject>>} */
     this.teams = {'ALL':[]}; // list of objects by team, with 'ALL' as well
 };
 

@@ -38,8 +38,6 @@ $Revision: 3026 $
 
 // SP3RDPARTY : Iuppiter.js : BSD License
 
-var Iuppiter = {};
-
 /**
  * Convert string value to a byte array.
  *

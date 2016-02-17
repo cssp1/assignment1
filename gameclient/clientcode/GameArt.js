@@ -16,14 +16,17 @@ goog.require('FlashDetect');
 
 // references metric_event from main.js
 
-// global namespace
-GameArt = { initialized: false };
+GameArt.initialized = false;
 
 /** @enum {number} */
 GameArt.file_kinds = {
     IMAGE : 0,
     AUDIO : 1
 };
+
+/** Shared base class for raw images/sounds
+    @constructor */
+GameArt.Source = function() { };
 
 /** @constructor
     @param {GameArt.file_kinds} kind
@@ -1114,10 +1117,6 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
         if(has_state) { GameArt.ctx.restore(); }
     }
 };
-
-/** Shared base class for raw images/sounds
-    @constructor */
-GameArt.Source = function() {};
 
 // GameArt.Image
 // this is a wrapper around an HTML5 Image element

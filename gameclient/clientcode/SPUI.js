@@ -132,7 +132,7 @@ SPUI.make_font = function(size, leading, style) {
 };
 
 
-// font used for debug graphics and other stuff rendered on the play field
+/** @type {SPUI.Font|null} font used for debug graphics and other stuff rendered on the play field */
 SPUI.desktop_font = null;
 
 /** @param {!HTMLCanvasElement} canvas

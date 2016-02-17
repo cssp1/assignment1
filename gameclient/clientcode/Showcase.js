@@ -648,7 +648,7 @@ Showcase.collect_child_sku_counts = function(sku, ignore_list) { // note: sku mu
 };
 
 // returns list of [{'path':'event_prizes/etc', 'ui_name':''}] of any SKU sales that are currently on
-/** @param {Object} sku - can be an individual sku or a folder with a 'skus' member
+/** @param {!Object} sku - can be an individual sku or a folder with a 'skus' member
     @param {string=} path */
 Showcase.collect_active_sales_data = function(sku, path) {
     if(!path) { path = ''; }

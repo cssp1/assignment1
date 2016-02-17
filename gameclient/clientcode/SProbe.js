@@ -14,8 +14,6 @@ goog.require('goog.net.XhrIo');
 goog.require('goog.net.ErrorCode');
 goog.require('goog.events');
 
-var SProbe = {};
-
 // client network capabilities probe
 SProbe.TestState = {INIT:0, PENDING:1, DONE:2};
 

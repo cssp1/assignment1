@@ -13,8 +13,6 @@ goog.provide('SPAudio');
 goog.require('buzz');
 goog.require('spin_SoundManager2');
 
-SPAudio = {};
-
 /** @constructor */
 SPAudio.Driver = function() {
     this.kind = 'unknown';

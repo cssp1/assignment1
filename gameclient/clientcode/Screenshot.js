@@ -113,6 +113,8 @@ Screenshot.apply_watermark = function(canvas, context, watermark) {
     } else if(hjustify == 'center') {
         x_start = Math.floor(canvas.width / 2); // center
         bounds[0] = [Math.floor(x_start - max_width/2), Math.ceil(x_start + max_width/2)];
+    } else {
+        throw Error('invalid hjustify');
     }
 
     var vjustify = 'bottom';
@@ -121,7 +123,10 @@ Screenshot.apply_watermark = function(canvas, context, watermark) {
         y_start = PAD;
     } else if(vjustify == 'bottom') {
         y_start = canvas.height - PAD - (lines.length-1) * leading; // bottom
+    } else {
+        throw Error('invalid vjustify');
     }
+
     bounds[1] = [y_start - Math.floor(leading/2), y_start + (lines.length-1) * leading];
 
     /*
