@@ -1607,26 +1607,20 @@ BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
   * @extends Predicate */
 function HomeRegionPredicate(data) {
     goog.base(this, data);
-    this.regions = data['regions'] || null;
+    this.regions = /** @type {Array<string>} */ (data['regions']) || null;
     this.require_nosql = data['is_nosql'] || false;
 }
 goog.inherits(HomeRegionPredicate, Predicate);
 HomeRegionPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(!session.region.data) { return false; }
+
     if(this.regions !== null) {
-        if(goog.array.contains(this.regions, 'ANY')) {
-            return !!session.region.data;
-        } else {
-            for(var i = 0; i < this.regions.length; i++) {
-                if(session.region.data && session.region.data['id'] === this.regions[i]) {
-                    return true;
-                }
-            }
-            return false;
-        }
+        return (goog.array.contains(this.regions, 'ANY') ||
+                goog.array.contains(this.regions, session.region.data['id']));
     }
 
     if(this.require_nosql) {
-        return (session.region.data && session.region.data['storage'] == 'nosql');
+        return (session.region.data['storage'] == 'nosql');
     }
     return false;
 };

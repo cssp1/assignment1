@@ -42611,10 +42611,10 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
 
     metric_event('4057_xsolla_order_prompt_init', my_extend(state['metric_props'], {'client_time': client_time}));
 
-    XPayStationWidget.init({'access_token': token, 'sandbox': !spin_secure_mode});
+    XPayStationWidget['init']({'access_token': token, 'sandbox': !spin_secure_mode});
 
-    XPayStationWidget.on('close', (function (_state, _on_fail) { return function(event, data) {
-        XPayStationWidget.off(); // detach remaining event handlers
+    XPayStationWidget['on']('close', (function (_state, _on_fail) { return function(event, data) {
+        XPayStationWidget['off'](); // detach remaining event handlers
         if(!_state['success'] && !_state['fail']) {
             _state['fail'] = true;
             metric_event('4059_xsolla_order_prompt_fail', my_extend(_state['metric_props'], {'method': 'close', 'client_time': client_time}));
@@ -42622,13 +42622,13 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
         }
     }; })(state, on_fail));
 
-    XPayStationWidget.on('status-done', (function (_state, _on_finish) { return function(event, data) {
+    XPayStationWidget['on']('status-done', (function (_state, _on_finish) { return function(event, data) {
         metric_event('4058_xsolla_order_prompt_success', my_extend(_state['metric_props'], {'client_time': client_time}));
         _state['success'] = true;
         _on_finish();
     }; })(state, on_finish));
 
-    XPayStationWidget.on('status-troubled', (function (_state, _on_fail) { return function(event, data) {
+    XPayStationWidget['on']('status-troubled', (function (_state, _on_fail) { return function(event, data) {
         metric_event('4059_xsolla_order_prompt_fail', my_extend(_state['metric_props'], {'method': 'status-troubled: '+JSON.stringify(data), 'client_time': client_time}));
         _state['fail'] = true;
         if(_on_fail) { _on_fail(); }
@@ -42636,7 +42636,7 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
 
     goog.array.forEach(['open', 'load', 'status-invoice', 'status-delivering'],
                        function(cbtype) {
-                           XPayStationWidget.on(cbtype, (function (_state, _cbtype) { return function(event, data) {
+                           XPayStationWidget['on'](cbtype, (function (_state, _cbtype) { return function(event, data) {
                                // might be unnecessary
                                metric_event('4078_xsolla_order_prompt_update', my_extend(_state['metric_props'], {'method': _cbtype, 'client_time': client_time}));
                            }; })(state, cbtype));
@@ -48751,6 +48751,7 @@ function draw_building_or_inert(obj, powerfac) {
 
     // draw weapon
     if(obj.is_building() && !obj.is_destroyed() && ('weapon_offset' in obj.spec)) {
+        obj = /** @type {!Building} */ (obj);
         var weapon_asset = obj.get_stat('weapon_asset', null);
         if(weapon_asset) {
             var weapon_icon = GameArt.assets[weapon_asset];
@@ -49046,10 +49047,12 @@ function draw_building_or_inert(obj, powerfac) {
 
 /**
  * Draws separate shadow sprites for a given GameObject.
- * @param {GameObject} unit
+ * @param {!GameObject} unit
  */
 function draw_shadow(unit) {
     if(!unit.is_mobile() || !unit.is_flying()) { return; }
+    unit = /** @type {!Mobile} */ (unit);
+
     if(session.viewing_base.base_climate_data['fly_at_ground_level']) { return; }
 
     if(unit.altitude > 0 && !unit.is_destroyed() && 'shadow_asset' in unit.spec) {
@@ -49537,6 +49540,8 @@ function draw_selection_highlight(unit, config_override) {
     ctx.fillStyle = config['basecol']+config['fill_alpha'].toString()+')';
 
     if(unit.is_mobile()) {
+        unit = /** @type {!Mobile} */ (unit);
+
         // draw ellipse underneath the object
         var xy = draw_quantize(ortho_to_draw(curpos));
 
@@ -49602,6 +49607,7 @@ function draw_selection_highlight(unit, config_override) {
     ctx.restore();
 }
 
+/** @param {!GameObject} unit */
 function draw_click_detection(unit) {
     ctx.save();
     // color uniquely
@@ -49655,6 +49661,10 @@ function draw_click_detection(unit) {
     ctx.restore();
 }
 
+/** @param {CanvasRenderingContext2D} ctx
+    @param {string} str
+    @param {!Array<number>} xy
+    @return {!Array<number>} */
 function draw_centered_text_with_shadow(ctx, str, xy) {
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,1)';
@@ -49663,6 +49673,10 @@ function draw_centered_text_with_shadow(ctx, str, xy) {
     return draw_centered_text(ctx, str, xy);
 }
 
+/** @param {CanvasRenderingContext2D} ctx
+    @param {string} str
+    @param {!Array<number>} xy
+    @return {!Array<number>} */
 function draw_centered_text(ctx, str, xy) {
     var ret = vec_copy(xy);
     var lines = str.split('\n');

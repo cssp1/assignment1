@@ -84,6 +84,7 @@ RegionMapReplay.compare_events = function(a,b) {
     return (a['_id'] < b['_id'] ? -1 : (a['_id'] > b['_id'] ? 1 : 0));
 };
 
+/** @param {Array<!Object<string,?>>} log */
 RegionMapReplay.receive_log = function(dialog, log) {
     // should already be sorted by _id by the server, but just in case...
     log.sort(RegionMapReplay.compare_events);
@@ -112,12 +113,15 @@ RegionMapReplay.receive_log = function(dialog, log) {
 };
 
 RegionMapReplay.seek = function(dialog, new_t) {
+    var log = /** @type {Array<!Object<string,?>>} */ (dialog.user_data['log']);
+    var snapshots = /** @type {Array<!Object<string,?>>} */ (dialog.user_data['snapshots']);
+
     new_t = Math.min(Math.max(new_t, dialog.user_data['time_range'][0]), dialog.user_data['time_range'][1]);
 
     if(new_t === dialog.user_data['time']) { return; }
     var old_t = dialog.user_data['time'];
 
-    var snap_index = goog.array.binarySelect(dialog.user_data['snapshots'],
+    var snap_index = goog.array.binarySelect(snapshots,
                                              function(entry, index) {
                                                  if(entry['time'] > new_t) {
                                                      return -1;
@@ -127,14 +131,14 @@ RegionMapReplay.seek = function(dialog, new_t) {
                                                      return 0;
                                                  }
                                              });
-    //console.log('search for '+new_t.toString()+' in '+JSON.stringify(goog.array.map(dialog.user_data['snapshots'], (entry) => entry['time']))+' returned '+snap_index.toString());
+    //console.log('search for '+new_t.toString()+' in '+JSON.stringify(goog.array.map(snapshots, (entry) => entry['time']))+' returned '+snap_index.toString());
     if(snap_index < 0) { // no exact match
-        snap_index = Math.max(0, Math.min(-(snap_index + 1) - 1, dialog.user_data['snapshots'].length-1));
+        snap_index = Math.max(0, Math.min(-(snap_index + 1) - 1, snapshots.length-1));
     }
     //console.log('snap_index '+snap_index.toString());
 
     var region = dialog.widgets['map'].region;
-    var snapshot = dialog.user_data['snapshots'][snap_index];
+    var snapshot = snapshots[snap_index];
     // apply snapshot if it's not the one we are on now, or if we need to go backwards in time
     if(dialog.user_data['cur_snapshot'] !== snapshot || new_t < dialog.user_data['time']) {
         region.receive_update(snapshot['time'], goog.object.getValues(snapshot['feature_snapshot']), -1);
@@ -149,13 +153,13 @@ RegionMapReplay.seek = function(dialog, new_t) {
     // cur_snapshot=56b9c68eb51119266726db77 t=1455015566
     // cur_event=56b9c745b51119266726dc3c t=1455015748
 
-    var cur_event_index = goog.array.binarySearch(dialog.user_data['log'], dialog.user_data['cur_event'],
+    var cur_event_index = goog.array.binarySearch(log, dialog.user_data['cur_event'],
                                                   RegionMapReplay.compare_events);
 
     cur_event_index += 1; // next event after the previous cur_event we just applied
     //console.log('cur_event_index '+cur_event_index.toString());
-    while(cur_event_index < dialog.user_data['log'].length-1) {
-        var event = dialog.user_data['log'][cur_event_index];
+    while(cur_event_index < log.length-1) {
+        var event = log[cur_event_index];
         if(!event) { throw Error("invalid cur_event_index "+cur_event_index.toString()+" for time "+new_t.toString()); }
         if(event['time'] > new_t) { // in the future
             break;

@@ -123,7 +123,7 @@ SPay.trialpay_invoke = function(app_id, vendor_id, callback_url, currency_url, t
     }
     SPay.trialpay_user_cb = user_cb;
 
-    TRIALPAY.fb.show_overlay(app_id,
+    TRIALPAY['fb']['show_overlay'](app_id,
                              'fbdirect',
                              {'tp_vendor_id': vendor_id,
                               'callback_url': callback_url,

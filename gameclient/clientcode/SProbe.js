@@ -157,7 +157,7 @@ SProbe.WSPing.prototype.launch = function() {
         _this.response();
     }; })(this);
     window.setTimeout( (function (_this) { return function() {
-        if(!_this.socket || this.socket_state == SProbe.WSPing.SocketState.CLOSED) { return; }
+        if(!_this.socket || _this.socket_state == SProbe.WSPing.SocketState.CLOSED) { return; }
         _this.socket_state = SProbe.WSPing.SocketState.TIMEOUT;
         _this.response();
     }; })(this), 1000*timeout_sec);

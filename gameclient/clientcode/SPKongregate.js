@@ -27,7 +27,7 @@ SPKongregate.purchaseItemsRemote = function(arg0, arg1) {
         document['SPINcancelFullScreen']();
     }
 
-    kongregate.mtx.purchaseItemsRemote(arg0, arg1);
+    kongregate['mtx']['purchaseItemsRemote'](arg0, arg1);
 };
 
 
@@ -47,5 +47,5 @@ SPKongregate.showInvitationBox = function(arg0) {
         document['SPINcancelFullScreen']();
     }
 
-    kongregate.services.showInvitationBox(arg0);
+    kongregate['services']['showInvitationBox'](arg0);
 };
