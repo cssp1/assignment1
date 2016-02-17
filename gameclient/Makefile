@@ -81,7 +81,23 @@ compiled-client.js: clientcode/*.js
 	@echo "var gameclient_build_date = \"${BUILD_DATE}\";" >> $@
 	@echo "${BUILD_DATE}" > $@.date
 
-check: all
+# variant of the build with experimental Closure compiler checks
+check: clientcode/*.js
+	@java -client -jar google/compiler.jar \
+		--new_type_inf \
+		--only_closure_dependencies true \
+		--closure_entry_point='SPINPUNCHGAME' \
+		--language_in=ECMASCRIPT6_STRICT \
+		--language_out=ECMASCRIPT5 \
+		--externs='externs.js' \
+		--js='clientcode' \
+		--js='google/closure' \
+	        --js='!google/closure/goog/demos/**' \
+	        --js='!google/closure/**_test.js' \
+		--compilation_level=ADVANCED_OPTIMIZATIONS \
+		--summary_detail_level=2 \
+		--warning_level=VERBOSE \
+		--js_output_file=/dev/null 2>&1 | ./filter_closure_warnings.py
 
 # To find SpinPunch code that is not type-safe yet:
 # grep reportUnknownTypes.*XXX clientcode/*.js
