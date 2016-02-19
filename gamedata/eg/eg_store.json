@@ -151,7 +151,23 @@
         [{"predicate": "ALWAYS_TRUE"}, "D2"]
     ],
 
-    "buy_gamebucks_dialog_version": 3,
+    "buy_gamebucks_dialog_version": 2,
+    "buy_gamebucks_bypass_loot_buffer": 1, // allow players to overstuff warehouse with bundled items
+
+    "buy_gamebucks_dialog_look": "B",
+    "buy_gamebucks_dialog_looks": {
+        // "default" looks is whatever is specified in dialogs.json
+
+        // subtle white-on-blue
+        "B": {"widgets": {"name": {"text_color": [1,1,1]},
+                          "warning_text": {"text_color": [1,1,0]},
+                          "price_display": {"text_color": [1,1,1], "text_style": "normal"},
+                          "buy_text": {"text_color": [1,1,1], "text_style": "normal", "ui_name": "Buy" },
+                          "price_bg": {"color": [0,0.07,0.33],
+                                       "gradient_color": [0,0.3,0.7]},
+                          "sale_bg": {"color":[0.8,0,0]}},
+              "enable_attachment_pulsing": 1}
+     },
 
     // GUI text for "Buy Gamebucks" dialog
     "ui_buy_gamebucks_warning": [
