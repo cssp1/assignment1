@@ -13,7 +13,7 @@ goog.provide('SPAudio');
 goog.require('buzz');
 goog.require('spin_SoundManager2');
 
-/** @constructor */
+/** @constructor @struct */
 SPAudio.Driver = function() {
     this.kind = 'unknown';
 };
@@ -22,7 +22,7 @@ SPAudio.Driver = function() {
 // SoundManager2 DRIVER
 ////////////////////////////////////////////////////////////////////////////////////////
 
-/** @constructor
+/** @constructor @struct
   * @extends SPAudio.Driver */
 SPAudio.SM2Driver = function(client_time, swf_location) {
     this.kind = 'sm2';
@@ -64,7 +64,7 @@ SPAudio.SM2Driver.prototype.create_sample = function(url, kind, success_cb, fail
     return new SPAudio.SM2Sample(this, url, kind, success_cb, fail_cb);
 };
 
-/** @constructor */
+/** @constructor @struct */
 SPAudio.SM2Sample = function(driver, url, kind, success_cb, fail_cb) {
     this.driver = driver;
     this.url = url;
@@ -166,7 +166,7 @@ SPAudio.SM2Sample.prototype.setTime = function(t) { console.log('SM2Sample.setTi
 // BUZZ DRIVER
 ////////////////////////////////////////////////////////////////////////////////////////
 
-/** @constructor
+/** @constructor @struct
   * @extends SPAudio.Driver */
 SPAudio.BuzzDriver = function(client_time) {
     this.kind = 'buzz';
@@ -187,7 +187,7 @@ SPAudio.BuzzDriver.prototype.create_sample = function(url, kind, success_cb, fai
     return new SPAudio.BuzzSample(url, success_cb, fail_cb);
 };
 
-/** @constructor */
+/** @constructor @struct */
 SPAudio.BuzzSample = function(url, success_cb, fail_cb) {
     this.url = url;
     this.buzz_sound = new buzz.sound(url, {preload:true});
@@ -246,7 +246,7 @@ SPAudio.ACDriverImpl = {
     WEB_AUDIO: 2
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends SPAudio.Driver */
 SPAudio.ACDriver = function(client_time) {
     this.kind = 'AudioContext';
@@ -287,7 +287,7 @@ SPAudio.ACDriver.prototype.create_sample = function(url, kind, success_cb, fail_
     return new SPAudio.ACSample(this, url, success_cb, fail_cb);
 };
 
-/** @constructor */
+/** @constructor @struct */
 SPAudio.ACSample = function(driver, url, success_cb, fail_cb) {
     this.driver = driver;
     this.url = url;

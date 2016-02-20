@@ -17,7 +17,7 @@ goog.require('goog.object');
 // [ [block, block, block], <- line 1
 //   [block, block] ] <- line 2 etc.
 
-/** @constructor */
+/** @constructor @struct */
 SPText.ABlock = function(str, props) {
     this.kind = 'a';
     this.str = str;
@@ -287,7 +287,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
 // SBlocks are ABlocks annotated with width/height information, used
 // for line breaking to fit a given pixel area
 
-/** @constructor */
+/** @constructor @struct */
 SPText.SBlock = function(str, props, wh) {
     this.kind = 's';
     this.str = str;
@@ -400,7 +400,7 @@ SPText.break_lines = function(inlines, width, default_font) {
 // RBlocks are "renderable"
 // they are like SBlocks, but also have xy coordinates for each block
 
-/** @constructor */
+/** @constructor @struct */
 SPText.RBlock = function(str, props, wh, xy) {
     this.kind = 'r';
     this.str = str;

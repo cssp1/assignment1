@@ -11,7 +11,7 @@ goog.provide('Base');
 */
 
 /** parallel to the Base class in gameserver
-    @constructor
+    @constructor @struct
     @param {string} id
     @param {Object|null=} base_data */
 Base.Base = function(id, base_data) {

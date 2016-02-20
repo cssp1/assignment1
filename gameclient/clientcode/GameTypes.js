@@ -10,8 +10,7 @@ GameTypes.assert_integer = function(num) { if(num != (num|0)) { throw Error('non
 /** @typedef {number} */
 GameTypes.Integer;
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {number} count */
 GameTypes.TickCount = function(count) {
     GameTypes.assert_integer(count);
@@ -78,8 +77,7 @@ GameTypes.TickCount.max = function(a, b) { return new GameTypes.TickCount(Math.m
 // are still relying on definitions from main.js (which is read in after
 // them, so they don't know about types defined there).
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {!GameObject} obj
     @param {!CombatEngine.Pos} dist
     @param {!Array.<number>} pos

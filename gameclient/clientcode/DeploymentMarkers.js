@@ -14,7 +14,7 @@ goog.provide('DeploymentMarkers');
 goog.require('goog.array');
 goog.require('SPFX');
 
-/** @constructor
+/** @constructor @struct
     @param {!SPFX.FXWorld} fxworld */
 DeploymentMarkers.MarkerList = function(fxworld) {
     this.fxworld = fxworld;

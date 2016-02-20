@@ -21,8 +21,7 @@ goog.require('goog.array');
     However, currently this has a bunch of global state
     that should be refactored out into World and CombatEngine.
 
-    @constructor
-    @struct */
+    @constructor @struct */
 Session.Session = function() {
     this.connect_time = -1; // set to client_time upon receiving first SERVER_HELLO message
     this.client_hello_packet = null; // keep our CLIENT_HELLO message in case we need to re-transmit it

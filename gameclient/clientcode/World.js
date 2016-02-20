@@ -17,8 +17,7 @@ goog.require('GameObjectCollection');
 goog.require('WallManager');
 
 /** Encapsulates the renderable/simulatable "world"
-    @constructor
-    @struct
+    @constructor @struct
     @param {!Base.Base} base
     @param {!GameObjectCollection.GameObjectCollection} objects
     @param {boolean} enable_citizens

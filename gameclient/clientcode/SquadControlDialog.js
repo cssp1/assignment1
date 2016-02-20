@@ -352,7 +352,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                             if(_squad_tile.user_data['icon_unit_specname']) {
                                 var spec = gamedata['units'][_squad_tile.user_data['icon_unit_specname']];
                                 if('sound_destination' in spec) {
-                                    GameArt.assets[spec['sound_destination']].states['normal'].audio.play(client_time);
+                                    GameArt.play_canned_sound(spec['sound_destination']);
                                 }
                             }
                         }

@@ -25,10 +25,10 @@ GameArt.file_kinds = {
 };
 
 /** Shared base class for raw images/sounds
-    @constructor */
+    @constructor @struct */
 GameArt.Source = function() { };
 
-/** @constructor
+/** @constructor @struct
     @param {GameArt.file_kinds} kind
     @param {boolean} delay_load
     @param {!GameArt.Source} gameart_obj
@@ -65,7 +65,7 @@ GameArt.FileEntry.prototype.start_load = function() {
 };
 
 
-/** @constructor
+/** @constructor @struct
     @extends GameArt.FileEntry
     @param {boolean} delay_load
     @param {!GameArt.Image} gameart_obj
@@ -130,7 +130,7 @@ GameArt.ImageFileEntry.prototype.start_load = function() {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends GameArt.FileEntry
     @param {boolean} delay_load
     @param {!GameArt.Sound} gameart_obj
@@ -157,7 +157,7 @@ GameArt.AudioFileEntry.prototype.start_load = function() {
 
     if(gamedata['client']['art_download_timeout']['audio'] > 0) {
         if(this.watchdog) { throw Error('duplicate start_load on '+this.filename); }
-        this.watchdog = window.setTimeout((function (/** !GameArt.FileEntry */  _this) { return function() {
+        this.watchdog = window.setTimeout((function (/** !GameArt.AudioFileEntry */  _this) { return function() {
             GameArt.image_ontimeout(_this.filename, _this.sample.url);
         }; })(this), 1000 * gamedata['client']['art_download_timeout']['audio']);
     }
@@ -277,16 +277,14 @@ GameArt.art_url = function(filename, needs_cors) {
 // it tries to ensure that we don't overload the underlying audio driver by
 // trying to play too many sound effects at the same time
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @implements {BinaryHeap.Element} */
 GameArt.ChannelGovernorEntry = function(end) {
     this.end = end;
     this.heapscore = 0;
 };
 
-/** @constructor
-    @struct */
+/** @constructor @struct */
 GameArt.ChannelGovernor = function(max_chan) {
     this.max_chan = max_chan;
     this.cur = 0;
@@ -571,7 +569,7 @@ GameArt.image_ontimeout = function(filename, url) {
 // IMAGE (e.g., "mining_droid_01.png")
 // is just a wrapper around the browser's Image class
 
-/** @constructor
+/** @constructor @struct
  * @param data A dictionary mapping state names to Sprites (the thing under gamedata['art'])
  */
 GameArt.Asset = function(name, data) {
@@ -631,7 +629,7 @@ GameArt.Asset.prototype.detect_rect = function(xy, facing, time, state, mouserec
     return this.get_state(state).detect_rect(xy, facing, time, mouserect, zoom, fuzz);
 };
 
-/** @constructor */
+/** @constructor @struct */
 GameArt.AbstractSprite = function(name, data) {
     this.name = name;
     /** @type {Array.<number>|null} */
@@ -656,6 +654,9 @@ GameArt.AbstractSprite.prototype.get_center = function() { return this.center; }
 /** @return {GameArt.Sound|null} */
 GameArt.AbstractSprite.prototype.get_audio = function() { return null; };
 
+GameArt.AbstractSprite.prototype.do_draw = goog.abstractMethod;
+GameArt.AbstractSprite.prototype.prep_for_draw = goog.abstractMethod;
+GameArt.AbstractSprite.prototype.ready_to_draw = goog.abstractMethod;
 
 // draw sprite with CENTER at 'xy'
 GameArt.AbstractSprite.prototype.draw = function(xy, facing, time) {
@@ -738,7 +739,7 @@ GameArt.AbstractSprite.prototype.detect_rect = function(xy, facing, time, mouser
 };
 
 // Sprites are initialized directly from the gamedata JSON
-/** @constructor
+/** @constructor @struct
   * @extends GameArt.AbstractSprite */
 GameArt.Sprite = function(name, data) {
     goog.base(this, name, data);
@@ -1014,7 +1015,7 @@ GameArt.Sprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends GameArt.AbstractSprite */
 GameArt.CompoundSprite = function(name, data) {
     goog.base(this, name, data);
@@ -1123,8 +1124,7 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
 // it brings loading into the GameArt framework and allows delayed loading
 // (you can call draw() even if the image data has not arrived yet)
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends GameArt.Source
     @param {string} filename
     @param {Array.<number>|null} origin
@@ -1139,15 +1139,18 @@ GameArt.Image = function(filename, origin, wh, load_priority, delay_load) {
     this.data_loaded = false;
     this.delay_load = delay_load;
 
+    /** @type {GameArt.ImageFileEntry|null} */
+    this.entry = null;
+    /** @type {Image|null} */
+    this.img = null;
+
     if(!GameArt.enable_images) {
-        this.entry = null;
-        this.img = null;
         return;
     }
 
     if(filename in GameArt.file_list) {
         // attach to existing download request
-        this.entry = GameArt.file_list[filename];
+        this.entry = /** @type {!GameArt.ImageFileEntry} */ (GameArt.file_list[filename]);
         this.entry.attach(this, load_priority, delay_load);
     } else {
         GameArt.file_list[filename] = this.entry = new GameArt.ImageFileEntry(delay_load, this, filename, false, load_priority);
@@ -1272,7 +1275,7 @@ GameArt.float_to_sRGB = function(f) { return Math.min(Math.max(Math.floor(255.0*
     @param {Array.<number>} tint
     @param {number=} saturation
     @param {Image=} mask_img
-    @return {!HTMLImageElement} */
+    @return {!Image} */
 GameArt.make_tinted_image = function(img, origin, wh, tint, saturation, mask_img) {
     var ret = new Image();
     var osc = null, con = null, data = null, pixels = null, data_url = null;
@@ -1349,7 +1352,7 @@ GameArt.tint_library_key = function(filename, tint, saturation) {
     return filename + ':' + tint.map(function (x) { return x.toFixed(2); }).join(',') + ',' + saturation.toFixed(2);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends GameArt.Image */
 GameArt.TintedImage = function(filename, origin, wh, load_priority, delay_load, tint, saturation, tint_share, tint_mask) {
     goog.base(this, filename, origin, wh, load_priority, delay_load);
@@ -1407,8 +1410,7 @@ GameArt.TintedImage.prototype.prep_for_draw = function() {
 
 
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends GameArt.Source
     @param {string} filename
     @param {number} volume - 0.0-1.0
@@ -1531,3 +1533,22 @@ GameArt.Sound.prototype.play = function(time) {
     return this.audio.play(time, this.volume*GameArt.sound_volume*gamedata['client']['global_audio_volume']);
 };
 
+/** Convenience method to play a hard-coded named sound effect
+    @param {string} asset_name
+    @param {string=} state_name */
+GameArt.play_canned_sound = function(asset_name, state_name) {
+    if(!state_name) { state_name = 'normal'; }
+    if(!(asset_name in GameArt.assets)) {
+        throw Error('unknown canned asset '+asset_name);
+    }
+    var asset = GameArt.assets[asset_name];
+    if(!(state_name in asset.states)) {
+        throw Error('canned asset '+asset_name+' missing state '+state_name);
+    }
+    var raw_state = asset.states[state_name];
+    if(!(raw_state instanceof GameArt.Sprite)) {
+        throw Error('canned asset '+asset_name+'.'+state_name+' is not a Sprite');
+    }
+    var state = /** @type {!GameArt.Sprite} */ (raw_state);
+    state.audio.play(GameArt.time);
+};

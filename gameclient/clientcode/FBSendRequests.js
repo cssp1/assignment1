@@ -79,7 +79,7 @@ FBSendRequests.invoke_send_gifts_dialog_v2 = function(to_user, reason, info_list
         var attempt_id = dialog.user_data['attempt_id'];
         var reason = dialog.user_data['reason'];
 
-        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound('success_playful_22');
         close_parent_dialog(w);
 
         var recipient_user_ids = goog.array.map(goog.object.getKeys(recipients),

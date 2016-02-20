@@ -17,14 +17,14 @@ goog.require('OfferChoice');
 // note: this parallel's Consequents.py on the server side, but
 // most consequents are implemented purely on either client or server side
 
-/** @constructor */
+/** @constructor @struct */
 function Consequent(data) {
     this.kind = data['consequent'];
 }
 /** @param {Object=} state */
 Consequent.prototype.execute = goog.abstractMethod;
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function NullConsequent(data) {
     goog.base(this, data);
@@ -32,7 +32,7 @@ function NullConsequent(data) {
 goog.inherits(NullConsequent, Consequent);
 NullConsequent.prototype.execute = function(state) { };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function AndConsequent(data) {
     goog.base(this, data);
@@ -48,7 +48,7 @@ AndConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function IfConsequent(data) {
     goog.base(this, data);
@@ -69,7 +69,7 @@ IfConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function CondConsequent(data) {
     goog.base(this, data);
@@ -85,7 +85,7 @@ CondConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function TutorialArrowConsequent(data) {
     goog.base(this, data);
@@ -120,7 +120,7 @@ TutorialArrowConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function ForceScrollConsequent(data) {
     goog.base(this, data);
@@ -137,7 +137,7 @@ ForceScrollConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function StartAIAttackConsequent(data) {
     goog.base(this, data);
@@ -155,7 +155,7 @@ StartAIAttackConsequent.prototype.execute = function(state) {
     start_ai_attack(id);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function LoadAIBaseConsequent(data) { // client-side only, kind of hacky
     goog.base(this, data);
@@ -176,7 +176,7 @@ LoadAIBaseConsequent.prototype.execute = function(state) {
     load_ai_base(id);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function VisitBaseConsequent(data) {
     goog.base(this, data);
@@ -190,7 +190,7 @@ VisitBaseConsequent.prototype.execute = function(state) {
     do_visit_base(this.user_id, options);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function RepairAllConsequent(data) { // client-side only, kind of hacky
     goog.base(this, data);
@@ -201,7 +201,7 @@ RepairAllConsequent.prototype.execute = function(state) {
     Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY", session.viewing_base.base_id);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function CastClientSpellConsequent(data) {
     goog.base(this, data);
@@ -221,7 +221,7 @@ CastClientSpellConsequent.prototype.execute = function(state) {
 
 var DisplayMessageConsequent_seen = {};
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function DisplayMessageConsequent(data) {
     goog.base(this, data);
@@ -246,7 +246,7 @@ DisplayMessageConsequent.prototype.execute = function(state) {
     notification_queue.push(cb, params);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function MessageBoxConsequent(data) {
     goog.base(this, data);
@@ -315,11 +315,11 @@ MessageBoxConsequent.prototype.execute = function(state) {
     }
 
     if(this.sound) {
-        GameArt.assets[this.sound].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound(this.sound);
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InviteFriendsPromptConsequent(data) {
     goog.base(this, data);
@@ -335,10 +335,10 @@ InviteFriendsPromptConsequent.prototype.execute = function(state) {
     if(this.show_arrow) {
         make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
     }
-    GameArt.assets['conquer_sound'].states['normal'].audio.play(client_time);
+    GameArt.play_canned_sound('conquer_sound');
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function FacebookPermissionsPromptConsequent(data) {
     // Ask for new facebook permissions. Do nothing if the player has already granted these permissions.
@@ -353,7 +353,7 @@ FacebookPermissionsPromptConsequent.prototype.execute = function(state) {
 };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeMissionsDialogConsequent(data) {
     goog.base(this, data);
@@ -373,7 +373,7 @@ InvokeMissionsDialogConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeStoreConsequent(data) {
     goog.base(this, data);
@@ -394,7 +394,7 @@ InvokeStoreConsequent.prototype.execute = function(state) {
     invoke_new_store_dialog();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeBuyGamebucksConsequent(data) {
     goog.base(this, data);
@@ -416,7 +416,7 @@ InvokeBuyGamebucksConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeLotteryConsequent(data) {
     goog.base(this, data);
@@ -444,7 +444,7 @@ InvokeLotteryConsequent.prototype.execute = function(state) {
     notification_queue.push(cb);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeUpgradeConsequent(data) {
     goog.base(this, data);
@@ -465,7 +465,7 @@ InvokeUpgradeConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeBuildDialogConsequent(data) {
     goog.base(this, data);
@@ -476,7 +476,7 @@ InvokeBuildDialogConsequent.prototype.execute = function(state) {
     invoke_build_dialog(this.category);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeCraftingConsequent(data) {
     goog.base(this, data);
@@ -487,7 +487,7 @@ InvokeCraftingConsequent.prototype.execute = function(state) {
     invoke_crafting_dialog(this.category);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeMapConsequent(data) {
     goog.base(this, data);
@@ -499,7 +499,7 @@ InvokeMapConsequent.prototype.execute = function(state) {
     invoke_map_dialog(this.chapter);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeManufactureDialogConsequent(data) {
     goog.base(this, data);
@@ -511,7 +511,7 @@ InvokeManufactureDialogConsequent.prototype.execute = function(state) {
     invoke_manufacture_dialog('consequent', this.category, this.specname);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeBlueprintCongratsConsequent(data) {
     goog.base(this, data);
@@ -524,7 +524,7 @@ InvokeBlueprintCongratsConsequent.prototype.execute = function(state) {
     invoke_blueprint_congrats(this.item, this.tech);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeChangeRegionDialogConsequent(data) {
     goog.base(this, data);
@@ -539,7 +539,7 @@ InvokeChangeRegionDialogConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeTopAlliancesDialogConsequent(data) {
     goog.base(this, data);
@@ -550,7 +550,7 @@ InvokeTopAlliancesDialogConsequent.prototype.execute = function(state) {
     alliance_list_change_tab(dialog, 'top');
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeInventoryDialogConsequent(data) {
     goog.base(this, data);
@@ -560,7 +560,7 @@ InvokeInventoryDialogConsequent.prototype.execute = function(state) {
     invoke_inventory_dialog();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function OpenURLConsequent(data) {
     goog.base(this, data);
@@ -571,7 +571,7 @@ OpenURLConsequent.prototype.execute = function(state) {
     url_open_in_new_tab(this.url);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function FocusChatGUIConsequent(data) {
     goog.base(this, data);
@@ -587,7 +587,7 @@ FocusChatGUIConsequent.prototype.execute = function(state) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function DailyTipUnderstoodConsequent(data) {
     goog.base(this, data);
@@ -610,7 +610,7 @@ DailyTipUnderstoodConsequent.prototype.execute = function(state) {
     send_to_server.func(["DAILY_TIP_UNDERSTOOD", name, this.status]);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function DisplayDailyTipConsequent(data) {
     goog.base(this, data);
@@ -623,7 +623,7 @@ DisplayDailyTipConsequent.prototype.execute = function(state) {
     invoke_daily_tip(this.name, this.skip_notification_queue, this.notification_params);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function InvokeOfferChoiceConsequent(data) {
     goog.base(this, data);
@@ -640,7 +640,7 @@ InvokeOfferChoiceConsequent.prototype.execute = function(state) {
     notification_queue.push(invoker);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function EnableCombatResourceBarsConsequent(data) {
     goog.base(this, data);
@@ -651,7 +651,7 @@ EnableCombatResourceBarsConsequent.prototype.execute = function(state) {
     session.enable_combat_resource_bars = this.enabled;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function EnableDialogCompletionConsequent(data) {
     goog.base(this, data);
@@ -662,7 +662,7 @@ EnableDialogCompletionConsequent.prototype.execute = function(state) {
     session.enable_dialog_completion_buttons = this.enabled;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function PreloadArtAssetConsequent(data) {
     goog.base(this, data);
@@ -685,7 +685,7 @@ PreloadArtAssetConsequent.prototype.execute = function(state) {
 // keep track of once-per-session metrics that we've sent already
 var MetricEventConsequent_sent = {};
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function MetricEventConsequent(data) {
     goog.base(this, data);
@@ -713,7 +713,7 @@ MetricEventConsequent.prototype.execute = function(state) {
     metric_event(this.event_name, props);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function ClearUIConsequent(data) {
     goog.base(this, data);
@@ -724,7 +724,7 @@ ClearUIConsequent.prototype.execute = function(state) {
     player.quest_tracked_dirty = true; // update quest tips
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function ClearNotificationsConsequent(data) {
     goog.base(this, data);
@@ -735,7 +735,7 @@ ClearNotificationsConsequent.prototype.execute = function(state) {
     notification_queue.clear();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function DevEditModeConsequent(data) {
     goog.base(this, data);
@@ -746,7 +746,7 @@ DevEditModeConsequent.prototype.execute = function(state) {
     send_to_server.func(["CAST_SPELL", 0, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function GiveGamebucksConsequent(data) { // client-side only, kind of hacky - for debugging only, DO NOT USE FOR GAMEPLAY
     goog.base(this, data);
@@ -757,7 +757,7 @@ GiveGamebucksConsequent.prototype.execute = function(state) {
     send_to_server.func(["CAST_SPELL", 0, "CHEAT_GIVE_GAMEBUCKS", this.amount]);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function FPSCounterConsequent(data) {
     goog.base(this, data);
@@ -768,7 +768,7 @@ FPSCounterConsequent.prototype.execute = function(state) {
     fps_counter.show = this.show;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Consequent */
 function LibraryConsequent(data) {
     goog.base(this, data);

@@ -27,7 +27,7 @@ Traceback.printStackTrace = function (options) {
     return (guess) ? p.guessAnonymousFunctions(result) : result;
 }
 
-/** @constructor */
+/** @constructor @struct */
 Traceback.printStackTrace.implementation = function() {
 };
 

@@ -14,15 +14,14 @@ goog.require('goog.array');
 // note: this is functionally identical to the server's Predicates.py,
 // except for a handful of client-only predicates that are for GUI stuff.
 
-/** @constructor */
+/** @constructor @struct */
 function Predicate(data) {
     this.data = data;
     this.kind = data['predicate'];
 }
 
 /** Encapsulates the info extracted for ui_describe() and variants
-    @constructor
-    @struct
+    @constructor @struct
     @param {string} descr
     @param {{already_obtained: (boolean|undefined)}=} options */
 function PredicateUIDescription(descr, options) {
@@ -111,7 +110,7 @@ Predicate.prototype.ui_progress = function(player, qdata) { return null; }
     @return {number} */
 Predicate.prototype.ui_difficulty = function() { return 0; }
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AlwaysTruePredicate(data) { goog.base(this, data); }
 goog.inherits(AlwaysTruePredicate, Predicate);
@@ -119,20 +118,20 @@ AlwaysTruePredicate.prototype.is_satisfied = function(player, qdata) { return tr
 /** @override */
 AlwaysTruePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AlwaysFalsePredicate(data) { goog.base(this, data); }
 goog.inherits(AlwaysFalsePredicate, Predicate);
 AlwaysFalsePredicate.prototype.is_satisfied = function(player, qdata) { return false; };
 AlwaysFalsePredicate.prototype.do_ui_describe = function(player) { return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']); };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function RandomPredicate(data) { goog.base(this, data); this.chance = data['chance']; }
 goog.inherits(RandomPredicate, Predicate);
 RandomPredicate.prototype.is_satisfied = function(player, qdata) { return Math.random() < this.chance; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ComboPredicate(data) {
     goog.base(this, data);
@@ -143,7 +142,7 @@ function ComboPredicate(data) {
 }
 goog.inherits(ComboPredicate, Predicate);
 
-/** @constructor
+/** @constructor @struct
   * @extends ComboPredicate */
 function AndPredicate(data) {
     goog.base(this, data);
@@ -199,7 +198,7 @@ AndPredicate.prototype.ui_difficulty = function() {
     return difficulty;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends ComboPredicate */
 function OrPredicate(data) {
     goog.base(this, data);
@@ -257,7 +256,7 @@ OrPredicate.prototype.ui_difficulty = function() {
     return difficulty;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends ComboPredicate */
 function NotPredicate(data) {
     goog.base(this, data);
@@ -273,13 +272,13 @@ NotPredicate.prototype.do_ui_describe = function(player) {
 /** @override */
 NotPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; }; // not sure on this one
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function TutorialCompletePredicate(data) { goog.base(this, data); }
 goog.inherits(TutorialCompletePredicate, Predicate);
 TutorialCompletePredicate.prototype.is_satisfied = function(player, qdata) { return (player.tutorial_state === "COMPLETE"); };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AllBuildingsUndamagedPredicate(data) { goog.base(this, data); }
 goog.inherits(AllBuildingsUndamagedPredicate, Predicate);
@@ -296,7 +295,7 @@ AllBuildingsUndamagedPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ObjectUndamagedPredicate(data) {
     goog.base(this, data);
@@ -331,7 +330,7 @@ ObjectUndamagedPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ObjectUnbusyPredicate(data) {
     goog.base(this, data);
@@ -366,7 +365,7 @@ ObjectUnbusyPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BuildingDestroyedPredicate(data) {
     goog.base(this, data);
@@ -384,7 +383,7 @@ BuildingDestroyedPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BuildingQuantityPredicate(data) {
     goog.base(this, data);
@@ -464,7 +463,7 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BuildingLevelPredicate(data) {
     goog.base(this, data);
@@ -555,7 +554,7 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
 /** @override */
 BuildingLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function UnitQuantityPredicate(data) {
     goog.base(this, data);
@@ -608,7 +607,7 @@ UnitQuantityPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(ret);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function TechLevelPredicate(data) {
     goog.base(this, data);
@@ -671,7 +670,7 @@ function predicate_cache_off() {
     quest_completed_predicate_cache = null;
 }
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function QuestCompletedPredicate(data) {
     goog.base(this, data);
@@ -713,7 +712,7 @@ QuestCompletedPredicate.prototype.do_ui_describe = function(player) {
 /** @override */
 QuestCompletedPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AuraActivePredicate(data) {
     goog.base(this, data);
@@ -760,7 +759,7 @@ AuraActivePredicate.prototype.ui_time_range = function(player) {
     return [-1,-1];
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AuraInactivePredicate(data) {
     goog.base(this, data);
@@ -788,7 +787,7 @@ AuraInactivePredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function CooldownActivePredicate(data) {
     goog.base(this, data);
@@ -813,7 +812,7 @@ CooldownActivePredicate.prototype.ui_time_range = function(player) {
     return [-1,-1];
 }
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function CooldownInactivePredicate(data) {
     goog.base(this, data);
@@ -829,7 +828,7 @@ CooldownInactivePredicate.prototype.do_ui_describe = function(player) {
 CooldownInactivePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function GamedataVarPredicate(data, name, value, method) {
     goog.base(this, data);
@@ -877,7 +876,7 @@ GamedataVarPredicate.prototype.ui_time_range = function(player) {
     return range;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PlayerHistoryPredicate(data, key, minvalue, ui_name_s, ui_name_d, method) {
     goog.base(this, data);
@@ -947,7 +946,7 @@ PlayerHistoryPredicate.prototype.ui_difficulty = function() {
     return this.minvalue;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PlayerPreferencePredicate(data) {
     goog.base(this, data);
@@ -964,7 +963,7 @@ PlayerPreferencePredicate.prototype.is_satisfied = function(player, qdata) {
     return test_value === this.value;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends PlayerHistoryPredicate */
 function FriendsJoinedPredicate(data, key, minvalue, ui_name_s, ui_name_d, method) {
     goog.base(this, data, key, minvalue, ui_name_s, ui_name_d, method);
@@ -994,7 +993,7 @@ FriendsJoinedPredicate.prototype.ui_progress = function(player, qdata) {
     return ret;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ABTestPredicate(data) {
     goog.base(this, data);
@@ -1010,7 +1009,7 @@ ABTestPredicate.prototype.is_satisfied = function(player, qdata) {
     return cur_value == this.value;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AnyABTestPredicate(data) {
     goog.base(this, data);
@@ -1027,7 +1026,7 @@ AnyABTestPredicate.prototype.is_satisfied = function(player, qdata) {
 /** @override */
 AnyABTestPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function LibraryPredicate(data) {
     goog.base(this, data);
@@ -1051,7 +1050,7 @@ LibraryPredicate.prototype.ui_time_range = function(player) {
     return this.pred.ui_time_range(player);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AIBaseActivePredicate(data) {
     goog.base(this, data);
@@ -1077,7 +1076,7 @@ AIBaseActivePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(s.replace('%d', this.user_id.toString()));
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AIBaseShownPredicate(data) {
     goog.base(this, data);
@@ -1104,7 +1103,7 @@ AIBaseShownPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(s.replace('%d', this.user_id.toString()));
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function UserIDPredicate(data) {
     goog.base(this, data);
@@ -1121,7 +1120,7 @@ UserIDPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PriceRegionPredicate(data) {
     goog.base(this, data);
@@ -1132,7 +1131,7 @@ PriceRegionPredicate.prototype.is_satisfied = function(player, qdata) {
     return goog.array.contains(this.regions, player.price_region);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function CountryTierPredicate(data) {
     goog.base(this, data);
@@ -1143,7 +1142,7 @@ CountryTierPredicate.prototype.is_satisfied = function(player, qdata) {
     return goog.array.contains(this.tiers, player.country_tier);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function CountryPredicate(data) {
     goog.base(this, data);
@@ -1156,7 +1155,7 @@ CountryPredicate.prototype.is_satisfied = function(player, qdata) {
 /** @override */
 CountryPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PurchasedRecentlyPredicate(data) {
     goog.base(this, data);
@@ -1170,7 +1169,7 @@ PurchasedRecentlyPredicate.prototype.is_satisfied = function(player, qdata) {
 /** @override */
 PurchasedRecentlyPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function EventTimePredicate(data) {
     goog.base(this, data);
@@ -1204,7 +1203,7 @@ EventTimePredicate.prototype.ui_time_range = function(player) {
     return [start_time, end_time];
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AbsoluteTimePredicate(data) {
     goog.base(this, data);
@@ -1256,7 +1255,7 @@ AbsoluteTimePredicate.prototype.ui_time_range = function(player) {
 };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function AccountCreationTimePredicate(data) {
     goog.base(this, data);
@@ -1284,7 +1283,7 @@ AccountCreationTimePredicate.prototype.do_ui_describe = function(player) {
 /** @override */
 AccountCreationTimePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BrowserNamePredicate(data) {
     goog.base(this, data);
@@ -1300,7 +1299,7 @@ BrowserNamePredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BrowserVersionPredicate(data) {
     goog.base(this, data);
@@ -1313,7 +1312,7 @@ BrowserVersionPredicate.prototype.is_satisfied = function(player, qdata) {
     return true;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BrowserOSPredicate(data) {
     goog.base(this, data);
@@ -1329,7 +1328,7 @@ BrowserOSPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BrowserHardwarePredicate(data) {
     goog.base(this, data);
@@ -1340,7 +1339,7 @@ BrowserHardwarePredicate.prototype.is_satisfied = function(player, qdata) {
     return goog.array.contains(this.hardware, spin_demographics['browser_hardware']);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function FramePlatformPredicate(data) {
     goog.base(this, data);
@@ -1353,7 +1352,7 @@ FramePlatformPredicate.prototype.is_satisfied = function(player, qdata) {
 /** @override */
 FramePlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function FacebookAppNamespacePredicate(data) {
     goog.base(this, data);
@@ -1368,7 +1367,7 @@ FacebookAppNamespacePredicate.prototype.is_satisfied = function(player, qdata) {
 //// CLIENT SIDE PREDICATES
 ///////////////////////////
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ClientFacebookLikesPredicate(data) {
     goog.base(this, data);
@@ -1380,7 +1379,7 @@ ClientFacebookLikesPredicate.prototype.is_satisfied = function(player, qdata) {
     return SPFB.likes(this.id);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function SelectedPredicate(data) {
     goog.base(this, data);
@@ -1411,7 +1410,7 @@ SelectedPredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function UIClearPredicate(data) {
     goog.base(this, data);
@@ -1421,7 +1420,7 @@ UIClearPredicate.prototype.is_satisfied = function(player, qdata) {
     return (selection.ui==null) && (client_time - selection.ui_change_time >= gamedata['client']['ui_quiet_time']);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function QuestClaimablePredicate(data) {
     goog.base(this, data);
@@ -1431,7 +1430,7 @@ QuestClaimablePredicate.prototype.is_satisfied = function(player, qdata) {
     return player.claimable_quests > 0;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HomeBasePredicate(data) {
     goog.base(this, data);
@@ -1441,7 +1440,7 @@ HomeBasePredicate.prototype.is_satisfied = function(player, qdata) {
     return session.home_base;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasAttackedPredicate(data) {
     goog.base(this, data);
@@ -1454,7 +1453,7 @@ HasAttackedPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasDeployedPredicate(data) {
     goog.base(this, data);
@@ -1484,7 +1483,7 @@ HasDeployedPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PreDeployUnitsPredicate(data) {
     goog.base(this, data);
@@ -1511,7 +1510,7 @@ PreDeployUnitsPredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HostileUnitNearPredicate(data) {
     goog.base(this, data);
@@ -1537,7 +1536,7 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
     return obj_list.length > 0;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ForemanIsBusyPredicate(data) {
     goog.base(this, data);
@@ -1547,7 +1546,7 @@ ForemanIsBusyPredicate.prototype.is_satisfied = function(player, qdata) {
     return !!player.foreman_is_busy();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function DialogOpenPredicate(data) {
     goog.base(this, data);
@@ -1581,7 +1580,7 @@ DialogOpenPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function BaseSizePredicate(data) {
     goog.base(this, data);
@@ -1603,7 +1602,7 @@ BaseSizePredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HomeRegionPredicate(data) {
     goog.base(this, data);
@@ -1625,7 +1624,7 @@ HomeRegionPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function RegionPropertyPredicate(data) {
     goog.base(this, data);
@@ -1640,7 +1639,7 @@ RegionPropertyPredicate.prototype.is_satisfied = function(player, qdata) {
     return val == this.value;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function InventoryPredicate(data) {
     goog.base(this, data);
@@ -1651,7 +1650,7 @@ InventoryPredicate.prototype.is_satisfied = function(player, qdata) {
     return (player.inventory.length >= this.num);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasItemPredicate(data) {
     goog.base(this, data);
@@ -1675,7 +1674,7 @@ HasItemPredicate.prototype.ui_progress = function(player, qdata) {
 /** @override */
 HasItemPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; }; // not sure on this one
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasItemSetPredicate(data) {
     goog.base(this, data);
@@ -1692,7 +1691,7 @@ HasItemSetPredicate.prototype.is_satisfied = function(player, qdata) {
     return (player.stattab['item_sets'][this.item_set] >= min_count);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function IsInAlliancePredicate(data) {
     goog.base(this, data);
@@ -1702,7 +1701,7 @@ IsInAlliancePredicate.prototype.is_satisfied = function(player, qdata) {
     return session.is_in_alliance();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasAliasPredicate(data) {
     goog.base(this, data);
@@ -1718,7 +1717,7 @@ HasAliasPredicate.prototype.do_ui_help = function(player) {
     return {'noun': 'alias', 'verb': 'set' };
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function HasTitlePredicate(data) {
     goog.base(this, data);
@@ -1736,7 +1735,7 @@ HasTitlePredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', gamedata['titles'][this.name]['ui_name']));
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function UsingTitlePredicate(data) {
     goog.base(this, data);
@@ -1751,7 +1750,7 @@ UsingTitlePredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function PlayerLevelPredicate(data) {
     goog.base(this, data);
@@ -1765,7 +1764,7 @@ PlayerLevelPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%d', this.level.toString()));
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function LadderPlayerPredicate(data) {
     goog.base(this, data);
@@ -1775,7 +1774,7 @@ LadderPlayerPredicate.prototype.is_satisfied = function(player, qdata) {
     return player.is_ladder_player();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function MailAttachmentsPredicate(data) {
     goog.base(this, data);
@@ -1790,7 +1789,7 @@ MailAttachmentsPredicate.prototype.is_satisfied = function(player, qdata) {
     return false;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ArmySizePredicate(data) {
     goog.base(this, data);
@@ -1817,7 +1816,7 @@ ArmySizePredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ViewingBaseDamagePredicate(data) {
     goog.base(this, data);
@@ -1834,7 +1833,7 @@ ViewingBaseDamagePredicate.prototype.is_satisfied = function(player, qdata) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends Predicate */
 function ViewingBaseObjectDestroyedPredicate(data) {
     goog.base(this, data);

@@ -16,8 +16,7 @@ SPWebsocket.SocketState = {CONNECTING:0, CONNECTED:1, CLOSING:2, CLOSED:3, TIMEO
 /** @return {boolean} */
 SPWebsocket.is_supported = function() { return (typeof(WebSocket) != 'undefined'); };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {string} url
     @param {number} connect_timeout
     @param {number} msg_timeout */

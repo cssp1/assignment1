@@ -14,8 +14,7 @@ ShakeSynth = {
     DATASCALE: 24.0/2589.0
 };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {number} seed */
 ShakeSynth.Shake = function(seed) {
     this.seed = seed;

@@ -89,7 +89,7 @@ Backdrop.draw_tiled = function(base, is_home_base, is_friendly_base, data) {
     var assetname = data[is_home_base || is_friendly_base ? 'friendly' : 'hostile'];
 
     var asset = GameArt.assets[assetname];
-    var main_sprite = GameArt.assets[assetname].states['fullleft'];
+    var main_sprite = /** @type {!GameArt.Sprite} */ (GameArt.assets[assetname].states['fullleft']);
     var main_image = main_sprite.images[0];
     if(!main_image.data_loaded) {
         // start it loading
@@ -234,7 +234,7 @@ Backdrop.draw_tiled = function(base, is_home_base, is_friendly_base, data) {
                 state = 'fullleft';
             }
 
-            var image = asset.states[state].images[0];
+            var image = /** @type {!GameArt.Sprite} */ (asset.states[state]).images[0];
             var w = tilesize[0], h = tilesize[1];
             var sx = 0, sy = 0, sw = main_sprite.wh[0], sh = main_sprite.wh[1];
 
@@ -294,7 +294,7 @@ Backdrop.draw_tiled = function(base, is_home_base, is_friendly_base, data) {
     @param {string} assetname */
 Backdrop.draw_whole = function(base, is_home_base, is_friendly_base, assetname) {
     var ncells = base.ncells();
-    var backdrop_sprite = GameArt.assets[assetname].states[is_home_base ? 'home':'other'];
+    var backdrop_sprite = /** @type {!GameArt.Sprite} */ (GameArt.assets[assetname].states[is_home_base ? 'home':'other']);
     if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
 
     var backdrop_image = backdrop_sprite.images[0];
@@ -379,7 +379,7 @@ Backdrop.draw_whole = function(base, is_home_base, is_friendly_base, assetname) 
     @param {boolean} is_friendly_base
     @param {string} assetname */
 Backdrop.draw_simple = function(is_home_base, is_friendly_base, assetname) {
-    var backdrop_sprite = GameArt.assets[assetname].states[is_home_base ? 'home':'other'];
+    var backdrop_sprite = /** @type {!GameArt.Sprite} */ (GameArt.assets[assetname].states[is_home_base ? 'home':'other']);
     if(!backdrop_sprite.wh) { throw Error('backdrop sprite needs specific dimensions'); }
 
     var backdrop_image = backdrop_sprite.images[0];

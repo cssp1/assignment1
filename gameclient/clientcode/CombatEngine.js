@@ -45,7 +45,7 @@ CombatEngine.Pos2D.sub = function(a, b) {
     return [a[0]-b[0], a[1]-b[1]];
 };
 
-/** @constructor
+/** @constructor @struct
     @param {!World.World} world */
 CombatEngine.CombatEngine = function(world) {
     /** @type {!World.World} */
@@ -67,7 +67,7 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
 
 // DamageEffects
 
-/** @constructor
+/** @constructor @struct
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObject|null} source
@@ -113,7 +113,7 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(use_t
 
 
 /** KillDamageEffect removes the object directly WITHOUT running on-death spells
-    @constructor
+    @constructor @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -151,7 +151,7 @@ CombatEngine.KillDamageEffect.prototype.apply = function(world) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -182,7 +182,7 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
     hurt_object(this.target_obj, this.amount, this.vs_table, this.source); // XXXXXX calls into main
 };
 
-/** @constructor
+/** @constructor @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -230,7 +230,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
@@ -300,7 +300,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
     }, this);
 };
 
-/** @constructor
+/** @constructor @struct
     @extends CombatEngine.DamageEffect
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack

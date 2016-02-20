@@ -11,8 +11,7 @@ goog.provide('RegionMapIndex');
 
 goog.require('goog.array');
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {!Array.<number>} dims */
 RegionMapIndex.RegionMapIndex = function(dims) {
     this.dims = dims;

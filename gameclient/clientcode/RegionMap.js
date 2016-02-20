@@ -18,7 +18,7 @@ goog.require('goog.string');
 
 // note: this references some stuff from main.js (player.travel_state etc)
 
-/** @constructor */
+/** @constructor @struct */
 RegionMap.Cursor = function(map) {
     this.map = map;
 };
@@ -38,7 +38,7 @@ RegionMap.Cursor.prototype.draw_text_at_cell = function(cell, text_str, text_col
                                 [text_str], text_color, text_size);
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends RegionMap.Cursor */
 RegionMap.DeployCursor = function(map, from_loc, squad_id, icon_assetname) {
     goog.base(this, map);
@@ -151,7 +151,7 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
     return true;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends RegionMap.Cursor */
 RegionMap.MoveCursor = function(map, from_loc, squad_id, icon_specname) {
     goog.base(this, map);
@@ -342,7 +342,7 @@ RegionMap.MoveCursor.prototype.on_mouseup = function(cell, button) {
 
         // play movement sound
         if(this.icon_unit_spec && 'sound_destination' in this.icon_unit_spec) {
-            GameArt.assets[this.icon_unit_spec['sound_destination']].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound(this.icon_unit_spec['sound_destination']);
         }
 
         this.map.cursor = null;
@@ -354,7 +354,7 @@ RegionMap.MoveCursor.prototype.on_mouseup = function(cell, button) {
 };
 
 
-/** @constructor
+/** @constructor @struct
   * @extends RegionMap.Cursor */
 RegionMap.RelocateCursor = function(map) {
     goog.base(this, map);
@@ -457,7 +457,7 @@ RegionMap.RelocateCursor.prototype.on_mouseup = function(cell, button) {
 // NOTE: ALL CANVAS DRAWING IS DONE IN "FIELD" COORDINATES!
 // the field->widget transform is done on the Canvas transform stack
 
-/** @constructor
+/** @constructor @struct
     @extends SPUI.DialogWidget
     @param {!SPFX.FXWorld} fxworld */
 RegionMap.RegionMap = function(data, fxworld) {
@@ -747,7 +747,7 @@ RegionMap.RegionMap.prototype.select_feature_at = function(loc) {
             if(this.popup) {
                 this.make_feature_popup_menu();
                 // play button-click sound
-                GameArt.assets[gamedata['dialogs']['region_map_popup_menu']['widgets']['button']['bg_image']].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound(gamedata['dialogs']['region_map_popup_menu']['widgets']['button']['bg_image']);
             }
         } else if(ls.length > 1) {
             // multi-selector
@@ -2709,7 +2709,7 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
         var fade_cells = 1.0;
 
         // fade from individual cells to image sprite at wide zooms
-        var bg_img = ('bg_image' in this.region.data ? GameArt.assets[this.region.data['bg_image']].states['normal'].images[0] : null);
+        var bg_img = ('bg_image' in this.region.data ? /** @type {!GameArt.Sprite} */ (GameArt.assets[this.region.data['bg_image']].states['normal']).images[0] : null);
 
         if(bg_img && this.gfx_detail < 1) {
             fade_cells = 0; // turn off cell drawing entirely in low graphics mode

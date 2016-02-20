@@ -20,8 +20,7 @@ Dripper.rate_table = [
 /** @typedef {function(?=): boolean} */
 Dripper.Callback;
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {Dripper.Callback|null} cb
     @param {number} rate
     @param {number} origin_time

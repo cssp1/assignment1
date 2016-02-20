@@ -22,8 +22,7 @@ VoxelMapAccelerator.clamp = function(x,a,b) {
     return x;
 };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {Array.<number>} wh Input map grid size
     @param {number} chunk Size of each voxel bucket, in gridcell units */
 VoxelMapAccelerator.VoxelMapAccelerator = function(wh, chunk) {

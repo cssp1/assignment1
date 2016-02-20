@@ -847,7 +847,7 @@ function force_scroll_eval() {
 
 // Auras
 
-/** @constructor
+/** @constructor @struct
     @param {GameObject|null} source object
     @param {Object} spec
     @param {?} strength
@@ -988,7 +988,7 @@ Aura.prototype.end = function(obj) {
 // to reduce the amount of AJAX traffic, group together all client->server messages
 // that are sent within each iteration of the main game loop
 
-/** @constructor */
+/** @constructor @struct */
 function AJAXMessageQueue() {
     this.queue = [];
     this.serial = -1;
@@ -1008,7 +1008,7 @@ var message_queue = new AJAXMessageQueue();
 var message_serial = 0;
 
 // for obfuscation purposes
-/** @constructor */
+/** @constructor @struct */
 function ServerSender() {
     this.foo = 123;
 };
@@ -1018,7 +1018,7 @@ ServerSender.prototype.func = function(msg) {
 var send_to_server = new ServerSender();
 
 // general-purpose mechanism for waiting for the server to acknowledge all actions submitted up to now
-/** @constructor */
+/** @constructor @struct */
 function Synchronizer() {
     this.last_sent = 0;
     this.last_received = -1;
@@ -1158,7 +1158,8 @@ var GameObjectId = {};
 /** @typedef {string} */
 var TeamId = {};
 
-/** @constructor */
+/** @constructor - XXX not ready for struct yet
+ */
 function GameObject() {
     /** @type {World.World|null} - undesirable to have a backreference
      * here, maybe try to eliminate it once the combat/AI code moves to World? */
@@ -2007,7 +2008,7 @@ GameObject.prototype.speak = function(name) {
     if(this.last_speak_sound == name && (client_time - this.last_speak_time) < gamedata['client']['min_speak_interval']) { return; }
     this.last_speak_sound = name;
     this.last_speak_time = client_time;
-    GameArt.assets[this.spec[field]].states['normal'].audio.play(client_time);
+    GameArt.play_canned_sound(this.spec[field]);
 };
 
 function apply_queued_damage_effects() {
@@ -4373,7 +4374,7 @@ GameObject.prototype.remove_permanent_effect = function() {
 };
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends GameObject
  */
 function MapBlockingGameObject() {
@@ -4521,7 +4522,7 @@ MapBlockingGameObject.prototype.detect_click = function(xy, ji, zoom, fuzz) {
 };
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends MapBlockingGameObject
  */
 function Inert() {
@@ -4558,13 +4559,19 @@ Inert.prototype.calc_draw_pos = function() {
 };
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends MapBlockingGameObject
  */
 function Building() {
     goog.base(this);
     this.repair_finish_time = -1;
     this.disarmed = false;
+
+    /** @type {Object|null} */
+    this.crafting = null;
+
+    /** @type {Object|string|null} */
+    this.config = null;
 
     this.build_total_time = -1;
     this.build_start_time = -1;
@@ -5258,7 +5265,7 @@ MapBlockingGameObject.prototype.playfield_xy = function() {
 };
 
 /** Functions for working with climates
-    @constructor */
+    @constructor @struct */
 var Climate = function(data) {
     /** @const */
     this.data = data;
@@ -6980,8 +6987,7 @@ function find_any_compatible_building(item_spec) {
 };
 
 /** Reference to a specific slot in an equipment data structure
-    @constructor
-    @struct
+    @constructor @struct
     @param {string} slot_type
     @param {number} slot_index */
 var EquipSlotAddress = function(slot_type, slot_index) {
@@ -6993,8 +6999,7 @@ EquipSlotAddress.prototype.equals = function(other) {
 };
 
 /** Reference to a specific slot on a specific building, e.g. used as delivery address for crafting products
-    @constructor
-    @struct
+    @constructor @struct
     @extends EquipSlotAddress
     @param {GameObjectId} obj_id
     @param {string} slot_type
@@ -7009,8 +7014,7 @@ BuildingEquipSlotAddress.prototype.equals = function(other) {
 };
 
 /** Reference to a specific slot on a specific unit type
-    @constructor
-    @struct
+    @constructor @struct
     @extends EquipSlotAddress
     @param {string} specname
     @param {string} slot_type
@@ -7248,7 +7252,7 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
 // NOTE: "Friend" represents AIs, True Facebook Friends, and "Rivals" (strangers the server gives you to attack)
 // to differentiate, use is_ai() and is_real_friend
 
-/** @constructor */
+/** @constructor @struct */
 function Friend(user_id, is_real_friend, info) {
     this.user_id = user_id;
     this.is_real_friend = !!is_real_friend;
@@ -7764,7 +7768,7 @@ function invalidate_unit_paths() {
 }
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends GameObject
  */
 function Mobile() {
@@ -9333,7 +9337,7 @@ var input_since_last_xmit = true;
 var input_since_last_proxy_xmit = true;
 
 // go through some gymnastics to preserve a reference to the XMLHttpRequest hidden inside a goog.net.XhrIo so we can attach our own progress listener.
-/** @constructor
+/** @constructor @struct
   * @extends goog.net.XmlHttpFactory */
 function MyXmlHttpFactory(request) {
     this.request = request;
@@ -9583,7 +9587,7 @@ function longpoll_send() {
 
 // queue of user notifications that occur upon login or next session change
 // (not active during initial on-rails tutorial - unless priority >= 200, or in combat)
-/** @constructor */
+/** @constructor @struct */
 function NotificationQueue() {
     this.queue = [];
     this.hold_time = -1;
@@ -11530,7 +11534,7 @@ function update_combat_damage_bar(dialog) {
         }
     }
     dialog.user_data['base_damage'] = base_damage; // XXXXXX nasty hack - save for later use by combat_resource_bars
-    if(do_sound) { GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time); }
+    if(do_sound) { GameArt.play_canned_sound('success_playful_22');; }
 }
 
 function invoke_combat_resource_bars() {
@@ -13618,7 +13622,7 @@ function update_combat_item_bar(dialog) {
 }
 
 /** UI element that displays an outline where building would be built or moved if you clicked now
- * @constructor
+ * @constructor @struct
  * @extends SPUI.Element
  */
 var BuildUICursor = function(obj, spec) {
@@ -13941,7 +13945,7 @@ function do_build(ji) {
 };
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends SPUI.Element
  */
 var DeployUICursor = function() {
@@ -14104,7 +14108,7 @@ function do_deploy(ji, objs_to_deploy) {
 };
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends SPUI.Element
  */
 var CommandUICursor = function(col) {
@@ -14131,7 +14135,7 @@ function make_move_cursor() { return new CommandUICursor([0.25,1,0.25,0.7]); }
 function make_patrol_cursor() { return new CommandUICursor([0.25,0.5,1,0.7]); }
 
 /**
- * @constructor
+ * @constructor @struct
  * @extends SPUI.Element
  */
 var AOEUICursor = function(origin_unit, range, radius) {
@@ -14274,7 +14278,7 @@ function publish_ai_base(base) { manipulate_ai_base(base, "PUBLISH_AI_BASE", "pu
 /** Sometimes chat messages from the server call for a modification to
     a previous message (e.g. to hide it or update a unit donation request).
     Encapsulate the necessary modifications here.
-    @constructor
+    @constructor @struct
     @param {number} mod_time
     @param {string|null} mod_message_id
     @param {string|null} target_message_id
@@ -14310,7 +14314,7 @@ ChatModifier.compare = function(a,b) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends ChatModifier
     @param {number} mod_time
     @param {string|null} mod_message_id
@@ -14331,7 +14335,7 @@ ChatHider.prototype.apply = function(output, req, node) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends ChatModifier
     @param {number} mod_time
     @param {string|null} mod_message_id
@@ -14373,7 +14377,7 @@ ChatUnitDonation.prototype.apply = function(output, req, node) {
     output.revise_text(node, text);
 };
 
-/** @constructor
+/** @constructor @struct
     @extends ChatModifier
     @param {number} mod_time
     @param {string|null} mod_message_id
@@ -15016,7 +15020,7 @@ function init_chat_frame() {
         tab.widgets['request_donation_button'].onclick = function(w) {
             if(resolve_unit_donation_problem()) { return; }
             request_unit_donation(find_object_by_type(gamedata['alliance_building']));
-            GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound('request_unit_donation_sound');
         };
     }
 
@@ -15069,8 +15073,7 @@ function init_chat_frame() {
         dialog.widgets['tabs'+dialog.user_data['cur_tab']].widgets['output'].scroll_to_bottom();
 
         // play a click effect
-        var state = GameArt.assets['action_button_134px'].states['normal'];
-        if(state.audio) { state.audio.play(client_time); }
+        GameArt.play_canned_sound('action_button_134px');
 
         // client-side predict for quest purposes
         player.history['chat_messages_sent'] = (player.history['chat_messages_sent'] || 0) + 1;
@@ -15147,7 +15150,7 @@ function invoke_chat_filter_warning(cb) {
     return true;
 }
 
-/** @constructor
+/** @constructor @struct
     @param {number} user_id of offender
     @param {string} channel in which offensive text was said
     @param {string} ui_name of the offender to show in the GUI
@@ -16705,8 +16708,7 @@ function play_level_up_sound(sound_asset) {
         // play big sound
         last_level_up_sound_time = client_time;
     }
-
-    GameArt.assets[sound_asset].states['normal'].audio.play(client_time);
+    GameArt.play_canned_sound(sound_asset);
 }
 
 // NEW metrics codes:
@@ -17567,7 +17569,7 @@ function tutorial_step_valentina_help_message(data) {
 
     dialog.widgets['ok_button'].onclick = (function (next) { return function() {
         // switch to combat music (use "recon" if "combat" not available)
-        change_backdrop_music(GameArt.assets['background_music'].states[(GameArt.assets['background_music'].has_state('combat') ? 'combat' : 'recon')].audio);
+        change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states[(GameArt.assets['background_music'].has_state('combat') ? 'combat' : 'recon')]).audio);
         player.tutorial_state = next;
         tutorial_step(true);
     }; })(data['next']);
@@ -18067,7 +18069,7 @@ function tutorial_step_move_rover_action_command() {
 function tutorial_step_repair_message(data) {
 
     // switch back to calm bg music
-    change_backdrop_music(GameArt.assets['background_music'].states['normal'].audio);
+    change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states['normal']).audio);
 
     var dialog_data = gamedata['dialogs']['tutorial_repair_message'];
     var dialog = new SPUI.Dialog(dialog_data);
@@ -18212,7 +18214,7 @@ function tutorial_step_congratulations(data) {
 
     make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
 
-    GameArt.assets['conquer_sound'].states['normal'].audio.play(client_time);
+    GameArt.play_canned_sound('conquer_sound');
 }
 
 function tutorial_step_invite_friends(data) {
@@ -18343,7 +18345,7 @@ function invoke_squad_error(title_text, body_text) {
     if(player.preferences['nonmodal_squad_errors'] && map_dialog) {
         body_text = body_text.replace(/\n/g, ' '); // get rid of newlines
         region_map_display_notification(map_dialog, '[color=#ffff00]'+title_text + ': ' + body_text+'[/color]');
-        GameArt.assets['error_sound'].states['normal'].audio.play(client_time); // play a sound so player knows something happened
+        GameArt.play_canned_sound('error_sound'); // play a sound so player knows something happened
         return;
     }
 
@@ -18756,7 +18758,7 @@ function create_splash_message(data, context) {
         dialog.widgets['picture'].asset = data['picture'];
     }
     if('sound' in data) {
-        GameArt.assets[data['sound']].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound(data['sound']);
     }
     apply_dialog_hacks(dialog, data, context);
     return dialog;
@@ -19691,7 +19693,7 @@ function do_harvest(all) {
         var descr = data['ui_description'].replace('%s1', ui_rsrc).replace('%s2', ui_rsrc);
 
         invoke_message_dialog(title, descr);
-        GameArt.assets['error_sound'].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound('error_sound');
     }
 }
 
@@ -19901,7 +19903,7 @@ function invoke_building_context_menu(mouse_xy) {
                 } else {
                     reinforcements_button = new ContextMenuButton({ui_name: spell['ui_name'], onclick: (function(_obj) { return function() {
                         request_unit_donation(_obj);
-                        GameArt.assets["request_unit_donation_sound"].states['normal'].audio.play(client_time);
+                        GameArt.play_canned_sound('request_unit_donation_sound');
                         change_selection_ui(null);
 
                         if(gamedata['client']['unit_donation_request_maximize_chat']) {
@@ -20265,8 +20267,7 @@ function invoke_building_context_menu(mouse_xy) {
 }
 
 /** button description for generic context menu
-    @constructor
-    @struct
+    @constructor @struct
     @param {{ui_name: string,
              onclick: (function(SPUI.DialogWidget)|null|undefined),
              state: (string|null|undefined),
@@ -20343,10 +20344,7 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
     dialog.widgets['bg_close_button'].onclick = close_parent_dialog;
 
     // play a "click" sound effect
-    if(1) {
-        var state = GameArt.assets['action_button_resizable'].states['normal'];
-        if(state.audio) { state.audio.play(client_time); }
-    }
+    GameArt.play_canned_sound('action_button_resizable');
 
     // fill in buttons
     var button_dict = {'': buttons};
@@ -23027,8 +23025,7 @@ function update_inventory_grid(dialog) {
     }
 };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {{ui_name: string,
              ui_name_pending: string,
              state: (string|undefined),
@@ -27660,7 +27657,7 @@ function invoke_alliance_join_request(user_id) {
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.widgets['accept_button'].onclick = function(w) {
         AllianceCache.ack_join_request(session.alliance_id, w.parent.user_data['user_id'], true, function() {});
-        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound('success_playful_22');;
         close_parent_dialog(w);
     };
     dialog.widgets['reject_button'].onclick = function(w) {
@@ -31692,10 +31689,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                         build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index) { return function() {
                             start_crafting(_builder, _build_recipe_spec, {'delivery': {'obj_id':_obj.id, 'slot_type':delivery_slot_type, 'slot_index': _delivery_slot_index}});
                             // play sound effect
-                            if(1) {
-                                var state = GameArt.assets['action_button_134px'].states['normal'];
-                                if(state.audio) { state.audio.play(client_time); }
-                            }
+                            GameArt.play_canned_sound('action_button_134px');
                             return true;
                         }; })(builder, build_recipe_spec, obj, delivery_slot_index);
                     } else {
@@ -31925,10 +31919,7 @@ function update_crafting_dialog_status_leaders(dialog) {
             build_cb = (function (_builder, _selected_recipe_spec, _selected_rec_level) { return function() {
                 start_crafting(_builder, _selected_recipe_spec, {'level': _selected_rec_level});
                 // play sound effect
-                if(1) {
-                    var state = GameArt.assets['action_button_134px'].states['normal'];
-                    if(state.audio) { state.audio.play(client_time); }
-                }
+                GameArt.play_canned_sound('action_button_134px');
                 return true;
             }; })(builder, selected_recipe_spec, selected_rec['level'] || 1);
         } else {
@@ -32355,7 +32346,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
             dialog.widgets['collect_button'].tooltip.str = null;
             dialog.widgets['collect_button'].onclick = (function (_builder, _bus, _rowdata) { return function(w) {
                 var dialog = w.parent;
-                GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('xp_gain_sound');
 
                 send_to_server.func(["CAST_SPELL", _builder.id, "COLLECT_CRAFT", [_bus['craft']['attempt_id']]]);
                 var queue = _builder.start_client_prediction('crafting.queue', _builder.crafting ? _builder.crafting['queue'] : []);
@@ -32417,7 +32408,7 @@ function update_fishing_dialog_row(parent_dialog, row, rowdata) {
                 }
                 dialog.parent.user_data['ui_priority_overrides'][ui_tag] = ui_priority;
                 invoke_ui_locker(_builder.request_sync());
-                GameArt.assets['action_button_134px'].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('action_button_134px');
             }; })(builder, recipe);
         } else {
             dialog.widgets['start_button'].state = (helper ? 'disabled_clickable' : 'disabled');
@@ -32688,7 +32679,7 @@ function research_dialog_scroll(dialog, page) {
                     var dialog = w.parent;
                     // play sound effect
                     if(1) {
-                        var state = GameArt.assets['action_button_134px'].states['normal'];
+                        var state = /** @type {!GameArt.Sprite} */ (GameArt.assets['action_button_134px'].states['normal']);
                         if(state.audio) { state.audio.play(client_time); }
                     }
                     invoke_upgrade_tech_dialog(bname, (function (_cat,_page) { return function() {
@@ -34588,7 +34579,7 @@ function invoke_daily_tip(tipname, skip_notification_queue, notification_params)
                                                       tip['understood_button_consequent'] || null);
 
         if('sound' in _tip) {
-            GameArt.assets[_tip['sound']].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound(_tip['sound']);
         }
         if('alloy_bonus_hack' in _tip) {
             var data = _tip['alloy_bonus_hack'];
@@ -35449,7 +35440,7 @@ function do_invoke_cc_upgrade_dialog(mode) {
                 return;
             } else {
                 if(d.user_data['line'] % 2 == 0) {
-                    GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
+                    GameArt.play_canned_sound('xp_gain_sound');
                 }
                 d.widgets['details'].append_text(parsed[d.user_data['line']]);
                 d.user_data['line'] += 1;
@@ -36150,7 +36141,7 @@ function invoke_you_got_bonus_units() {
     dialog.modal = true;
     dialog.widgets['ok_button'].onclick =
         dialog.widgets['close_button'].onclick = close_parent_dialog;
-    GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+    GameArt.play_canned_sound('success_playful_22');;
     return dialog;
 }
 
@@ -37657,7 +37648,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
                         session.get_draw_world().fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, _skudata['mouseover_effect'], true, null);
                     } else {
                         var assetname = ('mouseover_sound' in _skudata ? _skudata['mouseover_sound'] : 'mouseover_button_sound');
-                        GameArt.assets[assetname].states['normal'].audio.play(client_time);
+                        GameArt.play_canned_sound(assetname);
                     }
                 }
 
@@ -43280,7 +43271,7 @@ function handle_server_message(data) {
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', session.region.data['ui_name']),
                                             msg['ui_description'].replace('%s', session.region.data['ui_name']).replace('%loc', player.home_base_loc[0].toString()+','+player.home_base_loc[1].toString())+session.region.data['ui_description_long'],
                                             {'dialog': 'message_dialog_big'});
-                GameArt.assets[ "success_playful_22"].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('success_playful_22');
             }, -2);
         }
 
@@ -43343,7 +43334,7 @@ function handle_server_message(data) {
     } else if(msg == "ALLIANCE_INVITE_RESULT" || msg == "ALLIANCE_KICK_RESULT" || msg == "ALLIANCE_PROMOTE_RESULT") {
         var alliance_id = data[1], affected_user = data[2], success = data[3], tag = data[4];
         if(success) {
-            GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound('success_playful_22');;
             var ui_msg = gamedata['strings']['alliance_'+{'ALLIANCE_INVITE_RESULT':'invite',
                                                           'ALLIANCE_KICK_RESULT':'kick',
                                                           'ALLIANCE_PROMOTE_RESULT':'promote'}[msg]+'_finish'];
@@ -43400,7 +43391,7 @@ function handle_server_message(data) {
                 invoke_child_message_dialog(msg['ui_title'],
                                             msg['ui_description'].replace('%alliance', alliance_display_name(info)).replace('%role', info['roles'][(session.alliance_membership['role']||0).toString()]['ui_name']),
                                             {'dialog': 'message_dialog_big'});
-                GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('success_playful_22');;
             };
             notification_queue.push_with_priority(display_func, -3);
 
@@ -43413,7 +43404,7 @@ function handle_server_message(data) {
                         invoke_child_message_dialog(msg['ui_title'].replace('%s', _r['ui_name']),
                                                     msg['ui_description'].replace('%s', _r['ui_name']),
                                                     {'dialog': 'message_dialog_big'});
-                        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+                        GameArt.play_canned_sound('success_playful_22');;
                     }; })(r, (session.alliance_id == _old_id ? 'modify' : 'join'));
                     notification_queue.push_with_priority(display_func, -2);
                 }; })(old_id));
@@ -43423,7 +43414,7 @@ function handle_server_message(data) {
                     invoke_child_message_dialog(msg['ui_title'],
                                                 msg['ui_description'],
                                                 {'dialog': 'message_dialog_big'});
-                    GameArt.assets["error_sound"].states['normal'].audio.play(client_time);
+                    GameArt.play_canned_sound('error_sound');
                 };
                 change_selection(null);
                 notification_queue.push_with_priority(display_func, -2);
@@ -43712,7 +43703,7 @@ function handle_server_message(data) {
             tutorial_step(false);
         }
 
-        change_backdrop_music(GameArt.assets['background_music'].states[(session.home_base ? 'normal' : 'recon')].audio);
+        change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states[(session.home_base ? 'normal' : 'recon')]).audio);
 
         if(player.can_level_up()) {
             notification_queue.push_with_priority(invoke_level_up_dialog, -1);
@@ -44506,7 +44497,7 @@ function handle_server_message(data) {
                 }
             }
             if(!has_sound && client_time - last_loot_text_time > 1.0) { // play a default sound effect
-                GameArt.assets['harvest_sound'].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('harvest_sound');
             }
             flash_delay = gamedata['client']['harvest_flash_delay'];
             ticker_delay = gamedata['client']['harvest_flash_delay'] + gamedata['client']['resource_ticker_delay'];
@@ -44551,7 +44542,7 @@ function handle_server_message(data) {
             if(gamedata['client']['vfx']['gamebucks_harvest_effect']) {
                 world.fxworld.add_visual_effect_at_time(pos, 0, [0,1,0], client_time, gamedata['client']['vfx']['gamebucks_harvest_effect'], true, null);
             } else {
-                GameArt.assets['minor_level_up_sound'].states['normal'].audio.play(client_time);
+                GameArt.play_canned_sound('minor_level_up_sound');
             }
         }
 
@@ -44615,7 +44606,7 @@ function handle_server_message(data) {
             world.fxworld.add(new SPFX.CombatText([pos[0]+off[0],pos[1]+off[1]], 0, str, [1, 0.2, 1, 1], world.fxworld.now_time(), 3.0, text_props));
         }
 
-        GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound('xp_gain_sound');
 
         if(player.can_level_up()) {
             notification_queue.push_with_priority(invoke_level_up_dialog, -1);
@@ -44633,7 +44624,7 @@ function handle_server_message(data) {
         }
 
         if(loot) {
-            GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound('xp_gain_sound');
             clr = [1,0.5,0,1];
             var ls = [];
             for(var i = 0; i < loot.length; i++) {
@@ -44643,7 +44634,7 @@ function handle_server_message(data) {
             }
             str = gamedata['strings']['craft_completed'].replace('%s', ls.join(', '));
         } else {
-            GameArt.assets['xp_gain_sound'].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound('xp_gain_sound');
             clr = [1,0.0,0.0,1];
             str = gamedata['strings']['craft_fizzled'];
         }
@@ -44722,7 +44713,7 @@ function handle_server_message(data) {
             init_playfield_speed_bar();
 
             // use "recon" music if "combat" music not available
-            change_backdrop_music(GameArt.assets['background_music'].states[(GameArt.assets['background_music'].has_state('combat') ? 'combat' : 'recon')].audio);
+            change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states[(GameArt.assets['background_music'].has_state('combat') ? 'combat' : 'recon')]).audio);
         }
     } else if(msg == "PLAYER_ATTACK_WAVE_DEPLOYED") {
         session.has_attacked = true;
@@ -44735,7 +44726,7 @@ function handle_server_message(data) {
             init_combat_item_bar();
             if(GameArt.assets['background_music'].has_state('combat')) {
                 // if no "combat" music is available, stick with "recon"
-                change_backdrop_music(GameArt.assets['background_music'].states['combat'].audio);
+                change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states['combat']).audio);
             }
         }
     } else if(msg == "CHAT_RECV") {
@@ -44755,7 +44746,7 @@ function handle_server_message(data) {
         var dialog = find_dialog('unit_donation_dialog');
         if(dialog) { dialog.user_data['pending'] = false; }
         if(success) {
-            GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+            GameArt.play_canned_sound('success_playful_22');;
             if(dialog) { close_parent_dialog(dialog.widgets['close_button']); }
         } else {
             var error = gamedata['errors'][error_reason];
@@ -45866,10 +45857,7 @@ function do_on_mouseup(e) {
                                          selection.spellname,
                                          ji]);
                     // play sound effect
-                    if(1) {
-                        var state = GameArt.assets['action_button_134px'].states['bigaction'];
-                        if(state.audio) { state.audio.play(client_time); }
-                    }
+                    GameArt.play_canned_sound('action_button_134px', 'bigaction');
 
                     // client-side predict - not 100% sure if this is safe?
                     var old_x = selection.unit.x, old_y = selection.unit.y;
@@ -47001,8 +46989,11 @@ function on_keydown(e) {
                    !find_dialog('ui_locker')) {
                     // ok it's safe to close the dialog
                     var btn = selection.ui.widgets['close_button'];
-                    if(btn.bg_image && GameArt.assets[btn.bg_image].states[btn.state].audio) {
-                        GameArt.assets[btn.bg_image].states[btn.state].audio.play(client_time);
+                    if(btn.bg_image) {
+                        var sprite = /** @type {!GameArt.Sprite} */ (GameArt.assets[btn.bg_image].states[btn.state]);
+                        if(sprite.audio) {
+                            sprite.audio.play(client_time);
+                        }
                     }
                     btn.onclick(btn);
                 }
@@ -47244,7 +47235,7 @@ APMCounter.get = function() {
     return -1;
 };
 
-/** @constructor */
+/** @constructor @struct */
 var FPSCounter = function() {
     this.cur_fps = 0;
     this.last_time = 0;
@@ -49902,7 +49893,7 @@ function draw_debug_map() {
                 //sprite = GameArt.assets['TEMP_mapcell'].states['open'].images[0];
             } else {
                 ctx.strokeStyle = "red";
-                sprite = GameArt.assets['TEMP_mapcell'].states['blocked'].images[0];
+                sprite = /** @type {!GameArt.Sprite} */ (GameArt.assets['TEMP_mapcell'].states['blocked']).images[0];
             }
 
             // translate to upper-left corner of cell sprite (left of the diamond tip)

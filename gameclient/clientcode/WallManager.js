@@ -13,7 +13,7 @@ goog.require('GameTypes');
 /** The "Wall Manager" adjusts the neighbor values of Buildings representing linkable walls
     to create or close collision gaps as necessary. Updated lazily at the beginning of the
     next combat tick after any change to neighbor state.
-    @constructor
+    @constructor @struct
     @param {!Array.<number>} size - map size, in grid cells
     @param {!Object} spec - for the barrier object
 */

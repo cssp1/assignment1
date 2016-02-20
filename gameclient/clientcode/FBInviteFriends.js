@@ -92,7 +92,7 @@ FBInviteFriends.invoke_fb_invite_friends_dialog_v2 = function(reason) {
         var dialog = w.parent;
         var invitees = goog.object.getKeys(dialog.user_data['invites']);
 
-        GameArt.assets["success_playful_22"].states['normal'].audio.play(client_time);
+        GameArt.play_canned_sound('success_playful_22');
         close_parent_dialog(w);
 
         var batches = [];

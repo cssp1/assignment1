@@ -20,7 +20,7 @@ goog.require('ShakeSynth');
 
 /** Some effects want to fire at specific client_times and others want
  to fire at specific combat ticks. This type encapsulates both cases.
- @constructor
+ @constructor @struct
  @param {number|null} time - compared against fxworld.time (client_time)
  @param {GameTypes.TickCount|null} tick - compared against current combat tick count
  @param {number|null=} tick_delay - additional real-time delay (seconds) AFTER tick is reached
@@ -64,7 +64,7 @@ SPFX.last_id = 0;
 /** @type {number} */
 SPFX.detail = 1;
 
-/** @constructor
+/** @constructor @struct
     @param {number} gravity
     @param {number} ground_plane */
 SPFX.FXWorld = function(gravity, ground_plane) {
@@ -303,7 +303,7 @@ SPFX.FXWorld.prototype.shake_camera = function(when, amplitude, falloff) {
     this.shake_impulses.push({when:when, amplitude: gamedata['client']['camera_shake_scale']*amplitude, falloff:falloff, started_at: -1});
 };
 
-/** @constructor */
+/** @constructor @struct */
 SPFX.FXObject = function() {
     /** @type {string} */
     this.id = (SPFX.last_id++).toString();
@@ -317,7 +317,7 @@ SPFX.FXObject.prototype.reposition = function(xyz, rotation) {};
     @param {!SPFX.FXWorld} fxworld */
 SPFX.FXObject.prototype.dispose = function(fxworld) {};
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.FXObject
     @param {?string=} charge */
 SPFX.Field = function(charge) {
@@ -332,7 +332,7 @@ goog.inherits(SPFX.Field, SPFX.FXObject);
 SPFX.Field.prototype.eval_field = goog.abstractMethod;
 
 // MagnetField
-/** @constructor
+/** @constructor @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -368,7 +368,7 @@ SPFX.MagnetField.prototype.reposition = function(xyz, rotation) {
     this.pos = xyz;
 };
 
-/** @constructor
+/** @constructor @struct
     @param {!Array.<number>} pos
     @param {!Object} data
     @param {Object|null|undefined} instance_data
@@ -390,7 +390,7 @@ SPFX.DragField.prototype.eval_field = function(pos, vel) {
 
 // Effect
 
-/** @constructor
+/** @constructor @struct
     @param {Object|null=} data
     @extends SPFX.FXObject */
 SPFX.Effect = function(data) {
@@ -404,7 +404,7 @@ goog.inherits(SPFX.Effect, SPFX.FXObject);
 SPFX.Effect.prototype.draw = function(fxworld) {};
 
 // CoverScreen
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {string} color_str
 */
@@ -421,7 +421,7 @@ SPFX.CoverScreen.prototype.draw = function() {
     SPFX.ctx.restore();
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends SPFX.Effect
   * @param {Array.<SPFX.FXObject>=} effects */
 SPFX.CombineEffect = function(effects) {
@@ -457,7 +457,7 @@ SPFX.CombineEffect.prototype.dispose = function(fxworld) {
 
 // Particle system
 
-/** @constructor
+/** @constructor @struct
   * @extends SPFX.Effect
   * @param {!SPFX.FXWorld} fxworld
   * @param {Array.<number>|null} spawn_pos
@@ -836,7 +836,7 @@ SPFX.Particles.prototype.run_physics = function(fxworld, dt) {
 
 // TimeProjectile
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} from
@@ -1045,7 +1045,7 @@ SPFX.TimeProjectile.prototype.draw = function(fxworld) {
 
 // TicksProjectile
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} from
@@ -1333,7 +1333,7 @@ SPFX.cue_tracker = {};
     same sound effect (helps with swarm firing and bad browsers) */
 SPFX.sound_throttle = 0.3;
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!Object} data
     @param {!SPFX.When} when
@@ -1412,7 +1412,7 @@ SPFX.get_vec_parameter = function(param) {
     }
 };
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!SPFX.FXWorld} fxworld
     @param {!Array.<number>} where
@@ -1610,7 +1610,7 @@ SPFX.Explosion.prototype.draw = function(fxworld) {
 
 // Debris
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!Array.<number>} where
     @param {string} assetname
@@ -1637,7 +1637,7 @@ SPFX.Debris.prototype.draw = function() {
 
 // Blinking arrow to indicate units that are off-screen
 
-/** @constructor
+/** @constructor @struct
   * @extends SPFX.Effect
   */
 SPFX.OffscreenArrow = function() {
@@ -1730,7 +1730,7 @@ SPFX.OffscreenArrow.prototype.draw = function(fxworld) {
 
 // Scrolling Combat Text
 
-/** @constructor
+/** @constructor @struct
  @extends SPFX.Effect
  @param {!Array.<number>} where
  @param {number} altitude
@@ -1813,7 +1813,7 @@ SPFX.CombatText.prototype.draw = function(fxworld) {
 };
 
 /** Unit movement/attack feedback
-    @constructor
+    @constructor @struct
     @extends SPFX.Effect
     @param {!Array.<number>} col
     @param {!SPFX.When} when
@@ -1847,7 +1847,7 @@ SPFX.FeedbackEffect.prototype.draw = function(fxworld) {
     this.do_draw(fxworld);
 };
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.FeedbackEffect
     @param {!Array.<number>} pos
     @param {!Array.<number>} col
@@ -1877,7 +1877,7 @@ SPFX.ClickFeedback.prototype.do_draw = function(fxworld) {
     SPFX.ctx.restore();
 };
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!Array.<number>} where (2D)
     @param {number} altitude
@@ -1951,7 +1951,7 @@ SPFX.Shockwave.prototype.draw = function(fxworld) {
 };
 
 
-/** @constructor
+/** @constructor @struct
     @extends SPFX.Effect
     @param {!Array.<number>} pos
     @param {number} altitude

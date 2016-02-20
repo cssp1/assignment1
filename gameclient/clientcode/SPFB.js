@@ -190,7 +190,7 @@ SPFB.versioned_graph_endpoint = function(feature, path) {
 SPFB.likes_cache = {};
 SPFB.on_likes_cache_update = null;
 
-/** @constructor */
+/** @constructor @struct */
 SPFB.CachedLike = function(id) {
     this.id = id;
     this.state = 'unknown';

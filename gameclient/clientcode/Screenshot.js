@@ -19,8 +19,7 @@ Screenshot.blacklisted = false;
 /** @return {boolean} */
 Screenshot.supported = function() { return !Screenshot.blacklisted && (typeof Blob !== 'undefined'); };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {string} text */
 Screenshot.Watermark = function(text) {
     this.text = text;

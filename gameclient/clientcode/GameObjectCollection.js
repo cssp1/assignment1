@@ -14,7 +14,7 @@ goog.require('GameTypes');
     We manually set ids of deleted objects to -1 so that any other reference-holders can know that the
     object isn't valid anymore.
 
-    @constructor */
+    @constructor @struct */
 GameObjectCollection.GameObjectCollection = function() {
     /** @type {!Object<!GameObjectId, !GameObject>} */
     this.objects = {};

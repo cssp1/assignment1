@@ -26,8 +26,7 @@ SPUI.MouseButton = { // these match the HTML5 event button codes
     RIGHT: 2
 };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {SPUI.MouseButton=} init */
 SPUI.MouseButtonState = function(init) {
     /** @private */
@@ -54,7 +53,7 @@ SPUI.MouseButtonState.prototype.copy = function() {
 // SPUI.Font - a font of a particular size and style
 
 // do not call directly - use SPUI.make_font() instead
-/** @constructor */
+/** @constructor @struct */
 SPUI.Font = function(size, leading, style) {
     // vertical height of text font, in pixels
     this.size = size;
@@ -161,7 +160,7 @@ SPUI.on_resize = function(new_width, new_height) {
 };
 
 // range is 0-1, linear light
-/** @constructor
+/** @constructor @struct
  * @param {number} r
  * @param {number} g
  * @param {number} b
@@ -213,7 +212,7 @@ SPUI.modal_bg_color = new SPUI.Color(0,0,0,0.5);
 // Element
 // base class for all SPUI widgets
 
-/** @constructor */
+/** @constructor - XXX not ready for struct */
 SPUI.Element = function() {
     /** @type {?SPUI.Element} */
     this.parent = null;
@@ -258,7 +257,7 @@ SPUI.Element.prototype.is_frontmost = function() { return false; };
 // Container
 // an Element that contains child Elements
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.Element
   */
 SPUI.Container = function() {
@@ -546,7 +545,7 @@ SPUI.draw_active_tooltip = function() {
 
 // VLayout
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.Container
   */
 SPUI.VLayout = function() {
@@ -576,7 +575,7 @@ SPUI.VLayout.prototype.reflow = function() {
 
 // Text
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.Element
   * @param {null|string|function(): string} str can be either literal or a function
   * @param {Object=} props
@@ -635,7 +634,7 @@ SPUI.Text.prototype.reflow = function() {
 
 // ErrorLog
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.VLayout
   */
 SPUI.ErrorLog = function(maxlines) {
@@ -761,7 +760,7 @@ SPUI.get_array_widget_name = function(array_name, array_dims, xy) {
 // 'data': pass the member of gamedata['dialogs'] for the dialog you want to create
 // e.g. gamedata['dialogs']['upgrade_dialog']
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.Container
   * @param {Object} data reference to gamedata['dialogs']
   * @param {Object=} instance_props override data with per-instance key/vals
@@ -1160,7 +1159,7 @@ SPUI.Dialog.prototype.apply_layout = function() {
 };
 
 // parent class for all Dialog widgets
-/** @constructor
+/** @constructor - XXX not ready for struct
   * @extends SPUI.Element
   */
 SPUI.DialogWidget = function(data) {
@@ -1206,7 +1205,7 @@ SPUI.DialogWidget.prototype.draw = function(offset) {
     if(this.on_after > 0 && SPUI.time < this.start_time + this.on_after) { return false; }
     if(this.ondraw) { this.ondraw(this); }
     if(SPUI.time >= this.start_time && this.sound && !this.sound_played) {
-        GameArt.assets[this.sound].states['normal'].audio.play(SPUI.time);
+        GameArt.play_canned_sound(this.sound);
         this.sound_played = true;
     }
 
@@ -1240,7 +1239,7 @@ SPUI.DialogWidget.prototype.fx_time_remaining = function() {
 // TextWidget
 // common parent class for text-based widgets
 
-/** @constructor
+/** @constructor - XXX not ready for struct
   * @extends SPUI.DialogWidget
   */
 SPUI.TextWidget = function(data) {
@@ -1516,7 +1515,7 @@ SPUI.TextWidget.prototype.set_text_with_linebreaking_and_shrink_font_to_fit = fu
 
 // TextField
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.TextWidget
   */
 SPUI.TextField = function(data) {
@@ -1578,7 +1577,7 @@ SPUI.TextField.prototype.on_mousemove = function(uv, offset) {
 };
 
 // EXPERIMENTAL new BBCode rich-text field
-/** @constructor
+/** @constructor - XXX not ready for struct
   * @extends SPUI.DialogWidget
   */
 SPUI.RichTextField = function(data) {
@@ -1782,7 +1781,7 @@ SPUI.active_tooltip = null;
 SPUI.tooltip_bg_color = new SPUI.Color(0,0,0,0.66);
 SPUI.tooltip_outline_color = new SPUI.Color(1,1,1,1); // new SPUI.Color(0.5,0.15,0,1);
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.TextWidget
   */
 SPUI.Tooltip = function(data, owner) {
@@ -1899,7 +1898,7 @@ SPUI.Tooltip.prototype.draw = function(offset) {
 // ActionButton: a button that does something when clicked
 // (only draws a text string, the button itself is part of the dialog's background image)
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.TextWidget
   */
 SPUI.ActionButton = function(data) {
@@ -2016,23 +2015,23 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
         if(!art_asset || !(draw_state in art_asset.states)) {
             throw Error('undefined art asset "'+this.bg_image+'" state "'+draw_state+'" in '+this.get_address());
         }
+        var draw_sprite = /** @type {!GameArt.Sprite} */ (art_asset.states[draw_state]);
 
-        if(this.pushed && ('pushed' in art_asset.states || art_asset.states[draw_state].on_push)) {
+        if(this.pushed && ('pushed' in art_asset.states || draw_sprite.on_push)) {
             // switch to 'pushed' state during mouse push, unless disabled
-            if(this.state === 'normal' || this.state === 'active' || (this.state !== 'disabled' && art_asset.states[draw_state].on_push)) {
-                draw_state = art_asset.states[draw_state].on_push || 'pushed';
+            if(this.state === 'normal' || this.state === 'active' || (this.state !== 'disabled' && draw_sprite.on_push)) {
+                draw_state = draw_sprite.on_push || 'pushed';
             }
-        } else if(this.mouse_enter_time != -1 && ('highlight' in art_asset.states || art_asset.states[draw_state].on_mouseover)) {
+        } else if(this.mouse_enter_time != -1 && ('highlight' in art_asset.states || draw_sprite.on_mouseover)) {
             // switch to 'highlight' state during mouse-over, unless the button is disabled
-            if((this.state === 'normal') || (this.state !== 'disabled' && art_asset.states[draw_state].on_mouseover)) {
-                draw_state = art_asset.states[draw_state].on_mouseover || 'highlight';
+            if((this.state === 'normal') || (this.state !== 'disabled' && draw_sprite.on_mouseover)) {
+                draw_state = draw_sprite.on_mouseover || 'highlight';
             }
         }
 
-        var art_state = art_asset.states[draw_state];
+        var art_state = /** @type {!GameArt.Sprite} */ (art_asset.states[draw_state]);
         if(!art_state) {
             throw Error('undefined state "'+draw_state+'" for art asset "'+this.bg_image+'"');
-
         }
 
         var temp = this.text_color; // save text color so we can replace it later
@@ -2158,7 +2157,7 @@ SPUI.ActionButton.prototype.on_mouseup = function(uv, offset, button) {
         if(this.state === 'disabled') { return true; }
         if(this.onclick) {
             if(this.bg_image) {
-                var art_state = GameArt.assets[this.bg_image].states[this.state];
+                var art_state = /** @type {!GameArt.Sprite} */ (GameArt.assets[this.bg_image].states[this.state]);
                 if(art_state.audio) {
                     art_state.audio.play(SPUI.time);
                 }
@@ -2188,7 +2187,7 @@ SPUI.ActionButton.prototype.on_mousemove = function(uv, offset) {
             this.mouse_enter_time = SPUI.time;
 
             if(this.mouseover_sound && this.state != 'disabled' && 'mouseover_button_sound' in GameArt.assets) {
-                GameArt.assets['mouseover_button_sound'].states['normal'].audio.play(SPUI.time);
+                GameArt.play_canned_sound('mouseover_button_sound');
             }
 
             if(this.onenter) { this.onenter(this); }
@@ -2220,7 +2219,7 @@ SPUI.ActionButton.prototype.get_dripper = function() {
 
 // StaticImage
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.StaticImage = function(data) {
@@ -2429,12 +2428,13 @@ SPUI.StaticImage.prototype.on_mousedown = SPUI.StaticImage.prototype.on_mouseup;
 // FriendPortrait
 // this is JUST the 50x50 pixel avatar picture for an AI or human player
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.ActionButton
   */
 SPUI.FriendPortrait = function(data) {
     goog.base(this, data);
     this.user_id = null;
+    this.use_map_portrait = false;
 
     // filled in asynchronously
     // if displayed_user_id == this.user_id, then we are ready to draw
@@ -2567,7 +2567,7 @@ SPUI.FriendPortrait.prototype.do_draw = function(offset) {
 // FriendIcon
 // this is a FriendPortrait PLUS a (short) name and level display on top
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.ActionButton
   */
 SPUI.FriendIcon = function(data) {
@@ -2664,7 +2664,7 @@ SPUI.FriendIcon.prototype.do_draw = function(offset) {
         } else {
             text_state = 'normal';
         }
-        var col = GameArt.assets['friend_frame'].states[text_state].text_color;
+        var col = /** @type {!GameArt.Sprite} */ (GameArt.assets['friend_frame'].states[text_state]).text_color;
         this.name.text_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
         this.name.draw(offset);
         this.level.draw(offset);
@@ -2678,7 +2678,7 @@ SPUI.FriendIcon.prototype.on_mouseup = function(uv, offset, button) {
 };
 
 // SolidRect
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.SolidRect = function(data) {
@@ -2807,7 +2807,7 @@ SPUI.SolidRect.prototype.on_mouseup = SPUI.SolidRect.prototype.on_mousedown;
 SPUI.SolidRect.prototype.on_mousemove = SPUI.SolidRect.prototype.on_mousedown;
 
 // Line
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.Line = function(data) {
@@ -2830,7 +2830,7 @@ SPUI.Line.prototype.do_draw = function(offset) {
 };
 
 // ProgressBar
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.ProgressBar = function(data) {
@@ -2948,7 +2948,7 @@ SPUI.ProgressBar.prototype.on_mouseup = function(uv, offset, button) {
 };
 
 // TextInput
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.ActionButton
   */
 SPUI.TextInput = function(data) {
@@ -3120,7 +3120,7 @@ SPUI.set_keyboard_focus = function(newfocus) {
 // vertically scrollable text field
 // uses a queue (optionally of limited length) to hold lines of text
 
-/** @constructor */
+/** @constructor @struct */
 SPUI.TextNode = function() {
     /** @type {Array.<SPText.ABlock>|null} */
     this.text = null;
@@ -3134,7 +3134,7 @@ SPUI.TextNode.prototype.destroy = function() {
     this.text = this.on_destroy = this.user_data = null;
 };
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.ScrollingTextField = function(data) {
@@ -3164,6 +3164,8 @@ SPUI.ScrollingTextField = function(data) {
     this.text_offset = data['text_offset'] || [0,0];
     this.alpha = ('alpha' in data ? data['alpha'] : 1);
     this.clip_to = data['clip_to'] || null;
+
+    this.state = 'normal';
 
     /** Holds all the text
         @type {!Array<!SPUI.TextNode>}
@@ -3552,7 +3554,7 @@ SPUI.ScrollingTextField.prototype.getmore_responded = function(is_final) {
 
 // SpellIcon (obsolete, this has been replaced by inventory slot/item/stack/frame plus CooldownClock)
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.ActionButton
   */
 SPUI.SpellIcon = function(data) {
@@ -3562,18 +3564,14 @@ SPUI.SpellIcon = function(data) {
     this.glow_inner = GameArt.assets['spell_icon_glow_inner'].states['normal'];
     this.glow_outer = null; // GameArt.assets['spell_icon_glow_outer'].states['normal'];
 
+    this.activated = 0;
+    this.cooldown = 0;
     this.unit = 1234;
+    this.spell_name = '';
     this.spell = 1234; // not null so set_spell() initializes
     this.pushed_key = false;
+    this.icon = null;
 
-    /*
-
-    this.name = new SPUI.TextField({'xy':data['xy'], 'dimensions':[friend_frame.wh[0], 21],
-                                    'text_size': 11});
-    this.level = new SPUI.TextField({'xy':[data['xy'][0]+3, data['xy'][1]+55],
-                                     'dimensions':[28,15], 'text_size':13, 'text_style': 'bold',
-                                     'text_color':[1,1,1,1]});
-    */
     this.set_spell(null, null, null);
 };
 goog.inherits(SPUI.SpellIcon, SPUI.ActionButton);
@@ -3589,7 +3587,6 @@ SPUI.SpellIcon.prototype.set_spell = function(unit, spell_name, spell) {
     } else {
         this.icon = GameArt.assets[spell['icon']].states['normal'];
     }
-    //this.name.str = short_name;
 };
 
 SPUI.SpellIcon.prototype.do_draw = function(offset) {
@@ -3716,7 +3713,7 @@ SPUI.SpellIcon.prototype.on_mouseup = function(uv, offset, button) {
 
 // CooldownClock
 
-/** @constructor
+/** @constructor @struct
   * @extends SPUI.DialogWidget
   */
 SPUI.CooldownClock = function(data) {

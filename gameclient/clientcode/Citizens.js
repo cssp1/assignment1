@@ -27,7 +27,7 @@ goog.require('goog.array');
 goog.require('goog.object');
 
 /** State for one displayed citizen
-    @constructor
+    @constructor @struct
     @param {Citizens.Context} context
     @param {string} obj_id
     @param {GameData.UnitSpec} spec
@@ -172,7 +172,7 @@ Citizens.Citizen.prototype.get_random_pos_from = function(src) {
 // CITIZEN CONTEXT
 //
 
-/** @constructor
+/** @constructor @struct
     @param {Base.Base} base is the session.viewing_base
     @param {AStar.CachedAStarContext} astar_context is the map for pathfinding
     @param {!SPFX.FXWorld} fxworld in which to put the phantom units */
@@ -186,7 +186,7 @@ Citizens.Context = function(base, astar_context, fxworld) {
 };
 
 /** Just a data structure for passing input to Context.update()
-    @constructor
+    @constructor @struct
     @param {string} obj_id
     @param {string} specname
     @param {number} level

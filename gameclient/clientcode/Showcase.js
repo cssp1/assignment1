@@ -270,10 +270,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         'sku': { 'onclick': function (path) { return (function (_path) { return function() {
             invoke_store('exact_path', _path);
             // play sound effect
-            if(1) {
-                var state = GameArt.assets['action_button_134px'].states['normal'];
-                if(state.audio) { state.audio.play(client_time); }
-            }
+            GameArt.play_canned_sound('action_button_134px');
         }; })(path); } }
     };
 

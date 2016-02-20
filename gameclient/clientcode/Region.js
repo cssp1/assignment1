@@ -10,7 +10,7 @@ goog.provide('Region');
     References a lot of stuff from main.js :(
 */
 
-/** @constructor */
+/** @constructor @struct */
 Region.Region = function(data) {
     this.data = data;
     this.dirty = true;

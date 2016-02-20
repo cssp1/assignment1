@@ -17,8 +17,7 @@ goog.require('goog.events');
 // client network capabilities probe
 SProbe.TestState = {INIT:0, PENDING:1, DONE:2};
 
-/** @constructor
-    @struct */
+/** @constructor @struct */
 SProbe.Test = function() {
     this.state = SProbe.TestState.INIT;
     this.result = null;
@@ -28,8 +27,7 @@ SProbe.Test.prototype.listen = function(cb) {
     goog.events.listen(this.target, 'done', cb);
 };
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends SProbe.Test */
 SProbe.GraphicsTest = function(framerate, canvas_width, canvas_height, canvas_oversample, devicePixelRatio) {
     // doesn't really probe anything, just reports the numbers given
@@ -40,8 +38,7 @@ SProbe.GraphicsTest = function(framerate, canvas_width, canvas_height, canvas_ov
 };
 goog.inherits(SProbe.GraphicsTest, SProbe.Test);
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends SProbe.Test */
 SProbe.ConnectionTest = function() {
     // doesn't really probe anything, just reports the session connection method used
@@ -51,8 +48,7 @@ SProbe.ConnectionTest = function() {
 };
 goog.inherits(SProbe.ConnectionTest, SProbe.Test);
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends SProbe.Test*/
 SProbe.AJAXPing = function(url, args) {
     goog.base(this);
@@ -109,8 +105,7 @@ SProbe.AJAXPing.prototype.response = function(event) {
 };
 
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends SProbe.Test*/
 SProbe.WSPing = function(url) {
     goog.base(this);
@@ -186,8 +181,7 @@ SProbe.WSPing.prototype.response = function() {
 };
 
 
-/** @constructor
-    @struct */
+/** @constructor @struct */
 SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
                            game_host, game_http_port, game_ssl_port, game_ws_port, game_wss_port,
                            framerate, canvas_width, canvas_height, canvas_oversample, devicePixelRatio) {

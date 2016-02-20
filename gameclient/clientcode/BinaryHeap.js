@@ -12,8 +12,7 @@ BinaryHeap.Element = function() {};
     Inline .heapscore property. This is stored inside the object because it is critical to performance. */
 BinaryHeap.Element.prototype.heapscore;
 
-/** @constructor
-    @struct */
+/** @constructor @struct */
 BinaryHeap.BinaryHeap = function() {
     /** @type {!Array.<!BinaryHeap.Element>} */
     this.content = [];

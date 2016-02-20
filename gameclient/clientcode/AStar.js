@@ -91,8 +91,7 @@ AStar.BlockChecker;
  * @typedef {function(!AStar.AStarCell, !Array.<!Array.<number>>): !AStar.PassStatus | null} */
 AStar.PathChecker;
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @implements {BinaryHeap.Element}
     @param {!Array.<number>} pos
 */
@@ -152,8 +151,7 @@ AStar.AStarCell.prototype.get = function(serial) {
 
 // 2D MAP - 2D GRID OF CELLS AND BLOCKAGE INFO
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {!Array.<number>} size [x,y] size
     @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
 AStar.AStarMap = function (size, terrain_func) {
@@ -281,8 +279,7 @@ AStar.AStarMap.prototype.for_each_cell = function(func) {
 
 // RECTANGULAR MAP
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends AStar.AStarMap
     @param {!Array.<number>} size [x,y] size
     @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location
@@ -613,8 +610,7 @@ AStar.AStarRectMap.prototype.smooth_path = function(path) {
 
 // HEX MAP
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @extends AStar.AStarMap
     @param {!Array.<number>} size
     @param {function(!Array.<number>): boolean|null} terrain_func optional, return true if terrain is blocked at this location */
@@ -695,8 +691,7 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 // "region numbers" for two cells are the same if and only if there
 // is an unblocked path between them. Blocked cells get "region number" -1.
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {AStar.AStarMap} map */
 AStar.Connectivity = function(map) {
     if(!(map instanceof AStar.AStarRectMap)) { throw Error('Connectivity only implemented for RectMap'); }
@@ -789,8 +784,7 @@ AStar.Connectivity.prototype.debug_draw = function(ctx) {
                use_connectivity:(boolean|undefined)}} */
 AStar.AStarContextOptions;
 
-/** @constructor
-    @struct
+/** @constructor @struct
     @param {AStar.AStarMap} map
     @param {AStar.AStarContextOptions} options */
 AStar.AStarContext = function(map, options) {
@@ -1016,8 +1010,7 @@ AStar.AStarContext.prototype.search = function(start_pos, end_pos, path_checker)
 };
 
 /** Cached wrapper for AStarContext that memoizes previous queries and optionally caches connectivity.
-    @constructor
-    @struct
+    @constructor @struct
     @extends AStar.AStarContext
     @param {AStar.AStarMap} map
     @param {AStar.AStarContextOptions} options

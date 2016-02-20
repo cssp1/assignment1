@@ -6,8 +6,7 @@ goog.provide('TeamMapAccelerator');
 
 // Very simple acceleration data structure for map queries that just groups objects by team.
 
-/** @constructor
-    @struct */
+/** @constructor @struct */
 TeamMapAccelerator.TeamMapAccelerator = function() {
     /** @type {!Object.<!TeamId, !Array.<!GameObject>>} */
     this.teams = {'ALL':[]}; // list of objects by team, with 'ALL' as well
