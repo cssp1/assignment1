@@ -21,8 +21,9 @@ goog.require('WallManager');
     @constructor
     @param {Base.Base|null} base
     @param {GameObjectCollection.GameObjectCollection|null} objects
+    @param {boolean} enable_citizens
 */
-World.World = function(base, objects) {
+World.World = function(base, objects, enable_citizens) {
     /** @type {Base.Base|null} */
     this.base = base;
 
@@ -64,12 +65,25 @@ World.World = function(base, objects) {
     /** @type {number} client_time at which last unit simulation tick was run */
     this.last_tick_time = 0;
 
-    /** @type {Citizens.Context|null} */
-    this.citizens = null; // army units walking around the base
+    /** @type {SPFX.FXWorld|null} special effects world, with physics properties */
+    this.fxworld = (base ? new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
+                                            (('ground_plane' in base.base_climate_data) ? base.base_climate_data['ground_plane'] : 0))
+                    : null);
+
+
+    /** @type {Citizens.Context|null} army units walking around the base */
+    this.citizens = null;
     this.citizens_dirty = false;
+    if(enable_citizens && this.fxworld) {
+        this.citizens = new Citizens.Context(base, this.astar_context, this.fxworld);
+        this.lazy_update_citizens();
+    }
 };
 
 World.World.prototype.dispose = function() {
+    if(this.fxworld) {
+        this.fxworld.clear();
+    }
     if(this.citizens) {
         this.citizens.dispose();
         this.citizens = null;
@@ -326,10 +340,10 @@ World.World.prototype.run_unit_ticks = function() {
 
         // run phantom unit controllers
         tick_astar_queries_left = -1; // should not disturb actual unit control
-        goog.array.forEach(SPFX.get_phantom_objects(this), function(obj) {
+        goog.array.forEach(this.fxworld.get_phantom_objects(this), function(obj) {
             obj.run_control();
             obj.update_facing();
-        });
+        }, this);
 
         apply_queued_damage_effects();
         flush_dirty_objects({urgent_only:true, skip_check:true});
@@ -343,4 +357,16 @@ World.World.prototype.serialize = function() {
             'combat_engine': this.combat_engine.serialize(),
             'objects': this.objects.serialize()
            };
+};
+
+World.World.prototype.persist_debris = function() {
+    if(('show_debris' in this.base.base_climate_data) && !this.base.base_climate_data['show_debris']) { return; }
+    for(var id in this.fxworld.current_under) {
+        var effect = this.fxworld.current_under[id];
+        if(effect.user_data && effect.user_data['persist'] === 'debris') {
+            send_to_server.func(["CREATE_INERT", effect.user_data['spec'], effect.user_data['pos'], effect.user_data['metadata']]);
+            effect.user_data = null;
+            this.fxworld.remove(effect);
+        }
+    }
 };

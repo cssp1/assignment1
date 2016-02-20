@@ -35,7 +35,7 @@ OfferChoice.invoke_offer_choice = function(then_cb) {
         choice.widgets['glow'].reset_fx();
 
         if(gamedata['client']['vfx']['lottery_scan']) {
-            SPFX.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
+            session.get_draw_world().fxworld.add_visual_effect_at_time([0,0], 0, [0,1,0], client_time, gamedata['client']['vfx']['lottery_scan'], true, null);
         }
     };
 

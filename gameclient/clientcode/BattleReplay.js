@@ -37,6 +37,6 @@ BattleReplay.invoke = function(log) {
         }
     });
 
-    var world = new World.World(base, objects);
+    var world = new World.World(base, objects, false);
     session.push_world(world);
 };
