@@ -9749,7 +9749,7 @@ function log_exception(e, where) {
     }
 
     // show in JS console
-    var ui_tick = (session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick.get() : -1);
+    var ui_tick = (session.has_world() && session.get_real_world().combat_engine ? session.get_real_world().combat_engine.cur_tick.get() : -1);
     console.log('Exception thrown in '+where+' at tick '+ui_tick.toString()+':\n'+msg);
 
     if(player.is_developer()) {
@@ -43064,7 +43064,7 @@ function handle_server_message(data) {
     var msg = data[0];
 
     // presumably everything that happens in here affects the "real" world.
-    var world = session.get_real_world();
+    var world = (session.has_world() ? session.get_real_world() : null);
 
     if(msg == "SERVER_HELLO") {
         var server_gamedata_version = data[1];
@@ -43258,7 +43258,7 @@ function handle_server_message(data) {
         goog.array.forEach(data[1], function(state) {
             player.my_army[state['obj_id']] = state;
         });
-        world.lazy_update_citizens();
+        if(world) { world.lazy_update_citizens(); }
     } else if(msg == "PLAYER_ARMY_UPDATE_DESTROYED") {
         var obj_id = data[1];
         if(obj_id in player.my_army) { delete player.my_army[obj_id]; }
@@ -47447,9 +47447,9 @@ function do_draw() {
     ctx.lineWidth = 1;
     set_default_canvas_transform(ctx);
 
-    var world = (session.viewing_base ? session.get_draw_world() : null);
+    var world = (session.has_world() ? session.get_draw_world() : null);
     if(world) {
-        world.fxworld.set_time(client_time, (world.combat_engine ? world.combat_engine.cur_tick : new GameTypes.TickCount(0)));
+        world.fxworld.set_time(client_time, world.combat_engine.cur_tick);
     }
 
     if(client_state == client_states.UNABLE_TO_LOGIN || SPINPUNCHGAME.client_death_sent) { // TIMED_OUT gets handled below

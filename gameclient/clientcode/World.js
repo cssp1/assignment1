@@ -17,32 +17,32 @@ goog.require('GameObjectCollection');
 goog.require('WallManager');
 
 /** Encapsulates the renderable/simulatable "world"
-    XXXXXX remove non-base version and replace with a "blank" world type
     @constructor
-    @param {Base.Base|null} base
-    @param {GameObjectCollection.GameObjectCollection|null} objects
+    @struct
+    @param {!Base.Base} base
+    @param {!GameObjectCollection.GameObjectCollection} objects
     @param {boolean} enable_citizens
 */
 World.World = function(base, objects, enable_citizens) {
-    /** @type {Base.Base|null} */
+    /** @type {!Base.Base} */
     this.base = base;
 
-    /** @type {GameObjectCollection.GameObjectCollection|null} */
+    /** @type {!GameObjectCollection.GameObjectCollection} */
     this.objects = objects;
-    if(objects) { objects.for_each(function(obj) { obj.world = this; }, this); }
+    objects.for_each(function(obj) { obj.world = this; }, this);
 
-    /** @type {?AStar.AStarRectMap} current A* map for playfield movement queries */
-    this.astar_map = (base ? new AStar.AStarRectMap(base.ncells(), null, ('allow_diagonal_passage' in gamedata['map'] ? gamedata['map']['allow_diagonal_passage'] : true)) : null);
+    /** @type {!AStar.AStarRectMap} current A* map for playfield movement queries */
+    this.astar_map = new AStar.AStarRectMap(base.ncells(), null, ('allow_diagonal_passage' in gamedata['map'] ? gamedata['map']['allow_diagonal_passage'] : true));
 
-    /** @type {?AStar.CachedAStarContext} current A* context for playfield movement queries */
-    this.astar_context = (base ? new AStar.CachedAStarContext(this.astar_map,
-                                                              {heuristic_name:gamedata['client']['astar_heuristic'],
-                                                               iter_limit:gamedata['client']['astar_iter_limit'][is_ai_user_id_range(base.base_landlord_id) ? 'pve':'pvp'],
-                                                               use_connectivity:(!!gamedata['client']['astar_use_connectivity'])}) : null);
+    /** @type {!AStar.CachedAStarContext} current A* context for playfield movement queries */
+    this.astar_context = new AStar.CachedAStarContext(this.astar_map,
+                                                      {heuristic_name:gamedata['client']['astar_heuristic'],
+                                                       iter_limit:gamedata['client']['astar_iter_limit'][is_ai_user_id_range(base.base_landlord_id) ? 'pve':'pvp'],
+                                                       use_connectivity:(!!gamedata['client']['astar_use_connectivity'])});
 
     // note: astar_map is used for A* pathing and building placement queries ("is this cell blocked?")
     // combat-engine targeting queries ("list all objects near this point") are done using MapAccelerator
-    this.voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator((base ? base.ncells() : [0,0]), (base ? gamedata['client']['map_accel_chunk'] : 1));
+    this.voxel_map_accel = new VoxelMapAccelerator.VoxelMapAccelerator(base.ncells(), gamedata['client']['map_accel_chunk']);
     this.team_map_accel = new TeamMapAccelerator.TeamMapAccelerator();
 
     this.MAP_DEBUG = 0;
@@ -52,30 +52,26 @@ World.World = function(base, objects, enable_citizens) {
 
     /** @type {WallManager.WallManager|null} */
     this.wall_mgr = null;
-    if(base) { // note: gamedata is not available on first load
-        var wall_spec = gamedata['buildings']['barrier'];
-        if(wall_spec && (wall_spec['collide_as_wall'] || player.get_any_abtest_value('enable_wall_manager', gamedata['client']['enable_wall_manager']))) {
-            this.wall_mgr = new WallManager.WallManager(base.ncells(), wall_spec);
-        }
+    var wall_spec = gamedata['buildings']['barrier'];
+    if(wall_spec && (wall_spec['collide_as_wall'] || player.get_any_abtest_value('enable_wall_manager', gamedata['client']['enable_wall_manager']))) {
+        this.wall_mgr = new WallManager.WallManager(base.ncells(), wall_spec);
     }
 
-    /** @type {CombatEngine.CombatEngine|null} */
-    this.combat_engine = (base ? new CombatEngine.CombatEngine(this) : null);
+    /** @type {!CombatEngine.CombatEngine} */
+    this.combat_engine = new CombatEngine.CombatEngine(this);
 
     /** @type {number} client_time at which last unit simulation tick was run */
     this.last_tick_time = 0;
 
-    /** @type {SPFX.FXWorld|null} special effects world, with physics properties */
-    this.fxworld = (base ? new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
-                                            (('ground_plane' in base.base_climate_data) ? base.base_climate_data['ground_plane'] : 0))
-                    : null);
-
+    /** @type {!SPFX.FXWorld} special effects world, with physics properties */
+    this.fxworld = new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
+                                    (('ground_plane' in base.base_climate_data) ? base.base_climate_data['ground_plane'] : 0));
 
     /** @type {Citizens.Context|null} army units walking around the base */
     this.citizens = null;
     this.citizens_dirty = false;
-    if(enable_citizens && this.fxworld) {
-        this.citizens = new Citizens.Context(base, this.astar_context, this.fxworld);
+    if(enable_citizens) {
+        this.citizens = new Citizens.Context(this.base, this.astar_context, this.fxworld);
         this.lazy_update_citizens();
     }
 };

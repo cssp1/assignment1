@@ -21,7 +21,8 @@ goog.require('goog.array');
     However, currently this has a bunch of global state
     that should be refactored out into World and CombatEngine.
 
-    @constructor */
+    @constructor
+    @struct */
 Session.Session = function() {
     this.connect_time = -1; // set to client_time upon receiving first SERVER_HELLO message
     this.client_hello_packet = null; // keep our CLIENT_HELLO message in case we need to re-transmit it
@@ -69,6 +70,7 @@ Session.Session = function() {
     this.weak_zombie_warned = false; // whether or not we have already shown the "you are about to deploy a zombie unit" warning
     this.manufacture_overflow_warned = false; // whether we have already shown the "base defenders full, new units diverted to reserves" message
     this.buy_gamebucks_sku_highlight_shown = false; // whether we have already shown the SKU highlight upon Buy Gamebucks dialog open
+    this.is_alt_account = false; // whether we are viewing a base owned by a known alt account
     this.quarry_harvest_sync_marker = Synchronizer.INIT; // synchronizer used for showing Loading... while harvesting quarries
     this.deployable_squads = [];
     this.defending_squads = [];
@@ -98,10 +100,9 @@ Session.Session = function() {
     /** @type {!Array<!World.World>}
         Bottom-most element is the "real" world, replays push a "virtual" world on top */
     this.world_stack = [];
-    this.set_viewing_base(null, false);
 };
 
-/** @param {Base.Base|null} new_base
+/** @param {!Base.Base} new_base
     @param {boolean} enable_citizens */
 Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens) {
     this.viewing_base = new_base;
@@ -124,6 +125,10 @@ Session.Session.prototype.get_real_world = function() {
     if(this.world_stack.length < 1) { throw Error('no world'); }
     return this.world_stack[0];
 };
+
+/** @return {boolean}
+    @const */
+Session.Session.prototype.has_world = function() { return (this.world_stack.length >= 1); };
 
 Session.Session.prototype.incoming_attack_pending = function() { return (this.incoming_attack_time > server_time); };
 Session.Session.prototype.connected = function() { return this.connect_time > 0; };
