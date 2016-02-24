@@ -208,7 +208,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
     // show manufacture-queued units in base defenders, after all other units
     if((!player.squads_enabled() || !gamedata['produce_to_reserves']) && (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS)) {
-        goog.object.forEach(session.cur_objects.objects, function(obj) {
+        session.for_each_real_object(function(obj) {
             if(obj.team === 'player' && obj.is_building() && obj.is_manufacturer()) {
                 goog.array.forEach(obj.manuf_queue, function(item) {
                     squad_units.push({'obj_id':'IN_PRODUCTION', 'pending':1, 'in_manuf_queue':1,

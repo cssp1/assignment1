@@ -36,13 +36,16 @@ Backdrop.draw_scenery = function(base, cur_objects) {
     var obj_list = [];
     cur_objects.for_each(function(obj) {
         if(obj.spec['is_scenery'] && obj.spec['draw_flat'] && (SPFX.detail >= 0 || obj.spec['is_debris'])) {
-            obj.update_draw_pos();
+            // would rather not have to pass World here - using null means scenery objects can't move
+            obj.update_draw_pos(null);
             obj_list.push(obj);
         }
     });
     // do some Z-sorting
     obj_list.sort(sort_scene_objects);
-    goog.array.forEach(obj_list, function(obj) { draw_building_or_inert(obj,1); });
+
+    // would rather not have to pass World here - using null means scenery objects can't have permanent effects
+    goog.array.forEach(obj_list, function(obj) { draw_building_or_inert(null,obj,1); });
 
     // draw building bases
     if(SPFX.detail >= 2) {
@@ -53,7 +56,7 @@ Backdrop.draw_scenery = function(base, cur_objects) {
                 if(obj.is_building()) {
                     var key = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
                     if(key in climate_data['building_bases']) {
-                        obj.update_draw_pos();
+                        obj.update_draw_pos(null);
                         base_list.push(obj);
                     }
                 }

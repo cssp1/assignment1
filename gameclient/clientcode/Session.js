@@ -32,7 +32,7 @@ Session.Session = function() {
     this.alliance_id = -1; // player's current alliance ID, <= 0 is invalid
     this.alliance_membership = null; // player's current alliance membership info (alliance_members row), null for no membership
     this.region = null; // world map region we are connected to
-    this.cur_objects = new GameObjectCollection.GameObjectCollection(); // XXXXXX use references to world instead
+
     this.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only
     this.minefield_tags_by_tag = {}; // mapping from tag to obj_id
     this.factory_tags_by_obj_id = {}; // GUI purposes only - identify unique factories (same as minefield tags above)
@@ -107,7 +107,12 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
     this.viewing_base = new_base;
     // reinitialize world stack
     goog.array.forEach(this.world_stack, function(world) { world.dispose(); });
-    this.world_stack = [new World.World(this.viewing_base, this.cur_objects, enable_citizens)];
+    this.world_stack = [new World.World(this.viewing_base, [], enable_citizens)];
+
+    this.minefield_tags_by_obj_id = {};
+    this.minefield_tags_by_tag = {};
+    this.factory_tags_by_obj_id = {};
+    this.factory_tags_by_tag = {};
 };
 /** @param {!World.World} new_world */
 Session.Session.prototype.push_world = function(new_world) { return this.world_stack.push(new_world); };
@@ -253,25 +258,24 @@ Session.Session.prototype.get_weakest_pre_deploy_unit = function(specname) {
 };
 
 Session.Session.prototype.quarry_victory_satisfied = function() {
-    for(var id in this.cur_objects.objects) {
-        var obj = this.cur_objects.objects[id];
+    var survivors = this.for_each_real_object(function(obj) {
         if(obj.team === 'enemy') {
             if(obj.is_building() && !obj.is_destroyed() && obj.spec['history_category'] == 'turrets') {
-                return false;
+                return true;
             }
             if(obj.is_mobile() && !obj.is_destroyed()) {
-                return false;
+                return true;
             }
         }
-    }
-    return true;
+        return false;
+    }, this);
+    return !survivors;
 };
 
 // add new object to session (implicitly, to the real world)
-Session.Session.prototype.add_object = function(obj) {
+Session.Session.prototype.add_session_object = function(obj) {
     var world = this.get_real_world();
-    world.objects.add_object(obj);
-    obj.world = world;
+    world.add_world_object(obj);
 
     // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
     if(this.home_base && this.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {
@@ -303,10 +307,9 @@ Session.Session.prototype.add_object = function(obj) {
 };
 
 Session.Session.prototype.clear_building_idle_state_caches = function() {
-    for(var id in this.cur_objects.objects) {
-        var obj = this.cur_objects.objects[id];
+    this.for_each_real_object(function(obj) {
         if(obj.is_building()) { obj.idle_state_cache = null; }
-    }
+    }, this);
 };
 
 // flag the session so that, after the server catches up, we'll check for battle end at next opportunity
@@ -376,4 +379,22 @@ Session.Session.prototype.persist_debris = function() {
     if(this.has_deployed) {
         this.get_real_world().persist_debris();
     }
+};
+
+Session.Session.prototype.apply_queued_damage = function() {
+    var world = this.get_real_world();
+    var any_left = world.combat_engine.apply_queued_damage_effects(world, COMBAT_ENGINE_USE_TICKS);
+    if(!any_left && this.no_more_units) {
+        this.no_more_units = false;
+        this.set_battle_outcome_dirty();
+    }
+};
+
+/** @param {function(this: T, !GameObject, !GameObjectId=) : (R|null|undefined)} func
+    @param {T=} opt_obj
+    @return {R|null|undefined}
+    @suppress {reportUnknownTypes}
+    @template T, R */
+Session.Session.prototype.for_each_real_object = function(func, opt_obj) {
+    return this.get_real_world().objects.for_each(func, opt_obj);
 };

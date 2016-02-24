@@ -105,7 +105,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     if(kind == 'building') {
         spec = gamedata['buildings'][specname];
         dialog.widgets['upgrade_button'].onclick = (function (_obj_id) { return function(w) {
-            invoke_upgrade_building_dialog(session.cur_objects.get_object(_obj_id));
+            invoke_upgrade_building_dialog(session.get_real_world().objects.get_object(_obj_id));
         }; })(obj_id);
     } else if(kind == 'tech') {
         spec = gamedata['tech'][specname];
@@ -213,7 +213,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
     var click_handlers = {
         'building': {'onclick': (function (_obj_id) { return function(specname) { return function(w, mloc) {
             // if it's the same type as the object upon which the upgrade bar was invoked, prefer selecting that one
-            var sel_obj = session.cur_objects.get_object(_obj_id);
+            var sel_obj = session.get_real_world().objects.get_object(_obj_id);
             if(!sel_obj || sel_obj.spec['name'] != specname) {
                 sel_obj = find_object_by_type(specname);
             }

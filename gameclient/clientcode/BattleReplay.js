@@ -9,7 +9,6 @@ goog.provide('BattleReplay');
 */
 
 goog.require('Base');
-goog.require('GameObjectCollection');
 goog.require('Session');
 
 BattleReplay.invoke = function(log) {
@@ -21,19 +20,19 @@ BattleReplay.invoke = function(log) {
     var props_3820 = log[0];
 
     var base = new Base.Base(props_3820['base_id'], props_3820['base']);
-    var objects = new GameObjectCollection.GameObjectCollection();
+    var objects = [];
     goog.array.forEach(props_3820['base_objects'], function(state) {
         var obj = create_object(state, false);
-        objects.add_object(obj);
+        objects.push(obj);
     });
 
     // 3900_unit_exists always comes in one big block
     goog.array.forEach(log, function(event) {
         if(event['event_name'] === '3900_unit_exists') {
-            if(objects.has_object(event['obj_id'])) { return; } // already in base
+            if(goog.array.find(objects, function(x) { return x.id === event['obj_id']; }) !== null) { return; } // already in object list
             if(!('state' in event)) { throw Error('incompatible battle log: no state in 3900_unit_exists'); }
             var obj = create_object(event['state'], false);
-            objects.add_object(obj);
+            objects.push(obj);
         }
     });
 

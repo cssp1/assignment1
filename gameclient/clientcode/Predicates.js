@@ -283,13 +283,13 @@ TutorialCompletePredicate.prototype.is_satisfied = function(player, qdata) { ret
 function AllBuildingsUndamagedPredicate(data) { goog.base(this, data); }
 goog.inherits(AllBuildingsUndamagedPredicate, Predicate);
 AllBuildingsUndamagedPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    var injured = session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_damaged() && obj.team === 'player') {
-            return false;
+            return true;
         }
-    }
-    return true;
+    }, this);
+
+    return !injured;
 };
 AllBuildingsUndamagedPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']);
@@ -303,26 +303,22 @@ function ObjectUndamagedPredicate(data) {
 }
 goog.inherits(ObjectUndamagedPredicate, Predicate);
 ObjectUndamagedPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.spec['name'] == this.spec_name && !obj.is_damaged() && obj.team === 'player') {
             return true;
         }
-    }
-    return false;
+    }, this);
 };
 ObjectUndamagedPredicate.prototype.do_ui_describe = function(player) {
     var spec = gamedata['units'][this.spec_name] || gamedata['buildings'][this.spec_name];
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']));
 };
 ObjectUndamagedPredicate.prototype.do_ui_help = function(player) {
-    var obj = null;
-    for(var id in session.cur_objects.objects) {
-        var o = session.cur_objects.objects[id];
+    var obj = session.for_each_real_object(function(o) {
         if(o.spec['name'] === this.spec_name && o.team === 'player' && o.is_damaged()) {
-            obj = o;
+            return o;
         }
-    }
+    }, this);
     if(obj) {
         return {'noun': 'building', 'verb': 'repair', 'target': obj,
                 'ui_arg_s': gamedata['buildings'][this.spec_name]['ui_name'] };
@@ -338,26 +334,22 @@ function ObjectUnbusyPredicate(data) {
 }
 goog.inherits(ObjectUnbusyPredicate, Predicate);
 ObjectUnbusyPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return !session.for_each_real_object(function(obj) {
         if(obj.spec['name'] == this.spec_name && !obj.is_damaged() && !obj.is_busy() && obj.team === 'player') {
             return true;
         }
-    }
-    return false;
+    }, this);
 };
 ObjectUnbusyPredicate.prototype.do_ui_describe = function(player) {
     var spec = gamedata['buildings'][this.spec_name];
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%s', spec['ui_name']));
 };
 ObjectUnbusyPredicate.prototype.do_ui_help = function(player) {
-    var obj = null;
-    for(var id in session.cur_objects.objects) {
-        var o = session.cur_objects.objects[id];
+    var obj = session.for_each_real_object(function(o) {
         if(o.spec['name'] === this.spec_name && o.team === 'player' && (o.is_damaged() || (o.time_until_finish() > 0))) {
-            obj = o;
+            return o;
         }
-    }
+    }, this);
     if(obj) {
         return {'noun': 'building', 'verb': ((obj.is_damaged() && !obj.is_repairing()) ? 'repair' : 'speedup'), 'target': obj,
                 'ui_arg_s': gamedata['buildings'][this.spec_name]['ui_name'] };
@@ -373,13 +365,11 @@ function BuildingDestroyedPredicate(data) {
 }
 goog.inherits(BuildingDestroyedPredicate, Predicate);
 BuildingDestroyedPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.spec['name'] == this.spec_name && obj.is_destroyed()) {
             return true;
         }
-    }
-    return false;
+    }, this);
 };
 
 
@@ -394,12 +384,11 @@ function BuildingQuantityPredicate(data) {
 goog.inherits(BuildingQuantityPredicate, Predicate);
 BuildingQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
     var howmany = 0;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === this.building_type && (this.under_construction_ok || !obj.is_under_construction()) && obj.team === 'player') {
             howmany += 1;
         }
-    }
+    }, this);
     return (howmany >= this.trigger_qty);
 };
 BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
@@ -421,12 +410,11 @@ BuildingQuantityPredicate.prototype.do_ui_describe = function(player) {
 BuildingQuantityPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
     var howmany = 0;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === this.building_type && (this.under_construction_ok || !obj.is_under_construction()) && obj.team === 'player') {
             howmany += 1;
         }
-    }
+    }, this);
     ret = ret.replace('%d1', howmany.toString());
     ret = ret.replace('%d2', this.trigger_qty.toString());
     return ret;
@@ -440,8 +428,7 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
 
     var count = 0;
     var under_construction_obj = null;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === this.building_type && obj.team === 'player') {
             if(this.under_construction_ok || !obj.is_under_construction()) {
                 count += 1;
@@ -449,7 +436,7 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
                 under_construction_obj = obj;
             }
         }
-    }
+    }, this);
     if(count < this.trigger_qty) {
         if(under_construction_obj) {
             return {'noun': 'building', 'verb': 'speedup', 'target': under_construction_obj,
@@ -475,8 +462,7 @@ function BuildingLevelPredicate(data) {
 goog.inherits(BuildingLevelPredicate, Predicate);
 BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     var count = 0;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    if(session.for_each_real_object(function(obj) {
         if(obj.spec === this.building_spec &&
            obj.team === 'player' &&
            !obj.is_under_construction()) {
@@ -485,10 +471,10 @@ BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
             } else if(this.upgrading_ok && obj.is_upgrading() && (obj.level + 1) >= this.trigger_level) {
                 count += 1;
             } else if(this.trigger_qty < 0) {
-                return false; // require ALL buildings to be at this level
+                return true; // fail immediately - require ALL buildings to be at this level
             }
         }
-    }
+    }, this)) { return false; }
     return (count >= this.trigger_qty);
 };
 BuildingLevelPredicate.prototype.do_ui_describe = function(player) {
@@ -512,8 +498,7 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     var raw_count = 0;
     var level_count = 0;
     var min_level = 999, need_to_upgrade_obj = null, need_to_speedup_obj = null;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec === this.building_spec &&
            obj.team === 'player') {
             if(obj.is_under_construction()) {
@@ -535,7 +520,7 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
                 }
             }
         }
-    }
+    }, this);
     if(raw_count < this.trigger_qty) {
         if(need_to_speedup_obj) {
             return {'noun': 'building', 'verb': 'speedup', 'target': need_to_speedup_obj,
@@ -577,8 +562,7 @@ UnitQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
 
     // add units that are currently under construction
     if(this.include_queued) {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_building() && obj.is_manufacturing()) {
                 for(var j = 0; j < obj.manuf_queue.length; j++) {
                     var item = obj.manuf_queue[j];
@@ -587,7 +571,7 @@ UnitQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
                     }
                 }
             }
-        }
+        }, this);
     }
 
     if(this.method == '>=') {
@@ -626,12 +610,11 @@ TechLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     if(this.researching_ok) {
         var cur = (this.tech in player.tech ? player.tech[this.tech] : 0);
         if((cur+1) >= this.min_level) {
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            if(session.for_each_real_object(function(obj) {
                 if(obj.team === 'player' && obj.is_building() && obj.research_item == this.tech) {
                     return true;
                 }
-            }
+            }, this)) { return true; }
         }
     }
     return false;
@@ -1520,9 +1503,9 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!qdata || !('source_obj' in qdata)) { throw Error('no source_obj provided'); }
     var obj = qdata['source_obj'];
     if(obj.ai_target) {
-        return vec_distance(obj.interpolate_pos(), obj.ai_target.interpolate_pos()) < this.data['distance'];
+        return vec_distance(obj.raw_pos(), obj.ai_target.raw_pos()) < this.data['distance'];
     }
-    var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(), this.data['distance'],
+    var obj_list = session.get_real_world().query_objects_within_distance(obj.raw_pos(), this.data['distance'],
                                                  { ignore_object: obj,
                                                    exclude_invul: true,
                                                    only_team: (obj.team == 'enemy' ? 'player' : 'enemy'),
@@ -1841,13 +1824,11 @@ function ViewingBaseObjectDestroyedPredicate(data) {
 }
 goog.inherits(ViewingBaseObjectDestroyedPredicate, Predicate);
 ViewingBaseObjectDestroyedPredicate.prototype.is_satisfied = function(player, qdata) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.is_destroyed() && obj.spec['name'] === this.spec) {
             return true;
         }
-    }
-    return false;
+    }, this);
 };
 
 /** @param {!Object} data

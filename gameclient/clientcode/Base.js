@@ -4,6 +4,8 @@ goog.provide('Base');
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+goog.require('GameTypes');
+
 /** @fileoverview
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
 
@@ -12,6 +14,7 @@ goog.provide('Base');
 
 /** parallel to the Base class in gameserver
     @constructor @struct
+    @implements {GameTypes.ISerializable}
     @param {string} id
     @param {Object|null=} base_data */
 Base.Base = function(id, base_data) {
@@ -58,9 +61,11 @@ Base.Base.prototype.receive_state = function(base_data) {
     this.base_ncells = ('base_ncells' in base_data ? base_data['base_ncells'] : null);
     this.base_last_attack_time = base_data['base_last_attack_time'] || -1;
 };
-/** @return {!Object<string,?>} */
+
+/** @override */
 Base.Base.prototype.serialize = function() {
-    return {'deployment_buffer': this.deployment_buffer,
+    return {'base_id': this.base_id,
+            'deployment_buffer': this.deployment_buffer,
             'base_landlord_id': this.base_landlord_id,
             'base_climate': this.base_climate,
             'base_map_loc': this.base_map_loc,
@@ -68,7 +73,15 @@ Base.Base.prototype.serialize = function() {
             'base_ui_name': this.base_ui_name,
             'base_type': this.base_type,
             'base_ncells': this.base_ncells,
-            'base_last_attack_time': this.base_last_attack_time};
+            'base_last_attack_time': this.base_last_attack_time,
+            'power_state': this.power_state};
+};
+
+/** @override */
+Base.Base.prototype.apply_snapshot = function(snap) {
+    this.base_id = snap['base_id'];
+    this.receive_state(snap);
+    this.update_power_state(snap['power_state']);
 };
 
 Base.Base.prototype.ncells = function() {
@@ -116,74 +129,6 @@ Base.Base.prototype.deployment_zone_centroid = function() {
     }
     centroid = vec_scale(1.0/this.deployment_buffer['vertices'].length, centroid);
     return centroid;
-};
-
-// returns whether combat units can be deployed (by the player) at this location
-Base.Base.prototype.is_deployment_location_valid = function(xy) {
-    var ncells = this.ncells();
-
-    // check against play area bounds
-    if(xy[0] < 0 || xy[0] >= ncells[0] || xy[1] < 0 || xy[1] >= ncells[1]) {
-        return false;
-    }
-
-    if(this.base_landlord_id === session.user_id) {
-        return true; // landlord can deploy anywhere
-    }
-
-    // check against base perimeter or deployment zone
-    if(this.has_deployment_zone()) {
-        // Gangnam style
-        if(this.deployment_buffer['type'] != 'polygon') { throw Error('unhandled deployment buffer type'+this.deployment_buffer['type'].toString()); }
-        // point-in-polygon test via winding order
-        var sign = 0;
-        for(var i = 0; i < this.deployment_buffer['vertices'].length; i++) {
-            var iend = ((i+1) % this.deployment_buffer['vertices'].length);
-            var start = this.deployment_buffer['vertices'][i];
-            var end = this.deployment_buffer['vertices'][iend];
-            var seg = vec_sub(end, start);
-            var point = vec_sub(xy, start);
-            var k = seg[0]*point[1] - seg[1]*point[0];
-            var sign_k = (k >= 0 ? 1 : -1);
-            if(sign == 0) {
-                sign = sign_k;
-            } else if(sign_k != sign) {
-                return false;
-            }
-        }
-    } else if(gamedata['map']['deployment_buffer'] >= 0) {
-        // old style
-        var mid = this.midcell();
-        var rad = [this.get_base_radius(), this.get_base_radius()];
-
-        if(this.deployment_buffer) { rad[0] += gamedata['map']['deployment_buffer']; rad[1] += gamedata['map']['deployment_buffer']; }
-        rad[0] += Math.max(0, (ncells[0] - gamedata['map']['default_ncells'][0])/2);
-        rad[1] += Math.max(0, (ncells[1] - gamedata['map']['default_ncells'][1])/2);
-        if(xy[0] >= mid[0]-rad[0] && xy[0] <= mid[0]+rad[0] && xy[1] >= mid[1]-rad[1] && xy[1] <= mid[1]+rad[1]) {
-            return false;
-        }
-    }
-
-    // check against blockage from buildings
-    if(astar_map.is_blocked(vec_floor(xy))) {
-        return false;
-    }
-
-    // check building deployment buffer
-    if((gamedata['map']['building_deployment_buffer']||0) > 0) {
-        var buf = gamedata['map']['building_deployment_buffer'];
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            if(obj.is_building() && obj.team != 'player') {
-                var hisbound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
-                if(xy[0] >= hisbound[0][0]-buf && xy[0] < hisbound[0][1]+buf &&
-                   xy[1] >= hisbound[1][0]-buf && xy[1] < hisbound[1][1]+buf) {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
 };
 
 // stroke a path outlining the base area perimeter

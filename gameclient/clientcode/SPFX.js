@@ -245,16 +245,14 @@ SPFX.FXWorld.prototype.draw_ui = function() {
     }
 };
 
-/** @param {!World.World} world - XXX this should come from the SPFX world parent instead */
-SPFX.FXWorld.prototype.get_phantom_objects = function(world) {
-    if(world.fxworld !== this) { throw Error('phantom object world != this'); }
+/** @return {!Array<!GameObject>} */
+SPFX.FXWorld.prototype.get_phantom_objects = function() {
     var ret = [];
     goog.array.forEach(goog.object.getValues(this.current_phantoms), function(fx) {
         var obj = (/** @type {SPFX.PhantomUnit} */ (fx)).get_phantom_object(this); // will throw if it's not a SPFX.PhantomUnit
         if(obj === null) { // done
             this.remove(fx);
         } else {
-            obj.world = world;
             ret.push(obj);
         }
     }, this);
@@ -1992,7 +1990,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
     this.obj.hp = this.obj.max_hp = 0;
     this.obj.team = ('team' in data ? /** @type {string} */ (data['team']) : 'none');
     this.obj.level = (instance_data ? /** @type {number|undefined} */ (instance_data['level']) : null) || 1;
-    this.obj.update_stats();
+    this.obj.update_stats(null);
     this.obj.combat_stats.maxvel *= /** @type {number|undefined} */ (data['maxvel']) || 1;
     this.obj.ai_state = ai_states.AI_MOVE; // no AI
 

@@ -426,17 +426,14 @@ function InvokeLotteryConsequent(data) {
 goog.inherits(InvokeLotteryConsequent, Consequent);
 InvokeLotteryConsequent.prototype.execute = function(state) {
     var cb = (function (_this) { return function() {
-        var scanner = null;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        var scanner = session.for_each_real_object(function(obj) {
             if(obj.team === 'player' && obj.is_building() && obj.is_lottery_building() && !obj.is_under_construction()) {
                 var state = player.get_lottery_state(/** @type {!Building} */ (obj));
-                if(_this.force || state.can_scan) {
-                    scanner = obj;
-                    break;
+                if(this.force || state.can_scan) {
+                    return obj;
                 }
             }
-        }
+        }, _this);
         if(scanner) {
             invoke_lottery_dialog(scanner, _this.reason);
         }

@@ -91,7 +91,7 @@ Citizens.Citizen.prototype.update = function() {
 Citizens.Citizen.prototype.get_new_path = function() {
     var start_pos, end_pos;
     if(this.fx) {
-        start_pos = vec_floor(this.fx.obj.interpolate_pos());
+        start_pos = vec_floor(this.fx.obj.raw_pos());
     } else {
         start_pos = this.get_random_pos_from(null);
     }

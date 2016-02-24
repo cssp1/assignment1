@@ -639,14 +639,15 @@ var mouse_state = { last_x: 0, last_y: 0, // last x,y location of movement that 
                     has_scrolled: false, scroll_start_x: 0, scroll_start_y: 0,
                     // state of drag-select operation
                     has_dragged: false, drag_start_x: 0, drag_start_y: 0,
-                    // building over which the mouse is currently hovering
+
+                    /** @type {GameObject|null} over which the mouse is currently hovering */
                     hovering_over: null,
 
                     dripper: new Dripper.Dripper(null, -1, -1), // state of current "drip" operation (used for SG-style unit deployment)
                     // webkit PointerLock API in use and pointer is locked
                     pointer_locked: false, pointer_lock_origin: [-1,-1],
 
-                    // last unit that received a single click (cleared upon double-click)
+                    /** @type {GameObject|null} last unit that received a single click (cleared upon double-click) */
                     last_unit_clicked: null,
                     last_click_time: -1 // client_time when the click was made
                   };
@@ -673,7 +674,8 @@ var pointer_lock_supported = false;
 
 var selection = { /** @type {GameObject|null} */
                   unit: null,
-                  multi: [], // only used for drag-selection of multiple mobile units
+                  /** @type {!Array<!GameObject>} for drag-selection of multiple mobile units */
+                  multi: [],
                   spellname: null,
                   spellkind: null,
                   item: null, // inventory item
@@ -769,17 +771,6 @@ var LION_STONE_ID = 1002; // hard-coded Lion Stone base ID for rails tutorial
 /** @const */
 var cellsize = [20,10]; // 64 32
 
-// XXXXXX for legacy code only - references to these globals should be redirected to World
-
-/** @type {?AStar.AStarRectMap} current A* map for playfield movement queries */
-var astar_map = null;
-
-/** @type {?AStar.CachedAStarContext} current A* context for playfield movement queries */
-var astar_context = null;
-
-// note: astar_map is used for A* pathing and building placement queries ("is this cell blocked?")
-// combat-engine targeting queries ("list all objects near this point") are done using MapAccelerator
-
 // scroll offset of game view relative to center of play area, in units of pixels *at view_zoom=1.0*
 // when equal to [0,0], the game view is centered on the play area
 var view_pos = [0,0];
@@ -817,7 +808,7 @@ function force_scroll(obj_type, pos, key, speed) {
     if(obj_type) {
         var obj = find_object_by_type(obj_type);
         if(!obj) { return; }
-        pos = obj.interpolate_pos();
+        pos = obj.raw_pos();
     }
 
     var ncells = (session.viewing_base ? session.viewing_base.ncells() : [0,0]);
@@ -848,7 +839,8 @@ function force_scroll_eval() {
 // Auras
 
 /** @constructor @struct
-    @param {GameObject|null} source object
+    @implements {GameTypes.ISerializable}
+    @param {GameObjectId|null} source_id object ID
     @param {Object} spec
     @param {?} strength
     @param {number} range
@@ -856,8 +848,8 @@ function force_scroll_eval() {
     @param {!GameTypes.TickCount} expire_tick
     @param {Object|null=} vs_table
 */
-function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) {
-    this.source = source;
+function Aura(source_id, spec, strength, range, start_tick, expire_tick, vs_table) {
+    this.source_id = source_id;
     this.spec = spec;
     this.strength = strength;
     this.range = range;
@@ -870,9 +862,9 @@ function Aura(source, spec, strength, range, start_tick, expire_tick, vs_table) 
     this.visual_effect = null;
 };
 
-/** @return {!Object<string,?>} */
+/** @override */
 Aura.prototype.serialize = function() {
-    return {'source': this.source ? this.source.id : null,
+    return {'source_id': this.source_id,
             'spec': this.spec['name'],
             'strength': this.strength,
             'range': this.range,
@@ -881,9 +873,34 @@ Aura.prototype.serialize = function() {
             'stacks': this.stacks,
             'vs_table': this.vs_table};
 };
+/** @override */
+Aura.prototype.apply_snapshot = function(snap) {
+    this.source_id = snap['source_id'];
+    this.spec = gamedata['auras'][snap['spec']];
+    this.strength = snap['strength'];
+    this.range = snap['range'];
+    this.start_tick = new GameTypes.TickCount(snap['start_tick']);
+    this.expire_tick = new GameTypes.TickCount(snap['expire_tick']);
+    this.stacks = snap['stacks'];
+    this.vs_table = snap['vs_table'];
+};
 
-/** @param {!GameObject} obj */
-Aura.prototype.apply = function(obj) {
+/** @param {!Object<string,?>} snap
+    @return {!Aura} */
+Aura.unserialize = function(snap) {
+    var ret = new Aura(snap['source_id'],
+                       gamedata['auras'][snap['spec']],
+                       snap['strength'], snap['range'],
+                       new GameTypes.TickCount(snap['start_tick']),
+                       new GameTypes.TickCount(snap['expire_tick']),
+                       snap['vs_table']);
+    ret.stacks = snap['stacks'];
+    return ret;
+};
+
+/** @param {!World.World} world
+    @param {!GameObject} obj */
+Aura.prototype.apply = function(world, obj) {
     if('client' in this.spec && !this.spec['client']) { return; }
     goog.array.forEach(this.spec['effects'], function(effect) {
         var code = effect['code'];
@@ -926,21 +943,21 @@ Aura.prototype.apply = function(obj) {
             obj.combat_stats.extra_armor = Math.max(obj.combat_stats.extra_armor, this.strength);
         } else if(code === 'defense_booster') {
             // apply the defense_boosted aura to this and nearby units
-            var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(),
-                                                                                  gamedata['map']['range_conversion'] * this.range,
-                                                                                  { only_team: obj.team, mobile_only: true });
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
-                o.create_aura(obj, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o.create_aura(world, obj.id, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
-            var obj_list = session.get_real_world().query_objects_within_distance(obj.interpolate_pos(),
-                                                                                  gamedata['map']['range_conversion'] * this.range,
-                                                                                  { only_team: obj.team, mobile_only: true });
+            var obj_list = world.query_objects_within_distance(obj.raw_pos(),
+                                                               gamedata['map']['range_conversion'] * this.range,
+                                                               { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(obj, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o2.create_aura(world, obj.id, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
@@ -955,26 +972,30 @@ Aura.prototype.apply = function(obj) {
             var apply_interval = effect['apply_interval'] || TICK_INTERVAL;
             // apply effect every N ticks
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
-            if(n_ticks <= 1 || (((session.get_real_world().combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
+            if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(session.get_real_world().combat_engine.cur_tick, client_time, this.source, obj, dmg, effect['damage_vs'] || this.vs_table));
+                world.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
         } else if(code === 'cast_spell_continuously') {
             if(!obj.is_destroyed()) {
                 var spellname = effect['spell'];
-                obj.cast_client_spell(spellname, gamedata['spells'][spellname], null, null);
+                obj.cast_client_spell(world, spellname, gamedata['spells'][spellname], null, null);
             }
         } else {
             console.log('unhandled aura code '+code);
         }
     }, this);
+};
 
+/** @param {!World.World} world
+    @param {!GameObject} obj */
+Aura.prototype.update_effect = function(world, obj) {
     if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (obj.team != 'enemy' || !obj.is_invisible())) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
-        this.visual_effect = obj.world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
+        this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
     }
 };
 
@@ -1112,36 +1133,6 @@ function ai_state_can_be_queued(state) {
     return (state == ai_states.AI_ATTACK_SPECIFIC || state == ai_states.AI_MOVE || state == ai_states.AI_ATTACK_MOVE || state == ai_states.AI_ATTACK_MOVE_AGGRO || state == ai_states.AI_DEFEND_MOVE);
 }
 
-// The playfield_check_*() functions check for violations of
-// invariants where a certain cell or Bresenham path between two cells
-// are supposed to be free of obstacles.
-
-// check for invalid blocked cell
-function playfield_check_pos(pos, reason) {
-    if(!PLAYFIELD_DEBUG) { return; }
-    if(astar_map.is_blocked(vec_floor(pos))) {
-        console.log(reason+': invalid blocked cell! '+pos[0].toString()+','+pos[1].toString());
-    }
-}
-
-// check for invalid path (containing blocked cells)
-function playfield_check_path(path, reason) {
-    if(!PLAYFIELD_DEBUG) { return; }
-    for(var i = 0; i < path.length; i++) {
-        var error = null;
-        if(astar_map.is_blocked(vec_floor(path[i]))) {
-            error = 'blocked cell in path! cell i='+i.toString()+': '+path[i][0].toString()+','+path[i][1].toString();
-        } else if(i >= 1 && vec_distance(vec_floor(path[i-1]), vec_floor(path[i])) > 1 && !astar_map.linear_path_is_clear(vec_floor(path[i-1]), vec_floor(path[i]))) {
-            error ='blocked jump in path! cell i='+(i-1).toString()+'-'+i.toString()+': '+path[i-1][0].toString()+','+path[i-1][1].toString()+'-'+path[i][0].toString()+','+path[i][1].toString();
-        }
-        if(error) {
-            console.log(reason+': '+error);
-            console.log(path);
-            return;
-        }
-    }
-};
-
 // flags for tracking which parts of the GameObject state are dirty and need to be sent to the server
 var obj_state_flags = {
     XY: 1, // position
@@ -1159,12 +1150,9 @@ var GameObjectId = {};
 var TeamId = {};
 
 /** @constructor - XXX not ready for struct yet
+    @implements {GameTypes.ISerializable}
  */
 function GameObject() {
-    /** @type {World.World|null} - undesirable to have a backreference
-     * here, maybe try to eliminate it once the combat/AI code moves to World? */
-    this.world = null;
-
     /** @type {GameObjectId} */
     this.id = 'DEAD'; // = DEAD_ID if the object is "dead" or otherwise not part of the game world
 
@@ -1292,7 +1280,7 @@ function GameObject() {
     this.permanent_effect = null;
 }
 
-/** @return {!Object<string,?>} */
+/** @override */
 GameObject.prototype.serialize = function() {
     return {'obj_id': this.id,
             'spec': this.spec['name'],
@@ -1312,6 +1300,52 @@ GameObject.prototype.serialize = function() {
             'target_facing': this.target_facing
     };
 };
+/** @override */
+GameObject.prototype.apply_snapshot = function(snap) {
+    if(snap['obj_id'] !== this.id) { throw Error('obj_id mismatch'); }
+    if(snap['spec'] !== this.spec['name']) { throw Error('specname mismatch'); }
+    this.x = snap['x'];
+    this.y = snap['y'];
+    this.hp = snap['hp'];
+    this.max_hp = snap['max_hp'];
+    this.team = (snap['owner'] === session.user_id ? 'player' : 'enemy');
+    this.level = snap['level'];
+    this.equipment = snap['equipment'];
+    this.ai_state = snap['ai_state'];
+    this.combat_stats = snap['combat_stats']; // ?
+    this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this);
+    this.cooldowns = snap['cooldowns'];
+    this.cur_facing = snap['cur_facing'];
+    this.next_facing = snap['next_facing'];
+    this.target_facing = snap['target_facing'];
+};
+
+/** @param {!Object<string,?>} snap
+    @return {!GameObject} */
+GameObject.unserialize = function(snap) {
+    var spec = get_spec(snap['spec']);
+    if(!spec) {
+        throw Error('cannot create object of unrecognized type '+snap['spec']);
+    }
+    var kind = spec['kind'];
+    var obj;
+    if(kind === 'building') {
+        obj = new Building();
+    } else if(kind === 'mobile') {
+        obj = new Mobile();
+    } else if(kind === 'inert') {
+        obj = new Inert();
+    } else {
+        throw Error('bad spec kind '+kind);
+    }
+    obj.spec = spec;
+    obj.id = snap['obj_id'];
+    obj.apply_snapshot(snap);
+    return obj;
+};
+
+/** @param {!World.World} world */
+GameObject.prototype.on_added_to_world = function(world) {};
 
 /** @const
     @type {GameObjectId} */
@@ -1319,6 +1353,30 @@ GameObject.DEAD_ID = 'DEAD';
 /** @const
     @type {GameObjectId} */
 GameObject.VIRTUAL_ID = 'VIRTUAL';
+
+/** unlink from global references */
+GameObject.prototype.dispose = function() {
+    // deselect
+
+    // remove from selection.multi
+    for(var i = 0; i < selection.multi.length; i++) {
+        if(selection.multi[i] === this) {
+            selection.multi.splice(i,1);
+        }
+    }
+
+    if(selection.unit === this) {
+        // try to select something else in the multi group
+        if(selection.multi.length > 0) {
+            selection.unit = selection.multi[0];
+        } else {
+            change_selection(null);
+        }
+    }
+    if(mouse_state.hovering_over === this) {
+        mouse_state.hovering_over = null;
+    }
+};
 
 // pull raw combat stats from gamedata and initialize non-gamedata values
 
@@ -1412,8 +1470,9 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
     }
 };
 
-// check for aura expiration, and apply aura modifiers to combat stats
-GameObject.prototype.update_and_apply_auras = function() {
+/** @param {!World.World} world
+    check for aura expiration, and apply aura modifiers to combat stats */
+GameObject.prototype.update_and_apply_auras = function(world) {
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
         if(!a.expire_tick.is_infinite() && GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
@@ -1421,15 +1480,23 @@ GameObject.prototype.update_and_apply_auras = function() {
             a.end(this);
             continue;
         }
-        a.apply(this);
+        a.apply(world, this);
     }
 };
 
-// called once per tick
-GameObject.prototype.update_stats = function() {
+/** @param {!World.World} world */
+GameObject.prototype.update_aura_effects = function(world) {
+    goog.array.forEach(this.auras, function(aura) { aura.update_effect(world, this); }, this);
+};
+
+/** called once per tick
+    @param {World.World|null} world - null for phantom/scenery objects */
+GameObject.prototype.update_stats = function(world) {
     this.get_raw_stats();
     this.modify_stats_by_modstats();
-    this.update_and_apply_auras(); // XXX move before modstats?
+    if(world) {
+        this.update_and_apply_auras(world);
+    }
 };
 
 // Return true if the ability identified by 'key' (usually spell name) is able to be used
@@ -1450,11 +1517,13 @@ GameObject.prototype.set_cooldown = function(key, start, expire) {
     this.cooldowns[key] = { start_tick: start, expire_tick: expire };
 };
 
-GameObject.prototype.receive_auras_update = function(alist) {
+/** @param {!World.World} world
+    @param {!Array<!Object>} alist */
+GameObject.prototype.receive_auras_update = function(world, alist) {
     // remove all permanent and expired auras
     for(var i = 0; i < this.auras.length; i++) {
         var a = this.auras[i];
-        if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(session.get_real_world().combat_engine.cur_tick, a.expire_tick)) {
+        if(a.expire_tick.is_infinite() || GameTypes.TickCount.gt(world.combat_engine.cur_tick, a.expire_tick)) {
             this.auras.splice(i,1);
             a.end(this);
             continue;
@@ -1464,7 +1533,7 @@ GameObject.prototype.receive_auras_update = function(alist) {
     if(!alist) { return; }
     for(var i = 0; i < alist.length; i++) {
         var data = alist[i];
-        this.create_aura(null, data['name'], data['strength'],
+        this.create_aura(world, null, data['name'], data['strength'],
                          ('duration' in data? relative_time_to_tick(data['duration']) : GameTypes.TickCount.infinity),
                          ('range' in data? data['range'] : -1));
     }
@@ -1480,12 +1549,14 @@ function get_spec(specname) {
 
 // relink specs of all current objects into gamedata (called when gamedata is reloaded)
 function reset_specs() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         obj.spec = get_spec(obj.spec['name']);
-    }
+    });
 }
 
+/** @param {!Object} data
+    @param {boolean} init
+    @param {boolean} is_deploying */
 GameObject.prototype.receive_state = function(data, init, is_deploying) {
     this.id = /** @type {string} */ (data.shift());
     var specname = data.shift();
@@ -1511,7 +1582,7 @@ GameObject.prototype.receive_state = function(data, init, is_deploying) {
     this.level = data.shift();
     this.equipment = data.shift();
 
-    this.update_stats();
+    this.update_stats(null);
     if(updated_hp >= 0) {
         this.state_dirty = 0;
     } else {
@@ -1538,15 +1609,6 @@ GameObject.prototype.receive_state = function(data, init, is_deploying) {
                 }
             } else {
                 this.ai_state = ai_state_values[gamedata['client']['default_deploy_ai_order']['auto']['state']];
-            }
-
-            // check for arming delay when in hostile territory
-            if((this.team == 'player' && session.viewing_base.base_landlord_id !== session.user_id) ||
-               (this.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
-                var auto_spell = this.get_auto_spell();
-                if(auto_spell && auto_spell['deployment_arming_delay']) {
-                    this.create_aura(this, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
-                }
             }
         }
     }
@@ -1580,11 +1642,12 @@ function get_as_array(qty) {
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
 GameObject.prototype.get_leveled_quantity = function(qty) { return get_leveled_quantity(qty, this.level); }
 
-GameObject.prototype.run_tick = function() {
-    this.update_stats();
-    this.ai_threatlist_update();
-    this.run_ai();
-    this.run_control();
+/** @param {!World.World} world */
+GameObject.prototype.run_tick = function(world) {
+    this.update_stats(world);
+    this.ai_threatlist_update(world);
+    this.run_ai(world);
+    this.run_control(world);
     this.update_facing();
 };
 
@@ -1644,21 +1707,37 @@ GameObject.prototype.is_inert = function() { return (this.spec['kind'] === 'iner
 GameObject.prototype.is_blocker = function() { return false; };
 /** @return {!Array.<number>} */
 GameObject.prototype.raw_pos = function() { return [this.x, this.y]; };
-/** @return {!Array.<number>} */
-GameObject.prototype.interpolate_pos = function() { return [this.x, this.y]; };
-/** @return {!Array.<number>} */
-GameObject.prototype.interpolate_pos_for_draw = function() { return this.interpolate_pos(); };
+/** @param {!World.World} world
+    @return {!Array.<number>} */
+GameObject.prototype.interpolate_pos = function(world) { return [this.x, this.y]; };
+/** @param {!World.World} world
+    @return {!Array.<number>} */
+GameObject.prototype.interpolate_pos_for_draw = function(world) { return this.interpolate_pos(world); };
+/** @param {!World.World} world
+    @return {number} */
+GameObject.prototype.interpolate_facing = function(world) {
+    var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    return this.cur_facing + progress*(this.next_facing - this.cur_facing);
+};
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
 
-// return [[x,y], depth] for sprite drawing on game field
-GameObject.prototype.calc_draw_pos = function() {
-    var p = this.interpolate_pos();
+/** @param {World.World|null} world
+    return [[x,y], depth] for sprite drawing on game field */
+GameObject.prototype.calc_draw_pos = function(world) {
+    var p = (world ? this.interpolate_pos(world) : this.raw_pos());
     var depth = ortho_to_depth(p);
     return [p, depth];
 };
-GameObject.prototype.update_draw_pos = function() { this.draw_pos_cache = this.calc_draw_pos(); };
+/** @param {World.World|null} world */
+GameObject.prototype.update_draw_pos = function(world) { this.draw_pos_cache = this.calc_draw_pos(world); };
 
+/** @param {!World.World} world
+    @param {!Array<number>} xy
+    @param {!Array<number>} ji
+    @param {number} zoom
+    @param {number} fuzz
+    @return {boolean} */
 GameObject.prototype.detect_click = goog.abstractMethod;
 
 /** @return {boolean} */
@@ -1814,12 +1893,13 @@ GameObject.prototype.get_special_ability_spell = function() {
     return [spell_name, spell];
 };
 
-GameObject.prototype.use_special_ability = function() {
+/** @param {!World.World} world */
+GameObject.prototype.use_special_ability = function(world) {
     var name_sp = this.get_special_ability_spell();
     if(!name_sp) { return false; }
     var spell_name = name_sp[0], spell = name_sp[1];
     if(spell['activation'] === 'instant') {
-        return this.cast_client_spell(spell_name, spell, this, null);
+        return this.cast_client_spell(world, spell_name, spell, this, null);
     } else if(spell['activation'] === 'targeted_area') {
         if(!this.get_cooldown(spell_name)) { return; }
         selection.spellname = spell_name;
@@ -1833,8 +1913,13 @@ GameObject.prototype.use_special_ability = function() {
     return false;
 }
 
-// same as cast_client_spell, but has no effect if the spell is not castable by this unit
-GameObject.prototype.cast_client_spell_checked = function(spell_name, spell, target, location) {
+/** @param {!World.World} world
+    @param {string} spell_name
+    @param {Object} spell
+    @param {GameObject|null} target
+    @param {Array.<number>|null} location
+    Same as cast_client_spell, but has no effect if the spell is not castable by this unit */
+GameObject.prototype.cast_client_spell_checked = function(world, spell_name, spell, target, location) {
     var found = false;
     for(var i = 0; i < this.spec['spells'].length; i++) {
         if(this.spec['spells'][i] === spell_name) {
@@ -1843,17 +1928,18 @@ GameObject.prototype.cast_client_spell_checked = function(spell_name, spell, tar
         }
     }
     if(found) {
-        return this.cast_client_spell(spell_name, spell, target, location);
+        return this.cast_client_spell(world, spell_name, spell, target, location);
     } else {
         return false;
     }
 };
 
-/** @param {string} spell_name
+/** @param {!World.World} world
+    @param {string} spell_name
     @param {Object} spell
     @param {GameObject|null} target
     @param {Array.<number>|null} location */
-GameObject.prototype.cast_client_spell = function(spell_name, spell, target, location) {
+GameObject.prototype.cast_client_spell = function(world, spell_name, spell, target, location) {
     if(!this.get_cooldown(spell_name)) {
         return false;
     }
@@ -1863,7 +1949,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
         var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
         var range = this.get_leveled_quantity(spell['aura_range'] || 0);
-        this.create_aura(null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+        this.create_aura(world, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
     }
 
     if('code' in spell) {
@@ -1882,21 +1968,21 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
             // note: damage in spells.json is PER SECOND
             var damage = this.get_leveled_quantity(spell['damage']) * cooldown;
 
-            var impact_pos = this.interpolate_pos();
+            var impact_pos = this.raw_pos();
 
             if(spell['kills_self']) {
                 // Detonator droid/landmine
                 // queue BEFORE other damage so it's listed in this order in the battle log
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
-                var death_tick = GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick,
-                                                            relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+                var death_tick = GameTypes.TickCount.add(world.combat_engine.cur_tick,
+                                                         relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
+                world.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(session.get_real_world().combat_engine.cur_tick, client_time, this, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -1907,35 +1993,35 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
                                                     this.get_leveled_quantity(imp_aura['range'] || 0),
                                                     spell['damage_vs'] || {}, imp_aura['duration_vs'] || {},
                                                     spell['always_friendly_fire'] || false);
-                    session.get_real_world().combat_engine.damage_effect_queue.push(effect);
+                    world.combat_engine.damage_effect_queue.push(effect);
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(session.get_real_world().combat_engine.cur_tick, client_time, this, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
                                               this.get_leveled_quantity(spell['splash_falloff'] || 'linear'),
                                               damage, spell['damage_vs'] || {},
                                               spell['always_friendly_fire'] || false);
-            session.get_real_world().combat_engine.damage_effect_queue.push(effect);
+            world.combat_engine.damage_effect_queue.push(effect);
 
             // note: use both muzzle_flash and impact, because impact location is the object's own location
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
             if(vfx) {
                 var vfx_props = {'dest': null}; // special case: inhibit PhantomUnits from spawning (since this is a self-destruct, not an offensive shot)
-                this.world.fxworld.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
+                world.fxworld.add_visual_effect_at_time(impact_pos, 0, [0,1,0], client_time, this.get_leveled_quantity(vfx), true, vfx_props);
             }
         } else if(code === 'projectile_attack') {
             // make sure we are in range
             if(location) {
                 var range = gamedata['map']['range_conversion'] * this.get_leveled_quantity(spell['range'] || 0);
-                var dist = vec_distance(this.interpolate_pos(), location);
+                var dist = vec_distance(this.raw_pos(), location);
                 //console.log('range: dist '+dist+' range '+range+' loc '+location);
                 if(dist > range) {
                     return false;
                 }
-                this.fire_projectile(session.get_real_world().combat_engine.cur_tick, client_time, null, -1, spell, this.level, target, location, 0); // use object level for the spell
+                this.fire_projectile(world, world.combat_engine.cur_tick, client_time, null, -1, spell, this.level, target, location, 0); // use object level for the spell
             } else {
                 throw Error('projectile_attack with no location from '+this.spec['name']);
             }
@@ -1950,7 +2036,7 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
-        this.set_cooldown(spell_name, session.get_real_world().combat_engine.cur_tick, GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
+        this.set_cooldown(spell_name, world.combat_engine.cur_tick, GameTypes.TickCount.add(world.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
     }
 
     if(global_spell_icon && global_spell_icon.unit === this) {
@@ -1961,13 +2047,14 @@ GameObject.prototype.cast_client_spell = function(spell_name, spell, target, loc
     return true;
 };
 
-/** @param {GameObject|null} creator
+/** @param {!World.World} world
+    @param {GameObjectId|null} creator_id
     @param {string} aura_name
     @param {?} strength
     @param {!GameTypes.TickCount} duration
     @param {number} range
     @param {Object=} vs_table */
-GameObject.prototype.create_aura = function(creator, aura_name, strength, duration, range, vs_table) {
+GameObject.prototype.create_aura = function(world, creator_id, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
     var end_tick;
     if(duration.is_infinite()) {
@@ -1985,7 +2072,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
                 this.auras[i].strength = Math.max(this.auras[i].strength, strength);
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
-                this.auras[i].source = creator;
+                if(creator_id) { this.auras[i].source_id = creator_id; }
                 if(!this.auras[i].expire_tick.is_infinite()) {
                     this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
                 }
@@ -1998,7 +2085,7 @@ GameObject.prototype.create_aura = function(creator, aura_name, strength, durati
 
     if(i >= this.auras.length) {
         // no existing applications, create one
-        this.auras.push(new Aura(creator, aura_spec, strength, range, session.get_real_world().combat_engine.cur_tick, end_tick, vs_table));
+        this.auras.push(new Aura(creator_id, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
     }
 };
 
@@ -2010,50 +2097,6 @@ GameObject.prototype.speak = function(name) {
     this.last_speak_time = client_time;
     GameArt.play_canned_sound(this.spec[field]);
 };
-
-function apply_queued_damage_effects() {
-    var any_left = session.get_real_world().combat_engine.apply_queued_damage_effects(COMBAT_ENGINE_USE_TICKS);
-    if(!any_left && session.no_more_units) {
-        session.no_more_units = false;
-        session.set_battle_outcome_dirty();
-    }
-}
-
-function create_debris(target, pos) {
-    // add client-side debris effect
-    var inert_specname;
-    if('destroyed_inert' in target.spec) {
-        inert_specname = target.spec['destroyed_inert']; // can be null
-    } else {
-        inert_specname = gamedata['default_debris_inert'];
-    }
-
-    if(!inert_specname) { return; }
-
-    var inertspec = gamedata['inert'][inert_specname];
-
-    var debris = new SPFX.Debris(pos, inertspec['art_asset'], target.interpolate_facing())
-    debris.show = (!('show_debris' in session.viewing_base.base_climate_data) || session.viewing_base.base_climate_data['show_debris']);
-    target.world.fxworld.add_under(debris);
-
-    var tooltip = target.spec['ui_name'] + ' ' + inertspec['ui_name'];
-    if(target.team === 'player') {
-        tooltip += ' ('+player.get_ui_name()+')';
-    } else if(target.team === 'enemy') {
-        if(session.home_base) {
-            if(session.incoming_attacker_name) {
-                tooltip += ' ('+session.incoming_attacker_name+')';
-            }
-        } else {
-            tooltip += ' ('+session.ui_name.split(' ')[0]+')';
-        }
-    }
-    // add user_data that persist_debris() will reference at end of combat
-    debris.user_data = { 'persist': 'debris',
-                         'spec': inertspec['name'],
-                         'pos': vec_floor(pos),
-                         'metadata': {'facing':target.interpolate_facing(), 'tooltip': tooltip} };
-}
 
 /** Modify damage by vs_table coefficients
     @param {Object.<string,number>} vs_table
@@ -2084,246 +2127,6 @@ function get_damage_modifier(vs_table, target) {
     return damage_mod;
 };
 
-function hurt_object(target, damage, vs_table, source) {
-    if(target.id === GameObject.DEAD_ID) {
-        throw Error('hurt_object called on dead object');
-    }
-    //console.log('hurt_object '+target.spec['name']+' from '+(source?source.spec['name']:'null'));
-
-    // save for metrics use, because destroy_object() sets id to -1
-    var original_target_id = target.id;
-
-    if(target.max_hp === 0) { return; } // can't hurt indestructible objects
-
-    var pos = target.interpolate_pos();
-
-    // offset time to de-synchronize visual effects
-    var time_offset = Math.random()*TICK_INTERVAL/combat_time_scale();
-
-    damage *= get_damage_modifier(vs_table, target);
-
-
-    if(damage > 0) {
-
-        if(!vs_table || !vs_table['ignores_armor']) {
-            // reduce damage (not healing) by target's armor, down to a minimum of 1
-            var armor = target.get_leveled_quantity(target.spec['armor'] || 0);
-            armor += target.combat_stats.extra_armor;
-
-            if(armor > 0) {
-                damage -= armor;
-            }
-        }
-
-        // modify by damage_taken combat stat
-        damage *= target.combat_stats.damage_taken;
-
-        if(damage < 1) { damage = 1; }
-    }
-
-    damage = Math.floor(damage);
-
-    if(COMBAT_DEBUG) {
-        // Damage text
-        target.world.fxworld.add(new SPFX.CombatText(pos,
-                                     target.is_flying() ? target.altitude : 0,
-                                     pretty_print_number(Math.abs(damage)),
-                                     (damage >= 0 ? [1, 1, 0.1, 1] : [0,1,0,1]),
-                                     (COMBAT_ENGINE_USE_TICKS ? new SPFX.When(null, target.world.combat_engine.cur_tick, time_offset) : new SPFX.When(client_time + time_offset, null)),
-                                     1.0, {drop_shadow:true}));
-    }
-
-    // make player units invincible during the tutorial
-    if(player.tutorial_state != "COMPLETE") {
-        if(target.team === 'player') {
-            var health_limit;
-            if(target.is_building() && target.is_shooter()) {
-                health_limit = target.max_hp;
-            } else {
-                health_limit = Math.floor(0.2 * target.max_hp);
-            }
-            if(target.hp - damage < health_limit) {
-                damage = target.hp - health_limit;
-            }
-        }
-    }
-
-    var was_destroyed = target.is_destroyed(); // always going be false unless we implement building repair
-
-    var original_target_hp = target.hp;
-
-    target.hp -= damage;
-    target.last_attacker = source;
-    target.state_dirty |= obj_state_flags.HP;
-
-    if(target.is_building()) {
-        // immediately show that repair/research/upgrade/production stops in the UI. Subsequent OBJECT_STATE_UPDATE will return correct HP value and start/stop times.
-        target.repair_finish_time = -1;
-        if(target.research_start_time > 0) {
-            target.research_done_time += server_time - target.research_start_time;
-            target.research_start_time = -1;
-            target.state_dirty |= obj_state_flags.URGENT;
-        }
-        if(target.build_start_time > 0) {
-            target.build_done_time += server_time - target.build_start_time;
-            target.build_start_time = -1;
-            target.state_dirty |= obj_state_flags.URGENT;
-        }
-        if(target.upgrade_start_time > 0) {
-            target.upgrade_done_time += server_time - target.upgrade_start_time;
-            target.upgrade_start_time = -1;
-            target.state_dirty |= obj_state_flags.URGENT;
-        }
-        if(target.manuf_start_time > 0) {
-            target.manuf_done_time += server_time - target.manuf_start_time;
-            target.manuf_start_time = -1;
-            target.state_dirty |= obj_state_flags.URGENT;
-        }
-        if(target.is_crafting()) {
-            var cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][target.is_crafting()]['crafting_category']];
-            if(('haltable' in cat) && !cat['haltable']) {
-                // not haltable
-            } else {
-                // client-side predict what will happen
-
-                // first check if we're going to modify anything,
-                // since we do not want start_client_prediction() to
-                // fire a sync request if there is no actual mutation.
-                var need_to_halt = false;
-                goog.array.forEach(target.get_crafting_queue(), function(bus) {
-                    if(bus['start_time'] > 0) {
-                        need_to_halt = true;
-                    }
-                });
-                if(need_to_halt) {
-                    // XXX the request_sync here might need to be reordered after OBJECT_COMBAT_UPDATES
-                    var craft_queue = target.start_client_prediction('crafting.queue', target.crafting['queue']);
-                    goog.array.forEach(craft_queue, function(bus) {
-                        if(bus['start_time'] > 0) {
-                            bus['done_time'] += Math.max(0, server_time - bus['start_time']);
-                            bus['start_time'] = -1;
-                            target.state_dirty |= obj_state_flags.URGENT;
-                        }
-                    });
-                }
-            }
-        }
-    }
-
-    if(target.hp <= 0) {
-        // object is destroyed
-        target.hp = 0;
-
-        if(target.is_building() && target.killer_info === null) {
-            target.killer_info = get_killer_info(source);
-        }
-
-        // visual explosion and debris effects
-        var fx_data = null;
-        if(target === source && ('suicide_explosion_effect' in target.spec)) {
-            fx_data = target.spec['suicide_explosion_effect'];
-        } else if(target.is_mobile()) {
-            create_debris(target, pos);
-            if('explosion_effect' in target.spec) {
-                fx_data = target.spec['explosion_effect'];
-            } else {
-                fx_data = player.get_any_abtest_value('unit_explosion_effect', gamedata['client']['vfx']['unit_explosion']);
-            }
-        } else {
-            // buildings
-            if('explosion_effect' in target.spec) {
-                fx_data = target.spec['explosion_effect'];
-            } else if(target.spec['gridsize'][0] > 2) {
-                // big buildings
-                fx_data = player.get_any_abtest_value('building_explosion_normal_effect', gamedata['client']['vfx']['building_explosion_normal']);
-            } else {
-                fx_data = player.get_any_abtest_value('building_explosion_small_effect', gamedata['client']['vfx']['building_explosion_small']);
-            }
-        }
-
-        if(fx_data) {
-            target.world.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, fx_data, true, null);
-        }
-
-        target.update_permanent_effect();
-
-        // destruction of mobile units and buildings is handled differently
-        if(target.is_mobile()) {
-            if(('on_death_spell' in target.spec) && !target.combat_stats.disarmed) {
-                var death_spell_name = target.spec['on_death_spell'];
-                target.cast_client_spell(death_spell_name, gamedata['spells'][death_spell_name], target, null);
-            } else {
-                send_and_destroy_object(target, source);
-            }
-        } else if(target.is_building() || target.is_inert()) {
-            target.state_dirty |= obj_state_flags.URGENT;
-
-            // mark the tracked quest as dirty so we can update any quest tips
-            player.quest_tracked_dirty = true;
-            if(target.is_building()) {
-                session.set_battle_outcome_dirty();
-            }
-        }
-
-    } else if(damage < 0) {
-        // healing
-        if(target.hp > target.max_hp) { target.hp = target.max_hp; }
-    } else {
-        // took damage but was not destroyed
-        if(target.is_mobile() && target.ai_state === ai_states.AI_DEFEND_MOVE) {
-            // switch to attack-move-aggro
-            for(var i = 0; i < target.orders.length; i++) {
-                var order = target.orders[i];
-                order['state'] = ai_states.AI_ATTACK_MOVE_AGGRO;
-            }
-            target.apply_orders();
-        }
-
-        // check for gradual looting
-        if(target.is_building() && (target.is_storage() || target.is_producer())) {
-            // "ticks" here refer to the chunks of loot given out as certain hitpoint thresholds are crossed
-            // see gameserver/ResLoot.py for the details.
-            var tick_size = ('gradual_loot' in gamedata ? gamedata['gradual_loot'] : -1);
-            if(tick_size > 0) {
-                var last_tick = Math.floor((original_target_hp-1)/tick_size) + 1;
-                var this_tick = Math.floor((target.hp-1)/tick_size) + 1;
-                if(this_tick < last_tick) {
-                    target.state_dirty |= obj_state_flags.URGENT; // transmit the new hp value at the end of this tick
-                }
-            }
-        }
-
-        if('damaged_effect' in target.spec) {
-            target.world.fxworld.add_visual_effect_at_time(pos, (target.is_mobile() && target.is_flying() ? target.altitude : 0), [0,1,0], client_time+time_offset, target.spec['damaged_effect'], true, null);
-        }
-    }
-
-    if(target.is_blocker()) {
-        if(!was_destroyed && target.is_destroyed()) {
-            target.block_map(-1, 'hurt_object(destroyed)');
-        }
-        if(was_destroyed && !target.is_destroyed()) {
-            target.block_map(1, 'hurt_object(undestroyed)');
-        }
-    }
-
-    if(player.is_suspicious) {
-        metric_event('3950_object_hurt', {'attack_event': true,
-                                          'shooter_id': source ? source.id : -1,
-                                          'shooter_type': (source && source.spec && source.spec['name']) ? source.spec['name'] : 'unknown',
-                                          'shooter_team': source ? source.team : 'none',
-                                          'target_id': original_target_id,
-                                          'target_type': target.spec['name'],
-                                          'target_team': target.team,
-                                          'target_pos': pos,
-                                          'damage': damage,
-                                          'hp_before': original_target_hp,
-                                          'hp_left': target.hp,
-                                          'client_time': client_time
-                                        });
-    }
-}
-
 function check_battle_outcome() {
     if(!session.battle_outcome_dirty) { return; }
     if(!synchronizer.is_in_sync(session.battle_outcome_sync_marker)) { return ; } // waiting for server to sync up
@@ -2341,12 +2144,11 @@ function check_battle_outcome() {
             // set attacking units to hold position (celebration time, they won!)
             if(!session.home_base) {
                 var order = {'state': ai_states.AI_ATTACK_STATIONARY, 'aggressive': false};
-                for(var id in session.cur_objects.objects) {
-                    var obj = session.cur_objects.objects[id];
+                session.for_each_real_object(function(obj) {
                     if(!obj.is_destroyed() && obj.is_mobile() && obj.team == 'player') {
-                        obj.new_order(order, true);
+                        obj.new_order(session.get_real_world(), order, true);
                     }
-                }
+                });
             }
         }
     }
@@ -2364,26 +2166,24 @@ function calculate_battle_outcome() {
             return 'undecided';
         }
 
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.team === 'enemy' && !obj.is_destroyed()) {
                 victory = false;
             }
             if(obj.team === 'player' && !obj.is_destroyed()) {
                 defeat = false;
             }
-        }
+        });
     } else {
         // foreign-turf battles are won if all enemy units and buildings are dead
         // and UNDECIDED if all player units are dead (let player End Attack manually)
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
 
             // do not count barriers
-            if(obj.spec['name'] === 'barrier') { continue; }
+            if(obj.spec['name'] === 'barrier') { return; }
 
             // do not count invulnerable objects (e.g. quarry harvesters)
-            if(obj.spec['max_hp'] === 0 || obj.is_invul()) { continue; }
+            if(obj.spec['max_hp'] === 0 || obj.is_invul()) { return; }
 
             if(player.tutorial_state != "COMPLETE") {
                 // special case for tutorial: end battle once the three main buildings are destroyed
@@ -2406,7 +2206,7 @@ function calculate_battle_outcome() {
             if(obj.team === 'player' && !obj.is_destroyed()) {
                 defeat = false;
             }
-        }
+        });
 
         if(player.tutorial_state == "COMPLETE" && !gamedata['client']['end_battle_on_defeat']) {
             defeat = false; // allow battle to go on even if player has no units left
@@ -2451,23 +2251,8 @@ function calculate_battle_outcome() {
     }
 }
 
-function for_all_objects_of_type(specname, func) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj.spec['name'] === specname) {
-            func(obj);
-        }
-    }
-}
-
-function remove_all_barriers() {
-    for_all_objects_of_type('barrier', function(obj) { send_and_remove_object(obj); });
-}
-function upgrade_all_barriers() {
-    for_all_objects_of_type('barrier', function(obj) { Store.place_user_currency_order(obj.id, 'UPGRADE_FOR_MONEY', null, null, null); });
-}
-
-GameObject.prototype.run_control = function() {
+/** @param {!World.World} world */
+GameObject.prototype.run_control = function(world) {
     if(this.control_cooldown > 0) {
         this.control_cooldown -= 1;
     }
@@ -2478,7 +2263,7 @@ GameObject.prototype.run_control = function() {
 
         // turn to face target
         if(this.control_target && 'turn_rate' in this.spec) {
-            var dir = vec_sub(this.control_target.interpolate_pos(), this.interpolate_pos());
+            var dir = vec_sub(this.control_target.raw_pos(), this.raw_pos());
             if((dir[1]*dir[1]+dir[0]*dir[0]) > 0.0001) {
                 this.target_facing = Math.atan2(dir[1], dir[0]);
             }
@@ -2538,21 +2323,21 @@ GameObject.prototype.run_control = function() {
                 // trigger non-auto-attack cooldown
                 if(!this.get_cooldown(spell['cooldown_name'])) { return; }
                 var cd_ticks = Math.floor(get_leveled_quantity(spell['cooldown'], spell_level)/TICK_INTERVAL);
-                this.set_cooldown(spell['cooldown_name'], session.get_real_world().combat_engine.cur_tick,
-                                  GameTypes.TickCount.add(session.get_real_world().combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
+                this.set_cooldown(spell['cooldown_name'], world.combat_engine.cur_tick,
+                                  GameTypes.TickCount.add(world.combat_engine.cur_tick, new GameTypes.TickCount(cd_ticks)));
             }
 
             var target_pos, target_height;
 
             if(spell['targets_self']) {
-                target_pos = this.interpolate_pos();
+                target_pos = this.raw_pos();
                 target_height = this.is_flying() ? this.altitude : 0;
             } else {
-                target_pos = target.interpolate_pos();
+                target_pos = target.raw_pos();
                 target_height = target.is_flying() ? target.altitude : 0;
             }
 
-            this.fire_projectile(session.get_real_world().combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
+            this.fire_projectile(world, world.combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
         }
     } else if(this.control_state === control_states.CONTROL_STOP) {
 
@@ -2578,7 +2363,7 @@ GameObject.prototype.run_control = function() {
         (!this.is_destroyed() &&
          this.control_state === control_states.CONTROL_STOP &&
          !(this.is_building() && (this.is_under_construction() || this.is_upgrading() || this.is_repairing() || this.disarmed))))) {
-        this.cast_client_spell(continuous_spell, gamedata['spells'][continuous_spell], null, null);
+        this.cast_client_spell(world, continuous_spell, gamedata['spells'][continuous_spell], null, null);
     }
 };
 
@@ -2914,7 +2699,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -2931,7 +2716,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2946,7 +2731,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target,
+                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -2957,7 +2742,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source, target, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id, damage, damage_vs));
             }
         }
     }
@@ -3328,7 +3113,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -3345,7 +3130,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -3360,7 +3145,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source, target,
+                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -3371,7 +3156,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source, target, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id, damage, damage_vs));
             }
         }
     }
@@ -3411,6 +3196,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
 };
 
 /** For now, require callers to supply both combat-tick and clock-time parameters.
+    @param {!World.World} world
     @param {!GameTypes.TickCount} fire_tick
     @param {number} fire_time
     @param {GameTypes.TickCount|null} force_hit_tick
@@ -3420,8 +3206,8 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
     @param {GameObject|null} target
     @param {!Array.<number>} target_pos
     @param {number} target_height */
-GameObject.prototype.fire_projectile = function(fire_tick, fire_time, force_hit_tick, force_hit_time, spell, spell_level, target, target_pos, target_height) {
-    var my_pos = this.interpolate_pos();
+GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, force_hit_tick, force_hit_time, spell, spell_level, target, target_pos, target_height) {
+    var my_pos = this.interpolate_pos(world);
     var my_height = (this.is_flying() ? this.altitude : 0);
     var my_muzzle_pos = my_pos;
 
@@ -3430,7 +3216,7 @@ GameObject.prototype.fire_projectile = function(fire_tick, fire_time, force_hit_
     // to avoid pathfinding issues wiht facing
 
     if('muzzle_offset' in this.spec) {
-        var facing = this.interpolate_facing();
+        var facing = this.interpolate_facing(world);
         // note: convert muzzle_offset from model coordinates (+z north) to map coordinates (-z north)
         var offset = v3_rotate_by_facing(facing, v3_mul([1,1,-1], this.spec['muzzle_offset']));
         my_muzzle_pos = vec_add(my_muzzle_pos, [offset[0], offset[2]]);
@@ -3448,7 +3234,7 @@ GameObject.prototype.fire_projectile = function(fire_tick, fire_time, force_hit_
             death_client_time += spell['kills_self_delay'];
         }
 
-        session.get_real_world().combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this, this));
+        world.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
@@ -3463,7 +3249,8 @@ GameObject.prototype.fire_projectile = function(fire_tick, fire_time, force_hit_
 };
 
 
-GameObject.prototype.ai_threatlist_update = function() {
+/** @param {!World.World} world */
+GameObject.prototype.ai_threatlist_update = function(world) {
     if(!this.spec['enable_ai_threatlist']) { return; }
     if(this.ai_threatlist !== null && !this.ai_threatlist_dirty) { return; }
 
@@ -3493,14 +3280,14 @@ GameObject.prototype.ai_threatlist_update = function() {
         // state that would change our choice of target will also
         // dirty the threatlist.
 
-        var ncells = session.viewing_base.ncells();
+        var ncells = world.base.ncells();
         aggro_radius = Math.sqrt(2)*Math.max(ncells[0], ncells[1]);
     } else {
         // turrets only look within weapon range
         aggro_radius = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     }
 
-    var targeting_result = this.ai_pick_target_classic_cached(auto_spell, auto_spell_level, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
+    var targeting_result = this.ai_pick_target_classic_cached(world, auto_spell, auto_spell_level, aggro_radius, false, prev_target_id, 'ai_threatlist_update');
     if(targeting_result && targeting_result.target) {
         this.ai_threatlist.push({'obj_id': targeting_result.target.id,
                                  'spec': targeting_result.target.spec.name,
@@ -3509,42 +3296,44 @@ GameObject.prototype.ai_threatlist_update = function() {
 };
 
 // find "best" thing to target within shoot_range (which may be <= 0, or longer than weapon range)
-/** @param {Object} auto_spell
+/** @param {!World.World} world
+    @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {number} shoot_range
     @param {boolean} nearest_only
     @param {string} tag */
-GameObject.prototype.ai_pick_target = function(auto_spell, auto_spell_level, shoot_range, nearest_only, tag) {
+GameObject.prototype.ai_pick_target = function(world, auto_spell, auto_spell_level, shoot_range, nearest_only, tag) {
     if(this.spec['enable_ai_threatlist']) {
         if(this.ai_threatlist !== null) {
-            return this.ai_pick_target_by_threatlist(auto_spell, auto_spell_level, shoot_range);
+            return this.ai_pick_target_by_threatlist(world, auto_spell, auto_spell_level, shoot_range);
         } else {
             // this can happen if A* is starved
             if(AI_DEBUG >= 2) { console.log(this.spec['name']+' no active threatlist!'); }
             return {target:null};
         }
     } else {
-        return this.ai_pick_target_classic(auto_spell, auto_spell_level, shoot_range, nearest_only, null, tag);
+        return this.ai_pick_target_classic(world, auto_spell, auto_spell_level, shoot_range, nearest_only, null, tag);
     }
 };
 
-/** @param {Object} auto_spell
+/** @param {!World.World} world
+    @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {number} shoot_range */
-GameObject.prototype.ai_pick_target_by_threatlist = function(auto_spell, auto_spell_level, shoot_range) {
+GameObject.prototype.ai_pick_target_by_threatlist = function(world, auto_spell, auto_spell_level, shoot_range) {
     // weed out dead objects
     this.ai_threatlist = goog.array.filter(this.ai_threatlist, function(a) {
-        var obj = session.cur_objects.get_object(a['obj_id']);
+        var obj = world.objects._get_object(a['obj_id']);
         if(!obj || obj.is_destroyed()) { return false; }
         return true;
     });
     if(this.ai_threatlist.length > 0) {
         var entry = this.ai_threatlist[0];
-        var obj = session.cur_objects.get_object(entry['obj_id']);
-        var his_pos = obj.interpolate_pos();
+        var obj = world.objects.get_object(entry['obj_id']);
+        var his_pos = obj.raw_pos();
         return {target: obj,
                 pos: his_pos,
-                dist: Math.max(0, vec_distance(this.interpolate_pos(), his_pos) - obj.hit_radius()),
+                dist: Math.max(0, vec_distance(this.raw_pos(), his_pos) - obj.hit_radius()),
                 path_end: (entry['path_end'] || null)};
     }
     return {target:null};
@@ -3557,13 +3346,14 @@ var ai_pick_target_classic_cache = {};
 var ai_pick_target_classic_cache_gen = -1;
 var ai_pick_target_classic_cache_hits = 0, ai_pick_target_classic_cache_misses = 0;
 
-/** @param {Object} auto_spell
+/** @param {!World.World} world
+    @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {number} shoot_range
     @param {boolean} nearest_only
     @param {string|null} prev_target_id
     @param {string} tag */
-GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
+GameObject.prototype.ai_pick_target_classic_cached = function(world, auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
     // this cache operates by sharing the targeting results for nearby identical units
     // "nearby" means not necessarily in the same grid cell, but in the same connectivity region, so that pathing remains valid!
     var CHUNK = this.spec['ai_pick_target_cache_chunk'] || (get_preference_setting(player.preferences, 'sg_ai_20150416') ? 12 : 0) || player.get_any_abtest_value('ai_pick_target_cache_chunk', gamedata['client']['ai_pick_target_cache_chunk']) || -1;
@@ -3572,16 +3362,16 @@ GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_s
     var key = null;
 
     if(!nearest_only && CHUNK >= 1) {
-        astar_context.ensure_connectivity();
-        if(astar_context.connectivity) {
+        world.astar_context.ensure_connectivity();
+        if(world.astar_context.connectivity) {
             // cache is operational
-            if(ai_pick_target_classic_cache_gen != astar_map.generation) {
-                ai_pick_target_classic_cache_gen = astar_map.generation;
+            if(ai_pick_target_classic_cache_gen != world.astar_map.generation) {
+                ai_pick_target_classic_cache_gen = world.astar_map.generation;
                 ai_pick_target_classic_cache = {};
             }
 
-            var cur_cell = this.interpolate_pos();
-            key = this.spec['name']+','+this.team+','+Math.floor(cur_cell[0]/CHUNK).toFixed(0)+','+Math.floor(cur_cell[1]/CHUNK).toFixed(0)+','+astar_context.connectivity.region_num(vec_floor(cur_cell)).toFixed(0)+','+auto_spell['name']+','+(auto_spell_level||1).toFixed(0)+','+shoot_range.toFixed(3)+','+(prev_target_id || 'null');
+            var cur_cell = this.raw_pos();
+            key = this.spec['name']+','+this.team+','+Math.floor(cur_cell[0]/CHUNK).toFixed(0)+','+Math.floor(cur_cell[1]/CHUNK).toFixed(0)+','+world.astar_context.connectivity.region_num(vec_floor(cur_cell)).toFixed(0)+','+auto_spell['name']+','+(auto_spell_level||1).toFixed(0)+','+shoot_range.toFixed(3)+','+(prev_target_id || 'null');
         }
     }
 
@@ -3589,7 +3379,7 @@ GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_s
         ai_pick_target_classic_cache_hits += 1;
         return ai_pick_target_classic_cache[key];
     }
-    var ret = this.ai_pick_target_classic(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag);
+    var ret = this.ai_pick_target_classic(world, auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag);
     if(key !== null) {
         ai_pick_target_classic_cache_misses += 1;
         ai_pick_target_classic_cache[key] = ret;
@@ -3597,13 +3387,14 @@ GameObject.prototype.ai_pick_target_classic_cached = function(auto_spell, auto_s
     return ret;
 };
 
-/** @param {Object} auto_spell
+/** @param {!World.World} world
+    @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {number} shoot_range
     @param {boolean} nearest_only
     @param {string|null} prev_target_id
     @param {string} tag */
-GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
+GameObject.prototype.ai_pick_target_classic = function(world, auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag) {
     var verbose = (AI_DEBUG >= 2 && this.is_mobile());
 
     var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
@@ -3641,7 +3432,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
     // in the future, this table could be used to cut down on the object query (by skipping objects whose priority would be <= 0)
 
-    var my_pos = this.interpolate_pos();
+    var my_pos = this.raw_pos();
 
     // do we want to bother querying for barriers?
     var exclude_barriers;
@@ -3653,7 +3444,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
         exclude_barriers = (this.team === 'player' && (get_preference_setting(player.preferences, 'auto_unit_control') || !get_preference_setting(player.preferences, 'target_barriers')));
     }
 
-    var obj_list = session.get_real_world().query_objects_within_distance(my_pos, shoot_range,
+    var obj_list = world.query_objects_within_distance(my_pos, shoot_range,
                                                  { ignore_object: this,
                                                    exclude_invul: true,
                                                    only_team: target_team,
@@ -3707,7 +3498,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
         }
 
         if(verbose) {
-            var s = 'considering target: '+obj.spec['name']+' at '+vec_print(obj.interpolate_pos());
+            var s = 'considering target: '+obj.spec['name']+' at '+vec_print(obj.raw_pos());
             if(debug_orig_target) { s += ' blocking '+debug_orig_target.spec['name']; }
             console.log(s);
         }
@@ -3733,7 +3524,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                                 clamp(Math.floor(my_pos[1]),0,ncells[1]-1)];
                 var dest_cell = [clamp(Math.floor(dest[0]),0,ncells[0]-1),
                                  clamp(Math.floor(dest[1]),0,ncells[1]-1)];
-                var accessible = astar_map.linear_path_is_clear(cur_cell, dest_cell) ? 1 : 0;
+                var accessible = world.astar_map.linear_path_is_clear(cur_cell, dest_cell) ? 1 : 0;
                 if(verbose) { console.log('    direct path clear? '+accessible.toString()); }
 
                 if(!accessible) { // straight-line path is not clear - try an A* path to any cell within shooting range of the target
@@ -3741,14 +3532,14 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
                     var test_point = vec_floor(pos);
                     var ring_size;
-                    if(!astar_map.is_blocked(test_point)) {
+                    if(!world.astar_map.is_blocked(test_point)) {
                         // destination itself is unblocked, try getting directly to it
                         ring_size = -1;
-                        test_path = astar_context.search(cur_cell, test_point);
+                        test_path = world.astar_context.search(cur_cell, test_point);
                     } else {
                         // need to search in an expanding ring for unblocked cells
                         ring_size = auto_spell_range + obj.hit_radius();
-                        test_path = astar_context.ring_search(cur_cell, test_point, ring_size);
+                        test_path = world.astar_context.ring_search(cur_cell, test_point, ring_size);
                     }
 
                     if(verbose) {
@@ -3786,7 +3577,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
                         if(verbose) {
                             console.log("    LOOKING FOR BLOCKERS cur "+vec_print(cur_cell)+' dest '+vec_print(dest_cell)+' team '+target_team+' obj '+obj.id+' spell '+auto_spell['name']+' range '+auto_spell_range.toString());
                         }
-                        var temp = this.ai_pick_target_find_blocker(cur_cell, dest_cell, target_team, obj, auto_spell, auto_spell_range,
+                        var temp = this.ai_pick_target_find_blocker(world, cur_cell, dest_cell, target_team, obj, auto_spell, auto_spell_range,
                                                                     // note: pass damage_vs, not priority_vs, to avoid including things like "barrier":0
                                                                     auto_spell['damage_vs'] || {});
                         if(temp) {
@@ -3821,7 +3612,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
             }
 
             if(verbose) {
-                var s = 'new best target! '+obj.spec['name']+' prio '+priority.toString()+' at '+vec_print(obj.interpolate_pos());
+                var s = 'new best target! '+obj.spec['name']+' prio '+priority.toString()+' at '+vec_print(obj.raw_pos());
                 if(debug_orig_target) { s += ' blocking '+debug_orig_target.spec['name']; }
                 console.log(s);
             }
@@ -3836,7 +3627,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 
     var ret = {target:ret_obj, pos:min_pos, dist:min_dist, /*priority:max_priority,*/ path_end:min_path_end};
     if(verbose) {
-        console.log(this.spec['name']+' '+this.id+' now targeting -> '+ret_obj.spec['name']+' at '+vec_print(ret_obj.interpolate_pos()));
+        console.log(this.spec['name']+' '+this.id+' now targeting -> '+ret_obj.spec['name']+' at '+vec_print(ret_obj.raw_pos()));
         //console.log(ret);
     }
     return ret;
@@ -3845,6 +3636,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
 /** This function is called from the target-picking code when a target object is not accessibly by any clear path.
     It tries to find the best blocking object to break to clear the way. (note: regular buildings can also count
     as "blockers", it doesn't have to be a barrier).
+    @param {!World.World} world
     @param {!Array.<number>} cur_cell - where we are now
     @param {!Array.<number>} dest_cell - where we want to go (might be blocked)
     @param {string} target_team - limit candidate objects to those on this team
@@ -3854,7 +3646,7 @@ GameObject.prototype.ai_pick_target_classic = function(auto_spell, auto_spell_le
     @param {!Object.<string,number>} priority_table - scales our expected damage against various targets
     @return {{blocker:!GameObject, blocker_path_end: !Array.<number>}|null} - the blocking object, and the nearby cell coordinates from which we can hit it */
 // XXX should be a member of Mobile, not GameObject
-GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell, target_team, obj, auto_spell, auto_spell_range, priority_table) {
+GameObject.prototype.ai_pick_target_find_blocker = function(world, cur_cell, dest_cell, target_team, obj, auto_spell, auto_spell_range, priority_table) {
     var blocker = null;
     var blocker_path_end = null;
 
@@ -3899,16 +3691,15 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
 
         // enlarge iter_limit because we want to work very hard to find a path.
         // if no path is found to a valid target, the unit will get stuck "marching in place!"
-        var old_limit = astar_context.iter_limit;
-        //astar_context.iter_limit = 2 * Math.ceil(ring_size) * Math.max(ncells[0],ncells[1]); // -1;
-        var path = astar_context.search(cur_cell, dest_cell, checker, checker_key);
-        astar_context.iter_limit = old_limit;
+        var old_limit = world.astar_context.iter_limit;
+        var path = world.astar_context.search(cur_cell, dest_cell, checker, checker_key);
+        world.astar_context.iter_limit = old_limit;
 
         if(path && path.length > 0) {
             for(var i = 0; i < path.length; i++) {
                 var cell_pos = path[i];
-                if(astar_map.is_blocked(cell_pos) === AStar.PASS) { continue; } // ignore clear steps along path
-                var blocker_list = astar_map.cell(cell_pos).blockers;
+                if(world.astar_map.is_blocked(cell_pos) === AStar.PASS) { continue; } // ignore clear steps along path
+                var blocker_list = world.astar_map.cell(cell_pos).blockers;
                 if(!blocker_list) { continue; }
                 for(var k = 0; k < blocker_list.length; k++) {
                     var b = blocker_list[k];
@@ -3919,7 +3710,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
                         // XXX could optimize by going further back along path to edge of weapon range
                         blocker_path_end = (i > 0 ? path[i-1] : vec_copy(cur_cell));
                         //console.log('astar_accessibility FOUND '+blocker.spec['name']+' at '+vec_print(blocker_path_end));
-                        playfield_check_pos(blocker_path_end, 'blocker_path_end');
+                        world.playfield_check_pos(blocker_path_end, 'blocker_path_end');
                         break;
                     }
                 }
@@ -3934,13 +3725,13 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
 
     // Naive/greedy blocker detection: march along the straight line from cur to dest, picking the closest reachable obstacle along it.
     // This could be improved by using A* with a cost function.
-    var straight_path = astar_map.get_linear_path(cur_cell, dest_cell);
+    var straight_path = world.astar_map.get_linear_path(cur_cell, dest_cell);
 
     // Alternatively, this iteration could be done using astar_map, now that it can remember which objects are responsible for blocking a cell.
     // It would probably be faster that way.
     for(var j = 0; j < straight_path.length; j++) {
         // XXX note: this will return slightly different results depending on map_accel_chunk!
-        var blocker_list = session.get_real_world().voxel_map_accel.objects_near_xy(straight_path[j], target_team);
+        var blocker_list = world.voxel_map_accel.objects_near_xy(straight_path[j], target_team);
         if(!blocker_list) { continue; }
         var min_blocker_dist = Infinity; // use minimum distance from us to blocker to break ties
         for(var k = 0; k < blocker_list.length; k++) {
@@ -3954,23 +3745,23 @@ GameObject.prototype.ai_pick_target_find_blocker = function(cur_cell, dest_cell,
                 // nearby objects returned by voxel_map_accel, instead of only the ones that block their path!
                 if(!b.covers_any_of(straight_path)) { continue; }
 
-                var b_pos = b.interpolate_pos();
+                var b_pos = b.raw_pos();
                 var d = vec_distance(b_pos, cur_cell);
                 if(d < min_blocker_dist) {
                     // construct linear path towards blocker
-                    var b_path = astar_map.get_linear_path(cur_cell, b_pos);
+                    var b_path = world.astar_map.get_linear_path(cur_cell, b_pos);
 
                     // march along the linear path, trying to get in range before hitting a blocker
                     for(var p = 0; p < b_path.length; p++) {
                         var pt = b_path[p];
-                        if(p > 0 && astar_map.is_blocked(vec_floor(pt))) {
+                        if(p > 0 && world.astar_map.is_blocked(vec_floor(pt))) {
                             break; // can't get directly to this blocker
                         }
                         // in range yet?
                         if(vec_distance(pt, b_pos) - b.hit_radius() <= auto_spell_range) {
                             // found a viable blocker!
                             blocker_path_end = pt;
-                            playfield_check_pos(blocker_path_end, 'blocker_path_end');
+                            world.playfield_check_pos(blocker_path_end, 'blocker_path_end');
                             blocker = b;
                             min_blocker_dist = d;
                             break;
@@ -4001,16 +3792,18 @@ GameObject.prototype.ai_shoot = function(auto_spell, target) {
     this.control_target = target;
 };
 
-// AI-level function - set control state to move to a location. "target" is an optional target object to set as control_target
-// XXX should be a member of Mobile, not GameObject
+/** AI-level function - set control state to move to a location. "target" is an optional target object to set as control_target
+    XXX should be a member of Mobile, not GameObject
+    @param {Array<number>|null} new_dest
+    @param {GameObject|null} target
+    @param {string} reason */
 GameObject.prototype.ai_move_towards = function(new_dest, target, reason) {
     if(!new_dest) { this.ai_stop(); return; } // nowhere to go
-    playfield_check_pos(new_dest, 'ai_move_towards ('+reason+')');
 
     this.control_spellname = null;
     this.control_target = target || null;
 
-    if(vec_equals(this.interpolate_pos(), new_dest)) {
+    if(vec_equals(this.raw_pos(), new_dest)) {
         this.control_state = control_states.CONTROL_STOP; // already here
         this.dest = new_dest;
     } else {
@@ -4024,11 +3817,12 @@ GameObject.prototype.ai_move_towards = function(new_dest, target, reason) {
     }
 };
 
-// AI-level function - set control state to attack or pursue a target, as retured by ai_pick_target()
-/** @param {Object} auto_spell
+/** AI-level function - set control state to attack or pursue a target, as retured by ai_pick_target()
+    @param {!World.World} world
+    @param {Object} auto_spell
     @param {number} auto_spell_level
     @param {Object} targeting_result */
-GameObject.prototype.ai_pursue_target = function(auto_spell, auto_spell_level, targeting_result) {
+GameObject.prototype.ai_pursue_target = function(world, auto_spell, auto_spell_level, targeting_result) {
     var auto_spell_range = gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['range'], auto_spell_level) * this.combat_stats.weapon_range;
     var auto_spell_eff_range = ('effective_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['effective_range'], auto_spell_level) * this.combat_stats.effective_weapon_range : auto_spell_range;
     var auto_spell_min_range = ('min_range' in auto_spell) ? gamedata['map']['range_conversion'] * get_leveled_quantity(auto_spell['min_range'], auto_spell_level) : -1; // * Math.max(1,this.combat_stats.weapon_range); ?
@@ -4048,16 +3842,16 @@ GameObject.prototype.ai_pursue_target = function(auto_spell, auto_spell_level, t
         var dest;
         if(targeting_result.path_end) {
             dest = targeting_result.path_end;
-            playfield_check_pos(dest, 'ai_pursue_target (targeting_result.path_end)');
+            world.playfield_check_pos(dest, 'ai_pursue_target (targeting_result.path_end)');
         } else {
             dest = targeting_result.pos;
             var reason = 'targeting_result.pos';
 
             if(gamedata['enable_accurate_target_selection_distance'] &&
-               (targeting_result.dist > 0 || astar_map.is_blocked(vec_floor(dest)))) {
+               (targeting_result.dist > 0 || world.astar_map.is_blocked(vec_floor(dest)))) {
                 // move to nearest edge of target, not center of target
                 // (not sure about the is_blocked check - when dist is zero so that unit will stay in place (dest = my_pos) (?))
-                var my_pos = this.interpolate_pos();
+                var my_pos = this.raw_pos();
                 var delta = vec_sub(targeting_result.pos, my_pos);
                 var full_len = vec_length(delta);
                 if(targeting_result.dist < full_len) {
@@ -4065,7 +3859,7 @@ GameObject.prototype.ai_pursue_target = function(auto_spell, auto_spell_level, t
                     reason = 'targeting_result.pos -> accurate';
                 }
             }
-            playfield_check_pos(dest, 'ai_pursue_target ('+reason+')');
+            world.playfield_check_pos(dest, 'ai_pursue_target ('+reason+')');
         }
         this.ai_move_towards(dest, this.ai_target, 'ai_pursue_target');
     } else {
@@ -4078,8 +3872,9 @@ GameObject.prototype.ai_pursue_target = function(auto_spell, auto_spell_level, t
     }
 };
 
-// move on to next queued order, defaulting to AI_ATTACK_ANY (and returning true) if none apply
-GameObject.prototype.next_ai_order = function() {
+/** move on to next queued order, defaulting to AI_ATTACK_ANY (and returning true) if none apply
+    @param {!World.World} world */
+GameObject.prototype.next_ai_order = function(world) {
     this.state_dirty |= obj_state_flags.ORDERS;
 
     if(this.orders.length > 0) {
@@ -4100,22 +3895,23 @@ GameObject.prototype.next_ai_order = function() {
             // not sure if we want to also apply this to enemy units invading player's home base
             dest = null;
         } else {
-            dest = this.interpolate_pos();
+            dest = this.raw_pos();
         }
 
         // quantize dest
         if(dest) { dest = [Math.floor(dest[0]), Math.floor(dest[1])]; }
 
         var order = {'state': ai_states.AI_ATTACK_ANY, 'dest': dest};
-        this.new_order(order, true);
+        this.new_order(world, order, true);
         return true;
     } else {
-        this.apply_orders();
+        this.apply_orders(world);
     }
     return false;
 };
 
-GameObject.prototype.run_ai = function() {
+/** @param {!World.World} world */
+GameObject.prototype.run_ai = function(world) {
     var auto_spell = this.get_auto_spell();
     var auto_spell_level = this.get_auto_spell_level();
     var auto_spell_range, auto_spell_eff_range, auto_spell_min_range;
@@ -4137,19 +3933,19 @@ GameObject.prototype.run_ai = function() {
         // if the target is dead, switch to AI_ATTACK_ANY
         if(this.ai_target === null || this.ai_target.is_destroyed()) {
             this.ai_target = null;
-            this.next_ai_order();
+            this.next_ai_order(world);
         } else if(!(auto_spell['targets_air'] || this.combat_stats.anti_air) && this.ai_target.is_flying()) {
             // prevent non-anti-air weapons from shooting at air target
             this.ai_target = null;
-            this.next_ai_order();
+            this.next_ai_order(world);
         } else if(!auto_spell['targets_ground'] && !this.ai_target.is_flying()) {
             // prevent anti-air-only weapons from shooting at ground target
             this.ai_target = null;
-            this.next_ai_order();
+            this.next_ai_order(world);
         } else {
-            var target_pos = this.ai_target.interpolate_pos();
-            var dist = vec_distance(this.interpolate_pos(), target_pos) - this.ai_target.hit_radius();
-            this.ai_pursue_target(auto_spell, auto_spell_level, {target:this.ai_target, pos:target_pos, dist:dist});
+            var target_pos = this.ai_target.raw_pos();
+            var dist = vec_distance(this.raw_pos(), target_pos) - this.ai_target.hit_radius();
+            this.ai_pursue_target(world, auto_spell, auto_spell_level, {target:this.ai_target, pos:target_pos, dist:dist});
         }
     }
 
@@ -4182,7 +3978,7 @@ GameObject.prototype.run_ai = function() {
         if(leash_radius > 0 &&
            (this.ai_state === ai_states.AI_ATTACK_ANY || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO) &&
            this.ai_dest) {
-            leash_distance = vec_distance(this.interpolate_pos(), this.ai_dest);
+            leash_distance = vec_distance(this.raw_pos(), this.ai_dest);
 
             // check leash before shooting
             if(player.get_any_abtest_value('enable_leash_radius_while_shooting', gamedata['enable_leash_radius_while_shooting'])) {
@@ -4201,12 +3997,12 @@ GameObject.prototype.run_ai = function() {
         if(this.is_mobile() && this.ai_state !== ai_states.AI_ATTACK_STATIONARY && (gamedata['enable_global_targeting'] || auto_spell['global_targeting'])) {
             targeting_result = null; // skip directly to the aggro-range query
         } else if(shoot_range > 0) {
-            targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, shoot_range, false, 'enemies_near');
+            targeting_result = this.ai_pick_target(world, auto_spell, auto_spell_level, shoot_range, false, 'enemies_near');
         }
 
         if(targeting_result && targeting_result.target) {
             // a target has been found within max weapon range
-            this.ai_pursue_target(auto_spell, auto_spell_level, targeting_result);
+            this.ai_pursue_target(world, auto_spell, auto_spell_level, targeting_result);
 
             // BUT, as a special case, if we are mobile and shooting at a
             // nonmobile, non-dangerous target, and we are being
@@ -4218,12 +4014,12 @@ GameObject.prototype.run_ai = function() {
                this.last_attacker && !this.last_attacker.is_destroyed() && (this.last_attacker.is_mobile() || this.last_attacker.is_building()) &&
                ((auto_spell['targets_ground'] && !this.last_attacker.is_flying()) ||
                 ((auto_spell['targets_air'] || this.combat_stats.anti_air) && this.last_attacker.is_flying())) &&
-               vec_distance(this.interpolate_pos(), this.last_attacker.interpolate_pos()) <= this.last_attacker.weapon_range()[1] &&
+               vec_distance(this.raw_pos(), this.last_attacker.raw_pos()) <= this.last_attacker.weapon_range()[1] &&
                !(auto_spell['help'] || 0)) {
                 //console.log('SPECIAL CASE: SWITCHING TARGET TO '+this.last_attacker.spec['name']);
 
-                var last_attacker_pos = this.last_attacker.interpolate_pos();
-                this.ai_pursue_target(auto_spell, auto_spell_level, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.interpolate_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
+                var last_attacker_pos = this.last_attacker.raw_pos();
+                this.ai_pursue_target(world, auto_spell, auto_spell_level, {target:this.last_attacker, pos:last_attacker_pos, dist:vec_distance(this.raw_pos(), last_attacker_pos) - this.last_attacker.hit_radius()});
             }
 
         } else {
@@ -4290,10 +4086,10 @@ GameObject.prototype.run_ai = function() {
                     // unexpectedly change combat AI behavior in old
                     // games, so optionally use the old behavior.
                     var bad_long_range_targeting = !gamedata['enable_prioritized_long_range_targeting'];
-                    var long_range_targeting_result = this.ai_pick_target(auto_spell, auto_spell_level, aggro_radius, bad_long_range_targeting, 'enemies_far');
+                    var long_range_targeting_result = this.ai_pick_target(world, auto_spell, auto_spell_level, aggro_radius, bad_long_range_targeting, 'enemies_far');
 
                     if(long_range_targeting_result && long_range_targeting_result.target) {
-                        this.ai_pursue_target(auto_spell, auto_spell_level, long_range_targeting_result);
+                        this.ai_pursue_target(world, auto_spell, auto_spell_level, long_range_targeting_result);
                     } else if(this.ai_dest) {
                         // leash back to "home" location
                         this.ai_move_towards(this.ai_dest, null, 'leash');
@@ -4308,7 +4104,7 @@ GameObject.prototype.run_ai = function() {
     }
 
     if('special_ai' in this.spec) {
-        read_consequent(this.spec['special_ai']).execute({'source_obj':this}); // , 'xy': this.interpolate_pos()});
+        read_consequent(this.spec['special_ai']).execute({'source_obj':this}); // , 'xy': this.raw_pos()});
     }
 };
 
@@ -4329,27 +4125,27 @@ function get_grid_bounds(xy, gridsize) {
             [xy[1]-half[1], xy[1]+half[1]+extra[1]]];
 }
 
-/**
+/** @param {!World.World} world
  * Instantiate any permanent SPFX effect specified by this object's spec and stores a reference to it
  * in this.permanent_effect. Does nothing if that effect has already been created.
  */
-GameObject.prototype.update_permanent_effect = function() {
+GameObject.prototype.update_permanent_effect = function(world) {
     if(this.is_destroyed() || this.is_under_construction()) {
-        this.remove_permanent_effect();
+        this.remove_permanent_effect(world);
         return;
     }
 
     var fx = this.get_leveled_quantity(this.spec['permanent_effect'] || null);
     if(!fx) {
-        this.remove_permanent_effect();
+        this.remove_permanent_effect(world);
         return;
     }
 
-    var pos = this.interpolate_pos();
+    var pos = this.interpolate_pos(world);
 
     // if we already have an effect, but it's the wrong one, then remove it
     if(this.permanent_effect && (this.permanent_effect_source !== fx)) {
-        this.remove_permanent_effect();
+        this.remove_permanent_effect(world);
     }
 
     if(this.permanent_effect) {
@@ -4357,17 +4153,17 @@ GameObject.prototype.update_permanent_effect = function() {
         this.permanent_effect.reposition([pos[0], this.altitude || 0, pos[1]]);
     } else {
         // create new effect
-        this.permanent_effect = this.world.fxworld.add_visual_effect_at_time(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
+        this.permanent_effect = world.fxworld.add_visual_effect_at_time(pos, this.altitude || 0, [0, 1, 0], client_time, fx, true, null);
         this.permanent_effect_source = fx;
     }
 };
 
-/**
+/** @param {!World.World} world
  * Removes any permanent SPFX effects attached to this object.
  */
-GameObject.prototype.remove_permanent_effect = function() {
+GameObject.prototype.remove_permanent_effect = function(world) {
     if(this.permanent_effect) {
-        this.world.fxworld.remove(this.permanent_effect);
+        world.fxworld.remove(this.permanent_effect);
         this.permanent_effect = null;
         this.permanent_effect_source = null;
     }
@@ -4380,6 +4176,9 @@ GameObject.prototype.remove_permanent_effect = function() {
 function MapBlockingGameObject() {
     goog.base(this);
 
+    /** @type {World.World|null} world we've been added to */
+    this.world = null;
+
     // NESW neighbor presence - this is how much to ADD to bound size in each direction because of the presence or absence of a neighbor.
     // Only updated by WallManager.
     this.neighbors = [0,0,0,0];
@@ -4391,33 +4190,44 @@ goog.inherits(MapBlockingGameObject, GameObject);
 
 MapBlockingGameObject.prototype.is_blocker = function() { return true; };
 
+/** @override */
+MapBlockingGameObject.prototype.on_added_to_world = function(world) {
+    if(this.world !== null) { throw Error('already added to world'); }
+    this.world = world;
+    this.update_map(null, [this.x,this.y], this.is_destroyed(), 'on_added_to_world');
+};
+
+/** @override */
 MapBlockingGameObject.prototype.receive_state = function(data, init, is_deploying) {
     var old_x = this.x, old_y = this.y;
     var was_destroyed = (this.spec ? this.is_destroyed() : false);
 
     goog.base(this, 'receive_state', data, init, is_deploying);
 
-    this.update_map([old_x, old_y], was_destroyed, 'receive_state(destr '+(was_destroyed?'1':'0')+'->'+(this.is_destroyed()?'1':'0'));
+    this.update_map(this.world, [old_x, old_y], was_destroyed, 'receive_state(destr '+(was_destroyed?'1':'0')+'->'+(this.is_destroyed()?'1':'0'));
 };
 
 /** Update collision data structure after a possible change in position and destruction state
+    @param {World.World|null} old_world
     @param {!Array.<number>} old_xy
     @param {boolean} was_destroyed before this update
     @param {string} reason, for debugging */
-MapBlockingGameObject.prototype.update_map = function(old_xy, was_destroyed, reason) {
+MapBlockingGameObject.prototype.update_map = function(old_world, old_xy, was_destroyed, reason) {
     // update collision data structure
-    if(this.x != old_xy[0] || this.y != old_xy[1] || was_destroyed != this.is_destroyed()) {
-        if(old_xy[0] != -1 && old_xy[1] != -1 && !was_destroyed) {
+    if(this.world !== old_world || this.x != old_xy[0] || this.y != old_xy[1] || was_destroyed != this.is_destroyed()) {
+        if(old_world && old_xy[0] != -1 && old_xy[1] != -1 && !was_destroyed) {
             // unblock old location
             this.block_map_at(old_xy, -1, reason);
         }
         // block new location
-        if(!this.is_destroyed()) {
+        if(this.world && !this.is_destroyed()) {
             this.block_map(1, reason);
         }
 
-        var wall_mgr = session.get_real_world().wall_mgr;
-        if(wall_mgr && wall_mgr.spec === this.spec) { wall_mgr.dirty = true; }
+        if(this.world) {
+            var wall_mgr = this.world.wall_mgr;
+            if(wall_mgr && wall_mgr.spec === this.spec) { wall_mgr.dirty = true; }
+        }
     }
 };
 
@@ -4463,7 +4273,7 @@ MapBlockingGameObject.prototype.block_map_at = function(xy, incr, reason) {
     var bounds = this.current_collision_bounds(xy);
     if(!reason || typeof(reason) !== 'string') { throw Error('bad reason'); }
     this.debug_block_history.push({'xy':xy, 'incr':incr, 'reason':reason});
-    astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
+    this.world.astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
     invalidate_unit_paths();
     invalidate_all_threatlists();
 };
@@ -4483,13 +4293,13 @@ MapBlockingGameObject.prototype.hit_radius = function() {
     return rad;
 };
 
-// as a special case, destroyed map objects are pushed backwards in Z order
-MapBlockingGameObject.prototype.calc_draw_pos = function() {
+/** @override as a special case, destroyed map objects are pushed backwards in Z order */
+MapBlockingGameObject.prototype.calc_draw_pos = function(world) {
     // in space, drop buildings downward
-    var flat = (this.is_building() && session.viewing_base.base_climate_data['fly_at_ground_level']);
+    var flat = (this.is_building() && world && world.base.base_climate_data['fly_at_ground_level']);
 
     if(!this.is_destroyed() && !flat) {
-        return goog.base(this, 'calc_draw_pos');
+        return goog.base(this, 'calc_draw_pos', world);
     }
 
     var p = [this.x - this.spec['unit_collision_gridsize'][0]/2,
@@ -4498,8 +4308,9 @@ MapBlockingGameObject.prototype.calc_draw_pos = function() {
     return [[this.x, this.y], depth];
 };
 
-MapBlockingGameObject.prototype.detect_click = function(xy, ji, zoom, fuzz) {
-    var pos = this.interpolate_pos();
+/** @override */
+MapBlockingGameObject.prototype.detect_click = function(world, xy, ji, zoom, fuzz) {
+    var pos = this.interpolate_pos(world);
     // check orthogonal grid position against object's base area
     var bounds = get_grid_bounds(pos, this.spec['gridsize']);
     if(ji[0] >= bounds[0][0] && ji[0] < bounds[0][1] && ji[1] >= bounds[1][0] && ji[1] < bounds[1][1]) {
@@ -4514,7 +4325,7 @@ MapBlockingGameObject.prototype.detect_click = function(xy, ji, zoom, fuzz) {
         }
     } else if(this.spec['click_detection'] == 'sprite') {
         var asset = GameArt.assets[this.get_leveled_quantity(this.spec['art_asset'])];
-        if(asset.detect_click(ortho_to_screen(pos), this.interpolate_facing(), client_time, 'normal', xy, view_zoom, fuzz)) {
+        if(asset.detect_click(ortho_to_screen(pos), this.interpolate_facing(world), client_time, 'normal', xy, view_zoom, fuzz)) {
             return true;
         }
     }
@@ -4532,6 +4343,7 @@ function Inert() {
     this.collect_sent = false;
 }
 goog.inherits(Inert, MapBlockingGameObject);
+/** @override */
 Inert.prototype.receive_state = function(data, init, is_deploying) {
     goog.base(this, 'receive_state', data, init, is_deploying);
     this.metadata = data.shift();
@@ -4542,8 +4354,13 @@ Inert.prototype.serialize = function() {
     ret['metadata'] = deepcopy(this.metadata);
     return ret;
 };
-// as a special case, "flat" inert objects are pushed backwards in Z order
-Inert.prototype.calc_draw_pos = function() {
+/** @override */
+Inert.prototype.apply_snapshot = function(snap) {
+    goog.base(this, 'apply_snapshot', snap);
+    this.metadata = snap['metadata'];
+};
+/** @override as a special case, "flat" inert objects are pushed backwards in Z order */
+Inert.prototype.calc_draw_pos = function(world) {
     if(this.spec['draw_flat']) {
         // use depth of the far northwest corner rather than the center
         var p = [this.x - this.spec['gridsize'][0]/2,
@@ -4554,7 +4371,7 @@ Inert.prototype.calc_draw_pos = function() {
         depth += 1000*depth_bias;
         return [[this.x, this.y], depth];
     } else {
-        return goog.base(this, 'calc_draw_pos');
+        return goog.base(this, 'calc_draw_pos', world);
     }
 };
 
@@ -4619,6 +4436,12 @@ Building.prototype.serialize = function() {
     ret['modstats'] = deepcopy_obj(this.modstats); // ?
     return ret;
 };
+/** @override */
+Building.prototype.apply_snapshot = function(snap) {
+    goog.base(this, 'apply_snapshot', snap);
+    this.disarmed = snap['disarmed'];
+    this.modstats = snap['modstats'];
+};
 
 Building.prototype.request_sync = function() { this.sync_marker = synchronizer.request_sync(); return this.sync_marker; };
 Building.prototype.is_in_sync = function() { return synchronizer.is_in_sync(this.sync_marker); };
@@ -4641,7 +4464,7 @@ Building.prototype.get_client_prediction = function(field, original) {
 };
 
 Building.update_modstats = function(team, update) {
-    goog.object.forEach(session.cur_objects.objects, function(obj, id) {
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team == team) {
             obj.modstats = (obj.id in update ? update[obj.id] : {});
 
@@ -4673,6 +4496,7 @@ Building.prototype.get_auto_spell_level = function() {
     return this.get_stat('weapon_level', this.level);
 };
 
+/** @override */
 Building.prototype.receive_state = function(data, init, is_deploying) {
     var old_level = this.level;
     var old_manuf_queue = this.manuf_queue;
@@ -4739,7 +4563,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
                            this.spec['upgrade_finish_effect'] :
                            gamedata['client']['vfx']['building_upgrade_finish']);
             if(fx_data) {
-                this.world.fxworld.add_visual_effect_at_time([this.x,this.y], 0, [0,1,0], client_time, fx_data,
+                session.get_real_world().fxworld.add_visual_effect_at_time([this.x,this.y], 0, [0,1,0], client_time, fx_data,
                                                !this.spec['worth_less_xp'], // no sound for barrier upgrades
                                                { '%OBJECT_SPRITE': this.get_leveled_quantity(this.spec['art_asset'])});
             }
@@ -4783,13 +4607,11 @@ Building.prototype.minefield_item = function() {
 
 // search session for any player-owned minefield building
 var find_any_player_minefield = function() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_minefield() && obj.team === 'player') {
             return obj;
         }
-    }
-    return null;
+    });
 };
 
 Building.prototype.is_producer = function() {
@@ -5235,8 +5057,9 @@ Building.prototype.get_idle_state_appearance = function() {
     return null;
 };
 
-Building.prototype.detect_click = function(xy, ji, zoom, fuzz) {
-    if(goog.base(this, 'detect_click', xy, ji, zoom, fuzz)) {
+/** @override */
+Building.prototype.detect_click = function(world, xy, ji, zoom, fuzz) {
+    if(goog.base(this, 'detect_click', world, xy, ji, zoom, fuzz)) {
         return true;
     }
     if(!this.spec['worth_less_xp'] && player.get_any_abtest_value('idle_icon_type', gamedata['client']['idle_icon_type'] || 'old') == 'advanced') {
@@ -6191,12 +6014,11 @@ player.foreman_is_busy = function() {
 player.foreman_get_tasks = function() {
     var tasks = [];
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_using_foreman()) {
             tasks.push(obj);
         }
-    }
+    });
 
     return tasks;
 };
@@ -6206,13 +6028,11 @@ player.foreman_get_tasks = function() {
 player.foremen_in_use = function() { return player.foreman_get_tasks().length; };
 
 player.all_minefields_armed = function() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return !session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team == 'player' && obj.is_minefield() && !obj.is_minefield_armed()) {
-            return false;
+            return true;
         }
-    }
-    return true;
+    });
 };
 
 player.alliance_building_is_busy = function() {
@@ -6383,6 +6203,7 @@ player.is_building_location_valid = function(ji, spec, myself, options) {
     return player.is_building_location_valid_detailed(ji, spec, myself, options)[0];
 };
 player.is_building_location_valid_detailed = function(ji, spec, myself, options) {
+    var world = session.get_real_world();
     var gridsize = spec['gridsize'];
 
     if(spec['quantize_location']) { // enforce quantization
@@ -6396,9 +6217,9 @@ player.is_building_location_valid_detailed = function(ji, spec, myself, options)
     var bound = get_grid_bounds(ji, gridsize);
 
     // check against base size
-    var ncells = session.viewing_base.ncells();
-    var mid = session.viewing_base.midcell();
-    var rad = session.viewing_base.get_base_radius();
+    var ncells = world.base.ncells();
+    var mid = world.base.midcell();
+    var rad = world.base.get_base_radius();
 
     // allow outside perimeter in developer mode
     if(player.is_cheater || (options && options.ignore_perimeter)) {
@@ -6431,7 +6252,7 @@ player.is_building_location_valid_detailed = function(ji, spec, myself, options)
                     continue;
                 }
             }
-            if(astar_map.is_blocked([u,v])) {
+            if(world.astar_map.is_blocked([u,v])) {
                 return [false,'overlap'];
             }
         }
@@ -6446,8 +6267,8 @@ player.is_building_location_valid_detailed = function(ji, spec, myself, options)
     var excl_bound = [[bound[0][0]-zone[0], bound[0][1]+zone[0]],
                       [bound[1][0]-zone[1], bound[1][1]+zone[1]]];
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    for(var id in world.objects.objects) {
+        var obj = world.objects.objects[id];
         if(obj !== myself && obj.is_building()) {
             var hisbound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
             // if OTHER object has an exclusion zone, then apply OUR exclusion zone
@@ -6569,14 +6390,13 @@ player.map_bookmark_delete = function(region_id, coords) {
 
 player.get_max_storage = function() {
     var ret = goog.object.map(gamedata['resources'], function() { return 0; });
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && !obj.spec['worth_less_xp'] && !obj.is_under_construction()) {
             for(var res in gamedata['resources']) {
                 ret[res] += obj.get_leveled_quantity(obj.spec['storage_'+res] || 0);
             }
         }
-    }
+    });
     return ret;
 };
 
@@ -6808,13 +6628,11 @@ enemy.is_legacy_pvp_player = function() {
 };
 
 player.get_townhall = function() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.team === 'player' && obj.spec['name'] === gamedata['townhall']) {
             return obj;
         }
-    }
-    return null;
+    });
 };
 player.get_townhall_level = function() {
     var cc = player.get_townhall();
@@ -6973,14 +6791,14 @@ function find_any_compatible_building(item_spec) {
     for(var i = 0; i < crit_list.length; i++) {
         var crit = crit_list[i];
         if(crit['kind'] === 'building') {
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            var ok_obj = session.for_each_real_object(function(obj) {
                 if(obj.spec['equip_slots'] && crit['slot_type'] in obj.spec['equip_slots'] &&
                    equip_is_compatible_with_building(obj, crit['slot_type'], item_spec, true) &&
                    obj.team === 'player') {
                     return obj;
                 }
-            }
+            });
+            if(ok_obj) { return ok_obj; }
         }
     }
     return null;
@@ -7049,7 +6867,7 @@ player.equipped_item_iter = function(func) {
         });
     });
     if(stop) { return; }
-    goog.object.forEach(session.cur_objects.objects, function(obj) {
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team === 'player') {
             if(obj.equipment) {
                 goog.object.forEach(obj.equipment, function(name_list, slot_type) {
@@ -7071,7 +6889,7 @@ player.mail_attachments_iter = function(func) {
 /** Iterate through all crafting queues for ingredients and products
     @param {function(Object, (EquipSlotAddress|null)):(boolean|undefined)} func (return true to stop iteration) */
 player.crafting_queue_ingredients_and_products_iter = function(func) {
-    goog.object.forEach(session.cur_objects.objects, function(obj) {
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team === 'player' && obj.is_crafter() && obj.is_crafting()) {
             goog.array.forEach(obj.get_crafting_queue(), function(bus) {
                 var recipe_name = bus['craft']['recipe'];
@@ -7473,8 +7291,13 @@ player.get_leveled_quantity = function(qty) {
     }
 };
 
+/** @param {!World.World} world
+    @param {!Array<number>} xy0
+    @param {!Array<number>} xy1
+    @param {Object|null} look_for_spec
+    @return {!Array<!GameObject>} */
 // note: only looks at friendly units, used for drag selection
-function find_objects_in_screen_rect(xy0, xy1, look_for_spec) {
+function find_objects_in_screen_rect(world, xy0, xy1, look_for_spec) {
     var found_units = [];
     var mouserect = [ [xy0[0], xy1[0]],
                       [xy0[1], xy1[1]] ];
@@ -7482,22 +7305,26 @@ function find_objects_in_screen_rect(xy0, xy1, look_for_spec) {
     // drag-selection seems to feel better with a smaller amount of fuzz than click-selection
     var position_fuzz = 2;
 
-    for(var id in session.cur_objects.objects) {
-        var temp = session.cur_objects.objects[id];
-        if(look_for_spec && (temp.spec !== look_for_spec)) { continue; }
-        if(!temp.is_mobile()) { continue; }
-        if(temp.is_destroyed()) { continue; }
-        if(temp.team != 'player' || (session.is_quarry() && !session.has_deployed && session.region.data['storage'] != 'nosql')) { continue; }
-        var objji = temp.interpolate_pos();
+    world.objects.for_each(function(temp) {
+        if(look_for_spec && (temp.spec !== look_for_spec)) { return; }
+        if(!temp.is_mobile()) { return; }
+        if(temp.is_destroyed()) { return; }
+        if(temp.team != 'player' || (session.is_quarry() && !session.has_deployed && session.region.data['storage'] != 'nosql')) { return; }
+        var objji = temp.interpolate_pos(world);
         var asset = GameArt.assets[temp.get_leveled_quantity(temp.spec['art_asset'])];
-        if(asset.detect_rect(ortho_to_screen(objji), temp.interpolate_facing(), client_time, 'normal', mouserect, view_zoom, position_fuzz)) {
+        if(asset.detect_rect(ortho_to_screen(objji), temp.interpolate_facing(world), client_time, 'normal', mouserect, view_zoom, position_fuzz)) {
             found_units.push(temp);
         }
-    }
+    });
     return found_units;
 };
 
-function find_object_at_screen_pixel(xy, ji, include_unselectable) {
+/** @param {!World.World} world
+    @param {!Array<number>} xy
+    @param {!Array<number>} ji
+    @param {boolean} include_unselectable
+    @return {GameObject|null} */
+function find_object_at_screen_pixel(world, xy, ji, include_unselectable) {
     // note: prioritize units over buildings if there is any overlap
     // also sort units by Z order
     var found_units = [];
@@ -7510,35 +7337,34 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
     }
 
     // could speed up with some form of 2D data structure
-    for(var id in session.cur_objects.objects) {
-        var temp = session.cur_objects.objects[id];
-        var objji = temp.interpolate_pos();
+    world.objects.for_each(function(temp) {
+        var objji = temp.interpolate_pos(world);
 
         if(temp.is_inert() && !player.is_cheater) {
             if(temp.spec['is_scenery'] && !temp.spec['has_tooltip']) {
-                continue;
+                return;
             }
             if(!include_unselectable && !temp.spec['selectable']) {
-                continue;
+                return;
             }
         }
 
-        if(temp.is_invisible() && temp.team !== 'player') { continue; }
+        if(temp.is_invisible() && temp.team !== 'player') { return; }
 
         if(!temp.is_mobile()) {
             // in combat, skip destroyed buildings (but in peacetime keep them, because you want the context menu to repair)
-            if(temp.is_destroyed() && session.has_attacked && (session.viewing_base.base_type != 'quarry' || session.viewing_base.base_landlord_id != session.user_id)) { continue; }
+            if(temp.is_destroyed() && session.has_attacked && (session.viewing_base.base_type != 'quarry' || session.viewing_base.base_landlord_id != session.user_id)) { return; }
 
-            if(temp.detect_click(xy, ji, view_zoom, position_fuzz)) {
+            if(temp.detect_click(world, xy, ji, view_zoom, position_fuzz)) {
                 found_buildings.push(temp);
                 // do not break out of loop
             }
         } else {
-            if(!temp.is_destroyed() && temp.detect_click(xy, ji, view_zoom, position_fuzz)) {
+            if(!temp.is_destroyed() && temp.detect_click(world, xy, ji, view_zoom, position_fuzz)) {
                 found_units.push(temp);
             }
         }
-    }
+    });
 
     var found_list = (found_units.length > 0 ? found_units : found_buildings);
     var ret = null;
@@ -7550,7 +7376,7 @@ function find_object_at_screen_pixel(xy, ji, include_unselectable) {
             // return unit with highest Z coordinate
             var high_unit = found_list[0], high_z = -1;
             for(var i = 0; i < found_list.length; i++) {
-                var unit_xy = found_list[i].interpolate_pos();
+                var unit_xy = found_list[i].interpolate_pos(world);
                 var unit_z = ortho_to_depth(unit_xy);
                 if(unit_z > high_z) {
                     high_z = unit_z;
@@ -7728,8 +7554,7 @@ var tick_astar_queries_left = 0;
 // cause all defending units/turrets to recalculate their threatlists
 // called when new attacking units are spawned
 function invalidate_defender_threatlists() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(!obj.is_destroyed() &&
            ((session.home_base && obj.team == 'player') || (!session.home_base && obj.team != 'player')) &&
            (obj.is_building() || obj.is_mobile())) {
@@ -7737,7 +7562,7 @@ function invalidate_defender_threatlists() {
                 obj.ai_threatlist_dirty = true;
             }
         }
-    }
+    });
 }
 
 // cause all units to recalculate their threatlists
@@ -7745,26 +7570,24 @@ function invalidate_defender_threatlists() {
 // the current system for setting threatlist depends on A*
 // queries to determine accessibility
 function invalidate_all_threatlists() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(!obj.is_destroyed() &&
            (obj.is_building() || obj.is_mobile())) {
             if(obj.ai_threatlist !== null) {
                 obj.ai_threatlist_dirty = true;
             }
         }
-    }
+    });
 }
 
 // cause all mobile units to recalculate their movement paths
 // called when map blockage changes
 function invalidate_unit_paths() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_mobile()) {
             obj.path_valid = false;
         }
-    }
+    });
 }
 
 /**
@@ -7841,6 +7664,57 @@ Mobile.prototype.serialize = function() {
     ret['path'] = deepcopy_array(this.path);
     ret['stuck_loc'] = this.stuck_loc;
     return ret;
+};
+/** @override */
+Mobile.prototype.apply_snapshot = function(snap) {
+    goog.base(this, 'apply_snapshot', snap);
+    this.orders = snap['orders'];
+    this.patrol = snap['patrol'];
+    this.temporary = snap['temporary'];
+    this.squad_id = snap['squad_id'];
+    this.ai_dest = snap['ai_dest'];
+    this.ai_aggressive = snap['ai_aggressive'];
+    this.pos = snap['pos'];
+    this.vel = snap['vel'];
+    this.next_pos = snap['next_pos'];
+    this.dest = snap['dest'];
+    this.path_valid = snap['path_valid'];
+    this.path = snap['path'];
+    this.stuck_loc = snap['stuck_loc'];
+};
+
+/** @override */
+Mobile.prototype.dispose = function() {
+    goog.base(this, 'dispose');
+    if(this.is_under_repair()) {
+        for(var i = 0; i < player.unit_repair_queue.length; i++) {
+            var item = player.unit_repair_queue[i];
+            if(item['obj_id'] === this.id) {
+                player.unit_repair_queue.splice(i,1);
+                break;
+            }
+        }
+    }
+
+    if(this.team == 'player') {
+        // snoop hp update into my_army
+        if(this.id in player.my_army) {
+            if(player.can_resurrect_unit(this)) {
+                var entry = player.my_army[this.id];
+                if('hp' in entry) {
+                    entry['hp'] = 0;
+                } else if('hp_ratio' in entry) {
+                    entry['hp_ratio'] = 0;
+                } else {
+                    entry['hp_ratio'] = 0;
+                }
+            } else {
+                delete player.my_army[this.id];
+            }
+        }
+    } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) {
+        session.incoming_attack_units_destroyed += 1;
+    }
 };
 
 Mobile.prototype.is_temporary = function() { return !!this.temporary; };
@@ -7999,6 +7873,19 @@ Mobile.prototype.modify_stats_by_modstats = function() {
     if(tbl) { this.modify_stats_by_modstats_table(tbl); }
 };
 
+/** Check if the given "orders" are valid
+    @param {?} orders
+    @return {boolean} */
+Mobile.orders_are_valid = function(orders) {
+    if(!(orders instanceof Array)) { return false; }
+    for(var i = 0; i < orders.length; i++) {
+        var ord = orders[i];
+        if(typeof ord !== 'object') { return false; }
+    }
+    return true;
+};
+
+/** @override */
 Mobile.prototype.receive_state = function(data, init, is_deploying) {
     var old_x = this.x, old_y = this.y;
     goog.base(this, 'receive_state', data, init, is_deploying);
@@ -8031,10 +7918,10 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
     }
 
     if(init) {
-        // on object creation, apply persistent orders to AI state
+        // on object creation, apply (valid) persistent orders to AI state
         // however, do not accept AI_STOP as it is almost certainly not what the player wants
         // also, do not apply orders to player's units when being deployed in an attack
-        if(orders && orders[0]['state'] != ai_states.AI_STOP &&
+        if(orders && Mobile.orders_are_valid(orders) && orders[0]['state'] != ai_states.AI_STOP &&
            (this.team != 'player' || !is_deploying || session.home_base)) {
             this.orders = orders;
         } else {
@@ -8063,7 +7950,7 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
             // propagate orders to server
             this.state_dirty |= obj_state_flags.ORDERS;
         }
-        this.apply_orders();
+        this.apply_orders(null);
     }
 
     // snoop update into my_army
@@ -8074,7 +7961,8 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
     }
 };
 
-Mobile.prototype.apply_orders = function() {
+/** @param {World.World|null} world - only null on initial creation */
+Mobile.prototype.apply_orders = function(world) {
     if(typeof this.pos === 'undefined') {
         throw Error('apply_orders on '+this.spec['name']+' with this.pos undefined');
     }
@@ -8083,11 +7971,8 @@ Mobile.prototype.apply_orders = function() {
         var ord = this.orders[0];
         this.ai_state = ord['state'];
         this.ai_target = null;
-        if('target' in ord) {
-            var target_id = ord['target'];
-            if(target_id in session.cur_objects.objects) {
-                this.ai_target = session.cur_objects.objects[target_id];
-            }
+        if('target' in ord && world) {
+            this.ai_target = world.objects._get_object(ord['target']);
         }
         if('dest' in ord) {
             if(ord['dest'] === null) {
@@ -8106,7 +7991,10 @@ Mobile.prototype.apply_orders = function() {
     }
 };
 
-Mobile.prototype.new_order = function(neword, replace) {
+/** @param {!World.World} world
+    @param {!Object} neword
+    @param {boolean} replace */
+Mobile.prototype.new_order = function(world, neword, replace) {
     if(replace || this.orders.length == 0 ||
        !ai_state_can_be_queued(this.orders[0]['state'])) {
         this.orders = [neword];
@@ -8115,7 +8003,7 @@ Mobile.prototype.new_order = function(neword, replace) {
         this.patrol = null;
         this.state_dirty |= obj_state_flags.PATROL;
 
-        this.apply_orders();
+        this.apply_orders(world);
     } else {
         // limit max # of orders
         if(this.orders.length >= gamedata['client']['max_unit_orders']) { return; }
@@ -8137,37 +8025,34 @@ Mobile.prototype.new_order = function(neword, replace) {
     @override */
 Mobile.prototype.raw_pos = function() { return this.pos; };
 
-// interpolated location at current client_time
-Mobile.prototype.interpolate_pos = function () {
-    var progress = (visit_base_pending ? 1 : (client_time - this.world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+/** @override */
+Mobile.prototype.interpolate_pos = function(world) {
+    var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
     return vec_add(this.pos, vec_scale(progress, vec_sub(this.next_pos, this.pos)));
 };
 
-// interpolated location, with added offset for un-dogpiling units
-Mobile.prototype.interpolate_pos_for_draw = function() {
-    var pos = this.interpolate_pos();
+/** @override interpolated location, with added offset for un-dogpiling units */
+Mobile.prototype.interpolate_pos_for_draw = function(world) {
+    var pos = this.interpolate_pos(world);
     if(gamedata['client']['unit_draw_scatter'] && this.draw_offset) {
         return vec_mad(pos, gamedata['client']['unit_draw_scatter'], this.draw_offset);
     }
     return pos;
 };
 
-GameObject.prototype.interpolate_facing = function() {
-    var progress = (visit_base_pending ? 1 : (client_time - this.world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
-    return this.cur_facing + progress*(this.next_facing - this.cur_facing);
-};
-
-Mobile.prototype.detect_click = function(xy, ji, zoom, fuzz) {
+/** @override */
+Mobile.prototype.detect_click = function(world, xy, ji, zoom, fuzz) {
     // mobile units use the sprite hit detection code
     var asset = GameArt.assets[this.get_leveled_quantity(this.spec['art_asset'])];
-    var pos = this.interpolate_pos();
-    if(asset.detect_click(ortho_to_screen_3d([pos[0], this.altitude, pos[1]]), this.interpolate_facing(), client_time, 'normal', xy, zoom, fuzz)) {
+    var pos = this.interpolate_pos(world);
+    if(asset.detect_click(ortho_to_screen_3d([pos[0], this.altitude, pos[1]]), this.interpolate_facing(world), client_time, 'normal', xy, zoom, fuzz)) {
         return true;
     }
     return false;
 }
 
-Mobile.prototype.run_ai = function() {
+/** @override */
+Mobile.prototype.run_ai = function(world) {
     if(this.ai_state === ai_states.AI_ATTACK_STATIONARY) {
         this.control_state = control_states.CONTROL_STOP;
     }
@@ -8175,19 +8060,19 @@ Mobile.prototype.run_ai = function() {
     // run this before the base class run_ai() because we may switch to AI_ATTACK_ANY
     if(this.ai_state === ai_states.AI_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO || this.ai_state === ai_states.AI_DEFEND_MOVE ||
        (this.ai_state === ai_states.AI_ATTACK_ANY && !this.ai_target)) {
-        if(this.ai_dest && vec_equals(this.interpolate_pos(), this.ai_dest)) {
+        if(this.ai_dest && vec_equals(this.raw_pos(), this.ai_dest)) {
             // arrived at destination
             this.ai_stop();
 
             if(this.ai_state === ai_states.AI_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO || this.ai_state === ai_states.AI_DEFEND_MOVE) {
-                this.next_ai_order();
+                this.next_ai_order(world);
             }
         } else {
             this.ai_move_towards(this.ai_dest, null, 'run_ai/ai_dest');
         }
     }
 
-    goog.base(this, 'run_ai');
+    goog.base(this, 'run_ai', world);
 
     // Anti-clumping
 
@@ -8195,7 +8080,7 @@ Mobile.prototype.run_ai = function() {
     // We use a "gas diffusion" approach: treat the density of units as a scalar "pressure" and try to move the
     // unit along the gradient towards lower pressure.
     var declump_radius = player.get_any_abtest_value('unit_declump_radius', gamedata['client']['unit_declump_radius']);
-    //console.log('declump? '+this.spec['name'] +' '+declump_radius.toString()+' pos '+this.interpolate_pos()[0].toString()+','+this.interpolate_pos()[1].toString()+' dest '+this.ai_dest[0].toString()+','+this.ai_dest[1].toString()+' ai_state '+ai_state_names[this.ai_state]+' ai_target '+(this.ai_target? this.ai_target.spec['name'] : 'none')+' control_state '+control_state_names[this.control_state]);
+    //console.log('declump? '+this.spec['name'] +' '+declump_radius.toString()+' pos '+this.raw_pos()[0].toString()+','+this.raw_pos()[1].toString()+' dest '+this.ai_dest[0].toString()+','+this.ai_dest[1].toString()+' ai_state '+ai_state_names[this.ai_state]+' ai_target '+(this.ai_target? this.ai_target.spec['name'] : 'none')+' control_state '+control_state_names[this.control_state]);
 
     if((declump_radius > 0) &&
        (tick_astar_queries_left !== 0 || !gamedata['client']['unit_declump_avoid_astar']) &&
@@ -8203,7 +8088,7 @@ Mobile.prototype.run_ai = function() {
        (this.control_state === control_states.CONTROL_STOP || player.get_any_abtest_value('unit_declump_urgently',gamedata['client']['unit_declump_urgently']))) {
         // consider units this far away in pressure gradient calculation
         var gradient = [0,0]; // pressure gradient
-        var pos = this.interpolate_pos(); // get our position
+        var pos = this.raw_pos(); // get our position
 
         // Compute contribution to pressure gradient of each nearby unit
 
@@ -8258,7 +8143,7 @@ Mobile.prototype.run_ai = function() {
             if(!this.passes_through_walls()) {
                 while((target_pos[0] > 0) && (target_pos[1] > 0) &&
                       (target_pos[0] < ncells[0]-1) && (target_pos[1] < ncells[1]-1) &&
-                      (astar_map.is_blocked(vec_floor(target_pos)))) {
+                      (world.astar_map.is_blocked(vec_floor(target_pos)))) {
                     target_pos[0] += mdist * -gradient[0];
                     target_pos[1] += mdist * -gradient[1];
                 }
@@ -8280,8 +8165,9 @@ Mobile.prototype.run_ai = function() {
     }
 };
 
-Mobile.prototype.run_control = function() {
-    goog.base(this, 'run_control');
+/** @override */
+Mobile.prototype.run_control = function(world) {
+    goog.base(this, 'run_control', world);
 
     if(this.is_destroyed()) {
         // we're dead, Jim.
@@ -8340,17 +8226,17 @@ Mobile.prototype.run_control = function() {
                             clamp(Math.floor(this.pos[1]),0,ncells[1]-1)];
             var dest_cell = [clamp(Math.floor(this.dest[0]),0,ncells[0]-1),
                              clamp(Math.floor(this.dest[1]),0,ncells[1]-1)];
-            playfield_check_pos(dest_cell, 'dest_cell');
+            world.playfield_check_pos(dest_cell, 'dest_cell');
             if((cur_cell[0] == dest_cell[0]) && (cur_cell[1] == dest_cell[1])) {
                 // rover is same cell as final destination, no need to compute path
                 if(!this.dest) { throw Error('this.dest is null'); }
                 path_next = this.dest;
-                playfield_check_path([this.pos,path_next], 'copy_from_this.dest');
+                world.playfield_check_path([this.pos,path_next], 'copy_from_this.dest');
             } else {
                 // update the A* path
                 if(!this.path_valid) {
                     // first see if a direct route is open
-                    if(this.passes_through_walls() || astar_map.linear_path_is_clear(cur_cell, dest_cell)) {
+                    if(this.passes_through_walls() || world.astar_map.linear_path_is_clear(cur_cell, dest_cell)) {
                         // if so, construct a direct route, and skip the call to A*
                         if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) {
                             console.log(this.spec['name']+' taking direct route');
@@ -8358,7 +8244,7 @@ Mobile.prototype.run_control = function() {
                         this.path = [cur_cell, dest_cell];
                         this.path_valid = true; this.path_new = true;
                         if(!this.passes_through_walls()) {
-                            playfield_check_path(this.path, 'direct_skip_A*');
+                            world.playfield_check_path(this.path, 'direct_skip_A*');
                         }
                     } else {
                         if(tick_astar_queries_left === 0) {
@@ -8367,14 +8253,14 @@ Mobile.prototype.run_control = function() {
                                 console.log(this.spec['name']+' starved for A* time');
                             }
                             path_next = this.pos;
-                            playfield_check_path([this.pos,path_next], 'A*_starved');
+                            world.playfield_check_path([this.pos,path_next], 'A*_starved');
                         } else {
                             // run the slow A* search
                             tick_astar_queries_left -= 1;
-                            this.path = astar_context.search(cur_cell, dest_cell);
-                            playfield_check_path(this.path, 'A*');
-                            astar_map.smooth_path(this.path);
-                            playfield_check_path(this.path, 'A*_smoothed');
+                            this.path = world.astar_context.search(cur_cell, dest_cell);
+                            world.playfield_check_path(this.path, 'A*');
+                            world.astar_map.smooth_path(this.path);
+                            world.playfield_check_path(this.path, 'A*_smoothed');
                             this.path_valid = true;
                             this.path_new = true;
                             if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) {
@@ -8388,15 +8274,15 @@ Mobile.prototype.run_control = function() {
                 if(this.path.length == 0) {
                     // path is blocked
                     path_next = this.pos;
-                    playfield_check_path([this.pos,path_next], 'path is blocked');
+                    world.playfield_check_path([this.pos,path_next], 'path is blocked');
 
                     // check against blockage ON TOP OF unit
-                    if(astar_map.is_blocked(cur_cell)) {
+                    if(world.astar_map.is_blocked(cur_cell)) {
                         // unit is trapped inside of a blocked area
                         // construct a fake path that allows it to pass out
                         var temp = [cur_cell[0]+2, cur_cell[1]+2];
                         while(temp[0] < ncells[0]-1 && temp[1] < ncells[1]-1) {
-                            if(!astar_map.is_blocked(temp)) {
+                            if(!world.astar_map.is_blocked(temp)) {
                                 this.path = [temp];
                                 path_next = [this.path[0][0]+0.5, this.path[0][1]+0.5];
                                 this.path_valid = true; this.path_new = true;
@@ -8434,7 +8320,7 @@ Mobile.prototype.run_control = function() {
                                 if(this.path.length > 1) {
                                     // not the final waypoint - cut the corner, but only if we can make it
                                     // to the next waypoint without entering a blocked area
-                                    if(this.passes_through_walls() || astar_map.linear_path_is_clear(this.pos, this.path[1])) {
+                                    if(this.passes_through_walls() || world.astar_map.linear_path_is_clear(this.pos, this.path[1])) {
                                         this.path.shift(); // cut off the corner
                                     } else {
                                         break; // cannot cut the corner
@@ -8506,8 +8392,8 @@ Mobile.prototype.run_control = function() {
 
                 if(can_move) {
                     this.next_pos = vec_add(this.pos, vec_scale(move_dist, dir));
-                    playfield_check_path([this.pos, path_next], 'CONTROL_MOVING (normal, path_next)');
-                    playfield_check_path([this.pos, this.next_pos], 'CONTROL_MOVING (normal, next_pos)');
+                    world.playfield_check_path([this.pos, path_next], 'CONTROL_MOVING (normal, path_next)');
+                    world.playfield_check_path([this.pos, this.next_pos], 'CONTROL_MOVING (normal, next_pos)');
                     this.next_pos[0] = clamp(this.next_pos[0], 0, ncells[0]-1);
                     this.next_pos[1] = clamp(this.next_pos[1], 0, ncells[1]-1);
                 } else {
@@ -8537,9 +8423,6 @@ Mobile.prototype.run_control = function() {
 
         }
 
-        if('movement_effect' in this.spec) {
-            this.world.fxworld.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
-        }
     } // END control_moving
 
     if(typeof(this.pos) == 'undefined') {
@@ -8547,9 +8430,19 @@ Mobile.prototype.run_control = function() {
     }
 };
 
+/** @param {!SPFX.FXWorld} fxworld */
+Mobile.prototype.add_movement_effect = function(fxworld) {
+    if(this.control_state === control_states.CONTROL_MOVING &&
+       ('movement_effect' in this.spec)) {
+        fxworld.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
+    }
+};
+
 var last_created_object = null; // for debugging messages
 
-// instantiate game object from server message
+/** instantiate game object from server message
+    @param {!Object} data
+    @param {boolean} is_deploying */
 function create_object(data, is_deploying) {
     // peek inside state message to determine object type
     var specname = data[1];
@@ -8596,86 +8489,8 @@ function create_object(data, is_deploying) {
     return obj;
 };
 
-// remove object from client session
-// (but does NOT touch my_army)
-function remove_object(obj) {
-    // update map
-    if(obj.is_blocker() && !obj.is_destroyed()) {
-        obj.block_map(-1, 'remove_object');
-    }
-
-    // deselect
-
-    // remove from selection.multi
-    for(var i = 0; i < selection.multi.length; i++) {
-        if(selection.multi[i] === obj) {
-            selection.multi.splice(i,1);
-        }
-    }
-
-    if(selection.unit === obj) {
-        // try to select something else in the multi group
-        if(selection.multi.length > 0) {
-            selection.unit = selection.multi[0];
-        } else {
-            change_selection(null);
-        }
-    }
-    if(mouse_state.hovering_over === obj) {
-        mouse_state.hovering_over = null;
-    }
-
-    if(obj.is_mobile() && obj.is_under_repair()) {
-        for(var i = 0; i < player.unit_repair_queue.length; i++) {
-            var item = player.unit_repair_queue[i];
-            if(item['obj_id'] == obj.id) {
-                player.unit_repair_queue.splice(i,1);
-                break;
-            }
-        }
-    }
-
-    obj.remove_permanent_effect();
-
-    session.cur_objects.rem_object(obj);
-};
-
-// for level-editing only
-function send_and_remove_object(obj) {
-    if(obj.id && obj.id !== GameObject.DEAD_ID) {
-        send_to_server.func(["REMOVE_OBJECT", obj.id]);
-        remove_object(obj);
-    }
-}
-
-// called when an object actually *dies* in battle
-function destroy_object(obj) {
-    if(obj.is_mobile()) {
-        if(obj.team == 'player') {
-            // snoop hp update into my_army
-            if(obj.id in player.my_army) {
-                if(player.can_resurrect_unit(obj)) {
-                    var entry = player.my_army[obj.id];
-                    if('hp' in entry) {
-                        entry['hp'] = 0;
-                    } else if('hp_ratio' in entry) {
-                        entry['hp_ratio'] = 0;
-                    } else {
-                        entry['hp_ratio'] = 0;
-                    }
-                } else {
-                    delete player.my_army[obj.id];
-                }
-            }
-        } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && obj.team == 'enemy' && obj.id !== GameObject.DEAD_ID) {
-            session.incoming_attack_units_destroyed += 1;
-        }
-    }
-
-    remove_object(obj);
-}
-
-// pack up what we know about the object that got a killing blow on another object
+/** pack up what we know about the object that got a killing blow on another object
+    @param {GameObject|null} killer */
 function get_killer_info(killer) {
     if(killer && killer.id !== GameObject.VIRTUAL_ID) {
         // note: killer.id = 'VIRTUAL' for the virtual "player" unit, i.e. tactical missiles and such
@@ -8694,17 +8509,6 @@ function get_killer_info(killer) {
     }
     return null;
 }
-
-function send_and_destroy_object(victim, killer) {
-    send_to_server.func(["DSTROY_OBJECT",
-                         victim.id,
-                         victim.interpolate_pos(),
-                         get_killer_info(killer)
-                        ]);
-    destroy_object(victim);
-    session.set_battle_outcome_dirty();
-}
-
 
 //
 // engine code
@@ -9766,6 +9570,7 @@ function log_exception(e, where) {
     metric_event('0970_client_exception', add_demographics({'method':msg, 'location':where,
                                                             'since_connect': (session.connected() ? client_time - session.connect_time : session.connect_time),
                                                             'since_pageload': client_time - spin_pageload_begin,
+                                                            'server_message_history': debug_server_message_history.join(','),
                                                             'gameclient_build_date':(typeof gameclient_build_date === 'undefined' ? 'unknown' : gameclient_build_date),
                                                             'gamedata_build_info':gamedata['gamedata_build_info']}));
 }
@@ -12197,11 +12002,10 @@ function update_desktop_dialogs() {
     if(session.home_base) {
         // scan player's buildings to find a few things
 
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_building() && obj.is_manufacturer() && obj.spec['manufacture_category'] === basic_manuf_category) { droid_factory = obj; }
             if(obj.is_building() && obj.is_researcher() && obj.spec['research_categories'][0] === basic_research_category) { robotics_lab = obj; }
-        }
+        });
     }
 
     // during tutorial, restrict access to non-applicable dialogs
@@ -12262,7 +12066,9 @@ function update_desktop_dialogs() {
         // check for excessive scenery sprites
         var inert_count = 0;
         if(player.is_cheater) {
-            goog.object.forEach(session.cur_objects.objects, function(obj) { if(obj.is_inert()) { inert_count += 1; } });
+            session.for_each_real_object(function(obj) {
+                if(obj.is_inert()) { inert_count += 1; }
+            });
         }
         dialog.widgets['excessive_sprite_message'].show = player.is_cheater && (inert_count > gamedata['client']['inert_warn_count']);
         if(dialog.widgets['excessive_sprite_message'].show) {
@@ -13698,34 +13504,34 @@ function draw_weapon_range(xy, range, friend, aoe, min_range) {
     ctx.restore();
 }
 
-function draw_turret_ranges(ignore_obj) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj === ignore_obj) { continue; }
+function draw_turret_ranges(world, ignore_obj) {
+    world.objects.for_each(function(obj) {
+        if(obj === ignore_obj) { return; }
         if(obj.is_building()) {
             var ran = obj.weapon_range();
             var spell = ran[0], range = (ran[3] > 0 ? ran[3] : ran[1]), aoe = ran[2], min_range = ran[4];
             if(range > 0) {
-                var pos = obj.interpolate_pos();
+                var pos = obj.interpolate_pos(world);
                 draw_weapon_range(ortho_to_draw(pos), range, obj.team === 'player', aoe, min_range);
             }
         }
-    }
+    });
 }
 
 BuildUICursor.prototype.draw = function(offset) {
+    var world = session.get_draw_world();
+
     SPUI.ctx.save();
 
     SPUI.ctx.save();
     set_playfield_draw_transform(SPUI.ctx);
 
     // draw base perimeter
-    session.viewing_base.draw_base_perimeter(player.is_cheater ? 'dev_edit' : (!!this.spec['ignore_perimeter']) ? 'build_ignore_perimeter' : 'build');
+    world.base.draw_base_perimeter(player.is_cheater ? 'dev_edit' : (!!this.spec['ignore_perimeter']) ? 'build_ignore_perimeter' : 'build');
 
     // draw blocked building locations
     SPUI.ctx.fillStyle = 'rgba(255,0,0,0.25)';
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    world.objects.for_each(function(obj) {
         if(obj != selection.unit && obj.is_building() || (obj.is_inert() && obj.spec['unit_collision_gridsize'][0] != 0)) {
             var bound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
             shade_quad([draw_quantize(ortho_to_draw([bound[0][0], bound[1][0]])),
@@ -13733,7 +13539,7 @@ BuildUICursor.prototype.draw = function(offset) {
                         draw_quantize(ortho_to_draw([bound[0][1], bound[1][1]])),
                         draw_quantize(ortho_to_draw([bound[0][0], bound[1][1]]))]);
         }
-    }
+    }, this);
 
     // always draw around mouse location
     var ji = screen_to_ortho([mouse_state.last_x, mouse_state.last_y]);
@@ -13786,7 +13592,7 @@ BuildUICursor.prototype.draw = function(offset) {
         if(range > 0) {
             draw_weapon_range(xy, range, true, aoe, min_range);
         }
-        draw_turret_ranges(this.obj);
+        draw_turret_ranges(world, this.obj);
     }
 
     SPUI.ctx.restore(); // pop playfield transform
@@ -13968,6 +13774,8 @@ DeployUICursor.prototype.destroy = function() {
 };
 
 DeployUICursor.prototype.draw = function(offset) {
+    var world = session.get_draw_world();
+
     var has_state = true;
     SPUI.ctx.save();
     set_playfield_draw_transform(SPUI.ctx);
@@ -13978,7 +13786,7 @@ DeployUICursor.prototype.draw = function(offset) {
     var any_selected = goog.object.getCount(session.pre_deploy_units) > 0;
     if(any_selected) {
         var ji = screen_to_ortho([mouse_state.last_x, mouse_state.last_y]);
-        var location_valid = session.viewing_base.is_deployment_location_valid(ji);
+        var location_valid = world.is_deployment_location_valid(ji);
         SPUI.ctx.strokeStyle = (location_valid ? '#00FF00' : '#FF0000');
         SPUI.ctx.fillStyle = (location_valid ? 'rgba(0,255,0,0.25)' : 'rgba(255,0,0,0.25)');
 
@@ -14158,7 +13966,7 @@ AOEUICursor.prototype.draw = function(offset) {
     if(this.origin_unit && this.range > 0) {
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
-        var pos = this.origin_unit.interpolate_pos();
+        var pos = this.origin_unit.raw_pos();
         var xy = ortho_to_draw(pos);
         ctx.save();
         ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);
@@ -14217,9 +14025,9 @@ function invoke_cheat_menu(parent_widget) {
 
     if(player.is_cheater) {
         buttons.push(new ContextMenuButton({ui_name: "Remove All Barriers", asset: 'menu_button_resizable', onclick: function() {
-            remove_all_barriers(); }}));
+            session.get_real_world().remove_all_barriers(); }}));
         buttons.push(new ContextMenuButton({ui_name: "Upgrade All Barriers", asset: 'menu_button_resizable', onclick: function() {
-            upgrade_all_barriers(); }}));
+            session.get_real_world().upgrade_all_barriers(); }}));
         buttons.push(new ContextMenuButton({ui_name: "Get 10k Gamebucks", onclick: function() {
             send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "CHEAT_GIVE_GAMEBUCKS", 10000]); }}));
         buttons.push(new ContextMenuButton({ui_name: "Get Daily Gifts", asset: 'menu_button_resizable', onclick: function() {
@@ -15321,8 +15129,7 @@ function invoke_damage_protection_notice() {
 function do_calc_base_damage(options) {
     var damaged_objects = {};
     var base_hp_total = 0, base_hp_max = 0.1, barriers_damaged = 0;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building()) {
             if(obj.spec['worth_less_xp']) {
                 // handle barriers separately
@@ -15349,7 +15156,7 @@ function do_calc_base_damage(options) {
                 }
             }
         }
-    }
+    });
     base_hp_total = Math.floor(base_hp_total);
     base_hp_max = Math.floor(base_hp_max);
     var base_damage = (base_hp_max - base_hp_total) / Math.max(1,base_hp_max);
@@ -15517,8 +15324,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 
     // check base for building action interrupts
     var interrupts = [];
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team === 'player' && obj.is_damaged()) {
             if(obj.is_manufacturing() && obj.manuf_start_time <= 0) {
                 interrupts.push(dialog.data['widgets']['halt_message']['ui_name_production'].replace('%s',obj.spec['ui_name']).replace('%INTERRUPTED',gamedata['spells']['MAKE_DROIDS']['ui_name_interrupted']));
@@ -15541,7 +15347,7 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
                 interrupts.push(dialog.data['widgets']['halt_message']['ui_name_upgrade'].replace('%s',obj.spec['ui_name']));
             }
         }
-    }
+    });
 
     dialog.widgets['halt_bg'].show = dialog.widgets['halt_message'].show = (interrupts.length > 0);
 
@@ -15590,8 +15396,7 @@ var repairs_started = false;
 function start_slow_repairs() {
     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_damaged() && !obj.is_repairing()) {
             // client-side predict
             var health = (obj.hp) / (1.0*obj.max_hp);
@@ -15600,7 +15405,8 @@ function start_slow_repairs() {
             obj.repair_finish_time = server_time + repair_time;
             obj.update_all_actions(server_time);
         }
-    }
+    });
+
     if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
         // also check army for repair candidates
         for(var id in player.my_army) {
@@ -15644,8 +15450,7 @@ function do_instant_repairs(cb) {
     return Store.place_user_currency_order(GameObject.VIRTUAL_ID, "REPAIR_ALL_FOR_MONEY",
                                            session.viewing_base.base_id,
                                            (function (_cb) { return function() {
-                                               for(var id in session.cur_objects.objects) {
-                                                   var obj = session.cur_objects.objects[id];
+                                               session.for_each_real_object(function(obj) {
                                                    if(obj.is_building() && obj.is_damaged()) {
                                                        if(obj.is_destroyed()) { // reblock
                                                            obj.block_map(1, 'REPAIR_ALL_FOR_MONEY predict');
@@ -15653,7 +15458,7 @@ function do_instant_repairs(cb) {
                                                        obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
                                                        obj.update_all_actions(server_time);
                                                    }
-                                               }
+                                               });
                                                _cb();
                                            }; })(cb)
                                           );
@@ -15671,8 +15476,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
     var any_unit_damage = false;
 
     if(do_units) {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.team === 'player' && obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() && player.can_repair_unit(obj)) {
                 any_unit_damage = true;
                 var obj_cost = obj.cost_to_repair(player);
@@ -15681,7 +15485,7 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
                     cost_res[res] = (cost_res[res]||0) + obj_cost[res];
                 }
             }
-        }
+        });
         if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
             // also check army for repair candidates
             for(var id in player.my_army) {
@@ -15713,24 +15517,24 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
         if(instant_price < 1) {
             dialog.widgets['price_display'].onclick =
                 dialog.widgets['repair_instant_button'].onclick = function(w) {
-                // manually send REPAIR followed by SPEEDUP_FOR_FREE on each damaged building
-                close_parent_dialog(w);
-                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
+                    // manually send REPAIR followed by SPEEDUP_FOR_FREE on each damaged building
+                    close_parent_dialog(w);
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "REPAIR", session.viewing_base.base_id]);
 
-                for(var id in session.cur_objects.objects) {
-                    var obj = session.cur_objects.objects[id];
-                    if(obj.is_building() && obj.is_damaged()) {
-                        send_to_server.func(["CAST_SPELL", obj.id, "SPEEDUP_FOR_FREE"]);
-                        if(obj.is_destroyed()) { // reblock
-                            obj.block_map(1, 'REPAIR/SPEEDUP_FOR_FREE predict');
+                    session.for_each_real_object(function(obj) {
+                        if(obj.is_building() && obj.is_damaged()) {
+                            send_to_server.func(["CAST_SPELL", obj.id, "SPEEDUP_FOR_FREE"]);
+                            if(obj.is_destroyed()) { // reblock
+                                obj.block_map(1, 'REPAIR/SPEEDUP_FOR_FREE predict');
+                            }
+                            obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
+                            obj.update_all_actions(server_time);
                         }
-                        obj.hp = obj.max_hp; obj.repair_finish_time = -1; // client-side predict
-                        obj.update_all_actions(server_time);
-                    }
-                }
-                // no such thing as free unit repairs
-                //send_to_server.func(["UNIT_REPAIR_SPEEDUP_FOR_FREE"]);
-            };
+                    });
+
+                    // no such thing as free unit repairs
+                    //send_to_server.func(["UNIT_REPAIR_SPEEDUP_FOR_FREE"]);
+                };
         } else {
             var begin = (function (_dialog) { return function() {
                 var on_start = (function (__dialog) { return function() {
@@ -15778,8 +15582,7 @@ function do_invoke_repair_dialog() {
     init_dialog_repair_buttons(dialog, calc_base_damage({count_partial:true}), false);
     // count # of things needing repair, for UI only
     var buildings = 0, units = 0, barriers = 0, beyond_tech = 0, beyond_tech_types = {};
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.team === 'player' && obj.is_damaged()) {
             if(obj.is_building()) {
                 if(obj.spec['name'] == 'barrier') {
@@ -15799,7 +15602,7 @@ function do_invoke_repair_dialog() {
                 }
             }
         }
-    }
+    });
 
     if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
         // also check army for repair candidates
@@ -15869,16 +15672,15 @@ function invoke_repair_dialog_conditional() {
     var needs_rep = false;
 
     if(!repairs_started) {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        if(session.for_each_real_object(function(obj) {
             if(obj.team === 'player' && obj.is_building() && obj.is_damaged() && (session.is_quarry() || !obj.is_repairing())) {
-                needs_rep = true;
-                break;
+                return true;
             }
             if(obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() && obj.team === 'player' && !session.is_quarry() && player.can_repair_unit(obj)) {
-                needs_rep = true;
-                break;
+                return true;
             }
+        })) {
+            needs_rep = true;
         }
         if(('enable_defending_units' in gamedata) && !gamedata['enable_defending_units']) {
             // also check army for repair candidates
@@ -15941,8 +15743,8 @@ function invoke_recycle_dialog(obj) {
                     delete player.my_army[_obj['obj_id']];
                     session.get_real_world().lazy_update_citizens();
                 }
-                if(_obj['obj_id'] in session.cur_objects.objects) {
-                    remove_object(session.cur_objects.objects[_obj['obj_id']]);
+                if(session.get_real_world().objects.has_object(_obj['obj_id'])) {
+                    session.get_real_world().remove_object(session.get_real_world().objects.get_object(_obj['obj_id']));
                 }
                 session.clear_building_idle_state_caches();
             }
@@ -15955,7 +15757,7 @@ function invoke_recycle_dialog(obj) {
                     delete player.my_army[_obj.id];
                     session.get_real_world().lazy_update_citizens();
                 }
-                remove_object(_obj);
+                session.get_real_world().remove_object(_obj);
                 session.clear_building_idle_state_caches();
             }
         }
@@ -16799,35 +16601,30 @@ function invoke_facebook_message_dialog(recipient_fbid, recipient_uid) {
 }
 
 function surrender_to_ai_attack() {
+    var world = session.get_real_world();
+    if(!world) { return; }
+
     if(session.surrender_pending) { return; }
     session.surrender_pending = true;
 
     // change the appearance of the surrender button
     desktop_dialogs['desktop_top'].widgets['surrender_button'].state = 'attack';
-    desktop_dialogs['desktop_top'].widgets['surrender_button'].str =  desktop_dialogs['desktop_top'].data['widgets']['surrender_button']['ui_name_pending'];
+    desktop_dialogs['desktop_top'].widgets['surrender_button'].str = desktop_dialogs['desktop_top'].data['widgets']['surrender_button']['ui_name_pending'];
 
     // blow up the central computer and energy plants
     // (visually - the actual HP damage is done server-side, because otherwise you could just close
     // the browser window to avoid it!)
+    world.objects.for_each(function(obj) {
+        if(obj.team === 'player' && obj.spec['name'] === gamedata['townhall'] && !obj.is_destroyed()) {
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj.team != 'player') { continue; }
-        if(obj.spec['name'] == gamedata['townhall']) {
-            if(!obj.is_destroyed()) {
+            // change HP immediately just for visual effect - will get overriden by the upcoming OBJECT_STATE_UPDATE
+            obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
 
-                //hurt_object(obj, Math.floor(0.5*obj.hp), {}, null);
-
-                // chagne HP immediately just for visual effect - will get overriden by the upcoming OBJECT_STATE_UPDATE
-                obj.hp = Math.max(1, Math.floor(0.5*obj.hp));
-
-                if('explosion_effect' in obj.spec) {
-                    obj.world.fxworld.add_visual_effect_at_tick(obj.interpolate_pos(), 0, [0,1,0], session.get_real_world().combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
-                }
+            if('explosion_effect' in obj.spec) {
+                world.fxworld.add_visual_effect_at_tick(obj.raw_pos(), 0, [0,1,0], world.combat_engine.cur_tick, 0, obj.spec['explosion_effect'], true, null);
             }
         }
-    }
-
+    });
 
     // queue a session change after a few seconds
     window.setTimeout(visit_base_after_attack, 1000.0 * gamedata['client']['surrender_delay']);
@@ -16853,14 +16650,7 @@ function retreat_from_attack(bypass_timer) {
 
     // cancel retreat timer if no friendly units are left
     if(retreat_time > 0) {
-        var found = false;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
-            if(obj.team === 'player') {
-                found = true;
-                break;
-            }
-        }
+        var found = session.for_each_real_object(function(obj) { return obj.team === 'player'; });
         if(!found) {
             retreat_time = 0;
         }
@@ -17539,20 +17329,7 @@ function tutorial_step_slideshow(data) {
     }
 }
 
-function destroy_all_enemies() {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
-        if(obj.team === 'enemy' && !obj.is_destroyed()) {
-            if(obj.is_mobile()) {
-                send_and_destroy_object(obj, null);
-            } else if(obj.is_building()) {
-                obj.hp = 0;
-                obj.state_dirty |= obj_state_flags.HP;
-            }
-        }
-    }
-    flush_dirty_objects({});
-}
+function destroy_all_enemies() { session.get_real_world().destroy_all_enemies(); };
 
 function tutorial_step_valentina_help_message(data) {
     var dialog_data = gamedata['dialogs']['tutorial_valentina_help_message'];
@@ -17624,8 +17401,7 @@ function update_valentina_nonmodal_message(dialog) {
 
                 // draw transparent highlight box around enemy or friendly units
                 var bounds = null;
-                for(var id in session.cur_objects.objects) {
-                    var obj = session.cur_objects.objects[id];
+                session.for_each_real_object(function(/** !GameObject */ obj) {
                     if(obj.team == team &&
                        ((kind=='rovers' && obj.is_mobile()) ||
                         (kind=='townhall' && obj.spec['name'] == gamedata['townhall']))) {
@@ -17638,10 +17414,10 @@ function update_valentina_nonmodal_message(dialog) {
                                                 [gs[0]/2,gs[1]/2], // SE
                                                 [-gs[0]/2,gs[1]/2]], // SW
                                                function(offset) {
-                                                   points.push(ortho_to_draw(vec_add(vec_scale(grid_pad, offset), obj.interpolate_pos())));
+                                                   points.push(ortho_to_draw(vec_add(vec_scale(grid_pad, offset), obj.raw_pos())));
                                                });
                         } else {
-                            points.push(ortho_to_draw(obj.interpolate_pos())); // center point
+                            points.push(ortho_to_draw(obj.raw_pos())); // center point
                         }
 
                         goog.array.forEach(points, function(xy) {
@@ -17656,7 +17432,7 @@ function update_valentina_nonmodal_message(dialog) {
                             }
                         });
                     }
-                }
+                });
 
                 if(bounds) {
                     bounds[0] = draw_quantize(bounds[0]); // mixes x and y coordinate math
@@ -17979,7 +17755,7 @@ function update_tutorial_arrow_for_landscape(_dialog, _unit_name, _loc, _directi
 
         var xy;
         if(unit_name && unit) {
-            var myloc = unit.interpolate_pos();
+            var myloc = unit.raw_pos();
             dialog.user_data['reticle_loc'] = myloc;
             xy = ortho_to_screen(myloc);
             xy[0] -= 4; xy[1] -= 4;
@@ -18055,13 +17831,12 @@ function tutorial_step_move_rover_action_command() {
     // called when player issues any command to a rover
     // put all friendly rovers into AI_ATTACK_ANY state so they fire as soon as enemies are in range
     if(player.get_any_abtest_value('tut_battle_interact', gamedata['client']['tut_battle_interact']) != 'manual') {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_mobile() && obj.team === 'player') {
                 var order = {'state': ai_states.AI_ATTACK_ANY};
-                obj.new_order(order, true);
+                obj.new_order(session.get_real_world(), order, true);
             }
-        }
+        });
     }
     advance_tutorial();
 }
@@ -19471,18 +19246,16 @@ function start_incoming_attack() {
         var use_auto_aggressive = get_preference_setting(player.preferences, 'auto_unit_control');
 
         if(use_auto_aggressive && (player.tutorial_state == "COMPLETE" || gamedata['tutorial'][player.tutorial_state]['make_units_aggressive'])) {
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
-
+            session.for_each_real_object(function(obj) {
                 if(obj.is_mobile() && obj.team == 'player') {
                     if(obj.patrol || (obj.orders && obj.orders.length == 1 && obj.orders[0]['state'] == ai_states.AI_ATTACK_STATIONARY)) {
                         // don't make aggressive
                     } else {
                         var order = {'state': ai_states.AI_ATTACK_ANY, 'aggressive': true};
-                        obj.new_order(order, true);
+                        obj.new_order(session.get_real_world(), order, true);
                     }
                 }
-            }
+            });
         }
     }
     change_selection(null);
@@ -19645,12 +19418,11 @@ function do_harvest(all) {
 
             // set sync marker on all harvesters
             var marker = synchronizer.request_sync();
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            session.for_each_real_object(function(obj) {
                 if(obj.is_building() && obj.is_producer()) {
                     obj.sync_marker = Math.max(obj.sync_marker, marker);
                 }
-            }
+            });
 
             // collect from quarries
             do_harvest_quarries();
@@ -20199,7 +19971,7 @@ function invoke_building_context_menu(mouse_xy) {
     if(player.is_cheater) {
         // DEV Delete button
         buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['REMOVE_OBJECT']['ui_name'],
-                                            onclick: function() { send_and_remove_object(selection.unit); },
+                                            onclick: function() { session.get_real_world().send_and_remove_object(selection.unit); },
                                             asset: 'menu_button_resizable'}));
     }
 
@@ -24389,8 +24161,8 @@ function invoke_unit_donation_dialog(req) {
                         session.get_real_world().lazy_update_citizens();
                     }
                     // remove from session
-                    if(obj_id in session.cur_objects.objects) {
-                        remove_object(session.cur_objects.objects[obj_id]);
+                    if(session.get_real_world().objects.has_object(obj_id)) {
+                        session.get_real_world().remove_object(session.get_real_world().objects.get_object(obj_id));
                     }
                 });
             } else {
@@ -24420,14 +24192,14 @@ function update_unit_donation_dialog(dialog) {
 
     // trim nonexistent, damaged, or too-big units out of proposed donation
     for(var i = 0; i < donation.length; i++) {
-        if((source == 'session' && !(donation[i] in session.cur_objects.objects)) ||
+        if((source == 'session' && !(session.get_real_world().objects.has_object(donation[i]))) ||
            (source == 'army' && !(donation[i] in player.my_army))) {
             donation.splice(i,1); continue;
         }
 
         var obj_spec, obj_level, hp_ratio;
         if(source == 'session') {
-            var obj = session.cur_objects.objects[donation[i]];
+            var obj = session.get_real_world().objects.get_object(donation[i]);
             obj_spec = obj.spec;
             obj_level = obj.level;
             hp_ratio = obj.hp / obj.max_hp;
@@ -24458,13 +24230,12 @@ function update_unit_donation_dialog(dialog) {
     var available_unit_list = [];
 
     if(source == 'session') {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_mobile() && (obj.team === 'player') && (obj.hp >= obj.max_hp) &&
                (!('donatable' in obj.spec) || obj.spec['donatable'])) {
                 available_unit_list.push({obj_id: obj.id, spec: obj.spec['name'], level:obj.level});
             }
-        }
+        });
     } else if(source == 'army') {
         goog.object.forEach(player.my_army, function(unit) {
             var spec = gamedata['units'][unit['spec']];
@@ -24562,16 +24333,15 @@ function update_unit_donation_dialog(dialog) {
 
                 // XXX really inefficient
                 if(_source == 'session') {
-                    for(var id in session.cur_objects.objects) {
-                        var o = session.cur_objects.objects[id];
+                    session.for_each_real_object(function(o) {
                         if((o.spec['name'] === _specname) && (o.team === 'player') && (o.hp >= o.max_hp)) {
                             if(!goog.array.contains(_dialog.user_data['donation'], o.id)) {
                                 // found a new candidate
                                 obj_id = o.id;
-                                break;
+                                return true;
                             }
                         }
-                    }
+                    });
                 } else if(_source == 'army') {
                     for(var id in player.my_army) {
                         var o = player.my_army[id];
@@ -24638,7 +24408,7 @@ function update_unit_donation_dialog(dialog) {
                 // XXX really inefficient
                 for(var i = 0; i < _dialog.user_data['donation'].length; i++) {
                     if(_source == 'session') {
-                        var o = session.cur_objects.objects[_dialog.user_data['donation'][i]];
+                        var o = session.get_real_world().objects._get_object(_dialog.user_data['donation'][i]);
                         if(o && o.spec['name'] === _specname) {
                             _dialog.user_data['donation'].splice(i, 1);
                             break;
@@ -28633,7 +28403,7 @@ function army_unit_compare(a,b) {
 
 player.get_manufacture_queue_space_usage = function() {
     var usage = 0;
-    goog.object.forEach(session.cur_objects.objects, function(obj) {
+    session.for_each_real_object(function(obj) {
         if(obj.team === 'player' && obj.is_building() && obj.is_manufacturer()) {
             var manuf_queue = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
             goog.array.forEach(manuf_queue, function(item) {
@@ -28653,7 +28423,7 @@ player.get_army_unit_count_by_specname = function() {
         ret[obj['spec']] = (ret[obj['spec']]||0) + 1;
     });
     // also count units that are under construction
-    goog.object.forEach(session.cur_objects.objects, function(obj) {
+    session.for_each_real_object(function(obj) {
         if(obj.team === 'player' && obj.is_building() && obj.is_manufacturer()) {
             var manuf_queue = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
             goog.array.forEach(manuf_queue, function(item) {
@@ -29113,16 +28883,16 @@ function request_unit_repair_update() {
 }
 
 function receive_unit_repair_update(data) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         obj.under_repair_finish = -1;
-    }
+    });
     player.unit_repair_queue = data;
     for(var i = 0; i < player.unit_repair_queue.length; i++) {
         var item = player.unit_repair_queue[i];
         // can be race conditions here with server, so check to be careful
-        if(item['obj_id'] in session.cur_objects.objects) {
-            session.cur_objects.objects[item['obj_id']].under_repair_finish = item['finish_time'];
+        var obj = session.get_real_world().objects._get_object(item['obj_id']);
+        if(obj) {
+            obj.under_repair_finish = item['finish_time'];
         }
     }
     // confirm receipt of response from the repair_control dialog
@@ -29155,7 +28925,7 @@ function update_repair_control(dialog) {
     dialog.widgets['in_production_icon'].show =
         dialog.widgets['in_production_time'].show =
         dialog.widgets['in_production_wrench'].show =
-        dialog.widgets['in_production_health'].show = !player.squads_enabled() && (player.unit_repair_queue.length > 0 && (player.unit_repair_queue[0]['obj_id'] in session.cur_objects.objects || player.unit_repair_queue[0]['obj_id'] in player.my_army));
+        dialog.widgets['in_production_health'].show = !player.squads_enabled() && (player.unit_repair_queue.length > 0 && (session.get_real_world().objects.has_object(player.unit_repair_queue[0]['obj_id']) || player.unit_repair_queue[0]['obj_id'] in player.my_army));
     dialog.widgets['in_production_cancel'].show = (dialog.widgets['in_production_icon'].show && gamedata['unit_repair_can_cancel'] && !player.squads_enabled());
 
     if(dialog.widgets['in_production_icon'].show) {
@@ -29163,8 +28933,8 @@ function update_repair_control(dialog) {
         var orig_hp = item['original_hp'];
         var cur_hp = null, max_hp = null;
         var obj_spec, obj_level;
-        if(item['obj_id'] in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[item['obj_id']];
+        if(session.get_real_world().objects.has_object(item['obj_id'])) {
+            var obj = session.get_real_world().objects.get_object(item['obj_id']);
             obj_spec = obj.spec;
             if(!obj_spec) { throw Error('bad obj.spec in cur_objects for '+item['obj_id']); }
             obj_level = obj.level;
@@ -29223,8 +28993,8 @@ function update_repair_control(dialog) {
         var item = player.unit_repair_queue[i];
         var obj_spec, obj_level;
 
-        if(item['obj_id'] in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[item['obj_id']];
+        if(session.get_real_world().objects.has_object(item['obj_id'])) {
+            var obj = session.get_real_world().objects.get_object(item['obj_id']);
             obj_spec = obj.spec; obj_level = obj.level;
         } else if(item['obj_id'] in player.my_army) {
             var unit = player.my_army[item['obj_id']];
@@ -29276,15 +29046,14 @@ function update_repair_control(dialog) {
             }
         }
     } else {
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.team === 'player' && obj.is_mobile()) {
                 unit_list.push(obj);
                 if(obj.is_damaged() && !obj.is_under_repair()) {
                     any_need_repair = true;
                 }
             }
-        }
+        });
     }
 
     var compare_by_awesomeness = function(a,b) {
@@ -29469,12 +29238,11 @@ function update_repair_control(dialog) {
                 }
             }
         } else {
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            session.for_each_real_object(function(obj) {
                 if(obj.team === 'player' && obj.is_mobile() && obj.is_damaged() && !obj.is_under_repair() ) {
                     to_repair.push(obj);
                 }
-            }
+            });
         }
 
         // add quickest units first
@@ -30030,8 +29798,7 @@ function update_manufacture_dialog(dialog) {
 
     if(!('enable_defending_units' in gamedata) || gamedata['enable_defending_units']) {
         // in games with defending units, count units in session (i.e. base defenders)
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_mobile() && (obj.team === 'player')) {
                 var name = obj.spec['name'];
                 if(name in unit_count) {
@@ -30040,7 +29807,7 @@ function update_manufacture_dialog(dialog) {
                     unit_count[name] = 1;
                 }
             }
-        }
+        });
     } else {
         // in games without defending units, count entire army
         goog.object.forEach(player.my_army, function(obj) {
@@ -30055,8 +29822,7 @@ function update_manufacture_dialog(dialog) {
 
     // count queued units
     var queue_count = {};
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_manufacturer() && (obj.team === 'player')) {
             var q = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
             goog.array.forEach(q, function(data) {
@@ -30068,7 +29834,7 @@ function update_manufacture_dialog(dialog) {
                 }
             });
         }
-    }
+    });
 
     // fill in grid of unit types
     var grid_x = 0, grid_y = 0;
@@ -30152,7 +29918,7 @@ function update_manufacture_dialog(dialog) {
                         var fx_name = (manuf_queue.length == 1 ? 'unit_manufacture_start' : 'unit_manufacture_add_to_queue');
                         var fx_data = gamedata['client']['vfx'][fx_name];
                         if(fx_data) {
-                            builder.world.fxworld.add_visual_effect_at_time([builder.x,builder.y], 0, [0,1,0], client_time, fx_data,
+                            session.get_real_world().fxworld.add_visual_effect_at_time([builder.x,builder.y], 0, [0,1,0], client_time, fx_data,
                                                            true,
                                                            { '%OBJECT_SPRITE': get_leveled_quantity(spec['art_asset'], level)});
                         }
@@ -30533,51 +30299,45 @@ function update_manufacture_dialog(dialog) {
 // (inefficiently) find a particular object by its type and return a reference to it
 // (or null if not found)
 function find_object_by_type(specname) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === specname) {
             return obj;
         }
-    }
-    return null;
+    });
 }
 
 function find_all_objects_by_type(specname) {
     var ret = [];
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === specname) {
             ret.push(obj);
         }
-    }
+    });
     return ret;
 }
 
 function find_highest_level_object_by_type(specname) {
     var obj = null;
-    for(var id in session.cur_objects.objects) {
-        var o = session.cur_objects.objects[id];
+    session.for_each_real_object(function(o) {
         if(o.spec['name'] === specname) {
             if(!obj || o.level > obj.level) {
                 obj = o;
             }
         }
-    }
+    });
     return obj;
 }
 function count_objects_by_type(specname) {
     var count = 0;
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.spec['name'] === specname) {
             count += 1;
         }
-    }
+    });
     return count;
 }
 function find_object_with_spell(spellname) {
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    return session.for_each_real_object(function(obj) {
         if(obj.spec['spells']) {
             for(var i = 0; i < obj.spec['spells'].length; i++) {
                 if(obj.spec['spells'][i] === spellname) {
@@ -30585,8 +30345,7 @@ function find_object_with_spell(spellname) {
                 }
             }
         }
-    }
-    return null;
+    });
 }
 
 
@@ -31500,7 +31259,7 @@ function start_crafting(_builder, _build_recipe_spec, extra_params) {
     });
 
     if('start_effect' in _build_recipe_spec) {
-        _builder.world.fxworld.add_visual_effect_at_time(_builder.interpolate_pos(), 0, [0,1,0], client_time, _build_recipe_spec['start_effect'], true, null);
+        session.get_real_world().fxworld.add_visual_effect_at_time(_builder.raw_pos(), 0, [0,1,0], client_time, _build_recipe_spec['start_effect'], true, null);
     }
     return ui_tag;
 }
@@ -31611,9 +31370,9 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
                     max_slots = get_max_minefields();
                     delivery_slot_index = 0;
                     var tag = dialog.user_data['wname_to_tag'][wname];
-                    if((tag in session.minefield_tags_by_tag) && (session.cur_objects.has_object(session.minefield_tags_by_tag[tag]))) {
+                    if((tag in session.minefield_tags_by_tag) && (session.get_real_world().objects.has_object(session.minefield_tags_by_tag[tag]))) {
                         // minefield exists
-                        obj = session.cur_objects.get_object(session.minefield_tags_by_tag[tag]);
+                        obj = session.get_real_world().objects.get_object(session.minefield_tags_by_tag[tag]);
                         cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
                         cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
                     }
@@ -32737,12 +32496,11 @@ function update_research_dialog(dialog) {
 
     // mapping of techs -> labs working on it
     var under_research = {};
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.is_researcher() && obj.team == 'player' && obj.is_researching()) {
             under_research[obj.research_item] = obj;
         }
-    }
+    });
 
     var grid_x = 0, grid_y = 0;
 
@@ -38991,12 +38749,11 @@ function get_requirements_help(kind, arg, options) {
         var under_construction_obj = null;
         var num_built = 0;
         var min_level = 999, need_to_upgrade_obj = null;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.spec['name'] === specname && obj.team === 'player') {
                 if(obj.is_under_construction()) {
                     under_construction_obj = obj;
-                    continue;
+                    return;
                 }
                 num_built += 1;
                 if(obj.level < min_level && obj.level < obj.get_max_ui_level()) {
@@ -39004,7 +38761,7 @@ function get_requirements_help(kind, arg, options) {
                     need_to_upgrade_obj = obj;
                 }
             }
-        }
+        });
         ui_arg_s = gamedata['buildings'][specname]['ui_name'];
         ui_arg_d = gamedata['resources'][rsrc]['ui_name_lower'];
         unit_icon = get_leveled_quantity(gamedata['buildings'][specname]['art_asset'], 1);
@@ -39033,8 +38790,7 @@ function get_requirements_help(kind, arg, options) {
         var cc_level = player.get_townhall_level();
         var num_built = 0;
         var min_level = 999, need_to_upgrade_obj = null, powerplant_specname = null;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(('provides_power' in obj.spec) && obj.team === 'player') {
                 powerplant_specname = obj.spec['name'];
                 num_built += 1;
@@ -39043,7 +38799,7 @@ function get_requirements_help(kind, arg, options) {
                     need_to_upgrade_obj = obj;
                 }
             }
-        }
+        });
         if(powerplant_specname && (num_built < get_leveled_quantity(gamedata['buildings'][powerplant_specname]['limit'], cc_level))) {
             // player has not built the full number of energy plants yet
             noun = 'power'; verb = 'build_more'; target = powerplant_specname;
@@ -39098,8 +38854,7 @@ function get_requirements_help(kind, arg, options) {
                 var cc_level = player.get_townhall_level();
                 var num_built = 0;
                 var min_level = 999, need_to_upgrade_obj = null;
-                for(var id in session.cur_objects.objects) {
-                    var obj = session.cur_objects.objects[id];
+                session.for_each_real_object(function(obj) {
                     if(obj.spec['name'] === specname && obj.team === 'player') {
                         num_built += 1;
                         if(obj.level < min_level && obj.level < obj.get_max_ui_level()) {
@@ -39107,7 +38862,7 @@ function get_requirements_help(kind, arg, options) {
                             need_to_upgrade_obj = obj;
                         }
                     }
-                }
+                });
                 if(num_built < get_leveled_quantity(gamedata['buildings'][specname]['limit'], cc_level)) {
                     // player has not built the full number yet
                     noun = 'unit_space'; verb = (num_built < 1 ? 'build_first' : 'build_more'); target = specname;
@@ -39162,8 +38917,7 @@ function get_requirements_help(kind, arg, options) {
         var min_level = 999, need_to_upgrade_obj = null;
         var num_built = 0;
 
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(('provides_foremen' in obj.spec) && obj.team === 'player') {
                 num_built += 1;
                 if(obj.level < min_level && obj.level < obj.get_max_ui_level()) {
@@ -39171,7 +38925,7 @@ function get_requirements_help(kind, arg, options) {
                     need_to_upgrade_obj = obj;
                 }
             }
-        }
+        });
 
         // find what type of building provides foremen
         var builder_spec = null;
@@ -40458,7 +40212,7 @@ function update_upgrade_dialog(dialog) {
                                __unit.spec['upgrade_start_effect'] :
                                gamedata['client']['vfx']['building_upgrade_start']);
                 if(fx_data) {
-                    __unit.world.fxworld.add_visual_effect_at_time([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
+                    session.get_real_world().fxworld.add_visual_effect_at_time([__unit.x,__unit.y], 0, [0,1,0], client_time, fx_data,
                                                    true, // !spec['worth_less_xp'], // no sound for barrier upgrades?
                                                    { '%OBJECT_SPRITE': __unit.get_leveled_quantity(__unit.spec['art_asset'])});
                 }
@@ -41049,6 +40803,8 @@ Store.get_price = function(sale_currency, unit_id, spell, spellarg, ignore_error
     @param {string} spellname
     @param {*} spellarg */
 function can_cast_spell_detailed(unit_id, spellname, spellarg) {
+    var world = session.get_real_world();
+
     var spell = gamedata['spells'][spellname];
 
     // note: undecided if we should factor in the GCD here. Leaving it
@@ -41176,10 +40932,9 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         */
         if(spec['limit']) {
             var current = 0;
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
-                if(obj.team === 'player' && obj.spec['name'] === spec['name']) { current += 1 }
-            }
+            world.objects.for_each(function(obj) {
+                if(obj.team === 'player' && obj.spec['name'] === spec['name']) { current += 1; }
+            });
             var limit = get_leveled_quantity(spec['limit'], player.get_townhall_level());
             if(limit >= 0 && current >= limit && !player.is_cheater) {
                 // can we build more at a higher CC level?
@@ -41238,12 +40993,11 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         // always OK
     } else if(spellname.indexOf("UPGRADE_BARRIERS") == 0) {
         var min_level = 99;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        world.objects.for_each(function(obj) {
             if(obj.spec['name'] === 'barrier') {
                 min_level = Math.min(min_level, obj.level);
             }
-        }
+        });
         var formula = spell['price_formula'];
         var up_level = parseInt(formula[formula.length-1],10);
         if(min_level >= up_level) {
@@ -41269,14 +41023,11 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             return [false, gamedata['errors']['CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT']['ui_name'], null];
         }
     } else if(('code' in spell) && (spell['code'] == 'instant_repair' || spell['code'] == 'instant_combat_repair')) {
-        var found = false;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        var found = world.objects.for_each(function(obj) {
             if(obj.team === 'player' && obj.is_damaged()) {
-                found = true;
-                break;
+                return true;
             }
-        }
+        });
         if(!found && session.deployed_unit_space == 0) {
             return [false, gamedata['errors']['NOTHING_TO_REPAIR']['ui_name'], null];
         }
@@ -41293,7 +41044,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
 
         return [true, null, null];
     } else if(spellname == "CRAFT_FOR_FREE") {
-        var builder = session.cur_objects.objects[unit_id];
+        var builder = world.objects.get_object(unit_id);
         var recipe_name = spellarg[0]['recipe'];
         var recipe_level = spellarg[0]['level'] || 1;
         var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
@@ -41520,12 +41271,11 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         return [Math.max(1, Math.ceil(spellarg / (1.0*bucks_per_credit))), p_currency];
     } else if(formula.indexOf('barrier_upgrade') === 0) {
         var min_level = 99;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.spec['name'] === 'barrier') {
                 min_level = Math.min(min_level, obj.level);
             }
-        }
+        });
         var up_level = parseInt(formula[formula.length-1],10);
         if(min_level >= up_level && !ignore_error) {
             return [-1, p_currency];
@@ -41540,7 +41290,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         return [spell['price'], p_currency];
     } else if(formula === 'speedup' || formula === 'speedup_gamebucks') {
-        var unit = session.cur_objects.objects[unit_id];
+        var unit = session.get_real_world().objects.get_object(unit_id);
 
         if(unit.is_damaged() && !unit.is_repairing()) { return [-1, p_currency]; }
 
@@ -41654,8 +41404,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         var sum_time = 0;
         if(formula === 'repair_all_gamebucks') { p_currency = 'gamebucks'; }
 
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             if(obj.is_building() && obj.is_damaged()) {
                 var repair_time;
                 if(obj.is_repairing()) {
@@ -41672,7 +41421,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                     sum_price += Store.get_speedup_price(player, 'building_repair', time_to_finish, p_currency);
                 }
             }
-        }
+        });
 
         if(player.get_any_abtest_value('building_repair_sum_times', gamedata['store']['building_repair_sum_times'])) {
             var time_to_finish = sum_time;
@@ -41719,13 +41468,12 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 });
 
             } else { // OLD non-squads method
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
-                if(obj.is_mobile() && obj.is_damaged() && player.can_repair_unit(obj)) {
-                    var rep = obj.cost_to_repair(player);
-                    total_rep_time += rep['time'];
-                }
-            }
+                session.for_each_real_object(function(obj) {
+                    if(obj.is_mobile() && obj.is_damaged() && player.can_repair_unit(obj)) {
+                        var rep = obj.cost_to_repair(player);
+                        total_rep_time += rep['time'];
+                    }
+                });
             }
 
             if(total_rep_time > 0) {
@@ -41747,7 +41495,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula === 'research') {
 
         } else {
-            unit = session.cur_objects.objects[unit_id];
+            unit = session.get_real_world().objects.get_object(unit_id);
             if(!unit.is_building() || unit.is_damaged() ||
                (unit.is_busy() && !((formula==='research') && unit.is_researching()))) {
                 return [-1, p_currency];
@@ -41835,7 +41583,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
             // check destination slot
             if(delivery && delivery['obj_id'] && !delivery['replace']) {
-                var other = session.cur_objects.objects[delivery['obj_id']];
+                var other = session.get_real_world().objects.get_object(delivery['obj_id']);
                 if(other.equipment && delivery['slot_type'] in other.equipment && other.equipment[delivery['slot_type']][delivery['slot_index']||0]) {
                     return [-1, p_currency];
                 }
@@ -42014,10 +41762,9 @@ Store.force_order_cleanup = function() {
         var cb = Store.order_cleanup_cb;
         console.log('PERFORMING POST-ORDER CLEANUP');
         Store.order_cleanup_cb = null;
-        for(var id in session.cur_objects.objects) {
-            var obj = session.cur_objects.objects[id];
+        session.for_each_real_object(function(obj) {
             send_to_server.func(["PING_OBJECT", obj.id, "post_order_cleanup"]);
-        }
+        });
         send_to_server.func(["UNIT_REPAIR_TICK"]);
         send_to_server.func(["PING_CREDITS"]);
         send_to_server.func(["PING_TECH"]);
@@ -42108,7 +41855,8 @@ Store.place_gamebucks_order = function(price, unit_id, spellname, spellarg, cb) 
         var descr = ''; // 'INSUFFICIENT:';
         try {
             // really don't want to get errors here, since it would kill the order
-            descr += spellname+((unit_id in session.cur_objects.objects) ? ','+session.cur_objects.objects[unit_id].spec['name']:'')+(spellarg?','+spellarg.toString():'');
+            var unit = session.get_real_world().objects._get_object(unit_id);
+            descr += spellname+(unit ? ','+unit.spec['name']:'')+(spellarg?','+spellarg.toString():'');
         } catch (e) {
             descr += 'UNKNOWN';
         }
@@ -42200,7 +41948,7 @@ Store.place_fbcredits_order = function(price, unit_id, spellname, spellarg, on_f
         descr += ','+spellarg;
     }
     if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
-        var object = session.cur_objects.objects[unit_id];
+        var object = session.get_real_world().objects.get_object(unit_id);
         descr += ','+object.spec['name'];
     }
 
@@ -42317,7 +42065,7 @@ Store.place_kgcredits_order = function(price, unit_id, spellname, spellarg, on_f
         descr += ','+spellarg;
     }
     if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
-        var object = session.cur_objects.objects[unit_id];
+        var object = session.get_real_world().objects.get_object(unit_id);
         descr += ','+object.spec['name'];
     }
 
@@ -42420,7 +42168,7 @@ Store.place_fbpayments_order = function(fbpayments_currency, price, unit_id, spe
         descr += ','+spellarg;
     }
     if(unit_id && unit_id != GameObject.VIRTUAL_ID) {
-        var object = session.cur_objects.objects[unit_id];
+        var object = session.get_real_world().objects.get_object(unit_id);
         descr += ','+object.spec['name'];
     }
 
@@ -43048,11 +42796,18 @@ function handle_server_message_bundle(serial, bundle) {
     }
 }
 
-// for debugging bad battle summaries
-var debug_session_change_history = [];
+/** @type {!Array<string>} for debugging server->client traffic */
+var debug_server_message_history = [];
+/** @const */
+var debug_server_message_history_limit = 10;
 
 function handle_server_message(data) {
     var msg = data[0];
+
+    debug_server_message_history.push(msg);
+    if(debug_server_message_history.length > debug_server_message_history_limit) { // limit
+        debug_server_message_history.splice(0, debug_server_message_history.length - debug_server_message_history_limit);
+    }
 
     // presumably everything that happens in here affects the "real" world.
     var world = (session.has_world() ? session.get_real_world() : null);
@@ -43488,13 +43243,6 @@ function handle_server_message(data) {
 
         APMCounter.reset();
 
-        debug_session_change_history.push({'count': data[38],
-                                           'from': data[39],
-                                           'to': data[16], 'client_deployed': session.has_deployed, 'summary?': !!data[9]});
-        if(debug_session_change_history.length > 5) { // limit to last few session changes
-            debug_session_change_history.splice(0, 5 - debug_session_change_history.length);
-        }
-
         // blow away the old session
         change_selection(null);
 
@@ -43608,23 +43356,13 @@ function handle_server_message(data) {
 
         // set up game map
         var ncells = session.viewing_base.ncells();
-
-        //legacy pointers
-        astar_map = session.get_real_world().astar_map;
-        astar_context = session.get_real_world().astar_context;
-
-        // read object state from server
-        session.cur_objects.clear();
-        session.minefield_tags_by_obj_id = {};
-        session.minefield_tags_by_tag = {};
-        session.factory_tags_by_obj_id = {};
-        session.factory_tags_by_tag = {};
         mouse_state.hovering_over = null;
 
+        // read object state from server
         var object_state = data[5];
         for(var n = 0; n < object_state.length; n++) {
             var obj = create_object(object_state[n], false);
-            session.add_object(obj);
+            session.add_session_object(obj);
             if(obj.team === 'player' && obj.is_mobile()) {
                 session.deployed_unit_space += obj.get_leveled_quantity(obj.spec['consumes_space'] || 0);
             }
@@ -43730,15 +43468,14 @@ function handle_server_message(data) {
            session.viewing_ai &&
            player.get_any_abtest_value('enable_enemy_unit_tips', gamedata['client']['enable_enemy_unit_tips'])) {
             var tips = {};
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            session.for_each_real_object(function(obj) {
                 if(obj.team !== 'player') {
                     var tip = 'enemy_unit_'+obj.spec['name'];
                     if(tip in gamedata['strings']) {
                         tips[tip] = 1;
                     }
                 }
-            }
+            });
             for(var name in tips) {
                 // as soon as any tip is shown, stop.
                 if(invoke_ingame_tip(name, {frequency: GameTipFrequency.ONCE_ONLY})) {
@@ -43796,21 +43533,30 @@ function handle_server_message(data) {
 
     } else if(msg == "OBJECT_REMOVED" || msg == "OBJECT_REMOVED2") {
         var id = data[1];
-        if(!(id in session.cur_objects.objects)) {
+        if(!world.objects.has_object(id)) {
             console.log('race condition in OBJECT_REMOVED, ignoring');
             return;
         }
-        var obj = session.cur_objects.objects[id];
-        remove_object(obj);
+        var obj = world.objects.get_object(id);
+        world.remove_object(obj);
         if(msg == "OBJECT_REMOVED") {
             update_resources(data[2], false);
         }
     } else if(msg == "OBJECT_CREATED" || msg == "OBJECT_CREATED2") {
         var state = data[1];
         var obj = create_object(state, true);
-        session.add_object(obj);
+        session.add_session_object(obj);
 
         if(obj.is_mobile()) {
+            // check for arming delay when in hostile territory
+            if((obj.team == 'player' && session.viewing_base.base_landlord_id !== session.user_id) ||
+               (obj.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
+                var auto_spell = obj.get_auto_spell();
+                if(auto_spell && auto_spell['deployment_arming_delay']) {
+                    obj.create_aura(world, obj, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
+                }
+            }
+
             invalidate_defender_threatlists();
             if(unit_deployment_latency_high()) {
                 // spread sound effect time out by the min flush interval, to approximate units arriving smoothly over that time
@@ -43828,11 +43574,11 @@ function handle_server_message(data) {
     } else if(msg == "OBJECT_STATE_UPDATE" || msg == "OBJECT_STATE_UPDATE2") {
         var state = data[1];
         var id = state[0];
-        if(!(id in session.cur_objects.objects)) {
+        if(!world.objects.has_object(id)) {
             console.log('race condition in OBJECT_STATE_UPDATE, ignoring');
             return;
         }
-        var obj = session.cur_objects.objects[id];
+        var obj = world.objects.get_object(id);
         obj.receive_state(state, false, false);
 
         if(msg == "OBJECT_STATE_UPDATE") {
@@ -43848,12 +43594,11 @@ function handle_server_message(data) {
     } else if(msg == "OBJECT_AURAS_UPDATE") {
         var state = data[1];
         var id = state[0];
-        if(!(id in session.cur_objects.objects)) {
+        if(!world.objects.has_object(id)) {
             console.log('race condition in OBJECT_AURAS_UPDATE, ignoring');
             return;
         }
-        var obj = session.cur_objects.objects[id];
-        obj.receive_auras_update(state[1]);
+        world.objects.get_object(id).receive_auras_update(world, state[1]);
     } else if(msg == "PLAYER_STATE_UPDATE") {
         update_resources(data[1], false);
         if(player.can_level_up()) {
@@ -43883,7 +43628,9 @@ function handle_server_message(data) {
         var old_combat_time_scale = combat_time_scale(); // remember old combat_time_scale, since stattab update can change it
 
         player.stattab = data[1];
-        Building.update_modstats('player', player.stattab['buildings']);
+        if(world) { // ignore updates prior to first connection (pre-hello consequents etc)
+            Building.update_modstats('player', player.stattab['buildings']);
+        }
 
         // check for any change to combat_time_scale
         var new_combat_time_scale = combat_time_scale();
@@ -43897,7 +43644,9 @@ function handle_server_message(data) {
         }
     } else if(msg == "ENEMY_STATTAB_UPDATE") {
         enemy.stattab = data[1];
-        Building.update_modstats('enemy', enemy.stattab['buildings']);
+        if(world) {
+            Building.update_modstats('enemy', enemy.stattab['buildings']);
+        }
     } else if(msg == "PLAYER_UNIT_EQUIP_UPDATE") {
         player.unit_equipment = data[1];
     } else if(msg == "ENEMY_UNIT_EQUIP_UPDATE") {
@@ -43917,8 +43666,8 @@ function handle_server_message(data) {
         }
 
         // fire M&M
-        if(lab_id in session.cur_objects.objects) {
-            var lab = session.cur_objects.objects[lab_id];
+        var lab = world.objects._get_object(lab_id);
+        if(lab) {
             if(!player.is_cheater) {
                 // trigger visual effect
                 var fx_data = gamedata['client']['vfx']['tech_research_finish'];
@@ -44090,28 +43839,24 @@ function handle_server_message(data) {
 
 
                             // check for anti-missile defenses
-                            var interceptor = null;
-                            for(var id in session.cur_objects.objects) {
-                                var obj = session.cur_objects.objects[id];
+                            var interceptor = session.for_each_real_object(function(obj) {
                                 if(obj.is_building() && !obj.is_destroyed() && !obj.disarmed && !obj.combat_stats.stunned && (obj.team !== 'player') &&
                                    obj.equipment && obj.is_shooter()) {
                                     var chance = 1 - obj.combat_stats.anti_missile;
                                     if(chance > 0) {
                                         // check range
                                         var range = obj.weapon_range()[1];
-                                        var dist = vec_distance(obj.interpolate_pos(), target_loc);
+                                        var dist = vec_distance(obj.raw_pos(), target_loc);
                                         if(range > 0 && dist < range) {
                                             // chance of interception
                                             if(Math.random() < chance) {
-                                                interceptor = obj;
                                                 target_height = (launch_height > 0 ? 10 : -4);
-                                                break;
+                                                return obj;
                                             }
                                         }
                                     }
                                 }
-                                if(interceptor) { break; }
-                            }
+                            });
 
                             // missile effect
                             var hit_tick, hit_time;
@@ -44167,8 +43912,8 @@ function handle_server_message(data) {
         var my_arg = data[1], success = data[2];
         var unit_id = my_arg[1], addr = my_arg[2], inv_slot = my_arg[3], add_item = my_arg[4], remove_item = my_arg[5], ui_slot = my_arg[6];
 
-        if(unit_id in session.cur_objects.objects) {
-            var unit = session.cur_objects.objects[unit_id];
+        if(world.objects.has_object(unit_id)) {
+            var unit = world.objects.get_object(unit_id);
             unit.equip_pending = false;
 
             // add feedback to Upgrade dialog
@@ -44529,8 +44274,8 @@ function handle_server_message(data) {
         }
 
         if(need_glow_effect) { // trigger glow effect
-            if(obj_id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[obj_id];
+            var obj = world.objects._get_object(obj_id);
+            if(obj) {
                 if(obj.is_building() && obj.is_producer()) {
                     obj.harvest_glow_time = client_time;
                 }
@@ -44553,17 +44298,15 @@ function handle_server_message(data) {
                 invoke_child_message_dialog(s['ui_title'].replace('%s',Store.gamebucks_ui_name()),
                                             s['ui_description'].replace('%s', Store.display_user_currency_amount(res['gamebucks'], 'full')));
             }
-        } else if((obj_id in session.cur_objects.objects) &&
-                  session.cur_objects.objects[obj_id].spec['name'] == 'iron_deposit') {
+        } else if(world.objects.has_object(obj_id) &&
+                  world.objects.get_object(obj_id).spec['name'] == 'iron_deposit') {
             // see if this was the last deposit, and if so show consolation message
-            var more_deposits = false;
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            var more_deposits = session.for_each_real_object(function(obj, id) {
                 if(id != obj_id && obj.spec['name'] == 'iron_deposit') {
-                    more_deposits = true;
-                    break;
+                    return true;
                 }
-            }
+            });
+
             if(!more_deposits &&
                player.get_any_abtest_value('currency', gamedata['currency']) == 'gamebucks' &&
                player.get_any_abtest_value('gamebucks_in_deposits', gamedata['gamebucks_in_deposits'])) {
@@ -44593,7 +44336,7 @@ function handle_server_message(data) {
             // offset pos a little bit since these almost always go with other combat text
             var off = [-2,-2];
             var font_size = 16;
-            if(obj_id in session.cur_objects.objects && session.cur_objects.objects[obj_id].is_building()) {
+            if(world.objects.has_object(obj_id)) {
                 off = [0, -11];
                 font_size = 20;
             }
@@ -44613,7 +44356,7 @@ function handle_server_message(data) {
         }
     } else if(msg == "CRAFT_COMPLETE") {
         var obj_id = data[1], loot = data[2], attempt_ids = data[3];
-        var obj = session.cur_objects.objects[obj_id] || null;
+        var obj = world.objects._get_object(obj_id);
         if(!obj || !obj.is_building()) { return; }
         var pos = [obj.x, obj.y];
         var off = [0, 0];
@@ -44766,10 +44509,11 @@ function handle_server_message(data) {
         var which_slot = data[2];
         var loot = data[3];
 
-        var handle_it = (function (_obj_id, _which_slot, _loot) { return function() {
+        var handle_it = (function (_world, _obj_id, _which_slot, _loot) { return function() {
             // clear idle state cache
-            if(_obj_id in session.cur_objects.objects && session.cur_objects.objects[_obj_id].is_building()) {
-                session.cur_objects.objects[_obj_id].idle_state_cache = null;
+            var obj = _world.objects._get_object(_obj_id);
+            if(obj && obj.is_building()) {
+                obj.idle_state_cache = null;
             }
 
             player.session_lottery_loot = player.session_lottery_loot.concat(_loot);
@@ -44777,7 +44521,7 @@ function handle_server_message(data) {
             if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'lottery_dialog') {
                 lottery_dialog_scan_result(selection.ui, _which_slot, _loot);
             }
-        }; })(obj_id, which_slot, loot);
+        }; })(world, obj_id, which_slot, loot);
 
         var delay = 0;
         if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'lottery_dialog') {
@@ -45185,9 +44929,11 @@ function handle_server_message(data) {
 
     } else if(msg == "UNIT_MANUFACTURED") {
         // data is of the form ["UNIT_MANUFACTURED", manufacturer_id, [unit_id0, unit_id1, ...]]
-        if('unit_manufactured' in gamedata['client']['vfx']) {
+        var manufacturer_id = data[1];
+
+        if(manufacturer_id && world.objects.has_object(manufacturer_id) && ('unit_manufactured' in gamedata['client']['vfx'])) {
             var effect = gamedata['client']['vfx']['unit_manufactured'];
-            var manufacturer = session.cur_objects.get_object(data[1]);
+            var manufacturer = world.objects.get_object(manufacturer_id);
 
             if(effect['type'] === 'phantom_unit') {
                 // pick a random squad building to walk to
@@ -45195,8 +44941,8 @@ function handle_server_message(data) {
                 var squad_building = squad_buildings[Math.floor(Math.random() * squad_buildings.length)];
 
                 // prepare to calculate a path between the buildings (only done if a unit actually needs it)
-                var start_pos = vec_add(manufacturer.interpolate_pos(), vec_scale(0.5, manufacturer.spec['gridsize']));
-                var end_pos = vec_add(squad_building.interpolate_pos(), vec_scale(0.5, squad_building.spec['gridsize']));
+                var start_pos = vec_add(manufacturer.raw_pos(), vec_scale(0.5, manufacturer.spec['gridsize']));
+                var end_pos = vec_add(squad_building.raw_pos(), vec_scale(0.5, squad_building.spec['gridsize']));
                 var path, path_tried = false; // note: path is undefined until path_tried is set the first time
 
                 for(var i = 0; i < data[2].length; i++) {
@@ -45215,22 +44961,22 @@ function handle_server_message(data) {
                         // note: this does not interact with tick_astar_queries_left, it always runs the query unconditionally.
                         if(!path_tried) {
                             path_tried = true;
-                            path = astar_context.search(start_pos, end_pos);
+                            path = world.astar_context.search(start_pos, end_pos);
                             if(path && path.length > 0) {
-                                path = astar_map.smooth_path(path);
+                                path = world.astar_map.smooth_path(path);
                             }
                         }
 
                         if(path && path.length > 0) {
                             // only show phantoms for ground units if we have at least a partial path to the squad building
-                            session.get_real_world().fxworld.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
+                            world.fxworld.add_visual_effect_at_time(start_pos, spec['flying'] ? spec['altitude'] : 0, [1, 0, 1], client_time,
                                     gamedata['client']['vfx']['unit_manufactured'], true,
                                     {'spec': unit['spec'], 'level': unit['level'], 'path': path.slice(0), 'start_halted': delay});
                         }
                     }
                 }
             } else {
-                session.get_real_world().fxworld.add_visual_effect_at_time(manufacturer.interpolate_pos(), 0, [0, 1, 0], client_time, gamedata['client']['vfx']['unit_manufactured'], true, null);
+                world.fxworld.add_visual_effect_at_time(manufacturer.raw_pos(), 0, [0, 1, 0], client_time, gamedata['client']['vfx']['unit_manufactured'], true, null);
             }
         }
     } else if(msg == "ERROR") {
@@ -45294,13 +45040,13 @@ function handle_server_message(data) {
                 invoke_speedup_dialog('busy');
             }
         } else if(name == "LAB_IS_BUSY") {
-            var busy_obj = session.cur_objects.objects[argument];
+            var busy_obj = world.objects._get_object(argument);
             if(busy_obj) {
                 change_selection(busy_obj);
                 invoke_speedup_dialog('research');
             }
         } else if(name == "WORKSHOP_IS_BUSY") {
-            var busy_obj = session.cur_objects.objects[argument];
+            var busy_obj = world.objects._get_object(argument);
             if(busy_obj) {
                 change_selection(busy_obj);
                 invoke_speedup_dialog('crafting');
@@ -45488,11 +45234,10 @@ function invoke_login_error_message(error_name) {
 function flush_dirty_objects(options) {
     var args = [];
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.state_dirty != 0) {
-            if(options.urgent_only && !(obj.state_dirty & obj_state_flags.URGENT)) { continue; }
-            if(options.buildings_only && !obj.is_building()) { continue; }
+            if(options.urgent_only && !(obj.state_dirty & obj_state_flags.URGENT)) { return; }
+            if(options.buildings_only && !obj.is_building()) { return; }
             var xy, orders = null;
             if(obj.is_mobile()) {
                 // send the (quantized) client simulation position
@@ -45527,7 +45272,7 @@ function flush_dirty_objects(options) {
 
             obj.state_dirty = 0;
         }
-    }
+    });
 
     if(args.length > 0) {
         send_to_server.func(["OBJECT_COMBAT_UPDATES", args]);
@@ -45634,7 +45379,7 @@ function do_visit_base(uid, options) {
     }
 
     if(1) {
-        apply_queued_damage_effects();
+        session.apply_queued_damage();
         flush_dirty_objects({});
         session.persist_debris();
     }
@@ -45823,7 +45568,9 @@ function do_on_mouseup(e) {
         //}
     }
 
-    if(!session.viewing_base) { return; }
+    var world = session.get_draw_world();
+
+    if(!world || !session.viewing_base) { return; }
 
     // find cell index (note: j,i are not quantized to integers)
     var ji = screen_to_ortho(xy);
@@ -45840,7 +45587,7 @@ function do_on_mouseup(e) {
     // is a ground-targeted spell "armed"?
     if(selection.spellname) {
         if(selection.spellname === "MOVE_UNIT") {
-            unit_command_move(j, i, false, !!e.shiftKey);
+            unit_command_move(world, j, i, false, !!e.shiftKey);
             change_selection_ui(null);
             selection.spellname = null;
             return;
@@ -45862,13 +45609,13 @@ function do_on_mouseup(e) {
                     // client-side predict - not 100% sure if this is safe?
                     var old_x = selection.unit.x, old_y = selection.unit.y;
                     selection.unit.x = ji[0]; selection.unit.y = ji[1];
-                    selection.unit.update_map([old_x, old_y], selection.unit.is_destroyed(), 'MOVE_BUILDING predict');
+                    selection.unit.update_map(selection.unit.world, [old_x, old_y], selection.unit.is_destroyed(), 'MOVE_BUILDING predict');
                 }
             }
             change_selection(null);
             return;
         } else if(selection.spellname === "DEPLOY_UNITS") {
-            if(!session.viewing_base.is_deployment_location_valid(ji)) {
+            if(!world.is_deployment_location_valid(ji)) {
                 return;
             }
 
@@ -45900,15 +45647,15 @@ function do_on_mouseup(e) {
             if(selection.unit) {
                 var spell_name = selection.spellname, spell = gamedata['spells'][selection.spellname];
                 var success = false;
-                success |= selection.unit.cast_client_spell_checked(spell_name, spell, null, [j,i]);
+                success |= selection.unit.cast_client_spell_checked(world, spell_name, spell, null, [j,i]);
                 for(var m = 0; m < selection.multi.length; m++) {
                     var u = selection.multi[m];
                     if(u !== selection.unit && u.spec === selection.unit.spec) {
-                        success |= u.cast_client_spell_checked(spell_name, spell, null, [j,i]);
+                        success |= u.cast_client_spell_checked(world, spell_name, spell, null, [j,i]);
                     }
                 }
                 if(success) {
-                    session.get_draw_world().fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], session.get_draw_world().fxworld.now_time(), 0.15));
+                    world.fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], world.fxworld.now_time(), 0.15));
                 }
             } else if(selection.item) {
                 var spec = gamedata['items'][selection.item['spec']];
@@ -45916,7 +45663,7 @@ function do_on_mouseup(e) {
 
                 inventory_send_request(selection.item, selection.slot, "INVENTORY_USE", [[j,i]], {trigger_gcd: session.has_deployed}); // trigger GCD during combat only
 
-                var fxworld = session.get_draw_world().fxworld;
+                var fxworld = world.fxworld;
                 fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], fxworld.now_time(), 0.15));
                 if('ui_activation' in spell) {
                     fxworld.add(new SPFX.CombatText([j,i], 0,
@@ -45934,7 +45681,7 @@ function do_on_mouseup(e) {
         }
     }
 
-    var found = find_object_at_screen_pixel(xy, ji, false);
+    var found = find_object_at_screen_pixel(world, xy, ji, false);
 
     if(selection.unit && (selection.spellname === "AMOVE_UNIT" || selection.spellname === "PATROL_UNIT")) {
         if(selection.spellname === "AMOVE_UNIT") {
@@ -45942,12 +45689,12 @@ function do_on_mouseup(e) {
             var add_waypoint = !!e.shiftKey;
             if(found &&
                (gamedata['allow_self_attack'] || player.is_developer() || (found.team != selection.unit.team))) {
-                unit_command_attack(found, add_waypoint);
+                unit_command_attack(world, found, add_waypoint);
             } else {
-                unit_command_move(j, i, true, add_waypoint);
+                unit_command_move(world, j, i, true, add_waypoint);
             }
         } else if(selection.spellname === "PATROL_UNIT") {
-            unit_command_patrol(j, i);
+            unit_command_patrol(world, j, i);
         }
 
         if(!e.shiftKey) {
@@ -45966,13 +45713,13 @@ function do_on_mouseup(e) {
            (found != selection.unit) &&
            (found.team != selection.unit.team)) {
 
-            unit_command_attack(found, !!e.shiftKey);
+            unit_command_attack(world, found, !!e.shiftKey);
 
             if(player.tutorial_state === 'move_rover_action') {
                 tutorial_step_move_rover_action_command();
             }
 
-            found.world.fxworld.add_under(new SPFX.ClickFeedback(found.interpolate_pos(), [1,0,0,1], found.world.fxworld.now_time(), 0.15));
+            world.fxworld.add_under(new SPFX.ClickFeedback(found.interpolate_pos(world), [1,0,0,1], world.fxworld.now_time(), 0.15));
             APMCounter.record_action();
 
         } else {
@@ -45984,7 +45731,7 @@ function do_on_mouseup(e) {
                     (client_time - mouse_state.last_click_time < DOUBLE_CLICK_TIME))) {
                     // it's a double-click or control-click
                     // select all on-screen units of same type
-                    var units = find_objects_in_screen_rect([0,0], [canvas_width,canvas_height], found.spec);
+                    var units = find_objects_in_screen_rect(world, [0,0], [canvas_width,canvas_height], found.spec);
                     if(units.length > 0) { player.record_feature_use('double_click_select'); }
 
                     if(e.shiftKey) {
@@ -46087,7 +45834,7 @@ function do_on_mouseup(e) {
                 }
 
                 // move units
-                unit_command_move(j, i, use_amove, !!e.shiftKey);
+                unit_command_move(world, j, i, use_amove, !!e.shiftKey);
                 APMCounter.record_action();
             } else {
                 // deselect
@@ -46114,6 +45861,9 @@ function do_on_mouseout(e) {
 }
 
 function create_mouse_tooltip() {
+    var world = session.get_draw_world();
+    if(!world) { return; }
+
     // no tooltips during tutorial
     if(player.tutorial_state != "COMPLETE") { return; }
 
@@ -46288,7 +46038,7 @@ function create_mouse_tooltip() {
             }
         }
 
-        var pos = mouse_state.hovering_over.interpolate_pos();
+        var pos = mouse_state.hovering_over.interpolate_pos(world);
         var alt = (mouse_state.hovering_over.is_mobile() && mouse_state.hovering_over.is_flying() ?
                    mouse_state.hovering_over.altitude - 1 : 0);
 
@@ -46308,10 +46058,16 @@ function create_mouse_tooltip() {
     };
 }
 
-function do_on_mousemove_update_drag_selection(xmin, xmax, ymin, ymax, add_to_selection) {
+/** @param {!World.World} world
+    @param {number} xmin
+    @param {number} xmax
+    @param {number} ymin
+    @param {number} ymax
+    @param {boolean} add_to_selection */
+function do_on_mousemove_update_drag_selection(world, xmin, xmax, ymin, ymax, add_to_selection) {
     // do not change selection during move_rover_action tutorial step
     if(player.tutorial_state != 'move_rover_action') {
-        var units = find_objects_in_screen_rect([xmin,ymin], [xmax,ymax], null);
+        var units = find_objects_in_screen_rect(world, [xmin,ymin], [xmax,ymax], null);
 
         if(add_to_selection) {
             // add to existing selection
@@ -46418,8 +46174,9 @@ function do_on_mousemove(e) {
     }
 
     // mouse tooltip processing. Skip if game not loaded, or in combat.
-    if(session.viewing_base && !session.has_attacked) {
-        var found = find_object_at_screen_pixel(xy, screen_to_ortho(xy), true);
+    var world = session.get_draw_world();
+    if(world && session.viewing_base && !session.has_attacked) {
+        var found = find_object_at_screen_pixel(world, xy, screen_to_ortho(xy), true);
         if(mouse_state.hovering_over != found) {
             if(mouse_state.hovering_over && mouse_tooltip) {
                 mouse_tooltip.onleave();
@@ -46477,7 +46234,7 @@ function do_on_mousemove(e) {
                 var ymin = Math.min(y, mouse_state.drag_start_y);
                 var ymax = Math.max(y, mouse_state.drag_start_y);
 
-                do_on_mousemove_update_drag_selection(xmin, xmax, ymin, ymax, !!e.shiftKey);
+                do_on_mousemove_update_drag_selection(world, xmin, xmax, ymin, ymax, !!e.shiftKey);
             }
         }
 
@@ -46538,6 +46295,9 @@ function on_touchmove(e) {
     e.preventDefault();
     if(e.changedTouches.length < 1) { return; }
 
+    var world = session.get_draw_world();
+    if(!world) { return; }
+
         if(e.targetTouches.length > 1 && player.unit_micro_enabled()) {
             // two-finger multi-select
             var xy0 = event_to_canvas(e.targetTouches[0]);
@@ -46556,7 +46316,7 @@ function on_touchmove(e) {
                 var ymin = Math.min(xy0[1], xy1[1]);
                 var ymax = Math.max(xy0[1], xy1[1]);
 
-                do_on_mousemove_update_drag_selection(xmin, xmax, ymin, ymax, false);
+                do_on_mousemove_update_drag_selection(world, xmin, xmax, ymin, ymax, false);
             }
         } else {
             on_mousemove(touch_emulate_mouse(e, e.changedTouches[0]));
@@ -46603,7 +46363,9 @@ function on_MSPointerMove(e) {
 
     if(e.pointerType===e.MSPOINTER_TYPE_TOUCH) { touch_primary = true; }
 
-    if((e.pointerType===e.MSPOINTER_TYPE_TOUCH) && (count >= 2) && player.unit_micro_enabled()) {
+    var world = session.get_draw_world();
+
+    if((e.pointerType===e.MSPOINTER_TYPE_TOUCH) && (count >= 2) && world && player.unit_micro_enabled()) {
         // two-finger multi-select
         e.preventDefault();
         var xy0 = event_to_canvas(pointer0);
@@ -46622,7 +46384,7 @@ function on_MSPointerMove(e) {
             var ymin = Math.min(xy0[1], xy1[1]);
             var ymax = Math.max(xy0[1], xy1[1]);
 
-            do_on_mousemove_update_drag_selection(xmin, xmax, ymin, ymax, false);
+            do_on_mousemove_update_drag_selection(world, xmin, xmax, ymin, ymax, false);
         }
     } else {
         return on_mousemove(e);
@@ -46698,8 +46460,10 @@ function do_on_mousedown(e) {
         APMCounter.record_action();
 
         var deployment_dripper_callback = function(mouse_xy) {
+            var world = session.get_draw_world();
+
             var ji = screen_to_ortho(mouse_xy);
-            if(!session.viewing_base.is_deployment_location_valid(ji)) {
+            if(!world.is_deployment_location_valid(ji)) {
                 return true; // stop the dripper
             }
             var obj = null;
@@ -46727,39 +46491,46 @@ function do_on_mousedown(e) {
     }
 }
 
-function do_unit_command_attack(unit, target, add_waypoint) {
+/** @param {!World.World} world
+    @param {!GameObject} unit
+    @param {!GameObject} target
+    @param {boolean} add_waypoint */
+function do_unit_command_attack(world, unit, target, add_waypoint) {
     if(target.is_destroyed() || target.is_indestructible()) { return; }
     if(!unit.is_shooter()) { return; }
     if(unit === target) { return; }
     if(!unit.can_shoot_at(target)) { return; }
 
-    unit.new_order({'state': ai_states.AI_ATTACK_SPECIFIC,
-                    'target': target.id},
+    unit.new_order(world, {'state': ai_states.AI_ATTACK_SPECIFIC,
+                           'target': target.id},
                    !add_waypoint);
-    //unit.ai_state = ai_states.AI_ATTACK_SPECIFIC;
-    //unit.ai_target = target;
 }
 
-function unit_command_attack(target, add_waypoint) {
+/** @param {!World.World} world
+    @param {!GameObject} target
+    @param {boolean} add_waypoint */
+function unit_command_attack(world, target, add_waypoint) {
     if(!selection.unit) { return; }
 
     selection.unit.speak('attack');
 
-    do_unit_command_attack(selection.unit, target, add_waypoint);
+    do_unit_command_attack(world, selection.unit, target, add_waypoint);
     for(var i = 0; i < selection.multi.length; i++) {
-        do_unit_command_attack(selection.multi[i], target, add_waypoint);
+        do_unit_command_attack(world, selection.multi[i], target, add_waypoint);
     }
 }
 
-function do_unit_command_patrol(unit) {
+/** @param {!World.World} world
+    @param {!GameObject} unit */
+function do_unit_command_patrol(world, unit) {
     var patrol_ai_state = ai_state_values[gamedata['default_patrol_ai_state']];
 
     if(!unit.patrol) {
         // start the patrol - append new order sending unit back to start position
-        var start_pos = unit.interpolate_pos();
-        unit.new_order({'state':patrol_ai_state,
-                        'patrol_origin': 1,
-                        'dest': [Math.floor(start_pos[0]),Math.floor(start_pos[1])]}, false);
+        var start_pos = unit.raw_pos();
+        unit.new_order(world, {'state':patrol_ai_state,
+                               'patrol_origin': 1,
+                               'dest': [Math.floor(start_pos[0]),Math.floor(start_pos[1])]}, false);
         unit.state_dirty |= obj_state_flags.ORDERS;
     }
 
@@ -46781,20 +46552,25 @@ function do_unit_command_patrol(unit) {
     unit.state_dirty |= obj_state_flags.PATROL;
 }
 
-function unit_command_patrol(j, i) {
+/** @param {!World.World} world
+    @param {number} j
+    @param {number} i */
+function unit_command_patrol(world, j, i) {
     if(!selection.unit || !selection.unit.is_mobile()) { return; }
 
     player.record_feature_use('unit_patrol_command');
 
-    unit_command_move(j, i, true, true);
+    unit_command_move(world, j, i, true, true);
 
-    do_unit_command_patrol(selection.unit);
+    do_unit_command_patrol(world, selection.unit);
     goog.array.forEach(selection.multi, function(obj) {
-        do_unit_command_patrol(obj);
+        do_unit_command_patrol(world, obj);
     });
 }
 
-function do_unit_command_make_aggressive(unit) {
+/** @param {!World.World} world
+    @param {!GameObject} unit */
+function do_unit_command_make_aggressive(world, unit) {
     for(var i = 0; i < unit.orders.length; i++) {
         if(unit.orders[i]['state'] != ai_states.AI_ATTACK_MOVE &&
            unit.orders[i]['state'] != ai_states.AI_ATTACK_ANY) {
@@ -46804,24 +46580,28 @@ function do_unit_command_make_aggressive(unit) {
         unit.orders[i]['aggressive'] = true;
     }
     unit.state_dirty |= obj_state_flags.ORDERS;
-    unit.apply_orders();
-    //var order = {'state': ai_states.AI_ATTACK_ANY, 'aggressive': true};
-    //unit.new_order(order, true);
+    unit.apply_orders(world);
 }
 
-function unit_command_make_aggressive() {
+/** @param {!World.World} world */
+function unit_command_make_aggressive(world) {
     if(!selection.unit || !selection.unit.is_mobile()) { return; }
 
-    do_unit_command_make_aggressive(selection.unit);
+    do_unit_command_make_aggressive(world, selection.unit);
     for(var i = 0; i < selection.multi.length; i++) {
-        do_unit_command_make_aggressive(selection.multi[i]);
+        do_unit_command_make_aggressive(world, selection.multi[i]);
     }
 }
 
-function unit_command_move(j, i, use_amove, add_waypoint) {
+/** @param {!World.World} world
+    @param {number} j
+    @param {number} i
+    @param {boolean} use_amove
+    @param {boolean} add_waypoint */
+function unit_command_move(world, j, i, use_amove, add_waypoint) {
     if(!selection.unit || !selection.unit.is_mobile()) { return; }
 
-    selection.unit.world.fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], selection.unit.world.fxworld.now_time(), 0.15));
+    world.fxworld.add_under(new SPFX.ClickFeedback([j,i], [1,1,1,1], world.fxworld.now_time(), 0.15));
 
     if(!add_waypoint || selection.unit.orders.length < 2) {
         selection.unit.speak('destination');
@@ -46855,18 +46635,18 @@ function unit_command_move(j, i, use_amove, add_waypoint) {
     // EXPERIMENTAL
     // when in hostile territory and on auto_unit_control, make all player-initiated movement aggressive
     // otherwise, cancel aggressive mode
-    var aggressive = (session.viewing_base.base_landlord_id !== session.user_id) &&
+    var aggressive = (world.base.base_landlord_id !== session.user_id) &&
         ((get_preference_setting(player.preferences, 'auto_unit_control') && !get_preference_setting(player.preferences, 'auto_unit_control_dmove')) ||
          (('deploy_ai_order' in selection.unit.spec) && selection.unit.spec['deploy_ai_order']['aggressive']) ||
          gamedata['client']['default_deploy_ai_order']['manual']['aggressive']
         );
     my_order['aggressive'] = !!aggressive;
 
-    selection.unit.new_order(my_order, !add_waypoint);
+    selection.unit.new_order(world, my_order, !add_waypoint);
 
     if(selection.multi.length > 0) {
         // formation movement referenced against selection.unit
-        var origin = selection.unit.interpolate_pos();
+        var origin = selection.unit.raw_pos();
         var FORMATION_RADIUS2 = 20*20; // how close units must be in order to be considered "in formation"
 
         for(var n = 0; n < selection.multi.length; n++) {
@@ -46874,15 +46654,15 @@ function unit_command_move(j, i, use_amove, add_waypoint) {
                 continue;
             }
             var mydest = [j,i];
-            var offset = vec_sub(selection.multi[n].interpolate_pos(), origin);
+            var offset = vec_sub(selection.multi[n].raw_pos(), origin);
             if(vec_length2(offset) <= FORMATION_RADIUS2) {
                 mydest = vec_add([j,i], offset);
-                var ncells = session.viewing_base.ncells();
+                var ncells = world.base.ncells();
                 mydest = [clamp(mydest[0], 0, ncells[0]-1),
                           clamp(mydest[1], 0, ncells[1]-1)];
                 // check if the formation-movement destination is blocked. If so, just send it directly to dest
                 mydest = vec_floor(mydest);
-                if(astar_map.is_blocked(mydest)) {
+                if(world.astar_map.is_blocked(mydest)) {
                     mydest = [j,i];
                 }
             }
@@ -46890,14 +46670,14 @@ function unit_command_move(j, i, use_amove, add_waypoint) {
             var form_order = goog.object.clone(my_order);
             form_order['dest'] = mydest;
 
-            var form_aggressive = (session.viewing_base.base_landlord_id !== session.user_id) &&
+            var form_aggressive = (world.base.base_landlord_id !== session.user_id) &&
                 ((get_preference_setting(player.preferences, 'auto_unit_control') && !get_preference_setting(player.preferences, 'auto_unit_control_dmove')) ||
                  (('deploy_ai_order' in selection.multi[n].spec) && selection.multi[n].spec['deploy_ai_order']['aggressive']) ||
                  gamedata['client']['default_deploy_ai_order']['manual']['aggressive']
                 );
             form_order['aggressive'] = !!form_aggressive;
 
-            selection.multi[n].new_order(form_order, !add_waypoint);
+            selection.multi[n].new_order(world, form_order, !add_waypoint);
         }
     }
 
@@ -47058,16 +46838,18 @@ function on_keydown(e) {
             return false;
         }
 
-        // if a building is under construction, offer to speed it up (not during tutorial
+        // if a building is under construction, offer to speed it up (not during tutorial)
         if(player.tutorial_state == "COMPLETE") {
-            for(var id in session.cur_objects.objects) {
-                var obj = session.cur_objects.objects[id];
+            var obj = session.for_each_real_object(function(obj) {
                 if(obj.is_building() && obj.team == 'player' && obj.is_under_construction()) {
-                    change_selection(obj);
-                    invoke_speedup_dialog('speedup');
-                    if(e.preventDefault) { e.preventDefault(); }
-                    return false;
+                    return obj;
                 }
+            });
+            if(obj) {
+                change_selection(obj);
+                invoke_speedup_dialog('speedup');
+                if(e.preventDefault) { e.preventDefault(); }
+                return false;
             }
         }
     }
@@ -47123,33 +46905,36 @@ function on_keyup(e) {
 
     if(SPUI.keyboard_focus) { return true; } // event should have been handled already
 
+    var world = session.get_real_world();
+    if(!world) { return true; }
+
     if(selection.unit && selection.unit.is_mobile()) {
         if(code in key_unit_command_map) {
             var cmd = key_unit_command_map[code];
             if(cmd === 'SPECIAL_ABILITY') {
                 if(session.has_attacked || player.is_cheater) {
                     if(global_spell_icon) { global_spell_icon.pushed_key = false; }
-                    selection.unit.use_special_ability();
+                    selection.unit.use_special_ability(world);
                     for(var j = 0; j < selection.multi.length; j++) {
                         if(selection.multi[j] === selection.unit) { continue; }
-                        selection.multi[j].use_special_ability();
+                        selection.multi[j].use_special_ability(world);
                     }
                 }
             } else if(cmd === 'STOP_UNIT') {
                 var order = {'state': ai_states.AI_ATTACK_STATIONARY, 'aggressive': false};
-                selection.unit.new_order(order, true);
+                selection.unit.new_order(world, order, true);
                 selection.unit.ai_threatlist = null; selection.unit.ai_threatlist_dirty = true;
                 for(var i = 0; i < selection.multi.length; i++) {
-                    selection.multi[i].new_order(order, true);
+                    selection.multi[i].new_order(world, order, true);
                     selection.multi[i].ai_threatlist = null; selection.multi[i].ai_threatlist_dirty = true;
                 }
             } else if(cmd === 'MAKE_AGGRESSIVE') {
-                unit_command_make_aggressive();
+                unit_command_make_aggressive(world);
             } else if(cmd === 'REMOVE_OBJECT' && player.is_cheater) {
-                send_and_remove_object(selection.unit);
+                world.send_and_remove_object(selection.unit);
                 var temp = goog.array.clone(selection.multi); // send_and_remove mutates selection.multi
                 for(var i = 0; i < temp.length; i++) {
-                    send_and_remove_object(temp[i]);
+                    world.send_and_remove_object(temp[i]);
                 }
             } else {
                 // "arm" the spell for the next mousedown
@@ -47725,7 +47510,10 @@ function do_draw() {
         }
 
         // keep track of whether any enemy units are on-screen for displaying the direction arrow
-        var any_enemy = false, any_enemy_onscreen = false, offscreen_enemy_unit = null;
+        var any_enemy = false, any_enemy_onscreen = false;
+
+        /** @type {GameObject|null} */
+        var offscreen_enemy_unit = null;
 
         // when intensive GUI dialogs are up, skip drawing playfield objects for speed
         var draw_playfield_objects = true;
@@ -47761,11 +47549,7 @@ function do_draw() {
 
             // draw map grid
             if(PLAYFIELD_DEBUG_DRAW) {
-                ctx.save();
-                ctx.font = SPUI.make_font(8, 12, 'normal').str();
-                draw_debug_map();
-                if(astar_context) { astar_context.debug_draw(ctx); }
-                ctx.restore();
+                draw_debug_map(world);
             }
 
             if(draw_playfield_objects) {
@@ -47773,27 +47557,27 @@ function do_draw() {
                 world.fxworld.draw_under();
 
                 // draw flying unit shadows
-                world.objects.for_each(draw_shadow);
+                world.objects.for_each(function(obj) { draw_shadow(world, obj); });
 
                 // prepare phantom objects for drawing and draw shadows if necessary
                 var phantom_objects = world.fxworld.get_phantom_objects(world);
                 goog.array.forEach(phantom_objects, function(obj) {
-                    obj.update_draw_pos();
-                    draw_shadow(obj);
+                    obj.update_draw_pos(world);
+                    draw_shadow(world, obj);
                     if(obj.team === 'enemy') { // special case for enemy deployment markers
-                        draw_selection_highlight(obj, 'enemy');
+                        draw_selection_highlight(world, obj, 'enemy');
                     }
                 });
 
                 // draw selection
                 if(selection.unit && selection.unit.id &&
                    selection.unit.id !== GameObject.DEAD_ID && selection.unit.id !== GameObject.VIRTUAL_ID) {
-                    draw_selection_highlight(selection.unit);
+                    draw_selection_highlight(world, selection.unit);
                 }
                 for(var i = 0; i < selection.multi.length; i++) {
                     if(selection.multi[i] !== selection.unit && selection.multi[i].id &&
                        selection.multi[i].id !== GameObject.DEAD_ID && selection.multi[i].id !== GameObject.VIRTUAL_ID) {
-                        draw_selection_highlight(selection.multi[i]);
+                        draw_selection_highlight(world, selection.multi[i]);
                     }
                 }
 
@@ -47801,13 +47585,13 @@ function do_draw() {
                     world.objects.for_each(function(obj) {
                         if(obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
                            (!obj.spec['cloaked'] || !obj.is_invisible())) {
-                            draw_selection_highlight(obj);
+                            draw_selection_highlight(world, obj);
                         }
                     });
                 }
 
                 if(!selection.ui && !session.has_attacked && mouse_state.hovering_over && mouse_state.hovering_over.is_building() && mouse_state.hovering_over.team == 'player') {
-                    draw_selection_highlight(mouse_state.hovering_over, 'hover');
+                    draw_selection_highlight(world, mouse_state.hovering_over, 'hover');
                 }
 
                 // if mouse is hovering over a turret and there is no other UI up, draw all turret ranges
@@ -47817,7 +47601,7 @@ function do_draw() {
                   mouse_state.hovering_over.is_building()) {
                   var range = mouse_state.hovering_over.weapon_range()[1];
                   if(range > 0) {
-                  draw_turret_ranges(null);
+                  draw_turret_ranges(world, null);
                   }
                   }
                 */
@@ -47827,7 +47611,7 @@ function do_draw() {
 
                 world.objects.for_each(function(obj) {
                     if(!obj.spec['is_scenery'] || !obj.spec['draw_flat']) {
-                        obj.update_draw_pos();
+                        obj.update_draw_pos(world);
                         scene.push(obj);
                     }
                 });
@@ -47842,7 +47626,7 @@ function do_draw() {
                 for(var i = 0; i < scene.length; i++) {
                     var obj = scene[i];
                     if(obj.is_mobile()) {
-                        var visible = draw_unit(obj);
+                        var visible = draw_unit(world, obj);
                         if(obj.team === 'enemy' && !obj.is_destroyed()) {
                             any_enemy = true;
                             if(visible) {
@@ -47852,7 +47636,7 @@ function do_draw() {
                             }
                         }
                     } else if(obj.is_building() || obj.is_inert()) {
-                        playfield_text_list = playfield_text_list.concat(draw_building_or_inert(obj, powerfac));
+                        playfield_text_list = playfield_text_list.concat(draw_building_or_inert(world, obj, powerfac));
                     }
                 }
 
@@ -47863,7 +47647,7 @@ function do_draw() {
 
                 // draw A* debug info
                 if(PLAYFIELD_DEBUG) {
-                    draw_debug_astar_paths();
+                    draw_debug_astar_paths(world);
                 }
 
             } // END draw playfield objects
@@ -47885,7 +47669,7 @@ function do_draw() {
 
         var arrow_pos = null;
         if(any_enemy && !any_enemy_onscreen && offscreen_enemy_unit) {
-            arrow_pos = offscreen_enemy_unit.interpolate_pos();
+            arrow_pos = offscreen_enemy_unit.interpolate_pos(world);
         } else if(session.incoming_attack_pending() && session.incoming_attack_direction && session.incoming_attack_direction != 'tutorial') {
             var spawn_location = gamedata['ai_attacks_client']['directions'][session.incoming_attack_direction];
             // exaggerate spawn_location's distance from the middle of the map in order to force it offscreen
@@ -48420,10 +48204,11 @@ Building.prototype.get_idle_state_advanced = function() {
 };
 
 /** Draw a building or inert object
+    @param {World.World|null} world
     @param {!GameObject} obj
     @param {number} powerfac
     @return {!Array.<!PlayfieldText>} */
-function draw_building_or_inert(obj, powerfac) {
+function draw_building_or_inert(world, obj, powerfac) {
     /** @type {!Array.<!PlayfieldText>} */
     var text_list = [];
     var xy = draw_quantize(playfield_to_draw(obj.playfield_xy()));
@@ -48644,7 +48429,7 @@ function draw_building_or_inert(obj, powerfac) {
     // find wall segments
     var draw_as_wall = get_leveled_quantity(obj.spec['draw_as_wall']||null, obj.level);
     var wall_to = {'north':false, 'east':false, 'south':false, 'west':false}, wall_spacing = 0, wall_seg_offset = 0;
-    if(draw_as_wall && !obj.is_destroyed() && ((icon_state+'_ns') in sprite_data['states'])) {
+    if(world && draw_as_wall && !obj.is_destroyed() && ((icon_state+'_ns') in sprite_data['states'])) {
         wall_spacing = Math.floor(obj.spec['gridsize'][0]/2);
         // this extra offset is necessary for wall segments to be right on the centerline between posts
         // when the spacing is greater than 1 grid unit (SG)
@@ -48657,7 +48442,7 @@ function draw_building_or_inert(obj, powerfac) {
                       ];
 
         for(var i = 0; i < OFFSETS.length; i++) {
-            var objlist = session.get_draw_world().voxel_map_accel.objects_near_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
+            var objlist = world.voxel_map_accel.objects_near_xy([obj.x+OFFSETS[i][0], obj.y+OFFSETS[i][1]], obj.team);
             if(objlist) {
                 for(var j = 0; j < objlist.length; j++) {
                     var o = objlist[j];
@@ -48693,7 +48478,7 @@ function draw_building_or_inert(obj, powerfac) {
         if(obj.is_inert() && obj.metadata && 'facing' in obj.metadata) {
             facing = obj.metadata['facing'];
         } else if('turn_rate' in obj.spec && !(obj.is_building() && (obj.is_upgrading() || obj.is_repairing() || obj.disarmed))) {
-            facing = obj.interpolate_facing();
+            facing = (world ? obj.interpolate_facing(world) : obj.cur_facing);
         }
         if(icon) {
             var ready = icon.prep_for_draw(xy, facing, icon_time, icon_state);
@@ -48923,9 +48708,9 @@ function draw_building_or_inert(obj, powerfac) {
         count++;
     }
 
-    if(!obj.spec['worth_less_xp']) {
+    // draw auras and status text
+    if(world && !obj.spec['worth_less_xp']) {
 
-        // draw auras
         if(obj.combat_stats.stunned && !obj.is_destroyed()) {
             GameArt.assets['stun_icon'].states['normal'].draw([xy[0]+30+20*count,xy[1]-default_text_height+5], 0, 0);
             count++;
@@ -48934,7 +48719,7 @@ function draw_building_or_inert(obj, powerfac) {
         for(var i = 0; i < obj.auras.length; i++) {
             var aura = obj.auras[i];
             if(aura.visual_effect) {
-                var pos = obj.interpolate_pos();
+                var pos = obj.interpolate_pos(world);
                 aura.visual_effect.reposition([pos[0], 0, pos[1]]);
             }
             if(aura.spec['visual_effect'] || (aura.spec['show'] === 0)) { continue; } // aura has its own graphics
@@ -49016,22 +48801,25 @@ function draw_building_or_inert(obj, powerfac) {
         draw_centered_text(ctx, ai_state_names[obj.ai_state], [xy[0],xy[1]+45]);
     }
 
-    obj.update_permanent_effect();
+    if(world) {
+        obj.update_permanent_effect(world);
+    }
     return text_list;
 }
 
 /**
  * Draws separate shadow sprites for a given GameObject.
+ * @param {!World.World} world
  * @param {!GameObject} unit
  */
-function draw_shadow(unit) {
+function draw_shadow(world, unit) {
     if(!unit.is_mobile() || !unit.is_flying()) { return; }
     unit = /** @type {!Mobile} */ (unit);
 
     if(session.viewing_base.base_climate_data['fly_at_ground_level']) { return; }
 
     if(unit.altitude > 0 && !unit.is_destroyed() && 'shadow_asset' in unit.spec) {
-        var curpos = unit.interpolate_pos_for_draw();
+        var curpos = unit.interpolate_pos_for_draw(world);
         var xy = draw_quantize(ortho_to_draw(curpos));
 
         if((xy[0]+MAX_UNIT_SPRITE_SIZE < view_roi[0][0]) ||
@@ -49050,10 +48838,12 @@ function draw_shadow(unit) {
     }
 }
 
-// return true if the unit is on screen, false if offscreen
-function draw_unit(unit) {
+/** @param {!World.World} world
+    @param {!Mobile} unit
+    @return {boolean} true if the unit is on screen, false if offscreen */
+function draw_unit(world, unit) {
     // get simulated position
-    var curpos = unit.interpolate_pos_for_draw();
+    var curpos = unit.interpolate_pos_for_draw(world);
     var alt = unit.altitude;
 
     // don't levitate debris piles
@@ -49104,7 +48894,7 @@ function draw_unit(unit) {
             // melee strikes
             var spell = gamedata['spells'][unit.control_spellname];
             // seconds remaining before next strike initiation
-            var remaining_cooldown = unit.control_cooldown * TICK_INTERVAL - (client_time - unit.world.last_tick_time);
+            var remaining_cooldown = unit.control_cooldown * TICK_INTERVAL - (client_time - world.last_tick_time);
 
             // calculate the spell's final cooldown value, accounting for things like unit rate of fire and power loss
             var cooldown = unit.get_leveled_quantity(spell['cooldown']);
@@ -49199,7 +48989,7 @@ function draw_unit(unit) {
             ctx.transform(scale[0], 0, 0, scale[1], xy[0], xy[1]);
             draw_xy = [0,0];
         }
-        GameArt.assets[sprite].draw(draw_xy, unit.interpolate_facing(), client_time, state);
+        GameArt.assets[sprite].draw(draw_xy, unit.interpolate_facing(world), client_time, state);
         if(has_state) { ctx.restore(); }
     }
 
@@ -49277,7 +49067,7 @@ function draw_unit(unit) {
 
     if(CLICK_DETECTION_DEBUG) { draw_click_detection(unit); }
 
-    unit.update_permanent_effect();
+    unit.update_permanent_effect(world);
 
     // return whether unit is visible on screen or not (in addition to being unculled), for the purpose of determining whether to show the offscreen-unit arrow
     var visible = (xy[0] >= view_roi[0][0] &&
@@ -49385,10 +49175,10 @@ function draw_unit_control_order_segment(xy, state, d) {
 
 // draw one step in the order queue
 // NOTE: xy will be updated to point to the "endpoint" of this order
-function draw_unit_control_order(xy, ord) {
+function draw_unit_control_order(world, xy, ord) {
     var d;
-    if(ord['target'] && ord['target'] in session.cur_objects.objects) {
-        d = session.cur_objects.objects[ord['target']].interpolate_pos();
+    if(ord['target'] && world.objects.has_object(ord['target'])) {
+        d = world.objects.get_object(ord['target']).interpolate_pos(world);
     } else if(ord['dest']) {
         d = vec_add(ord['dest'], [0.5,0.5]);
     } else {
@@ -49398,7 +49188,10 @@ function draw_unit_control_order(xy, ord) {
     return draw_unit_control_order_segment(xy, ord['state'], d);
 }
 
-function draw_unit_control(unit, curpos) {
+/** @param {!World.World} world
+    @param {!GameObject} unit
+    @param {!Array<number>} curpos */
+function draw_unit_control(world, unit, curpos) {
     //ctx.save();
     var xy = draw_quantize(ortho_to_draw(curpos));
 
@@ -49409,7 +49202,7 @@ function draw_unit_control(unit, curpos) {
         ctx.strokeStyle = gamedata['client']['unit_control_colors']['target'];
         ctx.beginPath();
         ctx.moveTo(xy[0],xy[1]);
-        var target_pos = unit.control_target.interpolate_pos();
+        var target_pos = unit.control_target.interpolate_pos(world);
         var target_xy = draw_quantize(ortho_to_draw(target_pos));
         ctx.lineTo(target_xy[0], target_xy[1]);
         ctx.stroke();
@@ -49458,7 +49251,7 @@ function draw_unit_control(unit, curpos) {
 
         for(var i = 0; i < unit.orders.length; i++) {
             var ord = unit.orders[i];
-            xy = draw_unit_control_order(xy, ord);
+            xy = draw_unit_control_order(world, xy, ord);
         }
 
         if(unit.patrol) {
@@ -49490,10 +49283,11 @@ function draw_drag_selection() {
     ctx.restore();
 };
 
-/** @param {GameObject} unit
+/** @param {!World.World} world
+    @param {GameObject} unit
     @param {string=} config_override */
-function draw_selection_highlight(unit, config_override) {
-    var curpos = unit.interpolate_pos();
+function draw_selection_highlight(world, unit, config_override) {
+    var curpos = unit.interpolate_pos(world);
     ctx.save();
 
     var config_name;
@@ -49577,13 +49371,15 @@ function draw_selection_highlight(unit, config_override) {
         if(stroke_alpha > 0) { ctx.stroke(); }
     }
     if(unit.team === 'player') {
-        draw_unit_control(unit, curpos);
+        draw_unit_control(world, unit, curpos);
     }
     ctx.restore();
 }
 
 /** @param {!GameObject} unit */
 function draw_click_detection(unit) {
+    var world = session.get_draw_world();
+
     ctx.save();
     // color uniquely
     var COLORS = ['rgb(255,0,0)','rgba(0,255,0)','rgb(0,0,255)'];
@@ -49592,7 +49388,7 @@ function draw_click_detection(unit) {
     ctx.globalAlpha = 0.15;
     var position_fuzz = 2;
     if(unit.is_building()) {
-        var pos = unit.interpolate_pos();
+        var pos = unit.interpolate_pos(world);
         var bound = get_grid_bounds(pos, unit.spec['gridsize']);
         ctx.beginPath();
         SPUI.add_quad_to_path([ortho_to_draw([bound[0][0], bound[1][0]]),
@@ -49618,7 +49414,7 @@ function draw_click_detection(unit) {
         } else if(unit.spec['click_detection'] == 'sprite') {
             var asset = GameArt.assets[unit.get_leveled_quantity(unit.spec['art_asset'])];
             var sprite = asset.states['normal'];
-            var cound = sprite.detect_click_bounds(ortho_to_screen(pos), unit.interpolate_facing(), client_time, view_zoom, position_fuzz);
+            var cound = sprite.detect_click_bounds(ortho_to_screen(pos), unit.interpolate_facing(world), client_time, view_zoom, position_fuzz);
             if(cound) {
                 ctx.save();
                 set_default_canvas_transform(ctx); // undo playfield transform
@@ -49849,15 +49645,13 @@ function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
     ctx.strokeRect(xy[0], xy[1], w, h);
 };
 
-function draw_debug_astar_paths() {
+function draw_debug_astar_paths(world) {
     ctx.save();
 
-    for(var id in session.cur_objects.objects) {
-        var unit = session.cur_objects.objects[id];
-
+    world.objects.for_each(function(unit) {
         if(!unit.is_mobile() ||
            unit.path.length < 1) {
-            continue;
+            return;
         }
 
         var path = unit.path;
@@ -49867,7 +49661,7 @@ function draw_debug_astar_paths() {
         unit.path_new = false;
         ctx.beginPath();
 
-        var pos = unit.interpolate_pos();
+        var pos = unit.interpolate_pos(world);
         var xy = ortho_to_draw(pos);
         ctx.moveTo(xy[0], xy[1]);
         for(var i = 0; i < path.length; i++) {
@@ -49875,19 +49669,22 @@ function draw_debug_astar_paths() {
             ctx.lineTo(xy[0], xy[1]);
         }
         ctx.stroke();
-    }
+    });
     ctx.restore();
 };
 
-function draw_debug_map() {
+/** @param {!World.World} world */
+function draw_debug_map(world) {
     ctx.save();
-    var ncells = session.viewing_base.ncells();
+    ctx.font = SPUI.make_font(8, 12, 'normal').str();
+
+    var ncells = world.base.ncells();
 
     for(var i = 0; i < ncells[1]; i++) {
         for(var j = 0; j < ncells[0]; j++) {
             var xy = ortho_to_draw([j,i]);
             var sprite;
-            if(!astar_map.is_blocked([j,i])) {
+            if(!world.astar_map.is_blocked([j,i])) {
                 continue; // skip clear cells
                 //ctx.strokeStyle = "green";
                 //sprite = GameArt.assets['TEMP_mapcell'].states['open'].images[0];
@@ -49913,6 +49710,8 @@ function draw_debug_map() {
         }
     }
     ctx.restore();
+
+    if(world.astar_context) { world.astar_context.debug_draw(ctx); }
 }
 
 function test_consequent(cons) {

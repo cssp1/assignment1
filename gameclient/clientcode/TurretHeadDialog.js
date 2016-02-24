@@ -94,8 +94,7 @@ TurretHeadDialog.ondraw = function(dialog) {
     // also look for a building that provides the limited_equipped keys
     var provides_limit_building = {}, provides_limit_building_can_upgrade = {};
 
-    for(var id in session.cur_objects.objects) {
-        var obj = session.cur_objects.objects[id];
+    session.for_each_real_object(function(obj) {
         if(obj.is_building() && obj.team == 'player') {
             if(obj.is_emplacement()) {
                 var head = obj.turret_head_item() || obj.turret_head_inprogress_item();
@@ -128,7 +127,7 @@ TurretHeadDialog.ondraw = function(dialog) {
                 }
             }
         }
-    }
+    });
 
     // XXX copy/pasted from update_crafting_dialog()
     if(chapter_pages > 0) {

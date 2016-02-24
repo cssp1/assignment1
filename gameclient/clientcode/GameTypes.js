@@ -92,3 +92,11 @@ GameTypes.GameObjectQueryResult = function(obj, dist, pos, override_priority, ov
     this.override_path_end = override_path_end;
     this.debug_orig_target = debug_orig_target;
 };
+
+/** @interface for world state snapshotting */
+GameTypes.ISerializable = function() {};
+
+/** @return {!Object<string,?>} */
+GameTypes.ISerializable.prototype.serialize;
+/** @param {!Object<string,?>} snap */
+GameTypes.ISerializable.prototype.apply_snapshot;

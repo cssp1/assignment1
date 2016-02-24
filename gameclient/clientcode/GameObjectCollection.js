@@ -14,20 +14,32 @@ goog.require('GameTypes');
     We manually set ids of deleted objects to -1 so that any other reference-holders can know that the
     object isn't valid anymore.
 
-    @constructor @struct */
+    @constructor @struct
+    @implements {GameTypes.ISerializable}
+*/
 GameObjectCollection.GameObjectCollection = function() {
     /** @type {!Object<!GameObjectId, !GameObject>} */
     this.objects = {};
 }
 
 /** @param {!GameObject} obj */
-GameObjectCollection.GameObjectCollection.prototype.add_object = function(obj) { this.objects[obj.id] = obj; };
+GameObjectCollection.GameObjectCollection.prototype.add_object = function(obj) {
+    if(this.has_object(obj.id)) { throw Error('double-added object '+obj.id); }
+    this.objects[obj.id] = obj;
+};
 /** @param {!GameObjectId} id
     @return {boolean} */
 GameObjectCollection.GameObjectCollection.prototype.has_object = function(id) { return (id in this.objects); };
+/** @param {GameObjectId|null} id
+    @return {GameObject|null} */
+GameObjectCollection.GameObjectCollection.prototype._get_object = function(id) { return this.objects[/** @type {string} */ (id)] || null; };
 /** @param {!GameObjectId} id
     @return {!GameObject} */
-GameObjectCollection.GameObjectCollection.prototype.get_object = function(id) { return this.objects[id]; };
+GameObjectCollection.GameObjectCollection.prototype.get_object = function(id) {
+    var ret = this.objects[id];
+    if(!ret) { throw Error('object not found '+id); }
+    return ret;
+};
 /** @param {!GameObject} obj */
 GameObjectCollection.GameObjectCollection.prototype.rem_object = function(obj) {
     delete this.objects[obj.id];
@@ -40,21 +52,42 @@ GameObjectCollection.GameObjectCollection.prototype.clear = function() {
     this.objects = {};
 };
 
-/** @param {function(this: T, !GameObject, !GameObjectId=) : ?} func
+/** @param {function(this: T, !GameObject, !GameObjectId=) : (R|null)} func
     @param {T=} opt_obj
+    @return {R|null}
     @suppress {reportUnknownTypes}
-    @template T */
+    @template T, R */
 GameObjectCollection.GameObjectCollection.prototype.for_each = function(func, opt_obj) {
     for(var id in this.objects) {
-        func.call(opt_obj, this.objects[id], id);
+        var ret = func.call(opt_obj, this.objects[id], id);
+        if(ret) { return ret; }
     }
+    return null;
 };
 
-/** @return {!Array<!Object<string,?>>} */
+/** @override */
 GameObjectCollection.GameObjectCollection.prototype.serialize = function() {
-    var ret = [];
+    var ret = {};
     for(var id in this.objects) {
-        ret.push(this.objects[id].serialize());
+        ret[id] = this.objects[id].serialize();
     }
     return ret;
+};
+
+/** @override */
+GameObjectCollection.GameObjectCollection.prototype.apply_snapshot = function(snap) {
+    /** @type {!Object<!GameObjectId, !GameObject>} */
+    var new_objects = {};
+    goog.object.forEach(snap, function(/** !Object<string,?> */ s, /** string */ id) {
+        var obj;
+        if(id in this.objects) {
+            // reuse reference
+            obj = this.objects[id];
+            obj.apply_snapshot(s);
+        } else {
+            obj = GameObject.unserialize(s);
+        }
+        new_objects[id] = obj;
+    }, this);
+    this.objects = new_objects;
 };
