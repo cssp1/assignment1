@@ -15789,7 +15789,7 @@ class XSAPI(resource.Resource):
         ret = catch_all('XSAPI')(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
-            ret = SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': text}})
+            ret = SpinJSON.dumps({'error': {'code':'FATAL_ERROR', 'message': 'game server exception'}})
         return ret
 
     @admin_stats.measure_latency('XSAPI')
