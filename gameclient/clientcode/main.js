@@ -1173,9 +1173,12 @@ function GameObject() {
     this.state_dirty = 0;
 
     this.control_state = control_states.CONTROL_STOP;
-    this.control_target = null;
+    /** @type {GameObjectId|null} */
+    this.control_target_id = null;
+    /** @type {string|null} */
     this.control_spellname = null;
-    // this is a cooldown timer just for the default auto "shoot" spell
+
+    /** @type {number} this is a cooldown timer just for the default auto "shoot" spell */
     this.control_cooldown = 0;
 
     this.ai_state = ai_states.AI_STOP;
@@ -1243,7 +1246,7 @@ function GameObject() {
     /** @type {Array.<Aura>} */
     this.auras = [];
 
-    this.cooldowns = {}; // XXXXXX create a type for this
+    this.cooldowns = {}; // XXX create a type for this
 
     // random number for offsetting looped animations
     this.anim_offset = Math.random();
@@ -1291,7 +1294,10 @@ GameObject.prototype.serialize = function() {
             'owner': (this.team === 'player' ? session.user_id : -1),
             'level': this.level,
             'equipment': this.equipment ? deepcopy_obj(this.equipment) : null,
-            'ai_state': this.ai_state,
+            'control_state': this.control_state,
+            'control_target_id': this.control_target_id,
+            'control_spellname': this.control_spellname,
+            'control_cooldown': this.control_cooldown,
             'combat_stats': deepcopy_obj(this.combat_stats),
             'auras': goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this),
             'cooldowns': deepcopy_obj(this.cooldowns),
@@ -1311,7 +1317,10 @@ GameObject.prototype.apply_snapshot = function(snap) {
     this.team = (snap['owner'] === session.user_id ? 'player' : 'enemy');
     this.level = snap['level'];
     this.equipment = snap['equipment'];
-    this.ai_state = snap['ai_state'];
+    this.control_state = snap['control_state'];
+    this.control_target_id = snap['control_target_id'];
+    this.control_spellname = snap['control_spellname'];
+    this.control_cooldown = snap['control_cooldown'];
     this.combat_stats = snap['combat_stats']; // ?
     this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this);
     this.cooldowns = snap['cooldowns'];
@@ -2260,10 +2269,11 @@ GameObject.prototype.run_control = function(world) {
     if(this.combat_stats.stunned) { return; }
 
     if(this.control_state === control_states.CONTROL_SHOOT) {
+        var target = world.objects._get_object(this.control_target_id);
 
         // turn to face target
-        if(this.control_target && 'turn_rate' in this.spec) {
-            var dir = vec_sub(this.control_target.raw_pos(), this.raw_pos());
+        if(target && 'turn_rate' in this.spec) {
+            var dir = vec_sub(target.raw_pos(), this.raw_pos());
             if((dir[1]*dir[1]+dir[0]*dir[0]) > 0.0001) {
                 this.target_facing = Math.atan2(dir[1], dir[0]);
             }
@@ -2284,9 +2294,7 @@ GameObject.prototype.run_control = function(world) {
                 }
             }
 
-            var target = this.control_target;
-
-            if(target.is_destroyed()) {
+            if(!target || target.is_destroyed()) {
                 // target is already dead
                 this.control_state = control_states.CONTROL_STOP;
                 return;
@@ -3784,14 +3792,14 @@ GameObject.prototype.ai_pick_target_find_blocker = function(world, cur_cell, des
 GameObject.prototype.ai_stop = function() {
     this.control_state = control_states.CONTROL_STOP;
     this.control_spellname = null;
-    this.control_target = null;
+    this.control_target_id = null;
 };
 
 // AI-level function - set control state to shoot. Trusts that target is in range!
 GameObject.prototype.ai_shoot = function(auto_spell, target) {
     this.control_state = control_states.CONTROL_SHOOT;
     this.control_spellname = auto_spell['name'];
-    this.control_target = target;
+    this.control_target_id = target.id;
 };
 
 /** AI-level function - set control state to move to a location. "target" is an optional target object to set as control_target
@@ -3803,7 +3811,7 @@ GameObject.prototype.ai_move_towards = function(new_dest, target, reason) {
     if(!new_dest) { this.ai_stop(); return; } // nowhere to go
 
     this.control_spellname = null;
-    this.control_target = target || null;
+    this.control_target_id = (target ? target.id : null);
 
     if(vec_equals(this.raw_pos(), new_dest)) {
         this.control_state = control_states.CONTROL_STOP; // already here
@@ -8128,7 +8136,7 @@ Mobile.prototype.run_ai = function(world) {
         if(gradient[0] != 0 || gradient[1] != 0) {
             gradient = vec_normalized(gradient);
             this.control_state = control_states.CONTROL_MOVING;
-            this.control_target = null;
+            this.control_target_id = null;
             var target_pos = [pos[0], pos[1]];
 
             // arbitrarily move 1 unit along the gradient towards lower pressure
@@ -49202,15 +49210,20 @@ function draw_unit_control(world, unit, curpos) {
     // draw line to target
     var target_line_drawn = false;
 
-    if(unit.control_target /*&& !unit.control_target.is_destroyed()*/ && (unit.control_state != control_states.CONTROL_STOP)) {
-        ctx.strokeStyle = gamedata['client']['unit_control_colors']['target'];
-        ctx.beginPath();
-        ctx.moveTo(xy[0],xy[1]);
-        var target_pos = unit.control_target.interpolate_pos(world);
-        var target_xy = draw_quantize(ortho_to_draw(target_pos));
-        ctx.lineTo(target_xy[0], target_xy[1]);
-        ctx.stroke();
-        target_line_drawn = true;
+    if(unit.control_target_id &&
+       world.objects.has_object(unit.control_target_id) &&
+       (unit.control_state != control_states.CONTROL_STOP)) {
+        var target = world.objects.get_object(unit.control_target_id);
+        if(target) {
+            ctx.strokeStyle = gamedata['client']['unit_control_colors']['target'];
+            ctx.beginPath();
+            ctx.moveTo(xy[0],xy[1]);
+            var target_pos = target.interpolate_pos(world);
+            var target_xy = draw_quantize(ortho_to_draw(target_pos));
+            ctx.lineTo(target_xy[0], target_xy[1]);
+            ctx.stroke();
+            target_line_drawn = true;
+        }
     }
 
     if(unit.path_valid && unit.path.length >= 1 &&
