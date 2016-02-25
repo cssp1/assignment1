@@ -13188,9 +13188,11 @@ function inventory_item_is_usable_in_combat(spec, session) {
         var use = uselist[m];
         if('spellname' in use) {
             var spell = gamedata['spells'][use['spellname']];
-            if(goog.array.contains(['projectile_attack','instant_repair','instant_combat_repair'], spell['code'])) {
+            if(goog.array.contains(['projectile_attack','instant_combat_repair'], spell['code'])) {
                 // hide projectile_attack items if the current climate has an exclude_missiles flag
                 if(spell['code'] == 'projectile_attack' && session.viewing_base.base_climate_data['exclude_missiles']) {
+                    return UsableInCombat.NOT_USABLE;
+                } else if(spell['code'] === 'instant_combat_repair' && session.home_base) {
                     return UsableInCombat.NOT_USABLE;
                 }
                 return UsableInCombat.USABLE_MISSILE;
@@ -41030,7 +41032,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
                 return true;
             }
         });
-        if(!found && session.deployed_unit_space == 0) {
+        if(!found && (spell['code'] === 'instant_repair' || session.deployed_unit_space == 0)) {
             return [false, gamedata['errors']['NOTHING_TO_REPAIR']['ui_name'], null];
         }
 
@@ -41039,8 +41041,8 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
                 return [false, gamedata['errors']['CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT']['ui_name'], null];
             }
         } else {
-            if(!session.home_base && !session.has_deployed) {
-                return [false, gamedata['errors']['CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT']['ui_name'], null];
+            if(!session.home_base || session.has_deployed) {
+                return [false, gamedata['errors']['CANNOT_CAST_SPELL_IN_COMBAT']['ui_name'], null];
             }
         }
 

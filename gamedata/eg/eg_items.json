@@ -190,10 +190,10 @@
 
 "instant_repair": {
     "name": "instant_repair",
-    "ui_name": "Instant Repair",
+    "ui_name": "Home Base Repair Kit",
     "rarity": 1,
     "max_stack": 10,
-    "ui_description": "Activate to repair all damage to your on-screen units and buildings. If activated during an attack, does not repair destroyed units.",
+    "ui_description": "Activate to repair all damage to your home base buildings and your Base Defenders battalion.\n\nNote: Does not repair other battalions or reserves. Cannot be used in battle or away from home base.",
     "icon": "inventory_repair_item_green",
     "use": { "spellname": "USE_INSTANT_REPAIR_ITEM" }
 },

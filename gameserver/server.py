@@ -18426,24 +18426,27 @@ class GAMEAPI(resource.Resource):
 
         elif ('code' in spell) and (spell['code'] in ('instant_repair', 'instant_combat_repair')):
             do_units = False
+            do_resurrect_units = False
             do_buildings = False
+
             if spell['code'] == 'instant_repair':
+                if session.has_attacked or (not session.home_base):
+                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
+                    return False
                 do_units = True
+                do_resurrect_units = True
                 do_buildings = True
             elif spell['code'] == 'instant_combat_repair':
-                do_units = True
-                if session.home_base or (not session.has_attacked):
+                if (not session.has_attacked) or session.home_base: # important: don't allow use at home base (too many defenders will be repaired)
                     retmsg.append(["ERROR", "CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT"])
                     return False
+                do_units = True
+                do_resurrect_units = True
 
             if session.has_attacked: # in combat, home or away
                 props = {'spellname': spellname}
                 if spellarg: props['spellarg'] = spellarg
                 session.attack_event(session.player.user_id, '3960_combat_spell_cast', props)
-            elif (not session.home_base):
-                # not in combat - only allow repair at home base
-                retmsg.append(["ERROR", "CANNOT_USE_ITEM_OUTSIDE_OF_COMBAT"])
-                return False
 
             recalc_power = False
             for object in session.iter_objects():
@@ -18460,7 +18463,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state(fake_xy = [-1,-1])])
 
             # resurrect dead units
-            if do_units and session.has_attacked and (not session.home_base):
+            if do_resurrect_units and session.has_attacked and (not session.home_base):
                 to_remove = []
                 for entry in session.resurrectable_objects:
                     object, death_location = entry
