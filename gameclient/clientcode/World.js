@@ -391,6 +391,8 @@ World.World.prototype.run_unit_ticks = function() {
                 obj.add_movement_effect(this.fxworld);
             }, this);
 
+            this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this.notifier));
+
             if(this === session.get_real_world()) { // XXXXXX ugly
                 session.apply_queued_damage();
             } else {

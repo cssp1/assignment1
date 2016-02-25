@@ -10,6 +10,7 @@ goog.provide('BattleReplay');
 
 goog.require('Base');
 goog.require('Session');
+goog.require('goog.object');
 
 BattleReplay.invoke = function(log) {
     if(!log || log.length < 1 || log[0]['event_name'] !== '3820_battle_start' ||
@@ -44,43 +45,63 @@ BattleReplay.invoke = function(log) {
     @param {!World.World} world */
 BattleReplay.Recorder = function(world) {
     this.world = world;
+    // base snapshot is grabbed once at the start, since it won't change during the recording
     this.base_snapshot = null;
     this.snapshots = [];
-    this.listen_key = null;
-
-
-    this.replay_world = null;
-    this.replay_i = 0;
+    this.listen_keys = {};
 };
 BattleReplay.Recorder.prototype.start = function() {
-    if(this.listen_key) { throw Error('already started'); }
-    this.listen_key = this.world.listen('before_control', this.after_control, false, this);
+    if('before_control' in this.listen_keys) { throw Error('already started'); }
+
+    // need to grab objects snapshot before control pass, but wait until after control pass for damage effects
+    this.listen_keys['before_control'] = this.world.listen('before_control', this.before_control, false, this);
+    this.listen_keys['before_damage_effects'] = this.world.listen('before_damage_effects', this.before_damage_effects, false, this);
     this.base_snapshot = this.world.base.serialize();
 };
-BattleReplay.Recorder.prototype.after_control = function(event) {
-    this.snapshots.push(this.world.serialize());
+BattleReplay.Recorder.prototype.before_control = function(event) {
+    console.log('Snapshot '+this.snapshots.length.toString()+' at '+this.world.last_tick_time.toString());
+    this.snapshots.push({'tick_time': this.world.last_tick_time,
+                         'objects': this.world.objects.serialize()});
+};
+BattleReplay.Recorder.prototype.before_damage_effects = function(event) {
+    this.snapshots[this.snapshots.length-1]['combat_engine'] = this.world.combat_engine.serialize();
 };
 BattleReplay.Recorder.prototype.stop = function() {
-    if(this.listen_key) {
-        this.world.unlistenByKey(this.listen_key);
-        this.listen_key = null;
-    }
+    goog.array.forEach(goog.object.getKeys(this.listen_keys), function(k) {
+        this.world.unlistenByKey(this.listen_keys[k]);
+        delete this.listen_keys[k];
+    }, this);
+    console.log('Recorder stopped with '+this.snapshots.length.toString()+' snapshots');
 };
-BattleReplay.Recorder.prototype.replay = function() {
-    if(this.snapshots.length < 1) { throw Error('no snapshots'); }
-    var w = new World.World(new Base.Base(this.base_snapshot['base_id'], this.base_snapshot), [], false);
-    this.replay_world = w;
-    w.ai_paused = true;
-    w.control_paused = true;
-    session.push_world(w);
-    this.replay_i = 0;
-    this.replay_step();
+
+/** @param {!BattleReplay.Recorder} recorder */
+BattleReplay.replay = function(recorder) {
+    if(!recorder.base_snapshot || recorder.snapshots.length < 1) { throw Error('recorded not initialized'); }
+    return new BattleReplay.Player(recorder.base_snapshot, recorder.snapshots);
 };
-BattleReplay.Recorder.prototype.replay_step = function() {
-    this.replay_world.apply_snapshot(this.snapshots[this.replay_i]);
-    this.replay_world.run_unit_ticks();
-    this.replay_i += 1;
-    if(this.replay_i >= this.snapshots.length) {
-        this.replay_i = 0;
+
+/** @constructor @struct
+    @param {!Object} base_snapshot
+    @param {!Array<!Object>} snapshots */
+BattleReplay.Player = function(base_snapshot, snapshots) {
+    if(snapshots.length < 1) { throw Error('no snapshots'); }
+    this.snapshots = snapshots;
+    this.world = new World.World(new Base.Base(base_snapshot['base_id'], base_snapshot), [], false);
+    //this.world.ai_paused = true;
+    //this.world.control_paused = true;
+    this.index = 0;
+
+    // need to apply objects snapshot before control pass, but wait until after control pass for damage effects
+    this.listen_keys = {'before_control': this.world.listen('before_control', this.before_control, false, this),
+                        'before_damage_effects': this.world.listen('before_damage_effects', this.before_damage_effects, false, this)};
+};
+BattleReplay.Player.prototype.before_control = function(event) {
+    this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
+};
+BattleReplay.Player.prototype.before_damage_effects = function(event) {
+    this.world.combat_engine.apply_snapshot(this.snapshots[this.index]['combat_engine']);
+    this.index += 1;
+    if(this.index >= this.snapshots.length) {
+        this.index = 0;
     }
 };
