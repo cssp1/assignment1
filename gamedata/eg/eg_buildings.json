@@ -146,7 +146,7 @@
                   "draw_mode": "none", "width": 3, "min_length": 0.05, // leading "fireworks" particle streaks ("draw_mode": "lines" to enable)
                   "child": {"type": "particles", // trailing fireballs
                             "emit_continuous_rate":20, "emit_continuous_for": 1, "max_age": 0.8, "max_count": 60, "speed": 0.5, "randomize_vel": 0.27, "spin_rate": 0.1,
-                            "gravity": 50, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp" }
+                            "gravity": -10, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp" }
                            }
                 },
 
@@ -318,7 +318,7 @@
                   "draw_mode": "none", "width": 3, "min_length": 0.05, // leading "fireworks" particle streaks ("draw_mode": "lines" to enable)
                   "child": {"type": "particles", // trailing fireballs
                             "emit_continuous_rate":20, "emit_continuous_for": 1, "max_age": 1.0, "max_count": 60, "speed": 0.5, "randomize_vel": 0.27, "spin_rate": 0.1,
-                            "gravity": 50, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.5 }
+                            "gravity": -10, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.5 }
                            }
                 },
                 // same as previous but wiht smaller fireballs
@@ -326,7 +326,7 @@
                   "draw_mode": "none", "width": 3, "min_length": 0.05, // leading "fireworks" particle streaks ("draw_mode": "lines" to enable)
                   "child": {"type": "particles", // trailing fireballs
                             "emit_continuous_rate":20, "emit_continuous_for": 1, "max_age": 1.0, "max_count": 60, "speed": 0.5, "randomize_vel": 0.27, "spin_rate": 0.1,
-                            "gravity": 50, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.66, "sprite_scale": 0.6 }
+                            "gravity": -10, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.66, "sprite_scale": 0.6 }
                            }
                 },
 
@@ -463,7 +463,7 @@
                   "draw_mode": "none", "width": 3, "min_length": 0.05, // leading "fireworks" particle streaks ("draw_mode": "lines" to enable)
                   "child": {"type": "particles", // trailing fireballs
                             "emit_continuous_rate":20, "emit_continuous_for": 1, "max_age": 1.0, "max_count": 60, "speed": 0.5, "randomize_vel": 0.27, "spin_rate": 0.1,
-                            "gravity": 50, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.5 }
+                            "gravity": -10, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.5 }
                            }
                 },
                 // same as previous but wiht smaller fireballs
@@ -471,7 +471,7 @@
                   "draw_mode": "none", "width": 3, "min_length": 0.05, // leading "fireworks" particle streaks ("draw_mode": "lines" to enable)
                   "child": {"type": "particles", // trailing fireballs
                             "emit_continuous_rate":20, "emit_continuous_for": 1, "max_age": 1.0, "max_count": 60, "speed": 0.5, "randomize_vel": 0.27, "spin_rate": 0.1,
-                            "gravity": 50, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.66, "sprite_scale": 0.6 }
+                            "gravity": -10, "collide_ground": false, "child": { "type": "explosion", "sprite": "fx/fexp", "composite_mode": "lighter", "opacity": 0.66, "sprite_scale": 0.6 }
                            }
                 },
 
