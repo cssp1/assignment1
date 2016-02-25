@@ -119,18 +119,24 @@ CombatEngine.DamageEffect.prototype.serialize = function() {
 };
 
 /** @param {!World.World} world
+    @param {number} cur_client_time to judge whether time-based effects should apply yet
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
-CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
+CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, cur_client_time, use_ticks) {
     for(var i = 0; i < this.damage_effect_queue.length; i++) {
         var effect = this.damage_effect_queue[i];
         var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
-                     (client_time >= effect.client_time_hack));
+                     (cur_client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
             effect.apply(world);
         }
     }
+    return this.damage_effect_queue.length > 0;
+};
+
+/** @return {boolean} */
+CombatEngine.CombatEngine.prototype.has_pending_damage_effects = function() {
     return this.damage_effect_queue.length > 0;
 };
 

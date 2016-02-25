@@ -393,15 +393,9 @@ World.World.prototype.run_unit_ticks = function() {
 
             this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this.notifier));
 
-            if(this === session.get_real_world()) { // XXXXXX ugly
-                session.apply_queued_damage();
-            } else {
-                this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
-            }
+            this.combat_engine.apply_queued_damage_effects(this, this.last_tick_time, COMBAT_ENGINE_USE_TICKS);
 
-            if(this === session.get_real_world()) { // XXXXXX ugly
-                flush_dirty_objects({urgent_only:true, skip_check:true});
-            }
+            this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this.notifier));
 
             this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
         }

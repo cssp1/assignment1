@@ -45375,7 +45375,6 @@ function do_visit_base(uid, options) {
     }
 
     if(1) {
-        session.apply_queued_damage();
         flush_dirty_objects({});
         session.persist_debris();
     }

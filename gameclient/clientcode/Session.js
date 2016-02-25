@@ -107,7 +107,11 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
     this.viewing_base = new_base;
     // reinitialize world stack
     goog.array.forEach(this.world_stack, function(world) { world.dispose(); });
-    this.world_stack = [new World.World(this.viewing_base, [], enable_citizens)];
+
+    var world = new World.World(this.viewing_base, [], enable_citizens);
+    this.world_stack = [world];
+
+    world.listen('after_damage_effects', this.after_real_world_damage_effects, false, this);
 
     this.minefield_tags_by_obj_id = {};
     this.minefield_tags_by_tag = {};
@@ -381,13 +385,14 @@ Session.Session.prototype.persist_debris = function() {
     }
 };
 
-Session.Session.prototype.apply_queued_damage = function() {
+Session.Session.prototype.after_real_world_damage_effects = function(event) {
     var world = this.get_real_world();
-    var any_left = world.combat_engine.apply_queued_damage_effects(world, COMBAT_ENGINE_USE_TICKS);
+    var any_left = world.combat_engine.has_pending_damage_effects();
     if(!any_left && this.no_more_units) {
         this.no_more_units = false;
         this.set_battle_outcome_dirty();
     }
+    flush_dirty_objects({urgent_only:true, skip_check:true});
 };
 
 /** @param {function(this: T, !GameObject, !GameObjectId=) : (R|null|undefined)} func
