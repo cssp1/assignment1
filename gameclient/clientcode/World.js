@@ -16,6 +16,19 @@ goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('WallManager');
 goog.require('goog.events');
+goog.require('goog.events.EventTarget');
+goog.require('goog.events.Event');
+
+/** @constructor @struct
+    @extends {goog.events.Event}
+    @param {string} type
+    @param {Object} target
+    @param {!GameObject} obj */
+World.ObjectAddedEvent = function(type, target, obj) {
+    goog.base(this, type, target);
+    this.obj = obj;
+};
+goog.inherits(World.ObjectAddedEvent, goog.events.Event);
 
 /** Encapsulates the renderable/simulatable "world"
     @constructor @struct
@@ -30,8 +43,9 @@ World.World = function(base, objects, enable_citizens) {
 
     /** @type {!GameObjectCollection.GameObjectCollection} */
     this.objects = new GameObjectCollection.GameObjectCollection();
+    this.objects.listen('added', this.on_object_added, false, this);
     goog.array.forEach(objects, function(obj) {
-        this.add_world_object(obj);
+        this.objects.add_object(obj);
     }, this);
 
     /** @type {!AStar.AStarRectMap} current A* map for playfield movement queries */
@@ -149,10 +163,10 @@ World.World.prototype.map_query_stats = function() {
     }
 };
 
-/** @param {!GameObject} obj */
-World.World.prototype.add_world_object = function(obj) {
-    this.objects.add_object(obj);
-    obj.on_added_to_world(this);
+/** @param {!GameObjectCollection.AddedEvent} event */
+World.World.prototype.on_object_added = function(event) {
+    this.notifier.dispatchEvent(new World.ObjectAddedEvent('object_added', this, event.obj));
+    event.obj.on_added_to_world(this);
 };
 
 
@@ -372,7 +386,7 @@ World.World.prototype.run_unit_ticks = function() {
             }, this);
         }
 
-        this.notifier.dispatchEvent(new goog.events.Event('before_control', this.notifier));
+        this.notifier.dispatchEvent(new goog.events.Event('before_control', this));
 
         // Control layer and visual effects
         if(!this.control_paused) {
@@ -393,11 +407,11 @@ World.World.prototype.run_unit_ticks = function() {
                 obj.add_movement_effect(this.fxworld);
             }, this);
 
-            this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this.notifier));
+            this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this));
 
             this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
 
-            this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this.notifier));
+            this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this));
         }
     }
 };
@@ -455,13 +469,17 @@ World.World.prototype.send_and_remove_object = function(obj) {
 /** @param {!GameObject} victim
     @param {GameObject|null} killer */
 World.World.prototype.send_and_destroy_object = function(victim, killer) {
-    send_to_server.func(["DSTROY_OBJECT",
-                         victim.id,
-                         victim.raw_pos(),
-                         get_killer_info(killer)
-                        ]);
+    if(this === session.get_real_world()) { // XXXXXX ugly
+        send_to_server.func(["DSTROY_OBJECT",
+                             victim.id,
+                             victim.raw_pos(),
+                             get_killer_info(killer)
+                            ]);
+    }
     this.remove_object(victim);
-    session.set_battle_outcome_dirty();
+    if(this === session.get_real_world()) {
+        session.set_battle_outcome_dirty();
+    }
 };
 
 

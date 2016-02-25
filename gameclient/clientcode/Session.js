@@ -112,6 +112,7 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
     this.world_stack = [world];
 
     world.listen('after_damage_effects', this.after_real_world_damage_effects, false, this);
+    world.listen('object_added', this.on_real_world_object_added, false, this);
 
     this.minefield_tags_by_obj_id = {};
     this.minefield_tags_by_tag = {};
@@ -276,10 +277,9 @@ Session.Session.prototype.quarry_victory_satisfied = function() {
     return !survivors;
 };
 
-// add new object to session (implicitly, to the real world)
-Session.Session.prototype.add_session_object = function(obj) {
-    var world = this.get_real_world();
-    world.add_world_object(obj);
+/** @param {!World.ObjectAddedEvent} event */
+Session.Session.prototype.on_real_world_object_added = function(event) {
+    var obj = event.obj;
 
     // when spawning new temporary units (e.g. security teams) during an AI attack, add those to the count of attackers so the bookkeeping works out accurately
     if(this.home_base && this.attack_finish_time > server_time && obj.team == 'enemy' && obj.is_mobile() && obj.is_temporary()) {

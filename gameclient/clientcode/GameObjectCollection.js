@@ -5,6 +5,19 @@ goog.provide('GameObjectCollection');
 // found in the LICENSE file.
 
 goog.require('GameTypes');
+goog.require('goog.events.EventTarget');
+goog.require('goog.events.Event');
+
+/** @constructor @struct
+    @extends {goog.events.Event}
+    @param {string} type
+    @param {Object} target
+    @param {!GameObject} obj */
+GameObjectCollection.AddedEvent = function(type, target, obj) {
+    goog.base(this, type, target);
+    this.obj = obj;
+};
+goog.inherits(GameObjectCollection.AddedEvent, goog.events.Event);
 
 /** GameObjectCollection (client-side version of server's ObjectCollection)
 
@@ -16,17 +29,23 @@ goog.require('GameTypes');
 
     @constructor @struct
     @implements {GameTypes.ISerializable}
+    @extends {goog.events.EventTarget}
 */
 GameObjectCollection.GameObjectCollection = function() {
+    goog.base(this);
+
     /** @type {!Object<!GameObjectId, !GameObject>} */
     this.objects = {};
 }
+goog.inherits(GameObjectCollection.GameObjectCollection, goog.events.EventTarget);
 
 /** @param {!GameObject} obj */
 GameObjectCollection.GameObjectCollection.prototype.add_object = function(obj) {
     if(this.has_object(obj.id)) { throw Error('double-added object '+obj.id); }
     this.objects[obj.id] = obj;
+    this.dispatchEvent(new GameObjectCollection.AddedEvent('added', this, obj));
 };
+
 /** @param {!GameObjectId} id
     @return {boolean} */
 GameObjectCollection.GameObjectCollection.prototype.has_object = function(id) { return (id in this.objects); };

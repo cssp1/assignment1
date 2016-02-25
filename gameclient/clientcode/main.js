@@ -43358,7 +43358,7 @@ function handle_server_message(data) {
         var object_state = data[5];
         for(var n = 0; n < object_state.length; n++) {
             var obj = create_object(object_state[n], false);
-            session.add_session_object(obj);
+            session.get_real_world().objects.add_object(obj);
             if(obj.team === 'player' && obj.is_mobile()) {
                 session.deployed_unit_space += obj.get_leveled_quantity(obj.spec['consumes_space'] || 0);
             }
@@ -43541,7 +43541,7 @@ function handle_server_message(data) {
     } else if(msg == "OBJECT_CREATED" || msg == "OBJECT_CREATED2") {
         var state = data[1];
         var obj = create_object(state, true);
-        session.add_session_object(obj);
+        world.objects.add_object(obj);
 
         if(obj.is_mobile()) {
             // check for arming delay when in hostile territory
