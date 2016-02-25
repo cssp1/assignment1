@@ -317,6 +317,8 @@ World.World.prototype.run_unit_ticks = function() {
     if(client_time - this.last_tick_time > TICK_INTERVAL/combat_time_scale()) {
         // record time at which this tick was computed
         this.last_tick_time = client_time;
+        this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
+        this.combat_engine.cur_client_time = client_time;
 
         if(this.wall_mgr && this.objects) { this.wall_mgr.refresh(this.objects); }
 
@@ -393,11 +395,9 @@ World.World.prototype.run_unit_ticks = function() {
 
             this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this.notifier));
 
-            this.combat_engine.apply_queued_damage_effects(this, this.last_tick_time, COMBAT_ENGINE_USE_TICKS);
+            this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
 
             this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this.notifier));
-
-            this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
         }
     }
 };

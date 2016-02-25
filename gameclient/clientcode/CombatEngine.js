@@ -51,6 +51,9 @@ CombatEngine.CombatEngine = function() {
     /** @type {!GameTypes.TickCount} */
     this.cur_tick = new GameTypes.TickCount(0);
 
+    /** @type {number} hack for time-based effects */
+    this.cur_client_time = 0;
+
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @type {Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
@@ -59,11 +62,13 @@ CombatEngine.CombatEngine = function() {
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize = function() {
     return {'cur_tick': this.cur_tick.get(),
+            'cur_client_time': this.cur_client_time,
             'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this)};
 };
 /** @override */
 CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
     this.cur_tick = new GameTypes.TickCount(snap['cur_tick']);
+    this.cur_client_time = snap['cur_client_time'];
     this.damage_effect_queue = goog.array.map(snap['damage_effect_queue'], function(/** !Object<string,?> */ effect_snap) {
         return this.unserialize_damage_effect(effect_snap);
     }, this);
@@ -119,14 +124,13 @@ CombatEngine.DamageEffect.prototype.serialize = function() {
 };
 
 /** @param {!World.World} world
-    @param {number} cur_client_time to judge whether time-based effects should apply yet
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
-CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, cur_client_time, use_ticks) {
+CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
     for(var i = 0; i < this.damage_effect_queue.length; i++) {
         var effect = this.damage_effect_queue[i];
         var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
-                     (cur_client_time >= effect.client_time_hack));
+                     (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
             effect.apply(world);
