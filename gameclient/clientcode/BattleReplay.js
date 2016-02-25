@@ -39,3 +39,48 @@ BattleReplay.invoke = function(log) {
     var world = new World.World(base, objects, false);
     session.push_world(world);
 };
+
+/** @constructor @struct
+    @param {!World.World} world */
+BattleReplay.Recorder = function(world) {
+    this.world = world;
+    this.base_snapshot = null;
+    this.snapshots = [];
+    this.listen_key = null;
+
+
+    this.replay_world = null;
+    this.replay_i = 0;
+};
+BattleReplay.Recorder.prototype.start = function() {
+    if(this.listen_key) { throw Error('already started'); }
+    this.listen_key = this.world.listen('before_control', this.after_control, false, this);
+    this.base_snapshot = this.world.base.serialize();
+};
+BattleReplay.Recorder.prototype.after_control = function(event) {
+    this.snapshots.push(this.world.serialize());
+};
+BattleReplay.Recorder.prototype.stop = function() {
+    if(this.listen_key) {
+        this.world.unlistenByKey(this.listen_key);
+        this.listen_key = null;
+    }
+};
+BattleReplay.Recorder.prototype.replay = function() {
+    if(this.snapshots.length < 1) { throw Error('no snapshots'); }
+    var w = new World.World(new Base.Base(this.base_snapshot['base_id'], this.base_snapshot), [], false);
+    this.replay_world = w;
+    w.ai_paused = true;
+    w.control_paused = true;
+    session.push_world(w);
+    this.replay_i = 0;
+    this.replay_step();
+};
+BattleReplay.Recorder.prototype.replay_step = function() {
+    this.replay_world.apply_snapshot(this.snapshots[this.replay_i]);
+    this.replay_world.run_unit_ticks();
+    this.replay_i += 1;
+    if(this.replay_i >= this.snapshots.length) {
+        this.replay_i = 0;
+    }
+};

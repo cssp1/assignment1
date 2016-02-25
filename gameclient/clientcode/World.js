@@ -15,6 +15,7 @@ goog.require('CombatEngine');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('WallManager');
+goog.require('goog.events');
 
 /** Encapsulates the renderable/simulatable "world"
     @constructor @struct
@@ -73,6 +74,10 @@ World.World = function(base, objects, enable_citizens) {
     /** @type {number} client_time at which last unit simulation tick was run */
     this.last_tick_time = 0;
 
+    /** @type {boolean} */
+    this.ai_paused = false;
+    this.control_paused = false;
+
     /** @type {!SPFX.FXWorld} special effects world, with physics properties */
     this.fxworld = new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
                                     (('ground_plane' in base.base_climate_data) ? base.base_climate_data['ground_plane'] : 0));
@@ -84,9 +89,27 @@ World.World = function(base, objects, enable_citizens) {
         this.citizens = new Citizens.Context(this.base, this.astar_context, this.fxworld);
         this.lazy_update_citizens();
     }
+
+    this.notifier = new goog.events.EventTarget();
+};
+
+/** @param {string|!goog.events.EventId.<EVENTOBJ>} type The event type id.
+    @param {function(this:SCOPE, EVENTOBJ):(boolean|undefined)} listener Callback method.
+    @param {boolean=} opt_useCapture Whether to fire in capture phase
+    @param {SCOPE=} opt_listenerScope Object in whose scope to call the listener.
+    @return {goog.events.ListenableKey} Unique key for the listener.
+    @template SCOPE,EVENTOBJ */
+World.World.prototype.listen = function(type, listener, opt_useCapture, opt_listenerScope) {
+    return this.notifier.listen(type, listener, opt_useCapture, opt_listenerScope);
+};
+/** @param {!goog.events.ListenableKey} key
+    @return {boolean} Whether any listener was removed. */
+World.World.prototype.unlistenByKey = function(key) {
+    return this.notifier.unlistenByKey(key);
 };
 
 World.World.prototype.dispose = function() {
+    this.notifier.removeAllListeners();
     if(this.fxworld) {
         this.fxworld.clear();
     }
@@ -310,66 +333,76 @@ World.World.prototype.run_unit_ticks = function() {
 
         // randomly permute the order of objects each tick, so we don't starve
         // out objects waiting for A*
-        // http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-        // (note: will need to be deterministically seeded if we want deterministic combat)
-
-        var obj_list = [null];
-        var i = 0;
-        for(var id in this.objects.objects) {
-            var obj = this.objects.objects[id];
+        var obj_list = this.objects.get_random_permutation(function(obj) {
             // ignore inerts with no auras or contiuously-casting spells on them
-            if(obj.is_inert() && obj.auras.length === 0 && !('continuous_cast' in obj.spec)) { continue; }
-
-            var j = Math.floor(Math.random()*(i+1));
-            obj_list[i] = obj_list[j];
-            obj_list[j] = obj;
-            i++;
-        }
+            if(obj.is_inert() && obj.auras.length === 0 && !('continuous_cast' in obj.spec)) { return false; }
+            return true;
+        }, this);
 
         // rebuild map query acceleration data structure
         this.voxel_map_accel.clear();
         this.team_map_accel.clear();
         this.map_queries_by_tag['ticks'] += 1;
-        if(obj_list[0] !== null) {
-            for(i = 0; i < obj_list.length; i++) {
-                var obj = obj_list[i];
 
-                // check for any objects in blocked areas
-                if(PLAYFIELD_DEBUG && obj.is_mobile() && !obj.is_destroyed()) {
-                    this.playfield_check_path([obj.pos, obj.next_pos], 'pos->next_pos at beginning of tick');
-                }
+        goog.array.forEach(obj_list, function(obj) {
 
-                if(!obj.is_destroyed()) {
-                    // don't bother adding destroyed objects, since no users of query_objects_within_distance() look for destroyed things
-                    this.team_map_accel.add_object(obj);
-                    this.voxel_map_accel.add_object(obj);
-                }
+            // check for any objects in blocked areas
+            if(PLAYFIELD_DEBUG && obj.is_mobile() && !obj.is_destroyed()) {
+                this.playfield_check_path([obj.pos, obj.next_pos], 'pos->next_pos at beginning of tick');
             }
-            for(i = 0; i < obj_list.length; i++) {
-                obj_list[i].run_tick(this);
-                if(obj_list[i].is_mobile()) {
-                    obj_list[i].add_movement_effect(this.fxworld);
-                }
-                obj_list[i].update_aura_effects(this);
-            }
-        }
 
-        // run phantom unit controllers
-        this.tick_astar_queries_left = -1; // should not disturb actual unit control
-        goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
-            obj.run_control(this);
-            obj.update_facing();
-            obj.add_movement_effect(this.fxworld);
+            if(!obj.is_destroyed()) {
+                // don't bother adding destroyed objects, since no users of query_objects_within_distance() look for destroyed things
+                this.team_map_accel.add_object(obj);
+                this.voxel_map_accel.add_object(obj);
+            }
         }, this);
 
-        if(this === session.get_real_world()) { // XXXXXX ugly
-            session.apply_queued_damage();
-        } else {
-            this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
+        goog.array.forEach(obj_list, function(obj) {
+            obj.update_stats(this);
+        }, this);
+
+        // AI layer
+        if(!this.ai_paused) {
+            goog.array.forEach(obj_list, function(obj) {
+                obj.ai_threatlist_update(this);
+                obj.run_ai(this);
+            }, this);
         }
 
-        flush_dirty_objects({urgent_only:true, skip_check:true});
-        this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
+        this.notifier.dispatchEvent(new goog.events.Event('before_control', this.notifier));
+
+        // Control layer and visual effects
+        if(!this.control_paused) {
+            goog.array.forEach(obj_list, function(obj) {
+                obj.run_control(this);
+                obj.update_facing();
+                if(obj.is_mobile()) {
+                    obj.add_movement_effect(this.fxworld);
+                }
+                obj.update_aura_effects(this);
+            }, this);
+
+            // run phantom unit controllers
+            this.tick_astar_queries_left = -1; // should not disturb actual unit control
+            goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
+                obj.run_control(this);
+                obj.update_facing();
+                obj.add_movement_effect(this.fxworld);
+            }, this);
+
+            if(this === session.get_real_world()) { // XXXXXX ugly
+                session.apply_queued_damage();
+            } else {
+                this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
+            }
+
+            if(this === session.get_real_world()) { // XXXXXX ugly
+                flush_dirty_objects({urgent_only:true, skip_check:true});
+            }
+
+            this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
+        }
     }
 };
 

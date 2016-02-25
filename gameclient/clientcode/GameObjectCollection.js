@@ -52,6 +52,29 @@ GameObjectCollection.GameObjectCollection.prototype.clear = function() {
     this.objects = {};
 };
 
+/** Return a randomly-permuted array of all our objects
+    @param {function(this: T, !GameObject): boolean=} filter_func
+    @param {T=} opt_obj
+    @return {!Array<!GameObject>}
+    @suppress {reportUnknownTypes}
+    @template T */
+GameObjectCollection.GameObjectCollection.prototype.get_random_permutation = function(filter_func, opt_obj) {
+    var obj_list = [null];
+    var i = 0;
+    for(var id in this.objects) {
+        var obj = this.objects[id];
+        if(filter_func && !filter_func.call(opt_obj, obj)) {
+            continue;
+        }
+        // See http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+        var j = Math.floor(Math.random()*(i+1));
+        obj_list[i] = obj_list[j];
+        obj_list[j] = obj;
+        i++;
+    }
+    return (obj_list[0] ? obj_list : []);
+};
+
 /** @param {function(this: T, !GameObject, !GameObjectId=) : (R|null)} func
     @param {T=} opt_obj
     @return {R|null}

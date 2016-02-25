@@ -1651,15 +1651,6 @@ function get_as_array(qty) {
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
 GameObject.prototype.get_leveled_quantity = function(qty) { return get_leveled_quantity(qty, this.level); }
 
-/** @param {!World.World} world */
-GameObject.prototype.run_tick = function(world) {
-    this.update_stats(world);
-    this.ai_threatlist_update(world);
-    this.run_ai(world);
-    this.run_control(world);
-    this.update_facing();
-};
-
 GameObject.prototype.update_facing = function() {
     if('turn_rate' in this.spec) {
         this.cur_facing = this.next_facing;
@@ -46710,6 +46701,8 @@ function on_pointer_lock_change(e) {
 
 function on_keypress(e) {
     if(e.which != 0 && e.charCode != 0) {
+        var world = (session.has_world ? session.get_draw_world() : null);
+
         //console.log('KEYPRESS ' + e.which);
         var str = String.fromCharCode(e.which);
 
@@ -46734,6 +46727,9 @@ function on_keypress(e) {
             fps_counter.show = !fps_counter.show;
         } else if(str === 'm') {
             if(!selection.unit) { toggle_region_map(); }
+        } else if(str === 'z' && player.is_developer() && world) {
+            world.ai_paused = !(world.ai_paused || world.control_paused);
+            world.control_paused = world.ai_paused;
         } else if(str === 'l') {
             if(pointer_lock_supported) {
                 if(!mouse_state.pointer_locked) {
