@@ -52,6 +52,14 @@ World.World = function(base, objects, enable_citizens) {
     /** @type {Object<string, number>} stats tracking for map queries */
     this.map_queries_by_tag = {'ticks': 0};
 
+    this.tick_astar_queries_left = 0;
+
+    // to help swarms of identical units find targets faster, cache the results
+    this.ai_pick_target_classic_cache = {};
+    this.ai_pick_target_classic_cache_gen = -1;
+    this.ai_pick_target_classic_cache_hits = 0;
+    this.ai_pick_target_classic_cache_misses = 0;
+
     /** @type {WallManager.WallManager|null} */
     this.wall_mgr = null;
     var wall_spec = gamedata['buildings']['barrier'];
@@ -289,7 +297,7 @@ World.World.prototype.run_unit_ticks = function() {
 
         if(this.wall_mgr && this.objects) { this.wall_mgr.refresh(this.objects); }
 
-        ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
+        this.ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
 
         if(this.astar_map) {
             this.astar_map.cleanup();
@@ -298,7 +306,7 @@ World.World.prototype.run_unit_ticks = function() {
         // Limit the number of A* path queries that can be run per
         // unit tick. Massive numbers of units re-targeting at the same time often
         // causes performance glitches
-        tick_astar_queries_left = gamedata['client']['astar_max_queries_per_tick'];
+        this.tick_astar_queries_left = gamedata['client']['astar_max_queries_per_tick'];
 
         // randomly permute the order of objects each tick, so we don't starve
         // out objects waiting for A*
@@ -347,7 +355,7 @@ World.World.prototype.run_unit_ticks = function() {
         }
 
         // run phantom unit controllers
-        tick_astar_queries_left = -1; // should not disturb actual unit control
+        this.tick_astar_queries_left = -1; // should not disturb actual unit control
         goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
             obj.run_control(this);
             obj.update_facing();

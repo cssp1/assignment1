@@ -3265,10 +3265,10 @@ GameObject.prototype.ai_threatlist_update = function(world) {
     if(this.ai_threatlist !== null && !this.ai_threatlist_dirty) { return; }
 
     // throttle how many of these updates can take place per frame, since they can involve expensive queries
-    if(this.is_mobile() && tick_astar_queries_left === 0) {
+    if(this.is_mobile() && world.tick_astar_queries_left === 0) {
         return;
     }
-    tick_astar_queries_left -= 1;
+    world.tick_astar_queries_left -= 1;
 
     // remember previous target, to try to re-target it if possible
     var prev_target_id = null;
@@ -3351,11 +3351,6 @@ GameObject.prototype.ai_pick_target_by_threatlist = function(world, auto_spell, 
 
 // stateless version of target-picking
 
-// to help swarms of identical units find targets faster, cache the results
-var ai_pick_target_classic_cache = {};
-var ai_pick_target_classic_cache_gen = -1;
-var ai_pick_target_classic_cache_hits = 0, ai_pick_target_classic_cache_misses = 0;
-
 /** @param {!World.World} world
     @param {Object} auto_spell
     @param {number} auto_spell_level
@@ -3375,9 +3370,9 @@ GameObject.prototype.ai_pick_target_classic_cached = function(world, auto_spell,
         world.astar_context.ensure_connectivity();
         if(world.astar_context.connectivity) {
             // cache is operational
-            if(ai_pick_target_classic_cache_gen != world.astar_map.generation) {
-                ai_pick_target_classic_cache_gen = world.astar_map.generation;
-                ai_pick_target_classic_cache = {};
+            if(world.ai_pick_target_classic_cache_gen != world.astar_map.generation) {
+                world.ai_pick_target_classic_cache_gen = world.astar_map.generation;
+                world.ai_pick_target_classic_cache = {};
             }
 
             var cur_cell = this.raw_pos();
@@ -3385,14 +3380,14 @@ GameObject.prototype.ai_pick_target_classic_cached = function(world, auto_spell,
         }
     }
 
-    if(key !== null && (key in ai_pick_target_classic_cache)) {
-        ai_pick_target_classic_cache_hits += 1;
-        return ai_pick_target_classic_cache[key];
+    if(key !== null && (key in world.ai_pick_target_classic_cache)) {
+        world.ai_pick_target_classic_cache_hits += 1;
+        return world.ai_pick_target_classic_cache[key];
     }
     var ret = this.ai_pick_target_classic(world, auto_spell, auto_spell_level, shoot_range, nearest_only, prev_target_id, tag);
     if(key !== null) {
-        ai_pick_target_classic_cache_misses += 1;
-        ai_pick_target_classic_cache[key] = ret;
+        world.ai_pick_target_classic_cache_misses += 1;
+        world.ai_pick_target_classic_cache[key] = ret;
     }
     return ret;
 };
@@ -7559,8 +7554,6 @@ var last_loot_text_time = 0;
 var last_loot_text_count = 0;
 var last_loot_text_pos = null;
 
-var tick_astar_queries_left = 0;
-
 // cause all defending units/turrets to recalculate their threatlists
 // called when new attacking units are spawned
 function invalidate_defender_threatlists() {
@@ -8093,7 +8086,7 @@ Mobile.prototype.run_ai = function(world) {
     //console.log('declump? '+this.spec['name'] +' '+declump_radius.toString()+' pos '+this.raw_pos()[0].toString()+','+this.raw_pos()[1].toString()+' dest '+this.ai_dest[0].toString()+','+this.ai_dest[1].toString()+' ai_state '+ai_state_names[this.ai_state]+' ai_target '+(this.ai_target? this.ai_target.spec['name'] : 'none')+' control_state '+control_state_names[this.control_state]);
 
     if((declump_radius > 0) &&
-       (tick_astar_queries_left !== 0 || !gamedata['client']['unit_declump_avoid_astar']) &&
+       (world.tick_astar_queries_left !== 0 || !gamedata['client']['unit_declump_avoid_astar']) &&
        (this.ai_state === ai_states.AI_ATTACK_ANY || this.ai_state === ai_states.AI_ATTACK_STATIONARY || this.ai_state === ai_states.AI_ATTACK_MOVE || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO || this.ai_state === ai_states.AI_DEFEND_MOVE) &&
        (this.control_state === control_states.CONTROL_STOP || player.get_any_abtest_value('unit_declump_urgently',gamedata['client']['unit_declump_urgently']))) {
         // consider units this far away in pressure gradient calculation
@@ -8257,7 +8250,7 @@ Mobile.prototype.run_control = function(world) {
                             world.playfield_check_path(this.path, 'direct_skip_A*');
                         }
                     } else {
-                        if(tick_astar_queries_left === 0) {
+                        if(world.tick_astar_queries_left === 0) {
                             // do nothing until the client has CPU to run A*
                             if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) {
                                 console.log(this.spec['name']+' starved for A* time');
@@ -8266,7 +8259,7 @@ Mobile.prototype.run_control = function(world) {
                             world.playfield_check_path([this.pos,path_next], 'A*_starved');
                         } else {
                             // run the slow A* search
-                            tick_astar_queries_left -= 1;
+                            world.tick_astar_queries_left -= 1;
                             this.path = world.astar_context.search(cur_cell, dest_cell);
                             world.playfield_check_path(this.path, 'A*');
                             world.astar_map.smooth_path(this.path);
@@ -44970,7 +44963,7 @@ function handle_server_message(data) {
                                 {'spec': unit['spec'], 'level': unit['level'], 'path': [start_pos, end_pos], 'start_halted': delay});
                     } else {
                         // calculate the path if it hasn't already been done
-                        // note: this does not interact with tick_astar_queries_left, it always runs the query unconditionally.
+                        // note: this does not interact with world.tick_astar_queries_left, it always runs the query unconditionally.
                         if(!path_tried) {
                             path_tried = true;
                             path = world.astar_context.search(start_pos, end_pos);
