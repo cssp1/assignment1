@@ -2402,7 +2402,8 @@ function apply_target_lead(P, target_vel, speed) {
 var no_miss_hack_reported = false;
 
 
-/** @param {GameObject} my_source
+/** @param {!World.World} world
+    @param {GameObject} my_source
     @param {GameObjectId} my_id
     @param {string} my_spec_name
     @param {number} my_level
@@ -2420,7 +2421,7 @@ var no_miss_hack_reported = false;
     @param {boolean} fizzle
     @return {number}
 */
-function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
+function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, fizzle) {
     var max_range = gamedata['map']['range_conversion'] * get_leveled_quantity(spell['range'], my_level) * (my_stats ? my_stats.weapon_range : 1);
     var eff_range = ('effective_range' in spell ? (gamedata['map']['range_conversion'] * get_leveled_quantity(spell['effective_range'], my_level) * (my_stats ? my_stats.effective_weapon_range : 1)) : max_range);
     var shot_v = vec_sub(target_pos, my_pos);
@@ -2481,7 +2482,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
     var use_lead = get_leveled_quantity(spell['lead_target'] || 0, my_level);
     var lead_applied = false;
-    var arc = session.get_real_world().fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
+    var arc = world.fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
     var copies = get_leveled_quantity(spell['projectile_burst_size'] || 1, my_level);
     if(SPFX.detail < 1) {
         copies = Math.min(Math.max(Math.floor(SPFX.detail * copies), 1), 2);
@@ -2626,7 +2627,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
         // visual projectile effect
         if(color !== null && my_muzzle_pos) {
-            var fxworld = session.get_real_world().fxworld;
+            var fxworld = world.fxworld;
             fxworld.add(new SPFX.TimeProjectile(fxworld, my_muzzle_pos, my_height,
                                                 impact_pos, impact_height,
                                                 muzzle_time+prefire_delay, impact_time,
@@ -2664,9 +2665,9 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
         }
 
         if(impact_vfx) {
-            session.get_real_world().fxworld.add_visual_effect_at_time(impact_pos, impact_height, [0,1,0],
-                                           impact_time,
-                                           impact_vfx, (i == 0), vfx_props); // only play audio for first impact
+            world.fxworld.add_visual_effect_at_time(impact_pos, impact_height, [0,1,0],
+                                                    impact_time,
+                                                    impact_vfx, (i == 0), vfx_props); // only play audio for first impact
         }
 
         // visual muzzle flash effect
@@ -2681,10 +2682,10 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && my_muzzle_pos && (i == 0)) {
-            session.get_real_world().fxworld.add_visual_effect_at_time(my_muzzle_pos, my_height,
-                                           v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
-                                           muzzle_time,
-                                           muzzle_vfx, true, vfx_props);
+            world.fxworld.add_visual_effect_at_time(my_muzzle_pos, my_height,
+                                                    v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
+                                                    muzzle_time,
+                                                    muzzle_vfx, true, vfx_props);
         }
     }
 
@@ -2748,12 +2749,12 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     }
 
     for(var i = 0; i < effects.length; i++) {
-        session.get_real_world().combat_engine.damage_effect_queue.push(effects[i]);
+        world.combat_engine.damage_effect_queue.push(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
         // "Miss" alert text
-        session.get_real_world().fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], session.get_real_world().fxworld.now_time(), 1.0, {drop_shadow:true}));
+        world.fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], world.fxworld.now_time(), 1.0, {drop_shadow:true}));
     }
 
     }
@@ -2781,7 +2782,8 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     return hit_time;
 };
 
-/** @param {GameObject} my_source
+/** @param {!World.World} world
+    @param {GameObject} my_source
     @param {GameObjectId} my_id
     @param {string} my_spec_name
     @param {number} my_level
@@ -2799,7 +2801,7 @@ function do_fire_projectile_time(my_source, my_id, my_spec_name, my_level, my_te
     @param {boolean} fizzle
     @return {!GameTypes.TickCount}
 */
-function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_tick, force_hit_tick, spell, target, target_pos, target_height, fizzle) {
+function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_level, my_team, my_stats, my_pos, my_height, my_muzzle_pos, fire_tick, force_hit_tick, spell, target, target_pos, target_height, fizzle) {
     var max_range = gamedata['map']['range_conversion'] * get_leveled_quantity(spell['range'], my_level) * (my_stats ? my_stats.weapon_range : 1);
     var eff_range = ('effective_range' in spell ? (gamedata['map']['range_conversion'] * get_leveled_quantity(spell['effective_range'], my_level) * (my_stats ? my_stats.effective_weapon_range : 1)) : max_range);
     var shot_v = vec_sub(target_pos, my_pos);
@@ -2861,7 +2863,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
     // for non-splash weapons, it affects graphics only (since hits are computed independently)
     var use_lead = get_leveled_quantity(spell['lead_target'] || 0, my_level);
     var lead_applied = false;
-    var arc = session.get_real_world().fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
+    var arc = world.fxworld.global_gravity * get_leveled_quantity(spell['projectile_arc'] || 0, my_level);
     var copies = get_leveled_quantity(spell['projectile_burst_size'] || 1, my_level);
     if(SPFX.detail < 1) {
         copies = Math.min(Math.max(Math.floor(SPFX.detail * copies), 1), 2);
@@ -3038,7 +3040,7 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
                 my_impact_tick = new GameTypes.TickCount(my_impact_tick.get() + whole_ticks);
             }
 
-            var fxworld = session.get_real_world().fxworld;
+            var fxworld = world.fxworld;
             fxworld.add(new SPFX.TicksProjectile(fxworld, my_muzzle_pos, my_height,
                                                  impact_pos, impact_height,
                                                  my_fire_tick,
@@ -3078,9 +3080,9 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
         }
 
         if(impact_vfx) {
-            session.get_real_world().fxworld.add_visual_effect_at_tick(impact_pos, impact_height, [0,1,0],
-                                           impact_tick, i*interval + time_offset,
-                                           impact_vfx, (i == 0), vfx_props); // only play audio for first impact
+            world.fxworld.add_visual_effect_at_tick(impact_pos, impact_height, [0,1,0],
+                                                    impact_tick, i*interval + time_offset,
+                                                    impact_vfx, (i == 0), vfx_props); // only play audio for first impact
         }
 
         // visual muzzle flash effect
@@ -3095,10 +3097,10 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
 
         // only apply muzzle flash on first copy
         if(muzzle_vfx && my_muzzle_pos && (i == 0)) {
-            session.get_real_world().fxworld.add_visual_effect_at_tick(my_muzzle_pos, my_height,
-                                           v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
-                                           fire_tick, i*interval + time_offset,
-                                           muzzle_vfx, true, vfx_props);
+            world.fxworld.add_visual_effect_at_tick(my_muzzle_pos, my_height,
+                                                    v3_normalized([my_shot_v[0], 0, my_shot_v[1]]),
+                                                    fire_tick, i*interval + time_offset,
+                                                    muzzle_vfx, true, vfx_props);
         }
     }
 
@@ -3162,12 +3164,12 @@ function do_fire_projectile_ticks(my_source, my_id, my_spec_name, my_level, my_t
     }
 
     for(var i = 0; i < effects.length; i++) {
-        session.get_real_world().combat_engine.damage_effect_queue.push(effects[i]);
+        world.combat_engine.damage_effect_queue.push(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
         // "Miss" alert text
-        session.get_real_world().fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], session.get_real_world().fxworld.now_time(), 1.0, {drop_shadow:true}));
+        world.fxworld.add(new SPFX.CombatText(target_pos, 0, "MISS", [1,1,0.1,1], world.fxworld.now_time(), 1.0, {drop_shadow:true}));
     }
 
     }
@@ -3238,11 +3240,11 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
-        do_fire_projectile_ticks(this, this.id, this.spec['name'],
+        do_fire_projectile_ticks(world, this, this.id, this.spec['name'],
                                  spell_level,
                                  this.team, this.combat_stats, my_pos, my_height, my_muzzle_pos, fire_tick, force_hit_tick, spell, target, target_pos, target_height, false);
     } else {
-        do_fire_projectile_time(this, this.id, this.spec['name'],
+        do_fire_projectile_time(world, this, this.id, this.spec['name'],
                                 spell_level,
                                 this.team, this.combat_stats, my_pos, my_height, my_muzzle_pos, fire_time, force_hit_time, spell, target, target_pos, target_height, false);
     }
@@ -43839,7 +43841,7 @@ function handle_server_message(data) {
 
 
                             // check for anti-missile defenses
-                            var interceptor = session.for_each_real_object(function(obj) {
+                            var interceptor = /** @type {GameObject|null} */ (session.for_each_real_object(function(obj) {
                                 if(obj.is_building() && !obj.is_destroyed() && !obj.disarmed && !obj.combat_stats.stunned && (obj.team !== 'player') &&
                                    obj.equipment && obj.is_shooter()) {
                                     var chance = 1 - obj.combat_stats.anti_missile;
@@ -43856,22 +43858,22 @@ function handle_server_message(data) {
                                         }
                                     }
                                 }
-                            });
+                            }));
 
                             // missile effect
                             var hit_tick, hit_time;
                             if(COMBAT_ENGINE_USE_TICKS) {
-                                hit_tick = do_fire_projectile_ticks(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, world.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
+                                hit_tick = do_fire_projectile_ticks(world, player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, world.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
                                 hit_time = -1;
                             } else {
-                                hit_time = do_fire_projectile_time(player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
+                                hit_time = do_fire_projectile_time(world, player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
                                 hit_tick = absolute_time_to_tick(hit_time);
                             }
 
                             if(interceptor) {
                                 // intecepting shot effect
                                 // hack - don't bother computing the actual fire time
-                                interceptor.fire_projectile(new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
+                                interceptor.fire_projectile(world, new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
                             }
                         }
                     }
