@@ -36248,28 +36248,6 @@ function update_buy_gamebucks_dialog23_warning_text(dialog) {
     }
 }
 
-
-/** Get the UI-visible item bundle gamebucks value for an active BUY_GAMEBUCKS sku spell
-    @param {!Object} spell
-    @return {number} */
-function gamebucks_spell_ui_bundle_value(spell, spellarg) {
-    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        // note: this assumes a specific structure where the main loot table indirects once to another table
-        var master_loot = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
-        if(master_loot.length < 1) { return 0; } // empty
-        if(!('cond' in master_loot[0])) { throw Error('unexpected master loot table structure: '+JSON.stringify(table_ref)); }
-        var table_ref = eval_cond_or_literal(master_loot[0]['cond'], player, null);
-        if(table_ref) {
-            if(!('table' in table_ref)) { throw Error('unexpected loot table structure: '+JSON.stringify(table_ref)); }
-            var actual_table = gamedata['loot_tables_client'][table_ref['table']];
-            if('ui_gamebucks_value' in actual_table) {
-                return actual_table['ui_gamebucks_value'];
-            }
-        }
-    }
-    return 0;
-};
-
 /** Get the UI-visible expire time for an active BUY_GAMEBUCKS sku spell
     @param {!Object} spell
     @return {number} */
@@ -36453,7 +36431,7 @@ function update_buy_gamebucks_sku23(dialog) {
        'buy_gamebucks_dialog_looks' in gamedata['store'] &&
        gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default'] &&
        gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default']['enable_bundle_value']) {
-        bundle_value = gamebucks_spell_ui_bundle_value(spell, spellarg);
+        bundle_value = buy_gamebucks_sku2_ui_bundle_value(spell, spellarg);
     }
 
     if(bundle_value > 0) {
@@ -36654,27 +36632,66 @@ function buy_gamebucks_sku2_item_list(spell, spellarg) {
     }
     return [];
 }
-function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
+
+/** Look into the loot table for an active BUY_GAMEBUCKS sku spell to pull out a parameter
+    @param {!Object} spell
+    @param {?} spellarg
+    @param {string} param_name
+    @return {T|null}
+    @template T */
+function buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, param_name) {
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        var loot_table = gamedata['loot_tables_client'][spell['loot_table']];
-        if('metrics_description' in loot_table) {
-            return eval_cond_or_literal(loot_table['metrics_description'], player, null);
+        // note: this has some opinions about the loot table structure.
+        var master_table = gamedata['loot_tables_client'][spell['loot_table']];
+
+        // case 1 - parameter is on the master loot table
+        if(param_name in master_table) {
+            return eval_cond_or_literal(master_table[param_name], player, null);
+        }
+
+        // case 2 - master loot table indirects exactly once to another table
+        if(master_table['loot'].length < 1) { return null; } // empty
+        if(!('cond' in master_table['loot'][0])) { throw Error('unexpected master loot table structure: '+JSON.stringify(master_table['loot'])); }
+        var table_ref = eval_cond_or_literal(master_table['loot'][0]['cond'], player, null);
+        if(table_ref) {
+            if(!('table' in table_ref)) { throw Error('unexpected subordinate loot table structure: '+JSON.stringify(table_ref)); }
+            var sub_table = gamedata['loot_tables_client'][table_ref['table']];
+            if(param_name in sub_table) {
+                return eval_cond_or_literal(sub_table[param_name], player, null);
+            }
         }
     }
     return null;
+};
+
+
+/** Get the metrics_description for an active BUY_GAMEBUCKS sku spell
+    @param {!Object} spell
+    @param {?} spellarg
+    @return {string|null} */
+function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
+    return buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'metrics_description');
 }
 
-// return ui_warning attached to this SKU
+/** Get ui_warning attached to this SKU
+    @param {!Object} spell
+    @param {?} spellarg
+    @return {string|null} */
 function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
-    var ret = null;
-    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
-        ret = eval_cond_or_literal(gamedata['loot_tables_client'][spell['loot_table']]['ui_warning'] || null, player, null);
-    }
+    var ret = buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_warning');
     if(!ret && 'ui_bonus' in spell) {
         ret = spell['ui_bonus'];
     }
     return ret;
 }
+
+/** Get the UI-visible item bundle gamebucks value for an active BUY_GAMEBUCKS sku spell
+    @param {!Object} spell
+    @param {?} spellarg
+    @return {number} */
+function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg) {
+    return buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_gamebucks_value') || 0;
+};
 
 // merge identical successive entries in an item list, even if this would violate the max stack size
 function collapse_item_list(ls) {

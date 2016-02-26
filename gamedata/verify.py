@@ -3534,7 +3534,7 @@ def main(args):
         if 'on_purchase' in data:
             error |= check_consequent(data['on_purchase'], reason = 'loot_tables:'+name+':on_purchase')
         for COND in 'ui_warning', 'metrics_description':
-            if COND in data:
+            if COND in data and not isinstance(data[COND], basestring):
                 error |= check_cond_chain(data[COND], reason = 'loot_tables:'+name+':'+COND)
 
     for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():

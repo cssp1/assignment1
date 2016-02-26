@@ -15198,14 +15198,15 @@ class Store(object):
                         discovered_where = 'messages'
 
 
-                if ('metrics_description' in loot_table) and items:
-                    extra_description = Predicates.eval_cond_or_literal(loot_table['metrics_description'], session, session.player)
+                if items:
+                    extra_description = Store.buy_gamebucks_sku_get_loot_table_parameter(session, session.player, loot_table, 'metrics_description')
                     if extra_description:
                         price_description.append(extra_description)
 
                 # very important to do this last, since it may change the loot/description
-                if 'on_purchase' in loot_table:
-                     session.execute_consequent_safe(loot_table['on_purchase'], session.player, retmsg, reason=spellname+':loot_table')
+                on_purchase_cons = Store.buy_gamebucks_sku_get_loot_table_parameter(session, session.player, loot_table, 'on_purchase')
+                if on_purchase_cons:
+                     session.execute_consequent_safe(on_purchase_cons, session.player, retmsg, reason=spellname+':loot_table')
 
             # show "additional" gamebucks earned for purchase as if it were an item
             if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
@@ -15400,6 +15401,26 @@ class Store(object):
         # this should happen whenever the "version 2" scrollable buy_gamebucks dialog is in use
         return Predicates.eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, player) == 2
 
+    # retrieve a parameter on a loot-bearing BUY_GAMEBUCKS SKU by inspecting its loot table
+    # (similar to client's buy_gamebucks_sku2_get_loot_table_parameter())
+    @classmethod
+    def buy_gamebucks_sku_get_loot_table_parameter(cls, session, player, master_table, param_name):
+        # note: this has some opinions about the loot table structure.
+        # case 1 - parameter is on the master loot table
+        if param_name in master_table:
+            return Predicates.eval_cond_or_literal(master_table[param_name], session, player)
+
+        # case 2 - master loot table indirects exactly once to another table
+        if len(master_table['loot']) < 1: return None # empty
+        if 'cond' not in master_table['loot'][0]: raise Exception('unexpected master loot table structure: %r' % master_table['loot'])
+        table_ref = Predicates.eval_cond_or_literal(master_table['loot'][0]['cond'], session, player)
+        if table_ref:
+            if 'table' not in table_ref: raise Exception('unexpected subordinate loot table structure: %r' % table_ref)
+            sub_table = gamedata['loot_tables'][table_ref['table']]
+            if param_name in sub_table:
+                return Predicates.eval_cond_or_literal(sub_table[param_name], session, player)
+
+        return None
 
 def fungible_inventory_item_can_fit(spec, stack, resource_state):
     if spec['resource'] == 'gamebucks': return True
