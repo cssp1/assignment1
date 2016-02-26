@@ -478,6 +478,7 @@
         "expedition": "Expedition",
         "consumable": "Consumable",
         "blueprint": "Blueprint",
+        "token": "Loot Token",
         "building_equip": "Building %SLOT Equipment",
         "building_leader": "%NAME Leader",
         "unit_equip": "Unit %SLOT Equipment",

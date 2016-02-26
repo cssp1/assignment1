@@ -18764,7 +18764,7 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
                                  'units_lost':units,
                                  'battle_stars':{'foo':1,'bar':2,'baz':3},
                                  'trophies_pvp': (has_trophies ? 30 : null),
-                                 'items': (has_item_loot ? [{'spec':'inventory_unknown','stack':5}] : [])},
+                                 'items': (has_item_loot ? [{'spec':'token','stack':1000},{'spec':'inventory_unknown','stack':5}] : [])},
                                 {'base_damage': 0.51,
                                  'deployed_units':units},
                                 (kind == 'ladder' ? ladder_state : null));
@@ -19008,9 +19008,10 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 
         for(var i = 0; i < loot['items'].length; i++) {
             var item = loot['items'][i];
+            var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
 
-            if(item['spec'] == 'token') {
-                token_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+            if(item_spec['category'] === 'token') {
+                token_spec = item_spec;
                 token_qty = (('stack' in item) ? item['stack'] : 1);
             }
 

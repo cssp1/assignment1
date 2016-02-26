@@ -4358,7 +4358,7 @@ class Session(object):
                 item['expire_time'] = item_expire_time
 
             # special case: token quantity boost
-            if item['spec'] == 'token':
+            if spec.get('category') == 'token':
                 stack_mult = player.stattab.get_player_stat('loot_factor_tokens')
                 if stack_mult != 1:
                     item['stack'] = int(item.get('stack',1) * stack_mult + 0.5)
@@ -16796,7 +16796,8 @@ class GAMEAPI(resource.Resource):
                     stats['damage_inflicted'] = session.loot.get('damage_inflicted',0)
                     stats['hive_kill_points'] = session.loot.get('hive_kill_points',0) # must be set via SESSION_LOOT consequent
 
-                stats['tokens_looted'] = sum([item.get('stack',1) for item in session.loot.get('items',[]) if item['spec'].startswith('token')], 0)
+                stats['tokens_looted'] = sum([item.get('stack',1) for item in session.loot.get('items',[]) \
+                                              if gamedata['items'][item['spec']].get('category')=='token'], 0)
 
                 # collect trophy stats - note, trophies can come from AI attacks, but other stats cannot
                 for st in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):

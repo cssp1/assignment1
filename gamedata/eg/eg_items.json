@@ -43,6 +43,7 @@
 
 "token": {
     "name": "token",
+    "category": "token",
     "ui_name": "Ops Needs Points",
     "ui_name_plural": "Ops Needs Points",
     "ui_description": "Use to acquire special items in the Store. Spend before expiration date — use them or lose them!",

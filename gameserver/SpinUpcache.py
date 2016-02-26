@@ -539,7 +539,7 @@ def cons_has_tokens(gamedata, cons):
     elif cons['consequent'] == 'GIVE_LOOT':
         loot = LootTable.get_loot(gamedata['loot_tables'], cons['loot'], cond_resolver = lambda x: True)
         for item in loot:
-            if item['spec'].startswith('token'):
+            if gamedata['items'][item['spec']].get('category') == 'token':
                 return True
     return False
 def ai_base_has_tokens(gamedata, base):
