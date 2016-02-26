@@ -7499,19 +7499,25 @@
                        "tooltip_delay": 0, "fixed_tooltip_offset": [-7,92],
                        "text_hjustify": "right", "text_vjustify": "bottom" },
 
+            // comment, expire_time, and bundle_value all share the same spot in the GUI
             "comment": { "kind": "TextField",
                          "xy": [72,47], "dimensions": [118, 46],
                          "ui_name_best_value": "Best Value",
                          "text_size": 13, "text_style": "normal", "drop_shadow": 1,
                          "text_color": [0.1,1,0.2,1],
                          "text_hjustify": "right", "text_vjustify": "top" },
-            // mutually exclusive with comment
             "expire_time": { "kind": "TextField", "show": 1,
                              "xy": [72,48], "dimensions": [118, 46],
                              "ui_name": "Ending in %togo",
                              "text_size": 12, "text_style": "thick", "drop_shadow": 1,
                              "text_color": [1,0,0,1],
                              "text_hjustify": "right", "text_vjustify": "top" },
+            "bundle_value": { "kind": "TextField",
+                              "xy": [72,48], "dimensions": [118, 46],
+                              "ui_name": "+ Items worth %d %GAMEBUCKS_NAME",
+                              "text_size": 12, "text_style": "bold", "drop_shadow": 1,
+                              "text_color": [1,1,0,1],
+                              "text_hjustify": "right", "text_vjustify": "top" },
 
             "upperleft_shine": { "kind": "StaticImage", "xy": [7,8], "dimensions": [62,13], "asset": "button_shine", "alpha": 0.8 },
 
@@ -7548,9 +7554,9 @@
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,57], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[16,242], [33,225], [57,225], [16,264]] },
             "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,258], "dimensions": [20,100], "color": [1,1,1,1],
-                            "text_style": "bold", "text_size": 13, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
+                            "text_style": "bold", "text_size": 12, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
 
-            "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,281], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
+            "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,282], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
 
             "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,262], "color": [0,0,0,0.6], "bevel": 2 },
 

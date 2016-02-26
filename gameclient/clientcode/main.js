@@ -36248,6 +36248,28 @@ function update_buy_gamebucks_dialog23_warning_text(dialog) {
     }
 }
 
+
+/** Get the UI-visible item bundle gamebucks value for an active BUY_GAMEBUCKS sku spell
+    @param {!Object} spell
+    @return {number} */
+function gamebucks_spell_ui_bundle_value(spell, spellarg) {
+    if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
+        // note: this assumes a specific structure where the main loot table indirects once to another table
+        var master_loot = gamedata['loot_tables_client'][spell['loot_table']]['loot'];
+        if(master_loot.length < 1) { return 0; } // empty
+        if(!('cond' in master_loot[0])) { throw Error('unexpected master loot table structure: '+JSON.stringify(table_ref)); }
+        var table_ref = eval_cond_or_literal(master_loot[0]['cond'], player, null);
+        if(table_ref) {
+            if(!('table' in table_ref)) { throw Error('unexpected loot table structure: '+JSON.stringify(table_ref)); }
+            var actual_table = gamedata['loot_tables_client'][table_ref['table']];
+            if('ui_gamebucks_value' in actual_table) {
+                return actual_table['ui_gamebucks_value'];
+            }
+        }
+    }
+    return 0;
+};
+
 /** Get the UI-visible expire time for an active BUY_GAMEBUCKS sku spell
     @param {!Object} spell
     @return {number} */
@@ -36424,16 +36446,28 @@ function update_buy_gamebucks_sku23(dialog) {
         dialog.widgets['name2'].tooltip.str = null;
     }
 
-    // display expire time, if applicable
-    var expire_time = gamebucks_spell_ui_expire_time(spell, spellarg);
+    // display expire time and bundle values, if applicable
+    var expire_time = (dialog.data['widgets']['expire_time']['show'] ? gamebucks_spell_ui_expire_time(spell, spellarg) : -1);
+    var bundle_value = 0;
+    if('bundle_value' in dialog.widgets &&
+       'buy_gamebucks_dialog_looks' in gamedata['store'] &&
+       gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default'] &&
+       gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default']['enable_bundle_value']) {
+        bundle_value = gamebucks_spell_ui_bundle_value(spell, spellarg);
+    }
 
-    if(dialog.data['widgets']['expire_time']['show'] && expire_time > 0) {
-        dialog.widgets['expire_time'].show = true;
-        dialog.widgets['comment'].show = false;
+    if(bundle_value > 0) {
+        dialog.widgets['bundle_value'].str = dialog.data['widgets']['bundle_value']['ui_name'].replace('%d', pretty_print_number(bundle_value)).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+    }
+    if(expire_time > 0) {
         dialog.widgets['expire_time'].str = dialog.data['widgets']['expire_time']['ui_name'].replace('%togo', pretty_print_time(expire_time - server_time));
-    } else {
-        dialog.widgets['expire_time'].show = false;
+    }
+
+    // if neither bundle_value or expire_time is present, show the SKU comment
+    if(bundle_value <= 0 && expire_time <= 0) {
         dialog.widgets['comment'].show = true;
+        dialog.widgets['expire_time'].show = false;
+        dialog.widgets['bundle_value'].show = false;
 
         // do not display a comment unless at least one SKU has a bonus
         if(any_sku_has_bonus) {
@@ -36445,6 +36479,33 @@ function update_buy_gamebucks_sku23(dialog) {
                 dialog.widgets['comment'].str = null;
             }
         }
+    } else if(bundle_value > 0 && expire_time <= 0) { // ONLY show bundle_value
+        dialog.widgets['comment'].show = false;
+        dialog.widgets['expire_time'].show = false;
+        dialog.widgets['bundle_value'].show = true;
+    } else if(bundle_value <= 0 && expire_time > 0) { // ONLY show expire_time
+        dialog.widgets['comment'].show = false;
+        dialog.widgets['expire_time'].show = true;
+        dialog.widgets['bundle_value'].show = false;
+    } else { // show BOTH bundle_value and expire_time, alternating
+        dialog.widgets['comment'].show = false;
+        dialog.widgets['expire_time'].show = true;
+        dialog.widgets['bundle_value'].show = true;
+        // animate fading between the two
+        var period = 7, full = 0.3;
+        var t = (client_time % period)/period;
+        var u;
+        if(t < full) {
+            u = 0;
+        } else if(t < 0.5) {
+            u = (t-full)/(0.5-full);
+        } else if(t < 0.5+full) {
+            u = 1;
+        } else {
+            u = 1 - (t-(0.5+full))/(1-(0.5+full));
+        }
+        dialog.widgets['expire_time'].alpha = u;
+        dialog.widgets['bundle_value'].alpha = 1-u;
     }
 
     if('warning_text' in dialog.widgets) {
