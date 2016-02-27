@@ -24019,6 +24019,12 @@ class GAMEAPI(resource.Resource):
                     self.do_unit_repair_tick(session, retmsg, must_reply = True)
                     retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
+                elif spellname == 'REPAIR_ALL_FOR_MONEY':
+                    # we currently have a rare bug where player.my_army gets out of sync with the server, causing repair pricing to mis-match
+                    # until this is found and fixed, force a full query and update of the army on failure
+                    session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='GAMEBUCKS_ORDER failure')
+
+
             finally:
                 retmsg.append(["GAMEBUCKS_ORDER_ACK", tag, success])
 
