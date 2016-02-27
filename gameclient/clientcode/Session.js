@@ -113,6 +113,7 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
 
     world.listen('after_damage_effects', this.after_real_world_damage_effects, false, this);
     world.listen('object_added', this.on_real_world_object_added, false, this);
+    world.listen('object_removed', this.on_real_world_object_removed, false, this);
 
     this.minefield_tags_by_obj_id = {};
     this.minefield_tags_by_tag = {};
@@ -308,6 +309,10 @@ Session.Session.prototype.on_real_world_object_added = function(event) {
             this.factory_tags_by_tag[obj.spec['name']][tag] = obj.id;
         }
     }
+};
+/** @param {!World.ObjectRemovedEvent} event */
+Session.Session.prototype.on_real_world_object_removed = function(event) {
+    this.set_battle_outcome_dirty();
 };
 
 Session.Session.prototype.clear_building_idle_state_caches = function() {

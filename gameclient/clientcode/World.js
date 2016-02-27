@@ -459,27 +459,12 @@ World.World.prototype.persist_debris = function() {
     }
 };
 
-/** Main object removal function
-    @param {!GameObject} obj */
-World.World.prototype.remove_object = function(obj) {
-    // update map
-    if(obj.is_blocker() && !obj.is_destroyed()) {
-        obj.block_map(-1, 'remove_object');
-    }
-
-    obj.remove_permanent_effect(this);
-
-    obj.dispose(); // call this before rem_object() so obj.id is still valid
-
-    this.objects.rem_object(obj);
-};
-
 /** For level-editing only!
     @param {!GameObject} obj */
 World.World.prototype.send_and_remove_object = function(obj) {
     if(obj.id && obj.id !== GameObject.DEAD_ID) {
         send_to_server.func(["REMOVE_OBJECT", obj.id]);
-        this.remove_object(obj);
+        this.objects.rem_object(obj);
     }
 };
 /** @param {!GameObject} victim
@@ -492,10 +477,7 @@ World.World.prototype.send_and_destroy_object = function(victim, killer) {
                              get_killer_info(killer)
                             ]);
     }
-    this.remove_object(victim);
-    if(this === session.get_real_world()) {
-        session.set_battle_outcome_dirty();
-    }
+    this.objects.rem_object(victim);
 };
 
 
