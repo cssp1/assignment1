@@ -19,6 +19,17 @@ GameObjectCollection.AddedEvent = function(type, target, obj) {
 };
 goog.inherits(GameObjectCollection.AddedEvent, goog.events.Event);
 
+/** @constructor @struct
+    @extends {goog.events.Event}
+    @param {string} type
+    @param {Object} target
+    @param {!GameObject} obj */
+GameObjectCollection.RemovedEvent = function(type, target, obj) {
+    goog.base(this, type, target);
+    this.obj = obj;
+};
+goog.inherits(GameObjectCollection.RemovedEvent, goog.events.Event);
+
 /** GameObjectCollection (client-side version of server's ObjectCollection)
 
     Note: unlike in the server (where ObjectCollection assigns id numbers), in the client we assume
@@ -120,6 +131,10 @@ GameObjectCollection.GameObjectCollection.prototype.serialize = function() {
 GameObjectCollection.GameObjectCollection.prototype.apply_snapshot = function(snap) {
     /** @type {!Object<!GameObjectId, !GameObject>} */
     var new_objects = {};
+    /** @type {!Array<!GameObject>} */
+    var added_objects = [];
+    /** @type {!Array<!GameObject>} */
+    var removed_objects = [];
     goog.object.forEach(snap, function(/** !Object<string,?> */ s, /** string */ id) {
         var obj;
         if(id in this.objects) {
@@ -128,8 +143,21 @@ GameObjectCollection.GameObjectCollection.prototype.apply_snapshot = function(sn
             obj.apply_snapshot(s);
         } else {
             obj = GameObject.unserialize(s);
+            added_objects.push(obj);
         }
         new_objects[id] = obj;
     }, this);
+    goog.object.forEach(this.objects, function(/** !GameObject */ obj, /** string */ id) {
+        if(!(id in snap)) {
+            removed_objects.push(obj);
+        }
+    }, this);
+
     this.objects = new_objects;
+    goog.array.forEach(removed_objects, function(obj) {
+        this.dispatchEvent(new GameObjectCollection.RemovedEvent('removed', this, obj));
+    }, this);
+    goog.array.forEach(added_objects, function(obj) {
+        this.dispatchEvent(new GameObjectCollection.AddedEvent('added', this, obj));
+    }, this);
 };

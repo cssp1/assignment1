@@ -30,6 +30,17 @@ World.ObjectAddedEvent = function(type, target, obj) {
 };
 goog.inherits(World.ObjectAddedEvent, goog.events.Event);
 
+/** @constructor @struct
+    @extends {goog.events.Event}
+    @param {string} type
+    @param {Object} target
+    @param {!GameObject} obj */
+World.ObjectRemovedEvent = function(type, target, obj) {
+    goog.base(this, type, target);
+    this.obj = obj;
+};
+goog.inherits(World.ObjectRemovedEvent, goog.events.Event);
+
 /** Encapsulates the renderable/simulatable "world"
     @constructor @struct
     @implements {GameTypes.ISerializable}
@@ -44,6 +55,7 @@ World.World = function(base, objects, enable_citizens) {
     /** @type {!GameObjectCollection.GameObjectCollection} */
     this.objects = new GameObjectCollection.GameObjectCollection();
     this.objects.listen('added', this.on_object_added, false, this);
+    this.objects.listen('removed', this.on_object_removed, false, this);
     goog.array.forEach(objects, function(obj) {
         this.objects.add_object(obj);
     }, this);
@@ -168,7 +180,11 @@ World.World.prototype.on_object_added = function(event) {
     this.notifier.dispatchEvent(new World.ObjectAddedEvent('object_added', this, event.obj));
     event.obj.on_added_to_world(this);
 };
-
+/** @param {!GameObjectCollection.RemovedEvent} event */
+World.World.prototype.on_object_removed = function(event) {
+    this.notifier.dispatchEvent(new World.ObjectRemovedEvent('object_removed', this, event.obj));
+    event.obj.on_removed_from_world(this);
+};
 
 /** NEW object query function
     param meanings:

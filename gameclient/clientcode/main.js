@@ -1355,6 +1355,8 @@ GameObject.unserialize = function(snap) {
 
 /** @param {!World.World} world */
 GameObject.prototype.on_added_to_world = function(world) {};
+/** @param {!World.World} world */
+GameObject.prototype.on_removed_from_world = function(world) {};
 
 /** @const
     @type {GameObjectId} */
@@ -4192,6 +4194,20 @@ MapBlockingGameObject.prototype.on_added_to_world = function(world) {
     this.world = world;
     this.update_map(null, [this.x,this.y], this.is_destroyed(), 'on_added_to_world');
 };
+/** @override */
+MapBlockingGameObject.prototype.on_removed_from_world = function(world) {
+    if(this.world !== world) { throw Error('not added to world world'); }
+    this.world = null;
+    this.update_map(world, [this.x,this.y], this.is_destroyed(), 'on_removed_from_world');
+};
+
+/** @override */
+MapBlockingGameObject.prototype.apply_snapshot = function(snap) {
+    var old_x = this.x, old_y = this.y;
+    var was_destroyed = this.is_destroyed();
+    goog.base(this, 'apply_snapshot', snap);
+    this.update_map(this.world, [old_x, old_y], was_destroyed, 'apply_snapshot(destr '+(was_destroyed?'1':'0')+'->'+(this.is_destroyed()?'1':'0'));
+};
 
 /** @override */
 MapBlockingGameObject.prototype.receive_state = function(data, init, is_deploying) {
@@ -4213,7 +4229,7 @@ MapBlockingGameObject.prototype.update_map = function(old_world, old_xy, was_des
     if(this.world !== old_world || this.x != old_xy[0] || this.y != old_xy[1] || was_destroyed != this.is_destroyed()) {
         if(old_world && old_xy[0] != -1 && old_xy[1] != -1 && !was_destroyed) {
             // unblock old location
-            this.block_map_at(old_xy, -1, reason);
+            this.block_map_at(old_world, old_xy, -1, reason);
         }
         // block new location
         if(this.world && !this.is_destroyed()) {
@@ -4259,17 +4275,18 @@ MapBlockingGameObject.prototype.covers_any_of = function(path) {
 };
 
 /** @private
+    @param {!World.World} world
     @param {!Array.<number>} xy of the building itself
     @param {number} incr to add/subtract from blockage
     @param {string} reason, for debugging */
-MapBlockingGameObject.prototype.block_map_at = function(xy, incr, reason) {
+MapBlockingGameObject.prototype.block_map_at = function(world, xy, incr, reason) {
     if(this.spec['unit_collision_gridsize'][0] <= 0) {
         return;
     }
     var bounds = this.current_collision_bounds(xy);
     if(!reason || typeof(reason) !== 'string') { throw Error('bad reason'); }
     this.debug_block_history.push({'xy':xy, 'incr':incr, 'reason':reason});
-    this.world.astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
+    world.astar_map.block_map([bounds[0][0], bounds[1][0]], [bounds[0][1]-bounds[0][0], bounds[1][1]-bounds[1][0]], incr, this, reason);
     invalidate_unit_paths();
     invalidate_all_threatlists();
 };
@@ -4278,7 +4295,9 @@ MapBlockingGameObject.prototype.block_map_at = function(xy, incr, reason) {
     @param {number} incr
     @param {string} reason, for debugging */
 MapBlockingGameObject.prototype.block_map = function(incr, reason) {
-    this.block_map_at([this.x, this.y], incr, reason);
+    if(this.world) {
+        this.block_map_at(this.world, [this.x, this.y], incr, reason);
+    }
 };
 /** @override */
 MapBlockingGameObject.prototype.hit_radius = function() {
