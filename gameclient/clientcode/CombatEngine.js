@@ -96,6 +96,7 @@ CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
 // DamageEffects
 
 /** @constructor @struct
+    @implements {GameTypes.ISerializable}
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObjectId|null} source_id
@@ -112,7 +113,7 @@ CombatEngine.DamageEffect = function(tick, client_time_hack, source_id, amount, 
 /** @param {!World.World} world */
 CombatEngine.DamageEffect.prototype.apply = goog.abstractMethod;
 
-/** @return {!Object<string,?>} */
+/** @override */
 CombatEngine.DamageEffect.prototype.serialize = function() {
     /** @type {!Object<string,?>} */
     var ret;
@@ -123,6 +124,8 @@ CombatEngine.DamageEffect.prototype.serialize = function() {
            'vs_table': this.vs_table};
     return ret;
 };
+/** @override */
+CombatEngine.DamageEffect.prototype.apply_snapshot = goog.abstractMethod; // immutable
 
 /** @param {!CombatEngine.DamageEffect} effect */
 CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
