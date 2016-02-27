@@ -36473,7 +36473,7 @@ function update_buy_gamebucks_sku23(dialog) {
     if(bundle_value <= 0 && expire_time <= 0) {
         dialog.widgets['comment'].show = true;
         dialog.widgets['expire_time'].show = false;
-        dialog.widgets['bundle_value'].show = false;
+        if('bundle_value' in dialog.widgets) { dialog.widgets['bundle_value'].show = false; }
 
         // do not display a comment unless at least one SKU has a bonus
         if(any_sku_has_bonus) {
@@ -36492,7 +36492,7 @@ function update_buy_gamebucks_sku23(dialog) {
     } else if(bundle_value <= 0 && expire_time > 0) { // ONLY show expire_time
         dialog.widgets['comment'].show = false;
         dialog.widgets['expire_time'].show = true;
-        dialog.widgets['bundle_value'].show = false;
+        if('bundle_value' in dialog.widgets) { dialog.widgets['bundle_value'].show = false; }
     } else { // show BOTH bundle_value and expire_time, alternating
         dialog.widgets['comment'].show = false;
         dialog.widgets['expire_time'].show = true;
