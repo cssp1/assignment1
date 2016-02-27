@@ -19591,11 +19591,12 @@ function invoke_building_context_menu(mouse_xy) {
     change_selection_ui(null);
 
     var obj = selection.unit;
-    var spec = obj.spec;
 
-    if(!(obj.is_building() || (obj.is_inert() && obj.team == 'player') || player.is_cheater)) {
+    if(!obj || !(obj.is_building() || (obj.is_inert() && obj.team == 'player') || player.is_cheater)) {
         throw Error('context menu invoked without a building or player-owned inert object selected');
     }
+
+    var spec = obj.spec;
 
     var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
     var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
@@ -19740,11 +19741,13 @@ function invoke_building_context_menu(mouse_xy) {
             // offer to speed up repairs or construction
             upgrade_is_active = false;
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                                onclick: function() {invoke_speedup_dialog('speedup');}}));
+                                                onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
+                                               }));
         } else if((session.home_base || quarry_buildable) && obj.is_upgrading()) {
             // if upgrading, then just show speedup and cancel
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
-                                                onclick: function() {invoke_speedup_dialog('speedup');}}));
+                                                onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
+                                               }));
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
                                                 onclick: (function (_id) { return function() {
                                                     change_selection_ui(null);
@@ -19775,7 +19778,9 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_factory()) {
                 upgrade_is_active = false;
                 if(obj.is_manufacturing() && player.unit_speedups_enabled()) {
-                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], onclick: function() {invoke_speedup_dialog('speedup'); }}));
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                        onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
+                                                       }));
                 }
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MAKE_DROIDS']['ui_name'],
                                                     onclick: (function (_obj) { return function() {
@@ -19786,7 +19791,9 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_researcher()) {
                 upgrade_is_active = false; // XXX check idle_state for things we can research
                 if(obj.is_researching()) {
-                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], onclick: function() {invoke_speedup_dialog('speedup'); }}));
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                        onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
+                                                       }));
                     buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
                                                         onclick: (function (_id) { return function() {
                                                             change_selection_ui(null);
@@ -19834,7 +19841,9 @@ function invoke_building_context_menu(mouse_xy) {
                         if(('speedupable' in cat) && !cat['speedupable']) {
                             // cannot be sped up
                         } else {
-                            which_buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'], onclick: function() {invoke_speedup_dialog('speedup'); }}));
+                            which_buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                                      onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
+                                                                     }));
                         }
                     }
                     if(('cancelable' in cat) && !cat['cancelable']) {
