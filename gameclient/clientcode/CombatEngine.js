@@ -55,6 +55,7 @@ CombatEngine.CombatEngine = function() {
     this.cur_client_time = 0;
 
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
+        @private
         @type {Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
 };
@@ -121,6 +122,11 @@ CombatEngine.DamageEffect.prototype.serialize = function() {
            'amount': this.amount,
            'vs_table': this.vs_table};
     return ret;
+};
+
+/** @param {!CombatEngine.DamageEffect} effect */
+CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
+    this.damage_effect_queue.push(effect);
 };
 
 /** @param {!World.World} world

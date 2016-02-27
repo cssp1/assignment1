@@ -974,7 +974,7 @@ Aura.prototype.apply = function(world, obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                world.combat_engine.damage_effect_queue.push(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, obj.id, dmg, effect['damage_vs'] || this.vs_table));
+                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1976,7 +1976,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
                 var death_tick = GameTypes.TickCount.add(world.combat_engine.cur_tick,
                                                          relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                world.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
             }
 
             if(spell['impact_auras']) {
@@ -1993,7 +1993,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                                                     this.get_leveled_quantity(imp_aura['range'] || 0),
                                                     spell['damage_vs'] || {}, imp_aura['duration_vs'] || {},
                                                     spell['always_friendly_fire'] || false);
-                    world.combat_engine.damage_effect_queue.push(effect);
+                    world.combat_engine.queue_damage_effect(effect);
                 }
             }
 
@@ -2004,7 +2004,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                                               this.get_leveled_quantity(spell['splash_falloff'] || 'linear'),
                                               damage, spell['damage_vs'] || {},
                                               spell['always_friendly_fire'] || false);
-            world.combat_engine.damage_effect_queue.push(effect);
+            world.combat_engine.queue_damage_effect(effect);
 
             // note: use both muzzle_flash and impact, because impact location is the object's own location
             var vfx = spell['visual_effect'] || spell['muzzle_flash_effect'] || spell['impact_visual_effect'] || null;
@@ -2236,7 +2236,7 @@ function calculate_battle_outcome() {
         }
 
         // check for inbound missiles and damage over time effects
-        if(defeat && session.get_real_world().combat_engine.damage_effect_queue.length > 0) {
+        if(defeat && session.get_real_world().combat_engine.has_pending_damage_effects() > 0) {
             defeat = false;
             session.no_more_units = true;
         }
@@ -2748,7 +2748,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
     }
 
     for(var i = 0; i < effects.length; i++) {
-        world.combat_engine.damage_effect_queue.push(effects[i]);
+        world.combat_engine.queue_damage_effect(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
@@ -3163,7 +3163,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
     }
 
     for(var i = 0; i < effects.length; i++) {
-        world.combat_engine.damage_effect_queue.push(effects[i]);
+        world.combat_engine.queue_damage_effect(effects[i]);
     }
 
     if(miss && COMBAT_DEBUG) {
@@ -3235,7 +3235,7 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
             death_client_time += spell['kills_self_delay'];
         }
 
-        world.combat_engine.damage_effect_queue.push(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
