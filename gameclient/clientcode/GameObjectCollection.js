@@ -72,14 +72,14 @@ GameObjectCollection.GameObjectCollection.prototype.get_object = function(id) {
 };
 /** @param {!GameObject} obj */
 GameObjectCollection.GameObjectCollection.prototype.rem_object = function(obj) {
+    this.dispatchEvent(new GameObjectCollection.RemovedEvent('removed', this, obj));
     delete this.objects[obj.id];
     obj.id = GameObject.DEAD_ID;
 };
 GameObjectCollection.GameObjectCollection.prototype.clear = function() {
-    for(var id in this.objects) {
-        this.objects[id].id = GameObject.DEAD_ID;
-    }
-    this.objects = {};
+    goog.array.forEach(goog.object.getValues(this.objects), function(obj) {
+        this.rem_object(obj);
+    }, this);
 };
 
 /** Return a randomly-permuted array of all our objects
@@ -156,6 +156,7 @@ GameObjectCollection.GameObjectCollection.prototype.apply_snapshot = function(sn
     this.objects = new_objects;
     goog.array.forEach(removed_objects, function(obj) {
         this.dispatchEvent(new GameObjectCollection.RemovedEvent('removed', this, obj));
+        obj.id = GameObject.DEAD_ID;
     }, this);
     goog.array.forEach(added_objects, function(obj) {
         this.dispatchEvent(new GameObjectCollection.AddedEvent('added', this, obj));

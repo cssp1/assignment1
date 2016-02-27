@@ -1356,18 +1356,8 @@ GameObject.unserialize = function(snap) {
 /** @param {!World.World} world */
 GameObject.prototype.on_added_to_world = function(world) {};
 /** @param {!World.World} world */
-GameObject.prototype.on_removed_from_world = function(world) {};
-
-/** @const
-    @type {GameObjectId} */
-GameObject.DEAD_ID = 'DEAD';
-/** @const
-    @type {GameObjectId} */
-GameObject.VIRTUAL_ID = 'VIRTUAL';
-
-/** unlink from global references */
-GameObject.prototype.dispose = function() {
-    // deselect
+GameObject.prototype.on_removed_from_world = function(world) {
+    this.remove_permanent_effect(world);
 
     // remove from selection.multi
     for(var i = 0; i < selection.multi.length; i++) {
@@ -1388,6 +1378,13 @@ GameObject.prototype.dispose = function() {
         mouse_state.hovering_over = null;
     }
 };
+
+/** @const
+    @type {GameObjectId} */
+GameObject.DEAD_ID = 'DEAD';
+/** @const
+    @type {GameObjectId} */
+GameObject.VIRTUAL_ID = 'VIRTUAL';
 
 // pull raw combat stats from gamedata and initialize non-gamedata values
 
@@ -4190,12 +4187,14 @@ MapBlockingGameObject.prototype.is_blocker = function() { return true; };
 
 /** @override */
 MapBlockingGameObject.prototype.on_added_to_world = function(world) {
+    goog.base(this, 'on_added_to_world', world);
     if(this.world !== null) { throw Error('already added to world'); }
     this.world = world;
     this.update_map(null, [this.x,this.y], this.is_destroyed(), 'on_added_to_world');
 };
 /** @override */
 MapBlockingGameObject.prototype.on_removed_from_world = function(world) {
+    goog.base(this, 'on_removed_from_world', world);
     if(this.world !== world) { throw Error('not added to world world'); }
     this.world = null;
     this.update_map(world, [this.x,this.y], this.is_destroyed(), 'on_removed_from_world');
@@ -7697,8 +7696,8 @@ Mobile.prototype.apply_snapshot = function(snap) {
 };
 
 /** @override */
-Mobile.prototype.dispose = function() {
-    goog.base(this, 'dispose');
+Mobile.prototype.on_removed_from_world = function(world) {
+    goog.base(this, 'on_removed_from_world', world);
     if(this.is_under_repair()) {
         for(var i = 0; i < player.unit_repair_queue.length; i++) {
             var item = player.unit_repair_queue[i];
@@ -7725,7 +7724,7 @@ Mobile.prototype.dispose = function() {
                 delete player.my_army[this.id];
             }
         }
-    } else if(session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) {
+    } else if(world === session.get_real_world() && session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) { // XXX move into Session
         session.incoming_attack_units_destroyed += 1;
     }
 };
@@ -15759,7 +15758,7 @@ function invoke_recycle_dialog(obj) {
                     session.get_real_world().lazy_update_citizens();
                 }
                 if(session.get_real_world().objects.has_object(_obj['obj_id'])) {
-                    session.get_real_world().remove_object(session.get_real_world().objects.get_object(_obj['obj_id']));
+                    session.get_real_world().objects.rem_object(session.get_real_world().objects.get_object(_obj['obj_id']));
                 }
                 session.clear_building_idle_state_caches();
             }
@@ -15772,7 +15771,7 @@ function invoke_recycle_dialog(obj) {
                     delete player.my_army[_obj.id];
                     session.get_real_world().lazy_update_citizens();
                 }
-                session.get_real_world().remove_object(_obj);
+                session.get_real_world().objects.rem_object(_obj);
                 session.clear_building_idle_state_caches();
             }
         }
@@ -24187,7 +24186,7 @@ function invoke_unit_donation_dialog(req) {
                     }
                     // remove from session
                     if(session.get_real_world().objects.has_object(obj_id)) {
-                        session.get_real_world().remove_object(session.get_real_world().objects.get_object(obj_id));
+                        session.get_real_world().objects.rem_object(session.get_real_world().objects.get_object(obj_id));
                     }
                 });
             } else {
@@ -43641,7 +43640,7 @@ function handle_server_message(data) {
             return;
         }
         var obj = world.objects.get_object(id);
-        world.remove_object(obj);
+        world.objects.rem_object(obj);
         if(msg == "OBJECT_REMOVED") {
             update_resources(data[2], false);
         }
