@@ -72,6 +72,8 @@ goog.require('buzz');
 goog.require('Traceback');
 goog.require('Citizens');
 
+/** @param {?} x
+    @return {?} */
 function deepcopy(x) {
     if(x === undefined) {
         throw Error('attempt to deepcopy() undefined');
@@ -85,6 +87,8 @@ function deepcopy(x) {
         return x;
     };
 }
+/** @param {!Object} obj
+    @return {!Object} */
 function deepcopy_obj(obj) {
     var ret = {};
     for(var k in obj) {
@@ -92,6 +96,8 @@ function deepcopy_obj(obj) {
     }
     return ret;
 };
+/** @param {!Array} x
+    @return {!Array} */
 function deepcopy_array(x) {
     var ret = Array(x.length);
     for(var i = 0; i < x.length; i++) {
@@ -99,6 +105,50 @@ function deepcopy_array(x) {
     }
     return ret;
 };
+
+/** @param {!Object} x
+    @param {!Object} y
+    @return {boolean} */
+function deepequal_obj(x, y) {
+    for(var kx in x) {
+        if(!(kx in y) || !deepequal(x[kx], y[kx])) {
+            return false;
+        }
+    }
+    for(var ky in y) {
+        if(!(ky in x)) { return false;}
+    }
+    return true;
+};
+/** @param {!Array} x
+    @param {!Array} y
+    @return {boolean} */
+function deepequal_array(x, y) {
+    if(x.length !== y.length) { return false; }
+    for(var i = 0; i < x.length; i++) {
+        if(!deepequal(x[i], y[i])) { return false; }
+    }
+    return true;
+};
+/** @param {?} x
+    @param {?} y
+    @return {boolean} */
+function deepequal(x,y) {
+    if((x && !y) || (!x && y)) { return false; }
+    if(x === undefined || y === undefined) {
+        throw Error('attempt to deepequal() undefined');
+    } else if(x === null) {
+        return y === null;
+    } else if(x instanceof Array) {
+        if(!(y instanceof Array)) { throw Error('deepequal() of Array and non-Array'); }
+        return deepequal_array(x, y);
+    } else if(typeof(x) === 'object') {
+        if(typeof(y) !== 'object') { throw Error('deepequal() of Object and non-Object'); }
+        return deepequal_obj(x, y);
+    } else {
+        return x === y;
+    };
+}
 
 // detect whether browser has touch-screen events
 var touch_modes = {
@@ -506,6 +556,54 @@ function reverse_digits(n) {
     }
     return ret;
 }
+
+/** Return human-readable "diff" between two versions of a JSON structure
+    @param {?} a
+    @param {?} b
+    @param {string=} prefix
+    @return {string|null} */
+function json_diff(a, b, prefix) {
+    if(!prefix) { prefix = ''; }
+    var retlist = [];
+    if(a instanceof Array) {
+        if(!(b instanceof Array)) { throw Error('type mismatch'); }
+        if(a.length != b.length) {
+            retlist.push(prefix+' array length change');
+        } else {
+            for(var i = 0; i < a.length; i++) {
+                var subdiff = json_diff(a[i], b[i], prefix+'/'+i.toString());
+                if(subdiff) {
+                    retlist.push(subdiff);
+                }
+            }
+        }
+    } else if(typeof(a) === 'object' && a !== null) {
+        if(typeof(b) !== 'object') { throw Error('type mismatch'); }
+        for(var ka in a) {
+            if(!(ka in b)) {
+                retlist.push(prefix+'/'+ka+' property disappeared');
+            } else {
+                var subdiff = json_diff(a[ka], b[ka], prefix+'/'+ka);
+                if(subdiff) {
+                    retlist.push(subdiff);
+                }
+            }
+        }
+        for(var kb in b) {
+            if(!(kb in a)) {
+                retlist.push(prefix+'/'+kb+' new property');
+            }
+        }
+    } else if(a === null || typeof(a) === 'number' || typeof(a) === 'string' || typeof(a) === 'boolean') {
+        if(b !== null && a !== null && typeof(b) !== typeof(a)) { throw Error('type mismatch'); }
+        if(a != b) {
+            retlist.push(prefix+' '+(a === null ? 'null' : a.toString())+' -> '+(b === null ? 'null' : b.toString()));
+        }
+    } else {
+        throw Error('unhandled value '+JSON.stringify(a));
+    }
+    return (retlist.length >= 1 ? retlist.join('\n') : null);
+};
 
 function current_pvp_week() {
     return Math.floor((player.get_absolute_time() - gamedata['matchmaking']['week_origin'])/(7*24*60*60));
