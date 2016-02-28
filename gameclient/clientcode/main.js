@@ -8465,7 +8465,7 @@ Mobile.prototype.run_control = function(world) {
 
 /** @param {!SPFX.FXWorld} fxworld */
 Mobile.prototype.add_movement_effect = function(fxworld) {
-    if(this.control_state === control_states.CONTROL_MOVING &&
+    if(!this.is_destroyed() && this.control_state === control_states.CONTROL_MOVING &&
        ('movement_effect' in this.spec)) {
         fxworld.add_visual_effect_at_time(this.pos, this.altitude, [0,1,0], client_time, this.spec['movement_effect'], true, null);
     }
