@@ -1107,7 +1107,8 @@ var ai_states = {
     AI_ATTACK_STATIONARY : 4, // do not move, but shoot anything that comes within range
     AI_ATTACK_MOVE : 5, // StarCraft-style A-move: move towards ai_dest but stop and shoot if target comes in range
     AI_ATTACK_MOVE_AGGRO : 6, // like A-move, but pursue enemies within aggro radius (which is longer than weapon range)
-    AI_DEFEND_MOVE : 7 // like regular move, but flip info A-move if attacked
+    AI_DEFEND_MOVE : 7, // like regular move, but flip info A-move if attacked
+    AI_NULL : 8 // disable AI - unlike AI_STOP, this won't touch any control values
 };
 var ai_state_names = {};
 ai_state_names[ai_states.AI_STOP] = 'AI_STOP';
@@ -1118,6 +1119,7 @@ ai_state_names[ai_states.AI_ATTACK_STATIONARY] = 'AI_ATTACK_STATIONARY';
 ai_state_names[ai_states.AI_ATTACK_MOVE] = 'AI_ATTACK_MOVE';
 ai_state_names[ai_states.AI_ATTACK_MOVE_AGGRO] = 'AI_ATTACK_MOVE_AGGRO';
 ai_state_names[ai_states.AI_DEFEND_MOVE] = 'AI_DEFEND_MOVE';
+ai_state_names[ai_states.AI_NULL] = 'AI_NULL';
 
 var ai_state_values = {
     'AI_STOP': ai_states.AI_STOP,
@@ -1127,7 +1129,8 @@ var ai_state_values = {
     'AI_ATTACK_STATIONARY': ai_states.AI_ATTACK_STATIONARY,
     'AI_ATTACK_MOVE': ai_states.AI_ATTACK_MOVE,
     'AI_ATTACK_MOVE_AGGRO': ai_states.AI_ATTACK_MOVE_AGGRO,
-    'AI_DEFEND_MOVE': ai_states.AI_DEFEND_MOVE
+    'AI_DEFEND_MOVE': ai_states.AI_DEFEND_MOVE,
+    'AI_NULL': ai_states.AI_NULL
 };
 function ai_state_can_be_queued(state) {
     return (state == ai_states.AI_ATTACK_SPECIFIC || state == ai_states.AI_MOVE || state == ai_states.AI_ATTACK_MOVE || state == ai_states.AI_ATTACK_MOVE_AGGRO || state == ai_states.AI_DEFEND_MOVE);
@@ -1362,6 +1365,7 @@ GameObject.unserialize = function(snap) {
     obj.spec = spec;
     obj.id = snap['obj_id'];
     obj.apply_snapshot(snap);
+    obj.ai_state = ai_states.AI_NULL; // turn off AI
     return obj;
 };
 
