@@ -100,3 +100,9 @@ GameTypes.ISerializable = function() {};
 GameTypes.ISerializable.prototype.serialize;
 /** @param {!Object<string,?>} snap */
 GameTypes.ISerializable.prototype.apply_snapshot;
+
+/** @interface for incremental snapshotting
+    @extends {GameTypes.ISerializable} */
+GameTypes.IIncrementallySerializable = function() {};
+/** @return {Object<string,?>|null} */
+GameTypes.IIncrementallySerializable.prototype.serialize_incremental;

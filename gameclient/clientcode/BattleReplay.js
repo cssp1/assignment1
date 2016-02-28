@@ -48,6 +48,7 @@ BattleReplay.Recorder = function(world) {
     // base snapshot is grabbed once at the start, since it won't change during the recording
     this.base_snapshot = null;
     this.snapshots = [];
+    this.use_incremental = true;
     this.listen_keys = {};
 };
 BattleReplay.Recorder.prototype.start = function() {
@@ -61,10 +62,11 @@ BattleReplay.Recorder.prototype.start = function() {
 BattleReplay.Recorder.prototype.before_control = function(event) {
     console.log('Snapshot '+this.snapshots.length.toString()+' at '+this.world.last_tick_time.toString());
     this.snapshots.push({'tick_time': this.world.last_tick_time,
-                         'objects': this.world.objects.serialize()});
+                         'objects': (this.use_incremental && this.snapshots.length >= 1 ? this.world.objects.serialize_incremental() : this.world.objects.serialize())});
 };
 BattleReplay.Recorder.prototype.before_damage_effects = function(event) {
-    this.snapshots[this.snapshots.length-1]['combat_engine'] = this.world.combat_engine.serialize();
+    this.snapshots[this.snapshots.length-1]['combat_engine'] =
+        (this.use_incremental && this.snapshots.length >= 2 ? this.world.combat_engine.serialize_incremental() : this.world.combat_engine.serialize());
 };
 BattleReplay.Recorder.prototype.stop = function() {
     goog.array.forEach(goog.object.getKeys(this.listen_keys), function(k) {
@@ -96,6 +98,7 @@ BattleReplay.Player = function(base_snapshot, snapshots) {
                         'before_damage_effects': this.world.listen('before_damage_effects', this.before_damage_effects, false, this)};
 };
 BattleReplay.Player.prototype.before_control = function(event) {
+    console.log('Applying snapshot '+this.index.toString()+' at '+this.world.last_tick_time.toString());
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
 };
 BattleReplay.Player.prototype.before_damage_effects = function(event) {

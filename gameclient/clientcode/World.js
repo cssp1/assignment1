@@ -43,7 +43,7 @@ goog.inherits(World.ObjectRemovedEvent, goog.events.Event);
 
 /** Encapsulates the renderable/simulatable "world"
     @constructor @struct
-    @implements {GameTypes.ISerializable}
+    @implements {GameTypes.IIncrementallySerializable}
     @param {!Base.Base} base
     @param {!Array<!GameObject>} objects
     @param {boolean} enable_citizens
@@ -439,10 +439,17 @@ World.World.prototype.serialize = function() {
             'objects': this.objects.serialize()
            };
 };
-
+/** @override */
+World.World.prototype.serialize_incremental = function() {
+    return {'combat_engine': this.combat_engine.serialize_incremental(),
+            'objects': this.objects.serialize_incremental()
+           };
+};
 /** @override */
 World.World.prototype.apply_snapshot = function(snap) {
-    this.base.apply_snapshot(snap['base']);
+    if('base' in snap) {
+        this.base.apply_snapshot(snap['base']);
+    }
     this.combat_engine.apply_snapshot(snap['combat_engine']);
     this.objects.apply_snapshot(snap['objects']);
 };

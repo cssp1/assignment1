@@ -1150,7 +1150,7 @@ var GameObjectId = {};
 var TeamId = {};
 
 /** @constructor - XXX not ready for struct yet
-    @implements {GameTypes.ISerializable}
+    @implements {GameTypes.IIncrementallySerializable}
  */
 function GameObject() {
     /** @type {GameObjectId} */
@@ -1281,10 +1281,14 @@ function GameObject() {
     this.permanent_effect_source = null;
     /** @type {SPFX.FXObject|null} */
     this.permanent_effect = null;
+
+    // for incremental serialization only
+    this.serialization_dirty = false;
 }
 
 /** @override */
 GameObject.prototype.serialize = function() {
+    this.serialization_dirty = false;
     return {'obj_id': this.id,
             'spec': this.spec['name'],
             'x': this.x,
@@ -1307,6 +1311,14 @@ GameObject.prototype.serialize = function() {
     };
 };
 /** @override */
+GameObject.prototype.serialize_incremental = function() {
+    if(this.serialization_dirty) {
+        return this.serialize();
+    }
+    return null;
+};
+
+/** @override */
 GameObject.prototype.apply_snapshot = function(snap) {
     if(snap['obj_id'] !== this.id) { throw Error('obj_id mismatch'); }
     if(snap['spec'] !== this.spec['name']) { throw Error('specname mismatch'); }
@@ -1321,7 +1333,7 @@ GameObject.prototype.apply_snapshot = function(snap) {
     this.control_target_id = snap['control_target_id'];
     this.control_spellname = snap['control_spellname'];
     this.control_cooldown = snap['control_cooldown'];
-    this.combat_stats = snap['combat_stats']; // ?
+    this.combat_stats = snap['combat_stats'];
     this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this);
     this.cooldowns = snap['cooldowns'];
     this.cur_facing = snap['cur_facing'];
@@ -2254,11 +2266,14 @@ function calculate_battle_outcome() {
 GameObject.prototype.run_control = function(world) {
     if(this.control_cooldown > 0) {
         this.control_cooldown -= 1;
+        this.serialization_dirty = true;
     }
 
     if(this.combat_stats.stunned) { return; }
 
     if(this.control_state === control_states.CONTROL_SHOOT) {
+        this.serialization_dirty = true;
+
         var target = world.objects._get_object(this.control_target_id);
 
         // turn to face target
@@ -2348,6 +2363,7 @@ GameObject.prototype.run_control = function(world) {
             if(this.target_facing > 2*Math.PI) {
                 this.target_facing -= 2*Math.PI;
             }
+            //this.serialization_dirty = true; ?
         }
     }
 
@@ -2361,6 +2377,7 @@ GameObject.prototype.run_control = function(world) {
         (!this.is_destroyed() &&
          this.control_state === control_states.CONTROL_STOP &&
          !(this.is_building() && (this.is_under_construction() || this.is_upgrading() || this.is_repairing() || this.disarmed))))) {
+        this.serialization_dirty = true;
         this.cast_client_spell(world, continuous_spell, gamedata['spells'][continuous_spell], null, null);
     }
 };
@@ -7629,7 +7646,7 @@ function Mobile() {
 
     /** @type {!Array.<number>} */
     this.pos = [-1,-1]; // position at end of last computed tick
-    /** @type {Array.<number>} */
+    /** @type {!Array.<number>} */
     this.vel = [0,0];     // velocity at end of last computed tick
     /** @type {!Array.<number>} */
     this.next_pos = [-1,-1]; // position at beginning of next tick
@@ -8191,10 +8208,14 @@ Mobile.prototype.run_control = function(world) {
     if(this.control_state === control_states.CONTROL_STOP ||
        this.control_state === control_states.CONTROL_SHOOT) {
         // stop at end of this tick's motion
-        this.pos = this.next_pos;
-        this.vel = [0,0];
+        if(!vec_equals(this.pos, this.next_pos) || !vec_equals(this.vel, [0,0])) {
+            this.serialization_dirty = true;
+            this.pos = this.next_pos;
+            this.vel = [0,0];
+        }
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
+        this.serialization_dirty = true;
         var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
         if(this.dest === null) { throw Error('dest must be non-null here '+this.spec['name']+' '+this.id); }
 

@@ -46,7 +46,7 @@ CombatEngine.Pos2D.sub = function(a, b) {
 };
 
 /** @constructor @struct
-    @implements {GameTypes.ISerializable} */
+    @implements {GameTypes.IIncrementallySerializable} */
 CombatEngine.CombatEngine = function() {
     /** @type {!GameTypes.TickCount} */
     this.cur_tick = new GameTypes.TickCount(0);
@@ -58,21 +58,35 @@ CombatEngine.CombatEngine = function() {
         @private
         @type {Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
+    this.damage_effect_queue_dirty = false; // for incremental serialization
 };
 
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize = function() {
+    this.damage_effect_queue_dirty = false;
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
             'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this)};
 };
 /** @override */
+CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
+    var ret = {'cur_tick': this.cur_tick.get(),
+               'cur_client_time': this.cur_client_time};
+    if(this.damage_effect_queue_dirty) {
+        ret['damage_effect_queue'] = goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this);
+        this.damage_effect_queue_dirty = false;
+    }
+    return ret;
+};
+/** @override */
 CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
     this.cur_tick = new GameTypes.TickCount(snap['cur_tick']);
     this.cur_client_time = snap['cur_client_time'];
-    this.damage_effect_queue = goog.array.map(snap['damage_effect_queue'], function(/** !Object<string,?> */ effect_snap) {
-        return this.unserialize_damage_effect(effect_snap);
-    }, this);
+    if('damage_effect_queue' in snap) {
+        this.damage_effect_queue = goog.array.map(snap['damage_effect_queue'], function(/** !Object<string,?> */ effect_snap) {
+            return this.unserialize_damage_effect(effect_snap);
+        }, this);
+    }
 };
 
 /** @param {!Object<string,?>} snap
@@ -130,6 +144,7 @@ CombatEngine.DamageEffect.prototype.apply_snapshot = goog.abstractMethod; // imm
 /** @param {!CombatEngine.DamageEffect} effect */
 CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     this.damage_effect_queue.push(effect);
+    this.damage_effect_queue_dirty = true;
 };
 
 /** @param {!World.World} world
@@ -142,6 +157,7 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
                      (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
+            this.damage_effect_queue_dirty = true;
             effect.apply(world);
         }
     }
