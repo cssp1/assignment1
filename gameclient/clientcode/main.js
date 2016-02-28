@@ -1385,11 +1385,12 @@ function GameObject() {
 
     // for incremental serialization only
     this.serialization_dirty = false;
+    /** @type {Object<string,?>|null} */
+    this.prev_snapshot = null;
 }
 
 /** @override */
 GameObject.prototype.serialize = function() {
-    this.serialization_dirty = false;
     return {'obj_id': this.id,
             'spec': this.spec['name'],
             'x': this.x,
@@ -1409,37 +1410,53 @@ GameObject.prototype.serialize = function() {
             'cur_facing': this.cur_facing,
             'next_facing': this.next_facing,
             'target_facing': this.target_facing
-    };
+           };
 };
 /** @override */
 GameObject.prototype.serialize_incremental = function() {
+    if(!this.prev_snapshot) {
+        this.prev_snapshot = this.serialize();
+        return this.prev_snapshot;
+    }
     if(this.serialization_dirty) {
-        return this.serialize();
+        var new_snapshot = this.serialize();
+        /** @const fields that always should be updated (because run_control() and damage mutate them unpredictably) */
+        var always_diff = {'hp':1, 'cur_facing':1, 'next_facing':1, 'target_facing':1};
+        var diffs = {};
+        goog.object.forEach(new_snapshot, function(v, k) {
+            if((k in always_diff) || !deepequal(this.prev_snapshot[k], v)) {
+                diffs[k] = v;
+            }
+        }, this);
+
+        this.prev_snapshot = new_snapshot;
+        this.serialization_dirty = false;
+        return diffs;
     }
     return null;
 };
 
 /** @override */
 GameObject.prototype.apply_snapshot = function(snap) {
-    if(snap['obj_id'] !== this.id) { throw Error('obj_id mismatch'); }
-    if(snap['spec'] !== this.spec['name']) { throw Error('specname mismatch'); }
-    this.x = snap['x'];
-    this.y = snap['y'];
-    this.hp = snap['hp'];
-    this.max_hp = snap['max_hp'];
-    this.team = (snap['owner'] === session.user_id ? 'player' : 'enemy');
-    this.level = snap['level'];
-    this.equipment = snap['equipment'];
-    this.control_state = snap['control_state'];
-    this.control_target_id = snap['control_target_id'];
-    this.control_spellname = snap['control_spellname'];
-    this.control_cooldown = snap['control_cooldown'];
-    this.combat_stats = snap['combat_stats'];
-    this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this);
-    this.cooldowns = snap['cooldowns'];
-    this.cur_facing = snap['cur_facing'];
-    this.next_facing = snap['next_facing'];
-    this.target_facing = snap['target_facing'];
+    if(('obj_id' in snap) && snap['obj_id'] !== this.id) { throw Error('obj_id mismatch'); }
+    if(('spec' in snap) && snap['spec'] !== this.spec['name']) { throw Error('specname mismatch'); }
+    if('x' in snap) { this.x = snap['x']; }
+    if('y' in snap) { this.y = snap['y']; }
+    if('hp' in snap) { this.hp = snap['hp']; }
+    if('max_hp' in snap) { this.max_hp = snap['max_hp']; }
+    if('owner' in snap) { this.team = (snap['owner'] === session.user_id ? 'player' : 'enemy'); }
+    if('level' in snap) { this.level = snap['level']; }
+    if('equipment' in snap) { this.equipment = snap['equipment']; }
+    if('control_state' in snap) { this.control_state = snap['control_state']; }
+    if('control_target_id' in snap) { this.control_target_id = snap['control_target_id']; }
+    if('control_spellname' in snap) { this.control_spellname = snap['control_spellname']; }
+    if('control_cooldown' in snap) { this.control_cooldown = snap['control_cooldown']; }
+    if('combat_stats' in snap) { this.combat_stats = snap['combat_stats']; }
+    if('auras' in snap) { this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this); }
+    if('cooldowns' in snap) { this.cooldowns = snap['cooldowns']; }
+    if('cur_facing' in snap) { this.cur_facing = snap['cur_facing']; }
+    if('next_facing' in snap) { this.next_facing = snap['next_facing']; }
+    if('target_facing' in snap) { this.target_facing = snap['target_facing']; }
 };
 
 /** @param {!Object<string,?>} snap
@@ -2465,7 +2482,7 @@ GameObject.prototype.run_control = function(world) {
             if(this.target_facing > 2*Math.PI) {
                 this.target_facing -= 2*Math.PI;
             }
-            //this.serialization_dirty = true; ?
+            //this.serialization_dirty = true; // XXXXXX make predictable
         }
     }
 
@@ -4490,7 +4507,7 @@ Inert.prototype.serialize = function() {
 /** @override */
 Inert.prototype.apply_snapshot = function(snap) {
     goog.base(this, 'apply_snapshot', snap);
-    this.metadata = snap['metadata'];
+    if('metadata' in snap) { this.metadata = snap['metadata']; }
 };
 /** @override as a special case, "flat" inert objects are pushed backwards in Z order */
 Inert.prototype.calc_draw_pos = function(world) {
@@ -4566,14 +4583,14 @@ goog.inherits(Building, MapBlockingGameObject);
 Building.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
     ret['disarmed'] = this.disarmed;
-    ret['modstats'] = deepcopy_obj(this.modstats); // ?
+    ret['modstats'] = deepcopy_obj(this.modstats);
     return ret;
 };
 /** @override */
 Building.prototype.apply_snapshot = function(snap) {
     goog.base(this, 'apply_snapshot', snap);
-    this.disarmed = snap['disarmed'];
-    this.modstats = snap['modstats'];
+    if('disarmed' in snap) { this.disarmed = snap['disarmed']; }
+    if('modstats' in snap) { this.modstats = snap['modstats']; }
 };
 
 Building.prototype.request_sync = function() { this.sync_marker = synchronizer.request_sync(); return this.sync_marker; };
@@ -7781,37 +7798,37 @@ goog.inherits(Mobile, GameObject);
 /** @override */
 Mobile.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
-    ret['orders'] = deepcopy_array(this.orders);
-    ret['patrol'] = this.patrol;
+    //ret['orders'] = deepcopy_array(this.orders);
+    ret['patrol'] = this.patrol; // might be needed for facing
     ret['temporary'] = this.temporary;
     ret['squad_id'] = this.squad_id;
-    ret['ai_dest'] = this.ai_dest;
-    ret['ai_aggressive'] = this.ai_aggressive;
-    ret['pos'] = this.pos;
+    //ret['ai_dest'] = (this.ai_dest ? deepcopy_array(this.ai_dest) : null);
+    //ret['ai_aggressive'] = this.ai_aggressive;
+    ret['pos'] = deepcopy_array(this.pos);
     ret['vel'] = this.vel;
-    ret['next_pos'] = this.next_pos;
-    ret['dest'] = this.dest;
-    ret['path_valid'] = this.path_valid;
-    ret['path'] = deepcopy_array(this.path);
-    ret['stuck_loc'] = this.stuck_loc;
+    ret['next_pos'] = deepcopy_array(this.next_pos);
+    ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // XXX only needed for facing I think
+    ret['path_valid'] = this.path_valid; // XXX only needed for facing
+    ret['path'] = deepcopy_array(this.path); // XXX only needed for facing
+    ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null);
     return ret;
 };
 /** @override */
 Mobile.prototype.apply_snapshot = function(snap) {
     goog.base(this, 'apply_snapshot', snap);
-    this.orders = snap['orders'];
-    this.patrol = snap['patrol'];
-    this.temporary = snap['temporary'];
-    this.squad_id = snap['squad_id'];
-    this.ai_dest = snap['ai_dest'];
-    this.ai_aggressive = snap['ai_aggressive'];
-    this.pos = snap['pos'];
-    this.vel = snap['vel'];
-    this.next_pos = snap['next_pos'];
-    this.dest = snap['dest'];
-    this.path_valid = snap['path_valid'];
-    this.path = snap['path'];
-    this.stuck_loc = snap['stuck_loc'];
+    //if('orders' in snap) { this.orders = snap['orders']; }
+    if('patrol' in snap) { this.patrol = snap['patrol']; }
+    if('temporary' in snap) { this.temporary = snap['temporary']; }
+    if('squad_id' in snap) { this.squad_id = snap['squad_id']; }
+    //if('ai_dest' in snap) { this.ai_dest = snap['ai_dest']; }
+    //if('ai_aggressive' in snap) { this.ai_aggressive = snap['ai_aggressive']; }
+    if('pos' in snap) { this.pos = snap['pos']; }
+    if('vel' in snap) { this.vel = snap['vel']; }
+    if('next_pos' in snap) { this.next_pos = snap['next_pos']; }
+    if('dest' in snap) { this.dest = snap['dest']; } // XXX only needed for facing I think
+    if('path_valid' in snap) { this.path_valid = snap['path_valid']; } // XXX only needed for facing I think
+    if('path' in snap) { this.path = snap['path']; } // XXX only needed for facing I think
+    if('stuck_loc' in snap) { this.stuck_loc = snap['stuck_loc']; }
 };
 
 /** @override */

@@ -58,12 +58,11 @@ CombatEngine.CombatEngine = function() {
         @private
         @type {Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
-    this.damage_effect_queue_dirty = false; // for incremental serialization
+    this.damage_effect_queue_dirty = true; // for incremental serialization
 };
 
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize = function() {
-    this.damage_effect_queue_dirty = false;
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
             'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this)};

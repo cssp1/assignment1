@@ -45,11 +45,9 @@ BattleReplay.invoke = function(log) {
     @param {!World.World} world */
 BattleReplay.Recorder = function(world) {
     this.world = world;
-    // base snapshot is grabbed once at the start, since it won't change during the recording
-    this.base_snapshot = null;
     this.snapshots = [];
-    this.use_incremental = true;
     this.listen_keys = {};
+    this.diff_snap = null;
 };
 BattleReplay.Recorder.prototype.start = function() {
     if('before_control' in this.listen_keys) { throw Error('already started'); }
@@ -57,17 +55,42 @@ BattleReplay.Recorder.prototype.start = function() {
     // need to grab objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys['before_control'] = this.world.listen('before_control', this.before_control, false, this);
     this.listen_keys['before_damage_effects'] = this.world.listen('before_damage_effects', this.before_damage_effects, false, this);
-    this.base_snapshot = this.world.base.serialize();
+    this.listen_keys['after_damage_effects'] = this.world.listen('after_damage_effects', this.after_damage_effects, false, this);
 };
+/** @private
+    @param {string} reason */
+BattleReplay.Recorder.prototype.compare_snapshots = function(reason) {
+    if(this.diff_snap) {
+        var new_snap = this.world.objects.serialize();
+        console.log(reason +' diffs:');
+        console.log(json_diff(this.diff_snap, new_snap));
+        this.diff_snap = new_snap;
+    }
+};
+
 BattleReplay.Recorder.prototype.before_control = function(event) {
+
     console.log('Snapshot '+this.snapshots.length.toString()+' at '+this.world.last_tick_time.toString());
-    this.snapshots.push({'tick_time': this.world.last_tick_time,
-                         'objects': (this.use_incremental && this.snapshots.length >= 1 ? this.world.objects.serialize_incremental() : this.world.objects.serialize())});
+    var snap = {'tick_time': this.world.last_tick_time,
+                'objects': this.world.objects.serialize_incremental()};
+    if(this.snapshots.length < 1) {
+        snap['base'] = this.world.base.serialize();
+    }
+    this.snapshots.push(snap);
+
+    // uncomment this line to enable checking which fields mutated across the World control passes
+    // XXX note: this breaks playback since the incremental serialization is stateful
+    //this.diff_snap = this.world.objects.serialize();
 };
 BattleReplay.Recorder.prototype.before_damage_effects = function(event) {
-    this.snapshots[this.snapshots.length-1]['combat_engine'] =
-        (this.use_incremental && this.snapshots.length >= 2 ? this.world.combat_engine.serialize_incremental() : this.world.combat_engine.serialize());
+    this.compare_snapshots('run_control');
+
+    this.snapshots[this.snapshots.length-1]['combat_engine'] = this.world.combat_engine.serialize_incremental();
 };
+BattleReplay.Recorder.prototype.after_damage_effects = function(event) {
+    this.compare_snapshots('damage effects');
+};
+
 BattleReplay.Recorder.prototype.stop = function() {
     goog.array.forEach(goog.object.getKeys(this.listen_keys), function(k) {
         this.world.unlistenByKey(this.listen_keys[k]);
@@ -78,17 +101,17 @@ BattleReplay.Recorder.prototype.stop = function() {
 
 /** @param {!BattleReplay.Recorder} recorder */
 BattleReplay.replay = function(recorder) {
-    if(!recorder.base_snapshot || recorder.snapshots.length < 1) { throw Error('recorded not initialized'); }
-    return new BattleReplay.Player(recorder.base_snapshot, recorder.snapshots);
+    if(recorder.snapshots.length < 1) { throw Error('recorded not initialized'); }
+    return new BattleReplay.Player(recorder.snapshots);
 };
 
 /** @constructor @struct
-    @param {!Object} base_snapshot
     @param {!Array<!Object>} snapshots */
-BattleReplay.Player = function(base_snapshot, snapshots) {
+BattleReplay.Player = function(snapshots) {
     if(snapshots.length < 1) { throw Error('no snapshots'); }
+    if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
     this.snapshots = snapshots;
-    this.world = new World.World(new Base.Base(base_snapshot['base_id'], base_snapshot), [], false);
+    this.world = new World.World(new Base.Base(snapshots[0]['base']['base_id'], snapshots[0]['base']), [], false);
     //this.world.ai_paused = true;
     //this.world.control_paused = true;
     this.index = 0;
@@ -99,6 +122,9 @@ BattleReplay.Player = function(base_snapshot, snapshots) {
 };
 BattleReplay.Player.prototype.before_control = function(event) {
     console.log('Applying snapshot '+this.index.toString()+' at '+this.world.last_tick_time.toString());
+    if(this.index === 0) {
+        this.world.objects.clear();
+    }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
 };
 BattleReplay.Player.prototype.before_damage_effects = function(event) {

@@ -147,8 +147,6 @@ GameObjectCollection.GameObjectCollection.prototype.serialize = function() {
     for(var id in this.objects) {
         ret['full'][id] = this.objects[id].serialize();
     }
-    this.dirty_removed = {};
-    this.dirty_added = {};
     return ret;
 };
 
@@ -160,7 +158,7 @@ GameObjectCollection.GameObjectCollection.prototype.serialize_incremental = func
         ret['removed'] = snap_removed;
     }
     var snap_added = goog.object.map(this.dirty_added, function(_, /** GameObjectId */ id) { // full state
-        return this.objects[id].serialize();
+        return this.objects[id].serialize_incremental(); // assumes this is its first serialization!
     }, this);
     if(goog.object.getCount(snap_added) > 0) {
         ret['added'] = snap_added;

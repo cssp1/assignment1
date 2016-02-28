@@ -434,14 +434,16 @@ World.World.prototype.run_unit_ticks = function() {
 
 /** @override */
 World.World.prototype.serialize = function() {
-    return {'base': this.base.serialize(),
+    return {'tick_time': this.last_tick_time,
+            'base': this.base.serialize(),
             'combat_engine': this.combat_engine.serialize(),
             'objects': this.objects.serialize()
            };
 };
 /** @override */
 World.World.prototype.serialize_incremental = function() {
-    return {'combat_engine': this.combat_engine.serialize_incremental(),
+    return {'tick_time': this.last_tick_time,
+            'combat_engine': this.combat_engine.serialize_incremental(),
             'objects': this.objects.serialize_incremental()
            };
 };
@@ -631,6 +633,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
     target.hp -= damage;
     target.last_attacker = source;
     target.state_dirty |= obj_state_flags.HP;
+    target.serialization_dirty = true;
 
     if(target.is_building()) {
         // immediately show that repair/research/upgrade/production stops in the UI. Subsequent OBJECT_STATE_UPDATE will return correct HP value and start/stop times.
