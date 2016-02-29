@@ -373,7 +373,10 @@ function vec_normalized(v) {
     return [v[0]/len, v[1]/len];
 }
 
+/** @const */
 var POSITION_EPSILON = 0.01;
+/** @const */
+var ANGLE_EPSILON = 0.001;
 
 /** @param {!Array.<number>} v
     @param {!Array.<number>} w
@@ -407,6 +410,19 @@ function vec_list_reversed(ls) {
 /** @param {!Array.<number>} v
     @return {string} */
 function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
+
+/** Constrain radian angle to be in the range [0, 2*PI]
+    @param {number} a
+    @return {number} */
+function normalize_angle(a) {
+    if(a < 0) {
+        return (a % (2*Math.PI)) + 2*Math.PI;
+    } else if(a >= 2*Math.PI) {
+        return a % (2*Math.PI);
+    } else {
+        return a;
+    }
+};
 
 function hex_slanted(a) {
     // transform to "slanted" coordinate system for easier distance computation
@@ -1822,6 +1838,7 @@ GameObject.prototype.update_facing = function() {
                     this.next_facing = this.cur_facing - turn_amount;
                 }
             }
+            this.next_facing = normalize_angle(this.next_facing);
         }
     }
 };
@@ -1847,7 +1864,24 @@ GameObject.prototype.interpolate_pos_for_draw = function(world) { return this.in
     @return {number} */
 GameObject.prototype.interpolate_facing = function(world) {
     var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
-    return this.cur_facing + progress*(this.next_facing - this.cur_facing);
+    if(progress <= 0) {
+        return this.cur_facing;
+    } else if(progress >= 1) {
+        return this.next_facing;
+    } else {
+        // Spherical linear interpolation - see https://en.wikipedia.org/wiki/Slerp
+        var cur = [Math.cos(this.cur_facing), Math.sin(this.cur_facing)];
+        var next = [Math.cos(this.next_facing), Math.sin(this.next_facing)];
+        var cur_dot_next = vec_dot(cur, next);
+        if(cur_dot_next >= 1 - ANGLE_EPSILON) { // avoid precision problems with very small angles
+            return this.next_facing;
+        }
+        var omega = Math.acos(cur_dot_next);
+        var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
+        var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
+        var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
+        return normalize_angle(Math.atan2(slerp[1], slerp[0]));
+    }
 };
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
@@ -2399,7 +2433,7 @@ GameObject.prototype.run_control = function(world) {
         if(target && 'turn_rate' in this.spec) {
             var dir = vec_sub(target.raw_pos(), this.raw_pos());
             if((dir[1]*dir[1]+dir[0]*dir[0]) > 0.0001) {
-                this.target_facing = Math.atan2(dir[1], dir[0]);
+                this.target_facing = normalize_angle(Math.atan2(dir[1], dir[0]));
             }
         }
 
@@ -2478,7 +2512,7 @@ GameObject.prototype.run_control = function(world) {
             var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
             incr *= this.combat_power_factor(); // turn more slowly if depowered
             if(this.anim_offset > 0.5) { incr *= -1; }
-            this.target_facing = this.next_facing + incr*TICK_INTERVAL;
+            this.target_facing = normalize_angle(this.next_facing + incr*TICK_INTERVAL);
             if(this.target_facing > 2*Math.PI) {
                 this.target_facing -= 2*Math.PI;
             }
@@ -8520,7 +8554,7 @@ Mobile.prototype.run_control = function(world) {
                 // unit-vector direction to destination
                 var dir = vec_scale(1/dist, to_dest);
                 this.vel = vec_scale(maxvel, dir);
-                this.target_facing = Math.atan2(this.vel[1], this.vel[0]);
+                this.target_facing = normalize_angle(Math.atan2(this.vel[1], this.vel[0]));
 
                 var can_move = true;
 
