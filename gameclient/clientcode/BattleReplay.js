@@ -112,7 +112,7 @@ BattleReplay.Player = function(snapshots) {
     if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
     this.snapshots = snapshots;
     this.world = new World.World(new Base.Base(snapshots[0]['base']['base_id'], snapshots[0]['base']), [], false);
-    //this.world.ai_paused = true;
+    this.world.ai_paused = true;
     //this.world.control_paused = true;
     this.index = 0;
 
@@ -124,6 +124,7 @@ BattleReplay.Player.prototype.before_control = function(event) {
     console.log('Applying snapshot '+this.index.toString()+' at '+this.world.last_tick_time.toString());
     if(this.index === 0) {
         this.world.objects.clear();
+        this.world.combat_engine.clear_queued_damage_effects();
     }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
 

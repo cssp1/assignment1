@@ -79,6 +79,8 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
     var ret = {'cur_tick': this.cur_tick.get(),
                'cur_client_time': this.cur_client_time};
+    // XXXXXX this doesn't work if the first calll happens with effects already queued,
+    // because the dirty list has been cleared of them already!
     if(this.damage_effect_queue_dirty_added.length > 0) {
         ret['damage_effect_queue_added'] = goog.array.map(this.damage_effect_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
         ret['damage_effect_queue_length'] = this.damage_effect_queue.length;
@@ -179,6 +181,12 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
     }
     goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
     return this.damage_effect_queue.length > 0;
+};
+
+/** For use by replay code */
+CombatEngine.CombatEngine.prototype.clear_queued_damage_effects = function() {
+    goog.array.clear(this.damage_effect_queue);
+    goog.array.clear(this.damage_effect_queue_dirty_added);
 };
 
 /** @return {boolean} */
