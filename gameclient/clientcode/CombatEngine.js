@@ -109,15 +109,15 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
     @return {!CombatEngine.DamageEffect} */
 CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
     if(snap['kind'] === 'KillDamageEffect') {
-        return new CombatEngine.KillDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['target_id']);
+        return new CombatEngine.KillDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id']);
     } else if(snap['kind'] === 'TargetedDamageEffect') {
-        return new CombatEngine.TargetedDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['target_id'], snap['amount'], snap['vs_table']);
+        return new CombatEngine.TargetedDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['vs_table']);
     } else if(snap['kind'] === 'TargetedAuraEffect') {
-        return new CombatEngine.TargetedAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['target_id'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table']);
+        return new CombatEngine.TargetedAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table']);
     } else if(snap['kind'] === 'AreaDamageEffect') {
-        return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['falloff'], snap['amount'], snap['vs_table'], snap['allow_ff']);
+        return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['falloff'], snap['amount'], snap['vs_table'], snap['allow_ff']);
     } else if(snap['kind'] === 'AreaAuraEffect') {
-        return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
+        return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
@@ -130,13 +130,15 @@ CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack - until SPFX can think in terms of ticks, have to use client_time instead of tick count for applicaiton
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
-CombatEngine.DamageEffect = function(tick, client_time_hack, source_id, amount, vs_table) {
+CombatEngine.DamageEffect = function(tick, client_time_hack, source_id, source_team, amount, vs_table) {
     this.tick = tick;
     this.client_time_hack = client_time_hack;
     this.source_id = source_id;
+    this.source_team = source_team;
     this.amount = amount;
     this.vs_table = vs_table;
 }
@@ -150,6 +152,7 @@ CombatEngine.DamageEffect.prototype.serialize = function() {
     ret = {'tick': this.tick.get(),
            'client_time_hack': this.client_time_hack,
            'source_id': this.source_id,
+           'source_team': this.source_team,
            'amount': this.amount,
            'vs_table': this.vs_table};
     return ret;
@@ -193,10 +196,11 @@ CombatEngine.CombatEngine.prototype.has_queued_damage_effects = function() {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!GameObjectId} target_id
 */
-CombatEngine.KillDamageEffect = function(tick, client_time_hack, source_id, target_id) {
-    goog.base(this, tick, client_time_hack, source_id, 0, null);
+CombatEngine.KillDamageEffect = function(tick, client_time_hack, source_id, source_team, target_id) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, 0, null);
     this.target_id = target_id;
 }
 goog.inherits(CombatEngine.KillDamageEffect, CombatEngine.DamageEffect);
@@ -232,12 +236,13 @@ CombatEngine.KillDamageEffect.prototype.apply = function(world) {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!GameObjectId} target_id
     @param {!GameTypes.Integer} amount
     @param {Object.<string,CombatEngine.Coeff>} vs_table
 */
-CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source_id, target_id, amount, vs_table) {
-    goog.base(this, tick, client_time_hack, source_id, amount, vs_table);
+CombatEngine.TargetedDamageEffect = function(tick, client_time_hack, source_id, source_team, target_id, amount, vs_table) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.target_id = target_id;
 }
 goog.inherits(CombatEngine.TargetedDamageEffect, CombatEngine.DamageEffect);
@@ -264,6 +269,7 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!GameObjectId} target_id
     @param {!GameTypes.Integer} amount
     @param {string} aura_name
@@ -272,8 +278,8 @@ CombatEngine.TargetedDamageEffect.prototype.apply = function(world) {
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
 */
-CombatEngine.TargetedAuraEffect = function(tick, client_time_hack, source_id, target_id, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table) {
-    goog.base(this, tick, client_time_hack, source_id, amount, vs_table);
+CombatEngine.TargetedAuraEffect = function(tick, client_time_hack, source_id, source_team, target_id, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.target_id = target_id;
     this.aura_name = aura_name;
     this.aura_duration = aura_duration;
@@ -303,7 +309,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     if(this.amount != 0) {
         var duration = GameTypes.TickCount.scale(get_damage_modifier(this.duration_vs_table, target), this.aura_duration);
         if(duration.is_nonzero()) {
-            target.create_aura(world, this.source_id, this.aura_name, this.amount, duration, this.aura_range, this.vs_table);
+            target.create_aura(world, this.source_id, this.source_team, this.aura_name, this.amount, duration, this.aura_range, this.vs_table);
         }
     }
 };
@@ -313,6 +319,7 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
     @param {boolean} hit_air
@@ -322,8 +329,8 @@ CombatEngine.TargetedAuraEffect.prototype.apply = function(world) {
     @param {Object.<string,CombatEngine.Coeff>} vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
-CombatEngine.AreaDamageEffect = function(tick, client_time_hack, source_id, target_location, hit_ground, hit_air, radius, falloff, amount, vs_table, allow_ff) {
-    goog.base(this, tick, client_time_hack, source_id, amount, vs_table);
+CombatEngine.AreaDamageEffect = function(tick, client_time_hack, source_id, source_team, target_location, hit_ground, hit_air, radius, falloff, amount, vs_table, allow_ff) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.target_location = target_location;
     this.hit_ground = hit_ground;
     this.hit_air = hit_air;
@@ -359,7 +366,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
         var dist = result.dist;
         var pos = result.pos;
         if(obj.is_destroyed()) { return; }
-        if(!this.allow_ff && source && obj.team === source.team) { return; }
+        if(!this.allow_ff && this.source_team && obj.team === this.source_team) { return; }
         if(obj.spec['immune_to_splash']) { return; }
 
         /** @type {!CombatEngine.Pos} */
@@ -385,6 +392,7 @@ CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
     @param {!GameTypes.TickCount} tick
     @param {number} client_time_hack
     @param {GameObjectId|null} source_id
+    @param {string|null} source_team
     @param {!CombatEngine.Pos2D} target_location
     @param {boolean} hit_ground
     @param {boolean} hit_air
@@ -399,8 +407,8 @@ CombatEngine.AreaDamageEffect.prototype.apply = function(world) {
     @param {Object.<string,CombatEngine.Coeff>} duration_vs_table
     @param {boolean} allow_ff - allow friendly fire
 */
-CombatEngine.AreaAuraEffect = function(tick, client_time_hack, source_id, target_location, hit_ground, hit_air, radius, radius_rect, falloff, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table, allow_ff) {
-    goog.base(this, tick, client_time_hack, source_id, amount, vs_table);
+CombatEngine.AreaAuraEffect = function(tick, client_time_hack, source_id, source_team, target_location, hit_ground, hit_air, radius, radius_rect, falloff, amount, aura_name, aura_duration, aura_range, vs_table, duration_vs_table, allow_ff) {
+    goog.base(this, tick, client_time_hack, source_id, source_team, amount, vs_table);
     this.target_location = target_location;
     this.hit_ground = hit_ground;
     this.hit_air = hit_air;
@@ -455,7 +463,7 @@ CombatEngine.AreaAuraEffect.prototype.apply = function(world) {
         var obj = result.obj, dist = result.dist, pos = result.pos;
 
         if(obj.is_destroyed()) { return; }
-        if(!this.allow_ff && source && obj.team === source.team) { return; }
+        if(!this.allow_ff && this.source_team && obj.team === this.source_team) { return; }
         if(obj.spec['immune_to_splash']) { return; }
 
         if(this.radius_rect) {
@@ -480,7 +488,7 @@ CombatEngine.AreaAuraEffect.prototype.apply = function(world) {
         if(amt != 0) {
             var duration = GameTypes.TickCount.scale(get_damage_modifier(this.duration_vs_table, obj), this.aura_duration);
             if(duration.is_nonzero()) {
-                obj.create_aura(world, this.source_id, this.aura_name, amt, duration, this.aura_range, this.vs_table);
+                obj.create_aura(world, this.source_id, this.source_team, this.aura_name, amt, duration, this.aura_range, this.vs_table);
             }
         }
     }, this);

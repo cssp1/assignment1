@@ -955,6 +955,7 @@ function force_scroll_eval() {
 /** @constructor @struct
     @implements {GameTypes.ISerializable}
     @param {GameObjectId|null} source_id object ID
+    @param {string|null} source_team
     @param {Object} spec
     @param {?} strength
     @param {number} range
@@ -962,8 +963,9 @@ function force_scroll_eval() {
     @param {!GameTypes.TickCount} expire_tick
     @param {Object|null=} vs_table
 */
-function Aura(source_id, spec, strength, range, start_tick, expire_tick, vs_table) {
+function Aura(source_id, source_team, spec, strength, range, start_tick, expire_tick, vs_table) {
     this.source_id = source_id;
+    this.source_team = source_team;
     this.spec = spec;
     this.strength = strength;
     this.range = range;
@@ -979,6 +981,7 @@ function Aura(source_id, spec, strength, range, start_tick, expire_tick, vs_tabl
 /** @override */
 Aura.prototype.serialize = function() {
     return {'source_id': this.source_id,
+            'source_team': this.source_team,
             'spec': this.spec['name'],
             'strength': this.strength,
             'range': this.range,
@@ -990,6 +993,7 @@ Aura.prototype.serialize = function() {
 /** @override */
 Aura.prototype.apply_snapshot = function(snap) {
     this.source_id = snap['source_id'];
+    this.source_team = snap['source_team'];
     this.spec = gamedata['auras'][snap['spec']];
     this.strength = snap['strength'];
     this.range = snap['range'];
@@ -1002,7 +1006,7 @@ Aura.prototype.apply_snapshot = function(snap) {
 /** @param {!Object<string,?>} snap
     @return {!Aura} */
 Aura.unserialize = function(snap) {
-    var ret = new Aura(snap['source_id'],
+    var ret = new Aura(snap['source_id'], snap['source_team'],
                        gamedata['auras'][snap['spec']],
                        snap['strength'], snap['range'],
                        new GameTypes.TickCount(snap['start_tick']),
@@ -1062,7 +1066,7 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
-                o.create_aura(world, obj.id, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o.create_aura(world, obj.id, obj.team, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
@@ -1071,7 +1075,7 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
@@ -1088,7 +1092,7 @@ Aura.prototype.apply = function(world, obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, obj.id, dmg, effect['damage_vs'] || this.vs_table));
+                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1688,7 +1692,7 @@ GameObject.prototype.receive_auras_update = function(world, alist) {
     if(!alist) { return; }
     for(var i = 0; i < alist.length; i++) {
         var data = alist[i];
-        this.create_aura(world, null, data['name'], data['strength'],
+        this.create_aura(world, null, null, data['name'], data['strength'],
                          ('duration' in data? relative_time_to_tick(data['duration']) : GameTypes.TickCount.infinity),
                          ('range' in data? data['range'] : -1));
     }
@@ -2113,7 +2117,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
         var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
         var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
         var range = this.get_leveled_quantity(spell['aura_range'] || 0);
-        this.create_aura(world, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+        this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
     }
 
     if('code' in spell) {
@@ -2140,13 +2144,13 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
                 var death_tick = GameTypes.TickCount.add(world.combat_engine.cur_tick,
                                                          relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, this.team, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -2161,7 +2165,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(world.combat_engine.cur_tick, client_time, this.id, this.team, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
@@ -2213,12 +2217,13 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
 
 /** @param {!World.World} world
     @param {GameObjectId|null} creator_id
+    @param {string|null} creator_team
     @param {string} aura_name
     @param {?} strength
     @param {!GameTypes.TickCount} duration
     @param {number} range
     @param {Object=} vs_table */
-GameObject.prototype.create_aura = function(world, creator_id, aura_name, strength, duration, range, vs_table) {
+GameObject.prototype.create_aura = function(world, creator_id, creator_team, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
     var end_tick;
     if(duration.is_infinite()) {
@@ -2236,7 +2241,10 @@ GameObject.prototype.create_aura = function(world, creator_id, aura_name, streng
                 this.auras[i].strength = Math.max(this.auras[i].strength, strength);
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
-                if(creator_id) { this.auras[i].source_id = creator_id; }
+                if(creator_id) {
+                    this.auras[i].source_id = creator_id;
+                    this.auras[i].source_team = creator_team;
+                }
                 if(!this.auras[i].expire_tick.is_infinite()) {
                     this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
                 }
@@ -2249,7 +2257,7 @@ GameObject.prototype.create_aura = function(world, creator_id, aura_name, streng
 
     if(i >= this.auras.length) {
         // no existing applications, create one
-        this.auras.push(new Aura(creator_id, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
+        this.auras.push(new Aura(creator_id, creator_team, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
     }
 };
 
@@ -2868,7 +2876,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -2885,7 +2893,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2900,7 +2908,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -2911,7 +2919,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -3283,7 +3291,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -3300,7 +3308,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -3315,7 +3323,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -3326,7 +3334,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -3404,7 +3412,7 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
             death_client_time += spell['kills_self_delay'];
         }
 
-        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
@@ -43836,7 +43844,7 @@ function handle_server_message(data) {
                (obj.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
                 var auto_spell = obj.get_auto_spell();
                 if(auto_spell && auto_spell['deployment_arming_delay']) {
-                    obj.create_aura(world, obj, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
+                    obj.create_aura(world, obj.id, obj.team, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
                 }
             }
 
