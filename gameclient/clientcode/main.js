@@ -1797,10 +1797,9 @@ function get_as_array(qty) {
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
 GameObject.prototype.get_leveled_quantity = function(qty) { return get_leveled_quantity(qty, this.level); }
 
+/** Set new next_facing based on cur_facing and target_facing */
 GameObject.prototype.update_facing = function() {
     if('turn_rate' in this.spec) {
-        this.cur_facing = this.next_facing;
-
         // turn from cur_facing towards target_facing
         if(this.cur_facing != this.target_facing && !this.is_destroyed() && !this.combat_stats.stunned) {
             // how much the unit can turn in one tick
@@ -1818,16 +1817,8 @@ GameObject.prototype.update_facing = function() {
             dot = Math.min(dot, 1); // avoid acos NaNs with rounding errors
 
             if(dot > Math.cos(turn_amount)) {
-                // angle between vectors is less than turn_amount, snap cur to target
+                // angle between vectors is less than turn_amount, snap to target
                 this.next_facing = this.target_facing;
-                var cross = cur[0]*tgt[1] - cur[1]*tgt[0];
-
-                if(cross > 0) {
-                    this.cur_facing = this.next_facing - Math.acos(dot);
-                } else {
-                    this.cur_facing = this.next_facing + Math.acos(dot);
-                    //this.next_facing = this.cur_facing - turn_amount;
-                }
             } else {
                 // angle between vectors is greater than turn_amount
                 // choose direction to turn depending on Z component of cross product
@@ -2417,6 +2408,8 @@ function calculate_battle_outcome() {
 
 /** @param {!World.World} world */
 GameObject.prototype.run_control = function(world) {
+    this.cur_facing = this.next_facing;
+
     if(this.control_cooldown > 0) {
         this.control_cooldown -= 1;
         this.serialization_dirty = true;
@@ -2512,11 +2505,7 @@ GameObject.prototype.run_control = function(world) {
             var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
             incr *= this.combat_power_factor(); // turn more slowly if depowered
             if(this.anim_offset > 0.5) { incr *= -1; }
-            this.target_facing = normalize_angle(this.next_facing + incr*TICK_INTERVAL);
-            if(this.target_facing > 2*Math.PI) {
-                this.target_facing -= 2*Math.PI;
-            }
-            //this.serialization_dirty = true; // XXXXXX make predictable
+            this.target_facing = normalize_angle(this.cur_facing + incr*TICK_INTERVAL);
         }
     }
 
