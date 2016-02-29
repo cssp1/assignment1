@@ -56,9 +56,17 @@ CombatEngine.CombatEngine = function() {
 
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @private
-        @type {Array.<!CombatEngine.DamageEffect>} */
+        @type {!Array.<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = [];
-    this.damage_effect_queue_dirty = true; // for incremental serialization
+
+    // XXX awkward - for replays only - disable addition of new damage effects
+    // should be replaced by some kind of dataflow mechanism
+    this.accept_damage_effects = true;
+
+    /** for incremental serialization
+        @private
+        @type {!Array<!CombatEngine.DamageEffect>} */
+    this.damage_effect_queue_dirty_added = [];
 };
 
 /** @override */
@@ -71,9 +79,10 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
     var ret = {'cur_tick': this.cur_tick.get(),
                'cur_client_time': this.cur_client_time};
-    if(this.damage_effect_queue_dirty) {
-        ret['damage_effect_queue'] = goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this);
-        this.damage_effect_queue_dirty = false;
+    if(this.damage_effect_queue_dirty_added.length > 0) {
+        ret['damage_effect_queue_added'] = goog.array.map(this.damage_effect_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
+        ret['damage_effect_queue_length'] = this.damage_effect_queue.length;
+        goog.array.clear(this.damage_effect_queue_dirty_added);
     }
     return ret;
 };
@@ -85,6 +94,14 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
         this.damage_effect_queue = goog.array.map(snap['damage_effect_queue'], function(/** !Object<string,?> */ effect_snap) {
             return this.unserialize_damage_effect(effect_snap);
         }, this);
+    } else if('damage_effect_queue_added' in snap) {
+        this.damage_effect_queue = this.damage_effect_queue.concat(goog.array.map(snap['damage_effect_queue_added'], function(/** !Object<string,?> */ effect_snap) {
+            return this.unserialize_damage_effect(effect_snap);
+        }, this));
+        var expected_len = /** @type {number} */ (snap['damage_effect_queue_length']);
+        if(this.damage_effect_queue.length != expected_len) {
+            throw Error('unexpected damage_effect_queue_length '+expected_len.toString()+' vs. '+this.damage_effect_queue.length.toString());
+        }
     }
 };
 
@@ -142,8 +159,9 @@ CombatEngine.DamageEffect.prototype.apply_snapshot = goog.abstractMethod; // imm
 
 /** @param {!CombatEngine.DamageEffect} effect */
 CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
+    if(!this.accept_damage_effects) { return; }
     this.damage_effect_queue.push(effect);
-    this.damage_effect_queue_dirty = true;
+    this.damage_effect_queue_dirty_added.push(effect);
 };
 
 /** @param {!World.World} world
@@ -156,15 +174,15 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
                      (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
-            this.damage_effect_queue_dirty = true;
             effect.apply(world);
         }
     }
+    goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
     return this.damage_effect_queue.length > 0;
 };
 
 /** @return {boolean} */
-CombatEngine.CombatEngine.prototype.has_pending_damage_effects = function() {
+CombatEngine.CombatEngine.prototype.has_queued_damage_effects = function() {
     return this.damage_effect_queue.length > 0;
 };
 

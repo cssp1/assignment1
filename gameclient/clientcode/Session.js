@@ -122,6 +122,12 @@ Session.Session.prototype.set_viewing_base = function(new_base, enable_citizens)
 };
 /** @param {!World.World} new_world */
 Session.Session.prototype.push_world = function(new_world) { return this.world_stack.push(new_world); };
+/** Get rid of any worlds pushed on top of the real one */
+Session.Session.prototype.pop_to_real_world = function() {
+    while(this.world_stack.length > 1) {
+        this.world_stack.pop();
+    }
+};
 
 /** @return {!World.World} world at top of stack that should be drawn */
 Session.Session.prototype.get_draw_world = function() {
@@ -392,7 +398,7 @@ Session.Session.prototype.persist_debris = function() {
 
 Session.Session.prototype.after_real_world_damage_effects = function(event) {
     var world = this.get_real_world();
-    var any_left = world.combat_engine.has_pending_damage_effects();
+    var any_left = world.combat_engine.has_queued_damage_effects();
     if(!any_left && this.no_more_units) {
         this.no_more_units = false;
         this.set_battle_outcome_dirty();

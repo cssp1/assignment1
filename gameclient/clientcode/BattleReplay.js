@@ -126,8 +126,12 @@ BattleReplay.Player.prototype.before_control = function(event) {
         this.world.objects.clear();
     }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
+
+    // *throw away* damage effects added by our control code, in favor of the recorded ones
+    this.world.combat_engine.accept_damage_effects = false;
 };
 BattleReplay.Player.prototype.before_damage_effects = function(event) {
+    this.world.combat_engine.accept_damage_effects = true;
     this.world.combat_engine.apply_snapshot(this.snapshots[this.index]['combat_engine']);
     this.index += 1;
     if(this.index >= this.snapshots.length) {
