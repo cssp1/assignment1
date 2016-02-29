@@ -7868,33 +7868,8 @@ Mobile.prototype.apply_snapshot = function(snap) {
 /** @override */
 Mobile.prototype.on_removed_from_world = function(world) {
     goog.base(this, 'on_removed_from_world', world);
-    if(this.is_under_repair()) {
-        for(var i = 0; i < player.unit_repair_queue.length; i++) {
-            var item = player.unit_repair_queue[i];
-            if(item['obj_id'] === this.id) {
-                player.unit_repair_queue.splice(i,1);
-                break;
-            }
-        }
-    }
 
-    if(this.team == 'player') {
-        // snoop hp update into my_army
-        if(this.id in player.my_army) {
-            if(player.can_resurrect_unit(this)) {
-                var entry = player.my_army[this.id];
-                if('hp' in entry) {
-                    entry['hp'] = 0;
-                } else if('hp_ratio' in entry) {
-                    entry['hp_ratio'] = 0;
-                } else {
-                    entry['hp_ratio'] = 0;
-                }
-            } else {
-                delete player.my_army[this.id];
-            }
-        }
-    } else if(world === session.get_real_world() && session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) { // XXX move into Session
+    if(world === session.get_real_world() && session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) { // XXX move into Session
         session.incoming_attack_units_destroyed += 1;
     }
 };
@@ -15927,25 +15902,21 @@ function invoke_recycle_dialog(obj) {
             if(_obj['obj_id'] in player.my_army) {
                 send_to_server.func(["RECYCLE_UNIT", _obj['obj_id']]);
                 // snoop update into my_army
-                if(_obj['obj_id'] in player.my_army) {
-                    delete player.my_army[_obj['obj_id']];
-                    session.get_real_world().lazy_update_citizens();
-                }
+                player.army_unit_drop(_obj['obj_id']);
                 if(session.get_real_world().objects.has_object(_obj['obj_id'])) {
                     session.get_real_world().objects.rem_object(session.get_real_world().objects.get_object(_obj['obj_id']));
                 }
                 session.clear_building_idle_state_caches();
             }
         } else {
-            if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
+            if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed (hp=0) units
                 send_to_server.func(["RECYCLE_UNIT", _obj.id]);
                 unit_repair_sync_marker = synchronizer.request_sync();
                 // snoop update into my_army
-                if(_obj.id in player.my_army) {
-                    delete player.my_army[_obj.id];
-                    session.get_real_world().lazy_update_citizens();
+                player.army_unit_drop(_obj.id);
+                if(session.get_real_world().objects.has_object(_obj.id)) {
+                    session.get_real_world().objects.rem_object(_obj);
                 }
-                session.get_real_world().objects.rem_object(_obj);
                 session.clear_building_idle_state_caches();
             }
         }
@@ -29081,10 +29052,17 @@ function request_unit_repair_update() {
 }
 
 function receive_unit_repair_update(data) {
+    player.unit_repair_queue = data;
+    // confirm receipt of response from the repair_control dialog
+    unit_repair_ping_sent = false;
+    apply_unit_repair_update();
+}
+
+// propagate finish times on to individual objects
+function apply_unit_repair_update() {
     session.for_each_real_object(function(obj) {
         obj.under_repair_finish = -1;
     });
-    player.unit_repair_queue = data;
     for(var i = 0; i < player.unit_repair_queue.length; i++) {
         var item = player.unit_repair_queue[i];
         // can be race conditions here with server, so check to be careful
@@ -29093,9 +29071,38 @@ function receive_unit_repair_update(data) {
             obj.under_repair_finish = item['finish_time'];
         }
     }
-    // confirm receipt of response from the repair_control dialog
-    unit_repair_ping_sent = false;
 }
+
+/** Client-side predict removal of one unit from repair queue
+    (see Player.unit_repair_cancel() on server)
+    @param {!GameObjectId} obj_id */
+player.army_unit_cancel_repair = function(obj_id) {
+    for(var i = 0; i < player.unit_repair_queue.length; i++) {
+        var item = player.unit_repair_queue[i];
+        if(item['obj_id'] === obj_id) {
+            var time_remaining = (i === 0 ? item['finish_time'] - server_time :
+                                  item['finish_time'] - player.unit_repair_queue[i-1]['finish_time']);
+            // adjust timers on objects that remain in the repair queue
+            for(var j = i+1; j < player.unit_repair_queue.length; j++) {
+                player.unit_repair_queue[j]['finish_time'] -= time_remaining;
+                player.unit_repair_queue[j]['start_time'] -= time_remaining;
+            }
+            player.unit_repair_queue.splice(i,1);
+            apply_unit_repair_update();
+            unit_repair_sync_marker = synchronizer.request_sync();
+            break;
+        }
+    }
+};
+/** Client-side predict one unit disappearing from the army permanently
+    @param {!GameObjectId} obj_id */
+player.army_unit_drop = function(obj_id) {
+    if(obj_id in player.my_army) {
+        player.army_unit_cancel_repair(obj_id);
+        delete player.my_army[obj_id];
+        session.get_real_world().lazy_update_citizens();
+    }
+};
 
 /** @param {!GameObjectId} obj_id
     @return {boolean} */

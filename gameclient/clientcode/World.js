@@ -473,6 +473,7 @@ World.World.prototype.persist_debris = function() {
 World.World.prototype.send_and_remove_object = function(obj) {
     if(obj.id && obj.id !== GameObject.DEAD_ID) {
         send_to_server.func(["REMOVE_OBJECT", obj.id]);
+        player.army_unit_drop(obj.id);
         this.objects.rem_object(obj);
     }
 };
@@ -485,6 +486,23 @@ World.World.prototype.send_and_destroy_object = function(victim, killer) {
                              victim.raw_pos(),
                              get_killer_info(killer)
                             ]);
+        if(victim.id in player.my_army) {
+            player.army_unit_cancel_repair(victim.id);
+            // snoop hp update into my_army
+            if(player.can_resurrect_unit(victim)) {
+                var entry = player.my_army[victim.id];
+                if('hp' in entry) {
+                    entry['hp'] = 0;
+                } else if('hp_ratio' in entry) {
+                    entry['hp_ratio'] = 0;
+                } else {
+                    entry['hp_ratio'] = 0;
+                }
+            } else {
+                delete player.my_army[victim.id];
+            }
+            this.lazy_update_citizens();
+        }
     }
     this.objects.rem_object(victim);
 };
