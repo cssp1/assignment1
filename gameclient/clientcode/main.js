@@ -1698,6 +1698,23 @@ GameObject.prototype.receive_auras_update = function(world, alist) {
     }
 };
 
+GameObject.prototype.is_weak_zombie = function() {
+    if(this.auras) {
+        for(var i = 0; i < this.auras.length; i++) {
+            var spec = this.auras[i].spec;
+            if('effects' in spec && spec['effects'].length > 0) {
+                for(var j = 0; j < spec['effects'].length; j++) {
+                    var eff = spec['effects'][j];
+                    if(eff['code'] === 'weak_zombie') {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+};
+
 function get_spec(specname) {
     var spec = gamedata['buildings'][specname] || gamedata['units'][specname] || gamedata['inert'][specname];
     if(!spec) {
@@ -49301,19 +49318,10 @@ function draw_unit(world, unit) {
     } else if(unit.hp == 0 && unit.team == 'player') {
         // draw zombie skull
         GameArt.assets['repair_skull'].states['normal'].draw([xy[0]+20,xy[1]+15], 0, 0);
-    } else if((unit.hp > 0) && ((unit.hp / unit.max_hp) < gamedata['zombie_debuff_threshold']) && unit.team == 'player' &&
-       player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff'])) {
+    } else if((unit.hp > 0) && ((unit.hp / unit.max_hp) < gamedata['zombie_debuff_threshold']) && unit.team == 'player') {
         // when at home base, show yellow wrench unconditionally when at critical damage
         // but when attacking, only show if the weak_zombie aura truly applies (i.e. ignore battle damage that occurs DURING the fight).
-        var show_yellow_wrench = session.home_base;
-        if(!show_yellow_wrench) {
-            for(var i = 0; i < unit.auras.length; i++) {
-                if(unit.auras[i].spec['code'] === 'weak_zombie') {
-                    show_yellow_wrench = true;
-                    break;
-                }
-            }
-        }
+        var show_yellow_wrench = session.home_base || unit.is_weak_zombie();
         if(show_yellow_wrench) {
             GameArt.assets['repair_wrench_yellow'].states['normal'].draw([xy[0]+20,xy[1]+15], 0, 0);
         }
@@ -49376,9 +49384,15 @@ function draw_unit(world, unit) {
     @param {Array.<number>} indicator_xy
     @param {!Aura} aura */
 function draw_aura(xy, indicator_xy, aura) {
-    if(aura.spec['code'] === 'weak_zombie') {
-        // handled separately for UI consistency when debuff is not actually applied
-        return;
+    // skip weak_zombie here
+    // (it's handled separately for UI consistency when debuff is not actually applied)
+    if(('effects' in aura.spec) && aura.spec['effects'].length > 0) {
+        for(var j = 0; j < aura.spec['effects'].length; j++) {
+            var eff = aura.spec['effects'][j];
+            if(eff['code'] === 'weak_zombie') {
+                return;
+            }
+        }
     }
 
     var color;

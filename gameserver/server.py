@@ -4812,7 +4812,7 @@ class Session(object):
         self.debug_log_action('deploy_ai_attack')
 
         # add "weak zombie" debuff to player units
-        if self.player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff']):
+        if gamedata['zombie_debuff_threshold'] >= 0:
             for unit in self.player.home_base_iter():
                 if (unit.owner is self.player) and unit.is_mobile() and (not unit.is_destroyed()) and self.has_object(unit.obj_id):
                     if (unit.hp / max(0.01, float(unit.max_hp))) < gamedata['zombie_debuff_threshold']:
@@ -5844,6 +5844,15 @@ class Aura (object):
                 to_remove.append(aura)
         for aura in to_remove: aura_list.remove(aura)
 
+    @classmethod
+    def has_aura_with_code(cls, aura_list, code):
+        for aura in aura_list:
+            if 'effects' in aura.spec:
+                for eff in aura.spec['effects']:
+                    if eff['code'] == code:
+                        return True
+        return False
+
 class GameObject:
     VIRTUAL_ID = 'VIRTUAL' # stand-in obj_id for "virtual" units
     # note that the client also has a DEAD_ID (='DEAD') for dead units,
@@ -5920,6 +5929,11 @@ class GameObject:
     def change_auras(self, newauras):
         self.auras = newauras
         self.update_max_hp()
+
+    def is_weak_zombie(self):
+        if self.auras:
+            return Aura.has_aura_with_code(self.auras, 'weak_zombie')
+        return False
 
     def serialize_state(self, fake_xy = None, update_hp = True, update_xy = True):
         assert self.team != -1
@@ -21001,8 +21015,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["OBJECT_CREATED2", unit.serialize_state(fake_xy = loc)])
 
             # add "weak zombie" debuff
-            if (unit.hp / max(0.01, float(unit.max_hp))) < gamedata['zombie_debuff_threshold'] and \
-               session.player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff']):
+            if (unit.hp / max(0.01, float(unit.max_hp))) < gamedata['zombie_debuff_threshold']:
                 if unit.auras is None: unit.auras = []
                 Aura.apply_aura(unit.auras, 'weak_zombie', 1, session_only = True)
 
@@ -21754,11 +21767,12 @@ class GAMEAPI(resource.Resource):
                                 if 'buildings_killed' not in session.loot: session.loot['buildings_killed'] = {}
                                 dict_increment(session.loot['buildings_killed'], obj.spec.name, 1)
 
-                        # check for equipment that has on_destroy consequents (such as security team spawning)
-                        on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
-                        if on_destroy_cons_list:
-                            for cons in on_destroy_cons_list:
-                                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
+                        if not obj.is_weak_zombie():
+                            # check for equipment that has on_destroy consequents (such as security team spawning)
+                            on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+                            if on_destroy_cons_list:
+                                for cons in on_destroy_cons_list:
+                                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
 
                         # check for fragile equipment
                         items_destroyed = None
@@ -21954,7 +21968,9 @@ class GAMEAPI(resource.Resource):
         # must come before rem_object() since it needs obj.team
         session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed', fake_xy = death_location, killer_info = killer_info)
 
-        # note: this invalidates obj.team
+        was_zombie = obj.is_weak_zombie()
+
+        # note: this invalidates obj.team and removes session-only auras
         session.rem_object(id)
 
         if owning_player:
@@ -22007,10 +22023,11 @@ class GAMEAPI(resource.Resource):
 
         if session.damage_log: session.damage_log.record(obj) # record immediately since it may leave the session and/or bases
 
-        on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
-        if on_destroy_cons_list:
-            for cons in on_destroy_cons_list:
-                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj':obj, 'xy':death_location}, reason='on_destroy(%s)' % obj.spec.name)
+        if not was_zombie:
+            on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
+            if on_destroy_cons_list:
+                for cons in on_destroy_cons_list:
+                    session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj':obj, 'xy':death_location}, reason='on_destroy(%s)' % obj.spec.name)
 
     def do_harvest_all(self, session, retmsg, base_type, region_id, base_id, object_list, power_factor, base_info):
         base_loot = {} if base_id != session.viewing_base.base_id else None
