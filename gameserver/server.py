@@ -254,7 +254,7 @@ last_mail_id = 0
 def generate_mail_id():
     global last_mail_id
     last_mail_id += 1
-    return str(server_time)+'-'+str(int(10000*random.random())) + '-' + str(last_mail_id)
+    return '%d-%08x-%d' % (server_time, random.randint(0,0xffffffff), last_mail_id)
 
 def inventory_item_equal(a, b):
     if a['spec'] != b['spec']: return False
@@ -3113,7 +3113,7 @@ class DamageLog(object):
 
         return ret
 
-class AttackLog:
+class AttackLog (object):
     @classmethod
     def base_name(cls, log_time, attacker_id, defender_id, base_id):
         if base_id and base_id != home_base_id(attacker_id) and base_id != home_base_id(defender_id):
@@ -3146,8 +3146,8 @@ class AttackLog:
             buf = open(self.local_filename, 'rb').read()
             io_system.do_async_write((bucket,name), buf, lambda : None, False, 0)
 
-    def __init__(self, attacker_id, defender_id, base_id):
-        self.log_time = server_time # server_time when attack log was opened
+    def __init__(self, log_time, attacker_id, defender_id, base_id):
+        self.log_time = log_time # server_time when attack log was opened
         self.log_file = None # this will be recorded in battle history, to be used for retrieving the log later
         self.local_filename = None
 
@@ -3165,6 +3165,9 @@ class AttackLog:
         self.local_filename = os.path.join(attack_log_dir, self.log_file)
         self.log = SpinLog.JSONLog(SpinLog.GzipLogFile(self.local_filename))
 
+    def is_active(self): # whether or not we're actually recording, instead of dropping the events
+        return self.local_filename is not None
+
     def event(self, props):
         self.log.event(server_time, props)
     def close(self):
@@ -3173,14 +3176,64 @@ class AttackLog:
             self.upload()
             self.log = None
 
-# produce a globally unique key for player sessions
-session_counter = 0
-def new_session_id(seed):
-    global session_counter
-    if session_counter == 0:
-        session_counter = seed
-    session_counter += 1
-    return hashlib.sha256('SP!NP0NCH'+str(session_counter)).hexdigest()
+class AttackReplayReceiver (object):
+    @classmethod
+    def base_name(cls, log_time, attacker_id, defender_id, base_id):
+        # kind of a hack, just reuse the AttackLog convention
+        return AttackLog.base_name(log_time, attacker_id, defender_id, base_id).replace('.json.gz', '-replay.json.gz')
+    @classmethod
+    def storage_dir(cls, log_time):
+        return spin_log_dir+'/'+SpinLog.time_to_date_string(log_time)+'-replays'
+    @classmethod
+    def ensure_storage_dir(cls, log_time):
+        log_dir = cls.storage_dir(log_time)
+        if not os.path.exists(log_dir):
+            try: os.mkdir(log_dir)
+            except: pass
+    @classmethod
+    def storage_path(cls, log_time, attacker_id, defender_id, base_id):
+        return os.path.join(cls.storage_dir(log_time), cls.base_name(log_time, attacker_id, defender_id, base_id))
+
+    def __init__(self, log_time, expire_time, attacker_id, defender_id, base_id):
+        self.log_time = log_time
+        self.expire_time = expire_time # time after which we'll give up if the client hasn't finished uploading
+        self.log_file = self.base_name(self.log_time, attacker_id, defender_id, base_id)
+        self.local_filename = os.path.join(self.storage_dir(self.log_time), self.log_file)
+        self.buf = None # allocated lazily
+        self.codec = None
+
+    def accumulate(self, codec, from_count, to_count, total_count, inbuf):
+        # receive a segment of compressed replay data from the client.
+        # return true if finished with the last segment
+
+        if self.codec is None:
+            assert codec == 'raw'
+            self.codec = codec
+            self.buf = cStringIO.StringIO()
+        else:
+            assert codec == self.codec
+
+        if from_count != self.buf.tell(): raise Exception('unexpected range: %r-%r vs %r-%r' % (from_count, to_count, self.buf.tell(), self.buf.tell()+len(inbuf)))
+        self.buf.write(inbuf)
+
+        if self.buf.tell() >= total_count:
+            self.finalize()
+            return True
+        return False
+
+    def finalize(self):
+        # decompress what the client sent us
+        raw_buf = self.buf.getvalue()
+        # (then apply codec here)
+
+        self.ensure_storage_dir(self.log_time)
+
+        # gzip compress on the way out
+        with AtomicFileWrite.AtomicFileWrite(self.local_filename, 'wb') as atom:
+            temp = gzip.GzipFile(filename = self.local_filename, fileobj = atom.fd)
+            temp.write(raw_buf)
+            temp.close()
+            atom.complete()
 
 class Session(object):
     class AsyncLogout:
@@ -3288,6 +3341,7 @@ class Session(object):
         self.defender_protection_expired_at = -1 # set on initial base visit
 
         self.attack_log = None
+        self.attack_replay_receivers = {} # indexed by the replay token
         self.damage_log = None
 
         self.protection_eligible = None # False/True flag set at start of combat
@@ -3498,6 +3552,12 @@ class Session(object):
     # return current seconds of cumulative play time
     def cur_playtime(self):
         return (server_time - self.login_time) + self.player.history.get('time_in_game',0)
+
+    def prune_attack_replay_receivers(self):
+        # get rid of expired replay receivers so they don't take up memory
+        for token, recv in self.attack_replay_receivers.items():
+            if server_time >= recv.expire_time:
+                del self.attack_replay_receivers[token]
 
     def get_alliance_id(self, reason=''):
         if (not gamesite.sql_client) or \
@@ -4032,14 +4092,21 @@ class Session(object):
         return self.cur_objects and self.cur_objects.has_object(id)
     def iter_objects(self): return self.cur_objects.iter_objects()
 
-    def open_attack_log(self, attacker_id, defender_id, base_id = None):
+    def open_attack_log(self, attack_end_time, attacker_id, defender_id, base_id = None):
         if self.player.tutorial_state != "COMPLETE":
             attacker_id = -1
             defender_id = -1
-        self.attack_log = AttackLog(attacker_id, defender_id, base_id)
+        self.attack_log = AttackLog(server_time, attacker_id, defender_id, base_id)
 
         if gamedata['server'].get('enable_damage_log',True) and self.player.tutorial_state == "COMPLETE":
             self.damage_log = DamageLog(self.viewing_base.base_id, self.player)
+
+        replay_token = None
+        if self.attack_log.is_active():
+            replay_token = generate_mail_id() # just a random token
+            expire_time = attack_end_time + gamedata['server'].get('battle_replay_receive_time',600)
+            self.attack_replay_receivers[replay_token] = AttackReplayReceiver(server_time, expire_time, attacker_id, defender_id, base_id)
+        return replay_token
 
     def reset_attack_log(self):
         if self.attack_log:
@@ -4836,7 +4903,7 @@ class Session(object):
             for cd in cd_list:
                 self.player.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
 
-        self.open_attack_log(self.incoming_attack_id if (self.incoming_attack_id > 0) else -1, self.user.user_id)
+        replay_token = self.open_attack_log(self.attack_finish_time, self.incoming_attack_id if (self.incoming_attack_id > 0) else -1, self.user.user_id)
         self.attack_event(self.user.user_id, '3850_ai_attack_start', {})
         if self.player.player_auras: self.attack_event(self.user.user_id, '3901_player_auras', {'player_auras':copy.copy(self.player.player_auras)})
         self.log_attack_units(self.user.user_id, [obj for obj in self.player.home_base_iter() if self.has_object(obj.obj_id)], '3900_unit_exists')
@@ -4844,7 +4911,7 @@ class Session(object):
 
         self.activity_classifier.suffered_ai_attack(self.incoming_attack_id)
 
-        self.deploy_ai_attack_wave(retmsg)
+        self.deploy_ai_attack_wave(retmsg, replay_token = replay_token)
 
         # add grace period to prevent server and client from both trying to end the attack at the same time
         self.attack_finish_time += 5
@@ -4855,7 +4922,7 @@ class Session(object):
             if data and ('on_attack' in data):
                 self.execute_consequent_safe(data['on_attack'], self.player, retmsg, reason='on_attack(%d)' % self.incoming_attack_id)
 
-    def deploy_ai_attack_wave(self, retmsg):
+    def deploy_ai_attack_wave(self, retmsg, replay_token = None):
         if len(self.incoming_attack_units) < 1:
             return True
 
@@ -4929,7 +4996,7 @@ class Session(object):
         else:
             self.incoming_attack_wave_time = -1
 
-        retmsg.append(["AI_ATTACK_WAVE_DEPLOYED", self.attack_finish_time, self.incoming_attack_units, self.incoming_attack_wave_time])
+        retmsg.append(["AI_ATTACK_WAVE_DEPLOYED", self.attack_finish_time, self.incoming_attack_units, self.incoming_attack_wave_time, replay_token])
         return (len(self.incoming_attack_units) < 1)
 
     # call this after any action that may change the player's power production or consumption
@@ -12923,7 +12990,7 @@ def spawn_tutorial_units(session, retmsg):
         session.add_object(obj)
         retmsg.append(["OBJECT_CREATED2", obj.serialize_state()])
     # start the tutorial with a null attack log open
-    session.open_attack_log(-1, -1)
+    session.open_attack_log(-1, -1, -1)
 
 # FOR TESTING ONLY - create "someone else's" base
 def setup_test_user(facebook_id, user_id, ui_name):
@@ -20812,12 +20879,51 @@ class GAMEAPI(resource.Resource):
                                                if (obj.owner is session.player) and obj.is_mobile()])
             session.deployed_donated_unit_space = 0
 
+            # look up AI base or hive
+            if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
+                ai_data = gamedata['ai_bases_server']['bases'].get(str(session.viewing_player.user_id), None)
+            elif session.viewing_base.base_type == 'hive':
+                ai_data = gamedata['hives_server']['templates'].get(session.viewing_base.base_template, None)
+            else:
+                ai_data = None
+
+            if session.player.tutorial_state != "COMPLETE":
+                attack_time = gamedata['tutorial_attack_time']
+            else:
+                if session.viewing_player is session.player:
+                    attack_time = gamedata['reinforce_time']
+                elif (ai_data and ('attack_time' in ai_data)):
+                    attack_time = ai_data['attack_time']
+                else:
+                    if (session.viewing_base is session.viewing_player.my_home):
+                        if session.viewing_player.is_human():
+                            entry = 'pvp'
+                        else:
+                            entry = 'pve'
+                    elif session.viewing_base.base_type == 'quarry':
+                        entry = 'quarry'
+                    elif session.viewing_base.base_type == 'hive':
+                        entry = 'hive'
+                    else:
+                        entry = 'pvp'
+
+                    attack_time = gamedata['attack_time'][entry]
+
+            real_attack_finish_time = server_time + attack_time
+
+            # NOTE: add a few-second "grace period" to prevent the client
+            # and server from both trying to change the session at the
+            # exact same time
+            session.attack_finish_time = real_attack_finish_time + 5
+
             # open attack log
+            replay_token = None
+
             if session.viewing_player is session.player:
                 # reinforcement
-                session.open_attack_log(-1,-1)
+                session.open_attack_log(-1, -1,-1)
             else:
-                session.open_attack_log(session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
+                replay_token = session.open_attack_log(session.attack_finish_time, session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
                 props_3820 =  {'attacker_user_id': session.user.user_id,
                                'attacker_level': session.player.resources.player_level,
                                'attacker_deployable_squads': session.deployable_squads.copy(),
@@ -20855,43 +20961,8 @@ class GAMEAPI(resource.Resource):
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
                 if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
 
-            # look up AI base or hive
-            if (session.viewing_base is session.viewing_player.my_home) and session.viewing_player.is_ai():
-                ai_data = gamedata['ai_bases_server']['bases'].get(str(session.viewing_player.user_id), None)
-            elif session.viewing_base.base_type == 'hive':
-                ai_data = gamedata['hives_server']['templates'].get(session.viewing_base.base_template, None)
-            else:
-                ai_data = None
+            retmsg.append(["PLAYER_ATTACK_WAVE_DEPLOYED", real_attack_finish_time, replay_token])
 
-            if session.player.tutorial_state != "COMPLETE":
-                attack_time = gamedata['tutorial_attack_time']
-            else:
-                if session.viewing_player is session.player:
-                    attack_time = gamedata['reinforce_time']
-                elif (ai_data and ('attack_time' in ai_data)):
-                    attack_time = ai_data['attack_time']
-                else:
-                    if (session.viewing_base is session.viewing_player.my_home):
-                        if session.viewing_player.is_human():
-                            entry = 'pvp'
-                        else:
-                            entry = 'pve'
-                    elif session.viewing_base.base_type == 'quarry':
-                        entry = 'quarry'
-                    elif session.viewing_base.base_type == 'hive':
-                        entry = 'hive'
-                    else:
-                        entry = 'pvp'
-
-                    attack_time = gamedata['attack_time'][entry]
-
-            real_attack_finish_time = server_time + attack_time
-            retmsg.append(["PLAYER_ATTACK_WAVE_DEPLOYED", real_attack_finish_time])
-
-            # NOTE: add a few-second "grace period" to prevent the client
-            # and server from both trying to change the session at the
-            # exact same time
-            session.attack_finish_time = real_attack_finish_time + 5
 
             if session.viewing_player is not session.player:
                 session.activity_classifier.attacked_base(session.viewing_player, session.viewing_base, using_squads = session.using_squad_deployment())
@@ -24548,6 +24619,13 @@ class GAMEAPI(resource.Resource):
             return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
+        elif arg[0] == "UPLOAD_BATTLE_REPLAY":
+            token, codec, from_count, to_count, total_count, inbuf = arg[1:7]
+            if token in session.attack_replay_receivers:
+                if session.attack_replay_receivers[token].accumulate(codec, from_count, to_count, total_count, inbuf):
+                    # it's done
+                    del session.attack_replay_receivers[token]
+
         elif arg[0] == "QUERY_MAP_LOG":
             if (not session.player.is_developer()):
                 retmsg.append(["ERROR", "SERVER_PROTOCOL"])
@@ -27601,6 +27679,8 @@ class GameSite(server.Site):
                 if session.player.home_region not in region_lock_keepalives:
                     region_lock_keepalives[session.player.home_region] = []
                 region_lock_keepalives[session.player.home_region].append(session.player.my_home.base_id)
+
+            session.prune_attack_replay_receivers()
 
             # check for sessions with pending AI attacks
             if session.incoming_attack_pending() and (server_time >= session.incoming_attack_time):
