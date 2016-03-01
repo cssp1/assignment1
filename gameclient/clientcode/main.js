@@ -1896,18 +1896,23 @@ GameObject.prototype.interpolate_facing = function(world) {
         var cur = [Math.cos(this.cur_facing), Math.sin(this.cur_facing)];
         var next = [Math.cos(this.next_facing), Math.sin(this.next_facing)];
         var cur_dot_next = vec_dot(cur, next);
-        if(cur_dot_next >= 1 - ANGLE_EPSILON) { // avoid precision problems with very small angles
-            return this.next_facing;
+
+        // avoid precision problems
+        if(cur_dot_next >= 1 - ANGLE_EPSILON) { // angle almost zero - just snap to next
+            ret = this.next_facing;
+        } else if(cur_dot_next <= -1 + ANGLE_EPSILON) { // almost a perfect 180 degree turn
+            ret = this.next_facing; // omega = Math.sqrt(2)/2; ?
+        } else {
+            var omega = Math.acos(cur_dot_next);
+            var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
+            var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
+            var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
+            ret = Math.atan2(slerp[1], slerp[0]);
+            if(isNaN(ret)) {
+                throw Error('slerp atan2 NaN: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString()+' omega '+omega.toString());
+            }
+            ret = normalize_angle(ret);
         }
-        var omega = Math.acos(cur_dot_next);
-        var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
-        var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
-        var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
-        ret = Math.atan2(slerp[1], slerp[0]);
-        if(isNaN(ret)) {
-            throw Error('slerp atan2 NaN: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString()+' omega '+omega.toString());
-        }
-        ret = normalize_angle(ret);
     }
     if(isNaN(ret)) {
         throw Error('NaN from interpolate_facing: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString());
