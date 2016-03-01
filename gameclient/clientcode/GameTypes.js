@@ -102,7 +102,12 @@ GameTypes.ISerializable.prototype.serialize;
 GameTypes.ISerializable.prototype.apply_snapshot;
 
 /** @interface for incremental snapshotting
-    @extends {GameTypes.ISerializable} */
+    @extends {GameTypes.ISerializable}
+
+    XXX eventually this is going to need some kind of
+    SerializationContxt provided by the caller, so objects don't have
+    to maintain their serialization state internally.
+*/
 GameTypes.IIncrementallySerializable = function() {};
 /** @return {Object<string,?>|null} */
 GameTypes.IIncrementallySerializable.prototype.serialize_incremental;
