@@ -1903,7 +1903,11 @@ GameObject.prototype.interpolate_facing = function(world) {
         var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
         var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
         var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
-        ret = normalize_angle(Math.atan2(slerp[1], slerp[0]));
+        ret = Math.atan2(slerp[1], slerp[0]);
+        if(isNaN(ret)) {
+            throw Error('slerp atan2 NaN: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString()+' omega '+omega.toString());
+        }
+        ret = normalize_angle(ret);
     }
     if(isNaN(ret)) {
         throw Error('NaN from interpolate_facing: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString());
