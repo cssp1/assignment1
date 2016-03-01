@@ -245,7 +245,7 @@ Session.Session.prototype.get_next_deployable_unit = function(specname) {
         }
     }, this);
     if(!unit) { throw Error('get_next_deployable_unit('+specname+') failed'); }
-    if(unit && player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff'])) {
+    if(unit && gamedata['zombie_debuff_threshold'] >= 0) {
         var curmax = army_unit_hp(unit);
         var ratio = curmax[0]/Math.max(curmax[1],1);
         if(ratio < gamedata['zombie_debuff_threshold']) { is_zombie = true; }

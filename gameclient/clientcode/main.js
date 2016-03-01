@@ -415,6 +415,7 @@ function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
     @param {number} a
     @return {number} */
 function normalize_angle(a) {
+    if(isNaN(a)) { throw Error('normalize_angle(NaN)'); }
     if(a < 0) {
         return (a % (2*Math.PI)) + 2*Math.PI;
     } else if(a >= 2*Math.PI) {
@@ -955,6 +956,7 @@ function force_scroll_eval() {
 /** @constructor @struct
     @implements {GameTypes.ISerializable}
     @param {GameObjectId|null} source_id object ID
+    @param {string|null} source_team
     @param {Object} spec
     @param {?} strength
     @param {number} range
@@ -962,8 +964,9 @@ function force_scroll_eval() {
     @param {!GameTypes.TickCount} expire_tick
     @param {Object|null=} vs_table
 */
-function Aura(source_id, spec, strength, range, start_tick, expire_tick, vs_table) {
+function Aura(source_id, source_team, spec, strength, range, start_tick, expire_tick, vs_table) {
     this.source_id = source_id;
+    this.source_team = source_team;
     this.spec = spec;
     this.strength = strength;
     this.range = range;
@@ -979,6 +982,7 @@ function Aura(source_id, spec, strength, range, start_tick, expire_tick, vs_tabl
 /** @override */
 Aura.prototype.serialize = function() {
     return {'source_id': this.source_id,
+            'source_team': this.source_team,
             'spec': this.spec['name'],
             'strength': this.strength,
             'range': this.range,
@@ -990,6 +994,7 @@ Aura.prototype.serialize = function() {
 /** @override */
 Aura.prototype.apply_snapshot = function(snap) {
     this.source_id = snap['source_id'];
+    this.source_team = snap['source_team'];
     this.spec = gamedata['auras'][snap['spec']];
     this.strength = snap['strength'];
     this.range = snap['range'];
@@ -1002,7 +1007,7 @@ Aura.prototype.apply_snapshot = function(snap) {
 /** @param {!Object<string,?>} snap
     @return {!Aura} */
 Aura.unserialize = function(snap) {
-    var ret = new Aura(snap['source_id'],
+    var ret = new Aura(snap['source_id'], snap['source_team'],
                        gamedata['auras'][snap['spec']],
                        snap['strength'], snap['range'],
                        new GameTypes.TickCount(snap['start_tick']),
@@ -1062,7 +1067,7 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o = obj_list[i].obj;
-                o.create_aura(world, obj.id, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o.create_aura(world, obj.id, obj.team, 'defense_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'damage_booster') {
             // apply the damage_boosted aura to this and nearby units
@@ -1071,7 +1076,7 @@ Aura.prototype.apply = function(world, obj) {
                                                                { only_team: obj.team, mobile_only: true });
             for(var i = 0; i < obj_list.length; i++) {
                 var o2 = obj_list[i].obj;
-                o2.create_aura(world, obj.id, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
+                o2.create_aura(world, obj.id, obj.team, 'damage_boosted', this.strength, new GameTypes.TickCount(1), 0);
             }
         } else if(code === 'stunned') {
             obj.combat_stats.stunned += this.strength;
@@ -1088,7 +1093,7 @@ Aura.prototype.apply = function(world, obj) {
             var n_ticks = Math.floor(apply_interval/TICK_INTERVAL + 0.5);
             if(n_ticks <= 1 || (((world.combat_engine.cur_tick.get() - this.start_tick.get()) % n_ticks) == 0)) {
                 var dmg = Math.max(1, Math.floor(this.strength*apply_interval));
-                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, obj.id, dmg, effect['damage_vs'] || this.vs_table));
+                world.combat_engine.queue_damage_effect(new CombatEngine.TargetedDamageEffect(world.combat_engine.cur_tick, client_time, this.source_id, this.source_team, obj.id, dmg, effect['damage_vs'] || this.vs_table));
             }
         } else if(code === 'projectile_speed_reduced') {
             obj.combat_stats.projectile_speed *= (1 - this.strength);
@@ -1693,10 +1698,27 @@ GameObject.prototype.receive_auras_update = function(world, alist) {
     if(!alist) { return; }
     for(var i = 0; i < alist.length; i++) {
         var data = alist[i];
-        this.create_aura(world, null, data['name'], data['strength'],
+        this.create_aura(world, null, null, data['name'], data['strength'],
                          ('duration' in data? relative_time_to_tick(data['duration']) : GameTypes.TickCount.infinity),
                          ('range' in data? data['range'] : -1));
     }
+};
+
+GameObject.prototype.is_weak_zombie = function() {
+    if(this.auras) {
+        for(var i = 0; i < this.auras.length; i++) {
+            var spec = this.auras[i].spec;
+            if('effects' in spec && spec['effects'].length > 0) {
+                for(var j = 0; j < spec['effects'].length; j++) {
+                    var eff = spec['effects'][j];
+                    if(eff['code'] === 'weak_zombie') {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
 };
 
 function get_spec(specname) {
@@ -1870,25 +1892,40 @@ GameObject.prototype.interpolate_pos_for_draw = function(world) { return this.in
     @return {number} */
 GameObject.prototype.interpolate_facing = function(world) {
     var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    var ret;
     if(progress <= 0) {
-        return this.cur_facing;
+        ret = this.cur_facing;
     } else if(progress >= 1) {
-        return this.next_facing;
+        ret = this.next_facing;
     } else {
         // Spherical linear interpolation - see https://en.wikipedia.org/wiki/Slerp
         var cur = [Math.cos(this.cur_facing), Math.sin(this.cur_facing)];
         var next = [Math.cos(this.next_facing), Math.sin(this.next_facing)];
         var cur_dot_next = vec_dot(cur, next);
-        if(cur_dot_next >= 1 - ANGLE_EPSILON) { // avoid precision problems with very small angles
-            return this.next_facing;
+
+        // avoid precision problems
+        if(cur_dot_next >= 1 - ANGLE_EPSILON) { // angle almost zero - just snap to next
+            ret = this.next_facing;
+        } else if(cur_dot_next <= -1 + ANGLE_EPSILON) { // almost a perfect 180 degree turn
+            ret = this.next_facing; // omega = Math.sqrt(2)/2; ?
+        } else {
+            var omega = Math.acos(cur_dot_next);
+            var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
+            var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
+            var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
+            ret = Math.atan2(slerp[1], slerp[0]);
+            if(isNaN(ret)) {
+                throw Error('slerp atan2 NaN: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString()+' omega '+omega.toString());
+            }
+            ret = normalize_angle(ret);
         }
-        var omega = Math.acos(cur_dot_next);
-        var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
-        var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
-        var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
-        return normalize_angle(Math.atan2(slerp[1], slerp[0]));
     }
+    if(isNaN(ret)) {
+        throw Error('NaN from interpolate_facing: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString());
+    }
+    return ret;
 };
+
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
 
@@ -2119,7 +2156,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
         var strength = this.get_leveled_quantity(spell['aura_strength'] || 1);
         var duration = this.get_leveled_quantity(spell['aura_duration'] || -1);
         var range = this.get_leveled_quantity(spell['aura_range'] || 0);
-        this.create_aura(world, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
+        this.create_aura(world, null, null, aura_name, strength, (duration < 0 ? GameTypes.TickCount.infinity : relative_time_to_tick(duration)), range);
     }
 
     if('code' in spell) {
@@ -2146,13 +2183,13 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 var death_client_time = client_time + (spell['kills_self_delay']||0);
                 var death_tick = GameTypes.TickCount.add(world.combat_engine.cur_tick,
                                                          relative_time_to_tick(/** @type {number} */ (spell['kills_self_delay']||0)));
-                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
             }
 
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
+                    var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, this.team, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
@@ -2167,7 +2204,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
                 }
             }
 
-            var effect = new CombatEngine.AreaDamageEffect(world.combat_engine.cur_tick, client_time, this.id, impact_pos,
+            var effect = new CombatEngine.AreaDamageEffect(world.combat_engine.cur_tick, client_time, this.id, this.team, impact_pos,
                                               ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                               ('targets_air' in spell ? spell['targets_air'] : 1) || this.combat_stats.anti_air,
                                               radius,
@@ -2219,12 +2256,13 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
 
 /** @param {!World.World} world
     @param {GameObjectId|null} creator_id
+    @param {string|null} creator_team
     @param {string} aura_name
     @param {?} strength
     @param {!GameTypes.TickCount} duration
     @param {number} range
     @param {Object=} vs_table */
-GameObject.prototype.create_aura = function(world, creator_id, aura_name, strength, duration, range, vs_table) {
+GameObject.prototype.create_aura = function(world, creator_id, creator_team, aura_name, strength, duration, range, vs_table) {
     var aura_spec = gamedata['auras'][aura_name];
     var end_tick;
     if(duration.is_infinite()) {
@@ -2242,7 +2280,10 @@ GameObject.prototype.create_aura = function(world, creator_id, aura_name, streng
                 this.auras[i].strength = Math.max(this.auras[i].strength, strength);
                 this.auras[i].range = Math.max(this.auras[i].range, range);
                 this.auras[i].start_tick = session.get_real_world().combat_engine.cur_tick;
-                if(creator_id) { this.auras[i].source_id = creator_id; }
+                if(creator_id) {
+                    this.auras[i].source_id = creator_id;
+                    this.auras[i].source_team = creator_team;
+                }
                 if(!this.auras[i].expire_tick.is_infinite()) {
                     this.auras[i].expire_tick = GameTypes.TickCount.max(this.auras[i].expire_tick, end_tick);
                 }
@@ -2255,7 +2296,7 @@ GameObject.prototype.create_aura = function(world, creator_id, aura_name, streng
 
     if(i >= this.auras.length) {
         // no existing applications, create one
-        this.auras.push(new Aura(creator_id, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
+        this.auras.push(new Aura(creator_id, creator_team, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
     }
 };
 
@@ -2868,7 +2909,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -2885,7 +2926,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -2900,7 +2941,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -2911,7 +2952,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -3283,7 +3324,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -3300,7 +3341,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -3315,7 +3356,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -3326,7 +3367,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -3404,7 +3445,7 @@ GameObject.prototype.fire_projectile = function(world, fire_tick, fire_time, for
             death_client_time += spell['kills_self_delay'];
         }
 
-        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, this.id));
+        world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(death_tick, death_client_time, this.id, null, this.id));
     }
 
     if(COMBAT_ENGINE_USE_TICKS) {
@@ -7868,33 +7909,8 @@ Mobile.prototype.apply_snapshot = function(snap) {
 /** @override */
 Mobile.prototype.on_removed_from_world = function(world) {
     goog.base(this, 'on_removed_from_world', world);
-    if(this.is_under_repair()) {
-        for(var i = 0; i < player.unit_repair_queue.length; i++) {
-            var item = player.unit_repair_queue[i];
-            if(item['obj_id'] === this.id) {
-                player.unit_repair_queue.splice(i,1);
-                break;
-            }
-        }
-    }
 
-    if(this.team == 'player') {
-        // snoop hp update into my_army
-        if(this.id in player.my_army) {
-            if(player.can_resurrect_unit(this)) {
-                var entry = player.my_army[this.id];
-                if('hp' in entry) {
-                    entry['hp'] = 0;
-                } else if('hp_ratio' in entry) {
-                    entry['hp_ratio'] = 0;
-                } else {
-                    entry['hp_ratio'] = 0;
-                }
-            } else {
-                delete player.my_army[this.id];
-            }
-        }
-    } else if(world === session.get_real_world() && session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) { // XXX move into Session
+    if(world === session.get_real_world() && session.home_base /*&& session.attack_finish_time > server_time*/ && this.team == 'enemy' && this.id !== GameObject.DEAD_ID) { // XXX move into Session
         session.incoming_attack_units_destroyed += 1;
     }
 };
@@ -15937,25 +15953,21 @@ function invoke_recycle_dialog(obj) {
             if(_obj['obj_id'] in player.my_army) {
                 send_to_server.func(["RECYCLE_UNIT", _obj['obj_id']]);
                 // snoop update into my_army
-                if(_obj['obj_id'] in player.my_army) {
-                    delete player.my_army[_obj['obj_id']];
-                    session.get_real_world().lazy_update_citizens();
-                }
+                player.army_unit_drop(_obj['obj_id']);
                 if(session.get_real_world().objects.has_object(_obj['obj_id'])) {
                     session.get_real_world().objects.rem_object(session.get_real_world().objects.get_object(_obj['obj_id']));
                 }
                 session.clear_building_idle_state_caches();
             }
         } else {
-            if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed units
+            if(_obj.id && _obj.id !== GameObject.DEAD_ID) { // check obj.id rather than is_destroyed() because you CAN recycle destroyed (hp=0) units
                 send_to_server.func(["RECYCLE_UNIT", _obj.id]);
                 unit_repair_sync_marker = synchronizer.request_sync();
                 // snoop update into my_army
-                if(_obj.id in player.my_army) {
-                    delete player.my_army[_obj.id];
-                    session.get_real_world().lazy_update_citizens();
+                player.army_unit_drop(_obj.id);
+                if(session.get_real_world().objects.has_object(_obj.id)) {
+                    session.get_real_world().objects.rem_object(_obj);
                 }
-                session.get_real_world().objects.rem_object(_obj);
                 session.clear_building_idle_state_caches();
             }
         }
@@ -29091,10 +29103,17 @@ function request_unit_repair_update() {
 }
 
 function receive_unit_repair_update(data) {
+    player.unit_repair_queue = data;
+    // confirm receipt of response from the repair_control dialog
+    unit_repair_ping_sent = false;
+    apply_unit_repair_update();
+}
+
+// propagate finish times on to individual objects
+function apply_unit_repair_update() {
     session.for_each_real_object(function(obj) {
         obj.under_repair_finish = -1;
     });
-    player.unit_repair_queue = data;
     for(var i = 0; i < player.unit_repair_queue.length; i++) {
         var item = player.unit_repair_queue[i];
         // can be race conditions here with server, so check to be careful
@@ -29103,9 +29122,38 @@ function receive_unit_repair_update(data) {
             obj.under_repair_finish = item['finish_time'];
         }
     }
-    // confirm receipt of response from the repair_control dialog
-    unit_repair_ping_sent = false;
 }
+
+/** Client-side predict removal of one unit from repair queue
+    (see Player.unit_repair_cancel() on server)
+    @param {!GameObjectId} obj_id */
+player.army_unit_cancel_repair = function(obj_id) {
+    for(var i = 0; i < player.unit_repair_queue.length; i++) {
+        var item = player.unit_repair_queue[i];
+        if(item['obj_id'] === obj_id) {
+            var time_remaining = (i === 0 ? item['finish_time'] - server_time :
+                                  item['finish_time'] - player.unit_repair_queue[i-1]['finish_time']);
+            // adjust timers on objects that remain in the repair queue
+            for(var j = i+1; j < player.unit_repair_queue.length; j++) {
+                player.unit_repair_queue[j]['finish_time'] -= time_remaining;
+                player.unit_repair_queue[j]['start_time'] -= time_remaining;
+            }
+            player.unit_repair_queue.splice(i,1);
+            apply_unit_repair_update();
+            unit_repair_sync_marker = synchronizer.request_sync();
+            break;
+        }
+    }
+};
+/** Client-side predict one unit disappearing from the army permanently
+    @param {!GameObjectId} obj_id */
+player.army_unit_drop = function(obj_id) {
+    if(obj_id in player.my_army) {
+        player.army_unit_cancel_repair(obj_id);
+        delete player.my_army[obj_id];
+        session.get_real_world().lazy_update_citizens();
+    }
+};
 
 /** @param {!GameObjectId} obj_id
     @return {boolean} */
@@ -43839,7 +43887,7 @@ function handle_server_message(data) {
                (obj.team == 'enemy' && session.viewing_base.base_landlord_id === session.user_id)) {
                 var auto_spell = obj.get_auto_spell();
                 if(auto_spell && auto_spell['deployment_arming_delay']) {
-                    obj.create_aura(world, obj, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
+                    obj.create_aura(world, obj.id, obj.team, 'arming', 1, relative_time_to_tick(auto_spell['deployment_arming_delay']), -1, null);
                 }
             }
 
@@ -49295,19 +49343,10 @@ function draw_unit(world, unit) {
     } else if(unit.hp == 0 && unit.team == 'player') {
         // draw zombie skull
         GameArt.assets['repair_skull'].states['normal'].draw([xy[0]+20,xy[1]+15], 0, 0);
-    } else if((unit.hp > 0) && ((unit.hp / unit.max_hp) < gamedata['zombie_debuff_threshold']) && unit.team == 'player' &&
-       player.get_any_abtest_value('enable_zombie_debuff', gamedata['enable_zombie_debuff'])) {
+    } else if((unit.hp > 0) && ((unit.hp / unit.max_hp) < gamedata['zombie_debuff_threshold']) && unit.team == 'player') {
         // when at home base, show yellow wrench unconditionally when at critical damage
         // but when attacking, only show if the weak_zombie aura truly applies (i.e. ignore battle damage that occurs DURING the fight).
-        var show_yellow_wrench = session.home_base;
-        if(!show_yellow_wrench) {
-            for(var i = 0; i < unit.auras.length; i++) {
-                if(unit.auras[i].spec['code'] === 'weak_zombie') {
-                    show_yellow_wrench = true;
-                    break;
-                }
-            }
-        }
+        var show_yellow_wrench = session.home_base || unit.is_weak_zombie();
         if(show_yellow_wrench) {
             GameArt.assets['repair_wrench_yellow'].states['normal'].draw([xy[0]+20,xy[1]+15], 0, 0);
         }
@@ -49370,9 +49409,15 @@ function draw_unit(world, unit) {
     @param {Array.<number>} indicator_xy
     @param {!Aura} aura */
 function draw_aura(xy, indicator_xy, aura) {
-    if(aura.spec['code'] === 'weak_zombie') {
-        // handled separately for UI consistency when debuff is not actually applied
-        return;
+    // skip weak_zombie here
+    // (it's handled separately for UI consistency when debuff is not actually applied)
+    if(('effects' in aura.spec) && aura.spec['effects'].length > 0) {
+        for(var j = 0; j < aura.spec['effects'].length; j++) {
+            var eff = aura.spec['effects'][j];
+            if(eff['code'] === 'weak_zombie') {
+                return;
+            }
+        }
     }
 
     var color;

@@ -771,7 +771,7 @@
                             "ui_body": "Commander,\n\n%SENDER_NAME, %SENDER_ROLE_NAME sent us this gift on %day at %time GMT.\n\nWARNING: Messages expire, store items quickly."},
 
     "weak_zombie_tip": { "ui_title": "Random Failures Suffered",
-                         "ui_description": "Units with more than %one_minus_threshold% damage now suffer speed and damage reductions due to random equipment failures.\n\nOur forces desperately need repairs." },
+                         "ui_description": "Units with more than %one_minus_threshold% damage now suffer speed and damage reductions due to random equipment failures, and cannot spawn security teams.\n\nOur forces desperately need repairs." },
 
     "no_equipment_tip": { "ui_title": "You Lack Equipment",
                           "ui_description": "Your Warehouse lacks equipment items for this slot.\n\nWin equipment during limited-time special events by fighting featured opponents on the Attack menu." },

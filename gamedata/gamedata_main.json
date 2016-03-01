@@ -695,8 +695,7 @@
     "upgrade_cancel_refund": 0.50, // fraction of original cost that is refunded when building upgrades are cancelled
     "research_cancel_refund": 0.50, // fraction of original cost that is refunded when tech research is cancelled
 
-    "enable_zombie_debuff": 1, // reduce combat effectiveness of units deployed into battle at low health
-    "zombie_debuff_threshold": 0.1, // fraction of HP below which zombie debuff applies
+    "zombie_debuff_threshold": 0.1, // fraction of HP below which zombie debuff applies (set -1 to disable)
 
     "minimum_combat_power_factor": 0.30, // minimum effectiveness of turrets if all energy plants are inoperative
 
