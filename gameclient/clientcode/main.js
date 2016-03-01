@@ -415,6 +415,7 @@ function vec_print(v) { return v[0].toString()+','+v[1].toString(); };
     @param {number} a
     @return {number} */
 function normalize_angle(a) {
+    if(isNaN(a)) { throw Error('normalize_angle(NaN)'); }
     if(a < 0) {
         return (a % (2*Math.PI)) + 2*Math.PI;
     } else if(a >= 2*Math.PI) {
@@ -1885,10 +1886,11 @@ GameObject.prototype.interpolate_pos_for_draw = function(world) { return this.in
     @return {number} */
 GameObject.prototype.interpolate_facing = function(world) {
     var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    var ret;
     if(progress <= 0) {
-        return this.cur_facing;
+        ret = this.cur_facing;
     } else if(progress >= 1) {
-        return this.next_facing;
+        ret = this.next_facing;
     } else {
         // Spherical linear interpolation - see https://en.wikipedia.org/wiki/Slerp
         var cur = [Math.cos(this.cur_facing), Math.sin(this.cur_facing)];
@@ -1901,9 +1903,14 @@ GameObject.prototype.interpolate_facing = function(world) {
         var slerp_p0 = Math.sin((1-progress)*omega)/Math.sin(omega);
         var slerp_p1 = Math.sin(progress*omega)/Math.sin(omega);
         var slerp = vec_add(vec_scale(slerp_p0, cur), vec_scale(slerp_p1, next));
-        return normalize_angle(Math.atan2(slerp[1], slerp[0]));
+        ret = normalize_angle(Math.atan2(slerp[1], slerp[0]));
     }
+    if(isNaN(ret)) {
+        throw Error('NaN from interpolate_facing: progress '+progress.toString()+' cur '+this.cur_facing.toString()+' next '+this.next_facing.toString());
+    }
+    return ret;
 };
+
 /** @return {boolean} */
 GameObject.prototype.is_invisible = function() { return false; };
 
