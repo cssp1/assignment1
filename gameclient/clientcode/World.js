@@ -425,6 +425,7 @@ World.World.prototype.run_unit_ticks = function() {
         // run phantom unit controllers
         this.tick_astar_queries_left = -1; // should not disturb actual unit control
         goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
+            obj.run_control_prep();
             obj.run_control_pathing(this);
             obj.run_control_facing();
             obj.add_movement_effect(this.fxworld);
