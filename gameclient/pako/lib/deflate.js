@@ -366,6 +366,9 @@ function deflateRaw(input, options) {
  *
  * The same as [[deflate]], but create gzip wrapper instead of
  * deflate one.
+ @param {string|Array} input
+ @param {{to:(string|undefined)}} options
+ @return {string|Array}
  **/
 function gzip(input, options) {
   options = options || {};

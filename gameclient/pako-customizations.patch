@@ -18,7 +18,7 @@ diff -ru ./index.js /Users/dmaas/cvs/game/gameclient/pako/index.js
  
 diff -ru ./lib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js
 --- ./lib/deflate.js	2016-02-17 18:09:06.000000000 +0900
-+++ /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js	2016-03-03 07:14:08.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js	2016-03-03 08:24:02.000000000 +0900
 @@ -1,5 +1,8 @@
  'use strict';
  
@@ -37,9 +37,19 @@ diff -ru ./lib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js
   * new Deflate(options)
   * - options (Object): zlib deflate options.
   *
+@@ -363,6 +366,9 @@
+  *
+  * The same as [[deflate]], but create gzip wrapper instead of
+  * deflate one.
++ @param {string|Array} input
++ @param {{to:(string|undefined)}} options
++ @return {string|Array}
+  **/
+ function gzip(input, options) {
+   options = options || {};
 diff -ru ./lib/inflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js
 --- ./lib/inflate.js	2016-02-17 18:09:06.000000000 +0900
-+++ /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js	2016-03-03 07:16:51.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js	2016-03-03 08:34:05.000000000 +0900
 @@ -1,5 +1,8 @@
  'use strict';
  
@@ -58,6 +68,16 @@ diff -ru ./lib/inflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js
   * new Inflate(options)
   * - options (Object): zlib inflate options.
   *
+@@ -357,6 +360,9 @@
+  *   console.log(err);
+  * }
+  * ```
++ @param {string|Array} input
++ @param {{to:(string|undefined)}} options
++ @return {string|Array}
+  **/
+ function inflate(input, options) {
+   var inflator = new Inflate(options);
 diff -ru ./lib/utils/common.js /Users/dmaas/cvs/game/gameclient/pako/lib/utils/common.js
 --- ./lib/utils/common.js	2016-02-17 18:09:06.000000000 +0900
 +++ /Users/dmaas/cvs/game/gameclient/pako/lib/utils/common.js	2016-03-03 07:33:15.000000000 +0900

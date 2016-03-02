@@ -153,6 +153,20 @@ var XPayStationWidget = {
     "off": function() {}
 };
 
+// Pako compression library
+// (only needed for the Browserified version.
+// Unfortunately, this prevents Closure from shortening the API names.)
+var pako = {
+    /** @param {string|Array} input
+        @param {{to:(string|undefined)}} options
+        @return {string|Array} */
+    "gzip": function(input, options) {},
+    /** @param {string|Array} input
+        @param {{to:(string|undefined)}} options
+        @return {string|Array} */
+    "ungzip": function(input, options) {}
+};
+
 // JQuery
 var $ = {
     "fn": {
