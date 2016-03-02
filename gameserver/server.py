@@ -3201,14 +3201,16 @@ class AttackReplayReceiver (object):
         self.local_filename = os.path.join(self.storage_dir(self.log_time), self.log_file)
         self.buf = None # allocated lazily
         self.codec = None
+        self.raw_length = None
 
-    def accumulate(self, codec, from_count, to_count, total_count, inbuf):
+    def accumulate(self, raw_length, codec, from_count, to_count, total_count, inbuf):
         # receive a segment of compressed replay data from the client.
         # return true if finished with the last segment
 
         if self.codec is None:
             assert codec == 'raw'
             self.codec = codec
+            self.raw_length = raw_length
             self.buf = cStringIO.StringIO()
         else:
             assert codec == self.codec
@@ -3226,6 +3228,8 @@ class AttackReplayReceiver (object):
         raw_buf = self.buf.getvalue()
         # (then apply codec here)
 
+        # check the size of the decompressed raw representation
+        if len(raw_buf) != self.raw_length: raise Exception('raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
         self.ensure_storage_dir(self.log_time)
 
         # gzip compress on the way out
@@ -3234,6 +3238,9 @@ class AttackReplayReceiver (object):
             temp.write(raw_buf)
             temp.close()
             atom.complete()
+
+        gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
+                                     (self.log_file, self.raw_length, self.buf.tell()))
 
 class Session(object):
     class AsyncLogout:
@@ -24620,9 +24627,9 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
         elif arg[0] == "UPLOAD_BATTLE_REPLAY":
-            token, codec, from_count, to_count, total_count, inbuf = arg[1:7]
+            token, raw_length, codec, from_count, to_count, total_count, inbuf = arg[1:8]
             if token in session.attack_replay_receivers:
-                if session.attack_replay_receivers[token].accumulate(codec, from_count, to_count, total_count, inbuf):
+                if session.attack_replay_receivers[token].accumulate(raw_length, codec, from_count, to_count, total_count, inbuf):
                     # it's done
                     del session.attack_replay_receivers[token]
 

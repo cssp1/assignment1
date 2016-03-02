@@ -43819,6 +43819,10 @@ function handle_server_message(data) {
             }
         }
 
+        // if we were recording a replay, upload it
+        if(session.is_recording()) {
+            session.finish_and_upload_recording();
+        }
     } else if(msg == "END_SERVER_HELLO") {
         session.server_hello_ended = true;
 
@@ -44767,10 +44771,15 @@ function handle_server_message(data) {
         }
 
     } else if(msg == "AI_ATTACK_WAVE_DEPLOYED") {
+        var finish_time = data[1];
+        var units = data[2];
+        var wave_time = data[3];
+        var replay_token = data[4];
+
         session.has_attacked = true;
-        session.set_attack_finish_time(data[1]);
-        session.incoming_attack_units = data[2];
-        session.incoming_attack_wave_time = data[3];
+        session.set_attack_finish_time(finish_time);
+        session.incoming_attack_units = units;
+        session.incoming_attack_wave_time = wave_time;
         session.incoming_attack_wave_pending = false;
 
         if(!session.has_deployed) {
@@ -44792,9 +44801,16 @@ function handle_server_message(data) {
             // use "recon" music if "combat" music not available
             change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states[(GameArt.assets['background_music'].has_state('combat') ? 'combat' : 'recon')]).audio);
         }
+
+        if(replay_token && !session.is_recording()) {
+            session.start_recording(replay_token);
+        }
     } else if(msg == "PLAYER_ATTACK_WAVE_DEPLOYED") {
+        var finish_time = data[1];
+        var replay_token = data[2];
+
         session.has_attacked = true;
-        session.set_attack_finish_time(data[1]);
+        session.set_attack_finish_time(finish_time);
         if(!session.has_deployed) {
             session.has_deployed = true;
             session.deploy_time = server_time;
@@ -44805,6 +44821,10 @@ function handle_server_message(data) {
                 // if no "combat" music is available, stick with "recon"
                 change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states['combat']).audio);
             }
+        }
+
+        if(replay_token && !session.is_recording()) {
+            session.start_recording(replay_token);
         }
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];

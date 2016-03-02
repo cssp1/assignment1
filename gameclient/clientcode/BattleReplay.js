@@ -9,7 +9,7 @@ goog.provide('BattleReplay');
 */
 
 goog.require('Base');
-goog.require('Session');
+goog.require('World');
 goog.require('goog.object');
 
 BattleReplay.invoke = function(log) {
@@ -41,8 +41,10 @@ BattleReplay.invoke = function(log) {
     session.push_world(world);
 };
 
-/** @constructor @struct
-    @param {!World.World} world */
+/** RECORDER
+    @constructor @struct
+    @param {!World.World} world
+*/
 BattleReplay.Recorder = function(world) {
     this.world = world;
     this.snapshots = [];
@@ -68,12 +70,12 @@ BattleReplay.Recorder.prototype.compare_snapshots = function(reason) {
     }
 };
 
-BattleReplay.Recorder.prototype.before_control = function(event) {
-
-    console.log('Snapshot '+this.snapshots.length.toString()+' at '+this.world.last_tick_time.toString());
+BattleReplay.Recorder.prototype.before_control = function() {
+    console.log('Recorded snapshot '+this.snapshots.length.toString());
     var snap = {'tick_time': this.world.last_tick_time,
                 'objects': this.world.objects.serialize_incremental()};
     if(this.snapshots.length < 1) {
+        // grab base on first snapshot only
         snap['base'] = this.world.base.serialize();
     }
     this.snapshots.push(snap);
@@ -82,15 +84,13 @@ BattleReplay.Recorder.prototype.before_control = function(event) {
     // XXX note: this breaks playback since the incremental serialization is stateful
     //this.diff_snap = this.world.objects.serialize();
 };
-BattleReplay.Recorder.prototype.before_damage_effects = function(event) {
+BattleReplay.Recorder.prototype.before_damage_effects = function() {
     this.compare_snapshots('run_control');
-
     this.snapshots[this.snapshots.length-1]['combat_engine'] = this.world.combat_engine.serialize_incremental();
 };
-BattleReplay.Recorder.prototype.after_damage_effects = function(event) {
+BattleReplay.Recorder.prototype.after_damage_effects = function() {
     this.compare_snapshots('damage effects');
 };
-
 BattleReplay.Recorder.prototype.stop = function() {
     goog.array.forEach(goog.object.getKeys(this.listen_keys), function(k) {
         this.world.unlistenByKey(this.listen_keys[k]);
@@ -99,14 +99,25 @@ BattleReplay.Recorder.prototype.stop = function() {
     console.log('Recorder stopped with '+this.snapshots.length.toString()+' snapshots');
 };
 
-/** @param {!BattleReplay.Recorder} recorder */
+/** Return the final uploadable representation of the replay
+    @return {string} */
+BattleReplay.Recorder.prototype.pack_for_upload = function() {
+    var pack = {'version': 0,
+                'snapshots': this.snapshots};
+    return JSON.stringify(pack);
+};
+
+/** LINK FROM RECORDER TO PLAYER
+    @param {!BattleReplay.Recorder} recorder */
 BattleReplay.replay = function(recorder) {
     if(recorder.snapshots.length < 1) { throw Error('recorded not initialized'); }
     return new BattleReplay.Player(recorder.snapshots);
 };
 
-/** @constructor @struct
-    @param {!Array<!Object>} snapshots */
+/** PLAYER
+    @constructor @struct
+    @param {!Array<!Object>} snapshots
+*/
 BattleReplay.Player = function(snapshots) {
     if(snapshots.length < 1) { throw Error('no snapshots'); }
     if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
