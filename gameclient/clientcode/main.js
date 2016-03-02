@@ -1429,7 +1429,7 @@ GameObject.prototype.serialize = function() {
             'auras': goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this),
             'cooldowns': deepcopy_obj(this.cooldowns),
             'cur_facing': this.cur_facing,
-            'next_facing': this.next_facing,
+            //'next_facing': this.next_facing,
             'target_facing': this.target_facing
            };
 };
@@ -1441,8 +1441,8 @@ GameObject.prototype.serialize_incremental = function() {
     }
     if(this.serialization_dirty) {
         var new_snapshot = this.serialize();
-        /** @const fields that always should be updated (because run_control() and damage mutate them unpredictably) */
-        var always_diff = {'hp':1, 'cur_facing':1, 'next_facing':1, 'target_facing':1};
+        /** @const fields that always should be updated (because run_control_shooting() and damage mutate them unpredictably) */
+        var always_diff = {'hp':1};
         var diffs = {};
         goog.object.forEach(new_snapshot, function(v, k) {
             if((k in always_diff) || !deepequal(this.prev_snapshot[k], v)) {
@@ -1475,8 +1475,13 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('combat_stats' in snap) { this.combat_stats = snap['combat_stats']; }
     if('auras' in snap) { this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this); }
     if('cooldowns' in snap) { this.cooldowns = snap['cooldowns']; }
-    if('cur_facing' in snap) { this.cur_facing = snap['cur_facing']; }
-    if('next_facing' in snap) { this.next_facing = snap['next_facing']; }
+    if('cur_facing' in snap) {
+        this.cur_facing = snap['cur_facing'];
+        // set next_facing only for the very first tick after application of the initial snapshot
+        // for later ticks, it will be overwritten by run_control_facing().
+        this.next_facing = this.cur_facing;
+    }
+    //if('next_facing' in snap) { this.next_facing = snap['next_facing']; }
     if('target_facing' in snap) { this.target_facing = snap['target_facing']; }
 };
 
@@ -1819,9 +1824,18 @@ function get_as_array(qty) {
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
 GameObject.prototype.get_leveled_quantity = function(qty) { return get_leveled_quantity(qty, this.level); }
 
-GameObject.prototype.update_facing = function() {
+/** Set new next_facing based on cur_facing and target_facing */
+GameObject.prototype.run_control_facing = function() {
     if('turn_rate' in this.spec) {
-        this.cur_facing = this.next_facing;
+
+        if(this.is_building() && this.control_state === control_states.CONTROL_STOP &&
+           !this.combat_stats.stunned && !(this.is_upgrading() || this.is_repairing() || this.disarmed)) {
+            // idle turrets - rotate them around slowly
+            var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
+            incr *= this.combat_power_factor(); // turn more slowly if depowered
+            if(this.anim_offset > 0.5) { incr *= -1; }
+            this.target_facing = normalize_angle(this.cur_facing + incr*TICK_INTERVAL);
+        }
 
         // turn from cur_facing towards target_facing
         if(this.cur_facing != this.target_facing && !this.is_destroyed() && !this.combat_stats.stunned) {
@@ -1840,16 +1854,8 @@ GameObject.prototype.update_facing = function() {
             dot = Math.min(dot, 1); // avoid acos NaNs with rounding errors
 
             if(dot > Math.cos(turn_amount)) {
-                // angle between vectors is less than turn_amount, snap cur to target
+                // angle between vectors is less than turn_amount, snap to target
                 this.next_facing = this.target_facing;
-                var cross = cur[0]*tgt[1] - cur[1]*tgt[0];
-
-                if(cross > 0) {
-                    this.cur_facing = this.next_facing - Math.acos(dot);
-                } else {
-                    this.cur_facing = this.next_facing + Math.acos(dot);
-                    //this.next_facing = this.cur_facing - turn_amount;
-                }
             } else {
                 // angle between vectors is greater than turn_amount
                 // choose direction to turn depending on Z component of cross product
@@ -2456,14 +2462,21 @@ function calculate_battle_outcome() {
     }
 }
 
-/** @param {!World.World} world */
-GameObject.prototype.run_control = function(world) {
+/** Advance time-interpolated variables */
+GameObject.prototype.run_control_prep = function() {
+    this.cur_facing = this.next_facing;
     if(this.control_cooldown > 0) {
         this.control_cooldown -= 1;
-        this.serialization_dirty = true;
     }
+};
 
-    if(this.combat_stats.stunned) { return; }
+/** @param {!World.World} world */
+GameObject.prototype.run_control_pathing = function(world) {};
+
+/** @param {!World.World} world */
+GameObject.prototype.run_control_shooting = function(world) {
+
+    if(this.is_destroyed() || this.combat_stats.stunned) { return; }
 
     if(this.control_state === control_states.CONTROL_SHOOT) {
         this.serialization_dirty = true;
@@ -2545,19 +2558,6 @@ GameObject.prototype.run_control = function(world) {
             }
 
             this.fire_projectile(world, world.combat_engine.cur_tick, client_time, null, -1, spell, spell_level, target, target_pos, target_height);
-        }
-    } else if(this.control_state === control_states.CONTROL_STOP) {
-
-        if(this.is_building() && 'turn_rate' in this.spec) {
-            // idle turrets - rotate them around slowly
-            var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
-            incr *= this.combat_power_factor(); // turn more slowly if depowered
-            if(this.anim_offset > 0.5) { incr *= -1; }
-            this.target_facing = normalize_angle(this.next_facing + incr*TICK_INTERVAL);
-            if(this.target_facing > 2*Math.PI) {
-                this.target_facing -= 2*Math.PI;
-            }
-            //this.serialization_dirty = true; // XXXXXX make predictable
         }
     }
 
@@ -7874,7 +7874,7 @@ goog.inherits(Mobile, GameObject);
 Mobile.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
     //ret['orders'] = deepcopy_array(this.orders);
-    ret['patrol'] = this.patrol; // might be needed for facing
+    //ret['patrol'] = this.patrol; // might be needed for facing
     ret['temporary'] = this.temporary;
     ret['squad_id'] = this.squad_id;
     //ret['ai_dest'] = (this.ai_dest ? deepcopy_array(this.ai_dest) : null);
@@ -7882,17 +7882,17 @@ Mobile.prototype.serialize = function() {
     ret['pos'] = deepcopy_array(this.pos);
     ret['vel'] = this.vel;
     ret['next_pos'] = deepcopy_array(this.next_pos);
-    ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // XXX only needed for facing I think
-    ret['path_valid'] = this.path_valid; // XXX only needed for facing
-    ret['path'] = deepcopy_array(this.path); // XXX only needed for facing
-    ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null);
+    //ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // XXX only needed for facing I think
+    //ret['path_valid'] = this.path_valid; // XXX only needed for facing
+    //ret['path'] = deepcopy_array(this.path); // XXX only needed for facing
+    //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null);
     return ret;
 };
 /** @override */
 Mobile.prototype.apply_snapshot = function(snap) {
     goog.base(this, 'apply_snapshot', snap);
     //if('orders' in snap) { this.orders = snap['orders']; }
-    if('patrol' in snap) { this.patrol = snap['patrol']; }
+    //if('patrol' in snap) { this.patrol = snap['patrol']; }
     if('temporary' in snap) { this.temporary = snap['temporary']; }
     if('squad_id' in snap) { this.squad_id = snap['squad_id']; }
     //if('ai_dest' in snap) { this.ai_dest = snap['ai_dest']; }
@@ -7900,10 +7900,10 @@ Mobile.prototype.apply_snapshot = function(snap) {
     if('pos' in snap) { this.pos = snap['pos']; }
     if('vel' in snap) { this.vel = snap['vel']; }
     if('next_pos' in snap) { this.next_pos = snap['next_pos']; }
-    if('dest' in snap) { this.dest = snap['dest']; } // XXX only needed for facing I think
-    if('path_valid' in snap) { this.path_valid = snap['path_valid']; } // XXX only needed for facing I think
-    if('path' in snap) { this.path = snap['path']; } // XXX only needed for facing I think
-    if('stuck_loc' in snap) { this.stuck_loc = snap['stuck_loc']; }
+    //if('dest' in snap) { this.dest = snap['dest']; } // XXX only needed for facing I think
+    //if('path_valid' in snap) { this.path_valid = snap['path_valid']; } // XXX only needed for facing I think
+    //if('path' in snap) { this.path = snap['path']; } // XXX only needed for facing I think
+    //if('stuck_loc' in snap) { this.stuck_loc = snap['stuck_loc']; }
 };
 
 /** @override */
@@ -8251,8 +8251,13 @@ Mobile.prototype.detect_click = function(world, xy, ji, zoom, fuzz) {
 
 /** @override */
 Mobile.prototype.run_ai = function(world) {
+    if(this.is_destroyed()) {
+        this.ai_stop();
+        return;
+    }
+
     if(this.ai_state === ai_states.AI_ATTACK_STATIONARY) {
-        this.control_state = control_states.CONTROL_STOP;
+        this.ai_stop();
     }
 
     // run this before the base class run_ai() because we may switch to AI_ATTACK_ANY
@@ -8364,8 +8369,21 @@ Mobile.prototype.run_ai = function(world) {
 };
 
 /** @override */
-Mobile.prototype.run_control = function(world) {
-    goog.base(this, 'run_control', world);
+Mobile.prototype.run_control_prep = function() {
+    goog.base(this, 'run_control_prep');
+
+    // update pos
+    if(!vec_equals(this.pos, this.next_pos)) {
+        this.pos = this.next_pos;
+        // eventually persist the new location to the server
+        this.state_dirty |= obj_state_flags.XY;
+    }
+};
+
+/** Based on pos and dest, set next_pos and vel
+    @override */
+Mobile.prototype.run_control_pathing = function(world) {
+    goog.base(this, 'run_control_pathing', world);
 
     if(this.is_destroyed()) {
         // we're dead, Jim.
@@ -8377,9 +8395,9 @@ Mobile.prototype.run_control = function(world) {
     if(this.control_state === control_states.CONTROL_STOP ||
        this.control_state === control_states.CONTROL_SHOOT) {
         // stop at end of this tick's motion
-        if(!vec_equals(this.pos, this.next_pos) || !vec_equals(this.vel, [0,0])) {
+        if(!vec_equals(this.next_pos, this.pos) || !vec_equals(this.vel, [0,0])) {
             this.serialization_dirty = true;
-            this.pos = this.next_pos;
+            this.next_pos = this.pos;
             this.vel = [0,0];
         }
 
@@ -8387,14 +8405,6 @@ Mobile.prototype.run_control = function(world) {
         this.serialization_dirty = true;
         var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
         if(this.dest === null) { throw Error('dest must be non-null here '+this.spec['name']+' '+this.id); }
-
-        // update pos
-        if(this.next_pos[0] != this.pos[0] || this.next_pos[1] != this.pos[1]) {
-            this.pos = this.next_pos;
-
-            // eventually persist the new location to the server
-            this.state_dirty |= obj_state_flags.XY;
-        }
 
         if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) {
             console.log(this.spec['name']+' CONTROL_MOVING pos '+this.pos[0].toString()+','+this.pos[1].toString()+' dest '+this.dest[0].toString()+','+this.dest[1].toString()+' path_valid '+this.path_valid.toString());
@@ -8628,7 +8638,7 @@ Mobile.prototype.run_control = function(world) {
     } // END control_moving
 
     if(typeof(this.pos) == 'undefined') {
-        throw Error(this.spec['name']+' exited run_control (' + control_state_names[this.control_state] + ') with undefined this.pos');
+        throw Error(this.spec['name']+' exited run_control_pathing (' + control_state_names[this.control_state] + ') with undefined this.pos');
     }
 };
 
@@ -47055,8 +47065,7 @@ function on_keypress(e) {
         } else if(str === 'm') {
             if(!selection.unit) { toggle_region_map(); }
         } else if(str === 'z' && player.is_developer() && world) {
-            world.ai_paused = !(world.ai_paused || world.control_paused);
-            world.control_paused = world.ai_paused;
+            world.control_paused = !world.control_paused;
         } else if(str === 'l') {
             if(pointer_lock_supported) {
                 if(!mouse_state.pointer_locked) {

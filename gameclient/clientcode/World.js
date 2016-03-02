@@ -344,12 +344,15 @@ World.World.prototype.query_objects_within_distance = function(loc, dist, params
 };
 
 World.World.prototype.run_unit_ticks = function() {
+    if(this.control_paused) { return; }
+
     if(client_time - this.last_tick_time > TICK_INTERVAL/combat_time_scale()) {
         // record time at which this tick was computed
         this.last_tick_time = client_time;
         this.combat_engine.cur_tick = new GameTypes.TickCount(this.combat_engine.cur_tick.get()+1);
         this.combat_engine.cur_client_time = client_time;
 
+        // XXXXXX this is broken for replays, where the objects are injected later
         if(this.wall_mgr && this.objects) { this.wall_mgr.refresh(this.objects); }
 
         this.ai_pick_target_classic_cache_gen = -1; // clear the targeting cache
@@ -392,6 +395,7 @@ World.World.prototype.run_unit_ticks = function() {
 
         goog.array.forEach(obj_list, function(obj) {
             obj.update_stats(this);
+            obj.run_control_prep();
         }, this);
 
         // AI layer
@@ -400,35 +404,38 @@ World.World.prototype.run_unit_ticks = function() {
                 obj.ai_threatlist_update(this);
                 obj.run_ai(this);
             }, this);
+            goog.array.forEach(obj_list, function(obj) {
+                obj.run_control_pathing(this);
+            }, this);
         }
-
-        this.notifier.dispatchEvent(new goog.events.Event('before_control', this));
 
         // Control layer and visual effects
-        if(!this.control_paused) {
-            goog.array.forEach(obj_list, function(obj) {
-                obj.run_control(this);
-                obj.update_facing();
-                if(obj.is_mobile()) {
-                    obj.add_movement_effect(this.fxworld);
-                }
-                obj.update_aura_effects(this);
-            }, this);
+        this.notifier.dispatchEvent(new goog.events.Event('before_control', this));
 
-            // run phantom unit controllers
-            this.tick_astar_queries_left = -1; // should not disturb actual unit control
-            goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
-                obj.run_control(this);
-                obj.update_facing();
+        goog.array.forEach(obj_list, function(obj) {
+            obj.run_control_shooting(this);
+            obj.run_control_facing();
+
+            if(obj.is_mobile()) {
                 obj.add_movement_effect(this.fxworld);
-            }, this);
+            }
+            obj.update_aura_effects(this);
+        }, this);
 
-            this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this));
+        // run phantom unit controllers
+        this.tick_astar_queries_left = -1; // should not disturb actual unit control
+        goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
+            obj.run_control_prep();
+            obj.run_control_pathing(this);
+            obj.run_control_facing();
+            obj.add_movement_effect(this.fxworld);
+        }, this);
 
-            this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
+        this.notifier.dispatchEvent(new goog.events.Event('before_damage_effects', this));
 
-            this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this));
-        }
+        this.combat_engine.apply_queued_damage_effects(this, COMBAT_ENGINE_USE_TICKS);
+
+        this.notifier.dispatchEvent(new goog.events.Event('after_damage_effects', this));
     }
 };
 
