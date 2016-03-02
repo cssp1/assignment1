@@ -89,6 +89,16 @@ import itertools
 try: import lz4; has_lz4 = True
 except: has_lz4 = False
 
+# apply compression and JSON-safe wrapping to a text string for transmission to the client
+def compress_and_wrap_string(s):
+    if has_lz4:
+        codec = 'lz4'
+        z_result = base64.b64encode(bytes(lz4.compress(s)))
+    else:
+        codec = 'lzjb'
+        z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(s))))
+
+    return codec, z_result
 
 #
 # UTILITIES
@@ -17985,20 +17995,8 @@ class GAMEAPI(resource.Resource):
             db_time = max(db_time, x.get('last_mtime',-1))
 
         if gamedata['server']['enable_map_compression'] and updated_since < 0:
-
-            if has_lz4 and gamedata['server']['map_compression_codec'] == 'lz4':
-                codec = 'lz4'
-            else:
-                codec = 'lzjb'
-
-            with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':'+codec+'encode)'):
-                if codec == 'lz4':
-                    z_result = base64.b64encode(bytes(lz4.compress(SpinJSON.dumps(result))))
-                elif codec == 'lzjb':
-                    z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(SpinJSON.dumps(result)))))
-
-            #SpinJSON.dump(result, open('/tmp/zzz.txt','w'), pretty=True)
-
+            with admin_stats.latency_measurer('do_quarry_query_uncached('+reason+':encode)'):
+                codec, z_result = compress_and_wrap_string(SpinJSON.dumps(result))
         else:
             codec = 'raw'
             z_result = result

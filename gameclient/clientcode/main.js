@@ -42978,6 +42978,24 @@ function toggle_unit_selection(u) {
     }
 };
 
+/** Inverse of the server's compress_and_wrap_string()
+    @param {string} codec
+    @param {string} z_result
+    @return {string} */
+function unwrap_and_uncompress_string(codec, z_result) {
+    if(codec === 'raw') {
+        return z_result;
+    } else if(codec == 'lzjb') {
+        return Iuppiter.bytes_to_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result)));
+    } else if(codec == 'lz4') {
+        var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
+        arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
+        return Iuppiter.bytes_to_string(lz4.decompress(arr));
+    } else {
+        throw Error('unknown codec '+codec);
+    }
+};
+
 function on_ajax_goog(event) {
     if(!event.target.isSuccess()) {
         if(SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant (?)
@@ -44976,18 +44994,8 @@ function handle_server_message(data) {
         var z_result = data[5];
         var last_db_time = data[6];
 
-        var result;
-        if(codec == 'raw') {
-            result = z_result;
-        } else if(codec == 'lzjb') {
-            result = JSON.parse(Iuppiter.bytes_to_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result))));
-        } else if(codec == 'lz4') {
-            var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
-            arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
-            result = JSON.parse(Iuppiter.bytes_to_string(lz4.decompress(arr)));
-        } else {
-            throw Error('unknown codec '+codec);
-        }
+        // note: in "raw" mode, the result is already a parsed JSON structure
+        var result = (codec === 'raw' ? z_result : JSON.parse(unwrap_and_uncompress_string(codec, z_result)));
 
         last_quarry_query_time = client_time;
 
