@@ -9,22 +9,22 @@ goog.provide('SPHTTP');
 
 goog.require('goog.crypt.base64');
 
-var SPHTTP = {
-    /** @param {string} str
-        @return {string} */
-    wrap_string: function(str) {
-        // note: to make it safe for the AJAX post, use UTF-8 wrapped inside base64!
-        // JavaScript string -> UTF-8 conversion from http://ecmanaut.blogspot.com/2006/07/encoding-decoding-utf8-in-javascript.html
-        var utf8_str = unescape(encodeURIComponent(str));
-        var encoded_str = goog.crypt.base64.encodeString(utf8_str);
-        return encoded_str;
-    },
-    /** @param {string} input
-        @return {string} */
-    unwrap_string: function(input) {
-        var utf8_body = goog.crypt.base64.decodeString(input);
-        // UTF-8 -> JavaScript string see http://ecmanaut.blogspot.com/2006/07/encoding-decoding-utf8-in-javascript.html
-        var body = decodeURIComponent(escape(utf8_body));
-        return body;
-    }
+/** @param {string} str
+    @return {string} */
+SPHTTP.wrap_string = function(str) {
+    // note: to make it safe for the AJAX post, use UTF-8 wrapped inside base64!
+    // JavaScript string -> UTF-8 conversion from http://ecmanaut.blogspot.com/2006/07/encoding-decoding-utf8-in-javascript.html
+    var utf8_str = unescape(encodeURIComponent(str));
+    var encoded_str = goog.crypt.base64.encodeString(utf8_str);
+    return encoded_str;
 };
+
+/** @param {string} input
+    @return {string} */
+SPHTTP.unwrap_string = function(input) {
+    var utf8_body = goog.crypt.base64.decodeString(input);
+    // UTF-8 -> JavaScript string see http://ecmanaut.blogspot.com/2006/07/encoding-decoding-utf8-in-javascript.html
+    var body = decodeURIComponent(escape(utf8_body));
+    return body;
+};
+
