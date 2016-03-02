@@ -1715,7 +1715,12 @@ class GameProxy(proxy.ReverseProxyResource):
                                                 proxysite.proxy_root.static_resources['compiled-client.js'].length(),
                                                 'code', onload)
         else:
-            load_game_code  = '<script type="text/javascript" src="google/closure/goog/base.js"></script>'
+            load_game_code = ''
+            # load third-party CommonJS libraries using their browserified variant
+            # and reference the module under its mangled name to prevent errors in base.js
+            load_game_code += '<script type="text/javascript" src="pako/dist/pako.min.js"></script>' + \
+                              '<script type="text/javascript">module$pako$index = pako;</script>'
+            load_game_code += '<script type="text/javascript" src="google/closure/goog/base.js"></script>'
             load_game_code += '<script type="text/javascript" src="generated-deps.js"></script>'
             load_game_code += '<script type="text/javascript">goog.require("SPINPUNCHGAME");</script>'
             # call this directly in page onload because the code is loaded in-line
@@ -2695,7 +2700,7 @@ class ProxyRoot(TwistedNoResource):
 
         # access to raw source code (dangerous!)
         if (not SpinConfig.config.get('use_compiled_client',1)):
-            for srcfile in ('generated-deps.js', 'google', 'clientcode'):
+            for srcfile in ('generated-deps.js', 'google', 'clientcode', 'pako'):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}

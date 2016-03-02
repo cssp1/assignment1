@@ -16,6 +16,7 @@ CHECK_FLAGS += --jscomp_error=visibility
 CHECK_FLAGS += --jscomp_warning=globalThis
 CHECK_FLAGS += --jscomp_warning=duplicate
 CHECK_FLAGS += --jscomp_warning=uselessCode
+CHECK_FLAGS += --jscomp_warning=deprecated
 OPT_FLAGS :=
 
 # note: accessControls/visibility does not work unless checkTypes is also enabled :P
@@ -60,18 +61,52 @@ generated-deps.js: clientcode/*.js
 	@google/closure/bin/build/depswriter.py --root_with_prefix='clientcode ../../../clientcode' > $@
 	@echo "goog.require('SPINPUNCHGAME');" >> $@
 
+# For debugging Closure compiler module renaming, it may be helpful to disable unused-file pruning
+# by removing the --dependency_mode and --entry_point flags. This will caused Closure to try to compile
+# *everything* in the library together (including test cases and experimental code that would never
+# be reached by any user of the library). The compilation process will finish but you will get a broken
+# compiled executable (still useful to check the manifest and renaming reports though).
+# In order to facilitate this, manually prune away most of the irrelevant code from the Closure library.
+CLOSURE_LIB_FILES:= --js='google/third_party/closure/goog/mochikit/async/*.js' \
+ --js='google/closure/**.js' \
+ --js='!google/closure/test_module*.js' \
+ --js='!google/closure/**_test*.js' \
+ --js='!google/closure/**_perf.js' \
+ --js='!google/closure/**tester.js' \
+ --js='!google/closure/goog/bootstrap/**' \
+ --js='!google/closure/goog/cssom/**' \
+ --js='!google/closure/goog/debug/divconsole.js' \
+ --js='!google/closure/goog/debug/devcss/**' \
+ --js='!google/closure/goog/debug/fpsdisplay.js' \
+ --js='!google/closure/goog/demos/**' \
+ --js='!google/closure/goog/editor/**' \
+ --js='!google/closure/goog/events/*tester.js' \
+ --js='!google/closure/goog/fx/**' \
+ --js='!google/closure/goog/gears/**' \
+ --js='!google/closure/goog/graphics/**' \
+ --js='!google/closure/goog/labs/testing/**' \
+ --js='!google/closure/goog/labs/pubsub/**' \
+ --js='!google/closure/goog/labs/storage/**' \
+ --js='!google/closure/goog/module/testdata/**' \
+ --js='!google/closure/goog/positioning/**' \
+ --js='!google/closure/goog/storage/**' \
+ --js='!google/closure/goog/testing/**' \
+ --js='!google/closure/goog/tweak/**' \
+ --js='!google/closure/goog/ui/**'
+
 compiled-client.js: clientcode/*.js
 	@java -client -jar google/compiler.jar \
-		--only_closure_dependencies true \
-		--closure_entry_point='SPINPUNCHGAME' \
 		--language_in=ECMASCRIPT6_STRICT \
 		--language_out=ECMASCRIPT5 \
+		--dependency_mode=STRICT \
+		--entry_point='goog:SPINPUNCHGAME' \
+		--process_common_js_modules \
 		--externs='externs.js' \
-		--js='clientcode' \
-		--js='google/closure' \
-	        --js='!google/closure/goog/demos/**' \
-	        --js='!google/closure/**_test.js' \
-		--compilation_level=ADVANCED_OPTIMIZATIONS \
+		--js='clientcode/*.js' \
+		${CLOSURE_LIB_FILES} \
+		--js='pako/index.js' \
+		--js='pako/lib/**.js' \
+		--compilation_level=ADVANCED \
 		--summary_detail_level=2 \
 		--warning_level=VERBOSE \
 		--create_renaming_reports \
@@ -85,16 +120,17 @@ compiled-client.js: clientcode/*.js
 check: clientcode/*.js
 	@java -client -jar google/compiler.jar \
 		--new_type_inf \
-		--only_closure_dependencies true \
-		--closure_entry_point='SPINPUNCHGAME' \
 		--language_in=ECMASCRIPT6_STRICT \
 		--language_out=ECMASCRIPT5 \
+		--dependency_mode=STRICT \
+		--entry_point='goog:SPINPUNCHGAME' \
+		--process_common_js_modules \
 		--externs='externs.js' \
-		--js='clientcode' \
-		--js='google/closure' \
-	        --js='!google/closure/goog/demos/**' \
-	        --js='!google/closure/**_test.js' \
-		--compilation_level=ADVANCED_OPTIMIZATIONS \
+		--js='clientcode/*.js' \
+		${CLOSURE_LIB_FILES} \
+		--js='pako/index.js' \
+		--js='pako/lib/**.js' \
+		--compilation_level=ADVANCED \
 		--summary_detail_level=2 \
 		--warning_level=VERBOSE \
 		--js_output_file=/dev/null 2>&1 | ./filter_closure_warnings.py

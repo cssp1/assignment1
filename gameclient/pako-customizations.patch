@@ -1,0 +1,278 @@
+NOTES:
+
+* Get Pako from https://github.com/nodeca/pako
+* Only need the files already here in git
+(just the source code plus a browserified version for unobfuscated use)
+
+to create patch:
+diff -ru . ~/cvs/game/gameclient/pako | grep -v Only\ in
+
+diff -ru ./index.js /Users/dmaas/cvs/game/gameclient/pako/index.js
+--- ./index.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/index.js	2016-03-03 07:17:00.000000000 +0900
+@@ -1,3 +1,5 @@
++// SP3RDPARTY : pako JavaScript compression library : MIT License
++
+ // Top level file is just a mixin of submodules & constants
+ 'use strict';
+ 
+diff -ru ./lib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js
+--- ./lib/deflate.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js	2016-03-03 07:14:08.000000000 +0900
+@@ -1,5 +1,8 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var zlib_deflate = require('./zlib/deflate');
+ var utils        = require('./utils/common');
+@@ -68,7 +71,7 @@
+  **/
+ 
+ 
+-/**
++/** @constructor
+  * new Deflate(options)
+  * - options (Object): zlib deflate options.
+  *
+diff -ru ./lib/inflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js
+--- ./lib/inflate.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js	2016-03-03 07:16:51.000000000 +0900
+@@ -1,5 +1,8 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var zlib_inflate = require('./zlib/inflate');
+ var utils        = require('./utils/common');
+@@ -49,7 +52,7 @@
+  **/
+ 
+ 
+-/**
++/** @constructor
+  * new Inflate(options)
+  * - options (Object): zlib inflate options.
+  *
+diff -ru ./lib/utils/common.js /Users/dmaas/cvs/game/gameclient/pako/lib/utils/common.js
+--- ./lib/utils/common.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/utils/common.js	2016-03-03 07:33:15.000000000 +0900
+@@ -1,11 +1,14 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var TYPED_OK =  (typeof Uint8Array !== 'undefined') &&
+                 (typeof Uint16Array !== 'undefined') &&
+                 (typeof Int32Array !== 'undefined');
+ 
+-
++/** @param {...?} obj */
+ exports.assign = function (obj /*from1, from2, from3, ...*/) {
+   var sources = Array.prototype.slice.call(arguments, 1);
+   while (sources.length) {
+@@ -85,6 +88,8 @@
+ 
+ // Enable/Disable typed arrays use, for testing
+ //
++
++/* DJM - This confuses Closure. Use runtime dispatch instead.
+ exports.setTyped = function (on) {
+   if (on) {
+     exports.Buf8  = Uint8Array;
+@@ -100,3 +105,19 @@
+ };
+ 
+ exports.setTyped(TYPED_OK);
++*/
++
++/** @constructor @param {number} arg0 */
++exports.Buf8 = function(arg0) { return (TYPED_OK ? new Uint8Array(arg0) : new Array(arg0)); };
++/** @constructor @param {number} arg0 */
++exports.Buf16 = function(arg0) { return (TYPED_OK ? new Uint16Array(arg0) : new Array(arg0)); };
++/** @constructor @param {number} arg0 */
++exports.Buf32 = function(arg0) { return (TYPED_OK ? new Int32Array(arg0) : new Array(arg0)); };
++/** @param {?} arg0
++    @param {?} arg1
++    @param {?} arg2
++    @param {?} arg3
++    @param {?} arg4 */
++exports.arraySet = function(arg0,arg1,arg2,arg3,arg4) { return (TYPED_OK ? fnTyped.arraySet(arg0,arg1,arg2,arg3,arg4) : fnUntyped.arraySet(arg0,arg1,arg2,arg3,arg4)); };
++/** @param {?} arg0 */
++exports.flattenChunks = function(arg0) { return (TYPED_OK ? fnTyped.flattenChunks(arg0) : fnUntyped.flattenChunks(arg0)); };
+diff -ru ./lib/utils/strings.js /Users/dmaas/cvs/game/gameclient/pako/lib/utils/strings.js
+--- ./lib/utils/strings.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/utils/strings.js	2016-03-03 07:13:14.000000000 +0900
+@@ -1,6 +1,9 @@
+ // String encode/decode helpers
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var utils = require('./common');
+ 
+diff -ru ./lib/zlib/adler32.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/adler32.js
+--- ./lib/zlib/adler32.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/adler32.js	2016-03-03 07:12:02.000000000 +0900
+@@ -1,5 +1,9 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
++
+ // Note: adler32 takes 12% for level 0 and 2% for level 6.
+ // It doesn't worth to make additional optimizationa as in original.
+ // Small size is preferable.
+diff -ru ./lib/zlib/crc32.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/crc32.js
+--- ./lib/zlib/crc32.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/crc32.js	2016-03-03 07:11:58.000000000 +0900
+@@ -1,5 +1,9 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
++
+ // Note: we can't get significant speed boost here.
+ // So write code to minimize size - no pregenerated tables
+ // and array tools dependencies.
+diff -ru ./lib/zlib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/deflate.js
+--- ./lib/zlib/deflate.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/deflate.js	2016-03-03 07:11:42.000000000 +0900
+@@ -1,5 +1,9 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
++
+ var utils   = require('../utils/common');
+ var trees   = require('./trees');
+ var adler32 = require('./adler32');
+@@ -1017,6 +1021,7 @@
+  * exclude worst case performance for pathological files. Better values may be
+  * found for specific files.
+  */
++/** @constructor */
+ function Config(good_length, max_lazy, nice_length, max_chain, func) {
+   this.good_length = good_length;
+   this.max_lazy = max_lazy;
+@@ -1069,6 +1074,7 @@
+ }
+ 
+ 
++/** @constructor */
+ function DeflateState() {
+   this.strm = null;            /* pointer back to this zlib stream */
+   this.status = 0;            /* as the name implies */
+diff -ru ./lib/zlib/gzheader.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/gzheader.js
+--- ./lib/zlib/gzheader.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/gzheader.js	2016-03-03 07:08:30.000000000 +0900
+@@ -1,6 +1,10 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
++/** @constructor */
+ function GZheader() {
+   /* true if compressed data believed to be text */
+   this.text       = 0;
+diff -ru ./lib/zlib/inffast.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inffast.js
+--- ./lib/zlib/inffast.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inffast.js	2016-03-03 07:08:10.000000000 +0900
+@@ -1,5 +1,9 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
++
+ // See state defs from inflate.js
+ var BAD = 30;       /* got a data error -- remain here until reset */
+ var TYPE = 12;      /* i: waiting for type bits, including last-flag bit */
+diff -ru ./lib/zlib/inflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inflate.js
+--- ./lib/zlib/inflate.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inflate.js	2016-03-03 07:07:54.000000000 +0900
+@@ -1,5 +1,8 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var utils         = require('../utils/common');
+ var adler32       = require('./adler32');
+@@ -100,6 +103,7 @@
+ }
+ 
+ 
++/** @constructor */
+ function InflateState() {
+   this.mode = 0;             /* current inflate mode */
+   this.last = false;          /* true if processing last block */
+diff -ru ./lib/zlib/inftrees.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inftrees.js
+--- ./lib/zlib/inftrees.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/inftrees.js	2016-03-03 07:06:27.000000000 +0900
+@@ -1,5 +1,8 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var utils = require('../utils/common');
+ 
+diff -ru ./lib/zlib/trees.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/trees.js
+--- ./lib/zlib/trees.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/trees.js	2016-03-03 07:06:07.000000000 +0900
+@@ -1,5 +1,8 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
+ var utils = require('../utils/common');
+ 
+@@ -145,6 +148,7 @@
+ /* First normalized distance for each code (0 = distance of 1) */
+ 
+ 
++/** @constructor */
+ function StaticTreeDesc(static_tree, extra_bits, extra_base, elems, max_length) {
+ 
+   this.static_tree  = static_tree;  /* static tree or NULL */
+@@ -162,7 +166,7 @@
+ var static_d_desc;
+ var static_bl_desc;
+ 
+-
++/** @constructor */
+ function TreeDesc(dyn_tree, stat_desc) {
+   this.dyn_tree = dyn_tree;     /* the dynamic tree */
+   this.max_code = 0;            /* largest code with non zero frequency */
+diff -ru ./lib/zlib/zstream.js /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/zstream.js
+--- ./lib/zlib/zstream.js	2016-02-17 18:09:06.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/lib/zlib/zstream.js	2016-03-03 07:03:55.000000000 +0900
+@@ -1,6 +1,10 @@
+ 'use strict';
+ 
++/** @fileoverview
++    @suppress {reportUnknownTypes}
++*/
+ 
++/** @constructor */
+ function ZStream() {
+   /* next input byte */
+   this.input = null; // JS specific, because we have no pointers
