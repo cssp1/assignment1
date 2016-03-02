@@ -25,6 +25,7 @@ goog.require('AllianceCache');
 goog.require('Backdrop');
 goog.require('BattleLog');
 goog.require('BattleReplay');
+goog.require('BattleReplayGUI');
 goog.require('ChatFilter');
 goog.require('Congrats');
 goog.require('GameArt');
@@ -25631,6 +25632,7 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
     dialog.user_data['friendly_id'] = friendly_id;
     dialog.user_data['time'] = summary['time'];
     dialog.user_data['summary'] = summary;
+    dialog.user_data['signature'] = signature;
     dialog.user_data['log'] = null;
     dialog.user_data['page'] = -1;
     install_child_dialog(dialog);
@@ -25812,6 +25814,42 @@ function receive_battle_log_result(dialog, ret) {
             dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
                 show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
             }; })(summary, ret);
+        }
+
+        if(get_query_string('enable_recording') === '1') {
+            dialog.widgets['replay_button'].show = true;
+            dialog.widgets['replay_button'].onclick = function(w) {
+                var dialog = w.parent;
+                var summary = dialog.user_data['summary'];
+                last_query_tag += 1;
+                var tag = 'gbr'+last_query_tag.toString();
+                var locker = invoke_ui_locker_until_closed();
+                battle_log_receivers[tag] = (function (_dialog, _locker) { return function (result) {
+                    close_dialog(_locker);
+
+                    if(result) {
+                        var pack = unwrap_and_uncompress_string(result[0], result[1]); // codec, z_result
+                        var player = BattleReplay.replay_from_download(pack);
+                        if(player) {
+                            session.push_world(player.world);
+
+                            // set up overlay GUI
+                            change_selection(null);
+                            var replay_overlay = BattleReplayGUI.invoke(player);
+                            replay_overlay.on_destroy = function() {
+                                session.pop_to_real_world();
+                            };
+                            return;
+                        }
+                    }
+                    // failure
+                    invoke_child_message_dialog(_dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'], '');
+                    _dialog.widgets['replay_button'].state = 'disabled';
+                    _dialog.widgets['replay_button'].tooltip.str = _dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'];
+
+                }; })(dialog, locker);
+                send_to_server.func(["GET_BATTLE_REPLAY", summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature'], tag]);
+            };
         }
     }
     dialog.widgets['log'].scroll_to_top();
@@ -44918,7 +44956,7 @@ function handle_server_message(data) {
     } else if(msg == "QUERY_MAP_LOG_RESULT") {
         var tag = data[1], result = data[2];
         map_log_receiver.dispatchEvent({type: tag, result:result});
-    } else if(msg == "GET_BATTLE_LOG3_RESULT") {
+    } else if(msg == "GET_BATTLE_LOG3_RESULT" || msg == "GET_BATTLE_REPLAY_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {
             var cb = battle_log_receivers[tag];

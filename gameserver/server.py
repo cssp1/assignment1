@@ -3127,9 +3127,9 @@ class AttackLog (object):
     @classmethod
     def base_name(cls, log_time, attacker_id, defender_id, base_id):
         if base_id and base_id != home_base_id(attacker_id) and base_id != home_base_id(defender_id):
-            return '%10d-%d-vs-%d-at-%s.json.gz' % (log_time, attacker_id, defender_id, base_id)
+            return '%d-%d-vs-%d-at-%s.json.gz' % (log_time, attacker_id, defender_id, base_id)
         else:
-            return '%10d-%d-vs-%d.json.gz' % (log_time, attacker_id, defender_id)
+            return '%d-%d-vs-%d.json.gz' % (log_time, attacker_id, defender_id)
     @classmethod
     def storage_dir(cls, log_time):
         return spin_log_dir+'/'+SpinLog.time_to_date_string(log_time)+'-battles'
@@ -3204,7 +3204,11 @@ class AttackReplayReceiver (object):
     def storage_path(cls, log_time, attacker_id, defender_id, base_id):
         return os.path.join(cls.storage_dir(log_time), cls.base_name(log_time, attacker_id, defender_id, base_id))
 
-    def __init__(self, log_time, expire_time, attacker_id, defender_id, base_id):
+    def __init__(self, active_player_id, log_time, expire_time, attacker_id, defender_id, base_id):
+        self.active_player_id = active_player_id
+        self.attacker_id = attacker_id
+        self.defender_id = defender_id
+        self.base_id = base_id
         self.log_time = log_time
         self.expire_time = expire_time # time after which we'll give up if the client hasn't finished uploading
         self.log_file = self.base_name(self.log_time, attacker_id, defender_id, base_id)
@@ -3249,8 +3253,19 @@ class AttackReplayReceiver (object):
             temp.close()
             atom.complete()
 
+        # XXX add S3 storage
+
         gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
                                      (self.log_file, self.raw_length, self.buf.tell()))
+        metric_event_coded(self.active_player_id, '3832_battle_replay_uploaded', {'battle_time': self.log_time,
+                                                                                  'attacker_id': self.attacker_id,
+                                                                                  'defender_id': self.defender_id,
+                                                                                  'base_id': self.base_id,
+                                                                                  #'log_file': self.log_file,
+                                                                                  'raw_length': self.raw_length,
+                                                                                  'wire_length': self.buf.tell()
+                                                                                  })
+
 
 class Session(object):
     class AsyncLogout:
@@ -4122,7 +4137,7 @@ class Session(object):
         if self.attack_log.is_active():
             replay_token = generate_mail_id() # just a random token
             expire_time = attack_end_time + gamedata['server'].get('battle_replay_receive_time',600)
-            self.attack_replay_receivers[replay_token] = AttackReplayReceiver(server_time, expire_time, attacker_id, defender_id, base_id)
+            self.attack_replay_receivers[replay_token] = AttackReplayReceiver(self.user.user_id, server_time, expire_time, attacker_id, defender_id, base_id)
         return replay_token
 
     def reset_attack_log(self):
@@ -18024,6 +18039,11 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, None])
                 return
 
+        metric_event_coded(session.user.user_id, '3831_battle_log_viewed', {'battle_time': battle_time,
+                                                                            'attacker_id': attacker,
+                                                                            'defender_id': defender,
+                                                                            'base_id': base_id})
+
         filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
         ret = None
         try:
@@ -18055,6 +18075,52 @@ class GAMEAPI(resource.Resource):
 
         retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
         return None # not async
+
+    def get_battle_replay(self, session, retmsg, arg):
+        battle_time = arg[1]
+        attacker = arg[2]
+        defender = arg[3]
+        base_id = arg[4]
+        client_sig = arg[5]
+        tag = arg[6]
+
+        # the battle log itself does not have sufficient information (attacker/defender alliance IDs) to determine
+        # access permission. So instead, we use a secure signature of the args from the battle history.
+        if not session.player.is_developer():
+            if session.user.user_id not in (attacker, defender) and \
+               client_sig != self.sign_battle_history(battle_time, attacker, defender, base_id):
+                retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                retmsg.append(["GET_BATTLE_REPLAY_RESULT", tag, None])
+                return
+
+        metric_event_coded(session.user.user_id, '3833_battle_replay_downloaded', {'battle_time': battle_time,
+                                                                                   'attacker_id': attacker,
+                                                                                   'defender_id': defender,
+                                                                                   'base_id': base_id})
+
+        d = make_deferred('get_battle_replay')
+
+        def cb(self, d, session, retmsg, tag, success, buf):
+            if success and buf and (buf != 'NOTFOUND'):
+                with admin_stats.latency_measurer('GET_BATTLE_REPLAY(gunzip)'):
+                    raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
+                with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
+                    ret = compress_and_wrap_string(raw_ret)
+            else:
+                ret = None
+            d.callback(ret)
+
+        d.addErrback(report_and_absorb_deferred_failure, session)
+        d.addCallback(lambda ret, tag=tag, session=session:
+                      session.send([["GET_BATTLE_REPLAY_RESULT", tag, ret]]))
+
+        # XXX add S3 version
+        filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
+        io_system.do_async_read(filename,
+                                functools.partial(cb, self, d, session, retmsg, tag, True),
+                                functools.partial(cb, self, d, session, retmsg, tag, False),
+                                0)
+        return session.start_async_request(d) # go async
 
     def query_map_log(self, session, retmsg, arg):
         region_id = arg[1]
@@ -24630,6 +24696,8 @@ class GAMEAPI(resource.Resource):
                 if session.attack_replay_receivers[token].accumulate(raw_length, codec, from_count, to_count, total_count, inbuf):
                     # it's done
                     del session.attack_replay_receivers[token]
+        elif arg[0] == "GET_BATTLE_REPLAY":
+            return self.get_battle_replay(session, retmsg, arg)
 
         elif arg[0] == "QUERY_MAP_LOG":
             if (not session.player.is_developer()):

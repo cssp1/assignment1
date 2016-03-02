@@ -107,6 +107,15 @@ BattleReplay.Recorder.prototype.pack_for_upload = function() {
     return JSON.stringify(pack);
 };
 
+/** LINK FROM DOWNLOAD TO PLAYER
+    @param {string} packed */
+BattleReplay.replay_from_download = function(packed) {
+    var pack = JSON.parse(packed);
+    if(pack['version'] !== 0) { throw Error('version mismatch'); }
+    if(pack['snapshots'].length < 1) { throw Error('no snapshots'); }
+    return new BattleReplay.Player(pack['snapshots']);
+};
+
 /** LINK FROM RECORDER TO PLAYER
     @param {!BattleReplay.Recorder} recorder */
 BattleReplay.replay = function(recorder) {
@@ -132,7 +141,7 @@ BattleReplay.Player = function(snapshots) {
                         'before_damage_effects': this.world.listen('before_damage_effects', this.before_damage_effects, false, this)};
 };
 BattleReplay.Player.prototype.before_control = function(event) {
-    console.log('Applying snapshot '+this.index.toString()+' at '+this.world.last_tick_time.toString());
+    console.log('Applying snapshot '+this.index.toString()+' at tick '+this.world.combat_engine.cur_tick.get());
     if(this.index === 0) {
         this.world.objects.clear();
         this.world.combat_engine.clear_queued_damage_effects();
