@@ -1413,26 +1413,30 @@ function GameObject() {
 
 /** @override */
 GameObject.prototype.serialize = function() {
-    return {'obj_id': this.id,
-            'spec': this.spec['name'],
-            'x': this.x,
-            'y': this.y,
-            'hp': this.hp,
-            'max_hp': this.max_hp,
-            'owner': (this.team === 'player' ? session.user_id : -1),
-            'level': this.level,
-            'equipment': this.equipment ? deepcopy_obj(this.equipment) : null,
-            'control_state': this.control_state,
-            'control_target_id': this.control_target_id,
-            'control_spellname': this.control_spellname,
-            'control_cooldown': this.control_cooldown,
-            'combat_stats': deepcopy_obj(this.combat_stats),
-            'auras': goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this),
-            'cooldowns': deepcopy_obj(this.cooldowns),
-            'cur_facing': this.cur_facing,
-            //'next_facing': this.next_facing,
-            'target_facing': this.target_facing
-           };
+    var ret = {'obj_id': this.id,
+               'spec': this.spec['name'],
+               'x': this.x,
+               'y': this.y,
+               'hp': this.hp,
+               'max_hp': this.max_hp,
+               'owner': (this.team === 'player' ? session.user_id : -1),
+               'level': this.level,
+               'cur_facing': this.cur_facing,
+               //'next_facing': this.next_facing,
+               'target_facing': this.target_facing
+              };
+    if(!(this.is_inert() || this.spec['worth_less_xp'])) {
+        // fields that shouldn't be needed for barriers and scenery
+        ret['equipment'] = this.equipment ? deepcopy_obj(this.equipment) : null;
+        ret['control_state'] = this.control_state;
+        ret['control_target_id'] = this.control_target_id;
+        ret['control_spellname'] = this.control_spellname;
+        ret['control_cooldown'] = this.control_cooldown;
+        ret['auras'] = goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this);
+        ret['combat_stats'] = deepcopy_obj(this.combat_stats);
+        ret['cooldowns'] = deepcopy_obj(this.cooldowns);
+    }
+    return ret;
 };
 /** @override */
 GameObject.prototype.serialize_incremental = function() {
