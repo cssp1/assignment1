@@ -15,6 +15,7 @@ goog.require('goog.net.ErrorCode');
 goog.require('goog.crypt.base64');
 goog.require('Iuppiter');
 goog.require('lz4');
+goog.require('SPGzip');
 
 goog.require('AStar');
 goog.require('ModChain');
@@ -43033,6 +43034,8 @@ function unwrap_and_uncompress_string(codec, z_result) {
         var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
         arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
         return Iuppiter.bytes_to_string(lz4.decompress(arr));
+    } else if(codec == 'gzip') {
+        return SPGzip.gunzip_from_base64_string(z_result);
     } else {
         throw Error('unknown codec '+codec);
     }

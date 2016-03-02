@@ -3222,7 +3222,7 @@ class AttackReplayReceiver (object):
         # return true if finished with the last segment
 
         if self.codec is None:
-            assert codec == 'raw'
+            assert codec in ('raw', 'gzip')
             self.codec = codec
             self.raw_length = raw_length
             self.buf = cStringIO.StringIO()
@@ -3239,8 +3239,13 @@ class AttackReplayReceiver (object):
 
     def finalize(self):
         # decompress what the client sent us
-        raw_buf = self.buf.getvalue()
-        # (then apply codec here)
+        if self.codec == 'raw':
+            raw_buf = self.buf.getvalue()
+        elif self.codec == 'gzip':
+            de_b64 = base64.b64decode(self.buf.getvalue())
+            raw_buf = gzip.GzipFile(filename = 'from_client', fileobj = cStringIO.StringIO(de_b64)).read()
+            # as a future optimization, we could skip the decompression step and write this
+            # directly to the file (though we'd be trusting the client to generate valid gzip!).
 
         # check the size of the decompressed raw representation
         if len(raw_buf) != self.raw_length: raise Exception('raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))

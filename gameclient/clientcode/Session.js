@@ -12,6 +12,7 @@ goog.require('Base');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('BattleReplay');
+goog.require('SPGzip'); // for replay uploads
 goog.require('World');
 goog.require('goog.object');
 goog.require('goog.array');
@@ -442,7 +443,9 @@ Session.Session.prototype.finish_and_upload_recording = function() {
     console.log('Uploading '+n_snapshots.toString()+' snapshots.' +
                 ' Raw representation '+raw.length.toString()+ ' chars' +
                 ' (first '+first_snapshot_length.toString()+' chars then ~'+((delta_snapshot_lengths/(n_snapshots-1))).toFixed(0)+' chars/snapshot).');
-    send_to_server.func(["UPLOAD_BATTLE_REPLAY", this.replay_token, raw.length, 'raw', 0, raw.length, raw.length, raw]);
+    var zipped = SPGzip.gzip_to_base64_string(raw);
+    console.log('Gzipped+b64 to '+zipped.length.toString()+' chars');
+    send_to_server.func(["UPLOAD_BATTLE_REPLAY", this.replay_token, raw.length, 'gzip', 0, zipped.length, zipped.length, zipped]);
     this.replay_recorder = null;
     this.replay_token = null;
 };
