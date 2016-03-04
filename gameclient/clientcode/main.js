@@ -25848,7 +25848,7 @@ function receive_battle_log_result(dialog, ret) {
                             // kill desktop dialogs
                             // need special handling for user_log since it is parented to desktop_top
                             user_log.parent.unparent(user_log);
-                            goog.array.forEach(['aura_bar','desktop_bottom','desktop_top','player_portrait_dialog'], function(dname) {
+                            goog.array.forEach(['attack_button_dialog','aura_bar','combat_damage_bar','desktop_bottom','desktop_top','enemy_portrait_dialog','enemy_resource_bars','player_portrait_dialog','quest_bar'], function(dname) {
                                 if(dname in desktop_dialogs) {
                                     close_dialog(desktop_dialogs[dname]);
                                     delete desktop_dialogs[dname];
