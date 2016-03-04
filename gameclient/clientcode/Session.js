@@ -429,7 +429,6 @@ Session.Session.prototype.is_recording = function() { return this.replay_recorde
 /** @param {string} token for the upload */
 Session.Session.prototype.start_recording = function(token) {
     if(!eval_cond_or_literal(gamedata['client']['enable_replay_recording'], player, null)) { return; }
-    if(get_query_string('enable_recording') !== '1') { return; }
     this.replay_recorder = new BattleReplay.Recorder(this.get_real_world());
     this.replay_token = token;
     this.replay_recorder.start();
