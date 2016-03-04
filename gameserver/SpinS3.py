@@ -173,6 +173,9 @@ class S3 (object):
                    'Authorization': auth_string}
         return url, headers
 
+    def head_request(self, bucket, filename, query = None):
+        return self.get_request(bucket, filename, method = 'HEAD', query=query)
+
     def delete_request(self, bucket, filename):
         url = self.bucket_endpoint(bucket)+'/'+filename
         resource = self.resource_name(bucket, filename)
@@ -291,7 +294,7 @@ class S3 (object):
             else:
                 return False
     def do_exists(self, bucket, filename):
-        url, headers = self.get_request(bucket, filename, method = 'HEAD')
+        url, headers = self.head_request(bucket, filename)
         return self.requests_session.head(url, headers=headers, timeout = S3_REQUEST_TIMEOUT)
 
     # get entire contents of an S3 object

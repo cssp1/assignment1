@@ -80,6 +80,13 @@ class IOAPI(resource.Resource):
             except:
                 pass
             return 'ok'
+        elif 'exists' in request.args:
+            filename = request.args['exists'][0]
+            try:
+                return 'True' if os.path.exists(filename) else 'NOTFOUND'
+            except:
+                pass
+            return 'NOTFOUND'
 
         try:
             filename = request.args['filename'][0]
@@ -187,7 +194,10 @@ class IOClient (object):
         self.req.queue_request(time_now, 'http://localhost:'+str(self.port)+'/?delete='+filename+'&secret='+self.secret,
                                functools.partial(self.async_write_success, filename, success_cb),
                                error_callback = error_cb, method='POST')
-
+    def async_exists(self, filename, time_now, success_cb, error_cb):
+        self.req.queue_request(time_now, 'http://localhost:'+str(self.port)+'/?exists='+filename+'&secret='+self.secret,
+                               lambda result, success_cb=success_cb: success_cb(result is not None and result != 'NOTFOUND'),
+                               error_callback = error_cb, method='POST')
     # shutdown mechanics are complicated:
     # 1) reactor.stop() begins the shutdown process
     # 2) defer_until_all_complete(), which we insert into the shutdown path with addSystemEventTrigger(),
@@ -239,9 +249,9 @@ class TestClient (object):
         self.success_count = 0
 
     def success_cb(self, result):
-        print 'SUCCESS', len(result)
+        print 'SUCCESS', result
         self.success_count += 1
-        if self.success_count == 4:
+        if self.success_count == 6:
             print 'stopping reactor...'
             reactor.stop()
 
@@ -249,11 +259,13 @@ class TestClient (object):
         print 'ERROR', reason
 
     def go(self):
-        self.master.async_read('ioslave.py', time.time(), self.success_cb, self.error_cb)
-        self.master.async_read('missing.py', time.time(), self.success_cb, self.error_cb)
+        self.master.async_read('ioslave.py', time.time(), lambda read_ret: self.success_cb('read %d' % len(read_ret)), self.error_cb)
+        self.master.async_read('missing.py', time.time(), lambda read_ret: self.success_cb('missing read: %r' % read_ret), self.error_cb)
         self.master.async_write('/tmp/zzz', 'ZZZZZZZZZZZZZZZZZZZZZ\\u1234\\u4321ZZZZZ\n',
-                                time.time(), lambda: self.success_cb('xxx'), self.error_cb, fsync = True)
-        self.master.async_delete('/tmp/zzz', time.time(), lambda: self.success_cb('xxx'), self.error_cb)
+                                time.time(), lambda: self.success_cb('write succeeded'), self.error_cb, fsync = True)
+        self.master.async_delete('/tmp/zzz', time.time(), lambda: self.success_cb('delete succeeded'), self.error_cb)
+        self.master.async_exists('/tmp/zzz', time.time(), lambda exist_ret: self.success_cb('exist_ret (should be false): %r' % exist_ret), self.error_cb)
+        self.master.async_exists('ioslave.py', time.time(), lambda exist_ret: self.success_cb('exist_ret (should be true): %r' % exist_ret), self.error_cb)
 
 
 

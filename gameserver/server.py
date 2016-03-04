@@ -789,6 +789,9 @@ class IOSystem (object):
     def async_delete(self, filename, success_cb, procnum = None):
         if procnum is None: procnum = 0
         self.do_async_delete(filename, success_cb, procnum)
+    def async_exists(self, filename, success_cb, procnum = None):
+        if procnum is None: procnum = 0
+        self.do_async_exists(filename, success_cb, procnum)
 
     # need a little adaptor function to throw away the unnecessary "response" from async write requests
     def async_write_helper(self, ignore_errors, cb, delay, response):
@@ -801,6 +804,21 @@ class IOSystem (object):
 
     def async_write_error(self, reason):
         gamesite.exception_log.event(server_time, 'async write error! this is really bad! reason: '+repr(reason))
+
+    # helper to return an async read as a deferred
+    def async_read_deferred(self, filename, reason = None, procnum = None):
+        d = defer.Deferred()
+        self.async_read(filename,
+                        lambda buf, d=d: d.callback(buf),
+                        lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_read error: %r' % err_reason))),
+                        reason = reason, procnum = procnum)
+        return d
+    def async_exists_deferred(self, filename, reason = None, procnum = None):
+        d = defer.Deferred()
+        self.async_exists(filename,
+                          lambda buf, d=d: d.callback(buf),
+                          reason = reason, procnum = procnum)
+        return d
 
     def collect_aistate_garbage(self):
         # get rid of all files not modified for at least one
@@ -830,6 +848,8 @@ class FileIOSystem (IOSystem):
     def do_async_delete(self, filename, success_cb, procnum):
         safe_unlink(filename)
         reactor.callLater(0, success_cb)
+    def do_async_exists(self, filename, success_cb, procnum):
+        reactor.callLater(0, success_cb, os.path.exists(filename))
 
 class IOSlaveIOSystem (IOSystem):
     def __init__(self, config):
@@ -864,6 +884,8 @@ class IOSlaveIOSystem (IOSystem):
         self.clients[procnum].async_write(filename, buf, server_time, success_cb, self.async_write_error, fsync = True)
     def do_async_delete(self, filename, success_cb, procnum):
         self.clients[procnum].async_delete(filename, server_time, success_cb, self.async_write_error)
+    def do_async_exists(self, filename, success_cb, procnum):
+        self.clients[procnum].async_exists(filename, server_time, success_cb, self.async_write_error)
     def shutdown(self):
         return defer.DeferredList([client.defer_until_all_complete() for client in self.clients])
 
@@ -902,6 +924,8 @@ class S3IOSystem (IOSystem):
         request.url, request.headers = self.s3.put_request(bucket, objname, length)
     def preflight_delete_request(self, bucket, objname, request):
         request.url, request.headers = self.s3.delete_request(bucket, objname)
+    def preflight_exists_request(self, bucket, objname, request):
+        request.url, request.headers = self.s3.head_request(bucket, objname)
 
     def do_async_read(self, path, success_cb, error_cb, procnum):
         bucket, objname = path
@@ -924,6 +948,12 @@ class S3IOSystem (IOSystem):
                                   error_callback = self.async_write_error,
                                   preflight_callback = functools.partial(self.preflight_delete_request, bucket, objname),
                                   method = 'DELETE', headers = headers)
+    def do_async_exists(self, path, success_cb, procnum):
+        bucket, objname = path
+        url, headers = self.s3.head_request(bucket, objname)
+        self.s3_req.queue_request(server_time, url, lambda ret, success_cb=success_cb: success_cb(ret != 'NOTFOUND'),
+                                  preflight_callback = functools.partial(self.preflight_exists_request, bucket, objname),
+                                  method = 'HEAD', headers = headers)
 
 IO_SYSTEMS = { 'file': FileIOSystem, 'ioslave': IOSlaveIOSystem, 's3': S3IOSystem }
 io_system = None
