@@ -12,8 +12,9 @@ import os, sys, glob, time, subprocess, getopt
 
 SAVE_RECENT = 7*24*60*60 #  save most files less than a week old
 SAVE_EXCEPTIONS = 60*24*60*60 #  save server exception logs two months
-ARCHIVE_BATTLES = 30*24*60*60 # archive battles older than one month
-SAVE_BATTLES = False
+SAVE_REPLAYS = 14*24*60*60 # archive replays older than 14 days
+SAVE_BATTLES = 7*24*60*60 # archive battles older than 7 days
+ARCHIVE_BATTLES = False
 
 time_now = int(time.time())
 s3 = SpinS3.S3(SpinConfig.aws_key_file())
@@ -26,7 +27,7 @@ def upload_battle_archive(filename, bucketname):
     s3.put_file(bucketname, dest, filename, timeout=300)
 
 
-def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
+def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucket = None):
     if filename.endswith('-chat.json') or \
        filename.endswith('-pcheck.json') or \
        filename.endswith('-gamebucks.json') or \
@@ -41,15 +42,28 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
        filename.endswith('-adparlor.json') or \
        filename.endswith('-dauup2.json') or \
        filename.endswith('-dauup.json') or \
+       filename.endswith('-kg_conversion_pixels.json') or \
        filename.endswith('-liniad.json'):
+        if is_sandbox and \
+           os.path.getmtime(filename) < (time_now - SAVE_RECENT):
+            print 'DELETING', filename
+            if not dry_run:
+                os.unlink(filename)
+        else:
             print 'keeping vital', filename
 
     elif filename.endswith('-exceptions.txt'):
-        if os.path.getmtime(filename) >= (time_now - SAVE_EXCEPTIONS):
+        if ((not is_sandbox) and (os.path.getmtime(filename) >= (time_now - SAVE_EXCEPTIONS))) or \
+           (is_sandbox and (os.path.getmtime(filename) >= (time_now - SAVE_RECENT))):
             print 'keeping recent', filename
+        else:
+            print 'DELETING', filename
+            if not dry_run:
+                os.unlink(filename)
 
     elif filename.endswith('-dbserver.txt') or \
          filename.endswith('-proxyserver.txt') or \
+         filename.endswith('-purchase_ui.json') or \
          filename.endswith('-traces.txt') or \
          filename.endswith('-armorgames.txt') or \
          filename.endswith('-facebook.txt') or \
@@ -67,10 +81,10 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
                     os.unlink(filename)
 
     elif filename.endswith('-battles'):
-        if os.path.getmtime(filename) >= (time_now - ARCHIVE_BATTLES):
+        if os.path.getmtime(filename) >= (time_now - SAVE_BATTLES):
             print 'keeping recent', filename
         else:
-            if SAVE_BATTLES:
+            if ARCHIVE_BATTLES and battle_archive_s3_bucket:
                 print 'ARCHIVING', filename
                 archive = filename+".tar.gz"
                 cmd = ["tar", "zcf", archive, filename]
@@ -86,13 +100,21 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
                     subprocess.check_call(["rm", "-r", filename])
 
     elif filename.endswith('-battles.tar.gz'):
-        if SAVE_BATTLES and battle_archive_s3_bucket:
+        if ARCHIVE_BATTLES and battle_archive_s3_bucket:
             print 'UPLOADING', filename
             if not dry_run:
                 upload_battle_archive(filename, battle_archive_s3_bucket)
         print 'DELETING', filename
         if not dry_run:
             os.unlink(filename)
+
+    elif filename.endswith('-replays'):
+        if os.path.getmtime(filename) >= (time_now - SAVE_REPLAYS):
+            print 'keeping recent', filename
+        else:
+            print 'DELETING', filename
+            if not dry_run:
+                subprocess.check_call(["rm", "-r", filename])
 
     elif filename.endswith('-sessions.json') or \
          filename.endswith('-machine.json'):
@@ -103,7 +125,7 @@ def handle(filename, dry_run = True, battle_archive_s3_bucket = None):
         print 'do not know how to handle', filename
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['go', 'battle-archive-s3-bucket='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['go', 'dry-run', 'battle-archive-s3-bucket='])
 
     dry_run = True
     battle_archive_s3_bucket = None
@@ -111,6 +133,8 @@ if __name__ == '__main__':
     for key, val in opts:
         if key == '--go':
             dry_run = False
+        elif key == '--dry-run':
+            dry_run = True
         elif key == '--battle-archive-s3-bucket':
             battle_archive_s3_bucket = val
 
@@ -118,6 +142,9 @@ if __name__ == '__main__':
     os.chdir(log_dir)
     file_list = glob.glob('*.*')
     file_list += glob.glob('*-battles')
+    file_list += glob.glob('*-replays')
     file_list.sort()
     for filename in file_list:
-        handle(filename, dry_run = dry_run, battle_archive_s3_bucket = battle_archive_s3_bucket)
+        handle(filename, dry_run = dry_run,
+               is_sandbox = SpinConfig.config['game_id'].endswith('test'),
+               battle_archive_s3_bucket = battle_archive_s3_bucket)
