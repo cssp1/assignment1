@@ -16,29 +16,27 @@ goog.require('goog.crypt.base64');
 // https://github.com/google/closure-compiler/issues/1472
 // The hack works as follows:
 // - Plaintext code: we load the Browserified version of the library manually (see proxyserver)
-// and then fake out base.js to pretend that it's been loaded. We rely on the Browserified
-// code for the module to provide the global exported name.
-// - Compiled code: we goog.require() the undocumented internal mangled module name
+// and then fake out base.js to pretend that it's been loaded under the mangled module name.
+// - Compiled code: we goog.require() the mangled module name
 // so that Closure finds the source files and links up the type info.
 
 goog.require('module$pako$index');
 
-// For plaintext code, "pako" will already be defined by the pre-loaded Browserified code.
-// For compiled code, we need to assign it ourselves using the mangled symbol name.
+// Note: for plaintext code, "module$pako$index" will already be defined by the pre-loaded Browserified code.
+// For compiled code, we need to assign it ourselves.
 
-/** @suppress {duplicate} */
-var pako;
-if(pako === undefined) {
-    pako = goog.module.get('module$pako$index');
+SPGzip.pako = null;
+if(!SPGzip.pako) { // necessary to avoid Closure compiler error
+    SPGzip.pako = goog.module.get('module$pako$index');
 }
 
 /** @param {string} input
     @return {string} */
 SPGzip.gzip_to_base64_string = function(input) {
-    return goog.crypt.base64.encodeString(/** @type {string} */ (pako.gzip(input, {to: 'string'})));
+    return goog.crypt.base64.encodeString(/** @type {string} */ (SPGzip.pako.gzip(input, {to: 'string'})));
 };
 /** @param {string} input
     @return {string} */
 SPGzip.gunzip_from_base64_string = function(input) {
-    return /** @type {string} */ (pako.ungzip(goog.crypt.base64.decodeString(input), {to: 'string'}));
+    return /** @type {string} */ (SPGzip.pako.ungzip(goog.crypt.base64.decodeString(input), {to: 'string'}));
 };

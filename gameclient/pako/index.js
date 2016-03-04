@@ -9,8 +9,15 @@ var deflate   = require('./lib/deflate');
 var inflate   = require('./lib/inflate');
 var constants = require('./lib/zlib/constants');
 
-var pako = {};
+// DJM - Closure has a hard time understanding what assign() does.
+//var pako = {};
+//assign(pako, deflate, inflate, constants);
 
-assign(pako, deflate, inflate, constants);
-
-module.exports = pako;
+module.exports = {Deflate: deflate.Deflate,
+                  deflate: deflate.deflate,
+                  deflateRaw: deflate.deflateRaw,
+                  gzip: deflate.gzip,
+                  Inflate: inflate.Inflate,
+                  inflate: inflate.inflate,
+                  inflateRaw: inflate.inflateRaw,
+                  ungzip: inflate.inflate};

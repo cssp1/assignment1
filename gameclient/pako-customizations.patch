@@ -9,13 +9,33 @@ diff -ru . ~/cvs/game/gameclient/pako | grep -v Only\ in
 
 diff -ru ./index.js /Users/dmaas/cvs/game/gameclient/pako/index.js
 --- ./index.js	2016-02-17 18:09:06.000000000 +0900
-+++ /Users/dmaas/cvs/game/gameclient/pako/index.js	2016-03-03 07:17:00.000000000 +0900
++++ /Users/dmaas/cvs/game/gameclient/pako/index.js	2016-03-04 21:28:41.000000000 +0900
 @@ -1,3 +1,5 @@
 +// SP3RDPARTY : pako JavaScript compression library : MIT License
 +
  // Top level file is just a mixin of submodules & constants
  'use strict';
  
+@@ -7,8 +9,15 @@
+ var inflate   = require('./lib/inflate');
+ var constants = require('./lib/zlib/constants');
+ 
+-var pako = {};
+-
+-assign(pako, deflate, inflate, constants);
++// DJM - Closure has a hard time understanding what assign() does.
++//var pako = {};
++//assign(pako, deflate, inflate, constants);
+ 
+-module.exports = pako;
++module.exports = {Deflate: deflate.Deflate,
++                  deflate: deflate.deflate,
++                  deflateRaw: deflate.deflateRaw,
++                  gzip: deflate.gzip,
++                  Inflate: inflate.Inflate,
++                  inflate: inflate.inflate,
++                  inflateRaw: inflate.inflateRaw,
++                  ungzip: inflate.inflate};
 diff -ru ./lib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js
 --- ./lib/deflate.js	2016-02-17 18:09:06.000000000 +0900
 +++ /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js	2016-03-03 08:24:02.000000000 +0900
