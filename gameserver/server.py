@@ -18081,37 +18081,66 @@ class GAMEAPI(resource.Resource):
                                                                             'defender_id': defender,
                                                                             'base_id': base_id})
 
-        filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
-        ret = None
-        try:
-            if os.path.exists(filename):
-                # try local file
-                fd = gzip.GzipFile(filename)
-                ret = map(SpinJSON.loads, fd.readlines())
-            elif isinstance(io_system, S3IOSystem) and AttackLog.storage_s3_bucket():
-                # try S3 download
-                bucket = AttackLog.storage_s3_bucket()
-                name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
-                d = make_deferred('get_battle_log3(S3)')
-                def cb(self, d, session, retmsg, tag, success, buf):
-                    ret = None
-                    if success and buf and (buf != 'NOTFOUND'):
-                        with admin_stats.latency_measurer('GET_BATTLE_LOG3(s3 parse)'):
-                            ret = map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).readlines())
-                    retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
-                    d.callback(True)
-                io_system.do_async_read((bucket,name),
-                                        functools.partial(cb, self, d, session, retmsg, tag, True),
-                                        functools.partial(cb, self, d, session, retmsg, tag, False),
-                                        0)
-                return session.start_async_request(d) # go async
-        except:
-            gamesite.exception_log.event(server_time, 'error reading battle log %s on behalf of player %d: %s' % \
-                                         (filename, session.player.user_id, traceback.format_exc().strip())) # OK
-            ret = None
+        # try local file first, and fall back to S3 if enabled and the local file is not found
+        log_filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
 
-        retmsg.append(["GET_BATTLE_LOG3_RESULT", tag, ret])
-        return None # not async
+        # look for battle log on local disk
+        if os.path.exists(log_filename):
+            d_log_local = defer.succeed(open(log_filename, 'rb').read())
+        else:
+            d_log_local = defer.succeed(None)
+
+        d_log_local.addErrback(report_and_absorb_deferred_failure, session)
+
+        # look for battle log in S3
+        if isinstance(io_system, S3IOSystem) and AttackLog.storage_s3_bucket():
+            # try S3 download
+            bucket = AttackLog.storage_s3_bucket()
+            name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
+            d_log_s3 = io_system.async_read_deferred((bucket, name))
+        else:
+            d_log_s3 = defer.succeed(None)
+
+        d_log_s3.addErrback(report_and_absorb_deferred_failure, session)
+
+        # query for existence of a replay on local disk
+        replay_filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
+        d_replay_exists_local = defer.succeed(os.path.exists(replay_filename))
+        # failure path
+        d_replay_exists_local.addErrback(report_and_absorb_deferred_failure, session)
+
+        # XXX add S3 version
+        d_replay_exists_s3 = defer.succeed(False)
+        d_replay_exists_s3.addErrback(report_and_absorb_deferred_failure, session)
+
+        # wait for results of all queries
+        d_all = defer.DeferredList([d_log_local, d_log_s3, d_replay_exists_local, d_replay_exists_s3])
+        def cb(results, session, tag):
+            ((success_log_local, data_log_local), (success_log_s3, data_log_s3), \
+             (success_replay_exists_local, data_replay_exists_local), (success_replay_exists_s3, data_replay_exists_s3)) = results
+
+            # see if we got valid log data
+            raw_buf = None
+            for data in (data_log_local, data_log_s3):
+                if data and (data != 'NOTFOUND'):
+                    raw_buf = data
+                    break
+
+            # gunzip and parse line-by-line JSON
+            if raw_buf:
+                with admin_stats.latency_measurer('GET_BATTLE_LOG3(parse)'):
+                    ret = {'log': map(SpinJSON.loads, gzip.GzipFile(fileobj=cStringIO.StringIO(raw_buf)).readlines())}
+            else:
+                ret = None
+
+            # see if we got any evidence of a replay existing
+            if ret:
+                ret['replay_exists'] = any(x is True for x in (data_replay_exists_local, data_replay_exists_s3))
+
+            session.send([["GET_BATTLE_LOG3_RESULT", tag, ret]])
+
+        d_all.addCallback(cb, session, tag)
+        return session.start_async_request(d_all) # go async
 
     def get_battle_replay(self, session, retmsg, arg):
         battle_time = arg[1]
@@ -18135,28 +18164,26 @@ class GAMEAPI(resource.Resource):
                                                                                    'defender_id': defender,
                                                                                    'base_id': base_id})
 
-        d = make_deferred('get_battle_replay')
+        # XXX add S3 version
+        filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
+        d = io_system.async_read_deferred(filename)
 
-        def cb(self, d, session, retmsg, tag, success, buf):
-            if success and buf and (buf != 'NOTFOUND'):
+        # failure path
+        d.addErrback(report_and_absorb_deferred_failure, session)
+
+        # failure AND success path (failure indicated by buf being None)
+        def cb(buf, session, tag):
+            if buf and (buf != 'NOTFOUND'):
                 with admin_stats.latency_measurer('GET_BATTLE_REPLAY(gunzip)'):
                     raw_ret = gzip.GzipFile(fileobj=cStringIO.StringIO(buf)).read()
                 with admin_stats.latency_measurer('GET_BATTLE_REPLAY(compress)'):
                     ret = compress_and_wrap_string(raw_ret)
             else:
                 ret = None
-            d.callback(ret)
+            session.send([["GET_BATTLE_REPLAY_RESULT", tag, ret]])
 
-        d.addErrback(report_and_absorb_deferred_failure, session)
-        d.addCallback(lambda ret, tag=tag, session=session:
-                      session.send([["GET_BATTLE_REPLAY_RESULT", tag, ret]]))
+        d.addCallback(cb, session, tag)
 
-        # XXX add S3 version
-        filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
-        io_system.do_async_read(filename,
-                                functools.partial(cb, self, d, session, retmsg, tag, True),
-                                functools.partial(cb, self, d, session, retmsg, tag, False),
-                                0)
         return session.start_async_request(d) # go async
 
     def query_map_log(self, session, retmsg, arg):

@@ -15595,8 +15595,8 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
                            _summary['base_id'] || null, null,
                            (function (__summary, _locker) { return function(result) {
                                close_dialog(_locker);
-                               if(result) {
-                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result);
+                               if(result && result['log']) {
+                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result['log']);
                                } else {
                                    invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['loading_text']['ui_name_unavailable'], '', {'dialog': 'message_dialog'});
                                }
@@ -25793,17 +25793,24 @@ function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
 }
 
 function receive_battle_log_result(dialog, ret) {
+    var log, replay_exists;
     if(!ret) {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
+        log = null;
+        replay_exists = false;
+    } else {
+        log = ret['log'];
+        replay_exists = ret['replay_exists'];
     }
+
 
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show = false;
     dialog.widgets['scroll_text'].show = true;
 
-    dialog.user_data['log'] = ret;
+    dialog.user_data['log'] = log;
 
-    if(!ret) {
+    if(!log) {
         dialog.widgets['log'].append_text([[new SPText.ABlock(dialog.data['widgets']['loading_text']['ui_name_unavailable'], null)]]);
     } else {
         var parsed = BattleLog.parse(dialog.user_data['friendly_id'], session.user_id, dialog.user_data['summary'], dialog.user_data['log']);
@@ -25818,10 +25825,10 @@ function receive_battle_log_result(dialog, ret) {
             dialog.widgets['show_markers_button'].show = true;
             dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
                 show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
-            }; })(summary, ret);
+            }; })(summary, log);
         }
 
-        if(eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
+        if(replay_exists && eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
             dialog.widgets['replay_button'].show = true;
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;
