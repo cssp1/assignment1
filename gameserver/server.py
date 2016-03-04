@@ -18166,7 +18166,7 @@ class GAMEAPI(resource.Resource):
 
         # XXX add S3 version
         filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
-        d = io_system.async_read_deferred(filename)
+        d = defer.succeed(open(filename, 'rb').read())
 
         # failure path
         d.addErrback(report_and_absorb_deferred_failure, session)
