@@ -25821,7 +25821,7 @@ function receive_battle_log_result(dialog, ret) {
             }; })(summary, ret);
         }
 
-        if(get_query_string('enable_recording') === '1') {
+        if(eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
             dialog.widgets['replay_button'].show = true;
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;

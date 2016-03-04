@@ -1831,6 +1831,18 @@ ViewingBaseObjectDestroyedPredicate.prototype.is_satisfied = function(player, qd
     }, this);
 };
 
+/** @constructor @struct
+  * @extends Predicate */
+function QueryStringPredicate(data) {
+    goog.base(this, data);
+    this.key = data['key'];
+    this.value = data['value'];
+}
+goog.inherits(QueryStringPredicate, Predicate);
+QueryStringPredicate.prototype.is_satisfied = function(player, qdata) {
+    return get_query_string(this.key) === this.value;
+};
+
 /** @param {!Object} data
     @return {!Predicate} */
 function read_predicate(data) {
@@ -1961,6 +1973,8 @@ function read_predicate(data) {
         return new ViewingBaseDamagePredicate(data);
     } else if(kind === 'VIEWING_BASE_OBJECT_DESTROYED') {
         return new ViewingBaseObjectDestroyedPredicate(data);
+    } else if(kind === 'QUERY_STRING') {
+        return new QueryStringPredicate(data);
     } else {
         throw Error('unknown predicate '+JSON.stringify(data));
     }

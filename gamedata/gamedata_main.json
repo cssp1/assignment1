@@ -408,6 +408,13 @@
 
         "enable_websockets": 1, // use websockets by default, if browser supports them
 
+        "enable_replay_recording": [[{"predicate": "QUERY_STRING", "key": "enable_recording", "value": "1"}, true],
+                                    [{"predicate": "ANY_ABTEST", "key": "enable_replay_recording", "value": 1}, true],
+                                    [{"predicate": "ALWAYS_TRUE"}, false]],
+        "enable_replay_playback": [[{"predicate": "QUERY_STRING", "key": "enable_recording", "value": "1"}, true],
+                                   [{"predicate": "ANY_ABTEST", "key": "enable_replay_playback", "value": 1}, true],
+                                   [{"predicate": "ALWAYS_TRUE"}, false]],
+
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
 

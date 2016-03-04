@@ -1384,7 +1384,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
-                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE'
+                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'QUERY_STRING'
                    ])
 
 # context: 'ai_base', 'ai_attack', etc - describes the general environment of the predicate
@@ -1552,6 +1552,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if expect_absolute_time_end is not None:
             if ((pred['range'][1] - expect_absolute_time_end['origin']) % expect_absolute_time_end['interval']) != expect_absolute_time_end['offset']:
                 error |= 1; print '%s: %s predicate has incorrect end time (%d). Must agree with %r' % (reason, pred['predicate'], pred['range'][1], expect_absolute_time_end)
+    elif pred['predicate'] == 'QUERY_STRING':
+        if ('key' not in pred) or ('value' not in pred) or not isinstance(pred['value'], basestring):
+            error |= 1; print '%s: %s predicate needs a key and string value' % (reason, pred['predicate'])
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
@@ -3594,6 +3597,11 @@ def main(args):
 
     for name, fx in gamedata['client']['vfx'].iteritems():
         error |= check_visual_effect('client_vfx:'+name, fx)
+
+    for name in ('enable_replay_recording', 'enable_replay_playback',):
+        val = gamedata['client'][name]
+        if isinstance(val, list):
+            error |= check_cond_chain(val, reason='client:'+name)
 
     error |= check_server(gamedata['server'])
     error |= check_promo_codes(gamedata['promo_codes'])
