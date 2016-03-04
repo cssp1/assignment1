@@ -789,9 +789,9 @@ class IOSystem (object):
     def async_delete(self, filename, success_cb, procnum = None):
         if procnum is None: procnum = 0
         self.do_async_delete(filename, success_cb, procnum)
-    def async_exists(self, filename, success_cb, procnum = None):
+    def async_exists(self, filename, success_cb, error_cb, procnum = None):
         if procnum is None: procnum = 0
-        self.do_async_exists(filename, success_cb, procnum)
+        self.do_async_exists(filename, success_cb, error_cb, procnum)
 
     # need a little adaptor function to throw away the unnecessary "response" from async write requests
     def async_write_helper(self, ignore_errors, cb, delay, response):
@@ -810,13 +810,14 @@ class IOSystem (object):
         d = defer.Deferred()
         self.async_read(filename,
                         lambda buf, d=d: d.callback(buf),
-                        lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_read error: %r' % err_reason))),
+                        lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_read() error: %r' % err_reason))),
                         reason = reason, procnum = procnum)
         return d
     def async_exists_deferred(self, filename, reason = None, procnum = None):
         d = defer.Deferred()
         self.async_exists(filename,
                           lambda buf, d=d: d.callback(buf),
+                          lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_exists() error: %r' % err_reason))),
                           reason = reason, procnum = procnum)
         return d
 
@@ -848,7 +849,7 @@ class FileIOSystem (IOSystem):
     def do_async_delete(self, filename, success_cb, procnum):
         safe_unlink(filename)
         reactor.callLater(0, success_cb)
-    def do_async_exists(self, filename, success_cb, procnum):
+    def do_async_exists(self, filename, success_cb, error_cb, procnum):
         reactor.callLater(0, success_cb, os.path.exists(filename))
 
 class IOSlaveIOSystem (IOSystem):
@@ -884,8 +885,8 @@ class IOSlaveIOSystem (IOSystem):
         self.clients[procnum].async_write(filename, buf, server_time, success_cb, self.async_write_error, fsync = True)
     def do_async_delete(self, filename, success_cb, procnum):
         self.clients[procnum].async_delete(filename, server_time, success_cb, self.async_write_error)
-    def do_async_exists(self, filename, success_cb, procnum):
-        self.clients[procnum].async_exists(filename, server_time, success_cb, self.async_write_error)
+    def do_async_exists(self, filename, success_cb, error_cb, procnum):
+        self.clients[procnum].async_exists(filename, server_time, success_cb, error_cb)
     def shutdown(self):
         return defer.DeferredList([client.defer_until_all_complete() for client in self.clients])
 
@@ -948,10 +949,11 @@ class S3IOSystem (IOSystem):
                                   error_callback = self.async_write_error,
                                   preflight_callback = functools.partial(self.preflight_delete_request, bucket, objname),
                                   method = 'DELETE', headers = headers)
-    def do_async_exists(self, path, success_cb, procnum):
+    def do_async_exists(self, path, success_cb, error_cb, procnum):
         bucket, objname = path
         url, headers = self.s3.head_request(bucket, objname)
         self.s3_req.queue_request(server_time, url, lambda ret, success_cb=success_cb: success_cb(ret != 'NOTFOUND'),
+                                  error_callback = lambda err_reason, error_cb=error_cb: error_cb(err_reason),
                                   preflight_callback = functools.partial(self.preflight_exists_request, bucket, objname),
                                   method = 'HEAD', headers = headers)
 
