@@ -25845,11 +25845,23 @@ function receive_battle_log_result(dialog, ret) {
                         if(player) {
                             session.push_world(player.world);
 
+                            // kill desktop dialogs
+                            // need special handling for user_log since it is parented to desktop_top
+                            user_log.parent.unparent(user_log);
+                            goog.array.forEach(['aura_bar','desktop_bottom','desktop_top','player_portrait_dialog'], function(dname) {
+                                if(dname in desktop_dialogs) {
+                                    close_dialog(desktop_dialogs[dname]);
+                                    delete desktop_dialogs[dname];
+                                }
+                            });
+                            init_playfield_speed_bar(); // but add speed bar
+
                             // set up overlay GUI
                             change_selection(null);
                             var replay_overlay = BattleReplayGUI.invoke(player);
                             replay_overlay.on_destroy = function() {
                                 session.pop_to_real_world();
+                                init_desktop_dialogs();
                             };
                             return;
                         }
