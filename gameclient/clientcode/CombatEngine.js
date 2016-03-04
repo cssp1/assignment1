@@ -115,11 +115,11 @@ CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
     } else if(snap['kind'] === 'TargetedDamageEffect') {
         return new CombatEngine.TargetedDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['vs_table']);
     } else if(snap['kind'] === 'TargetedAuraEffect') {
-        return new CombatEngine.TargetedAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table']);
+        return new CombatEngine.TargetedAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id'], snap['amount'], snap['aura_name'], new GameTypes.TickCount(snap['aura_duration']), snap['aura_range'], snap['vs_table'], snap['duration_vs_table']);
     } else if(snap['kind'] === 'AreaDamageEffect') {
         return new CombatEngine.AreaDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['falloff'], snap['amount'], snap['vs_table'], snap['allow_ff']);
     } else if(snap['kind'] === 'AreaAuraEffect') {
-        return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], snap['aura_duration'], snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
+        return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], new GameTypes.TickCount(snap['aura_duration']), snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
     } else {
         throw Error('unknown kind '+snap['kind']);
     }
