@@ -45986,6 +45986,11 @@ function do_on_mouseup(e) {
 
     var world = session.get_draw_world();
 
+    if(world !== session.get_real_world()) {
+        // all the rest deals with player input, so ignore for non-real-world
+        return;
+    }
+
     // find cell index (note: j,i are not quantized to integers)
     var ji = screen_to_ortho(xy);
 
@@ -46638,7 +46643,7 @@ function do_on_mousemove(e) {
                 mouse_state.dripper.stop(); // abort current drip operation
             }
         }
-        if(player.unit_micro_enabled() && (mouse_state.button.get_button(SPUI.MouseButton.RIGHT) || mouse_state.spacebar)) {
+        if(world === session.get_real_world() && player.unit_micro_enabled() && (mouse_state.button.get_button(SPUI.MouseButton.RIGHT) || mouse_state.spacebar)) {
             // drag-select
             if(!mouse_state.has_dragged) {
                 mouse_state.has_dragged = true;
@@ -46869,10 +46874,14 @@ function do_on_mousedown(e) {
         change_selection_ui(null);
     }
 
+    if(!session.has_world()) { return; }
+    var world = session.get_draw_world();
+
     // awkward special case for SG unit deployment
     // this has to fire on mousedown, not mouseup for "dripping" to work properly
     // so it cannot go together with the usual mouseup handling
-    if(gamedata['unit_deploy_style'] == 'drip' && selection.spellname === "DEPLOY_UNITS") {
+    if(world === session.get_real_world() &&
+       gamedata['unit_deploy_style'] == 'drip' && selection.spellname === "DEPLOY_UNITS") {
         APMCounter.record_action();
 
         var deployment_dripper_callback = function(mouse_xy) {
@@ -47178,6 +47187,7 @@ function on_keydown(e) {
 
     var code = e.keyCode;
     //console.log('KEYDOWN ' + code);
+    var world = (session.has_world() ? session.get_draw_world() : null);
 
     // escape key to get out of dialogs/chat
     if(player.tutorial_state === "COMPLETE" && code === 27) {
@@ -47251,25 +47261,27 @@ function on_keydown(e) {
             return false;
         }
 
-        // if build spell is armed, fire it
-        if(selection.spellname == "BUILD") {
-            do_build(screen_to_ortho([mouse_state.last_x, mouse_state.last_y]));
-            if(e.preventDefault) { e.preventDefault(); }
-            return false;
-        }
-
-        // if a building is under construction, offer to speed it up (not during tutorial)
-        if(player.tutorial_state == "COMPLETE") {
-            var obj = session.for_each_real_object(function(obj) {
-                if(obj.is_building() && obj.team == 'player' && obj.is_under_construction()) {
-                    return obj;
-                }
-            });
-            if(obj) {
-                change_selection(obj);
-                invoke_speedup_dialog('speedup');
+        if(world && world === session.get_real_world()) {
+            // if build spell is armed, fire it
+            if(selection.spellname == "BUILD") {
+                do_build(screen_to_ortho([mouse_state.last_x, mouse_state.last_y]));
                 if(e.preventDefault) { e.preventDefault(); }
                 return false;
+            }
+
+            // if a building is under construction, offer to speed it up (not during tutorial)
+            if(player.tutorial_state == "COMPLETE") {
+                var obj = session.for_each_real_object(function(obj) {
+                    if(obj.is_building() && obj.team == 'player' && obj.is_under_construction()) {
+                        return obj;
+                    }
+                });
+                if(obj) {
+                    change_selection(obj);
+                    invoke_speedup_dialog('speedup');
+                    if(e.preventDefault) { e.preventDefault(); }
+                    return false;
+                }
             }
         }
     }
@@ -47326,9 +47338,9 @@ function on_keyup(e) {
     if(SPUI.keyboard_focus) { return true; } // event should have been handled already
 
     if(!session.has_world()) { return true; }
-    var world = session.get_real_world();
+    var world = session.get_draw_world();
 
-    if(selection.unit && selection.unit.is_mobile()) {
+    if(world === session.get_real_world() && selection.unit && selection.unit.is_mobile()) {
         if(code in key_unit_command_map) {
             var cmd = key_unit_command_map[code];
             if(cmd === 'SPECIAL_ABILITY') {
