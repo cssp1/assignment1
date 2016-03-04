@@ -45974,9 +45974,10 @@ function do_on_mouseup(e) {
         //}
     }
 
-    var world = session.get_draw_world();
+    if(!session.has_world()) { return; }
+    if(!session.viewing_base) { return; }
 
-    if(!world || !session.viewing_base) { return; }
+    var world = session.get_draw_world();
 
     // find cell index (note: j,i are not quantized to integers)
     var ji = screen_to_ortho(xy);
@@ -46267,8 +46268,8 @@ function do_on_mouseout(e) {
 }
 
 function create_mouse_tooltip() {
+    if(!session.has_world()) { return; }
     var world = session.get_draw_world();
-    if(!world) { return; }
 
     // no tooltips during tutorial
     if(player.tutorial_state != "COMPLETE") { return; }
@@ -46580,8 +46581,10 @@ function do_on_mousemove(e) {
     }
 
     // mouse tooltip processing. Skip if game not loaded, or in combat.
+    if(!session.has_world()) { return; }
     var world = session.get_draw_world();
-    if(world && session.viewing_base && !session.has_attacked) {
+
+    if(session.viewing_base && !session.has_attacked) {
         var found = find_object_at_screen_pixel(world, xy, screen_to_ortho(xy), true);
         if(mouse_state.hovering_over != found) {
             if(mouse_state.hovering_over && mouse_tooltip) {
@@ -47111,7 +47114,7 @@ function on_pointer_lock_change(e) {
 
 function on_keypress(e) {
     if(e.which != 0 && e.charCode != 0) {
-        var world = (session.has_world ? session.get_draw_world() : null);
+        var world = (session.has_world() ? session.get_draw_world() : null);
 
         //console.log('KEYPRESS ' + e.which);
         var str = String.fromCharCode(e.which);
@@ -47315,8 +47318,8 @@ function on_keyup(e) {
 
     if(SPUI.keyboard_focus) { return true; } // event should have been handled already
 
+    if(!session.has_world()) { return true; }
     var world = session.get_real_world();
-    if(!world) { return true; }
 
     if(selection.unit && selection.unit.is_mobile()) {
         if(code in key_unit_command_map) {
