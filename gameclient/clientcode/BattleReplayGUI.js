@@ -21,8 +21,12 @@ BattleReplayGUI.invoke = function(player) {
     dialog.modal = false;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.ondraw = function(dialog) {
+        var player = dialog.user_data['player'];
         dialog.xy = [Math.floor((SPUI.canvas_width - dialog.wh[0])/2),
                      Math.floor((0.5*SPUI.canvas_height - dialog.wh[1])/2)];
+        var s = dialog.data['widgets']['description']['ui_name'];
+        dialog.widgets['description'].str = s.replace('%cur_tick', pretty_print_number(player.cur_tick())).replace('%num_ticks', pretty_print_number(player.num_ticks()));
+
     };
     return dialog;
 };
