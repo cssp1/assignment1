@@ -13,6 +13,8 @@ goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('BattleReplay');
 goog.require('SPGzip'); // for replay uploads
+goog.require('SPStringCoding'); // for replay uploads
+goog.require('goog.crypt.base64'); // for replay uploads
 goog.require('World');
 goog.require('goog.object');
 goog.require('goog.array');
@@ -436,15 +438,19 @@ Session.Session.prototype.start_recording = function(token) {
 /** Stop and upload recording (might break upload process apart later) */
 Session.Session.prototype.finish_and_upload_recording = function() {
     this.replay_recorder.stop();
-    var raw = this.replay_recorder.pack_for_upload();
-    var n_snapshots = this.replay_recorder.snapshots.length;
-    var first_snapshot_length = JSON.stringify(this.replay_recorder.snapshots[0]).length;
-    var delta_snapshot_lengths = raw.length - first_snapshot_length; // approximate
-    console.log('Uploading '+n_snapshots.toString()+' snapshots.' +
-                ' Raw representation '+raw.length.toString()+ ' chars' +
-                ' (first '+first_snapshot_length.toString()+' chars then ~'+((delta_snapshot_lengths/(n_snapshots-1))).toFixed(0)+' chars/snapshot).');
-    var zipped = SPGzip.gzip_to_base64_string(raw);
-    console.log('Gzipped+b64 to '+zipped.length.toString()+' chars');
+    var raw = SPStringCoding.js_string_to_utf8_array(this.replay_recorder.pack_for_upload());
+    var zipped = goog.crypt.base64.encodeByteArray(SPGzip.gzip(raw));
+
+    if(player.is_developer()) { // print some compression efficiency statistics
+        var n_snapshots = this.replay_recorder.snapshots.length;
+        var first_snapshot_length = JSON.stringify(this.replay_recorder.snapshots[0]).length; // approximate, ignores UTF-8 encoding
+        var delta_snapshot_lengths = raw.length - first_snapshot_length; // approximate
+        console.log('Uploading '+n_snapshots.toString()+' snapshots.' +
+                    ' Raw representation '+raw.length.toString()+ ' chars' +
+                    ' (first '+first_snapshot_length.toString()+' chars then ~'+((delta_snapshot_lengths/(n_snapshots-1))).toFixed(0)+' chars/snapshot).');
+        console.log('Gzipped+b64 to '+zipped.length.toString()+' chars');
+    }
+
     send_to_server.func(["UPLOAD_BATTLE_REPLAY", this.replay_token, raw.length, 'gzip', 0, zipped.length, zipped.length, zipped]);
     this.replay_recorder = null;
     this.replay_token = null;

@@ -9,8 +9,6 @@ goog.provide('SPGzip');
     It's not going to be possible to make this typesafe due to the CommonJS hack :(
 */
 
-goog.require('goog.crypt.base64');
-
 // Hack to import the pako CommonJS module into this goog.module code
 // Affected by work-in-progress issue in the Closure compiler:
 // https://github.com/google/closure-compiler/issues/1472
@@ -30,13 +28,13 @@ if(!SPGzip.pako) { // necessary to avoid Closure compiler error
     SPGzip.pako = goog.module.get('module$pako$index');
 }
 
-/** @param {string} input
-    @return {string} */
-SPGzip.gzip_to_base64_string = function(input) {
-    return goog.crypt.base64.encodeString(/** @type {string} */ (SPGzip.pako.gzip(input, {to: 'string'})));
+/** @param {!Array<number>|Uint8Array} input
+    @return {!Array<number>|Uint8Array} */
+SPGzip.gzip = function(input) {
+    return /** @type {!Array<number>|Uint8Array} */ (SPGzip.pako.gzip(input));
 };
-/** @param {string} input
-    @return {string} */
-SPGzip.gunzip_from_base64_string = function(input) {
-    return /** @type {string} */ (SPGzip.pako.ungzip(goog.crypt.base64.decodeString(input), {to: 'string'}));
+/** @param {!Array<number>|Uint8Array} input
+    @return {!Array<number>|Uint8Array} */
+SPGzip.gunzip = function(input) {
+    return /** @type {!Array<number>|Uint8Array} */ (SPGzip.pako.ungzip(input));
 };

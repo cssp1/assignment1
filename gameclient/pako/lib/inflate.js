@@ -360,9 +360,9 @@ Inflate.prototype.onEnd = function (status) {
  *   console.log(err);
  * }
  * ```
- @param {string|Array} input
- @param {{to:(string|undefined)}} options
- @return {string|Array}
+ @param {string|Uint8Array|Array<number>} input
+ @param {{to:(string|undefined)}=} options
+ @return {string|Uint8Array|Array<number>}
  **/
 function inflate(input, options) {
   var inflator = new Inflate(options);

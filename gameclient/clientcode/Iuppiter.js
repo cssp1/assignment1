@@ -38,35 +38,6 @@ $Revision: 3026 $
 
 // SP3RDPARTY : Iuppiter.js : BSD License
 
-/**
- * Convert string value to a byte array.
- *
- * @param {string} input The input string value.
- * @return {Array} A byte array from string value.
- */
-Iuppiter.string_to_bytes = function(input) {
-    /* FIXED version from http://code.google.com/p/jslzjb/issues/detail?id=2 */
-    var b = [];
-    for(var i = 0; i < input.length; i++) {
-        b.push(input.charCodeAt(i));
-    }
-    return b;
-};
-
-/**
- * Convert byte array to string
- *
- * @param {Array} input
- * @return {string}
- */
-Iuppiter.bytes_to_string = function(input) {
-    var ret = [];
-    for(var i = 0; i < input.length; i++) {
-        ret.push(String.fromCharCode(input[i]));
-    }
-    return ret.join('');
-};
-
 // Constants was used for compress/decompress function.
 
 /** @const */ Iuppiter.NBBY = 8;
@@ -195,7 +166,6 @@ Iuppiter.decompress = function(sstart) {
     }
 
     while (src < slen) {
-        //console.log('HERE '+src+' '+slen+' '+Iuppiter.bytes_to_string(dstart));
         if ((copymask <<= 1) == (1 << Iuppiter.NBBY)) {
             copymask = 1;
             copymap = sstart[src++];
@@ -219,14 +189,6 @@ Iuppiter.decompress = function(sstart) {
     }
     return dstart;
 };
-
-// convenience functions that work with JavaScript strings.
-/** @param {string} s
-    @return {Array} */
-Iuppiter.compress_string = function(s) { return Iuppiter.compress(Iuppiter.string_to_bytes(s)); };
-/** @param {Array} s
-    @return {string} */
-Iuppiter.decompress_string = function(s) { return Iuppiter.bytes_to_string(Iuppiter.decompress(s)); };
 
 /*
 Iuppiter.test = function() {

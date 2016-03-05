@@ -43062,13 +43062,13 @@ function unwrap_and_uncompress_string(codec, z_result) {
     if(codec === 'raw') {
         return z_result;
     } else if(codec == 'lzjb') {
-        return Iuppiter.bytes_to_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result)));
+        return SPStringCoding.utf8_array_to_js_string(Iuppiter.decompress(goog.crypt.base64.decodeStringToByteArray(z_result)));
     } else if(codec == 'lz4') {
         var arr = goog.crypt.base64.decodeStringToByteArray(z_result);
         arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
-        return Iuppiter.bytes_to_string(lz4.decompress(arr));
+        return SPStringCoding.utf8_array_to_js_string(lz4.decompress(arr));
     } else if(codec == 'gzip') {
-        return SPGzip.gunzip_from_base64_string(z_result);
+        return SPStringCoding.utf8_array_to_js_string(SPGzip.gunzip(goog.crypt.base64.decodeStringToByteArray(z_result)));
     } else {
         throw Error('unknown codec '+codec);
     }

@@ -61,9 +61,9 @@ diff -ru ./lib/deflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/deflate.js
   *
   * The same as [[deflate]], but create gzip wrapper instead of
   * deflate one.
-+ @param {string|Array} input
-+ @param {{to:(string|undefined)}} options
-+ @return {string|Array}
++ @param {string|Uint8Array|Array<number>} input
++ @param {{to:(string|undefined)}=} options
++ @return {string|Uint8Array|Array<number>}
   **/
  function gzip(input, options) {
    options = options || {};
@@ -92,9 +92,9 @@ diff -ru ./lib/inflate.js /Users/dmaas/cvs/game/gameclient/pako/lib/inflate.js
   *   console.log(err);
   * }
   * ```
-+ @param {string|Array} input
-+ @param {{to:(string|undefined)}} options
-+ @return {string|Array}
++ @param {string|Uint8Array|Array<number>} input
++ @param {{to:(string|undefined)}=} options
++ @return {string|Uint8Array|Array<number>}
   **/
  function inflate(input, options) {
    var inflator = new Inflate(options);

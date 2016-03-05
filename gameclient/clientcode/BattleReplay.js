@@ -100,15 +100,16 @@ BattleReplay.Recorder.prototype.stop = function() {
 };
 
 /** Return the final uploadable representation of the replay
-    @return {string} */
+    @return {string} native JS string, possibly including Unicode */
 BattleReplay.Recorder.prototype.pack_for_upload = function() {
     var pack = {'version': 0,
                 'snapshots': this.snapshots};
+    // stringify, but don't UTF-8 encode yet
     return JSON.stringify(pack);
 };
 
 /** LINK FROM DOWNLOAD TO PLAYER
-    @param {string} packed */
+    @param {string} packed - native JS string, possibly including Unicode */
 BattleReplay.replay_from_download = function(packed) {
     var pack = JSON.parse(packed);
     if(pack['version'] !== 0) { throw Error('version mismatch'); }
