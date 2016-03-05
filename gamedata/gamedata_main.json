@@ -419,7 +419,7 @@
                                         {"predicate": "OR", "subpredicates": [
                                             {"predicate": "RANDOM", "chance": 0.01},
                                             {"predicate": "AND", "subpredicates": [{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "tr"},
-                                                                                   {"predicate": "USER_ID", "allow": [3599285]}]},
+                                                                                   {"predicate": "USER_ID", "allow": [3599285,4027136]}]},
                                             {"predicate": "AND", "subpredicates": [{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"},
                                                                                    {"predicate": "USER_ID", "allow": [235055]}]}
                                         ]}
