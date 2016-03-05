@@ -3289,12 +3289,13 @@ class AttackReplayReceiver (object):
             # as a future optimization, we could skip the decompression step and write this
             # directly to the file (though we'd be trusting the client to generate valid gzip!).
 
-        gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
-                                     (self.log_file, self.raw_length, self.buf.tell()))
+        if 0:
+            gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
+                                         (self.log_file, self.raw_length, self.buf.tell()))
 
         # check the size of the decompressed raw representation
         if len(raw_buf) != self.raw_length:
-            gamesite.exception_log.event(server_time, 'raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
+            gamesite.exception_log.event(server_time, 'replay raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
 
         self.ensure_storage_dir(self.log_time)
 
