@@ -43215,7 +43215,7 @@ function handle_server_message_bundle(serial, bundle) {
 /** @type {!Array<string>} for debugging server->client traffic */
 var debug_server_message_history = [];
 /** @const */
-var debug_server_message_history_limit = 10;
+var debug_server_message_history_limit = 7;
 
 function handle_server_message(data) {
     var msg = data[0];
