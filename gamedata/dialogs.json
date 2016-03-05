@@ -3971,7 +3971,11 @@
     },
 
     "battle_dialog": {
-        "dimensions": [366, 326],
+        // deliberately mis-match the bg dimensions so that auto_center() will offset the dialog a bit
+        // to avoid the "OK" button overlapping on screen with the "Instant" button on a following repair dialog.
+        // (a common source of player complaints is accidentally clicking on that "Instant" button after the "OK").
+        "dimensions": [366, 420],
+
         "default_button": "ok_button",
         "widgets": {
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[366,326], "asset":"dialog_resizable","bg_image_resizable":1,
