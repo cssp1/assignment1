@@ -413,6 +413,7 @@
 
                                     // randomized testing
                                     [{"predicate": "AND", "subpredicates": [
+                                        {"predicate": "GAMEDATA_VAR", "name": "game_id", "method": "in", "value": ["tr","bfm"]},
                                         {"predicate": "COUNTRY_TIER", "tiers": [3,4]},
                                         {"predicate": "PLAYER_HISTORY", "key": "money_spent", "method": "<", "value": 0.01},
                                         {"predicate": "PLAYER_HISTORY", "key": "player_level", "method": ">=", "value": 20},

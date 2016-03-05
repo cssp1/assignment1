@@ -3173,9 +3173,9 @@ class AttackLog (object):
     def storage_s3_bucket(cls):
         return SpinConfig.config.get('battle_logs_s3_bucket',None)
     @classmethod
-    def storage_s3_name(cls, base_name):
-        unix_time = int(base_name[0:10])
-        tm = time.gmtime(unix_time)
+    def storage_s3_name(cls, log_time, attacker_id, defender_id, base_id):
+        tm = time.gmtime(log_time)
+        base_name = cls.base_name(log_time, attacker_id, defender_id, base_id)
         return '%s-battles-%04d%02d/%04d%02d%02d/%s' % (game_id, tm.tm_year, tm.tm_mon, tm.tm_year, tm.tm_mon, tm.tm_mday, base_name)
 
     def upload(self):
@@ -3183,15 +3183,15 @@ class AttackLog (object):
         if not isinstance(io_system, S3IOSystem): return # S3 not enabled
         bucket = self.storage_s3_bucket()
         if bucket:
-            name = self.storage_s3_name(self.log_file)
             # fire-and-forget write
             buf = open(self.local_filename, 'rb').read()
-            io_system.do_async_write((bucket,name), buf, lambda : None, False, 0)
+            io_system.do_async_write((bucket,self.s3_filename), buf, lambda : None, False, 0)
 
     def __init__(self, log_time, attacker_id, defender_id, base_id):
         self.log_time = log_time # server_time when attack log was opened
         self.log_file = None # this will be recorded in battle history, to be used for retrieving the log later
         self.local_filename = None
+        self.s3_filename = None
 
         if (attacker_id < 0) or (defender_id < 0):
             self.log = SpinLog.NullLog()
@@ -3205,6 +3205,7 @@ class AttackLog (object):
             except: pass
 
         self.local_filename = os.path.join(attack_log_dir, self.log_file)
+        self.s3_filename = self.storage_s3_name(log_time, attacker_id, defender_id, base_id)
         self.log = SpinLog.JSONLog(SpinLog.GzipLogFile(self.local_filename))
 
     def is_active(self): # whether or not we're actually recording, instead of dropping the events
@@ -3235,6 +3236,15 @@ class AttackReplayReceiver (object):
     @classmethod
     def storage_path(cls, log_time, attacker_id, defender_id, base_id):
         return os.path.join(cls.storage_dir(log_time), cls.base_name(log_time, attacker_id, defender_id, base_id))
+
+    @classmethod
+    def storage_s3_bucket(cls):
+        return SpinConfig.config.get('battle_replays_s3_bucket',None)
+    @classmethod
+    def storage_s3_name(cls, log_time, attacker_id, defender_id, base_id):
+        tm = time.gmtime(log_time)
+        base_name = cls.base_name(log_time, attacker_id, defender_id, base_id)
+        return '%s-battles-%04d%02d/%04d%02d%02d/%s' % (game_id, tm.tm_year, tm.tm_mon, tm.tm_year, tm.tm_mon, tm.tm_mday, base_name)
 
     def __init__(self, active_player_id, log_time, expire_time, attacker_id, defender_id, base_id):
         self.active_player_id = active_player_id
@@ -3295,7 +3305,14 @@ class AttackReplayReceiver (object):
             temp.close()
             atom.complete()
 
-        # XXX add S3 storage
+        # fire-and-forget S3 upload
+        if isinstance(io_system, S3IOSystem): # S3 enabled
+            bucket = self.storage_s3_bucket()
+            if bucket:
+                name = self.storage_s3_name(self.log_time, self.attacker_id, self.defender_id, self.base_id)
+                s3_buf = open(self.local_filename, 'rb').read() # inefficient, but whatever
+                io_system.do_async_write((bucket,name), s3_buf, lambda : None, False, 0)
+
         metric_event_coded(self.active_player_id, '3832_battle_replay_uploaded', {'battle_time': self.log_time,
                                                                                   'attacker_id': self.attacker_id,
                                                                                   'defender_id': self.defender_id,
@@ -16249,6 +16266,7 @@ class GAMEAPI(resource.Resource):
             summary = { 'time': session.attack_log.log_time,
                         'duration': int(server_time - session.attack_log.log_time),
                         'logfile': session.attack_log.log_file if session.attack_log.log_file else '',
+                        'replay_version': gamedata.get('replay_version', 0),
                         'involved_players': [session.user.user_id, session.viewing_user.user_id],
                         'battle_type': 'attack',
                         'attacker_id': session.user.user_id,
@@ -16845,6 +16863,7 @@ class GAMEAPI(resource.Resource):
                     summary = { 'time': session.attack_log.log_time,
                                 'duration': int(server_time - session.attack_log.log_time),
                                 'logfile': session.attack_log.log_file if session.attack_log.log_file else '',
+                                'replay_version': gamedata.get('replay_version', 0),
                                 'involved_players': [session.user.user_id],
                                 'battle_type': 'defense',
                                 'attacker_id': session.incoming_attack_id,
@@ -17745,7 +17764,8 @@ class GAMEAPI(resource.Resource):
                              'attacker_name', 'defender_name',
                              'attacker_level', 'defender_level',
                              'deployed_units',
-                             'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time')
+                             'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time',
+                             'replay_version')
 
     def query_battle_history(self, session, retmsg, arg):
         target = arg[1] # look up battles against this player (-1 for anyone)
@@ -18098,7 +18118,7 @@ class GAMEAPI(resource.Resource):
         if isinstance(io_system, S3IOSystem) and AttackLog.storage_s3_bucket():
             # try S3 download
             bucket = AttackLog.storage_s3_bucket()
-            name = AttackLog.storage_s3_name(AttackLog.base_name(battle_time, attacker, defender, base_id))
+            name = AttackLog.storage_s3_name(battle_time, attacker, defender, base_id)
             d_log_s3 = io_system.async_read_deferred((bucket, name))
         else:
             d_log_s3 = defer.succeed(None)
@@ -18111,8 +18131,14 @@ class GAMEAPI(resource.Resource):
         # failure path
         d_replay_exists_local.addErrback(report_and_absorb_deferred_failure, session)
 
-        # XXX add S3 version
-        d_replay_exists_s3 = defer.succeed(False)
+        # query for existence of a replay on S3
+        s3_bucket = AttackReplayReceiver.storage_s3_bucket()
+        if s3_bucket and isinstance(io_system, S3IOSystem):
+            s3_name = AttackReplayReceiver.storage_s3_name(battle_time, attacker, defender, base_id)
+            d_replay_exists_s3 = io_system.async_exists_deferred((s3_bucket, s3_name), reason = 'GET_BATTLE_LOG3')
+        else:
+            d_replay_exists_s3 = defer.succeed(False)
+
         d_replay_exists_s3.addErrback(report_and_absorb_deferred_failure, session)
 
         # wait for results of all queries
@@ -18166,12 +18192,14 @@ class GAMEAPI(resource.Resource):
                                                                                    'defender_id': defender,
                                                                                    'base_id': base_id})
 
-        # XXX add S3 version
         filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
         if os.path.exists(filename):
             d = defer.succeed(open(filename, 'rb').read())
-        else:
-            d = defer.succeed(None)
+        elif isinstance(io_system, S3IOSystem) and AttackReplayReceiver.storage_s3_bucket():
+            # try S3 download
+            bucket = AttackReplayReceiver.storage_s3_bucket()
+            name = AttackReplayReceiver.storage_s3_name(battle_time, attacker, defender, base_id)
+            d = io_system.async_read_deferred((bucket, name))
 
         # failure path
         d.addErrback(report_and_absorb_deferred_failure, session)
