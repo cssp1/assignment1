@@ -25833,52 +25833,66 @@ function receive_battle_log_result(dialog, ret) {
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;
                 var summary = dialog.user_data['summary'];
-                last_query_tag += 1;
-                var tag = 'gbr'+last_query_tag.toString();
-                var locker = invoke_ui_locker_until_closed();
-                battle_log_receivers[tag] = (function (_dialog, _locker) { return function (result) {
-                    close_dialog(_locker);
-
-                    if(result) {
-                        var pack = unwrap_and_uncompress_string(result[0], result[1]); // codec, z_result
-                        var player = BattleReplay.replay_from_download(pack);
-                        if(player) {
-                            session.push_world(player.world);
-
-                            // kill desktop dialogs
-                            // need special handling for user_log since it is parented to desktop_top
-                            user_log.parent.unparent(user_log);
-                            goog.array.forEach(['attack_button_dialog','aura_bar','combat_damage_bar','desktop_bottom','desktop_top','enemy_portrait_dialog','enemy_resource_bars','player_portrait_dialog','quest_bar'], function(dname) {
-                                if(dname in desktop_dialogs) {
-                                    close_dialog(desktop_dialogs[dname]);
-                                    delete desktop_dialogs[dname];
-                                }
-                            });
-                            init_playfield_speed_bar(); // but add speed bar
-
-                            // set up overlay GUI
-                            change_selection(null);
-                            var replay_overlay = BattleReplayGUI.invoke(player);
-                            replay_overlay.on_destroy = function() {
-                                session.pop_to_real_world();
-                                init_desktop_dialogs();
-                            };
-                            return;
-                        }
-                    }
-                    // failure
+                var fail_cb = (function (_dialog) { return function() {
                     invoke_child_message_dialog(_dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'], '');
                     _dialog.widgets['replay_button'].state = 'disabled';
                     _dialog.widgets['replay_button'].tooltip.str = _dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'];
+                }; })(dialog);
 
-                }; })(dialog, locker);
-                send_to_server.func(["GET_BATTLE_REPLAY", summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature'], tag]);
+                download_and_play_replay(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'],
+                                         dialog.user_data['signature'], fail_cb);
             };
         }
     }
     dialog.widgets['log'].scroll_to_top();
 
     battle_log_change_page(dialog, 0);
+};
+
+/** @param {number} battle_time
+    @param {number} attacker_id
+    @param {number} defender_id
+    @param {string|null} base_id
+    @param {string|null} signature
+    @param {function()=} fail_cb */
+function download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, fail_cb) {
+    last_query_tag += 1;
+    var tag = 'gbr'+last_query_tag.toString();
+    var locker = invoke_ui_locker_until_closed();
+    battle_log_receivers[tag] = (function (_locker, _fail_cb) { return function (result) {
+        close_dialog(_locker);
+        if(result) {
+            var pack = unwrap_and_uncompress_string(result[0], result[1]); // codec, z_result
+            var player = BattleReplay.replay_from_download(pack);
+            if(player) {
+                session.push_world(player.world);
+
+                // kill desktop dialogs
+                // need special handling for user_log since it is parented to desktop_top
+                user_log.parent.unparent(user_log);
+                goog.array.forEach(['attack_button_dialog','aura_bar','combat_damage_bar','desktop_bottom','desktop_top','enemy_portrait_dialog','enemy_resource_bars','player_portrait_dialog','quest_bar'], function(dname) {
+                    if(dname in desktop_dialogs) {
+                        close_dialog(desktop_dialogs[dname]);
+                        delete desktop_dialogs[dname];
+                    }
+                });
+                init_playfield_speed_bar(); // but add speed bar
+
+                // set up overlay GUI
+                change_selection(null);
+                var replay_overlay = BattleReplayGUI.invoke(player);
+                replay_overlay.on_destroy = function() {
+                    session.pop_to_real_world();
+                    init_desktop_dialogs();
+                };
+                return;
+            }
+        } else {
+            // failure
+            if(_fail_cb) { _fail_cb(); }
+        }
+    }; })(locker, fail_cb);
+    send_to_server.func(["GET_BATTLE_REPLAY", battle_time, attacker_id, defender_id, base_id, signature, tag]);
 };
 
 function battle_log_change_page(dialog, page) {
@@ -43935,6 +43949,20 @@ function handle_server_message(data) {
         var immediate_visit = get_query_string('visit_base');
         if(player.is_developer() && immediate_visit) {
             visit_base(parseInt(immediate_visit,10));
+        }
+
+        // deep link to a replay
+        var immediate_replay = get_query_string('replay');
+        if(immediate_replay) {
+            // relies on the server's naming convention: "1457163456-828095-vs-3606753-at-s3606753_42"
+            var fields = immediate_replay.split('-');
+            var battle_time = parseInt(fields[0], 10);
+            var attacker_id = parseInt(fields[1], 10);
+            var defender_id = parseInt(fields[3], 10);
+            var base_id = (fields.length >= 6 ? fields[5] : null);
+            download_and_play_replay(battle_time, attacker_id, defender_id, base_id, null, function() {
+                invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
+            });
         }
 
         // deep link to player info statistics
