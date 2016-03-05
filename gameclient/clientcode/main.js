@@ -25828,7 +25828,10 @@ function receive_battle_log_result(dialog, ret) {
             }; })(summary, log);
         }
 
-        if(replay_exists && eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
+        var their_replay_version = summary['replay_version'] || 0;
+        var cur_replay_version = gamedata['replay_version'] || 0;
+        if(replay_exists && their_replay_version === cur_replay_version &&
+           eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
             dialog.widgets['replay_button'].show = true;
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;
@@ -25887,10 +25890,10 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 };
                 return;
             }
-        } else {
-            // failure
-            if(_fail_cb) { _fail_cb(); }
         }
+        // failure to download or play
+        if(_fail_cb) { _fail_cb(); }
+
     }; })(locker, fail_cb);
     send_to_server.func(["GET_BATTLE_REPLAY", battle_time, attacker_id, defender_id, base_id, signature, tag]);
 };

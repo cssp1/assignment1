@@ -102,18 +102,26 @@ BattleReplay.Recorder.prototype.stop = function() {
 /** Return the final uploadable representation of the replay
     @return {string} native JS string, possibly including Unicode */
 BattleReplay.Recorder.prototype.pack_for_upload = function() {
-    var pack = {'version': 0,
+    var pack = {'version': gamedata['replay_version'] || 0,
                 'snapshots': this.snapshots};
     // stringify, but don't UTF-8 encode yet
     return JSON.stringify(pack);
 };
 
 /** LINK FROM DOWNLOAD TO PLAYER
-    @param {string} packed - native JS string, possibly including Unicode */
+    @param {string} packed - native JS string, possibly including Unicode
+    @return {BattleReplay.Player|null} - null if error */
 BattleReplay.replay_from_download = function(packed) {
+    var cur_ver = gamedata['replay_version'] || 0;
     var pack = JSON.parse(packed);
-    if(pack['version'] !== 0) { throw Error('version mismatch'); }
-    if(pack['snapshots'].length < 1) { throw Error('no snapshots'); }
+    if(pack['version'] !== cur_ver) {
+        console.log('Replay version mismatch: '+pack['version'].toString()+' vs '+cur_ver.toString());
+        return null;
+    }
+    if(pack['snapshots'].length < 1) {
+        console.log('Replay had no snapshots');
+        return null;
+    }
     return new BattleReplay.Player(pack['snapshots']);
 };
 
