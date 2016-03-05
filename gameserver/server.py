@@ -3279,8 +3279,13 @@ class AttackReplayReceiver (object):
             # as a future optimization, we could skip the decompression step and write this
             # directly to the file (though we'd be trusting the client to generate valid gzip!).
 
+        gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
+                                     (self.log_file, self.raw_length, self.buf.tell()))
+
         # check the size of the decompressed raw representation
-        if len(raw_buf) != self.raw_length: raise Exception('raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
+        if len(raw_buf) != self.raw_length:
+            gamesite.exception_log.event(server_time, 'raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
+
         self.ensure_storage_dir(self.log_time)
 
         # gzip compress on the way out
@@ -3291,9 +3296,6 @@ class AttackReplayReceiver (object):
             atom.complete()
 
         # XXX add S3 storage
-
-        gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
-                                     (self.log_file, self.raw_length, self.buf.tell()))
         metric_event_coded(self.active_player_id, '3832_battle_replay_uploaded', {'battle_time': self.log_time,
                                                                                   'attacker_id': self.attacker_id,
                                                                                   'defender_id': self.defender_id,

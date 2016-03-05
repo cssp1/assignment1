@@ -416,7 +416,13 @@
                                         {"predicate": "COUNTRY_TIER", "tiers": [3,4]},
                                         {"predicate": "PLAYER_HISTORY", "key": "money_spent", "method": "<", "value": 0.01},
                                         {"predicate": "PLAYER_HISTORY", "key": "player_level", "method": ">=", "value": 20},
-                                        {"predicate": "RANDOM", "chance": 0.01}
+                                        {"predicate": "OR", "subpredicates": [
+                                            {"predicate": "RANDOM", "chance": 0.01},
+                                            {"predicate": "AND", "subpredicates": [{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "tr"},
+                                                                                   {"predicate": "USER_ID", "allow": [3599285]}]},
+                                            {"predicate": "AND", "subpredicates": [{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"},
+                                                                                   {"predicate": "USER_ID", "allow": [235055]}]}
+                                        ]}
                                     ]}, true],
 
                                     [{"predicate": "ALWAYS_TRUE"}, false]],
