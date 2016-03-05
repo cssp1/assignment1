@@ -818,7 +818,7 @@ class IOSystem (object):
         self.async_exists(filename,
                           lambda buf, d=d: d.callback(buf),
                           lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_exists() error: %r' % err_reason))),
-                          reason = reason, procnum = procnum)
+                          procnum = procnum)
         return d
 
     def collect_aistate_garbage(self):
