@@ -152,9 +152,13 @@ Session.Session.prototype.get_real_world = function() {
     return this.world_stack[0];
 };
 
-/** @return {boolean}
-    @const */
+/** @return {boolean}*/
 Session.Session.prototype.has_world = function() { return (this.world_stack.length >= 1); };
+
+/** Checks if we're looking at something other than the real world
+    @return {boolean} */
+Session.Session.prototype.is_replay = function() { return (this.world_stack.length >= 2); };
+
 
 Session.Session.prototype.incoming_attack_pending = function() { return (this.incoming_attack_time > server_time); };
 Session.Session.prototype.connected = function() { return this.connect_time > 0; };

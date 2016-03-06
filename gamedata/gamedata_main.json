@@ -150,8 +150,13 @@
         "view_zoom_tile_border": [0.35, 0.75], // amount (source pixels) by which to enlarge dynamic backdrop tiles to hide seams [minify,maximize]
 
         // playfield speed controls (enabled by enable_playfield_speed_bar)
-        "playfield_speed_limits": [0,2], // min/max speed (0 = legacy default)
-        "playfield_speeds": { "0": 1.0, "1": 1.5, "2": 2.0 }, // coefficient corresponding to each linear increment
+        "playfield_speed_limits": {
+            // min/max speed increments (0 = legacy default)
+            "normal": [0,2], // during actual gameplay
+            "replay": [-2,5] // when viewing a replay
+        },
+
+        "playfield_speeds": { "-2": 0.25, "-1": 0.5, "0": 1.0, "1": 1.5, "2": 2.0, "3": 4.0, "4": 8.0, "5": 16.0 }, // coefficient corresponding to each linear increment
 
         "backdrop_whole_fringe": 90, // size (in zoom=100% pixels) of gradient fringe to draw surrounding "whole" backdrop images when zoomed out
 

@@ -7755,9 +7755,8 @@ function relative_time_to_tick(t) {
 
 var player_combat_time_scale = 1.0; // additional time scaling applied by playfield speed bar controls
 var player_playfield_speed = 0; // incremental version, used to drive player_combat_time_scale
-function update_player_combat_time_scale(new_speed) {
-    var limits = gamedata['client']['playfield_speed_limits'];
-    player_playfield_speed = clamp(new_speed, limits[0], limits[1]);
+function update_player_combat_time_scale(new_speed) { // note: caller's responsibility to check against limits.
+    player_playfield_speed = new_speed;
     player_combat_time_scale = gamedata['client']['playfield_speeds'][player_playfield_speed.toFixed(0)] || 1;
     //session.set_attack_finish_time(session.true_attack_finish_time);
 };
@@ -9317,17 +9316,28 @@ function init_playfield_speed_bar() {
         }
     }
 }
+
+/** @return {!Array<number>} */
+function get_playfield_speed_limits() {
+    return gamedata['client']['playfield_speed_limits'][session.is_replay() ? 'replay': 'normal'];
+};
 function invoke_playfield_speed_bar() {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_speed_bar']);
     dialog.user_data['dialog'] = 'playfield_speed_bar';
     var speed_cb = function(incr) { return function(w) {
         player.record_feature_use('playfield_speed');
         var new_speed = player_playfield_speed + incr;
-        update_player_combat_time_scale(new_speed);
+        var limits = get_playfield_speed_limits();
+        new_speed = clamp(new_speed, limits[0], limits[1]);
+        if(new_speed != player_playfield_speed) {
+            update_player_combat_time_scale(new_speed);
+        }
+        /*
         if(player.preferences['playfield_speed'] != player_playfield_speed) {
             player.preferences['playfield_speed'] = player_playfield_speed;
             send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         }
+        */
     }; };
     dialog.widgets['speed_up_button'].onclick = speed_cb(1);
     dialog.widgets['speed_down_button'].onclick = speed_cb(-1);
@@ -9336,13 +9346,13 @@ function invoke_playfield_speed_bar() {
 }
 function update_playfield_speed_bar(dialog) {
     // attach to right side of desktop, underneath zoom bar
-    //if('playfield_controls_bar' in desktop_dialogs && (desktop_dialogs['playfield_controls_bar'].user_data['dialog'] == 'playfield_controls_bar_vertical')) { ... }
     dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor((canvas_height/2) + gamedata['dialogs']['playfield_zoom_bar']['dimensions'][1])]);
     goog.array.forEach(['speed_amount', 'speed_label'], function(wname) {
         dialog.widgets[wname].text_color = SPUI.make_colorv(dialog.data['widgets'][wname]['text_color_'+(player_playfield_speed === 0 ? 'zero' : 'nonzero')]);
     });
-    dialog.widgets['speed_up_button'].state = (player_playfield_speed >= gamedata['client']['playfield_speed_limits'][1] ? 'disabled' : 'normal');
-    dialog.widgets['speed_down_button'].state = (player_playfield_speed <= gamedata['client']['playfield_speed_limits'][0] ? 'disabled' : 'normal');
+    var limits = get_playfield_speed_limits();
+    dialog.widgets['speed_up_button'].state = (player_playfield_speed >= limits[1] ? 'disabled' : 'normal');
+    dialog.widgets['speed_down_button'].state = (player_playfield_speed <= limits[0] ? 'disabled' : 'normal');
     dialog.widgets['speed_amount'].str = dialog.data['widgets']['speed_amount']['ui_name'].replace('%f', player_combat_time_scale.toFixed(1));
 }
 
@@ -43837,8 +43847,8 @@ function handle_server_message(data) {
         set_view_limits();
 
         // note: do not recall the persisted setting, but remember it for metrics?
-        //if('playfield_speed' in player.preferences) { delete player.preferences['playfield_speed']; }
-        update_player_combat_time_scale(get_preference_setting(player.preferences, 'playfield_speed'));
+        if('playfield_speed' in player.preferences) { delete player.preferences['playfield_speed']; }
+        update_player_combat_time_scale(0); // get_preference_setting(player.preferences, 'playfield_speed'));
 
         if(client_state != client_states.RUNNING) {
             // very first session initiated
