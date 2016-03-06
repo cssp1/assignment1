@@ -10,7 +10,8 @@ def get_leveled_quantity(qty, level): # XXX duplicate
     return qty
 
 def get_base_value(stat, spec, level):
-    if hasattr(spec, stat): return get_leveled_quantity(getattr(spec, stat), level)
+    if stat == 'maxvel': return 1 # this is a scaling factor in the combat engine
+    elif hasattr(spec, stat): return get_leveled_quantity(getattr(spec, stat), level)
     elif stat == 'armor': # XXX annoying special case
         return 0
     elif stat == 'on_destroy':

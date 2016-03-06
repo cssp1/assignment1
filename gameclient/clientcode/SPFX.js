@@ -2005,7 +2005,7 @@ SPFX.PhantomUnit = function(pos, altitude, orient, when, data, instance_data) {
         var heading = /** @type {number} */ (instance_data['heading']) +
             (Math.PI/180) * (/** @type {number|undefined} */ (data['heading']) || 0); // add heading to original spawn orientation
         if(this.duration <= 0) { throw Error('duration must be positive'); }
-        dest = vec_add(pos, vec_scale((this.duration) * this.obj.combat_stats.maxvel * 1.1, [Math.cos(heading), Math.sin(heading)]));
+        dest = vec_add(pos, vec_scale((this.duration) * this.obj.current_maxvel() * 1.1, [Math.cos(heading), Math.sin(heading)]));
     } else if('path' in instance_data) {
         path = /** @type {!Array.<!Array.<number>>} */ (instance_data['path']);
         dest = path[path.length - 1];

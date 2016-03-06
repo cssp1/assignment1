@@ -1323,49 +1323,8 @@ function GameObject() {
     this.last_speak_time = -1;
 
     // combat stats - pulled from gamedata but modified by auras
-    /** @type {{stunned: number,
-                disarmed: number,
-                damage_taken: number,
-                damage_taken_from: !Object.<string,number>,
-                rate_of_fire: number,
-                accuracy: number,
-                weapon_damage: number,
-                weapon_damage_vs: !Object.<string,number>,
-                effective_weapon_range: number,
-                weapon_range: number,
-                extra_armor: number,
-                anti_air: number,
-                anti_missile: number,
-                turn_rate: number,
-                ice_effects: number,
-                swamp_effects: number,
-                projectile_speed: number,
-                splash_range: number,
-                maxvel: number,
-                erratic_flight: number}} */
-    this.combat_stats = {stunned: 0,
-                         disarmed: 0,
-                         damage_taken: 1,
-                         damage_taken_from: {},
-                         rate_of_fire: 1,
-                         accuracy: 1,
-                         weapon_damage: 1,
-                         weapon_damage_vs: {}, // multiplies with the usual damage_vs_table
-                         effective_weapon_range: 1,
-                         weapon_range: 1,
-                         extra_armor: 0,
-                         anti_air: 0,
-                         anti_missile: 1, // note! this is the chance that a missile is NOT intercepted
-                         turn_rate: 1,
-                         ice_effects: 1,
-                         swamp_effects: 1,
-                         projectile_speed: 1,
-                         splash_range: 1,
-
-                         // Mobile only
-                         maxvel: 1,
-                         erratic_flight: 0
-                        };
+    /** @type {!CombatStats} */
+    this.combat_stats = new CombatStats();
 
     /** @type {Array.<Aura>} */
     this.auras = [];
@@ -1436,7 +1395,7 @@ GameObject.prototype.serialize = function() {
         ret['control_spellname'] = this.control_spellname;
         ret['control_cooldown'] = this.control_cooldown;
         ret['auras'] = goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this);
-        ret['combat_stats'] = deepcopy_obj(this.combat_stats);
+        ret['combat_stats'] = this.combat_stats.serialize();
         ret['cooldowns'] = deepcopy_obj(this.cooldowns);
         if('turn_rate' in this.spec) {
             ret['cur_facing'] = this.cur_facing;
@@ -1465,6 +1424,9 @@ GameObject.prototype.serialize_incremental = function() {
 
         this.prev_snapshot = new_snapshot;
         this.serialization_dirty = false;
+        if(goog.object.isEmpty(diffs)) {
+            return null;
+        }
         return diffs;
     }
     return null;
@@ -1485,7 +1447,7 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('control_target_id' in snap) { this.control_target_id = snap['control_target_id']; }
     if('control_spellname' in snap) { this.control_spellname = snap['control_spellname']; }
     if('control_cooldown' in snap) { this.control_cooldown = snap['control_cooldown']; }
-    if('combat_stats' in snap) { this.combat_stats = snap['combat_stats']; }
+    if('combat_stats' in snap) { this.combat_stats.apply_snapshot(snap['combat_stats']); }
     if('auras' in snap) { this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this); }
     if('cooldowns' in snap) { this.cooldowns = snap['cooldowns']; }
     if('cur_facing' in snap) {
@@ -1561,25 +1523,118 @@ var RESURRECT_NEVER = 1;
 var RESURRECT_AND_REPAIR_WITH_TECH = 2;
 var RESURRECT_AND_REPAIR_ALWAYS = 10;
 
-GameObject.prototype.get_raw_stats = function() {
-    this.combat_stats.stunned = 0;
-    this.combat_stats.disarmed = 0;
-    this.combat_stats.damage_taken = 1;
-    this.combat_stats.damage_taken_from = {};
-    this.combat_stats.rate_of_fire = 1;
-    this.combat_stats.accuracy = 1;
-    this.combat_stats.weapon_damage = 1;
-    this.combat_stats.weapon_damage_vs = {}; // multiplies with the usual damage_vs_table
-    this.combat_stats.effective_weapon_range = 1;
-    this.combat_stats.weapon_range = 1;
-    this.combat_stats.extra_armor = 0;
-    this.combat_stats.anti_air = 0;
-    this.combat_stats.anti_missile = 1; // note! this is the chance that a missile is NOT intercepted
-    this.combat_stats.turn_rate = 1;
-    this.combat_stats.ice_effects = 1;
-    this.combat_stats.swamp_effects = 1;
-    this.combat_stats.projectile_speed = 1;
-    this.combat_stats.splash_range = 1;
+/** CombatStats is the interface that carries stat modifications from ModChains and object auras
+    into the combat engine core.
+    @constructor @struct
+    @implements {GameTypes.ISerializable} */
+function CombatStats() {
+    this.stunned = 0;
+    this.disarmed = 0;
+    this.damage_taken = 1;
+    /** @type {!Object.<string,number>} */
+    this.damage_taken_from = {};
+    this.rate_of_fire = 1;
+    this.accuracy = 1;
+    this.weapon_damage = 1;
+    /** @type {!Object.<string,number>} */
+    this.weapon_damage_vs = {}; // multiplies with the usual damage_vs_table
+    this.effective_weapon_range = 1;
+    this.weapon_range = 1;
+    this.extra_armor = 0;
+    this.anti_air = 0;
+    this.anti_missile = 1; // note! this is the chance that a missile is NOT intercepted
+    this.turn_rate = 1;
+    this.ice_effects = 1;
+    this.swamp_effects = 1;
+    this.projectile_speed = 1;
+    this.splash_range = 1;
+
+    // Mobile only
+
+    /** @type {number} */
+    this.maxvel = 1; // scales the spec maxvel
+    this.erratic_flight = 0;
+};
+
+CombatStats.prototype.clear = function() {
+    // on, Javascript...
+    this.stunned = 0;
+    this.disarmed = 0;
+    this.damage_taken = 1;
+    this.damage_taken_from = {};
+    this.rate_of_fire = 1;
+    this.accuracy = 1;
+    this.weapon_damage = 1;
+    this.weapon_damage_vs = {}; // multiplies with the usual damage_vs_table
+    this.effective_weapon_range = 1;
+    this.weapon_range = 1;
+    this.extra_armor = 0;
+    this.anti_air = 0;
+    this.anti_missile = 1; // note! this is the chance that a missile is NOT intercepted
+    this.turn_rate = 1;
+    this.ice_effects = 1;
+    this.swamp_effects = 1;
+    this.projectile_speed = 1;
+    this.splash_range = 1;
+    this.maxvel = 1;
+    this.erratic_flight = 0;
+};
+
+/** @override */
+CombatStats.prototype.serialize = function() {
+    var ret = {};
+    // only include non-default values, since the apply will clear to default first
+    if(this.stunned) { ret['stunned'] = this.stunned; }
+    if(this.disarmed) { ret['disarmed'] = this.disarmed; }
+    if(this.damage_taken != 1) { ret['damage_taken'] = this.damage_taken; }
+    if(!goog.object.isEmpty(this.damage_taken_from)) {
+        ret['damage_taken_from'] = this.damage_taken_from; // reference, not copy!
+    }
+    if(this.rate_of_fire != 1) { ret['rate_of_fire'] = this.rate_of_fire; }
+    if(this.accuracy != 1) { ret['accuracy'] = this.accuracy; }
+    if(this.weapon_damage != 1) { ret['weapon_damage'] = this.weapon_damage; }
+    if(!goog.object.isEmpty(this.weapon_damage_vs)) {
+        ret['weapon_damage_vs'] = this.weapon_damage_vs; // reference, not copy!
+    }
+    if(this.effective_weapon_range != 1) { ret['effective_weapon_range'] = this.effective_weapon_range; }
+    if(this.weapon_range != 1) { ret['weapon_range'] = this.weapon_range; }
+    if(this.extra_armor != 0) { ret['extra_armor'] = this.extra_armor; }
+    if(this.anti_air) { ret['anti_air'] = this.anti_air; }
+    if(this.anti_missile != 1) { ret['anti_missile'] = this.anti_missile; }
+    if(this.turn_rate != 1) { ret['turn_rate'] = this.turn_rate; }
+    if(this.ice_effects != 1) { ret['ice_effects'] = this.ice_effects; }
+    if(this.swamp_effects != 1) { ret['swamp_effects'] = this.swamp_effects; }
+    if(this.projectile_speed != 1) { ret['projectile_speed'] = this.projectile_speed; }
+    if(this.splash_range != 1) { ret['splash_range'] = this.splash_range; }
+    if(this.maxvel != 1) { ret['maxvel'] = this.maxvel; }
+    if(this.erratic_flight) { ret['erratic_flight'] = this.erratic_flight; }
+    return ret;
+};
+
+/** @override */
+CombatStats.prototype.apply_snapshot = function(snap) {
+    // clear to defaults
+    if(!snap['incremental']) { this.clear(); }
+    if('stunned' in snap) { this.stunned = snap['stunned']; }
+    if('disarmed' in snap) { this.disarmed = snap['disarmed']; }
+    if('damage_taken' in snap) { this.damage_taken = snap['damage_taken']; }
+    if('damage_taken_from' in snap) { this.damage_taken_from = snap['damage_taken_from']; }
+    if('rate_of_fire' in snap) { this.rate_of_fire = snap['rate_of_fire']; }
+    if('accuracy' in snap) { this.accuracy = snap['accuracy']; }
+    if('weapon_damage' in snap) { this.weapon_damage = snap['weapon_damage']; }
+    if('weapon_damage_vs' in snap) { this.weapon_damage_vs = snap['weapon_damage_vs']; }
+    if('effective_weapon_range' in snap) { this.effective_weapon_range = snap['effective_weapon_range']; }
+    if('weapon_range' in snap) { this.weapon_range = snap['weapon_range']; }
+    if('extra_armor' in snap) { this.extra_armor = snap['extra_armor']; }
+    if('anti_air' in snap) { this.anti_air = snap['anti_air']; }
+    if('anti_missile' in snap) { this.anti_missile = snap['anti_missile']; }
+    if('turn_rate' in snap) { this.turn_rate = snap['turn_rate']; }
+    if('ice_effects' in snap) { this.ice_effects = snap['ice_effects']; }
+    if('swamp_effects' in snap) { this.swamp_effects = snap['swamp_effects']; }
+    if('projectile_speed' in snap) { this.projectile_speed = snap['projectile_speed']; }
+    if('splash_range' in snap) { this.splash_range = snap['splash_range']; }
+    if('maxvel' in snap) { this.maxvel = snap['maxvel']; }
+    if('erratic_flight' in snap) { this.erratic_flight = snap['erratic_flight']; }
 };
 
 // "merge" together two damage_vs tables, returning a table that has
@@ -1603,9 +1658,18 @@ function merge_damage_vs(a, b) {
     return ret;
 }
 
+/** @return {number} */
+GameObject.prototype.current_maxvel = function() {
+    if('maxvel' in this.spec) {
+        return player.get_any_abtest_value('global_maxvel_scale', gamedata['map']['global_maxvel_scale']) * this.get_leveled_quantity(this.spec['maxvel']) * this.combat_stats.maxvel;
+    } else {
+        return 0;
+    }
+};
+
 GameObject.prototype.modify_stats_by_modstats = function() {};
 GameObject.prototype.modify_stats_by_modstats_table = function(table) {
-    if('maxvel' in table) { this.combat_stats.maxvel = table['maxvel']['val']; } // note: replace, don't multiply
+    if('maxvel' in table) { this.combat_stats.maxvel *= table['maxvel']['val']; }
 
     if('weapon_damage' in table) { this.combat_stats.weapon_damage *= table['weapon_damage']['val']; }
     if('weapon_range' in table) {
@@ -1669,7 +1733,7 @@ GameObject.prototype.update_aura_effects = function(world) {
 /** called once per tick
     @param {World.World|null} world - null for phantom/scenery objects */
 GameObject.prototype.update_stats = function(world) {
-    this.get_raw_stats();
+    this.combat_stats.clear();
     this.modify_stats_by_modstats();
     if(world) {
         this.update_and_apply_auras(world);
@@ -3876,7 +3940,7 @@ GameObject.prototype.ai_pick_target_find_blocker = function(world, cur_cell, des
 
         // A* cost function
         // cost equals "how fast we can kill it" expressed in units of "time it would take to move one map cell"
-        var secs_per_move = 1.0 / this.combat_stats.maxvel;
+        var secs_per_move = 1.0 / this.current_maxvel();
         var my_dps = this.get_leveled_quantity(auto_spell['damage'])/this.get_leveled_quantity(auto_spell['cooldown']);
 
         var checker = function(cell, ignored_path) {
@@ -8068,12 +8132,6 @@ function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, b
 
 Mobile.prototype.cost_to_repair = function(player) { return mobile_cost_to_repair(this.spec, this.level, this.hp, this.max_hp, player); };
 
-Mobile.prototype.get_raw_stats = function() {
-    goog.base(this, 'get_raw_stats');
-    this.combat_stats.maxvel = player.get_any_abtest_value('global_maxvel_scale', gamedata['map']['global_maxvel_scale']) * this.get_leveled_quantity(this.spec['maxvel']);
-    this.combat_stats.erratic_flight = 0;
-};
-
 Mobile.prototype.modify_stats_by_modstats = function() {
     var tbl = null;
     if(this.team === 'player') {
@@ -8419,7 +8477,7 @@ Mobile.prototype.run_control_pathing = function(world) {
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
         this.serialization_dirty = true;
-        var maxvel = this.combat_stats.maxvel; // this.get_leveled_quantity(this.spec['maxvel']);
+        var maxvel = this.current_maxvel();
         if(this.dest === null) { throw Error('dest must be non-null here '+this.spec['name']+' '+this.id); }
 
         if(PLAYFIELD_DEBUG >= 2 && this === last_created_object) {
@@ -30135,6 +30193,11 @@ function manufacture_dialog_select_unit(dialog, name) {
     var row = 0;
     goog.array.forEach(features, function(stat) {
         var modchain = (player.stattab['units'][spec['name']] || {})[stat] || null;
+        if(stat == 'maxvel') {
+            // special case to rebase maxvel, which is a scaling factor from the point of view of mods
+            var base_maxvel = get_leveled_quantity(spec['maxvel'], level);
+            modchain = (modchain ? ModChain.recompute_with_new_base_val(modchain, base_maxvel, level) : ModChain.make_chain(base_maxvel, {'level':level}));
+        }
         dialog.widgets['feature_value'+row.toString()].show = dialog.widgets['feature_label'+row.toString()].show = true;
         ModChain.display_widget(dialog.widgets['feature_value'+row.toString()], stat, modchain, spec, Math.max(level, 1), auto_spell, auto_spell_level, true);
         ModChain.display_label_widget(dialog.widgets['feature_label'+row.toString()], stat, auto_spell, true);
@@ -40294,6 +40357,10 @@ function update_upgrade_dialog(dialog) {
         } else if(stat_name == 'deployable_unit_space') {
             if(old_level > 0) { rebase_old = Math.floor(gamedata['deployable_unit_space']*get_leveled_quantity(spec['provides_space'], old_level)); }
             if(new_level <= max_level) { rebase_new = Math.floor(gamedata['deployable_unit_space']*get_leveled_quantity(spec['provides_space'], new_level)); }
+        // special case to rebase maxvel, which is a scaling factor from the point of view of mods
+        } else if(stat_name == 'maxvel') {
+            if(old_level > 0) { rebase_old = get_leveled_quantity(spec[stat_name], old_level); }
+            if(new_level <= max_level) { rebase_new = get_leveled_quantity(spec[stat_name], new_level); }
         }
 
         if(rebase_old !== null) { old_chain = (old_chain ? ModChain.recompute_with_new_base_val(old_chain, rebase_old, old_chain_level) : ModChain.make_chain(rebase_old, {'level':old_chain_level})); }

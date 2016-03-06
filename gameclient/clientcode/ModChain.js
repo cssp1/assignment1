@@ -19,7 +19,9 @@ goog.require('goog.object');
 ModChain.ModChain;
 
 ModChain.get_base_value = function(stat, spec, level) {
-    if(stat in spec) {
+    if(stat == 'maxvel') {
+        return 1; // this is a scaling factor in the combat engine
+    } else if(stat in spec) {
         return get_leveled_quantity(spec[stat], level);
     } else if(stat == 'armor') { // annoying special cases
         return 0;
