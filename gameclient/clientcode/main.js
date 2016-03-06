@@ -2374,6 +2374,8 @@ GameObject.prototype.create_aura = function(world, creator_id, creator_team, aur
         // no existing applications, create one
         this.auras.push(new Aura(creator_id, creator_team, aura_spec, strength, range, world.combat_engine.cur_tick, end_tick, vs_table));
     }
+
+    this.serialization_dirty = true;
 };
 
 GameObject.prototype.speak = function(name) {
