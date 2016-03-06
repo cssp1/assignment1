@@ -7854,7 +7854,7 @@ function Mobile() {
     /** @type {!Array.<number>} */
     this.pos = [-1,-1]; // position at end of last computed tick
     /** @type {!Array.<number>} */
-    this.vel = [0,0];     // velocity at end of last computed tick
+    this.vel = [0,0];     // velocity at end of last computed tick, in pos units per second. Only used for lead-aiming computations.
     /** @type {!Array.<number>} */
     this.next_pos = [-1,-1]; // position at beginning of next tick
 
@@ -7893,12 +7893,12 @@ Mobile.prototype.serialize = function() {
     //ret['ai_dest'] = (this.ai_dest ? deepcopy_array(this.ai_dest) : null);
     //ret['ai_aggressive'] = this.ai_aggressive;
     ret['pos'] = deepcopy_array(this.pos);
-    ret['vel'] = this.vel;
+    //ret['vel'] = this.vel; // computed by control prep
     ret['next_pos'] = deepcopy_array(this.next_pos);
-    //ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // XXX only needed for facing I think
-    //ret['path_valid'] = this.path_valid; // XXX only needed for facing
-    //ret['path'] = deepcopy_array(this.path); // XXX only needed for facing
-    //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null);
+    //ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // only needed for pathing
+    //ret['path_valid'] = this.path_valid; // only needed for pathing
+    //ret['path'] = deepcopy_array(this.path); // only needed for pathing
+    //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null); // only needed for pathing
     return ret;
 };
 /** @override */
@@ -7911,7 +7911,7 @@ Mobile.prototype.apply_snapshot = function(snap) {
     //if('ai_dest' in snap) { this.ai_dest = snap['ai_dest']; }
     //if('ai_aggressive' in snap) { this.ai_aggressive = snap['ai_aggressive']; }
     if('pos' in snap) { this.pos = snap['pos']; }
-    if('vel' in snap) { this.vel = snap['vel']; }
+    //if('vel' in snap) { this.vel = snap['vel']; }
     if('next_pos' in snap) { this.next_pos = snap['next_pos']; }
     //if('dest' in snap) { this.dest = snap['dest']; } // XXX only needed for facing I think
     //if('path_valid' in snap) { this.path_valid = snap['path_valid']; } // XXX only needed for facing I think
@@ -8387,9 +8387,13 @@ Mobile.prototype.run_control_prep = function() {
 
     // update pos
     if(!vec_equals(this.pos, this.next_pos)) {
+        this.vel = vec_scale(1/TICK_INTERVAL, vec_sub(this.next_pos, this.pos));
+
         this.pos = this.next_pos;
         // eventually persist the new location to the server
         this.state_dirty |= obj_state_flags.XY;
+    } else {
+        this.vel = [0,0];
     }
 };
 
@@ -8408,10 +8412,9 @@ Mobile.prototype.run_control_pathing = function(world) {
     if(this.control_state === control_states.CONTROL_STOP ||
        this.control_state === control_states.CONTROL_SHOOT) {
         // stop at end of this tick's motion
-        if(!vec_equals(this.next_pos, this.pos) || !vec_equals(this.vel, [0,0])) {
+        if(!vec_equals(this.next_pos, this.pos)) {
             this.serialization_dirty = true;
             this.next_pos = this.pos;
-            this.vel = [0,0];
         }
 
     } else if(this.control_state === control_states.CONTROL_MOVING) {
@@ -8433,7 +8436,6 @@ Mobile.prototype.run_control_pathing = function(world) {
             // arrived at destination
             this.pos = this.dest;
             this.next_pos = this.dest;
-            this.vel = [0,0];
             this.path = [];
             this.path_valid = false;
             // leave rover.facing alone
@@ -8592,8 +8594,7 @@ Mobile.prototype.run_control_pathing = function(world) {
             if(dist > 0.001) {
                 // unit-vector direction to destination
                 var dir = vec_scale(1/dist, to_dest);
-                this.vel = vec_scale(maxvel, dir);
-                this.target_facing = normalize_angle(Math.atan2(this.vel[1], this.vel[0]));
+                this.target_facing = normalize_angle(Math.atan2(dir[1], dir[0]));
 
                 var can_move = true;
 
@@ -8623,14 +8624,12 @@ Mobile.prototype.run_control_pathing = function(world) {
                     this.next_pos[1] = clamp(this.next_pos[1], 0, ncells[1]-1);
                 } else {
                     this.next_pos = this.pos;
-                    this.vel = [0,0];
                 }
 
 //                this.stuck_loc = null;
             } else {
                 //  rover wants to move, but path is blocked
                 this.next_pos = this.pos;
-                this.vel = [0,0];
                 // leave rover.facing alone
 
                 // give it one chance to un-stick, in case there is a valid path beyond the iter limit
