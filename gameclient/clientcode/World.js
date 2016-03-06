@@ -102,7 +102,10 @@ World.World = function(base, objects, enable_citizens) {
 
     /** @type {boolean} */
     this.ai_paused = false;
+    /** @type {boolean} */
     this.control_paused = false;
+    /** @type {number} overrides control_paused for the next N ticks */
+    this.control_step = 0;
 
     /** @type {!SPFX.FXWorld} special effects world, with physics properties */
     this.fxworld = new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
@@ -344,7 +347,13 @@ World.World.prototype.query_objects_within_distance = function(loc, dist, params
 };
 
 World.World.prototype.run_unit_ticks = function() {
-    if(this.control_paused) { return; }
+    if(this.control_step > 0) { // single-step
+        this.control_step -= 1;
+    } else {
+        if(this.control_paused) {
+            return;
+        }
+    }
 
     if(client_time - this.last_tick_time > TICK_INTERVAL/combat_time_scale()) {
         // record time at which this tick was computed

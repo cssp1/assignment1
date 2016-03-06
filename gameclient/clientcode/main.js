@@ -8230,7 +8230,7 @@ Mobile.prototype.raw_pos = function() { return this.pos; };
 
 /** @override */
 Mobile.prototype.interpolate_pos = function(world) {
-    var progress = (visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()));
+    var progress = clamp((visit_base_pending ? 1 : (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale())), 0, 1);
     return vec_add(this.pos, vec_scale(progress, vec_sub(this.next_pos, this.pos)));
 };
 
@@ -9306,10 +9306,11 @@ function update_playfield_zoom_bar(dialog) {
     dialog.widgets['zoom_out_button'].state = (view_zoom_linear < gamedata['client']['view_zoom_limits'] ? 'disabled' : 'normal');
 }
 
-function init_playfield_speed_bar() {
+/** @param {BattleReplay.Player|null=} replay_player */
+function init_playfield_speed_bar(replay_player) {
     if(player.get_any_abtest_value('enable_playfield_speed_bar', gamedata['client']['enable_playfield_speed_bar']) &&
        !('playfield_speed_bar' in desktop_dialogs)) {
-        var dialog = invoke_playfield_speed_bar();
+        var dialog = invoke_playfield_speed_bar(replay_player);
         if(dialog) {
             desktop_dialogs['playfield_speed_bar'] = dialog;
             SPUI.root.add_under(dialog);
@@ -9321,15 +9322,20 @@ function init_playfield_speed_bar() {
 function get_playfield_speed_limits() {
     return gamedata['client']['playfield_speed_limits'][session.is_replay() ? 'replay': 'normal'];
 };
-function invoke_playfield_speed_bar() {
+/** @param {BattleReplay.Player|null=} replay_player */
+function invoke_playfield_speed_bar(replay_player) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['playfield_speed_bar']);
     dialog.user_data['dialog'] = 'playfield_speed_bar';
+    dialog.user_data['replay_player'] = replay_player || null;
+    dialog.wh = dialog.data[replay_player ? 'dimensions_replay' : 'dimensions'];
+    dialog.widgets['speed_bg'].wh = dialog.data['widgets']['speed_bg'][replay_player ? 'dimensions_replay' : 'dimensions'];
     var speed_cb = function(incr) { return function(w) {
         player.record_feature_use('playfield_speed');
         var new_speed = player_playfield_speed + incr;
         var limits = get_playfield_speed_limits();
         new_speed = clamp(new_speed, limits[0], limits[1]);
         if(new_speed != player_playfield_speed) {
+            session.get_draw_world().control_paused = false;
             update_player_combat_time_scale(new_speed);
         }
         /*
@@ -9341,10 +9347,23 @@ function invoke_playfield_speed_bar() {
     }; };
     dialog.widgets['speed_up_button'].onclick = speed_cb(1);
     dialog.widgets['speed_down_button'].onclick = speed_cb(-1);
+    dialog.widgets['pause_button'].onclick = function() {
+        var world = session.get_draw_world();
+        world.control_paused = !world.control_paused;
+    };
+    dialog.widgets['restart_button'].onclick = function(w) {
+        var dialog = w.parent;
+        var replay_player = dialog.user_data['replay_player'];
+        if(replay_player) {
+            replay_player.restart();
+        }
+    };
     dialog.ondraw = update_playfield_speed_bar;
     return dialog;
 }
 function update_playfield_speed_bar(dialog) {
+    var is_replay = session.is_replay() && dialog.user_data['replay_player'];
+
     // attach to right side of desktop, underneath zoom bar
     dialog.xy = vec_add(dialog.data['spacing'], [canvas_width-dialog.wh[0], Math.floor((canvas_height/2) + gamedata['dialogs']['playfield_zoom_bar']['dimensions'][1])]);
     goog.array.forEach(['speed_amount', 'speed_label'], function(wname) {
@@ -9354,6 +9373,10 @@ function update_playfield_speed_bar(dialog) {
     dialog.widgets['speed_up_button'].state = (player_playfield_speed >= limits[1] ? 'disabled' : 'normal');
     dialog.widgets['speed_down_button'].state = (player_playfield_speed <= limits[0] ? 'disabled' : 'normal');
     dialog.widgets['speed_amount'].str = dialog.data['widgets']['speed_amount']['ui_name'].replace('%f', player_combat_time_scale.toFixed(1));
+    dialog.widgets['pause_button'].state = (session.get_draw_world().control_paused ? 'active' : 'normal');
+
+    dialog.widgets['pause_button'].show =
+        dialog.widgets['restart_button'].show = is_replay;
 }
 
 var last_flush_time = 0;
@@ -25889,7 +25912,7 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                         delete desktop_dialogs[dname];
                     }
                 });
-                init_playfield_speed_bar(); // but add speed bar
+                init_playfield_speed_bar(player); // but add speed bar
 
                 // set up overlay GUI
                 change_selection(null);
@@ -49412,7 +49435,7 @@ function draw_unit(world, unit) {
             state = state+'_shoot';
         } else if((unit.control_state === control_states.CONTROL_MOVING) && ('walk_cycle' in sprite_data)) {
             var walk_period = unit.get_leveled_quantity(unit.spec['walk_period'] || 1.0);
-            var cycprog = ((client_time/walk_period) + unit.anim_offset) % 1.0;
+            var cycprog = ((world.control_paused ? 0 : (client_time/walk_period)) + unit.anim_offset) % 1.0;
             var cycfrm = Math.floor(sprite_data['walk_cycle'].length*cycprog);
             state = sprite_data['walk_cycle'][cycfrm];
         }

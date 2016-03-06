@@ -174,3 +174,9 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
         this.index = 0;
     }
 };
+BattleReplay.Player.prototype.restart = function() {
+    this.index = 0;
+    if(this.world.control_paused) { // force a single-step to reset
+        this.world.control_step = 1;
+    }
+};

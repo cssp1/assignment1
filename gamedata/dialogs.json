@@ -666,10 +666,14 @@
 
     "playfield_speed_bar": {
         "xy": [0,180],
-        "dimensions": [43,96], "spacing": [0,6],
+        "dimensions": [43,96],
+        "dimensions_replay": [43,150],
+        "spacing": [0,6],
         "transparent_to_mouse": 1,
         "widgets": {
-            "speed_bg": {"kind": "SolidRect", "xy":[0,0], "dimensions":[43,96], "color":[0.066,0.066,0.066,0.86], "bevel":4 },
+            "speed_bg": {"kind": "SolidRect", "xy":[0,0],
+                         "dimensions":[43,96], "dimensions_replay": [43,150],
+                         "color":[0.066,0.066,0.066,0.86], "bevel":4 },
             "speed_label": { "kind": "TextField", "xy": [0,3], "dimensions": [43,20], "text_size": 12, "text_style": "normal", "drop_shadow": 1,
                              "text_hjustify": "center", "ui_name": "Speed",
                              "text_color_zero": [0.8,0.8,0.8,1], "text_color_nonzero": [0.8,0.8,0.8,1] },
@@ -677,9 +681,13 @@
                               "text_hjustify": "center", "ui_name": "%fx",
                               "text_color_zero": [0.8,0.8,0.8,1], "text_color_nonzero": [1,0.88,0,1] },
             "speed_up_button": { "kind": "ActionButton", "xy": [10,41], "dimensions": [23,23], "bg_image": "speedup_button", "push_bg_image": 1,
-                                 "ui_tooltip": "Increase combat speed", "tooltip_delay": 0, "fixed_tooltip_offset": [-164,42] },
+                                 "ui_tooltip": "Increase combat speed", "tooltip_delay": 0, "fixed_tooltip_offset": [-163,42] },
             "speed_down_button": { "kind": "ActionButton", "xy": [10,69], "dimensions": [23,23], "bg_image": "slowdown_button", "push_bg_image": 1,
-                                   "ui_tooltip": "Decrease combat speed", "tooltip_delay": 0, "fixed_tooltip_offset": [-168,67] }
+                                   "ui_tooltip": "Decrease combat speed", "tooltip_delay": 0, "fixed_tooltip_offset": [-168,67] },
+            "pause_button": { "kind": "ActionButton", "xy": [10,97], "dimensions": [23,23], "bg_image": "pause_button", "push_bg_image": 1,
+                              "ui_tooltip": "Pause", "tooltip_delay": 0, "fixed_tooltip_offset": [-55,95] },
+            "restart_button": { "kind": "ActionButton", "xy": [9,125], "dimensions": [22,20], "bg_image": "refresh_button", "push_bg_image": 1,
+                                "ui_tooltip": "Restart from beginning", "tooltip_delay": 0, "fixed_tooltip_offset": [-157,124] }
         }
     },
 
