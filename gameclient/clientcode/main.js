@@ -1284,11 +1284,11 @@ function GameObject() {
     this.spec = {}; // set upon instantiation
     this.x = -1;
     this.y = -1;
-    this.hp = -1;
-    this.max_hp = -1;
+    this.hp = 0;
+    this.max_hp = 0;
     /** @type {TeamId} */
     this.team = 'invalid';
-    this.level = -1;
+    this.level = 1;
     this.equipment = null;
 
     // true if there are unsaved changes that should be sent back to
@@ -1418,14 +1418,16 @@ GameObject.prototype.serialize = function() {
                'spec': this.spec['name'],
                'x': this.x,
                'y': this.y,
-               'hp': this.hp,
-               'max_hp': this.max_hp,
-               'owner': (this.team === 'player' ? session.user_id : -1),
-               'level': this.level,
-               'cur_facing': this.cur_facing,
-               //'next_facing': this.next_facing,
-               'target_facing': this.target_facing
+               'owner': (this.team === 'player' ? session.user_id : -1)
               };
+
+    if(this.max_hp !== 0) {
+        ret['hp'] = this.hp;
+        ret['max_hp'] = this.max_hp;
+    }
+    if(this.level != 1) {
+        ret['level'] = this.level;
+    }
     if(!(this.is_inert() || this.spec['worth_less_xp'])) {
         // fields that shouldn't be needed for barriers and scenery
         ret['equipment'] = this.equipment ? deepcopy_obj(this.equipment) : null;
@@ -1436,6 +1438,11 @@ GameObject.prototype.serialize = function() {
         ret['auras'] = goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this);
         ret['combat_stats'] = deepcopy_obj(this.combat_stats);
         ret['cooldowns'] = deepcopy_obj(this.cooldowns);
+        if('turn_rate' in this.spec) {
+            ret['cur_facing'] = this.cur_facing;
+            ret['target_facing'] = this.target_facing;
+            // note: next_facing is assumed to be computed from cur_facing and target_facing
+        }
     }
     return ret;
 };
@@ -1448,7 +1455,7 @@ GameObject.prototype.serialize_incremental = function() {
     if(this.serialization_dirty) {
         var new_snapshot = this.serialize();
         /** @const fields that always should be updated (because run_control_shooting() and damage mutate them unpredictably) */
-        var always_diff = {'hp':1};
+        var always_diff = {}; // {'hp':1};
         var diffs = {};
         goog.object.forEach(new_snapshot, function(v, k) {
             if((k in always_diff) || !deepequal(this.prev_snapshot[k], v)) {
@@ -1487,7 +1494,6 @@ GameObject.prototype.apply_snapshot = function(snap) {
         // for later ticks, it will be overwritten by run_control_facing().
         this.next_facing = this.cur_facing;
     }
-    //if('next_facing' in snap) { this.next_facing = snap['next_facing']; }
     if('target_facing' in snap) { this.target_facing = snap['target_facing']; }
 };
 
@@ -4582,7 +4588,9 @@ Inert.prototype.receive_state = function(data, init, is_deploying) {
 /** @override */
 Inert.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
-    ret['metadata'] = deepcopy(this.metadata);
+    if(this.metadata) {
+        ret['metadata'] = deepcopy(this.metadata);
+    }
     return ret;
 };
 /** @override */
@@ -4779,7 +4787,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     }
 
     // invoke building upgrade congrats
-    if(((old_level != -1 && this.level > old_level) ||
+    if(((!init && this.level > old_level) ||
         was_under_construction && !this.is_under_construction()) &&
         this.team == 'player') {
 
@@ -7880,8 +7888,8 @@ Mobile.prototype.serialize = function() {
     var ret = goog.base(this, 'serialize');
     //ret['orders'] = deepcopy_array(this.orders);
     //ret['patrol'] = this.patrol; // might be needed for facing
-    ret['temporary'] = this.temporary;
-    ret['squad_id'] = this.squad_id;
+    if(this.temporary) { ret['temporary'] = this.temporary; } // should be constant during a replay
+    if(this.squad_id) { ret['squad_id'] = this.squad_id;} // should be constant during a replay
     //ret['ai_dest'] = (this.ai_dest ? deepcopy_array(this.ai_dest) : null);
     //ret['ai_aggressive'] = this.ai_aggressive;
     ret['pos'] = deepcopy_array(this.pos);
