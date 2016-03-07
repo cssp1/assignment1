@@ -173,16 +173,23 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
 CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
-    for(var i = 0; i < this.damage_effect_queue.length; i++) {
+    goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
+
+    // only apply effects that were already queued at entry to this function
+    // take care not to apply effects that are appended from within apply() below.
+    var to_check = this.damage_effect_queue.length;
+
+    for(var i = 0; i < to_check; i++) {
         var effect = this.damage_effect_queue[i];
         var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
                      (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
             this.damage_effect_queue.splice(i,1);
+            to_check -= 1;
             effect.apply(world);
         }
     }
-    goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
+
     return this.damage_effect_queue.length > 0;
 };
 

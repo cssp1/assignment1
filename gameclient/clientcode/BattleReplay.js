@@ -143,6 +143,8 @@ BattleReplay.Player = function(snapshots) {
     this.world = new World.World(new Base.Base(snapshots[0]['base']['base_id'], snapshots[0]['base']), [], false);
     this.world.ai_paused = true;
     //this.world.control_paused = true;
+    // *throw away* damage effects added by our control code, in favor of the recorded ones
+    this.world.combat_engine.accept_damage_effects = false;
     this.index = 0;
     // need to apply objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys = {'before_control': this.world.listen('before_control', this.before_control, false, this),
@@ -161,13 +163,9 @@ BattleReplay.Player.prototype.before_control = function(event) {
         this.world.combat_engine.clear_queued_damage_effects();
     }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
-
-    // *throw away* damage effects added by our control code, in favor of the recorded ones
-    this.world.combat_engine.accept_damage_effects = false;
 };
 /** @private */
 BattleReplay.Player.prototype.before_damage_effects = function(event) {
-    this.world.combat_engine.accept_damage_effects = true;
     this.world.combat_engine.apply_snapshot(this.snapshots[this.index]['combat_engine']);
     this.index += 1;
     if(this.index >= this.snapshots.length) {
