@@ -4074,6 +4074,7 @@ GameObject.prototype.ai_shoot = function(auto_spell, target) {
     this.control_state = control_states.CONTROL_SHOOT;
     this.control_spellname = auto_spell['name'];
     this.control_target_id = target.id;
+    this.serialization_dirty = true;
 };
 
 /** AI-level function - set control state to move to a location. "target" is an optional target object to set as control_target
