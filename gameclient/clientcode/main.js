@@ -49511,7 +49511,7 @@ function draw_unit(world, unit) {
             state = state+'_shoot';
         } else if((unit.control_state === control_states.CONTROL_MOVING) && ('walk_cycle' in sprite_data)) {
             var walk_period = unit.get_leveled_quantity(unit.spec['walk_period'] || 1.0);
-            var cycprog = ((world.control_paused ? 0 : (client_time/walk_period)) + unit.anim_offset) % 1.0;
+            var cycprog = ((world.control_paused ? 0 : (combat_time_scale()*client_time/walk_period)) + unit.anim_offset) % 1.0;
             var cycfrm = Math.floor(sprite_data['walk_cycle'].length*cycprog);
             state = sprite_data['walk_cycle'][cycfrm];
         }
@@ -49702,7 +49702,7 @@ function draw_clock(xy, color, start_tick, end_tick) {
     var world = session.get_draw_world();
     if(GameTypes.TickCount.lt(world.combat_engine.cur_tick, start_tick) ||
        GameTypes.TickCount.gt(world.combat_engine.cur_tick, end_tick)) { return; }
-    var client_tick_smooth = world.combat_engine.cur_tick.get() + (client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale());
+    var client_tick_smooth = world.combat_engine.cur_tick.get() + Math.min((client_time - world.last_tick_time)/(TICK_INTERVAL/combat_time_scale()), 1);
     var progress;
     if(end_tick.get() - start_tick.get() > 1.5/TICK_INTERVAL) {
         progress = (client_tick_smooth - start_tick.get()) / (end_tick.get() - start_tick.get());
