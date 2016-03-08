@@ -2156,7 +2156,6 @@ SPFX.FXWorld.prototype.add_visual_effect_at_tick = function(pos, altitude, orien
    @param {boolean} allow_sound
    @param {Object|null} instance_data
    @return {SPFX.FXObject|null}
-   @private
    */
 SPFX.FXWorld.prototype._add_visual_effect = function(pos, altitude, orient, when, data, allow_sound, instance_data) {
     if(/** @type {number} */ (data['require_detail']) > SPFX.detail) { return null; }

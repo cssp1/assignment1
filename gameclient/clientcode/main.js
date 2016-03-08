@@ -25981,6 +25981,7 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 // kill desktop dialogs
                 // need special handling for user_log since it is parented to desktop_top
                 user_log.parent.unparent(user_log);
+                SPUI.root.add(user_log);
                 goog.array.forEach(['attack_button_dialog','aura_bar','combat_damage_bar','desktop_bottom','desktop_top','enemy_portrait_dialog','enemy_resource_bars','player_portrait_dialog','quest_bar'], function(dname) {
                     if(dname in desktop_dialogs) {
                         close_dialog(desktop_dialogs[dname]);
@@ -44384,6 +44385,8 @@ function handle_server_message(data) {
 
         if(success && msg == "INVENTORY_USE_RESULT") {
             var extra_spellargs = data[5];
+            var log_item = {'spec': specname, 'stack': count};
+            var log_target_pos = null;
 
             if('use_effect' in spec) {
                 // check for null separately from checking if the effect exists so we can use a null effect
@@ -44403,6 +44406,7 @@ function handle_server_message(data) {
                         var spell = gamedata['spells'][use['spellname']];
                         if(('code' in spell) && (spell['code'] == 'projectile_attack')) {
                             var target_loc = extra_spellargs[0], target_height = 0;
+                            log_target_pos = target_loc;
                             var launch_loc = vec_add(target_loc, [-20, 20]);
                             var launch_height = (('ground_plane' in session.viewing_base.base_climate_data && session.viewing_base.base_climate_data['ground_plane'] < 0) ? -100 : 100);
 
@@ -44441,6 +44445,7 @@ function handle_server_message(data) {
                     }
                 }
             }
+            world.combat_engine.log_item(new CombatEngine.ItemRecord(log_item, log_target_pos));
         }
 
         // update Warehouse UI

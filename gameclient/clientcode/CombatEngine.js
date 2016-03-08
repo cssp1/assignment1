@@ -76,6 +76,11 @@ CombatEngine.CombatEngine = function() {
         @private
         @type {!Array<!CombatEngine.ProjectileEffect>} */
     this.projectile_queue_dirty_added = [];
+
+    /** record items expended during combat (this tick), for replay purposes only
+        @private
+        @type {!Array<!CombatEngine.ItemRecord>} */
+    this.item_log = [];
 };
 
 /** @override */
@@ -83,7 +88,7 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
             'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this),
-            'projectile_queue': goog.array.map(this.projectile_queue, function(effect) { return effect.serialize(); }, this)};
+            'projectile_queue': goog.array.map(this.projectile_queue, function(effect) { return effect.serialize();}, this)};
 };
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
@@ -100,6 +105,10 @@ CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
         ret['projectile_queue_added'] = goog.array.map(this.projectile_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
         ret['projectile_queue_length'] = this.projectile_queue.length;
         goog.array.clear(this.projectile_queue_dirty_added);
+    }
+    if(this.item_log.length > 0) {
+        ret['item_log'] = goog.array.map(this.item_log, function(entry) { return entry.serialize(); }, this);
+        goog.array.clear(this.item_log);
     }
     return ret;
 };
@@ -163,6 +172,26 @@ CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
         throw Error('unknown kind '+snap['kind']);
     }
 };
+
+/** ItemRecord
+    @constructor @struct
+    @implements {GameTypes.ISerializable}
+    @param {!Object<string,?>} item
+    @param {CombatEngine.Pos2D|null} target_pos */
+CombatEngine.ItemRecord = function(item, target_pos) {
+    this.item = item;
+    this.target_pos = target_pos;
+};
+/** @override */
+CombatEngine.ItemRecord.prototype.serialize = function() {
+    /** @type {!Object<string,?>} */
+    var ret = {'item': this.item,
+               'target_pos': this.target_pos};
+    return ret;
+};
+/** @override */
+CombatEngine.ItemRecord.prototype.apply_snapshot = goog.abstractMethod; // immutable
+
 
 // ProjectileEffect
 // Right now this is only used for firing missiles in combat
@@ -303,11 +332,17 @@ CombatEngine.CombatEngine.prototype.queue_projectile = function(effect) {
     this.projectile_queue.push(effect);
     this.projectile_queue_dirty_added.push(effect);
 };
+/** @param {!CombatEngine.ItemRecord} entry */
+CombatEngine.CombatEngine.prototype.log_item = function(entry) {
+    this.item_log.push(entry);
+};
+
 
 /** @param {!World.World} world
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
 CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
+    goog.array.clear(this.item_log); // just a convenient place to reset this
     goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
     goog.array.clear(this.projectile_queue_dirty_added); // just a convenient place to reset this
 

@@ -10,6 +10,9 @@ goog.provide('BattleReplay');
 
 goog.require('Base');
 goog.require('World');
+goog.require('SPFX'); // only for item usage display - move out of here?
+goog.require('ItemDisplay'); record and display items used during combat in replay
+goog.require('goog.array');
 goog.require('goog.object');
 
 BattleReplay.invoke = function(log) {
@@ -166,7 +169,38 @@ BattleReplay.Player.prototype.before_control = function(event) {
 };
 /** @private */
 BattleReplay.Player.prototype.before_damage_effects = function(event) {
-    this.world.combat_engine.apply_snapshot(this.snapshots[this.index]['combat_engine']);
+    var combat_snap = this.snapshots[this.index]['combat_engine'];
+
+    // grab any item-usage events and post them to on-screen log
+    if('item_log' in combat_snap) {
+        goog.array.forEach(combat_snap['item_log'], function(event) {
+            var spec = ItemDisplay.get_inventory_item_spec(event['item']['spec']);
+
+            if('use_effect' in spec) {
+                // check for null separately from checking if the effect exists so we can use a null effect
+                // in the item spec to disable the game-wide effect
+                if(spec['use_effect']) {
+                    this.world.fxworld._add_visual_effect([0,0], 0, [0,1,0], this.world.fxworld.now_time(), spec['use_effect'], true, null);
+                }
+            } else if(gamedata['client']['vfx']['item_use']) {
+                this.world.fxworld._add_visual_effect([0,0], 0, [0,1,0], this.world.fxworld.now_time(), gamedata['client']['vfx']['item_use'], true, null);
+            }
+
+            var ui_text = ItemDisplay.get_inventory_item_ui_name(spec, event['item']['level'] || 1, event['item']['stack'] || 1) + " " + gamedata['strings']['combat_messages']['activated'];
+            if(event['target_pos']) {
+                this.world.fxworld.add_under(new SPFX.ClickFeedback(event['target_pos'], [1,1,1,1], this.world.fxworld.now_time(), 0.15));
+                this.world.fxworld.add(new SPFX.CombatText(event['target_pos'], 0,
+                                                           ui_text,
+                                                           [1,1,0.3],
+                                                           this.world.fxworld.now_time(), 3.0,
+                                                           { drop_shadow: true, font_size: 20, text_style: 'thick' }));
+            } else {
+                user_log.msg(ui_text, new SPUI.Color(1,1,0,1));
+            }
+        }, this);
+    }
+
+    this.world.combat_engine.apply_snapshot(combat_snap);
     this.index += 1;
     if(this.index >= this.snapshots.length) {
         this.index = 0;
