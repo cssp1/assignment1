@@ -519,8 +519,11 @@ World.World.prototype.send_and_destroy_object = function(victim, killer) {
             }
             this.lazy_update_citizens();
         }
+
+        // for replays, don't remove the object - let the next world object snapshot do it
+        // awkward - this relies on the details of how BattleReplay.Player works
+        this.objects.rem_object(victim);
     }
-    this.objects.rem_object(victim);
 };
 
 
