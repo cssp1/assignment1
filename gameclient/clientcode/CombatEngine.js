@@ -179,12 +179,12 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
     // take care not to apply effects that are appended from within apply() below.
     var to_check = this.damage_effect_queue.length;
 
-    for(var i = 0; i < to_check; i++) {
+    for(var i = 0, checked = 0; checked < to_check; i++, checked++) {
         var effect = this.damage_effect_queue[i];
         var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
                      (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
-            this.damage_effect_queue.splice(i,1);
+            this.damage_effect_queue.splice(i,1); i -= 1;
             to_check -= 1;
             effect.apply(world);
         }
