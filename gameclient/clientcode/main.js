@@ -2090,7 +2090,9 @@ function get_next_level_with_stat_increase(spec, statname, cur_level) {
 /** @return {number} radius of "hitbox" - nonzero only for objects that cause collisions */
 GameObject.prototype.hit_radius = function() { return 0; };
 
+/** @return {Object<string,?>|null} */
 GameObject.prototype.get_auto_spell = function() { return null; }; // for inerts etc
+/** @return {number} */
 GameObject.prototype.get_auto_spell_level = function() { return this.level; }; // index for stats of the auto spell
 
 function is_melee_spell(spell) {
@@ -4786,6 +4788,7 @@ Building.prototype.get_stat = function(stat, default_value) {
     return ModChain.get_stat(this.modstats[stat]||null, default_value);
 };
 
+/** @override */
 Building.prototype.get_auto_spell = function() {
     if(('spells' in this.spec) && (this.spec['spells'].length > 0)) {
         var spellname = this.get_stat('weapon', this.spec['spells'][0]);
@@ -4798,6 +4801,8 @@ Building.prototype.get_auto_spell = function() {
     }
     return null;
 };
+
+/** @override */
 Building.prototype.get_auto_spell_level = function() {
     return this.get_stat('weapon_level', this.level);
 };
@@ -8064,10 +8069,12 @@ function get_auto_spell_level_for_unit(player_or_enemy, unit_spec, unit_level) {
     return get_unit_stat(player_or_enemy.stattab, unit_spec['name'], 'weapon_level', unit_level);
 }
 
+/** @override */
 Mobile.prototype.get_auto_spell = function() {
     var owner = (this.team === 'player' ? player : enemy);
     return get_auto_spell_for_unit(owner, this.spec);
 };
+/** @override */
 Mobile.prototype.get_auto_spell_level = function() {
     var owner = (this.team === 'player' ? player : enemy);
     return get_auto_spell_level_for_unit(owner, this.spec, this.level);

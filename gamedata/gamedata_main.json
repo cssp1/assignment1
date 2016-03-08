@@ -838,22 +838,26 @@
     ,
 
     "virtual_units": {
-        "PLAYER": { "ui_name": "PLAYER", "kind": "virtual" },
+        "PLAYER": { "name": "PLAYER", "ui_name": "PLAYER", "kind": "virtual" },
         "BUILDMENU": {
+            "name": "BUILDMENU",
             "ui_name": "BUILDMENU",
             "kind": "virtual",
             "spells": ["BUILD"]
         },
         "DEPLOYER": {
+            "name": "DEPLOYER",
             "ui_name": "DEPLOYER",
             "kind": "virtual",
             "spells": ["DEPLOY_UNITS"]
         },
         "STOREMENU": {
+            "name": "STOREMENU",
             "ui_name": "STOREMENU",
             "kind": "virtual"
         },
         "CHEATMENU": {
+            "name": "CHEATMENU",
             "ui_name": "CHEATMENU",
             "kind": "virtual"
         }
