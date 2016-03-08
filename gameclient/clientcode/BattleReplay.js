@@ -11,7 +11,7 @@ goog.provide('BattleReplay');
 goog.require('Base');
 goog.require('World');
 goog.require('SPFX'); // only for item usage display - move out of here?
-goog.require('ItemDisplay'); record and display items used during combat in replay
+goog.require('ItemDisplay'); // only for item usage display - move out of here?
 goog.require('goog.array');
 goog.require('goog.object');
 
