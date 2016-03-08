@@ -2916,7 +2916,6 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 
         // visual projectile effect
         if(color !== null && my_muzzle_pos) {
-            console.log("HERE "+my_muzzle_pos.toString());
             var fxworld = world.fxworld;
             fxworld.add(new SPFX.TimeProjectile(fxworld, my_muzzle_pos, my_height,
                                                 impact_pos, impact_height,
