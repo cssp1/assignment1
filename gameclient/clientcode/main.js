@@ -44429,6 +44429,8 @@ function handle_server_message(data) {
                             // missile effect
                             world.combat_engine.queue_projectile(new CombatEngine.ProjectileEffect('PLAYER', 'player',
                                                                                                    launch_loc, launch_height, launch_loc,
+                                                                                                   // might be more correct to add 1 tick here,
+                                                                                                   // since it won't be processed until next iteration
                                                                                                    world.combat_engine.cur_tick,
                                                                                                    0, null, -1,
                                                                                                    spell['name'], 1, null,
