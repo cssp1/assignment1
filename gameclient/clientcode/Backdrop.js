@@ -65,7 +65,7 @@ Backdrop.draw_scenery = function(base, cur_objects) {
             goog.array.forEach(base_list, function(obj) {
                 var key = obj.spec['gridsize'][0].toString()+'x'+obj.spec['gridsize'][1].toString();
                 var sprite = GameArt.assets[climate_data['building_bases'][key]];
-                var xy = vec_floor(ortho_to_draw([obj.x, obj.y]));
+                var xy = draw_quantize(ortho_to_draw([obj.x, obj.y]));
                 if(!sprite.prep_for_draw(xy, 0, client_time, 'normal')) {
                     return; // not ready yet, no gray box
                 }
@@ -324,8 +324,8 @@ Backdrop.draw_whole = function(base, is_home_base, is_friendly_base, assetname) 
             // draw one extra pixel at right/bottom to avoid seams
             dest_area = vec_add(dest_area, [1/view_zoom,1/view_zoom]);
         } else {
-            start = vec_floor(start);
-            end = vec_floor(end);
+            start = draw_quantize(start);
+            end = draw_quantize(end);
         }
         backdrop_image.drawSubImage_clipped(start, vec_sub(end, start), [0,0], dest_area);
 

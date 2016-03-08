@@ -49349,7 +49349,7 @@ function draw_building_or_inert(world, obj, powerfac) {
                 uoffset = vec_add(vec_scale(0.5, obj.spec['gridsize']),
                                   gamedata['strings']['idle_buildings']['upgrade_advanced']['default_icon_offset']);
             }
-            var pos = vec_floor(vec_add(xy, ortho_to_draw_vector(uoffset)));
+            var pos = draw_quantize(vec_add(xy, ortho_to_draw_vector(uoffset)));
 
             if(gamedata['strings']['idle_buildings']['upgrade_advanced']['ui_name_short']) {
                 pos = draw_centered_text_with_shadow(ctx, gamedata['strings']['idle_buildings']['upgrade_advanced']['ui_name_short'], pos);
