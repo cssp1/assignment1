@@ -25994,6 +25994,7 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 var replay_overlay = BattleReplayGUI.invoke(player);
                 replay_overlay.on_destroy = function() {
                     session.pop_to_real_world();
+                    update_player_combat_time_scale(0); 
                     init_desktop_dialogs();
                 };
                 return;
