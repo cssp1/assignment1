@@ -2692,7 +2692,7 @@ var no_miss_hack_reported = false;
 
 
 /** @param {!World.World} world
-    @param {GameObject} my_source
+    @param {GameObject|null} my_source
     @param {GameObjectId} my_id
     @param {string} my_spec_name
     @param {number} my_level
@@ -2878,7 +2878,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
         } else if(my_team !== 'player') {
             if('projectile_hostile_color' in spell) {
                 color = spell['projectile_hostile_color'];
-            } else if(my_source.is_mobile()) {
+            } else if(my_source && my_source.is_mobile()) {
                 // hack - swap red and blue components for hostile attacks
                 color = [color[2], 0.5*color[1], color[0]];
             }
@@ -2916,6 +2916,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 
         // visual projectile effect
         if(color !== null && my_muzzle_pos) {
+            console.log("HERE "+my_muzzle_pos.toString());
             var fxworld = world.fxworld;
             fxworld.add(new SPFX.TimeProjectile(fxworld, my_muzzle_pos, my_height,
                                                 impact_pos, impact_height,
@@ -2948,7 +2949,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             vfx_props['heading'] = Math.atan2(my_shot_v[1], my_shot_v[0]);
         }
 
-        if(my_source.is_mobile()) {
+        if(my_source && my_source.is_mobile()) {
             vfx_props['tick_offset'] = tick_offset;
             vfx_props['my_next_pos'] = my_source.next_pos; // position we will have at start of next combat tick
         }
@@ -2989,7 +2990,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -3006,7 +3007,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -3021,7 +3022,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -3032,7 +3033,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_source.id, my_team, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -3072,7 +3073,7 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
 };
 
 /** @param {!World.World} world
-    @param {GameObject} my_source
+    @param {GameObject|null} my_source
     @param {GameObjectId} my_id
     @param {string} my_spec_name
     @param {number} my_level
@@ -3275,7 +3276,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
         } else if(my_team !== 'player') {
             if('projectile_hostile_color' in spell) {
                 color = spell['projectile_hostile_color'];
-            } else if(my_source.is_mobile()) {
+            } else if(my_source && my_source.is_mobile()) {
                 // hack - swap red and blue components for hostile attacks
                 color = [color[2], 0.5*color[1], color[0]];
             }
@@ -3363,7 +3364,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             vfx_props['heading'] = Math.atan2(my_shot_v[1], my_shot_v[0]);
         }
 
-        if(my_source.is_mobile()) {
+        if(my_source && my_source.is_mobile()) {
             vfx_props['tick_offset'] = tick_offset;
             vfx_props['my_next_pos'] = my_source.next_pos; // position we will have at start of next combat tick
         }
@@ -3404,7 +3405,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
-                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
+                effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
@@ -3421,7 +3422,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
 
         // splash damage
         if(damage != 0) {
-            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target_pos,
+            effects.push(new CombatEngine.AreaDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target_pos,
                                               ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                               ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                               radius,
@@ -3436,7 +3437,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
-                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id,
+                    effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target.id,
                                                         get_leveled_quantity(imp_aura['strength'] || 1, my_level),
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
@@ -3447,7 +3448,7 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             }
 
             if(damage != 0) {
-                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_source.id, my_team, target.id, damage, damage_vs));
+                effects.push(new CombatEngine.TargetedDamageEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target.id, damage, damage_vs));
             }
         }
     }
@@ -44427,20 +44428,13 @@ function handle_server_message(data) {
                             }));
 
                             // missile effect
-                            var hit_tick, hit_time;
-                            if(COMBAT_ENGINE_USE_TICKS) {
-                                hit_tick = do_fire_projectile_ticks(world, player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, world.combat_engine.cur_tick, null, spell, null, target_loc, target_height, (interceptor!=null));
-                                hit_time = -1;
-                            } else {
-                                hit_time = do_fire_projectile_time(world, player.virtual_units["PLAYER"], '0', 'PLAYER', 1, 'player', null, launch_loc, launch_height, launch_loc, client_time, -1, spell, null, target_loc, target_height, (interceptor!=null));
-                                hit_tick = absolute_time_to_tick(hit_time);
-                            }
-
-                            if(interceptor) {
-                                // intecepting shot effect
-                                // hack - don't bother computing the actual fire time
-                                interceptor.fire_projectile(world, new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, target_loc, target_height);
-                            }
+                            world.combat_engine.queue_projectile(new CombatEngine.ProjectileEffect('PLAYER', 'player',
+                                                                                                   launch_loc, launch_height, launch_loc,
+                                                                                                   world.combat_engine.cur_tick,
+                                                                                                   0, null, -1,
+                                                                                                   spell['name'], 1, null,
+                                                                                                   target_loc, target_height,
+                                                                                                   interceptor ? interceptor.id : null));
                         }
                     }
                 }

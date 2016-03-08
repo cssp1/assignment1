@@ -67,13 +67,23 @@ CombatEngine.CombatEngine = function() {
         @private
         @type {!Array<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue_dirty_added = [];
+
+    /** list of not-unit-based (missile) projectiles that need to be evaluated for firing this tick (may not actually fire until a future tick)
+        @private
+        @type {!Array<!CombatEngine.ProjectileEffect>} */
+    this.projectile_queue = [];
+    /** for incremental serialization
+        @private
+        @type {!Array<!CombatEngine.ProjectileEffect>} */
+    this.projectile_queue_dirty_added = [];
 };
 
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize = function() {
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
-            'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this)};
+            'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this),
+            'projectile_queue': goog.array.map(this.projectile_queue, function(effect) { return effect.serialize(); }, this)};
 };
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
@@ -85,6 +95,11 @@ CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
         ret['damage_effect_queue_added'] = goog.array.map(this.damage_effect_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
         ret['damage_effect_queue_length'] = this.damage_effect_queue.length;
         goog.array.clear(this.damage_effect_queue_dirty_added);
+    }
+    if(this.projectile_queue_dirty_added.length > 0) {
+        ret['projectile_queue_added'] = goog.array.map(this.projectile_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
+        ret['projectile_queue_length'] = this.projectile_queue.length;
+        goog.array.clear(this.projectile_queue_dirty_added);
     }
     return ret;
 };
@@ -105,6 +120,30 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
             throw Error('unexpected damage_effect_queue_length '+expected_len.toString()+' vs. '+this.damage_effect_queue.length.toString());
         }
     }
+    if('projectile_queue' in snap) { // complete replacement
+        this.projectile_queue = goog.array.map(snap['projectile_queue'], function(/** !Object<string,?> */ effect_snap) {
+            return this.unserialize_projectile_effect(effect_snap);
+        }, this);
+    } else if('projectile_queue_added' in snap) {
+        this.projectile_queue = this.projectile_queue.concat(goog.array.map(snap['projectile_queue_added'], function(/** !Object<string,?> */ effect_snap) {
+            return this.unserialize_projectile_effect(effect_snap);
+        }, this));
+        var expected_len = /** @type {number} */ (snap['projectile_queue_length']);
+        if(this.projectile_queue.length != expected_len) {
+            throw Error('unexpected projectile_queue_length '+expected_len.toString()+' vs. '+this.projectile_queue.length.toString());
+        }
+    }
+};
+
+/** @param {!Object<string,?>} snap
+    @return {!CombatEngine.ProjectileEffect} */
+CombatEngine.CombatEngine.prototype.unserialize_projectile_effect = function(snap) {
+    return new CombatEngine.ProjectileEffect(snap['source_id'], snap['source_team'], snap['source_pos'], snap['source_height'],
+                                             snap['muzzle_pos'],
+                                             new GameTypes.TickCount(snap['fire_tick']), snap['fire_time_hack'],
+                                             snap['force_hit_tick'] ? new GameTypes.TickCount(snap['force_hit_tick']) : null, snap['force_hit_time_hack'],
+                                             snap['spellname'], snap['spell_level'],
+                                             snap['target_id'], snap['target_pos'], snap['target_height'], snap['interceptor_id']);
 };
 
 /** @param {!Object<string,?>} snap
@@ -122,6 +161,97 @@ CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
         return new CombatEngine.AreaAuraEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_location'], snap['hit_ground'], snap['hit_air'], snap['radius'], snap['radius_rect'], snap['falloff'], snap['amount'], snap['aura_name'], new GameTypes.TickCount(snap['aura_duration']), snap['aura_range'], snap['vs_table'], snap['duration_vs_table'], snap['allow_ff']);
     } else {
         throw Error('unknown kind '+snap['kind']);
+    }
+};
+
+// ProjectileEffect
+// Right now this is only used for firing missiles in combat
+
+/** @constructor @struct
+    @implements {GameTypes.ISerializable}
+    @param {!GameObjectId} source_id
+    @param {!TeamId} source_team
+    @param {!CombatEngine.Pos2D} source_pos
+    @param {number} source_height
+    @param {!CombatEngine.Pos2D} muzzle_pos
+    @param {!GameTypes.TickCount} fire_tick
+    @param {number} fire_time_hack - offset from client_time at effect creation, -1 if invalid
+    @param {GameTypes.TickCount|null} force_hit_tick
+    @param {number} force_hit_time_hack - offset from client_time at effect creation -1 if invalid
+    @param {string} spellname
+    @param {number} spell_level
+    @param {GameObjectId|null} target_id
+    @param {!CombatEngine.Pos2D} target_pos
+    @param {number} target_height
+    @param {GameObjectId|null} interceptor_id
+*/
+CombatEngine.ProjectileEffect = function(source_id, source_team, source_pos, source_height, muzzle_pos,
+                                         fire_tick, fire_time_hack, force_hit_tick, force_hit_time_hack,
+                                         spellname, spell_level, target_id, target_pos, target_height, interceptor_id) {
+    this.source_id = source_id;
+    this.source_team = source_team;
+    this.source_pos = source_pos;
+    this.source_height = source_height;
+    this.muzzle_pos = muzzle_pos;
+    this.fire_tick = fire_tick;
+    this.fire_time_hack = fire_time_hack;
+    this.force_hit_tick = force_hit_tick;
+    this.force_hit_time_hack = force_hit_time_hack;
+    this.spellname = spellname;
+    this.spell_level = spell_level;
+    this.target_id = target_id;
+    this.target_pos = target_pos;
+    this.target_height = target_height;
+    this.interceptor_id = interceptor_id;
+};
+/** @override */
+CombatEngine.ProjectileEffect.prototype.serialize = function() {
+    /** @type {!Object<string,?>} */
+    var ret = {'source_id': this.source_id,
+               'source_team': this.source_team,
+               'source_pos': this.source_pos,
+               'source_height': this.source_height,
+               'muzzle_pos': this.muzzle_pos,
+               'fire_tick': this.fire_tick.get(),
+               'fire_time_hack': this.fire_time_hack,
+               'force_hit_tick': this.force_hit_tick ? this.force_hit_tick.get() : null,
+               'force_hit_time_hack': this.force_hit_time_hack,
+               'spellname': this.spellname,
+               'spell_level': this.spell_level,
+               'target_id': this.target_id,
+               'target_pos': this.target_pos,
+               'target_height': this.target_height,
+               'interceptor_id': this.interceptor_id};
+    return ret;
+};
+/** @override */
+CombatEngine.ProjectileEffect.prototype.apply_snapshot = goog.abstractMethod; // immutable
+
+/** @param {!World.World} world */
+CombatEngine.ProjectileEffect.prototype.apply = function(world) {
+    /** @type {GameObject|null} note: may be null */
+    var source = world.objects._get_object(this.source_id);
+    /** @type {GameObject|null} note: may be null */
+    var target = (this.target_id ? world.objects._get_object(this.target_id) : null);
+    if(!target && !this.target_pos) { return; } // targeted to an object that doesn't exist anymore
+
+    var spell = /** @type {!Object<string,?>} */ (gamedata['spells'][this.spellname]);
+    var fizzle = !!this.interceptor_id;
+
+    var hit_tick, hit_time;
+    if(COMBAT_ENGINE_USE_TICKS) {
+        hit_tick = do_fire_projectile_ticks(world, source, this.source_id, source ? /** @type {string} */ (source.spec['name']) : 'VIRTUAL', this.spell_level, this.source_team, null, this.source_pos, this.source_height, this.muzzle_pos, this.fire_tick, this.force_hit_tick, spell, target, this.target_pos, this.target_height, fizzle);
+        hit_time = -1;
+    } else {
+        hit_time = do_fire_projectile_time(world, source, this.source_id, source ? /** @type {string} */ (source.spec['name']) : 'VIRTUAL', this.spell_level, this.source_team, null, this.source_pos, this.source_height, this.muzzle_pos, this.fire_time_hack + world.last_tick_time, this.force_hit_time_hack, spell, target, this.target_pos, this.target_height, fizzle);
+        hit_tick = absolute_time_to_tick(hit_time);
+    }
+
+    if(this.interceptor_id) {
+        // intecepting shot effect
+        var interceptor = world.objects.get_object(this.interceptor_id); // will fail for dead mobile interceptors
+        // hack - don't bother computing the actual fire time
+        interceptor.fire_projectile(world, new GameTypes.TickCount(hit_tick.get()-1), hit_time-0.25, hit_tick, hit_time, interceptor.get_auto_spell(), interceptor.get_auto_spell_level(), null, this.target_pos, this.target_height);
     }
 };
 
@@ -168,14 +298,26 @@ CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     this.damage_effect_queue.push(effect);
     this.damage_effect_queue_dirty_added.push(effect);
 };
+/** @param {!CombatEngine.ProjectileEffect} effect */
+CombatEngine.CombatEngine.prototype.queue_projectile = function(effect) {
+    this.projectile_queue.push(effect);
+    this.projectile_queue_dirty_added.push(effect);
+};
 
 /** @param {!World.World} world
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
 CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
     goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
+    goog.array.clear(this.projectile_queue_dirty_added); // just a convenient place to reset this
 
-    // only apply effects that were already queued at entry to this function
+    for(var p = 0; p < this.projectile_queue.length; p++) {
+        var peffect = this.projectile_queue.splice(p,1)[0]; p -= 1;
+        peffect.apply(world);
+    }
+
+
+    // only apply effects that were already queued right now
     // take care not to apply effects that are appended from within apply() below.
     var to_check = this.damage_effect_queue.length;
 
@@ -190,18 +332,20 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
         }
     }
 
-    return this.damage_effect_queue.length > 0;
+    return this.has_queued_damage_effects();
 };
 
 /** For use by replay code */
 CombatEngine.CombatEngine.prototype.clear_queued_damage_effects = function() {
     goog.array.clear(this.damage_effect_queue);
     goog.array.clear(this.damage_effect_queue_dirty_added);
+    goog.array.clear(this.projectile_queue);
+    goog.array.clear(this.projectile_queue_dirty_added);
 };
 
 /** @return {boolean} */
 CombatEngine.CombatEngine.prototype.has_queued_damage_effects = function() {
-    return this.damage_effect_queue.length > 0;
+    return this.damage_effect_queue.length > 0 || this.projectile_queue.length > 0;
 };
 
 
