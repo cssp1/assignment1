@@ -9413,12 +9413,12 @@ function invoke_playfield_speed_bar(replay_player) {
             session.get_draw_world().control_paused = false;
             update_player_combat_time_scale(new_speed);
         }
-        /*
-        if(player.preferences['playfield_speed'] != player_playfield_speed) {
+
+        // persist preference
+        if(!session.is_replay() && player.preferences['playfield_speed'] != player_playfield_speed) {
             player.preferences['playfield_speed'] = player_playfield_speed;
             send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
         }
-        */
     }; };
     dialog.widgets['speed_up_button'].onclick = speed_cb(1);
     dialog.widgets['speed_down_button'].onclick = speed_cb(-1);
@@ -43955,9 +43955,8 @@ function handle_server_message(data) {
         set_view_zoom(get_preference_setting(player.preferences, 'playfield_zoom'));
         set_view_limits();
 
-        // note: do not recall the persisted setting, but remember it for metrics?
-        if('playfield_speed' in player.preferences) { delete player.preferences['playfield_speed']; }
-        update_player_combat_time_scale(0); // get_preference_setting(player.preferences, 'playfield_speed'));
+        // recall persisted playfield speed setting for battles only
+        update_player_combat_time_scale(session.home_base ? 0 : get_preference_setting(player.preferences, 'playfield_speed'));
 
         if(client_state != client_states.RUNNING) {
             // very first session initiated
@@ -45019,6 +45018,9 @@ function handle_server_message(data) {
             APMCounter.reset();
 
             change_selection(null);
+
+            // recall persisted playfield speed setting for battles only
+            update_player_combat_time_scale(get_preference_setting(player.preferences, 'playfield_speed'));
 
             if(player.tutorial_state === 'ai_attack_begin') {
                 metric_event('0260_tutorial_ai_attack_start', {});
