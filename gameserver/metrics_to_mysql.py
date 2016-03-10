@@ -155,6 +155,9 @@ if __name__ == '__main__':
             elif row['event_name'] == '4461_promo_warehouse_upgrade':
                 keyvals.append(('stack', row['level']))
 
+            elif row['event_name'] == '3832_battle_replay_uploaded':
+                keyvals.append(('stack', row.get('wire_length')))
+
             elif row['event_name'] in ('0113_account_deauthorized',
                                        '0140_tutorial_oneway_ticket',
                                        '0140_tutorial_start',
