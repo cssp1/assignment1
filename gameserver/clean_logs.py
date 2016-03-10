@@ -12,7 +12,7 @@ import os, sys, glob, time, subprocess, getopt
 
 SAVE_RECENT = 7*24*60*60 #  save most files less than a week old
 SAVE_EXCEPTIONS = 60*24*60*60 #  save server exception logs two months
-SAVE_REPLAYS = 14*24*60*60 # archive replays older than 14 days
+SAVE_REPLAYS = 2*24*60*60 # archive replays older than 2 days
 SAVE_BATTLES = 7*24*60*60 # archive battles older than 7 days
 ARCHIVE_BATTLES = False
 
