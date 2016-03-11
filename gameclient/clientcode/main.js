@@ -36893,23 +36893,27 @@ function update_buy_gamebucks_sku23(dialog) {
 
     // display expire time and bundle values, if applicable
     var expire_time = (dialog.data['widgets']['expire_time']['show'] ? gamebucks_spell_ui_expire_time(spell, spellarg) : -1);
-    var bundle_value = 0;
+    /** @type {string|null} */
+    var bundle_value = null;
     if('bundle_value' in dialog.widgets &&
        'buy_gamebucks_dialog_looks' in gamedata['store'] &&
        gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default'] &&
        gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default']['enable_bundle_value']) {
-        bundle_value = buy_gamebucks_sku2_ui_bundle_value(spell, spellarg);
+        var look_data = gamedata['store']['buy_gamebucks_dialog_looks'][dialog.user_data['look'] || 'default'];
+        var currency = look_data['bundle_value_currency'] || 'gamebucks';
+        var scale = eval_cond_or_literal(look_data['bundle_value_scale'] || 1, player, null);
+        bundle_value = buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale, (currency === 'local'));
     }
 
-    if(bundle_value > 0) {
-        dialog.widgets['bundle_value'].str = dialog.data['widgets']['bundle_value']['ui_name'].replace('%d', pretty_print_number(bundle_value)).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
+    if(bundle_value) {
+        dialog.widgets['bundle_value'].str = dialog.data['widgets']['bundle_value']['ui_name'].replace('%d', bundle_value);
     }
     if(expire_time > 0) {
         dialog.widgets['expire_time'].str = dialog.data['widgets']['expire_time']['ui_name'].replace('%togo', pretty_print_time(expire_time - server_time));
     }
 
     // if neither bundle_value or expire_time is present, show the SKU comment
-    if(bundle_value <= 0 && expire_time <= 0) {
+    if(!bundle_value && expire_time <= 0) {
         dialog.widgets['comment'].show = true;
         dialog.widgets['expire_time'].show = false;
         if('bundle_value' in dialog.widgets) { dialog.widgets['bundle_value'].show = false; }
@@ -36924,11 +36928,11 @@ function update_buy_gamebucks_sku23(dialog) {
                 dialog.widgets['comment'].str = null;
             }
         }
-    } else if(bundle_value > 0 && expire_time <= 0) { // ONLY show bundle_value
+    } else if(bundle_value && expire_time <= 0) { // ONLY show bundle_value
         dialog.widgets['comment'].show = false;
         dialog.widgets['expire_time'].show = false;
         dialog.widgets['bundle_value'].show = true;
-    } else if(bundle_value <= 0 && expire_time > 0) { // ONLY show expire_time
+    } else if(!bundle_value && expire_time > 0) { // ONLY show expire_time
         dialog.widgets['comment'].show = false;
         dialog.widgets['expire_time'].show = true;
         if('bundle_value' in dialog.widgets) { dialog.widgets['bundle_value'].show = false; }
@@ -37155,9 +37159,29 @@ function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
 /** Get the UI-visible item bundle gamebucks value for an active BUY_GAMEBUCKS sku spell
     @param {!Object} spell
     @param {?} spellarg
-    @return {number} */
-function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg) {
-    return buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_gamebucks_value') || 0;
+    @param {number} scale_factor
+    @param {boolean} use_local_currency
+    @return {string|null} */
+function buy_gamebucks_sku2_ui_bundle_value(spell, spellarg, scale_factor, use_local_currency) {
+    var num_gamebucks = buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_gamebucks_value') || 0;
+    if(num_gamebucks <= 0) { return null; }
+    num_gamebucks *= scale_factor;
+
+    // the local currency conversion is messy and only works for fbpayments and xsolla APIs.
+    // XXX fix up later if the A/B test is successful.
+    if(use_local_currency && 'currency' in spell &&
+       (spell['currency'].indexOf('fbpayments:') === 0 || spell['currency'].indexOf('xsolla:') === 0)) {
+        var real_currency = spell['currency'].split(':')[1];
+        var tbl = gamedata['store']['gamebucks_open_graph_prices'];
+        for(var i = 0; i < tbl.length; i++) {
+            var cur_name = tbl[i][0], cur_rate = tbl[i][1];
+            if(cur_name === real_currency) {
+                var real_amount = parseFloat(cur_rate) * num_gamebucks;
+                return Store.display_real_currency_amount(real_currency, real_amount, spell['currency'], true);
+            }
+        }
+    }
+    return Store.display_user_currency_amount(num_gamebucks, 'full');
 };
 
 // merge identical successive entries in an item list, even if this would violate the max stack size

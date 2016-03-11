@@ -7530,7 +7530,7 @@
                              "text_hjustify": "right", "text_vjustify": "top" },
             "bundle_value": { "kind": "TextField",
                               "xy": [72,48], "dimensions": [118, 46],
-                              "ui_name": "+ Items worth %d %GAMEBUCKS_NAME",
+                              "ui_name": "+ Items worth %d",
                               "text_size": 12, "text_style": "bold", "drop_shadow": 1,
                               "text_color": [1,1,0,1],
                               "text_hjustify": "right", "text_vjustify": "top" },
