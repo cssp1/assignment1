@@ -152,6 +152,19 @@ function deepequal(x,y) {
     };
 }
 
+/** truncate floating-point value for leaner JSON.stringify() serialization
+    @param {number} val
+    @param {number} prec
+    @return {number} */
+function serialize_number(val, prec) {
+    return +val.toFixed(prec);
+}
+/** @param {!Array<number>} v
+    @return {!Array<number>} */
+function vec_serialize(v) {
+    return [serialize_number(v[0], 2), serialize_number(v[1], 2)];
+}
+
 // detect whether browser has touch-screen events
 var touch_modes = {
     NONE : 0,
@@ -1398,8 +1411,8 @@ GameObject.prototype.serialize = function() {
         ret['combat_stats'] = this.combat_stats.serialize();
         ret['cooldowns'] = deepcopy_obj(this.cooldowns);
         if('turn_rate' in this.spec) {
-            ret['cur_facing'] = this.cur_facing;
-            ret['target_facing'] = this.target_facing;
+            ret['cur_facing'] = serialize_number(this.cur_facing, 2);
+            ret['target_facing'] = serialize_number(this.target_facing, 2);
             // note: next_facing is assumed to be computed from cur_facing and target_facing
         }
     }
@@ -7964,9 +7977,9 @@ Mobile.prototype.serialize = function() {
     if(this.squad_id) { ret['squad_id'] = this.squad_id;} // should be constant during a replay
     //ret['ai_dest'] = (this.ai_dest ? deepcopy_array(this.ai_dest) : null);
     //ret['ai_aggressive'] = this.ai_aggressive;
-    ret['pos'] = deepcopy_array(this.pos);
+    ret['pos'] = vec_serialize(this.pos);
     //ret['vel'] = this.vel; // computed by control prep
-    ret['next_pos'] = deepcopy_array(this.next_pos);
+    ret['next_pos'] = vec_serialize(this.next_pos);
     //ret['dest'] = (this.dest ? deepcopy_array(this.dest) : null); // only needed for pathing
     //ret['path_valid'] = this.path_valid; // only needed for pathing
     //ret['path'] = deepcopy_array(this.path); // only needed for pathing
