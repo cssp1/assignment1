@@ -3283,36 +3283,27 @@ class AttackReplayReceiver (object):
         # decompress what the client sent us
         if self.codec == 'raw':
             raw_buf = self.buf.getvalue()
+            gzip_buf = gzip.GzipFile(fileobj=cStringIO.StringIO(raw_buf)).read()
         elif self.codec == 'gzip':
-            de_b64 = base64.b64decode(self.buf.getvalue())
-            raw_buf = gzip.GzipFile(filename = 'from_client', fileobj = cStringIO.StringIO(de_b64)).read()
-            # as a future optimization, we could skip the decompression step and write this
-            # directly to the file (though we'd be trusting the client to generate valid gzip!).
-
-        if 0:
-            gamesite.exception_log.event(server_time, 'replay received: %r raw %r chars, %r bytes on the wire' % \
-                                         (self.log_file, self.raw_length, self.buf.tell()))
+            # we trust the client to generate valid gzip!
+            raw_buf = None
+            gzip_buf = base64.b64decode(self.buf.getvalue())
 
         # check the size of the decompressed raw representation
-        if len(raw_buf) != self.raw_length:
+        if raw_buf is not None and len(raw_buf) != self.raw_length:
             gamesite.exception_log.event(server_time, 'replay raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
 
-        self.ensure_storage_dir(self.log_time)
-
-        # gzip compress on the way out
-        with AtomicFileWrite.AtomicFileWrite(self.local_filename, 'wb') as atom:
-            temp = gzip.GzipFile(filename = self.local_filename, fileobj = atom.fd)
-            temp.write(raw_buf)
-            temp.close()
-            atom.complete()
-
         # fire-and-forget S3 upload
-        if isinstance(io_system, S3IOSystem): # S3 enabled
+        if isinstance(io_system, S3IOSystem) and self.storage_s3_bucket(): # S3 enabled
             bucket = self.storage_s3_bucket()
-            if bucket:
-                name = self.storage_s3_name(self.log_time, self.attacker_id, self.defender_id, self.base_id)
-                s3_buf = open(self.local_filename, 'rb').read() # inefficient, but whatever
-                io_system.do_async_write((bucket,name), s3_buf, lambda : None, False, 0)
+            name = self.storage_s3_name(self.log_time, self.attacker_id, self.defender_id, self.base_id)
+            io_system.do_async_write((bucket,name), gzip_buf, lambda : None, False, 0)
+        else:
+            # write to local disk
+            self.ensure_storage_dir(self.log_time)
+            with AtomicFileWrite.AtomicFileWrite(self.local_filename, 'wb') as atom:
+                atom.fd.write(gzip_buf)
+                atom.complete()
 
         metric_event_coded(self.active_player_id, '3832_battle_replay_uploaded', {'battle_time': self.log_time,
                                                                                   'attacker_id': self.attacker_id,
@@ -18104,43 +18095,38 @@ class GAMEAPI(resource.Resource):
                                                                             'defender_id': defender,
                                                                             'base_id': base_id})
 
-        # try local file first, and fall back to S3 if enabled and the local file is not found
-        log_filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
-
-        # look for battle log on local disk
-        if os.path.exists(log_filename):
-            d_log_local = defer.succeed(open(log_filename, 'rb').read())
-        else:
-            d_log_local = defer.succeed(None)
-
-        d_log_local.addErrback(report_and_absorb_deferred_failure, session)
-
-        # look for battle log in S3
+        # look for battle log
         if isinstance(io_system, S3IOSystem) and AttackLog.storage_s3_bucket():
             # try S3 download
             bucket = AttackLog.storage_s3_bucket()
             name = AttackLog.storage_s3_name(battle_time, attacker, defender, base_id)
-            d_log_s3 = io_system.async_read_deferred((bucket, name))
+            d_log_s3 = io_system.async_read_deferred((bucket, name), reason = 'GET_BATTLE_LOG3(log)')
+            d_log_local = defer.succeed(None)
         else:
+            # try local disk
+            log_filename = AttackLog.storage_path(battle_time, attacker, defender, base_id)
+            if os.path.exists(log_filename):
+                d_log_local = defer.succeed(open(log_filename, 'rb').read())
+            else:
+                d_log_local = defer.succeed(None)
             d_log_s3 = defer.succeed(None)
 
         d_log_s3.addErrback(report_and_absorb_deferred_failure, session)
+        d_log_local.addErrback(report_and_absorb_deferred_failure, session)
 
-        # query for existence of a replay on local disk
-        replay_filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
-        d_replay_exists_local = defer.succeed(os.path.exists(replay_filename))
-        # failure path
-        d_replay_exists_local.addErrback(report_and_absorb_deferred_failure, session)
-
-        # query for existence of a replay on S3
-        s3_bucket = AttackReplayReceiver.storage_s3_bucket()
-        if s3_bucket and isinstance(io_system, S3IOSystem):
+        # query for existence of a replay
+        if isinstance(io_system, S3IOSystem) and AttackReplayReceiver.storage_s3_bucket():
+            s3_bucket = AttackReplayReceiver.storage_s3_bucket()
             s3_name = AttackReplayReceiver.storage_s3_name(battle_time, attacker, defender, base_id)
-            d_replay_exists_s3 = io_system.async_exists_deferred((s3_bucket, s3_name), reason = 'GET_BATTLE_LOG3')
+            d_replay_exists_s3 = io_system.async_exists_deferred((s3_bucket, s3_name), reason = 'GET_BATTLE_LOG3(replay-exists)')
+            d_replay_exists_local = defer.succeed(False)
         else:
+            replay_filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
+            d_replay_exists_local = defer.succeed(os.path.exists(replay_filename))
             d_replay_exists_s3 = defer.succeed(False)
 
         d_replay_exists_s3.addErrback(report_and_absorb_deferred_failure, session)
+        d_replay_exists_local.addErrback(report_and_absorb_deferred_failure, session)
 
         # wait for results of all queries
         d_all = defer.DeferredList([d_log_local, d_log_s3, d_replay_exists_local, d_replay_exists_s3])
@@ -18193,19 +18179,22 @@ class GAMEAPI(resource.Resource):
                                                                                    'defender_id': defender,
                                                                                    'base_id': base_id})
 
-        filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
-        if os.path.exists(filename):
-            d = defer.succeed(open(filename, 'rb').read())
-        elif isinstance(io_system, S3IOSystem) and AttackReplayReceiver.storage_s3_bucket():
+        if isinstance(io_system, S3IOSystem) and AttackReplayReceiver.storage_s3_bucket():
             # try S3 download
             bucket = AttackReplayReceiver.storage_s3_bucket()
             name = AttackReplayReceiver.storage_s3_name(battle_time, attacker, defender, base_id)
             d = io_system.async_read_deferred((bucket, name))
+        else:
+            filename = AttackReplayReceiver.storage_path(battle_time, attacker, defender, base_id)
+            if os.path.exists(filename):
+                d = defer.succeed(open(filename, 'rb').read())
+            else:
+                d = defer.succeed('NOTFOUND')
 
         # failure path
         d.addErrback(report_and_absorb_deferred_failure, session)
 
-        # failure AND success path (failure indicated by buf being None)
+        # failure AND success path (failure indicated by buf being None or the 404 'NOTFOUND' value)
         def cb(buf, session, tag):
             if buf and (buf != 'NOTFOUND'):
                 with admin_stats.latency_measurer('GET_BATTLE_REPLAY(gunzip)'):
