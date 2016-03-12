@@ -121,6 +121,8 @@ SPStringCoding.construct_string_from_array = function (buf, len) {
             return String.fromCharCode.apply(null, SPStringCoding.shrinkBuf(buf, len));
         }
     }
+    // note: this has pathological memory issues on Chrome
+    // https://bugs.chromium.org/p/v8/issues/detail?id=4786
     var result = '';
     for (var i = 0; i < len; i++) {
         result += String.fromCharCode(buf[i]);
@@ -152,6 +154,16 @@ SPStringCoding.construct_array_from_string = function (str) {
     @param {number=} max
     @return {string} */
 SPStringCoding.utf8_array_to_js_string = function (buf, max) {
+
+    // when TextDecoder API is available, it's superior to the manual method
+    if(typeof TextDecoder !== 'undefined') {
+        if(!(buf instanceof Uint8Array)) { // require ArrayBuffer input
+            buf = new Uint8Array(buf);
+        }
+        var decoder = new TextDecoder('utf-8');
+        return decoder.decode(buf);
+    }
+
     var i, out;
     var len = max || buf.length;
 

@@ -26008,7 +26008,7 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 var replay_overlay = BattleReplayGUI.invoke(player);
                 replay_overlay.on_destroy = function() {
                     session.pop_to_real_world();
-                    update_player_combat_time_scale(0); 
+                    update_player_combat_time_scale(0);
                     init_desktop_dialogs();
                 };
                 return;
@@ -43227,7 +43227,10 @@ function unwrap_and_uncompress_string(codec, z_result) {
         arr = /** @type {!Array} */ (arr); // since decodeStringToByteArray's return value is incorrectly annotated to be nullable
         return SPStringCoding.utf8_array_to_js_string(lz4.decompress(arr));
     } else if(codec == 'gzip') {
-        return SPStringCoding.utf8_array_to_js_string(SPGzip.gunzip(goog.crypt.base64.decodeStringToByteArray(z_result)));
+        // erase temporaries after use to help GC
+        var temp1 = goog.crypt.base64.decodeStringToByteArray(z_result); z_result = '';
+        var temp2 = SPGzip.gunzip(temp1); temp1 = null;
+        return SPStringCoding.utf8_array_to_js_string(temp2);
     } else {
         throw Error('unknown codec '+codec);
     }
