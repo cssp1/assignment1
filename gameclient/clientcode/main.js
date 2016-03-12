@@ -9343,12 +9343,20 @@ function update_playfield_controls_bar(dialog) {
 
     if(dialog.user_data['dialog'] == 'playfield_controls_bar_horizontal') {
         var top = desktop_dialogs['desktop_top'];
-        if(!top) { dialog.show = false; return; }
-        dialog.show = true;
-        if('alliances_button' in top.widgets) {
-            dialog.xy = vec_add(dialog.data['spacing_under'], vec_add([0,top.widgets['alliances_button'].wh[1]], top.widgets['alliances_button'].get_absolute_xy()));
+        if(!top) {
+            if(session.is_replay()) {
+                dialog.show = true;
+                dialog.xy = [Math.floor(canvas_width_half - dialog.wh[0]/2), 0];
+            } else {
+                dialog.show = false; return;
+            }
         } else {
-            dialog.xy = vec_add(dialog.data['spacing_right'], top.get_absolute_xy());
+            dialog.show = true;
+            if('alliances_button' in top.widgets) {
+                dialog.xy = vec_add(dialog.data['spacing_under'], vec_add([0,top.widgets['alliances_button'].wh[1]], top.widgets['alliances_button'].get_absolute_xy()));
+            } else {
+                dialog.xy = vec_add(dialog.data['spacing_right'], top.get_absolute_xy());
+            }
         }
     } else {
         // attach to right side of desktop
@@ -10523,7 +10531,7 @@ function init_desktop_dialogs() {
     // playfield controls bar
     var controls_bar = invoke_playfield_controls_bar();
     desktop_dialogs['playfield_controls_bar'] = controls_bar;
-    SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depots on desktop_top's position
+    SPUI.root.add_after(dialog, controls_bar); // add controls_bar to SPUI.root right after desktop_top, because its update method depends on desktop_top's position
 
     // desktop bottom
 

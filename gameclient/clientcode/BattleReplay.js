@@ -203,6 +203,9 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
     this.world.combat_engine.apply_snapshot(combat_snap);
     this.index += 1;
     if(this.index >= this.snapshots.length) {
+        if(!this.world.control_paused) { // pause at end
+            this.world.control_paused = true;
+        }
         this.index = 0;
     }
 };
