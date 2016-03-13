@@ -12,7 +12,7 @@ var SPLWMetrics = {
 var spin_pageload_begin;
 var spin_demographics;
 var spin_page_url;
-var spin_game_container_url;
+var /** string */ spin_game_container;
 var spin_app_namespace;
 var spin_app_id;
 var spin_trialpay_vendor_id;
