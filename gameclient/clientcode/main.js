@@ -25960,7 +25960,7 @@ function receive_battle_log_result(dialog, ret) {
         var their_replay_version = summary['replay_version'] || 0;
         var cur_replay_version = gamedata['replay_version'] || 0;
         if(replay_exists && their_replay_version === cur_replay_version &&
-           eval_cond_or_literal(gamedata['client']['enable_replay_playback'], player, null)) {
+           read_predicate(gamedata['client']['enable_replay_playback']).is_satisfied(player, null)) {
             dialog.widgets['replay_button'].show = true;
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;

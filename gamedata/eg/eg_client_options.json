@@ -29,4 +29,15 @@
 // there is no way to opt out of the initial "rails" tutorial, because it is completely hard-coded
 "skip_tutorial_button": 1,
 
-"advanced_chat_reporting": 1
+"advanced_chat_reporting": 1,
+
+"enable_replay_recording": {"predicate": "OR", "subpredicates": [
+    {"predicate": "QUERY_STRING", "key": "enable_recording", "value": "1"},
+    {"predicate": "ANY_ABTEST", "key": "enable_replay_recording", "value": 1}
+]},
+
+"enable_replay_playback": {"predicate": "OR", "subpredicates": [
+    {"predicate": "QUERY_STRING", "key": "enable_recording", "value": "1"},
+    {"predicate": "ANY_ABTEST", "key": "enable_replay_playback", "value": 1}
+]}
+

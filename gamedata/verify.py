@@ -3599,9 +3599,7 @@ def main(args):
         error |= check_visual_effect('client_vfx:'+name, fx)
 
     for name in ('enable_replay_recording', 'enable_replay_playback',):
-        val = gamedata['client'][name]
-        if isinstance(val, list):
-            error |= check_cond_chain(val, reason='client:'+name)
+        error |= check_predicate(gamedata['client'][name], reason = 'client:'+name)
 
     error |= check_server(gamedata['server'])
     error |= check_promo_codes(gamedata['promo_codes'])
