@@ -3257,29 +3257,41 @@ class AttackReplayReceiver (object):
         self.local_filename = os.path.join(self.storage_dir(self.log_time), self.log_file)
         self.buf = None # allocated lazily
         self.codec = None
-        self.raw_length = None
+        self.next_line = 0
+        self.total_raw_length = 0
 
-    def accumulate(self, raw_length, codec, from_count, to_count, total_count, inbuf):
+    def accumulate(self, codec, first_line, n_lines, is_final, raw_length, inbuf):
         # receive a segment of compressed replay data from the client.
         # return true if finished with the last segment
 
         if self.codec is None:
             assert codec in ('raw', 'gzip')
             self.codec = codec
-            self.raw_length = raw_length
             self.buf = cStringIO.StringIO()
         else:
             assert codec == self.codec
 
-        if from_count != self.buf.tell(): raise Exception('unexpected range: %r-%r vs %r-%r' % (from_count, to_count, self.buf.tell(), self.buf.tell()+len(inbuf)))
+        if first_line != self.next_line: raise Exception('unexpected first line: %r vs %r' % (first_line, self.next_line))
+        if self.codec == 'gzip': # this is base64-encoded as well
+            inbuf = base64.b64decode(inbuf)
+            # note: we trust the client to generate valid gzip, and also trust it to send
+            # us atomic chunks where we can terminate the recording after any chunk.
         self.buf.write(inbuf)
+        self.next_line += n_lines
+        self.total_raw_length += raw_length
 
-        if self.buf.tell() >= total_count:
+        if is_final:
             self.finalize()
             return True
+
+        # we could write the data received so far to disk immediately, but for now let's just buffer it
+        # (will lose data if server stops during a battle, but that will probably mess up the battle result anyway).
+
         return False
 
     def finalize(self):
+        if self.buf is None: return # received no data
+
         # decompress what the client sent us
         if self.codec == 'raw':
             raw_buf = self.buf.getvalue()
@@ -3287,11 +3299,11 @@ class AttackReplayReceiver (object):
         elif self.codec == 'gzip':
             # we trust the client to generate valid gzip!
             raw_buf = None
-            gzip_buf = base64.b64decode(self.buf.getvalue())
+            gzip_buf = self.buf.getvalue()
 
         # check the size of the decompressed raw representation
-        if raw_buf is not None and len(raw_buf) != self.raw_length:
-            gamesite.exception_log.event(server_time, 'replay raw length mismatch: %r vs %r' % (len(raw_buf), self.raw_length))
+        if raw_buf is not None and len(raw_buf) != self.total_raw_length:
+            gamesite.exception_log.event(server_time, 'replay raw length mismatch: %r vs %r' % (len(raw_buf), self.total_raw_length))
 
         # fire-and-forget S3 upload
         if isinstance(io_system, S3IOSystem) and self.storage_s3_bucket(): # S3 enabled
@@ -3309,8 +3321,7 @@ class AttackReplayReceiver (object):
                                                                                   'attacker_id': self.attacker_id,
                                                                                   'defender_id': self.defender_id,
                                                                                   'base_id': self.base_id,
-                                                                                  #'log_file': self.log_file,
-                                                                                  'raw_length': self.raw_length,
+                                                                                  'raw_length': self.total_raw_length,
                                                                                   'wire_length': self.buf.tell()
                                                                                   })
 
@@ -3633,10 +3644,11 @@ class Session(object):
     def cur_playtime(self):
         return (server_time - self.login_time) + self.player.history.get('time_in_game',0)
 
-    def prune_attack_replay_receivers(self):
+    def prune_attack_replay_receivers(self, force = False):
         # get rid of expired replay receivers so they don't take up memory
         for token, recv in self.attack_replay_receivers.items():
-            if server_time >= recv.expire_time:
+            if server_time >= recv.expire_time or force:
+                self.attack_replay_receivers[token].finalize()
                 del self.attack_replay_receivers[token]
 
     def get_alliance_id(self, reason=''):
@@ -3756,6 +3768,8 @@ class Session(object):
         gamesite.chat_mgr.join(self, self.region_chat_channel)
 
     def shutdown(self):
+        self.prune_attack_replay_receivers(True)
+
         if self.region_chat_channel:
             gamesite.chat_mgr.leave(self, self.region_chat_channel)
         if self.alliance_chat_channel:
@@ -24778,9 +24792,9 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "GET_BATTLE_LOG3":
             return self.get_battle_log3(session, retmsg, arg)
         elif arg[0] == "UPLOAD_BATTLE_REPLAY":
-            token, raw_length, codec, from_count, to_count, total_count, inbuf = arg[1:8]
+            token, codec, first_line, n_lines, is_final, raw_length, zipped = arg[1:8]
             if token in session.attack_replay_receivers:
-                if session.attack_replay_receivers[token].accumulate(raw_length, codec, from_count, to_count, total_count, inbuf):
+                if session.attack_replay_receivers[token].accumulate(codec, first_line, n_lines, is_final, raw_length, zipped):
                     # it's done
                     del session.attack_replay_receivers[token]
         elif arg[0] == "GET_BATTLE_REPLAY":

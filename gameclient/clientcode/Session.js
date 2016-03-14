@@ -12,9 +12,6 @@ goog.require('Base');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('BattleReplay');
-goog.require('SPGzip'); // for replay uploads
-goog.require('SPStringCoding'); // for replay uploads
-goog.require('goog.crypt.base64'); // for replay uploads
 goog.require('World');
 goog.require('goog.object');
 goog.require('goog.array');
@@ -55,8 +52,6 @@ Session.Session = function() {
 
     /** @type {BattleReplay.Recorder|null} current recorder in use */
     this.replay_recorder = null;
-    /** @type {string|null} */
-    this.replay_token = null;
 
     this.change_time = -1; // client_time at which last SESSION_CHANGE was received (for debugging only)
     this.enable_combat_resource_bars = true; // used by the tutorial to hide combat resource bars (via ENABLE_COMBAT_RESOURCE_BARS consequent)
@@ -435,27 +430,15 @@ Session.Session.prototype.is_recording = function() { return this.replay_recorde
 /** @param {string} token for the upload */
 Session.Session.prototype.start_recording = function(token) {
     if(!read_predicate(gamedata['client']['enable_replay_recording']).is_satisfied(player, null)) { return; }
-    this.replay_recorder = new BattleReplay.Recorder(this.get_real_world());
-    this.replay_token = token;
+    this.replay_recorder = new BattleReplay.Recorder(this.get_real_world(), token);
     this.replay_recorder.start();
 };
-/** Stop and upload recording (might break upload process apart later) */
+Session.Session.prototype.flush_recording = function() {
+    this.replay_recorder.flush(false);
+};
+/** Stop and upload the end of the recording */
 Session.Session.prototype.finish_and_upload_recording = function() {
     this.replay_recorder.stop();
-    var raw = SPStringCoding.js_string_to_utf8_array(this.replay_recorder.pack_for_upload());
-    var zipped = goog.crypt.base64.encodeByteArray(SPGzip.gzip(raw));
-
-    if(player.is_developer()) { // print some compression efficiency statistics
-        var n_snapshots = this.replay_recorder.snapshots.length;
-        var first_snapshot_length = JSON.stringify(this.replay_recorder.snapshots[0]).length; // approximate, ignores UTF-8 encoding
-        var delta_snapshot_lengths = raw.length - first_snapshot_length; // approximate
-        console.log('Uploading '+n_snapshots.toString()+' snapshots.' +
-                    ' Raw representation '+raw.length.toString()+ ' chars' +
-                    ' (first '+first_snapshot_length.toString()+' chars then ~'+((delta_snapshot_lengths/(n_snapshots-1))).toFixed(0)+' chars/snapshot).');
-        console.log('Gzipped+b64 to '+zipped.length.toString()+' chars');
-    }
-
-    send_to_server.func(["UPLOAD_BATTLE_REPLAY", this.replay_token, raw.length, 'gzip', 0, zipped.length, zipped.length, zipped]);
+    this.replay_recorder.finish();
     this.replay_recorder = null;
-    this.replay_token = null;
 };
