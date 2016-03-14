@@ -12,6 +12,9 @@ goog.require('Base');
 goog.require('World');
 goog.require('SPFX'); // only for item usage display - move out of here?
 goog.require('ItemDisplay'); // only for item usage display - move out of here?
+goog.require('SPGzip'); // for replay uploads
+goog.require('SPStringCoding'); // for replay uploads
+goog.require('goog.crypt.base64'); // for replay uploads
 goog.require('goog.array');
 goog.require('goog.object');
 
@@ -47,12 +50,19 @@ BattleReplay.invoke = function(log) {
 /** RECORDER
     @constructor @struct
     @param {!World.World} world
+    @param {string} token
 */
-BattleReplay.Recorder = function(world) {
+BattleReplay.Recorder = function(world, token) {
     this.world = world;
-    this.snapshots = [];
+    this.token = token;
+    this.snapshots = []; // cleared after each flush
+    this.snapshot_count = 0;
     this.listen_keys = {};
     this.diff_snap = null;
+    this.sent_lines = 0;
+
+    // parameter to control flush interval. By default, flush no fewer than 50 snapshots at once for compression efficiency.
+    this.min_snapshots_to_flush = /** @type {number} */ (gamedata['client']['replay_min_snapshots_to_flush']);
 };
 BattleReplay.Recorder.prototype.start = function() {
     if('before_control' in this.listen_keys) { throw Error('already started'); }
@@ -74,7 +84,9 @@ BattleReplay.Recorder.prototype.compare_snapshots = function(reason) {
 };
 
 BattleReplay.Recorder.prototype.before_control = function() {
-    console.log('Recorded snapshot '+this.snapshots.length.toString());
+    if(player.is_developer()) {
+        console.log('Recorded snapshot '+this.snapshot_count.toString());
+    }
     var snap = {'tick_time': this.world.last_tick_time,
                 'objects': this.world.objects.serialize_incremental()};
     if(this.snapshots.length < 1) {
@@ -82,6 +94,7 @@ BattleReplay.Recorder.prototype.before_control = function() {
         snap['base'] = this.world.base.serialize();
     }
     this.snapshots.push(snap);
+    this.snapshot_count += 1;
 
     // uncomment this line to enable checking which fields mutated across the World control passes
     // XXX note: this breaks playback since the incremental serialization is stateful
@@ -99,33 +112,91 @@ BattleReplay.Recorder.prototype.stop = function() {
         this.world.unlistenByKey(this.listen_keys[k]);
         delete this.listen_keys[k];
     }, this);
-    console.log('Recorder stopped with '+this.snapshots.length.toString()+' snapshots');
+    if(player.is_developer()) {
+        console.log('Recorder stopped with '+this.snapshots.length.toString()+' snapshots');
+    }
 };
 
-/** Return the final uploadable representation of the replay
-    @return {string} native JS string, possibly including Unicode */
-BattleReplay.Recorder.prototype.pack_for_upload = function() {
-    var pack = {'version': gamedata['replay_version'] || 0,
-                'snapshots': this.snapshots};
-    // stringify, but don't UTF-8 encode yet
-    return JSON.stringify(pack);
+// A packed replay is a native JS string consisting of newline-separated lines.
+// Each line is an independently-parsable JSON object.
+// The first line is a header and all subsequent lines contain world snapshots.
+// Lines may be sent in batches, but a batch will always contain a complete set of lines.
+// (this allows the server to terminate the recording after any batch and get a valid replay).
+
+/** Transmit one or more lines to the server
+    @private
+    @param {!Array<!Object>} json_obj_arr
+    @param {boolean=} is_final */
+BattleReplay.Recorder.prototype.send_lines = function(json_obj_arr, is_final) {
+
+    var pack_list = goog.array.map(json_obj_arr, function(json_obj) { return JSON.stringify(json_obj); });
+
+    pack_list.push(''); // to get a final newline on the end after join()
+    var raw_string = pack_list.join('\n');
+
+    var raw_array = SPStringCoding.js_string_to_utf8_array(raw_string);
+
+    // note! this takes advantage of the fact that the gzip format allows you to concatenate
+    // successive gzipped blobs together.
+    // XXX could be made more efficient by digging in to the zlib library and sharing
+    // a single stream for successive lines.
+    // however, with 50 snapshots per flush, the compression ratio is only ~3% worse than smashing it all together.
+    var zipped = goog.crypt.base64.encodeByteArray(SPGzip.gzip(raw_array));
+
+    send_to_server.func(["UPLOAD_BATTLE_REPLAY", this.token, 'gzip',
+                         this.sent_lines, // first_line
+                         json_obj_arr.length, // n_lines
+                         !!is_final,
+                         raw_array.length, // raw_length (pre-base64)
+                         zipped]);
+    this.sent_lines += json_obj_arr.length;
+};
+
+/** Transmit any pending snapshots
+    @param {boolean=} is_final */
+BattleReplay.Recorder.prototype.flush = function(is_final) {
+    if(!is_final && this.snapshots.length < this.min_snapshots_to_flush) { return; }
+
+    if(this.snapshots.length > 0 || (is_final && this.snapshot_count > 0)) {
+        var to_send = this.snapshots;
+        this.snapshots = [];
+        if(this.sent_lines === 0) {
+            // prepend the header
+            var header = {'version': gamedata['replay_version']};
+            to_send = [header].concat(to_send);
+        }
+        this.send_lines(to_send, !!is_final);
+    }
+};
+
+/** finalize and upload the rest of the recording */
+BattleReplay.Recorder.prototype.finish = function() {
+    this.flush(true);
 };
 
 /** LINK FROM DOWNLOAD TO PLAYER
     @param {string} packed - native JS string, possibly including Unicode
     @return {BattleReplay.Player|null} - null if error */
 BattleReplay.replay_from_download = function(packed) {
+    var lines = packed.split('\n');
+    // trim trailing empty line from the final newline
+    if(lines[lines.length-1] == '') {
+        lines.length = lines.length - 1;
+    }
+
+    if(lines.length < 2) {
+        console.log('Replay has fewer than 2 lines');
+        return null;
+    }
+
+    var header = JSON.parse(lines[0]);
     var cur_ver = gamedata['replay_version'] || 0;
-    var pack = JSON.parse(packed);
-    if(pack['version'] !== cur_ver) {
-        console.log('Replay version mismatch: '+pack['version'].toString()+' vs '+cur_ver.toString());
+    if(header['version'] !== cur_ver) {
+        console.log('Replay version mismatch: '+header['version'].toString()+' vs '+cur_ver.toString());
         return null;
     }
-    if(pack['snapshots'].length < 1) {
-        console.log('Replay had no snapshots');
-        return null;
-    }
-    return new BattleReplay.Player(pack['snapshots']);
+    var snapshots = goog.array.map(lines.slice(1, lines.length), function(f) { return JSON.parse(f); });
+    return new BattleReplay.Player(snapshots);
 };
 
 /** LINK FROM RECORDER TO PLAYER

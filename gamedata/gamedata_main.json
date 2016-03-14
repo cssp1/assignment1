@@ -110,6 +110,10 @@
 
         "player_ping_interval": 29.0, // max number of seconds between automatic PING_PLAYER requests
         "combat_state_save_interval": 44.0, // max number of seconds between flushing dirty position/HP values with OBJECT_COMBAT_STATES message
+
+        // flush no fewer than this many snapshots at once, for compression efficiency
+        "replay_min_snapshots_to_flush": 50, // set to 999999 to turn off replay streaming and just upload it all after the battle
+
         "unit_repair_ping_interval": 8.0, // min number of seconds between UNIT_REPAIR_TICK requests when looking for completed repairs
         "base_damage_ping_interval": 10.0, // min number of seconds between PING_BASE_DAMAGE when used for non-critical synchronization
         "base_damage_ping_detail": true, // whether to send detailed info with the base damage ping, for debugging only
@@ -971,5 +975,7 @@
         "QAR": { "suffix": " QR", "decimals": 2 },
         "ZAR": { "suffix": " R", "decimals": 2 },
         "JPY": { "prefix": "\u00a5", "suffix": "", "decimals": 0 }
-    }
+    },
+
+    "replay_version": 2 // replay storage format version
 }
