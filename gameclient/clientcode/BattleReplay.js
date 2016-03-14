@@ -155,8 +155,9 @@ BattleReplay.Recorder.prototype.send_lines = function(json_obj_arr, is_final) {
 /** Transmit any pending snapshots
     @param {boolean=} is_final */
 BattleReplay.Recorder.prototype.flush = function(is_final) {
-    if(this.snapshots.length > 0) {
-        if(!is_final && this.snapshots.length < this.min_snapshots_to_flush) { return; }
+    if(!is_final && this.snapshots.length < this.min_snapshots_to_flush) { return; }
+
+    if(this.snapshots.length > 0 || (is_final && this.snapshot_count > 0)) {
         var to_send = this.snapshots;
         this.snapshots = [];
         if(this.sent_lines === 0) {
