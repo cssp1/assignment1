@@ -406,6 +406,8 @@ def FBOpenGraphLogFilter(child):
                                   ])
 def ClientTroubleLogFilter(child):
     return JSONLogFilter(child, allow = ['0620_client_died_from_client_lag',
+                                         '0621_client_died_from_downstream_lag',
+                                         '0622_client_died_from_upstream_lag',
                                          '0630_client_died_from_ajax_xmit_failure',
                                          '0631_direct_ajax_failure_falling_back_to_proxy',
                                          '0635_client_died_from_ajax_xmit_timeout',
