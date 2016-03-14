@@ -9451,6 +9451,7 @@ function invoke_playfield_speed_bar(replay_player) {
         var dialog = w.parent;
         var replay_player = dialog.user_data['replay_player'];
         if(replay_player) {
+            replay_player.world.control_paused = false;
             replay_player.restart();
         }
     };
