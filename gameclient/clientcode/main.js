@@ -45925,10 +45925,9 @@ function flush_dirty_objects(options) {
 
     if(args.length > 0) {
         send_to_server.func(["OBJECT_COMBAT_UPDATES", args]);
-    }
-
-    if(args.length > 0 && session.is_recording()) {
-        session.flush_recording();
+        if(session.is_recording()) {
+            session.flush_recording();
+        }
     }
 }
 
