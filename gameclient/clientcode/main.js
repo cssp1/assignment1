@@ -25698,7 +25698,15 @@ function update_battle_history_dialog(dialog) {
         }
         var summary = dialog.user_data['sumlist'][index];
 
-        var user_id = summary[(summary['attacker_id'] == dialog.user_data['from_id'] ? 'defender' : 'attacker')+'_id'];
+        var opprole;
+        if((summary['attacker_id'] == dialog.user_data['from_id']) ||
+           (dialog.user_data['from_alliance'] >= 0 && summary['attacker_alliance_id'] == dialog.user_data['from_alliance'])) {
+            opprole = 'defender';
+        } else {
+            opprole = 'attacker';
+        }
+        var user_id = summary[opprole+'_id'];
+
         var info = PlayerCache.query_sync(user_id) || {};
         var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
         var is_protected = (prot_end_time == 1 || prot_end_time > server_time || (info && info['LOCK_STATE']));
