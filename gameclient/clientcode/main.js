@@ -5740,6 +5740,7 @@ player.quest_root.transparent_to_mouse = true;
 player.quest_landscape_arrow = null; // reference to tutorial arrow SPUI Dialog, if one is up
 
 player.tutorial_state = 'START';
+player.tutorial_hold = false; // stop tutorial temporarily, e.g. for replay on first visit
 
 player.unit_repair_queue = [];
 player.tech = {};
@@ -17522,6 +17523,11 @@ var tutorial_ui = null;
 var tutorial_nonmodal_ui = null;
 
 function tutorial_step(clear_nonmodal_ui) {
+
+    if(player.is_developer()) {
+        console.log('Tutorial step '+player.tutorial_state+(player.tutorial_hold ? ' (HOLD)' : ''));
+    }
+
     if(tutorial_ui && tutorial_ui.parent) {
         tutorial_root.remove(tutorial_ui);
         tutorial_ui = null;
@@ -17534,7 +17540,7 @@ function tutorial_step(clear_nonmodal_ui) {
         }
     }
 
-    console.log('Tutorial step '+player.tutorial_state);
+    if(player.tutorial_hold) { return; }
 
     if(gamedata['client']['instrument_tutorial'] ||
        goog.array.contains(["COMPLETE","congratulations_message"], player.tutorial_state)) {
@@ -17628,6 +17634,9 @@ function tutorial_step(clear_nonmodal_ui) {
 }
 
 function advance_tutorial() {
+    if(player.is_developer()) {
+        console.log('advance_tutorial(): '+player.tutorial_state+' -> '+gamedata['tutorial'][player.tutorial_state]['next']);
+    }
     player.tutorial_state = gamedata['tutorial'][player.tutorial_state]['next'];
     tutorial_step(true);
 }
@@ -26028,9 +26037,9 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
         close_dialog(_locker);
         if(result) {
             var pack = unwrap_and_uncompress_string(result[0], result[1]); // codec, z_result
-            var player = BattleReplay.replay_from_download(pack);
-            if(player) {
-                session.push_world(player.world);
+            var replay_player = BattleReplay.replay_from_download(pack);
+            if(replay_player) {
+                session.push_world(replay_player.world);
 
                 // kill desktop dialogs
                 // need special handling for user_log since it is parented to desktop_top
@@ -26042,15 +26051,22 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                         delete desktop_dialogs[dname];
                     }
                 });
-                init_playfield_speed_bar(player); // but add speed bar
+                init_playfield_speed_bar(replay_player); // but add speed bar
 
                 // set up overlay GUI
                 change_selection(null);
                 var link_url = battle_replay_link_url(battle_time, attacker_id, defender_id, base_id);
-                var replay_overlay = BattleReplayGUI.invoke(player, link_url);
+                var replay_overlay = BattleReplayGUI.invoke(replay_player, link_url);
                 replay_overlay.on_destroy = function() {
                     session.pop_to_real_world();
                     update_player_combat_time_scale(0);
+
+                    // kick tutorial back into action
+                    if(player.tutorial_state !== "COMPLETE") {
+                        player.tutorial_hold = false;
+                        tutorial_step(true);
+                    }
+
                     init_desktop_dialogs();
                 };
                 return;
@@ -44166,6 +44182,12 @@ function handle_server_message(data) {
             download_and_play_replay(battle_time, attacker_id, defender_id, base_id, null, function() {
                 invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
             });
+            // special case for replay on first visit
+
+            if(player.tutorial_state != "COMPLETE") {
+                player.tutorial_hold = true;
+                tutorial_step(true);
+            }
         }
 
         // deep link to player info statistics
@@ -48405,7 +48427,7 @@ function do_draw() {
         SPUI.draw_all();
 
         // draw tutorial UI elements
-        if(player.tutorial_state != "COMPLETE" && client_state == client_states.RUNNING) {
+        if(player.tutorial_state != "COMPLETE" && client_state == client_states.RUNNING && !player.tutorial_hold) {
             var data = gamedata['tutorial'][player.tutorial_state];
             if('bg_fill_color' in data) {
                 var col = data['bg_fill_color'];
