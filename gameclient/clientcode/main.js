@@ -1400,7 +1400,7 @@ GameObject.prototype.serialize = function() {
     if(this.level != 1) {
         ret['level'] = this.level;
     }
-    if(!(this.is_inert() || this.spec['worth_less_xp'])) {
+    if(!(this.is_inert() || (this.spec['worth_less_xp'] && !this.is_minefield()))) {
         // fields that shouldn't be needed for barriers and scenery
         ret['equipment'] = this.equipment ? deepcopy_obj(this.equipment) : null;
         ret['control_state'] = this.control_state;
