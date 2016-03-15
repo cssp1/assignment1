@@ -8452,7 +8452,7 @@
             "valentina": { "kind": "StaticImage", "xy": [8,9], "dimensions": [72,72], "clip_to": [12,11,65,67], "asset": "valentina_72x72" },
             "close_button": { "kind": "ActionButton", "xy": [426,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "TextField", "xy": [108,14], "dimensions": [335,68], "text_hjustify": "left",  "text_size": 15,
-                             "text_vjustify": "top", "ui_name": "DEVELOPER-ONLY - Expect bugs.\nClick \"X\" to exit replay." },
+                             "text_vjustify": "top", "ui_name": "Replay of %attacker vs %defender\nTime %cur_time of %total_time\nClick \"X\" to exit replay." },
             "share_button": { "kind": "ActionButton", "xy": [300,47], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Get Link"}
         }
     },
