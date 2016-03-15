@@ -48995,7 +48995,7 @@ function draw_building_or_inert(world, obj, powerfac) {
         }
     }
 
-    if(obj.is_invisible() && obj.team !== 'player' && !obj.is_destroyed()) {
+    if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay()) && !obj.is_destroyed()) {
         return text_list; // hidden building!
     }
 
