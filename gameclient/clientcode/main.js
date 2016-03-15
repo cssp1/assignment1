@@ -48100,6 +48100,7 @@ function do_draw() {
             if(player.quest_tracked && player.tutorial_state === "COMPLETE" &&
                (('tips' in player.quest_tracked) || player.quest_tracked['force_claim']) &&
                !notification_queue.pending() &&
+               !session.is_replay() &&
                (session.home_base || player.quest_tracked['tips_in_enemy_base'])) {
 
                 var can_complete = player.can_complete_quest(player.quest_tracked);
@@ -48141,7 +48142,7 @@ function do_draw() {
         }
 
         if(session.home_base && player.quest_tracked && player.quest_tracked_complete_time > 0 &&
-           client_time >= player.quest_tracked_complete_time && !selection.ui && !notification_queue.pending()) {
+           client_time >= player.quest_tracked_complete_time && !selection.ui && !notification_queue.pending() && !session.is_replay()) {
             player.quest_tracked_complete_time = -1;
             if(player.can_complete_quest(player.quest_tracked)) {
                 var method = player.get_any_abtest_value('on_quest_tips_complete', gamedata['client']['on_quest_tips_complete'] || 'missions_dialog');
