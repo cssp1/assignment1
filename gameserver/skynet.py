@@ -596,9 +596,13 @@ def _adstats_pull(db, adgroup_list, time_range = None):
         # really awkward - API only lets you get daily stats in the advertiser's time zone!
         def chop_to_date(unix): return time.strftime('%Y-%m-%d', time.gmtime(unix))
 
-        query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[0])),
+        # note: the time zone / daylight savings time math here is really hairy
+        # it looks like Facebook thinks it is more important for the "day" to be 24 hours than for the since/until times to
+        # actually be on a midnight boundary. So, use the time offset of the END time for all computations, including the start time.
+        query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[1])),
                                                      # FB API is inclusive of last day, so subtract one day
-                                                     'until': chop_to_date(time_range[1] - 86400 + utc_pacific_offset(time_range[1]-86400))}})
+                                                     'until': chop_to_date(max(time_range[0] + utc_pacific_offset(time_range[1]),
+                                                                               time_range[1] - 86400 + utc_pacific_offset(time_range[1])))}})
     else:
         query = ''
 
@@ -618,8 +622,9 @@ def _adstats_pull(db, adgroup_list, time_range = None):
             parsed_start_time = SpinFacebook.parse_fb_date(x['date_start'], utc_pacific_offset(time_range[0]))
             parsed_end_time = SpinFacebook.parse_fb_date(x['date_stop'], utc_pacific_offset(time_range[1])) + 86400
 
-            if parsed_start_time != time_range[0] or \
-               parsed_end_time != time_range[1]:
+            # fudge room for daylight savings time
+            if abs(parsed_start_time - time_range[0]) not in (0,3600) or \
+               abs(parsed_end_time - time_range[1]) not in (0,3600):
                 raise Exception('asked for time_range %r %r %r but got %r (parsed %r %r %r %r)' % \
                                 (time_range, SpinFacebook.unparse_fb_time(time_range[0]), SpinFacebook.unparse_fb_time(time_range[1]),
                                  str(adgroup['id']), parsed_start_time, parsed_end_time, x['date_start'], x['date_stop']))
@@ -721,16 +726,19 @@ def adstats_record_verify_time_range(table, time_range, allow_multi_period = Fal
         delta = time_range[1] - time_range[0]
         if allow_multi_period: delta = delta % 3600 + 3600
         if delta != 3600:
+            print "non-hour delta", delta
             return False
     elif ADSTATS_PERIOD == 'day':
         delta = time_range[1] - time_range[0]
         if allow_multi_period: delta = delta % 86400 + 86400
-        if delta not in (86400, 86400-3600, 86400+3600): # allow daylight savings time
+        if (abs(delta) % 86400) not in (0, 3600, 86400-3600): # allow fudge room for daylight savings time
+            print "unexpected delta", delta
             return False
         for r in time_range:
             ts = time.gmtime(pacific_to_utc(r))
             # must be Pacific time midnight
-            if ts.tm_hour != 0 or ts.tm_min != 0 or ts.tm_sec != 0:
+            if ts.tm_hour not in (0,1,23) or ts.tm_min != 0 or ts.tm_sec != 0: # allow fudge room for daylight savings time
+                print "is not midnight", ts
                 return False
     return True
 
