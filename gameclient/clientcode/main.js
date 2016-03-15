@@ -11567,6 +11567,8 @@ function update_combat_damage_bar(dialog) {
                     if(!dialog.user_data['battle_star_'+name+'_announced']) {
                         dialog.user_data['battle_star_'+name+'_announced'] = client_time;
                         do_sound = true;
+
+                        session.get_real_world().combat_engine.log_annotation(new CombatEngine.BattleStarAnnotation(name));
                     }
                     // apply animation to the battle star
                     if(i < dialog.data['widgets']['battle_stars_star']['array'][0]) {

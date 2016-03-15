@@ -81,6 +81,11 @@ CombatEngine.CombatEngine = function() {
         @private
         @type {!Array<!CombatEngine.ItemRecord>} */
     this.item_log = [];
+
+    /** record miscellaneous events during combat (this tick), for replay purposes only
+        @private
+        @type {!Array<!CombatEngine.Annotation>} */
+    this.annotation_log = [];
 };
 
 /** @override */
@@ -109,6 +114,10 @@ CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
     if(this.item_log.length > 0) {
         ret['item_log'] = goog.array.map(this.item_log, function(entry) { return entry.serialize(); }, this);
         goog.array.clear(this.item_log);
+    }
+    if(this.annotation_log.length > 0) {
+        ret['annotation_log'] = goog.array.map(this.annotation_log, function(entry) { return entry.serialize(); }, this);
+        goog.array.clear(this.annotation_log);
     }
     return ret;
 };
@@ -192,6 +201,35 @@ CombatEngine.ItemRecord.prototype.serialize = function() {
 /** @override */
 CombatEngine.ItemRecord.prototype.apply_snapshot = goog.abstractMethod; // immutable
 
+/** Annotation
+    @constructor @struct
+    @implements {GameTypes.ISerializable}
+    @param {string} kind */
+CombatEngine.Annotation = function(kind) {
+    this.kind = kind;
+};
+/** @override */
+CombatEngine.Annotation.prototype.serialize = function() {
+    return {'kind': this.kind};
+};
+/** @override */
+CombatEngine.Annotation.prototype.apply_snapshot = goog.abstractMethod; // immutable
+
+/** BattleStarAnnotation
+    @constructor @struct
+    @extends {CombatEngine.Annotation}
+    @param {string} name */
+CombatEngine.BattleStarAnnotation = function(name) {
+    goog.base(this, 'BattleStarAnnotation');
+    this.name = name;
+};
+goog.inherits(CombatEngine.BattleStarAnnotation, CombatEngine.Annotation);
+/** @override */
+CombatEngine.BattleStarAnnotation.prototype.serialize = function() {
+    var ret = goog.base(this, 'serialize');
+    ret['name'] = this.name;
+    return ret;
+};
 
 // ProjectileEffect
 // Right now this is only used for firing missiles in combat
@@ -336,7 +374,10 @@ CombatEngine.CombatEngine.prototype.queue_projectile = function(effect) {
 CombatEngine.CombatEngine.prototype.log_item = function(entry) {
     this.item_log.push(entry);
 };
-
+/** @param {!CombatEngine.Annotation} entry */
+CombatEngine.CombatEngine.prototype.log_annotation = function(entry) {
+    this.annotation_log.push(entry);
+};
 
 /** @param {!World.World} world
     @param {boolean} use_ticks instead of client_time

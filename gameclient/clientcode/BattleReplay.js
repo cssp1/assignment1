@@ -290,6 +290,13 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
             }
         }, this);
     }
+    if('annotation_log' in combat_snap) {
+        goog.array.forEach(combat_snap['annotation_log'], function(event) {
+            if(event['kind'] === 'BattleStarAnnotation' && event['name'] in gamedata['battle_stars']) {
+                user_log.msg(gamedata['battle_stars'][event['name']]['ui_name'], new SPUI.Color(1,1,0,1));
+            }
+        }, this);
+    }
 
     this.world.combat_engine.apply_snapshot(combat_snap);
     this.index += 1;
