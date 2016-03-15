@@ -9404,7 +9404,7 @@ function update_playfield_zoom_bar(dialog) {
 
 /** @param {BattleReplay.Player|null=} replay_player */
 function init_playfield_speed_bar(replay_player) {
-    if(player.get_any_abtest_value('enable_playfield_speed_bar', gamedata['client']['enable_playfield_speed_bar']) &&
+    if((replay_player || player.get_any_abtest_value('enable_playfield_speed_bar', gamedata['client']['enable_playfield_speed_bar'])) &&
        !('playfield_speed_bar' in desktop_dialogs)) {
         var dialog = invoke_playfield_speed_bar(replay_player);
         if(dialog) {
