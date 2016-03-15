@@ -88,5 +88,9 @@ BattleReplayGUI.update = function(dialog) {
     var cur_minutes = Math.floor(cur_seconds/60.0);
     var cur_time = cur_minutes.toFixed(0) + ':' + pad_with_zeros(Math.floor(cur_seconds%60.0).toFixed(0), 2); // +'.'+pad_with_zeros(((cur_seconds*100)%100).toFixed(0), 2);
     var s = dialog.data['widgets']['description']['ui_name'];
-    dialog.widgets['description'].str = s.replace('%cur_time', cur_time).replace('%total_time', total_time);
+    dialog.widgets['description'].str = s
+        .replace('%cur_time', cur_time)
+        .replace('%total_time', total_time)
+        .replace('%attacker', replay_player.header['attacker_name'] || '?')
+        .replace('%defender', replay_player.header['defender_name'] || '?');
 };

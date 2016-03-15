@@ -61,11 +61,29 @@ BattleReplay.Recorder = function(world, token) {
     this.diff_snap = null;
     this.sent_lines = 0;
 
+    /** @type {Object<string,?>|null} */
+    this.header = null; // initialized in start()
+
     // parameter to control flush interval. By default, flush no fewer than 50 snapshots at once for compression efficiency.
     this.min_snapshots_to_flush = /** @type {number} */ (gamedata['client']['replay_min_snapshots_to_flush']);
 };
 BattleReplay.Recorder.prototype.start = function() {
     if('before_control' in this.listen_keys) { throw Error('already started'); }
+
+    // cut-down version of battle summary
+    this.header = {'replay_version': gamedata['replay_version'] || 0};
+    if(this.world.base.base_landlord_id === session.user_id) {
+        // defending
+        this.header['attacker_name'] = session.incoming_attacker_name || 'Unknown';
+        this.header['defender_name'] = player.get_ui_name();
+        this.header['defender_level'] = player.resource_state['player_level'];
+    } else {
+        // attacking
+        this.header['attacker_name'] = player.get_ui_name();
+        this.header['attacker_level'] = player.resource_state['player_level'];
+        this.header['defender_name'] = session.ui_name;
+        this.header['defender_level'] = enemy.resource_state['player_level'];
+    }
 
     // need to grab objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys['before_control'] = this.world.listen('before_control', this.before_control, false, this);
@@ -162,8 +180,7 @@ BattleReplay.Recorder.prototype.flush = function(is_final) {
         this.snapshots = [];
         if(this.sent_lines === 0) {
             // prepend the header
-            var header = {'version': gamedata['replay_version']};
-            to_send = [header].concat(to_send);
+            to_send = [this.header].concat(to_send);
         }
         this.send_lines(to_send, !!is_final);
     }
@@ -189,30 +206,33 @@ BattleReplay.replay_from_download = function(packed) {
         return null;
     }
 
-    var header = JSON.parse(lines[0]);
+    var header = /** @type {!Object<string,?>} */ (JSON.parse(lines[0]));
     var cur_ver = gamedata['replay_version'] || 0;
-    if(header['version'] !== cur_ver) {
-        console.log('Replay version mismatch: '+header['version'].toString()+' vs '+cur_ver.toString());
+    var header_ver = ('replay_version' in header ? header['replay_version'] : header['version']);
+    if(header_ver !== cur_ver) {
+        console.log('Replay version mismatch: '+header_ver.toString()+' vs '+cur_ver.toString());
         return null;
     }
     var snapshots = goog.array.map(lines.slice(1, lines.length), function(f) { return JSON.parse(f); });
-    return new BattleReplay.Player(snapshots);
+    return new BattleReplay.Player(header, snapshots);
 };
 
 /** LINK FROM RECORDER TO PLAYER
     @param {!BattleReplay.Recorder} recorder */
 BattleReplay.replay = function(recorder) {
     if(recorder.snapshots.length < 1) { throw Error('recorded not initialized'); }
-    return new BattleReplay.Player(recorder.snapshots);
+    return new BattleReplay.Player({}, recorder.snapshots);
 };
 
 /** PLAYER
     @constructor @struct
+    @param {!Object<string,?>} header
     @param {!Array<!Object>} snapshots
 */
-BattleReplay.Player = function(snapshots) {
+BattleReplay.Player = function(header, snapshots) {
     if(snapshots.length < 1) { throw Error('no snapshots'); }
     if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
+    this.header = header;
     this.snapshots = snapshots;
     this.world = new World.World(new Base.Base(snapshots[0]['base']['base_id'], snapshots[0]['base']), [], false);
     this.world.ai_paused = true;
