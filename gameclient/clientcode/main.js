@@ -26010,7 +26010,7 @@ function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id) 
     // see server's AttackReplayReceiver
     var at = (base_id ? '-at-'+base_id : '');
     // strip existing query string out of game container URL
-    var container = spin_page_url;
+    var container = spin_game_container;
     var q_index = container.indexOf('?');
     if(q_index > 0) {
         container = container.substr(0, q_index);
