@@ -26008,7 +26008,7 @@ function receive_battle_log_result(dialog, ret) {
     @return {string} */
 function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id) {
     // see server's AttackReplayReceiver
-    var at = (base_id ? '-at-'+base_id : '');
+    var at = ((base_id && base_id.charAt(0) != 'h') ? '-at-'+base_id : '');
     // strip existing query string out of game container URL
     var container = spin_game_container;
     var q_index = container.indexOf('?');
