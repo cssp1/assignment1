@@ -330,7 +330,9 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
 
         if(met['event_name'] == '3820_battle_start' || met['event_name'] == '3850_ai_attack_start') {
             start = met['time'];
-            line.push(new SPText.ABlock('Battle starts at '+(new Date(1000*summary['time'])).toUTCString()+' (Timestamp '+summary['time'].toString()+')', props.neutral.normal));
+            // note: GUI displays the timestamp as a "Battle ID" to reduce player confusion, but it's just the UNIX
+            // timestamp of the battle start, NOT an actual unique ID.
+            line.push(new SPText.ABlock('Battle starts at '+(new Date(1000*summary['time'])).toUTCString()+' (Battle ID '+summary['time'].toString()+')', props.neutral.normal));
         } else {
             line.push(new SPText.ABlock((met['time']-start).toString()+'s: ', pr.normal));
         }
