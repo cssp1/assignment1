@@ -227,6 +227,7 @@ def MetricsLogFilter(child):
 
                                   '1500_server_restart',
                                   '3832_battle_replay_uploaded',
+                                  '3833_battle_replay_downloaded',
                                   '3870_loot_given',
                                   '4701_change_region_success',
                                   '4702_region_close_notified',
