@@ -49637,7 +49637,8 @@ function draw_unit(world, unit) {
             }
         } else if((unit.control_state === control_states.CONTROL_SHOOT) && (state+'_shoot' in mystates)) {
             state = state+'_shoot';
-        } else if((unit.control_state === control_states.CONTROL_MOVING) && ('walk_cycle' in sprite_data)) {
+        } else if((unit.control_state === control_states.CONTROL_MOVING) && ('walk_cycle' in sprite_data) &&
+                  !vec_equals(unit.vel, [0,0])) {
             var walk_period = unit.get_leveled_quantity(unit.spec['walk_period'] || 1.0);
             var cycprog = ((world.control_paused ? 0 : (combat_time_scale()*client_time/walk_period)) + unit.anim_offset) % 1.0;
             var cycfrm = Math.floor(sprite_data['walk_cycle'].length*cycprog);
