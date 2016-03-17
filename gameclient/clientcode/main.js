@@ -26008,24 +26008,38 @@ function receive_battle_log_result(dialog, ret) {
     @param {number} defender_id
     @param {string|null} base_id
     @param {string|null} signature
-    @return {string} */
-function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, signature) {
+    @return {!Object<string,string>} */
+function battle_replay_link_qs(battle_time, attacker_id, defender_id, base_id, signature) {
     // see server's AttackReplayReceiver
     var at = ((base_id && base_id.charAt(0) != 'h') ? '-at-'+base_id : '');
+    var ret = {'replay': '%TIME-%ATTACKER-vs-%DEFENDER%AT'
+               .replace('%TIME', battle_time.toString())
+               .replace('%ATTACKER', attacker_id.toString())
+               .replace('%DEFENDER', defender_id.toString())
+               .replace('%AT', at)};
+    if(signature) {
+        ret['replay_signature'] = signature;
+    }
+    return ret;
+}
+/** @param {number} battle_time
+    @param {number} attacker_id
+    @param {number} defender_id
+    @param {string|null} base_id
+    @param {string|null} signature
+    @return {string} */
+function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, signature) {
+    var link_qs = battle_replay_link_qs(battle_time, attacker_id, defender_id, base_id, signature);
+
     // strip existing query string out of game container URL
     var container = spin_game_container;
     var q_index = container.indexOf('?');
     if(q_index > 0) {
         container = container.substr(0, q_index);
     }
-    var ret = '%URL?replay=%TIME-%ATTACKER-vs-%DEFENDER%AT'
-        .replace('%URL', container)
-        .replace('%TIME', battle_time.toString())
-        .replace('%ATTACKER', attacker_id.toString())
-        .replace('%DEFENDER', defender_id.toString())
-        .replace('%AT', at);
-    if(signature) {
-        ret += '&replay_signature='+encodeURIComponent(signature);
+    var ret = container+'?replay='+link_qs['replay'];
+    if(link_qs['replay_signature']) {
+        ret += '&replay_signature='+encodeURIComponent(link_qs['replay_signature']);
     }
     return ret;
 }
@@ -26063,7 +26077,8 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 // set up overlay GUI
                 change_selection(null);
                 var link_url = battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, signature);
-                var replay_overlay = BattleReplayGUI.invoke(replay_player, link_url);
+                var link_qs = battle_replay_link_qs(battle_time, attacker_id, defender_id, base_id, signature);
+                var replay_overlay = BattleReplayGUI.invoke(replay_player, link_url, link_qs);
                 replay_overlay.on_destroy = function() {
                     session.pop_to_real_world();
                     update_player_combat_time_scale(0);

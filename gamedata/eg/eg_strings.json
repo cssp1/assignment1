@@ -850,7 +850,7 @@
                             "ui_description": "User ID %d (%s) has been unmuted." },
 
     "copy_replay_link_success": { "ui_title": "Replay Link Copied to Clipboard",
-                                  "ui_description": "Link URL already copied. Use Control-V to paste elsewhere." },
+                                  "ui_description": "Link already copied. Use Control-V to paste elsewhere." },
     "post_screenshot_success": { "ui_title": "Screenshot Posted!",
                                  "ui_description": "Visit your Facebook profile to see the post." },
 

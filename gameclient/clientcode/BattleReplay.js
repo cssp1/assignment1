@@ -71,7 +71,9 @@ BattleReplay.Recorder.prototype.start = function() {
     if('before_control' in this.listen_keys) { throw Error('already started'); }
 
     // cut-down version of battle summary
-    this.header = {'replay_version': gamedata['replay_version'] || 0};
+    this.header = {'replay_version': gamedata['replay_version'] || 0,
+                   'server_time_according_to_client': server_time // unreliable
+                  };
     if(this.world.base.base_landlord_id === session.user_id) {
         // defending
         this.header['attacker_name'] = session.incoming_attacker_name || 'Unknown';

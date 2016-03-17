@@ -60,6 +60,9 @@
     "stats_share": {
         "ui_post_headline": "Can you beat this score in Example Game?"
     },
+    "replay": {
+        "ui_post_headline": "Watch %ATTACKER vs %DEFENDER battle in Example Game!"
+    },
 
     "achievement_brag": {
         "ui_button_text": "Share",

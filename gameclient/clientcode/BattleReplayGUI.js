@@ -9,6 +9,7 @@ goog.provide('BattleReplayGUI');
 */
 
 goog.require('BattleReplay');
+goog.require('FBShare');
 goog.require('SPUI');
 
 /** Copy text to clipboard - may want to move this into a separate library
@@ -45,12 +46,14 @@ BattleReplayGUI.copy_text_to_clipboard = function(s) {
 
 /** @param {!BattleReplay.Player} replay_player
     @param {string|null} link_url
+    @param {Object<string,string>|null} link_qs
     @return {!SPUI.Dialog} */
-BattleReplayGUI.invoke = function(replay_player, link_url) {
+BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['replay_overlay_dialog']);
     dialog.user_data['dialog'] = 'replay_overlay_dialog';
     dialog.user_data['player'] = replay_player;
     dialog.user_data['link_url'] = link_url;
+    dialog.user_data['link_qs'] = link_qs;
     install_child_dialog(dialog);
     dialog.modal = false;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
@@ -59,9 +62,10 @@ BattleReplayGUI.invoke = function(replay_player, link_url) {
         make_tutorial_arrow_for_button('replay_overlay_dialog', 'close_button', 'up');
     }
 
+    // Get Link button
     if(link_url) {
-        dialog.widgets['share_button'].show = true;
-        dialog.widgets['share_button'].onclick = function(w) {
+        dialog.widgets['get_link_button'].show = true;
+        dialog.widgets['get_link_button'].onclick = function(w) {
             var dialog = w.parent;
             var link_url = dialog.user_data['link_url'];
             var s = gamedata['strings']['copy_replay_link_success'];
@@ -73,8 +77,25 @@ BattleReplayGUI.invoke = function(replay_player, link_url) {
             return;
         };
     } else {
+        dialog.widgets['get_link_button'].show = false;
+    }
+
+    // FB share button
+    if(link_qs && spin_frame_platform === 'fb') {
+        dialog.widgets['share_button'].show = true;
+        dialog.widgets['share_button'].onclick = function(w) {
+            var dialog = w.parent;
+            FBShare.invoke({link_qs: dialog.user_data['link_qs'],
+                            name: gamedata['virals']['replay']['ui_post_headline']
+                            .replace('%ATTACKER', replay_player.header['attacker_name'] || '?')
+                            .replace('%DEFENDER', replay_player.header['defender_name'] || '?'),
+                            ref: 'replay',
+                           });
+        };
+    } else {
         dialog.widgets['share_button'].show = false;
     }
+
     dialog.ondraw = BattleReplayGUI.update;
     return dialog;
 };
@@ -83,7 +104,7 @@ BattleReplayGUI.invoke = function(replay_player, link_url) {
 BattleReplayGUI.update = function(dialog) {
     var replay_player = dialog.user_data['player'];
     dialog.xy = [Math.floor((SPUI.canvas_width - dialog.wh[0])/2),
-                 Math.floor((0.3*SPUI.canvas_height - dialog.wh[1])/2)];
+                 Math.max(15, Math.floor(0.05*SPUI.canvas_height))];
     // update description text
     var total_seconds = replay_player.num_ticks() * TICK_INTERVAL;
     var total_minutes = Math.floor(total_seconds/60.0);
