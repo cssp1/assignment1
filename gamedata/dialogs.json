@@ -8444,7 +8444,7 @@
         }
     },
 
-    "replay_overlay": {
+    "replay_overlay_dialog": {
         "dimensions": [451, 88],
         "clip_children": 0, "transparent_to_mouse": 1,
         "widgets": {

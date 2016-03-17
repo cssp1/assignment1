@@ -43,17 +43,22 @@ BattleReplayGUI.copy_text_to_clipboard = function(s) {
     document.body.removeChild(fakeElem);
 };
 
-/** @param {!BattleReplay.Player} player
+/** @param {!BattleReplay.Player} replay_player
     @param {string|null} link_url
     @return {!SPUI.Dialog} */
-BattleReplayGUI.invoke = function(player, link_url) {
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['replay_overlay']);
-    dialog.user_data['dialog'] = 'replay_overlay';
-    dialog.user_data['player'] = player;
+BattleReplayGUI.invoke = function(replay_player, link_url) {
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['replay_overlay_dialog']);
+    dialog.user_data['dialog'] = 'replay_overlay_dialog';
+    dialog.user_data['player'] = replay_player;
     dialog.user_data['link_url'] = link_url;
     install_child_dialog(dialog);
     dialog.modal = false;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
+
+    if(player.tutorial_state != "COMPLETE") {
+        make_tutorial_arrow_for_button('replay_overlay_dialog', 'close_button', 'up');
+    }
+
     if(link_url) {
         dialog.widgets['share_button'].show = true;
         dialog.widgets['share_button'].onclick = function(w) {
