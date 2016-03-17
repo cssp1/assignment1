@@ -6725,13 +6725,15 @@ player.get_max_storage = function() {
     return ret;
 };
 
+/** @param {string} resname
+    @return {number} 0-1 fullness of storage */
 function get_storage_fullness(resname) {
     // XXX probably should make this clearer by separating base vs. player data
-    if(session.viewing_ai || session.viewing_base.base_id != session.viewing_player_home_base_id) {
+    if(session.viewing_ai || session.is_replay() || session.viewing_base.base_id != session.viewing_player_home_base_id) {
         return 0.5;
     } else {
         var max_res = player.get_max_storage();
-        if(max_res <= 0) { return 0; }
+        if(max_res[resname] <= 0) { return 0; }
         var p = (session.home_base ? player.resource_state : enemy.resource_state);
         return p[resname][1]/max_res[resname];
     }
