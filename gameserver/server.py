@@ -18179,8 +18179,9 @@ class GAMEAPI(resource.Resource):
         client_sig = arg[5]
         tag = arg[6]
 
-        # the battle log itself does not have sufficient information (attacker/defender alliance IDs) to determine
+        # the battle replay itself does not have sufficient information (attacker/defender alliance IDs) to determine
         # access permission. So instead, we use a secure signature of the args from the battle history.
+        # this also allows sharing of replays, when the signature is included
         if not session.player.is_developer():
             if session.user.user_id not in (attacker, defender) and \
                client_sig != self.sign_battle_history(battle_time, attacker, defender, base_id):

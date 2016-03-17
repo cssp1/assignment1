@@ -202,7 +202,7 @@ function get_query_string(name) {
     start += name.length+1;
     var end = query.indexOf('&', start);
     if(end == -1) { end = query.length; }
-    return query.substring(start, end);
+    return unescape(query.substring(start, end));
 };
 
 function chrome_version_atleast(min_big, min_major, min_minor, min_release) {
@@ -26005,8 +26005,9 @@ function receive_battle_log_result(dialog, ret) {
     @param {number} attacker_id
     @param {number} defender_id
     @param {string|null} base_id
+    @param {string|null} signature
     @return {string} */
-function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id) {
+function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, signature) {
     // see server's AttackReplayReceiver
     var at = ((base_id && base_id.charAt(0) != 'h') ? '-at-'+base_id : '');
     // strip existing query string out of game container URL
@@ -26015,12 +26016,16 @@ function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id) 
     if(q_index > 0) {
         container = container.substr(0, q_index);
     }
-    return '%URL?replay=%TIME-%ATTACKER-vs-%DEFENDER%AT'
+    var ret = '%URL?replay=%TIME-%ATTACKER-vs-%DEFENDER%AT'
         .replace('%URL', container)
         .replace('%TIME', battle_time.toString())
         .replace('%ATTACKER', attacker_id.toString())
         .replace('%DEFENDER', defender_id.toString())
         .replace('%AT', at);
+    if(signature) {
+        ret += '&replay_signature='+encodeURIComponent(signature);
+    }
+    return ret;
 }
 
 /** @param {number} battle_time
@@ -26055,7 +26060,7 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
 
                 // set up overlay GUI
                 change_selection(null);
-                var link_url = battle_replay_link_url(battle_time, attacker_id, defender_id, base_id);
+                var link_url = battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, signature);
                 var replay_overlay = BattleReplayGUI.invoke(replay_player, link_url);
                 replay_overlay.on_destroy = function() {
                     session.pop_to_real_world();
@@ -44179,7 +44184,9 @@ function handle_server_message(data) {
             var attacker_id = parseInt(fields[1], 10);
             var defender_id = parseInt(fields[3], 10);
             var base_id = (fields.length >= 6 ? fields[5] : null);
-            download_and_play_replay(battle_time, attacker_id, defender_id, base_id, null, function() {
+            var signature = get_query_string('replay_signature');
+            if(!signature || signature.length < 1) { signature = null; }
+            download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
                 invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
             });
             // special case for replay on first visit
