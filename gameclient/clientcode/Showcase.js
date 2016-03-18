@@ -362,7 +362,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         dialog.widgets['progression_rewards_bg'].show = true;
 
         // this will be a list of [{"level": N, "loot": {"spec": ...}}, ... ]
-        // where "loot" acn also be a "multi", "cond", or random-choice array,
+        // where "loot" can also be a "multi", "cond", or random-choice array,
         // similar but NOT identical to an actual loot table.
         var progression_item_list = eval_cond_or_literal(hack['progression_reward_items'], player, null) || [];
 
@@ -572,7 +572,7 @@ function update_progression_rewards(dialog) {
         var progression_item_list = dialog.user_data['progression_item_list'];
         var period = dialog.data['widgets']['progression_rewards']['blink_period'];
 
-        for(var i = 0; i < progression_item_list.length; i++) {
+        for(var i = 0; i < Math.min(progression_item_list.length, dialog.data['widgets']['progression_rewards']['array'][0]); i++) {
             var loot = progression_item_list[i]['loot'];
 
             // only change the item displayed if the level drops multiple items

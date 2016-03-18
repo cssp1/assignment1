@@ -800,6 +800,9 @@ def get_progression_reward_items(loot, include_resource_boosts, include_random_l
         if filtered_loot:
             ret.append({'level': level, 'loot': filtered_loot})
 
+    GUI_WIDGET_LIMIT = 8
+    if len(ret) > GUI_WIDGET_LIMIT:
+        raise Exception('there is significant progression loot on %r different levels, but the showcase GUI can only display %r levels at once. Remove one of these loot drops:\n%s' % (len(ret), GUI_WIDGET_LIMIT, '\n'.join(repr(x) for x in ret)))
     return ret
 
 def make_show_time_pred(start, end, repeat_interval):
