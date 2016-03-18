@@ -34758,7 +34758,7 @@ function daily_tip_pageable_show_tip(dialog, idx) {
 
     dialog.widgets['description'].clear_text();
     if('ui_description' in tip) {
-        dialog.widgets['description'].append_text(SPText.cstring_to_ablocks_bbcode(tip['ui_description']));
+        dialog.widgets['description'].append_text(SPText.cstring_to_ablocks_bbcode(tip['ui_description'], null, system_chat_bbcode_click_handlers));
     }
 
     var image_name = ('image' in tip ? tip['image'] : gamedata['game_id']+'_pageable_generic.jpg');
