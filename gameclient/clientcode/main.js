@@ -44204,7 +44204,13 @@ function handle_server_message(data) {
             var signature = get_query_string('replay_signature');
             if(!signature || signature.length < 1) { signature = null; }
             download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
-                invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
+                // failure path
+                if(player.tutorial_state != "COMPLETE") {
+                    player.tutorial_hold = false;
+                    tutorial_step(true);
+                } else {
+                    invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
+                }
             });
             // special case for replay on first visit
 
