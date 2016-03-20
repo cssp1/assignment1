@@ -15720,7 +15720,27 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
     }
 
     var most_recent_summary = recent_attacks[recent_attacks.length-1];
-    if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
+
+    // replay or show deployments
+    // don't bother doing a round-trip to check for existence of replay - just assume it's there if the version
+    // matches in the summary and the battle is fairly recent
+    if(can_show_replay_for_battle_summary(most_recent_summary) && most_recent_summary['time'] >= server_time - 7*86400) {
+        dialog.widgets['replay_button'].show = true;
+        dialog.widgets['replay_button'].onclick = (function (_summary) { return function(w) {
+            var dialog = w.parent;
+            // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
+            // and is missing defender_id
+
+            var fail_cb = (function (_dialog) { return function() {
+                _dialog.widgets['replay_button'].state = 'disabled';
+                _dialog.widgets['replay_button'].tooltip.str = _dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'];
+            }; })(dialog);
+
+            download_and_play_replay(_summary['time'], _summary['attacker_user_id'], session.user_id, _summary['base_id'], null, fail_cb);
+
+        }; })(most_recent_summary);
+
+    } else if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
         dialog.widgets['show_markers_button'].show = true;
         dialog.widgets['show_markers_button'].onclick = (function (_summary) { return function(w) {
             var locker = invoke_ui_locker_until_closed();
@@ -25908,15 +25928,25 @@ function get_battle_log(battle_time, attacker_id, defender_id, base_id, signatur
     send_to_server.func(["GET_BATTLE_LOG3", battle_time, attacker_id, defender_id, base_id, signature, tag]);
 };
 
-// given a battle summary, determine if we can shot deployment markers
+// given a battle summary, determine if we can show a replay (doesn't check for actual existence)
+function can_show_replay_for_battle_summary(summary) {
+    if(!read_predicate(gamedata['client']['enable_replay_playback']).is_satisfied(player, null)) { return false; }
+    var their_replay_version = summary['replay_version'] || 0;
+    var cur_replay_version = gamedata['replay_version'] || 0;
+    return their_replay_version === cur_replay_version;
+}
+
+// given a battle summary, determine if we can show deployment markers
 function can_show_deployment_markers_for_battle_summary(summary) {
     if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
     return (summary['base_id'] === session.viewing_base.base_id &&
             ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
-             vec_equals(summary['base_ncells'], (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
+             vec_equals(summary['base_ncells'] || gamedata['map']['default_ncells'],
+                        (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
             ('deployed_units' in summary) &&
             goog.object.getCount(summary['deployed_units']) >= 1);
 }
+
 // given a battle log, turn on the deployment markers for it
 function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
     // mimic normal unit deployment spread
@@ -25979,16 +26009,12 @@ function receive_battle_log_result(dialog, ret) {
             }; })(summary, log);
         }
 
-        var their_replay_version = summary['replay_version'] || 0;
-        var cur_replay_version = gamedata['replay_version'] || 0;
-        if(replay_exists && their_replay_version === cur_replay_version &&
-           read_predicate(gamedata['client']['enable_replay_playback']).is_satisfied(player, null)) {
+        if(replay_exists && can_show_replay_for_battle_summary(summary)) {
             dialog.widgets['replay_button'].show = true;
             dialog.widgets['replay_button'].onclick = function(w) {
                 var dialog = w.parent;
                 var summary = dialog.user_data['summary'];
                 var fail_cb = (function (_dialog) { return function() {
-                    invoke_child_message_dialog(_dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'], '');
                     _dialog.widgets['replay_button'].state = 'disabled';
                     _dialog.widgets['replay_button'].tooltip.str = _dialog.data['widgets']['replay_button']['ui_tooltip_unavailable'];
                 }; })(dialog);
@@ -26044,7 +26070,9 @@ function battle_replay_link_url(battle_time, attacker_id, defender_id, base_id, 
     return ret;
 }
 
-/** @param {number} battle_time
+/** Download and start playing a replay. This handles locking the GUI during the round-trip,
+    and displays an error message if the replay is not available. fail_cb can be used for additional cleanup.
+    @param {number} battle_time
     @param {number} attacker_id
     @param {number} defender_id
     @param {string|null} base_id
@@ -26094,8 +26122,16 @@ function download_and_play_replay(battle_time, attacker_id, defender_id, base_id
                 return;
             }
         }
+
         // failure to download or play
-        if(_fail_cb) { _fail_cb(); }
+        if(player.tutorial_state == "COMPLETE") {
+            var s = gamedata['errors']['REPLAY_NOT_AVAILABLE'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': 'message_dialog_big'});
+        }
+
+        if(_fail_cb) {
+            _fail_cb();
+        }
 
     }; })(locker, fail_cb);
     send_to_server.func(["GET_BATTLE_REPLAY", battle_time, attacker_id, defender_id, base_id, signature, tag]);
@@ -44208,8 +44244,6 @@ function handle_server_message(data) {
                 if(player.tutorial_state != "COMPLETE") {
                     player.tutorial_hold = false;
                     tutorial_step(true);
-                } else {
-                    invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['replay_button']['ui_tooltip_unavailable'], '');
                 }
             });
             // special case for replay on first visit

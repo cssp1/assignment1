@@ -10837,6 +10837,7 @@ class Player(AbstractPlayer):
                 'defender_xp':summary['loot'].get('defender_xp', 0),
                 'viewing_trophies_pvp':summary['loot'].get('viewing_trophies_pvp',0),
                 'viewing_trophies_pvv':summary['loot'].get('viewing_trophies_pvv',0),
+                'replay_version':summary.get('replay_version', None)
                 }
         for res in gamedata['resources']:
             ret['lost_'+res] = summary['loot'].get(res+'_lost',0)

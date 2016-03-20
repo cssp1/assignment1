@@ -236,6 +236,7 @@
                                 "ui_button": "Play on",
                                 "dialog": "message_dialog_big" },
 
+    "REPLAY_NOT_AVAILABLE": {"ui_title": "Replay not available", "ui_name": "Sorry, this battle is too old to recover a replay."},
     "ALLIANCES_OFFLINE": { "ui_title": "Alliance error", "ui_name": "Alliance features are temporarily unavailable" },
     "SCORES_OFFLINE": { "ui_title": "Database Maintenance", "ui_name": "Some battle stats are temporarily offline due to scheduled database maintenance. Please check back later." },
     "CANNOT_JOIN_ALLIANCE": { "ui_title": "Alliance error", "ui_name": "You cannot join this alliance" },
