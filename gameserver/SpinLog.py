@@ -394,7 +394,9 @@ def FBRequestsLogFilter(child):
                                   ])
 def FBSharingLogFilter(child):
     return JSONLogFilter(child,
-                         allow = ['7272_photo_upload_attempted',
+                         allow = ['7270_feed_post_attempted',
+                                  '7271_feed_post_completed',
+                                  '7272_photo_upload_attempted',
                                   '7273_photo_upload_completed',
                                   '7274_photo_upload_failed',
                                   '7275_screenshot_failed',
