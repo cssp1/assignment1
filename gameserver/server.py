@@ -10823,22 +10823,27 @@ class Player(AbstractPlayer):
     @classmethod
     def battle_summary_to_recent_attack(cls, summary):
         ret = {'time':summary['time'],
-                'attacker_user_id':summary['attacker_id'],
-                'attacker_facebook_id':summary['attacker_facebook_id'],
-                'attacker_name':summary['attacker_name'],
-                'attacker_level':summary['attacker_level'],
-                'defender_outcome':summary['defender_outcome'],
-                'base_id': summary['base_id'],
-                'base_ncells': summary['base_ncells'],
-                'base_damage': summary['base_damage'],
-                'deployed_units': summary.get('deployed_units',{}),
-                'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),
-                'killed_units':sum(summary['loot'].get('units_lost', {}).itervalues()),
-                'defender_xp':summary['loot'].get('defender_xp', 0),
-                'viewing_trophies_pvp':summary['loot'].get('viewing_trophies_pvp',0),
-                'viewing_trophies_pvv':summary['loot'].get('viewing_trophies_pvv',0),
-                'replay_version':summary.get('replay_version', None)
-                }
+               'attacker_user_id':summary['attacker_id'],
+               'attacker_facebook_id':summary['attacker_facebook_id'],
+               'attacker_name':summary['attacker_name'],
+               'attacker_level':summary['attacker_level'],
+               'defender_outcome':summary['defender_outcome'],
+               'base_id': summary['base_id'],
+               'base_ncells': summary['base_ncells'],
+               'base_damage': summary['base_damage'],
+               'deployed_units': summary.get('deployed_units',{}),
+               'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),
+               'killed_units':sum(summary['loot'].get('units_lost', {}).itervalues()),
+               'defender_xp':summary['loot'].get('defender_xp', 0),
+               'viewing_trophies_pvp':summary['loot'].get('viewing_trophies_pvp',0),
+               'viewing_trophies_pvv':summary['loot'].get('viewing_trophies_pvv',0),
+               'replay_version':summary.get('replay_version', None),
+
+               # begin migration to unify player.recent_attacks to standard battle summary format
+               'attacker_id': summary['attacker_id'],
+               'loot': summary['loot'],
+               'defender_id': summary['defender_id'],
+               }
         for res in gamedata['resources']:
             ret['lost_'+res] = summary['loot'].get(res+'_lost',0)
             ret['killed_units_'+res] = summary['loot'].get('units_lost_'+res,0)
