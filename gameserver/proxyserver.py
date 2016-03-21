@@ -162,7 +162,7 @@ def reload_static_includes():
     global static_includes
     STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'facebookexternalhit.html',
+                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'facebookexternalhit.html',
                             'XsollaSDK.js']
     new_includes = dict([(basename, str(open('../gameclient/'+basename).read())) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
