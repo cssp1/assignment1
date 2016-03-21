@@ -162,7 +162,7 @@ function serialize_number(val, prec) {
 /** @param {!Array<number>} v
     @return {!Array<number>} */
 function vec_serialize(v) {
-    return [serialize_number(v[0], 2), serialize_number(v[1], 2)];
+    return [serialize_number(v[0], 1), serialize_number(v[1], 1)];
 }
 
 // detect whether browser has touch-screen events
