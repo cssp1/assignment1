@@ -1831,6 +1831,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
+            '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             # XXX probably need a frame platform restriction on loading Xsolla
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
