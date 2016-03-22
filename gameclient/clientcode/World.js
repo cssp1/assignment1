@@ -182,6 +182,12 @@ World.World.prototype.map_query_stats = function() {
 World.World.prototype.on_object_added = function(event) {
     this.notifier.dispatchEvent(new World.ObjectAddedEvent('object_added', this, event.obj));
     event.obj.on_added_to_world(this);
+    if(!event.obj.is_destroyed()) {
+        // if an object comes in during the tick cycle, keep map accelerators up to date
+        // (doesn't affect combat, but needed for GUI display of walls during replays)
+        this.team_map_accel.add_object(event.obj);
+        this.voxel_map_accel.add_object(event.obj);
+    }
 };
 /** @param {!GameObjectCollection.RemovedEvent} event */
 World.World.prototype.on_object_removed = function(event) {
