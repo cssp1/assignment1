@@ -106,12 +106,22 @@ BattleReplayGUI.update = function(dialog) {
     dialog.xy = [Math.floor((SPUI.canvas_width - dialog.wh[0])/2),
                  Math.max(15, Math.floor(0.05*SPUI.canvas_height))];
     // update description text
-    var total_seconds = replay_player.num_ticks() * TICK_INTERVAL;
+    var total_seconds = Math.max(replay_player.num_ticks()-1, 1) * TICK_INTERVAL;
     var total_minutes = Math.floor(total_seconds/60.0);
-    var total_time = total_minutes.toFixed(0) + ':' + pad_with_zeros((total_seconds%60.0).toFixed(0), 2);
+    var total_time = total_minutes.toFixed(0) + ':' + pad_with_zeros(Math.floor(total_seconds%60.0).toFixed(0), 2); // +'.'+pad_with_zeros(((total_seconds*100)%100).toFixed(0), 2);;
 
-    var cur_seconds = Math.min(replay_player.cur_tick() * TICK_INTERVAL, Math.floor(total_seconds)); // chop off fractional part at end
-    var cur_minutes = Math.floor(cur_seconds/60.0);
+
+    var cur_tick = Math.max(replay_player.cur_tick(),0); // display -1 uninitialized state as 0
+
+    var cur_seconds, cur_minutes;
+    // snap to end time at final tick for UI friendliness
+    if(cur_tick >= replay_player.num_ticks()-1) {
+        cur_seconds = total_seconds;
+        cur_minutes = total_minutes;
+    } else {
+        cur_seconds = cur_tick * TICK_INTERVAL;
+        cur_minutes = Math.floor(cur_seconds/60.0);
+    }
     var cur_time = cur_minutes.toFixed(0) + ':' + pad_with_zeros(Math.floor(cur_seconds%60.0).toFixed(0), 2); // +'.'+pad_with_zeros(((cur_seconds*100)%100).toFixed(0), 2);
     var s = dialog.data['widgets']['description']['ui_name'];
     dialog.widgets['description'].set_text_bbcode(s

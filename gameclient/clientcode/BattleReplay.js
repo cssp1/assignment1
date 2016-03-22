@@ -241,7 +241,7 @@ BattleReplay.Player = function(header, snapshots) {
     //this.world.control_paused = true;
     // *throw away* damage effects added by our control code, in favor of the recorded ones
     this.world.combat_engine.accept_damage_effects = false;
-    this.index = 0;
+    this.index = -1;
     // need to apply objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys = {'before_control': this.world.listen('before_control', this.before_control, false, this),
                         'before_damage_effects': this.world.listen('before_damage_effects', this.before_damage_effects, false, this)};
@@ -253,6 +253,10 @@ BattleReplay.Player.prototype.num_ticks = function() { return this.snapshots.len
 BattleReplay.Player.prototype.cur_tick = function() { return this.index; };
 /** @private */
 BattleReplay.Player.prototype.before_control = function(event) {
+    this.index += 1;
+    if(this.index >= this.snapshots.length) {
+        this.index = 0;
+    }
     console.log('Applying snapshot '+this.index.toString()+' at tick '+this.world.combat_engine.cur_tick.get());
     if(this.index === 0) {
         this.world.objects.clear();
@@ -301,16 +305,15 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
     }
 
     this.world.combat_engine.apply_snapshot(combat_snap);
-    this.index += 1;
-    if(this.index >= this.snapshots.length) {
+    if(this.index >= this.snapshots.length - 1) {
         if(!this.world.control_paused) { // pause at end
             this.world.control_paused = true;
         }
-        this.index = 0;
+        this.index = this.snapshots.length - 1;
     }
 };
 BattleReplay.Player.prototype.restart = function() {
-    this.index = 0;
+    this.index = -1;
     if(this.world.control_paused) { // force a single-step to reset
         this.world.control_step = 1;
     }
