@@ -8008,6 +8008,16 @@ Mobile.prototype.apply_snapshot = function(snap) {
 };
 
 /** @override */
+Mobile.prototype.on_added_to_world = function(world) {
+    goog.base(this, 'on_added_to_world', world);
+    this.altitude = (this.get_leveled_quantity(this.spec['altitude'] || 0));
+    if(this.altitude != 0 && world.base.base_climate_data['fly_at_ground_level']) {
+        // set altitudes low, but not to zero, so it doesn't screw up anti-air/anti-ground weapon behavior
+        this.altitude = 1.0;
+    }
+};
+
+/** @override */
 Mobile.prototype.on_removed_from_world = function(world) {
     goog.base(this, 'on_removed_from_world', world);
 
@@ -8204,12 +8214,6 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
 
         this.next_pos = [this.pos[0], this.pos[1]];
         this.dest = [this.pos[0], this.pos[1]];
-    }
-
-    this.altitude = (this.get_leveled_quantity(this.spec['altitude'] || 0));
-    if(this.altitude != 0 && session.viewing_base.base_climate_data['fly_at_ground_level']) {
-        // set altitudes low, but not to zero, so it doesn't screw up anti-air/anti-ground weapon behavior
-        this.altitude = 1.0;
     }
 
     if(init) {
