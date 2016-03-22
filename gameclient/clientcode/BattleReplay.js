@@ -235,7 +235,7 @@ BattleReplay.Player = function(header, snapshots) {
     if(snapshots.length < 1) { throw Error('no snapshots'); }
     if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
     this.header = header;
-    this.snapshots = snapshots;
+    this.snapshots = BattleReplay.Player.migrate_snapshots(snapshots);
     this.world = new World.World(new Base.Base(snapshots[0]['base']['base_id'], snapshots[0]['base']), [], false);
     this.world.ai_paused = true;
     //this.world.control_paused = true;
@@ -269,8 +269,8 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
     var combat_snap = this.snapshots[this.index]['combat_engine'];
 
     // grab any item-usage events and post them to on-screen log
-    if('item_log' in combat_snap) {
-        goog.array.forEach(combat_snap['item_log'], function(event) {
+    if('item_log' in combat_snap && ('queue' in combat_snap['item_log'] || ('added' in combat_snap['item_log']))) {
+        goog.array.forEach(combat_snap['item_log']['queue'] || combat_snap['item_log']['added'], function(event) {
             var spec = ItemDisplay.get_inventory_item_spec(event['item']['spec']);
 
             if('use_effect' in spec) {
@@ -296,8 +296,8 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
             }
         }, this);
     }
-    if('annotation_log' in combat_snap) {
-        goog.array.forEach(combat_snap['annotation_log'], function(event) {
+    if('annotation_log' in combat_snap && ('queue' in combat_snap['annotation_log'] || ('added' in combat_snap['annotation_log']))) {
+        goog.array.forEach(combat_snap['annotation_log']['queue'] || combat_snap['annotation_log']['added'], function(event) {
             if(event['kind'] === 'BattleStarAnnotation' && event['name'] in gamedata['battle_stars']) {
                 user_log.msg(gamedata['battle_stars'][event['name']]['ui_name'], new SPUI.Color(1,1,0,1));
             }
@@ -317,4 +317,40 @@ BattleReplay.Player.prototype.restart = function() {
     if(this.world.control_paused) { // force a single-step to reset
         this.world.control_step = 1;
     }
+};
+
+/** Handle any backwards-compatibility issues with replay snapshots
+    Return a migrated version of the snapshot array */
+BattleReplay.Player.migrate_snapshots = function(snapshots) {
+    return goog.array.map(snapshots, BattleReplay.Player.migrate_snapshot);
+};
+BattleReplay.Player.migrate_snapshot = function(original_snap) {
+    var snap = original_snap; // will return unmodified original if there are no changes
+    if('combat_engine' in snap) {
+        var combat_engine = snap['combat_engine'];
+
+        // transform flat arrays to queue replacements
+        goog.array.forEach(['damage_effect_queue', 'projectile_queue', 'item_log', 'annotation_log'], function(kind) {
+            if(kind in combat_engine && combat_engine[kind] instanceof Array) {
+                // copy-on-write
+                if(snap === original_snap) { snap = goog.object.clone(original_snap); combat_engine = snap['combat_engine']; }
+                combat_engine[kind] = {'queue': combat_engine[kind] };
+            }
+        });
+        // transform queue increments to new format
+        goog.array.forEach(['damage_effect_queue', 'projectile_queue'], function(kind) {
+            if(kind + '_added' in combat_engine) {
+                // copy-on-write
+                if(snap === original_snap) { snap = goog.object.clone(original_snap); combat_engine = snap['combat_engine']; }
+                // note: don't include a 'length' because it will probably mis-match what the engine expects
+                // (due to incorrect serialization timing in legacy replays)
+                combat_engine[kind] = {'added': combat_engine[kind+'_added'] };
+                delete combat_engine[kind+'_added'];
+                if(kind+'_length' in combat_engine) {
+                    delete combat_engine[kind+'_length'];
+                }
+            }
+        });
+    }
+    return snap;
 };

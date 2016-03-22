@@ -46,6 +46,83 @@ CombatEngine.Pos2D.sub = function(a, b) {
 };
 
 /** @constructor @struct
+    @implements {GameTypes.IIncrementallySerializable}
+    @template T
+    @param {function(!Object<string,?>): T} unserialize_func
+    Note: T must be ISerializable
+*/
+CombatEngine.Queue = function(unserialize_func) {
+    /** @private
+        @type {!Array<!GameTypes.ISerializable>} */
+    this.queue = [];
+    /** @private
+        @type {!Array<!GameTypes.ISerializable>} */
+    this.dirty_added = [];
+    /** @private */
+    this.unserialize_func = unserialize_func;
+};
+/** @param {!GameTypes.ISerializable} effect */
+CombatEngine.Queue.prototype.push = function(effect) {
+    this.queue.push(effect);
+    this.dirty_added.push(effect);
+};
+/** @return {T} */
+CombatEngine.Queue.prototype.popleft = function() {
+    return this.queue.splice(0,1)[0];
+};
+/** @param {number} index
+    @return {T} */
+CombatEngine.Queue.prototype.pop_at = function(index) {
+    var effect = this.queue.splice(index,1)[0];
+    return effect;
+};
+/** @param {number} index
+    @return {T} */
+CombatEngine.Queue.prototype.peek_at = function(index) {
+    return this.queue[index];
+};
+CombatEngine.Queue.prototype.clear = function() {
+    goog.array.clear(this.queue);
+    goog.array.clear(this.dirty_added);
+};
+CombatEngine.Queue.prototype.clear_dirty_added = function() {
+    goog.array.clear(this.dirty_added);
+};
+/** @return {boolean} */
+CombatEngine.Queue.prototype.empty = function() { return this.queue.length == 0; };
+/** @return {number} */
+CombatEngine.Queue.prototype.length = function() { return this.queue.length; };
+
+/** @override */
+CombatEngine.Queue.prototype.serialize = function() {
+    return {'queue': goog.array.map(this.queue, function(effect) { return effect.serialize();}, this)};
+};
+/** @override */
+CombatEngine.Queue.prototype.serialize_incremental = function() {
+    if(this.dirty_added.length > 0) {
+        var ret = {'added': goog.array.map(this.dirty_added, function(effect) { return effect.serialize(); }, this),
+                   'length': this.queue.length};
+        goog.array.clear(this.dirty_added);
+        return ret;
+    } else {
+        return null;
+    }
+};
+CombatEngine.Queue.prototype.apply_snapshot = function(snap) {
+    if('queue' in snap) { // complete replacement
+        this.queue = goog.array.map(snap['queue'], goog.bind(this.unserialize_func, this));
+    } else if('added' in snap) {
+        this.queue = this.queue.concat(goog.array.map(snap['added'], goog.bind(this.unserialize_func, this)));
+        if('length' in snap) { // optional sanity check
+            var expected_len = /** @type {number} */ (snap['length']);
+            if(this.queue.length != expected_len) {
+                throw Error('unexpected queue_length '+expected_len.toString()+' vs actual '+this.queue.length.toString());
+            }
+        }
+    }
+};
+
+/** @constructor @struct
     @implements {GameTypes.IIncrementallySerializable} */
 CombatEngine.CombatEngine = function() {
     /** @type {!GameTypes.TickCount} */
@@ -54,46 +131,37 @@ CombatEngine.CombatEngine = function() {
     /** @type {number} hack for time-based effects */
     this.cur_client_time = 0;
 
-    /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
-        @private
-        @type {!Array.<!CombatEngine.DamageEffect>} */
-    this.damage_effect_queue = [];
-
     // XXX awkward - for replays only - disable addition of new damage effects
     // should be replaced by some kind of dataflow mechanism
     this.accept_damage_effects = true;
 
-    /** for incremental serialization
+    /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
         @private
-        @type {!Array<!CombatEngine.DamageEffect>} */
-    this.damage_effect_queue_dirty_added = [];
+        @type {!CombatEngine.Queue<!CombatEngine.DamageEffect>} */
+    this.damage_effect_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_damage_effect);
 
     /** list of not-unit-based (missile) projectiles that need to be evaluated for firing this tick (may not actually fire until a future tick)
         @private
-        @type {!Array<!CombatEngine.ProjectileEffect>} */
-    this.projectile_queue = [];
-    /** for incremental serialization
-        @private
-        @type {!Array<!CombatEngine.ProjectileEffect>} */
-    this.projectile_queue_dirty_added = [];
+        @type {!CombatEngine.Queue<!CombatEngine.ProjectileEffect>} */
+    this.projectile_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_projectile_effect);
 
     /** record items expended during combat (this tick), for replay purposes only
         @private
-        @type {!Array<!CombatEngine.ItemRecord>} */
-    this.item_log = [];
+        @type {!CombatEngine.Queue<!CombatEngine.ItemRecord>} */
+    this.item_log = new CombatEngine.Queue(goog.abstractMethod);
 
     /** record miscellaneous events during combat (this tick), for replay purposes only
         @private
-        @type {!Array<!CombatEngine.Annotation>} */
-    this.annotation_log = [];
+        @type {!CombatEngine.Queue<!CombatEngine.Annotation>} */
+    this.annotation_log = new CombatEngine.Queue(goog.abstractMethod);
 };
 
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize = function() {
     return {'cur_tick': this.cur_tick.get(),
             'cur_client_time': this.cur_client_time,
-            'damage_effect_queue': goog.array.map(this.damage_effect_queue, function(effect) { return effect.serialize(); }, this),
-            'projectile_queue': goog.array.map(this.projectile_queue, function(effect) { return effect.serialize();}, this)};
+            'damage_effect_queue': this.damage_effect_queue.serialize(),
+            'projectile_queue': this.projectile_queue.serialize()};
 };
 /** @override */
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
@@ -101,23 +169,21 @@ CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
                'cur_client_time': this.cur_client_time};
     // XXXXXX this doesn't work if the first call happens with effects already queued,
     // because the dirty list has been cleared of them already!
-    if(this.damage_effect_queue_dirty_added.length > 0) {
-        ret['damage_effect_queue_added'] = goog.array.map(this.damage_effect_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
-        ret['damage_effect_queue_length'] = this.damage_effect_queue.length;
-        goog.array.clear(this.damage_effect_queue_dirty_added);
+    var dmg = this.damage_effect_queue.serialize_incremental();
+    if(dmg) {
+        ret['damage_effect_queue'] = dmg;
     }
-    if(this.projectile_queue_dirty_added.length > 0) {
-        ret['projectile_queue_added'] = goog.array.map(this.projectile_queue_dirty_added, function(effect) { return effect.serialize(); }, this);
-        ret['projectile_queue_length'] = this.projectile_queue.length;
-        goog.array.clear(this.projectile_queue_dirty_added);
+    var proj = this.projectile_queue.serialize_incremental();
+    if(proj) {
+        ret['projectile_queue'] = proj;
     }
-    if(this.item_log.length > 0) {
-        ret['item_log'] = goog.array.map(this.item_log, function(entry) { return entry.serialize(); }, this);
-        goog.array.clear(this.item_log);
+    var item = this.item_log.serialize_incremental();
+    if(item) {
+        ret['item_log'] = item;
     }
-    if(this.annotation_log.length > 0) {
-        ret['annotation_log'] = goog.array.map(this.annotation_log, function(entry) { return entry.serialize(); }, this);
-        goog.array.clear(this.annotation_log);
+    var anno = this.annotation_log.serialize_incremental();
+    if(anno) {
+        ret['annotation_log'] = anno;
     }
     return ret;
 };
@@ -126,43 +192,16 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
     this.cur_tick = new GameTypes.TickCount(snap['cur_tick']);
     this.cur_client_time = snap['cur_client_time'];
     if('damage_effect_queue' in snap) {
-        this.damage_effect_queue = goog.array.map(snap['damage_effect_queue'], function(/** !Object<string,?> */ effect_snap) {
-            return this.unserialize_damage_effect(effect_snap);
-        }, this);
-    } else if('damage_effect_queue_added' in snap) {
-        this.damage_effect_queue = this.damage_effect_queue.concat(goog.array.map(snap['damage_effect_queue_added'], function(/** !Object<string,?> */ effect_snap) {
-            return this.unserialize_damage_effect(effect_snap);
-        }, this));
-        var expected_len = /** @type {number} */ (snap['damage_effect_queue_length']);
-        if(this.damage_effect_queue.length != expected_len) {
-            var msg = 'unexpected damage_effect_queue_length '+expected_len.toString()+' vs. '+this.damage_effect_queue.length.toString();
-            // XXXXXX band-aid fix for projectile effects that create and consume a damage effect on the same tick (SG spells)
-            // which cause a length mismatch because the serialized length is checked before applying projectile effects
-            if(0) {
-                throw Error(msg);
-            } else {
-                console.log(msg);
-            }
-        }
+        this.damage_effect_queue.apply_snapshot(snap['damage_effect_queue']);
     }
-    if('projectile_queue' in snap) { // complete replacement
-        this.projectile_queue = goog.array.map(snap['projectile_queue'], function(/** !Object<string,?> */ effect_snap) {
-            return this.unserialize_projectile_effect(effect_snap);
-        }, this);
-    } else if('projectile_queue_added' in snap) {
-        this.projectile_queue = this.projectile_queue.concat(goog.array.map(snap['projectile_queue_added'], function(/** !Object<string,?> */ effect_snap) {
-            return this.unserialize_projectile_effect(effect_snap);
-        }, this));
-        var expected_len = /** @type {number} */ (snap['projectile_queue_length']);
-        if(this.projectile_queue.length != expected_len) {
-            throw Error('unexpected projectile_queue_length '+expected_len.toString()+' vs. '+this.projectile_queue.length.toString());
-        }
+    if('projectile_queue' in snap) {
+        this.projectile_queue.apply_snapshot(snap['projectile_queue']);
     }
 };
 
 /** @param {!Object<string,?>} snap
     @return {!CombatEngine.ProjectileEffect} */
-CombatEngine.CombatEngine.prototype.unserialize_projectile_effect = function(snap) {
+CombatEngine.CombatEngine.unserialize_projectile_effect = function(snap) {
     return new CombatEngine.ProjectileEffect(snap['source_id'], snap['source_team'], snap['source_pos'], snap['source_height'],
                                              snap['muzzle_pos'],
                                              new GameTypes.TickCount(snap['fire_tick']), snap['fire_time_hack'],
@@ -173,7 +212,7 @@ CombatEngine.CombatEngine.prototype.unserialize_projectile_effect = function(sna
 
 /** @param {!Object<string,?>} snap
     @return {!CombatEngine.DamageEffect} */
-CombatEngine.CombatEngine.prototype.unserialize_damage_effect = function(snap) {
+CombatEngine.CombatEngine.unserialize_damage_effect = function(snap) {
     if(snap['kind'] === 'KillDamageEffect') {
         return new CombatEngine.KillDamageEffect(new GameTypes.TickCount(snap['tick']), snap['client_time_hack'], snap['source_id'], snap['source_team'], snap['target_id']);
     } else if(snap['kind'] === 'TargetedDamageEffect') {
@@ -370,12 +409,10 @@ CombatEngine.DamageEffect.prototype.apply_snapshot = goog.abstractMethod; // imm
 CombatEngine.CombatEngine.prototype.queue_damage_effect = function(effect) {
     if(!this.accept_damage_effects) { return; }
     this.damage_effect_queue.push(effect);
-    this.damage_effect_queue_dirty_added.push(effect);
 };
 /** @param {!CombatEngine.ProjectileEffect} effect */
 CombatEngine.CombatEngine.prototype.queue_projectile = function(effect) {
     this.projectile_queue.push(effect);
-    this.projectile_queue_dirty_added.push(effect);
 };
 /** @param {!CombatEngine.ItemRecord} entry */
 CombatEngine.CombatEngine.prototype.log_item = function(entry) {
@@ -390,26 +427,25 @@ CombatEngine.CombatEngine.prototype.log_annotation = function(entry) {
     @param {boolean} use_ticks instead of client_time
     @return {boolean} true if more are pending */
 CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
-    goog.array.clear(this.item_log); // just a convenient place to reset this
-    goog.array.clear(this.damage_effect_queue_dirty_added); // just a convenient place to reset this
-    goog.array.clear(this.projectile_queue_dirty_added); // just a convenient place to reset this
+    this.item_log.clear_dirty_added(); // just a convenient place to reset this
+    this.damage_effect_queue.clear_dirty_added(); // just a convenient place to reset this
+    this.projectile_queue.clear_dirty_added(); // just a convenient place to reset this
 
-    for(var p = 0; p < this.projectile_queue.length; p++) {
-        var peffect = this.projectile_queue.splice(p,1)[0]; p -= 1;
+    while(!this.projectile_queue.empty()) {
+        var peffect = this.projectile_queue.popleft();
         peffect.apply(world);
     }
 
-
     // only apply effects that were already queued right now
     // take care not to apply effects that are appended from within apply() below.
-    var to_check = this.damage_effect_queue.length;
+    var to_check = this.damage_effect_queue.length();
 
     for(var i = 0, checked = 0; checked < to_check; i++, checked++) {
-        var effect = this.damage_effect_queue[i];
+        var effect = /** @type {!CombatEngine.DamageEffect} */ (this.damage_effect_queue.peek_at(i));
         var do_it = (use_ticks ? GameTypes.TickCount.gte(this.cur_tick, effect.tick) :
                      (this.cur_client_time >= effect.client_time_hack));
         if(do_it) {
-            this.damage_effect_queue.splice(i,1); i -= 1;
+            this.damage_effect_queue.pop_at(i); i -= 1;
             to_check -= 1;
             effect.apply(world);
         }
@@ -420,15 +456,13 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
 
 /** For use by replay code */
 CombatEngine.CombatEngine.prototype.clear_queued_damage_effects = function() {
-    goog.array.clear(this.damage_effect_queue);
-    goog.array.clear(this.damage_effect_queue_dirty_added);
-    goog.array.clear(this.projectile_queue);
-    goog.array.clear(this.projectile_queue_dirty_added);
+    this.damage_effect_queue.clear();
+    this.projectile_queue.clear();
 };
 
 /** @return {boolean} */
 CombatEngine.CombatEngine.prototype.has_queued_damage_effects = function() {
-    return this.damage_effect_queue.length > 0 || this.projectile_queue.length > 0;
+    return (!this.damage_effect_queue.empty()) || (!this.projectile_queue.empty());
 };
 
 
