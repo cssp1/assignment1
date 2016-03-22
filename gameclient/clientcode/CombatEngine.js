@@ -99,6 +99,8 @@ CombatEngine.Queue.prototype.serialize = function() {
 };
 /** @override */
 CombatEngine.Queue.prototype.serialize_incremental = function() {
+    // XXXXXX this doesn't work if the first call happens with effects already queued,
+    // because the dirty list has been cleared of them already!
     if(this.dirty_added.length > 0) {
         var ret = {'added': goog.array.map(this.dirty_added, function(effect) { return effect.serialize(); }, this),
                    'length': this.queue.length};
@@ -135,23 +137,21 @@ CombatEngine.CombatEngine = function() {
     // should be replaced by some kind of dataflow mechanism
     this.accept_damage_effects = true;
 
+    // below fields should be private, but need to be accessed by BattleReplay as a "friend"
+
     /** list of queued damage effects that should be applied at later times (possible optimization: use a priority queue)
-        @private
         @type {!CombatEngine.Queue<!CombatEngine.DamageEffect>} */
     this.damage_effect_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_damage_effect);
 
     /** list of not-unit-based (missile) projectiles that need to be evaluated for firing this tick (may not actually fire until a future tick)
-        @private
         @type {!CombatEngine.Queue<!CombatEngine.ProjectileEffect>} */
     this.projectile_queue = new CombatEngine.Queue(CombatEngine.CombatEngine.unserialize_projectile_effect);
 
     /** record items expended during combat (this tick), for replay purposes only
-        @private
         @type {!CombatEngine.Queue<!CombatEngine.ItemRecord>} */
     this.item_log = new CombatEngine.Queue(goog.abstractMethod);
 
     /** record miscellaneous events during combat (this tick), for replay purposes only
-        @private
         @type {!CombatEngine.Queue<!CombatEngine.Annotation>} */
     this.annotation_log = new CombatEngine.Queue(goog.abstractMethod);
 };
@@ -163,12 +163,19 @@ CombatEngine.CombatEngine.prototype.serialize = function() {
             'damage_effect_queue': this.damage_effect_queue.serialize(),
             'projectile_queue': this.projectile_queue.serialize()};
 };
-/** @override */
+/** @override
+    Note: For reference only! Naive incremental serialization doesn't
+    actually work, because there are subtle ordering issues with
+    projectile effects that add damage effects within the same tick.
+    (the effect is created, added to "dirty" list, and then erased,
+    but it won't show up until the NEXT tick's snapshot).  In order to
+    get correct results, BattleReplay has to interleave the
+    serialization with projectile and damage effect queue
+    processing. */
 CombatEngine.CombatEngine.prototype.serialize_incremental = function() {
     var ret = {'cur_tick': this.cur_tick.get(),
                'cur_client_time': this.cur_client_time};
-    // XXXXXX this doesn't work if the first call happens with effects already queued,
-    // because the dirty list has been cleared of them already!
+
     var dmg = this.damage_effect_queue.serialize_incremental();
     if(dmg) {
         ret['damage_effect_queue'] = dmg;
@@ -423,18 +430,22 @@ CombatEngine.CombatEngine.prototype.log_annotation = function(entry) {
     this.annotation_log.push(entry);
 };
 
-/** @param {!World.World} world
-    @param {boolean} use_ticks instead of client_time
-    @return {boolean} true if more are pending */
-CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
-    this.item_log.clear_dirty_added(); // just a convenient place to reset this
-    this.damage_effect_queue.clear_dirty_added(); // just a convenient place to reset this
+/** @param {!World.World} world */
+CombatEngine.CombatEngine.prototype.apply_queued_projectile_effects = function(world) {
     this.projectile_queue.clear_dirty_added(); // just a convenient place to reset this
 
     while(!this.projectile_queue.empty()) {
         var peffect = this.projectile_queue.popleft();
         peffect.apply(world);
     }
+};
+
+/** @param {!World.World} world
+    @param {boolean} use_ticks instead of client_time */
+CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world, use_ticks) {
+    this.item_log.clear_dirty_added(); // just a convenient place to reset this
+    this.annotation_log.clear_dirty_added(); // just a convenient place to reset this
+    this.damage_effect_queue.clear_dirty_added(); // just a convenient place to reset this
 
     // only apply effects that were already queued right now
     // take care not to apply effects that are appended from within apply() below.
@@ -450,18 +461,16 @@ CombatEngine.CombatEngine.prototype.apply_queued_damage_effects = function(world
             effect.apply(world);
         }
     }
-
-    return this.has_queued_damage_effects();
 };
 
 /** For use by replay code */
-CombatEngine.CombatEngine.prototype.clear_queued_damage_effects = function() {
+CombatEngine.CombatEngine.prototype.clear_queued_effects = function() {
     this.damage_effect_queue.clear();
     this.projectile_queue.clear();
 };
 
 /** @return {boolean} */
-CombatEngine.CombatEngine.prototype.has_queued_damage_effects = function() {
+CombatEngine.CombatEngine.prototype.has_queued_effects = function() {
     return (!this.damage_effect_queue.empty()) || (!this.projectile_queue.empty());
 };
 

@@ -2540,7 +2540,7 @@ function calculate_battle_outcome() {
         }
 
         // check for inbound missiles and damage over time effects
-        if(defeat && session.get_real_world().combat_engine.has_queued_damage_effects() > 0) {
+        if(defeat && session.get_real_world().combat_engine.has_queued_effects()) {
             defeat = false;
             session.no_more_units = true;
         }

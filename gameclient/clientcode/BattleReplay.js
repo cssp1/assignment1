@@ -89,6 +89,7 @@ BattleReplay.Recorder.prototype.start = function() {
 
     // need to grab objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys['before_control'] = this.world.listen('before_control', this.before_control, false, this);
+    this.listen_keys['before_projectile_effects'] = this.world.listen('before_projectile_effects', this.before_projectile_effects, false, this);
     this.listen_keys['before_damage_effects'] = this.world.listen('before_damage_effects', this.before_damage_effects, false, this);
     this.listen_keys['after_damage_effects'] = this.world.listen('after_damage_effects', this.after_damage_effects, false, this);
 };
@@ -120,9 +121,35 @@ BattleReplay.Recorder.prototype.before_control = function() {
     // XXX note: this breaks playback since the incremental serialization is stateful
     //this.diff_snap = this.world.objects.serialize();
 };
-BattleReplay.Recorder.prototype.before_damage_effects = function() {
+BattleReplay.Recorder.prototype.before_projectile_effects = function() {
     this.compare_snapshots('run_control');
-    this.snapshots[this.snapshots.length-1]['combat_engine'] = this.world.combat_engine.serialize_incremental();
+    // serialize just the "header" and the projectile effects
+    var eng = this.world.combat_engine;
+    var snap = this.snapshots[this.snapshots.length-1]['combat_engine'] = {
+        'cur_tick': eng.cur_tick.get(),
+        'cur_client_time': eng.cur_client_time};
+    var proj = eng.projectile_queue.serialize_incremental();
+    if(proj) {
+        snap['projectile_queue'] = proj;
+    }
+};
+BattleReplay.Recorder.prototype.before_damage_effects = function() {
+    this.compare_snapshots('projectile effects');
+    // serialize the rest of the combat engine
+    var eng = this.world.combat_engine;
+    var snap = this.snapshots[this.snapshots.length-1]['combat_engine'];
+    var dmg = eng.damage_effect_queue.serialize_incremental();
+    if(dmg) {
+        snap['damage_effect_queue'] = dmg;
+    }
+    var item = eng.item_log.serialize_incremental();
+    if(item) {
+        snap['item_log'] = item;
+    }
+    var anno = eng.annotation_log.serialize_incremental();
+    if(anno) {
+        snap['annotation_log'] = anno;
+    }
 };
 BattleReplay.Recorder.prototype.after_damage_effects = function() {
     this.compare_snapshots('damage effects');
@@ -244,6 +271,7 @@ BattleReplay.Player = function(header, snapshots) {
     this.index = -1;
     // need to apply objects snapshot before control pass, but wait until after control pass for damage effects
     this.listen_keys = {'before_control': this.world.listen('before_control', this.before_control, false, this),
+                        'before_projectile_effects': this.world.listen('before_projectile_effects', this.before_projectile_effects, false, this),
                         'before_damage_effects': this.world.listen('before_damage_effects', this.before_damage_effects, false, this)};
     console.log('Initialized replay with '+this.snapshots.length.toString()+' snapshots');
 };
@@ -257,12 +285,23 @@ BattleReplay.Player.prototype.before_control = function(event) {
     if(this.index >= this.snapshots.length) {
         this.index = 0;
     }
-    console.log('Applying snapshot '+this.index.toString()+' at tick '+this.world.combat_engine.cur_tick.get());
     if(this.index === 0) {
         this.world.objects.clear();
-        this.world.combat_engine.clear_queued_damage_effects();
+        this.world.combat_engine.clear_queued_effects();
+    }
+    if(player.is_developer()) {
+        console.log('Applying snapshot '+this.index.toString()+' of tick '+this.snapshots[this.index]['combat_engine']['cur_tick'].toString());
     }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
+};
+/** @private */
+BattleReplay.Player.prototype.before_projectile_effects = function(event) {
+    var combat_snap = this.snapshots[this.index]['combat_engine'];
+    this.world.combat_engine.cur_tick = new GameTypes.TickCount(combat_snap['cur_tick']);
+    this.world.combat_engine.cur_client_time = combat_snap['cur_client_time'];
+    if('projectile_queue' in combat_snap) {
+        this.world.combat_engine.projectile_queue.apply_snapshot(combat_snap['projectile_queue']);
+    }
 };
 /** @private */
 BattleReplay.Player.prototype.before_damage_effects = function(event) {
@@ -304,7 +343,10 @@ BattleReplay.Player.prototype.before_damage_effects = function(event) {
         }, this);
     }
 
-    this.world.combat_engine.apply_snapshot(combat_snap);
+    if('damage_effect_queue' in combat_snap) {
+        this.world.combat_engine.damage_effect_queue.apply_snapshot(combat_snap['damage_effect_queue']);
+    }
+
     if(this.index >= this.snapshots.length - 1) {
         if(!this.world.control_paused) { // pause at end
             this.world.control_paused = true;
