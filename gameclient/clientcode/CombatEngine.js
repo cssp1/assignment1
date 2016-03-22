@@ -134,9 +134,15 @@ CombatEngine.CombatEngine.prototype.apply_snapshot = function(snap) {
             return this.unserialize_damage_effect(effect_snap);
         }, this));
         var expected_len = /** @type {number} */ (snap['damage_effect_queue_length']);
-        // XXXXXX band-aid fix for SG PbAOE effects
-        if(0 && this.damage_effect_queue.length != expected_len) {
-            throw Error('unexpected damage_effect_queue_length '+expected_len.toString()+' vs. '+this.damage_effect_queue.length.toString());
+        if(this.damage_effect_queue.length != expected_len) {
+            var msg = 'unexpected damage_effect_queue_length '+expected_len.toString()+' vs. '+this.damage_effect_queue.length.toString();
+            // XXXXXX band-aid fix for projectile effects that create and consume a damage effect on the same tick (SG spells)
+            // which cause a length mismatch because the serialized length is checked before applying projectile effects
+            if(0) {
+                throw Error(msg);
+            } else {
+                console.log(msg);
+            }
         }
     }
     if('projectile_queue' in snap) { // complete replacement
