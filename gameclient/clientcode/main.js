@@ -10029,6 +10029,9 @@ SPINPUNCHGAME.init = function() {
     } else if(spin_demographics['browser_name'] === 'Firefox' &&
               spin_demographics['browser_version'] < 6) {
         unsupported_reason = 'Firefox version < 6';
+    } else if(spin_demographics['browser_name'] === 'Safari' &&
+              spin_demographics['browser_version'] < 5) {
+        unsupported_reason = 'Safari version < 5';
     } else if(spin_demographics['browser_name'] === 'Chrome' &&
               spin_demographics['browser_version'] <= 6) {
         unsupported_reason = 'Chrome version < 6';
