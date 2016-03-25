@@ -34,7 +34,7 @@ FBShare.invoke_feed = function(p_options) {
 
     call_with_facebook_permissions('publish_actions',
         (function(options) { return function() {
-            metric_event('7270_feed_post_attempted', {'method':options.ref, 'api':'feed'});
+            metric_event('7270_feed_post_attempted', {'method':options.ref, 'api':'feed', 'sum': player.get_denormalized_summary_props('brief')});
             var url = 'https://apps.facebook.com/'+spin_app_namespace+'/?spin_ref='+options.ref+'&spin_ref_user_id='+spin_user_id.toString();
             if(options.link_qs) {
                 for(var k in options.link_qs) {
@@ -60,7 +60,9 @@ FBShare.invoke_feed = function(p_options) {
                             if(result && ('post_id' in result)) {
                                 metric_event('7271_feed_post_completed',
                                              {'method':_options.ref, 'api':'feed',
-                                              'facebook_post_id':result['post_id']});
+                                              'facebook_post_id':result['post_id'],
+                                              'sum': player.get_denormalized_summary_props('brief')
+                                             });
                             }
                         }); })(options)
                    );
@@ -89,7 +91,8 @@ FBShare.invoke_share = function(options) {
         console.log(props);
         console.log(url);
     }
-    metric_event('7270_feed_post_attempted', {'method':options.ref, 'api':'share'});
+    metric_event('7270_feed_post_attempted', {'method':options.ref, 'api':'share',
+                                              'sum': player.get_denormalized_summary_props('brief')});
 
     if(!spin_facebook_enabled) { console.log('FBShare.invoke_share: '+url); return; }
 
@@ -103,7 +106,8 @@ FBShare.invoke_share = function(options) {
                     if(result && ('post_id' in result)) {
                         metric_event('7271_feed_post_completed',
                                      {'method':_options.ref, 'api':'share',
-                                      'facebook_post_id':result['post_id']});
+                                      'facebook_post_id':result['post_id'],
+                                      'sum': player.get_denormalized_summary_props('brief')});
                     }
                 }); })(options)
            );
