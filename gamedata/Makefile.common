@@ -34,6 +34,7 @@ dep:
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_ai_attacks.json --get-deps-as ${BUILT}/${GAME_ID}_ai_attacks_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_quarries.json --get-deps-as ${BUILT}/${GAME_ID}_quarries_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_hives.json --get-deps-as ${BUILT}/${GAME_ID}_hives_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_raids.json --get-deps-as ${BUILT}/${GAME_ID}_raids_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_tech.json --get-deps-as ${BUILT}/${GAME_ID}_tech_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_crafting.json --get-deps-as ${BUILT}/${GAME_ID}_crafting_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps gamedata_main.json --get-deps-as ${BUILT}/gamedata-${GAME_ID}.json.unverified >> ${BUILT}/deps
@@ -59,6 +60,10 @@ ${BUILT}/${GAME_ID}_quarries_compiled.json: ${GAME_ID}/${GAME_ID}_quarries.json
 	@echo "    ${GAME_ID}_quarries_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_quarries_server.json: ${GAMEDATA}/make_quarries.py ${BUILT}/${GAME_ID}_quarries_compiled.json
 	@echo "    ${GAME_ID}_quarries_server.json..." && ${GAMEDATA}/make_quarries.py --server ${BUILT}/${GAME_ID}_quarries_compiled.json $@
+${BUILT}/${GAME_ID}_raids_compiled.json: ${GAME_ID}/${GAME_ID}_raids.json
+	@echo "    ${GAME_ID}_raids_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@;
+${BUILT}/${GAME_ID}_raids_server.json: ${GAMEDATA}/make_raids.py ${BUILT}/${GAME_ID}_raids_compiled.json
+	@echo "    ${GAME_ID}_raids_server.json..." && ${GAMEDATA}/make_raids.py --server ${BUILT}/${GAME_ID}_raids_compiled.json $@
 ${BUILT}/${GAME_ID}_tech_compiled.json: ${GAME_ID}/${GAME_ID}_tech.json # just for invert_requirements.py, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_tech_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_crafting_compiled.json: ${GAME_ID}/${GAME_ID}_crafting.json # just for invert_requirements.py, NOT actually incorprated into gamedata
@@ -71,6 +76,8 @@ ${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives.py ${BUILT}/${GAME
 	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives.py --client ${BUILT}/${GAME_ID}_hives_compiled.json $@
 ${BUILT}/${GAME_ID}_quarries_client.json: ${GAMEDATA}/make_quarries.py ${BUILT}/${GAME_ID}_quarries_compiled.json
 	@echo "    ${GAME_ID}_quarries_client.json..." && ${GAMEDATA}/make_quarries.py --client ${BUILT}/${GAME_ID}_quarries_compiled.json $@
+${BUILT}/${GAME_ID}_raids_client.json: ${GAMEDATA}/make_raids.py ${BUILT}/${GAME_ID}_raids_compiled.json
+	@echo "    ${GAME_ID}_raids_client.json..." && ${GAMEDATA}/make_raids.py --client ${BUILT}/${GAME_ID}_raids_compiled.json $@
 
 # needs the gamebucks SKUs to detect item bundles
 ${BUILT}/${GAME_ID}_loot_tables_client.json: ${GAMEDATA}/make_loot_tables_client.py ${BUILT}/${GAME_ID}_loot_tables.json \
@@ -113,6 +120,7 @@ ${BUILT}/gamedata-${GAME_ID}.json: ${GAMEDATA}/verify.py ${BUILT}/gamedata-${GAM
         ${BUILT}/${GAME_ID}_ai_attacks_compiled.json \
         ${BUILT}/${GAME_ID}_quarries_compiled.json \
         ${BUILT}/${GAME_ID}_hives_compiled.json \
+        ${BUILT}/${GAME_ID}_raids_compiled.json \
         ${BUILT}/${GAME_ID}_loot_tables_compiled.json \
         ${BUILT}/${GAME_ID}_promo_codes_compiled.json \
 	${BUILT}/${GAME_ID}_server_compiled.json \
@@ -135,6 +143,8 @@ all: ${BUILT}/gamedata-${GAME_ID}.json \
 	${BUILT}/${GAME_ID}_ai_bases_compiled.json \
 	${BUILT}/${GAME_ID}_ai_bases_server.json \
 	${BUILT}/${GAME_ID}_ai_attacks_compiled.json \
+	${BUILT}/${GAME_ID}_raids_compiled.json \
+	${BUILT}/${GAME_ID}_raids_server.json \
 	${BUILT}/${GAME_ID}_hives_compiled.json \
 	${BUILT}/${GAME_ID}_hives_server.json \
 	${BUILT}/${GAME_ID}_quarries_compiled.json \

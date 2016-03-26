@@ -874,6 +874,10 @@
     "hives_client":
 #include "$GAME_ID/built/$GAME_ID_hives_client.json"
     ,
+    // client-visible subset of raids.json
+    "raids_client":
+#include "$GAME_ID/built/$GAME_ID_raids_client.json"
+    ,
 
     "ai_attacks_client": {
         // time from login to daily attack warning, in seconds

@@ -3308,10 +3308,11 @@ def main(args):
     gamedata['ai_attacks'] = SpinJSON.load(open(args[2]))
     gamedata['quarries'] = SpinJSON.load(open(args[3]))
     gamedata['hives'] = SpinJSON.load(open(args[4]))
-    gamedata['loot_tables'] = SpinJSON.load(open(args[5]))
-    gamedata['promo_codes'] = SpinJSON.load(open(args[6]))
-    gamedata['server'] = SpinJSON.load(open(args[7]))
-    gamedata['loading_screens'] = SpinJSON.load(open(args[8]))
+    gamedata['raids'] = SpinJSON.load(open(args[5]))
+    gamedata['loot_tables'] = SpinJSON.load(open(args[6]))
+    gamedata['promo_codes'] = SpinJSON.load(open(args[7]))
+    gamedata['server'] = SpinJSON.load(open(args[8]))
+    gamedata['loading_screens'] = SpinJSON.load(open(args[9]))
 
     global MAX_STORAGE
     MAX_STORAGE = dict((resname, GameDataUtil.calc_max_storage_for_resource(gamedata, resname)) for resname in gamedata['resources'])
