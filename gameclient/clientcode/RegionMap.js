@@ -898,6 +898,7 @@ RegionMap.RegionMap.prototype.on_mousewheel = function(uv, offset, delta) {
 RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
     if(feature['base_type'] === 'squad' && !player.squad_combat_enabled()) { return []; }
     if(feature['base_type'] === 'home' && !player.map_home_combat_enabled()) { return []; }
+    if(feature['base_type'] === 'raid') { return []; }
 
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
@@ -1167,10 +1168,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                           PlayerInfoDialog.invoke(_feature['base_landlord_id']);
                       }; })(mapwidget, feature), 'passive']);
 
-    } else if(!player.is_cheater && feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
-              ('activation' in gamedata['hives_client']['templates'][feature['base_template']]) &&
-              !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
-        var rpred = read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']);
+    } else if(!player.is_cheater && goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates']) &&
+              ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
+              !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+        var rpred = read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']);
         var pred_text = rpred.ui_describe(player);
         buttons.push([gamedata['strings']['regional_map']['locked'], get_requirements_help(rpred), 'disabled_clickable',
                       gamedata['strings']['regional_map']['to_unlock'].replace('%s',pred_text), SPUI.error_text_color]);
@@ -1267,7 +1268,7 @@ RegionMap.RegionMap.prototype.make_feature_popup_menu = function() {
 
     var feature = this.popup.user_data['feature'];
 
-    if(!goog.array.contains(['quarry','home','hive','squad','empty'], feature['base_type'])) { return; } // decorative base
+    if(!goog.array.contains(['quarry','home','hive','raid','squad','empty'], feature['base_type'])) { return; } // decorative base
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['region_map_popup_menu']);
     this.popup.user_data['menu'] = dialog; // reference from dialog to menu
@@ -1471,11 +1472,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         } else {
             descr = gamedata['strings']['regional_map']['quarry'].replace('%s',feature['base_ui_name']);
         }
-    } else if(ftype == 'hive') {
-        var template = (('base_template' in feature) ? (gamedata['hives_client']['templates'][feature['base_template']] || null) : null);
+    } else if(goog.array.contains(['hive','raid'], ftype)) {
+        var template = (('base_template' in feature) ? (gamedata[ftype+'s_client']['templates'][feature['base_template']] || null) : null);
         if(template) {
             // default
-            descr = gamedata['strings']['regional_map']['hive_descr'].replace('%s',feature['base_ui_name']);
+            descr = gamedata['strings']['regional_map'][ftype+'_descr'].replace('%s',feature['base_ui_name']);
             var ls = [];
             if(template['ui_tokens']) {
                 ls.push(gamedata['strings']['regional_map']['with_tokens'].replace('%d', (typeof(template['ui_tokens']) === 'number' ? pretty_print_number(template['ui_tokens']) : template['ui_tokens'])));
@@ -1588,11 +1589,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         }
     } else if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > mapwidget.time)) {
         blink_list.push({'status':'protection'});
-    } else if(!player.is_cheater && feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
-              ('activation' in gamedata['hives_client']['templates'][feature['base_template']]) &&
-              !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+    } else if(!player.is_cheater && goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates']) &&
+              ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
+              !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
         blink_list.push({'status':'locked'});
-    } else if(feature['base_type'] == 'hive' && ('base_expire_time' in feature) && (feature['base_expire_time'] > 0) &&
+    } else if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_expire_time' in feature) && (feature['base_expire_time'] > 0) &&
               (feature['base_expire_time'] - mapwidget.time) < gamedata['territory']['escaping_soon_time']) {
         blink_list.push({'status':'escaping_soon'});
     } else if(feature['base_last_conquer_time'] && feature['base_last_conquer_time'] > 0) {
@@ -2262,12 +2263,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 }
             }
 
-            if(feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates'])) {
-                if(gamedata['hives_client']['templates'][feature['base_template']]['ui_tokens']) {
+            if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates'])) {
+                if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens']) {
                     show_token_icon = true;
                 }
-                if(!player.is_cheater && ('activation' in gamedata['hives_client']['templates'][feature['base_template']]) &&
-                   !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+                if(!player.is_cheater && ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
+                   !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
                     show_padlock = true; // hive that player cannot attack
                 }
             }
@@ -2413,11 +2414,11 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         subtitle = display_name;
                     }
                 }
-            } else if(feature['base_type'] == 'hive' && ('base_template' in feature) &&
-                      gamedata['hives_client']['templates'][feature['base_template']]) {
-                var template = gamedata['hives_client']['templates'][feature['base_template']];
+            } else if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) &&
+                      gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) {
+                var template = gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']];
                 // default
-                subtitle = gamedata['strings']['regional_map']['hive_label'].replace('%s',feature['base_ui_name']);
+                subtitle = gamedata['strings']['regional_map'][feature['base_type']+'_label'].replace('%s',feature['base_ui_name']);
 
                 var ls = [];
                 if(template['ui_tokens']) {
@@ -2519,8 +2520,8 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
         if(feature['base_richness'] >= 40) {
             color += '_xl';
         }
-    } else if(feature['base_type'] == 'hive') {
-        color = 'hive';
+    } else if(goog.array.contains(['hive','raid'], feature['base_type'])) {
+        color = feature['base_type'];
         if(feature['base_climate'] && feature['base_climate'].indexOf('ice')==0) {
             color += '_ice';
         }
