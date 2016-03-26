@@ -135,10 +135,10 @@ def nosql_write_all_objects(region_id, base_id, owner_id, objlist):
                  'owner_id':ENVIRONMENT_OWNER_ID if obj.get('owner',owner_id) == 'environment' else owner_id,
                  'base_id':base_id,
                  'kind': spec['kind'],
-                 'spec': obj['spec'],
-                 'xy': obj['xy'], }
+                 'spec': obj['spec']}
+
         if obj.get('level',1) != 1: props['level'] = obj['level']
-        for FIELD in ('orders','patrol','equipment','produce_start_time','produce_rate','contents'):
+        for FIELD in ('xy','stack','orders','patrol','equipment','produce_start_time','produce_rate','contents'):
             if FIELD in obj: props[FIELD] = obj[FIELD]
 
         if spec['kind'] == 'mobile':
@@ -284,14 +284,16 @@ def transform_deployment_buffer(m, buf):
         newbuf = buf
     return newbuf
 
-def auto_level_hive_objects(objlist, owner_level, owner_tech, xform):
+def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0,0]):
     ret = []
     powerplants = []
     for src in objlist:
         spec_name = src['spec']
         spec = gamedata['units'][spec_name] if spec_name in gamedata['units'] else gamedata['buildings'][spec_name]
 
-        dst = {'obj_id': nosql_id_generator.generate(), 'xy':transform(xform, src['xy']), 'spec':spec['name']}
+        dst = {'obj_id': nosql_id_generator.generate(), 'spec':spec['name']}
+        if 'xy' in src: dst['xy'] = transform(xform, src['xy'])
+        if 'stack' in src: dst['stack'] = src['stack'] # for raids only
         if 'orders' in src:
             dst['orders'] = []
             for order in src['orders']:
@@ -1209,6 +1211,221 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
 
     return success
 
+def spawn_all_raids(db, lock_manager, region_id, dry_run = True):
+    region_data = gamedata['regions'][region_id]
+    if (not region_data.get('spawn_raids',True)): return
+
+    raids = SpinConfig.load(SpinConfig.gamedata_component_filename("raids_compiled.json"))
+
+    global_qty_scale = 1.0
+    if 'region_pop' in raids:
+        global_qty_scale *= raids['region_pop'].get(region_id,1.0)
+    if global_qty_scale <= 0: return
+
+    player_pop = None # player population, used for scaling the spawn
+    player_pop_factor = None # fullness of player population relative to pop_soft_cap, used for scaling the spawn
+
+    map_cache = get_existing_map_by_type(db, region_id, 'raid')
+    name_idx = 0
+
+    spawn_list = raids.get('spawn_for_'+region_id, raids['spawn'])
+    num_spawned_by_type = {}
+
+    for spawn_data in spawn_list:
+        if not spawn_data.get('active',1): continue
+        template = raids['templates'][spawn_data['template']]
+
+        if 'num_by_region' in spawn_data and region_id in spawn_data['num_by_region']:
+            base_qty = spawn_data['num_by_region'][region_id]
+        else:
+            base_qty = spawn_data['num']
+        if base_qty <= 0: continue
+
+        # get list of start,end spawn times
+        if 'spawn_times' in spawn_data:
+            spawn_times = spawn_data['spawn_times']
+        else:
+            spawn_times = [[spawn_data.get('start_time',-1), spawn_data.get('end_time',-1)]]
+
+        repeat_interval = spawn_data.get('repeat_interval',None)
+
+        do_spawn = False
+        ref_time = event_time_override or time_now
+        for start_time, end_time in spawn_times:
+            # restrict time range by any start/end times provided within the template itself
+            if template.get('start_time',-1) > 0:
+                start_time = max(start_time, template['start_time']) if (start_time > 0) else template['start_time']
+            if template.get('end_time',-1) > 0:
+                end_time = min(end_time, template['end_time']) if (end_time > 0) else template['end_time'] # this defaults to [[start_time,end_time]] or [[-1,-1]] if none is specified
+
+            if ((start_time > 0) and (ref_time < start_time)): continue # in the future
+            if repeat_interval:
+                delta = (ref_time - start_time) % repeat_interval
+                if ((end_time > 0) and (delta >= (end_time - start_time))): continue # outside a run
+            else:
+                if ((end_time > 0) and (ref_time >= end_time)): continue # in the past
+
+            do_spawn = True # found a valid spawn time
+            break
+
+        if not do_spawn:
+            #if verbose: print 'not spawning raid template', spawn_data['template'], 'because current time is outside its start/end_time range(s)'
+            continue
+
+        local_qty_scale = 1
+
+        if 'raid_num_scale_by_player_pop' in region_data:
+            if player_pop is None: # cache this
+                player_pop = nosql_client.count_map_features_by_type(region_id, 'home')
+                player_pop_factor = min(max(float(player_pop) / region_data['pop_soft_cap'], 0), 1)
+                if 'min_player_pop_factor' in region_data:
+                    player_pop_factor = max(player_pop_factor, region_data['min_player_pop_factor'])
+                if verbose: print 'player_pop_factor', player_pop_factor
+
+            # move local_qty_scale proportionally toward local_qty_scale * player_pop_factor
+            local_qty_scale *= (1.0 + region_data['raid_num_scale_by_player_pop'] * (player_pop_factor - 1.0))
+
+        if local_qty_scale <= 0:
+            if verbose: print 'not spawning raid template', spawn_data['template'], 'because local_qty_scale is', local_qty_scale
+            continue
+
+        # spawn at least one as long as base_qty is above zero
+        qty = max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale))
+
+        for i in xrange(qty):
+            if spawn_raid(raids, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
+                          start_time = start_time, end_time = end_time, repeat_interval = repeat_interval,
+                          duration = spawn_data['duration'] * (1.0 - spawn_data.get('randomize_duration',0) * random.random()),
+                          region_player_pop = player_pop if region_data.get('raid_num_scale_by_player_pop',False) else None,
+                          dry_run = dry_run):
+                num_spawned_by_type[spawn_data['template']] = num_spawned_by_type.get(spawn_data['template'],0) + 1
+                do_throttle()
+            name_idx += 1
+
+    num_total = sum(num_spawned_by_type.itervalues(),0)
+    if num_total > 0:
+        print 'TOTAL SPAWNED %d:' % num_total
+        for k in sorted(num_spawned_by_type.keys()):
+            print k, num_spawned_by_type[k]
+
+def spawn_raid(raids, map_cache, db, lock_manager, region_id, id_num, name_idx, template_name, template,
+               start_time = -1, end_time = -1, repeat_interval = None, duration = None, region_player_pop = None,
+               dry_run = True):
+
+    owner_id = template['owner_id']
+    base_id = 'r%d' % (id_num)
+
+    feature = map_cache.get(base_id, None)
+
+    if feature:
+        if verbose: print 'SKIPPING (EXISTING)', pretty_feature(feature)
+        return
+
+    alphabet = gamedata['strings']['icao_alphabet']
+    if 'ui_name' in template:
+        ui_name = template['ui_name']
+    else:
+        ui_name = '%s-%04d' % (alphabet[name_idx%len(alphabet)], id_num)
+
+    # clamp duration to end time
+    ref_time = (event_time_override or time_now)
+    if (end_time > 0):
+        if repeat_interval:
+            delta = (ref_time - start_time) % repeat_interval
+            run_end_time = ref_time + (end_time - start_time - delta)
+        else:
+            run_end_time = end_time
+        if (ref_time + duration >= run_end_time):
+            duration = min(duration, run_end_time - ref_time)
+
+    assign_climate = template.get('base_climate', None)
+
+    base_data = {
+        'base_id': base_id,
+        'base_landlord_id': owner_id,
+        'base_creator_id': owner_id,
+        'base_map_loc': None,
+        'base_type': 'raid',
+        'base_ui_name': ui_name,
+        'base_creation_time': time_now,
+        'base_expire_time': time_now + duration,
+        'base_icon': 'raid',
+        'base_climate': assign_climate,
+        'base_template': template_name
+        }
+    if 'base_richness' in template: raise Exception('base_richness should not be used for raids')
+    if 'base_resource_loot' in template: base_data['base_resource_loot'] = template['base_resource_loot']
+
+    # make copy of the set of properties that go into map_cache
+    feature = base_data.copy()
+
+    # now add the detailed properties that go only to basedb
+    base_data['base_region'] = region_id
+    base_data['base_generation'] = 0
+
+    nosql_id_generator.set_time(int(time.time()))
+
+    base_data['my_base'] = auto_level_hive_objects(template.get('buildings',[]) + template.get('units',[]), 1, {})
+    #if template.get('randomize_defenses',False):
+    #    AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
+
+    print 'SPAWNING raid', template_name, pretty_feature(feature)
+
+    success = False
+
+    # place on map with rejection sampling
+    region_data = gamedata['regions'][region_id]
+    map_dims = region_data['dimensions']
+    mid = (int(map_dims[0]/2), int(map_dims[1]/2))
+    minrange = 0
+    maxrange = map_dims[0]/2 - gamedata['territory']['border_zone_ai']
+
+    # when entering a low-population region, prefer placing hives close to the center of the map
+    # note: use the same formula used for placing player bases geographically, which scales differently than the spawn number scaling
+    if region_player_pop is not None:
+        cap = region_data.get('pop_hard_cap',-1)
+        if cap > 0:
+            # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
+            fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+            if fullness < 1:
+                # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
+                maxrange = max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * maxrange))
+
+    for x in xrange(20):
+        side = [1 if (random.random() > 0.5) else -1,
+                1 if (random.random() > 0.5) else -1]
+
+        feature['base_map_loc'] = (min(max(mid[0] + side[0]*int(minrange + (maxrange-minrange)*random.random()), 2), map_dims[0]-2),
+                                   min(max(mid[1] + side[1]*int(minrange + (maxrange-minrange)*random.random()), 2), map_dims[1]-2))
+        if not assign_climate:
+            feature['base_climate'] = Region(gamedata, region_id).read_climate_name(feature['base_map_loc'])
+
+        if Region(gamedata, region_id).obstructs_bases(feature['base_map_loc']):
+            feature['base_map_loc'] = None
+            feature['base_climate'] = assign_climate
+            continue
+
+        if dry_run: break
+        if nosql_client.create_map_feature(region_id, base_id, feature, originator = LockManager.SETUP_LOCK_OWNER, exclusive = 1):
+            lock_manager.create(region_id, base_id)
+            break
+        feature['base_map_loc'] = None
+        feature['base_climate'] = assign_climate
+
+    if feature['base_map_loc']:
+        base_data['base_map_loc'] = feature['base_map_loc']
+        base_data['base_climate'] = feature['base_climate']
+
+        if not dry_run:
+            nosql_client.drop_all_objects_by_base(region_id, base_id) # clear out any objects hanging around from expired older base
+            nosql_write_all_objects(region_id, base_id, owner_id, base_data['my_base'])
+
+        lock_manager.release(region_id, base_id)
+        success = True
+    else:
+        print 'COULD NOT FIND OPEN MAP LOCATION!'
+
+    return success
 
 def remove_player_from_map(db, lock_manager, region_id, user_id, feature = None, dry_run = True):
     base_id = 'h'+str(user_id)
@@ -1422,17 +1639,17 @@ if __name__ == '__main__':
                                                        'score-week=', 'event-time-override=', 'quiet',
                                                        'force-rotation', 'skip-quarry-owners', 'yes-i-am-sure'])
     if len(args) < 3:
-        print 'usage: maptool.py REGION_ID home|hives|quarries ACTION [options]'
+        print 'usage: maptool.py REGION_ID home|hives|quarries|raids ACTION [options]'
         print 'Actions:'
-        print '    info          Print info about existing hives or quarries'
+        print '    info          Print info about existing map features'
         print '    maint         Perform all hourly maintenance (weeding, expiring, spawning)'
-        print '    spawn         Spawn hives or quarries as indicated by gamedata JSON, leaving existing unexpired bases alone'
+        print '    spawn         Spawn hives, quarries, or raids as indicated by gamedata JSON, leaving existing unexpired bases alone'
         print '    extend        Extend lifetimes of all existing quarries to last at least quarries["override_duration"] seconds'
         print '    weed          Remove "weeds" (churned players) from the map, abandoning and refunding quarries they own'
         print '    abandon       Have the owner abandon this quarry, refunding units as appropriate'
         print '    expire        Force all quarries to expire immediately, and send units back to owners'
         print '    pluck         Remove a player from the regional map, abandoning and refunding all owned quarries'
-        print '    clear         Delete all hives or quarries (DANGEROUS! - requires --yes-i-am-sure flag)'
+        print '    clear         Delete all map features of this type (DANGEROUS! - requires --yes-i-am-sure flag)'
         print '    leaderboard   Print Quarry Resources leaderboard, requires --score-week'
         print 'Options:'
         print '    --dry-run              Print what changes would be made, but do not make them'
@@ -1451,6 +1668,7 @@ if __name__ == '__main__':
     region_id = args[0]
     base_type = {'hives':'hive','hive':'hive',
                  'quarries':'quarry','quarry':'quarry',
+                 'raids':'raid','raid':'raid',
                  'home': 'home', 'squad': 'squad', 'ALL': 'ALL'}[args[1]]
     action = args[2]
     dry_run = False
@@ -1541,8 +1759,8 @@ if __name__ == '__main__':
                 nosql_client.do_region_maint(region_id)
 
                 # 2. weed expired bases
-                print "%s: weeding expired hives/quarries..." % region_id
-                weed_expired_bases(db, lock_manager, region_id, ['hive','quarry'], dry_run=dry_run)
+                print "%s: weeding expired hives/quarries/raids..." % region_id
+                weed_expired_bases(db, lock_manager, region_id, ['hive','quarry','raid'], dry_run=dry_run)
 
                 # 3. weed churned players
                 print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
@@ -1566,6 +1784,9 @@ if __name__ == '__main__':
                 spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
                 print "%s: spawning quarries..." % region_id
                 spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
+                if gamedata['regions'][region_id].get('spawn_raids', True) and len(gamedata['raids_client']['templates']) > 0:
+                    print "%s: spawning raids..." % region_id
+                    spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
 
         elif action == 'prune-stale-locks':
             nosql_client.do_region_maint(region_id)
@@ -1600,6 +1821,11 @@ if __name__ == '__main__':
                 expire_all_hives(db, lock_manager, region_id, dry_run=dry_run)
             elif action == 'weed':
                 weed_expired_bases(db, lock_manager, region_id, ['hive'], dry_run=dry_run)
+            else:
+                print 'unknown action '+action
+        elif base_type == 'raid':
+            if action == 'spawn':
+                spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
             else:
                 print 'unknown action '+action
         elif base_type == 'quarry':
