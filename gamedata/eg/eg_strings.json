@@ -301,6 +301,7 @@
         "finish_tech_upgrade": "Finish upgrading %s",
         "finish_manufacturing": "Finish training",
         "finish_crafting": "Finish %s activity",
+        "finish_squad_movement": "Finish battalion %s travel",
 
         "before_building": "before starting a new build",
         "before_manufacturing": "before training units",

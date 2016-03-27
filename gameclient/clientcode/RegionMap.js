@@ -1018,6 +1018,12 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         player.squad_halt(_squad_data['id']);
                     }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'halt_pending')) ? 'disabled' : 'normal')]);
 
+                    if(player.squad_speedups_enabled()) {
+                        buttons.push([gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY']['ui_name'], (function(_squad_id) { return function() {
+                            RegionMap.invoke_squad_speedup_dialog(_squad_id);
+                        }; })(squad_id), 'normal']);
+                    }
+
                 } else {
                     if(player.squad_combat_enabled()) {
                         buttons.push([gamedata['strings']['regional_map']['instant_visit_own_squad'],
@@ -2812,4 +2818,73 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
         SPUI.ctx.fillRect(this.xy[0]+offset[0], this.xy[1]+offset[1], this.wh[0], this.wh[1]);
     }
     SPUI.ctx.restore();
+};
+
+/** @param {number} squad_id */
+RegionMap.invoke_squad_speedup_dialog = function(squad_id) {
+    var squad_data = player.squads[squad_id.toString()];
+    if(!squad_data) {
+        return null;
+    }
+
+    var dialog_data = gamedata['dialogs']['speedup_dialog'];
+    var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = 'speedup_dialog';
+    dialog.user_data['squad_id'] = squad_id;
+    dialog.modal = true;
+    install_child_dialog(dialog);
+    dialog.auto_center();
+
+    dialog.widgets['title_speedup'].show = true;
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    dialog.widgets['ok_button'].onclick =
+        dialog.widgets['price_display'].onclick = function(w) {
+            var dialog = w.parent;
+            var squad_id = dialog.user_data['squad_id'];
+            // update price since time may have passed
+            var new_price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY'], squad_id);
+            if(new_price < 0) {
+                // order became invalid, maybe the squad got to its destination already
+                close_parent_dialog(w);
+            } else {
+                if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY", squad_id,
+                                                   (function (_w) { return function() { close_parent_dialog(_w); }; })(w)
+                                                  )) {
+                    invoke_ui_locker(synchronizer.request_sync());
+                    dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_pending'];
+                    dialog.widgets['ok_button'].state = 'disabled'; dialog.widgets['price_display'].onclick = null;
+                }
+            }
+        };
+    dialog.ondraw = RegionMap.update_squad_speedup_dialog;
+    dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
+    dialog.widgets['price_display'].state = Store.get_user_currency();
+    return dialog;
+};
+
+/** @param {!SPUI.Dialog} dialog */
+RegionMap.update_squad_speedup_dialog = function(dialog) {
+    var squad_id = dialog.user_data['squad_id'];
+    if(!player.squad_is_deployed(squad_id) || !player.squad_is_moving(squad_id)) {
+        close_dialog(dialog);
+        return;
+    }
+    var squad_data = player.squads[squad_id.toString()];
+
+    var path = squad_data['map_path'];
+    var time_left = path[path.length-1]['eta'] - server_time;
+    if(time_left < 0) {
+        close_dialog(dialog);
+        return;
+    }
+    time_left = Math.max(time_left, 1);
+
+    var description_finish = gamedata['strings']['speedup']['finish_squad_movement'].replace('%s', squad_data['ui_name']);
+    var description_before = gamedata['strings']['speedup']['before_generic'];
+    var description = gamedata['strings']['speedup']['template'].replace('%TIME',pretty_print_time(time_left)).replace('%FINISH', description_finish).replace('%BEFORE', description_before);
+    dialog.widgets['description'].set_text_with_linebreaking(description);
+
+    var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY'], squad_id);
+    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
 };

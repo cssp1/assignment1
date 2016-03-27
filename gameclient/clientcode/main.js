@@ -6302,6 +6302,8 @@ player.auto_resolve_enabled = function() { return player.get_territory_setting('
 /** @return {boolean} */
 player.squad_combat_enabled = function() { return player.get_territory_setting('enable_squad_combat'); };
 /** @return {boolean} */
+player.squad_speedups_enabled = function() { return player.get_territory_setting('enable_squad_speedups'); };
+/** @return {boolean} */
 player.map_home_combat_enabled = function() { return player.get_territory_setting('enable_map_home_combat'); };
 /** @return {boolean} */
 player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
@@ -42067,6 +42069,16 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         var time_to_finish = Math.max(aura['end_time'] - server_time, 0)
         var price = Store.get_speedup_price(player, 'player_aura', time_to_finish, p_currency);
+        return [price, p_currency];
+    } else if(formula === 'squad_movement_speedup_gamebucks') {
+        var squad_id = spellarg;
+        p_currency = 'gamebucks';
+        if(!player.squad_is_deployed(squad_id) || !player.squad_is_moving(squad_id)) {
+            return [-1, p_currency];
+        }
+        var squad_data = player.squads[squad_id.toString()];
+        var time_to_finish = Math.max(squad_data['map_path'][squad_data['map_path'].length-1]['eta'] - server_time, 1);
+        var price = Store.get_speedup_price(player, 'squad_movement', time_to_finish, p_currency);
         return [price, p_currency];
     } else if(formula === 'unit_repair_speedup' || formula === 'unit_repair_speedup_gamebucks') {
         if(!player.unit_speedups_enabled()) {

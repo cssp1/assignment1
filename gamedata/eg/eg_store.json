@@ -6,7 +6,13 @@
     // how many seconds of speedup are granted for free
     "free_speedup_time": 0,
 
-    "speedup_minutes_per_credit": 30, // how many speedup minutes you get per Facebook credit
+    // how many speedup minutes you get per Facebook credit
+    // note: varies by activity type
+    "speedup_minutes_per_credit": {
+        // 0.75min per gamebuck
+        "squad_movement": 7.5,
+        "default": 30
+    },
     "uncap_building_repair": 1, // do not cap price of "Repair All" on buildings
     "building_repair_sum_times": 1, // use "Repair All" building price formula
     "count_free_speedup_time": 1, // do not subtract free speedup time in speedup price calc (but still allow free speedups within that time)

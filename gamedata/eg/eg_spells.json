@@ -198,6 +198,14 @@
         "price_formula": "unit_repair_speedup_gamebucks",
         "ui_description": "Speed up unit repair."
     },
+    // same for squad movement speedup
+    "SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY": {
+        "ui_name": "Speed Up",
+        "activation": "instant",
+        "paid": 1,
+        "price_formula": "squad_movement_speedup_gamebucks",
+        "ui_description": "Speed up battalion travel."
+    },
     "BUY_RESOURCES": {
         "ui_name": "Full Resources",
         "activation": "instant",
