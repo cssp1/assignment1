@@ -498,3 +498,15 @@ diff -ruN google-clean/closure/goog/useragent/useragent.js google/closure/goog/u
   * @see <a href="http://www.useragentstring.com/">User agent strings</a>
   * For information on the browser brand (such as Safari versus Chrome), see
   * goog.userAgent.product.
+diff -ruN google-clean/closure/goog/uri/uri.js google/closure/goog/uri/uri.js
+index c3b0cec..83d77fa 100644
+--- google-clean/closure/goog/uri/uri.js	2016-02-11 14:24:14.000000000 -0600
++++ google/closure/goog/uri/uri.js	2016-02-11 14:25:37.000000000 -0600
+@@ -14,6 +14,7 @@
+ 
+ /**
+  * @fileoverview Class for parsing and formatting URIs.
++ * @suppress {reportUnknownTypes} DJM/SpinPunch
+  *
+  * Use goog.Uri(string) to parse a URI string.  Use goog.Uri.create(...) to
+  * create a new instance of the goog.Uri object from Uri parts.

@@ -13,6 +13,7 @@ goog.require('goog.array');
 goog.require('goog.net.XhrIo');
 goog.require('goog.net.ErrorCode');
 goog.require('goog.crypt.base64');
+goog.require('goog.Uri');
 goog.require('Iuppiter');
 goog.require('lz4');
 goog.require('SPGzip');
@@ -14357,10 +14358,17 @@ AOEUICursor.prototype.draw = function(offset) {
 function reload_game() {
     // running outside the frame
     // XXX this may have problems if spin_page_url points to the Facebook root and there is no valid signed request
-    if(location.href == spin_page_url) {
+
+    // remove any "deep link" parameters, since players usually do not want this
+    var new_url = (new goog.Uri(spin_page_url))
+        .removeParameter('replay')
+        .removeParameter('player_info_statistics')
+        .toString();
+
+    if(location.href == new_url) {
         location.reload(true);
     } else {
-        location.href = spin_page_url;
+        location.href = new_url;
     }
 }
 
@@ -45952,6 +45960,9 @@ function handle_server_message(data) {
 
 SPINPUNCHGAME.client_death_sent = null;
 
+/** @param {string} event_name
+    @param {!Object} props
+    @param {!Object} options */
 function invoke_timeout_message(event_name, props, options) {
     var code = (event_name ? event_name.slice(0,4) : null);
 
@@ -45995,25 +46006,16 @@ function invoke_timeout_message(event_name, props, options) {
     }
 
     // force a browser window refresh on click
-    var do_reload = reload_game;
-    // old code:
-//    if((options['uncached_reload'] &&
-//        location.href == spin_page_url) {
-//      do_reload = function() { location.reload(true); };
-//    } else {
-//      do_reload = function() { location.href = spin_page_url; };
-//    }
-
     dialog.widgets['close_button'].onclick =
-        dialog.widgets['ok_button'].onclick = (function (_do_reload) { return function(w) {
+        dialog.widgets['ok_button'].onclick = (function (_options) { return function(w) {
             var dialog = w.parent;
             dialog.widgets['ok_button'].state = 'disabled';
             dialog.widgets['ok_button'].str = s['ui_button_pending'];
             dialog.widgets['close_button'].onclick =
                 dialog.widgets['ok_button'].onclick = null;
             // put a timeout on the reload so that players can't spam it as easily
-            window.setTimeout(_do_reload, (options['reload_delay'] || 2.0) * 1000);
-        }; })(do_reload);
+            window.setTimeout(reload_game, (_options['reload_delay'] || 2.0) * 1000);
+        }; })(options);
 
     // deactivate simulation and do not send any more pings
     client_state = client_states.TIMED_OUT;

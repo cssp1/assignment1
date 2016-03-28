@@ -14,6 +14,7 @@
 
 /**
  * @fileoverview Class for parsing and formatting URIs.
+ * @suppress {reportUnknownTypes} DJM/SpinPunch
  *
  * Use goog.Uri(string) to parse a URI string.  Use goog.Uri.create(...) to
  * create a new instance of the goog.Uri object from Uri parts.
