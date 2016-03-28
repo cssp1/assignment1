@@ -389,20 +389,28 @@ InvokeMailDialogConsequent.prototype.execute = function(state) {
 function InvokeStoreConsequent(data) {
     goog.base(this, data);
     this.category = data['category'] || null;
+    this.notification_params = data['notification_params'] || null;
 }
 goog.inherits(InvokeStoreConsequent, Consequent);
 InvokeStoreConsequent.prototype.execute = function(state) {
-    change_selection_ui(null);
-    if(this.category) {
-        for(var i = 0; i < gamedata['store']['catalog'].length; i++) {
-            var cat = gamedata['store']['catalog'][i];
-            if(cat['name'] === this.category) {
-                invoke_new_store_category(cat);
-                return;
+    var cb = (function(_this) { return function() {
+        if(_this.category) {
+            for(var i = 0; i < gamedata['store']['catalog'].length; i++) {
+                var cat = gamedata['store']['catalog'][i];
+                if(cat['name'] === _this.category) {
+                    invoke_new_store_category(cat);
+                    return;
+                }
             }
         }
+        invoke_new_store_dialog();
+    }; })(this);
+    if(this.notification_params) {
+        notification_queue.push(cb, this.notification_params);
+    } else {
+        change_selection_ui(null);
+        cb();
     }
-    invoke_new_store_dialog();
 };
 
 /** @constructor @struct
