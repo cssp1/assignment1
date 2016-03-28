@@ -365,7 +365,7 @@ def classify_purchase(gamedata, descr):
         else:
             spellarg = SpinJSON.loads(spellarg_str)
         skudata = spellarg['skudata']
-        if 'expedition' in skudata['item']:
+        if 'item' in skudata and ('expedition' in skudata['item']):
             catname = 'random_items'
         else:
             catname = PURCHASE_CATEGORY_MAP.get(cat, None) # 'specific_items'

@@ -3031,6 +3031,9 @@ def check_store_sku(sku_name, sku):
         if 'spell' in sku and sku['spell'] not in gamedata['spells']:
             error |= 1; print 'store sku %s refers to invalid spell "%s"' % (sku_name, sku['spell'])
 
+        if 'loot_table' in sku and sku['loot_table'] not in gamedata['loot_tables']:
+            error |= 1; print 'store sku %s refers to invalid loot table "%s"' % (sku_name, sku['spell'], sku['loot_table'])
+
         if 'on_purchase' in sku: error |= check_consequent(sku['on_purchase'], reason='sku:'+sku_name+':on_purchase')
         if ('price_currency' in sku):
             if sku['price_currency'].startswith('item:'):

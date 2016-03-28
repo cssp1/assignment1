@@ -37331,11 +37331,15 @@ function collapse_item_list(ls) {
     return ret
 };
 
+/** @param {!SPUI.Dialog} dialog
+    @param {!Object} spell
+    @param {?} spellarg
+    @param {boolean} enable_attachment_pulsing */
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing) {
     if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
     var item_list = [];
 
-    // special case for bonus gamebucks
+    // special case for bonus gamebucks - add a virtual "gamebucks" item
     if('nominal_quantity' in spell && spell['nominal_quantity'] < spell['quantity']) {
         var bonus_pct = 100.0*(spell['quantity']-spell['nominal_quantity'])/spell['nominal_quantity'];
         var bonus_pct_str = Math.max(Math.floor(bonus_pct), 1).toFixed(0);
@@ -37344,7 +37348,13 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_a
                        });
     }
     item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
+    update_buy_gamebucks_or_store_sku_attachments(dialog, item_list, enable_attachment_pulsing);
+};
 
+/** @param {!SPUI.Dialog} dialog
+    @param {!Array<!Object>} item_list
+    @param {boolean} enable_attachment_pulsing */
+function update_buy_gamebucks_or_store_sku_attachments(dialog, item_list, enable_attachment_pulsing) {
     if(!('attachment_phases' in dialog.user_data) || dialog.user_data['attachment_phases'].length < item_list.length) {
         dialog.user_data['attachment_phases'] = Array(item_list.length);
         for(var i = 0; i < item_list.length; i++) {
@@ -37965,6 +37975,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
 
         d.user_data['skudata'] = skudata;
         d.user_data['ui_index'] = i;
+        d.user_data['context_parent'] = dialog;
 
         d.user_data['catpath'] = [];
         if(parent_catdata) {
@@ -38025,6 +38036,12 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
             d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(('ui_name' in skudata ? skudata['ui_name'] : fallback_name));
             ItemDisplay.set_inventory_item_asset(d.widgets['icon'], spec);
             ItemDisplay.set_inventory_item_stack(d.widgets['icon_stack'], spec, tip_item);
+        } else if('loot_table' in skudata) {
+            // loot table - override the single item icon
+            d.widgets['name'].set_text_with_linebreaking_and_shrink_font_to_fit(skudata['ui_name'] || '?');
+            goog.array.forEach(['slot0,0','icon_bg','icon_glow','icon','icon_stack','icon_frame'], function(wname) {
+                d.widgets[wname].show = false;
+            });
         } else if('name' in skudata) {
             // hierarchical child category
 
@@ -38269,7 +38286,14 @@ function update_new_store_sku(d) {
     var info_str = null, info_col = 'ok', info_small = false, info_high = false;
     var helper = null, child_catdata = null;
 
+    // initialize cooldown to hidden
     d.widgets['cooldown_label'].show = d.widgets['cooldown_time'].show = false;
+
+    // reposition cooldown to avoid overlap with loot table attachment list
+    d.widgets['cooldown_label'].xy = d.widgets['cooldown_label'].data['loot_table' in skudata ? 'xy_with_attachments' : 'xy'];
+    d.widgets['cooldown_time'].xy = d.widgets['cooldown_time'].data['loot_table' in skudata ? 'xy_with_attachments' : 'xy'];
+    d.widgets['cooldown_time'].wh = d.widgets['cooldown_time'].data['loot_table' in skudata ? 'dimensions_with_attachments' : 'dimensions'];
+    d.widgets['cooldown_time'].text_hjustify = d.widgets['cooldown_time'].data['loot_table' in skudata ? 'text_hjustify_with_attachments' : 'text_hjustify'];
 
     var count = 0;
     if(player.get_any_abtest_value('enable_store_jewel', gamedata['store']['enable_store_jewel'])) {
@@ -38382,10 +38406,9 @@ function update_new_store_sku(d) {
             d.widgets['cooldown_time'].text_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
         }
 
-    } else if('item' in skudata) {
+    } else if('item' in skudata || 'loot_table' in skudata) {
         var pred = (('requires' in skudata) ? read_predicate(skudata['requires']) : null);
-        var spec = gamedata['items'][skudata['item']];
-        var stack = ('stack' in skudata ? skudata['stack'] : 1);
+        var stack = ('item' in skudata && 'stack' in skudata ? skudata['stack'] : 1);
         var arg = {'catpath': d.user_data['catpath'], 'ui_index': d.user_data['ui_index'], 'skudata':skudata};
         if('price_currency' in skudata) { sale_currency = skudata['price_currency']; }
 
@@ -38420,16 +38443,19 @@ function update_new_store_sku(d) {
             var subtitle = null;
             if('ui_subtitle' in skudata) {
                 subtitle = skudata['ui_subtitle'];
-            } else {
-                subtitle = ItemDisplay.get_inventory_item_ui_subtitle(spec);
+            } else if('item' in skudata) {
+                subtitle = ItemDisplay.get_inventory_item_ui_subtitle(ItemDisplay.get_inventory_item_spec(skudata['item']))
             }
             if(subtitle) { ls.push([subtitle,'ok']); }
 
             // blink with item set membership
-            if(spec['item_set']) {
-                var set_spec = gamedata['item_sets'][spec['item_set']];
-                var s = d.data['widgets']['info']['ui_name_item_set'].replace('%s', set_spec['ui_name']).replace('%n', (1+set_spec['members'].indexOf(spec['name'])).toString()).replace('%total', set_spec['members'].length.toString());
-                ls.push([s,'item_set']);
+            if('item' in skudata) {
+                var spec = ItemDisplay.get_inventory_item_spec(skudata['item']);
+                if(spec['item_set']) {
+                    var set_spec = gamedata['item_sets'][spec['item_set']];
+                    var s = d.data['widgets']['info']['ui_name_item_set'].replace('%s', set_spec['ui_name']).replace('%n', (1+set_spec['members'].indexOf(spec['name'])).toString()).replace('%total', set_spec['members'].length.toString());
+                    ls.push([s,'item_set']);
+                }
             }
 
             if(ls.length > 0) {
@@ -38473,6 +38499,19 @@ function update_new_store_sku(d) {
                 }
                 catlist = cat['skus'] || [];
             }
+        }
+
+        // show loot table contents and expiration time
+        if('loot_table' in skudata) {
+            var item_result = session.get_loot_items(player, gamedata['loot_tables_client'][skudata['loot_table']]['loot']);
+            if(item_result.predicate) {
+                var etime = read_predicate(item_result.predicate).ui_expire_time(player);
+                if(etime > 0) {
+                    expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
+                }
+            }
+            var collapsed_item_list = collapse_item_list(item_result.item_list);
+            update_buy_gamebucks_or_store_sku_attachments(d, collapsed_item_list, true);
         }
 
         if(expire_time > 0) {
@@ -41820,8 +41859,12 @@ function can_cast_spell(unit_id, spellname, spellarg) {
     return ret[0];
 }
 
-function sku_match(skudata, player, specname, level, stack, melt_time, melt_duration, tm, ignore_error) {
-    if(!('item' in skudata) || skudata['item'] !== specname || ((skudata['level']||1) !== level)) { return false; }
+function sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_duration, tm, ignore_error) {
+    if(specname) {
+        if(!('item' in skudata) || skudata['item'] !== specname || ((skudata['level']||1) !== level)) { return false; }
+    } else if(tablename) {
+        if(!('loot_table' in skudata) || skudata['loot_table'] !== tablename) { return false; }
+    }
     if(!('price' in skudata)) { return false; }
     if(melt_time > 0 && tm >= melt_time) { return false; }
     if(('start_time' in skudata) && (tm < skudata['start_time'])) { return false; }
@@ -41840,8 +41883,9 @@ function sku_match(skudata, player, specname, level, stack, melt_time, melt_dura
 // look through the store catalog for the SKU representing this BUY_ITEM spellarg
 Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
     var catpath = spellarg['catpath'];
-    var specname = spellarg['skudata']['item'];
-    if(!catpath || !specname) { return null; }
+    var specname = spellarg['skudata']['item'] || null;
+    var tablename = spellarg['skudata']['loot_table'] || null;
+    if(!catpath || (!specname && !tablename)) { return null; }
     var stack = ('stack' in spellarg['skudata'] ? spellarg['skudata']['stack'] : 1);
     var level = ('level' in spellarg['skudata'] ? spellarg['skudata']['level'] : 1);
     var melt_time = ('melt_time' in spellarg['skudata'] ? spellarg['skudata']['melt_time'] : -1);
@@ -41865,7 +41909,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
 
     var ret = null, pr = -1;
     goog.array.forEach(cat['skus'], function(skudata) {
-        if(sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm, ignore_error)) {
+        if(sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm, ignore_error)) {
             if(pr < 0 || skudata['price'] < pr) {
                 // use lowest price, in case there are multiple matches
                 ret = skudata;
@@ -41884,7 +41928,7 @@ Store.buy_item_find_skudata = function(spellarg, player, ignore_error) {
                     var extras = data['extra_store_specials'];
                     for(var i = 0; i < extras.length; i++) {
                         var skudata = extras[i];
-                        if(sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm, ignore_error)) {
+                        if(sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm, ignore_error)) {
                             if(pr < 0 || skudata['price'] < pr) {
                                 // use lowest price, in case there are multiple matches
                                 ret = skudata;
@@ -41948,13 +41992,14 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         var skudata = Store.buy_item_find_skudata(spellarg, player, ignore_error);
         if(!skudata || !('price' in skudata)) { return [-1, p_currency]; }
 
-        var stack = ('stack' in skudata ? skudata['stack'] : 1);
-        var spec = gamedata['items'][skudata['item']];
-        if(!spec) {
-            return [-1, p_currency];
-        }
-        if(('store_requires' in spec) && !ignore_error && !read_predicate(spec['store_requires']).is_satisfied(player, null)) {
-            return [-1, p_currency];
+        if('item' in skudata) {
+            var spec = gamedata['items'][skudata['item']];
+            if(!spec) {
+                return [-1, p_currency];
+            }
+            if(('store_requires' in spec) && !ignore_error && !read_predicate(spec['store_requires']).is_satisfied(player, null)) {
+                return [-1, p_currency];
+            }
         }
         if('price_currency' in skudata) { p_currency = skudata['price_currency']; }
         return [skudata['price'], p_currency];

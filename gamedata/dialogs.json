@@ -4991,6 +4991,10 @@
 
             "icon_frame": {"kind": "StaticImage", "xy":[83,124], "xy_centered": [83,131], "dimensions":[50,50], "asset": "inventory_frame" },
 
+            // for showing loot tables with multiple items
+            "attachments": {"show": 0, "kind": "Dialog", "dialog": "buy_gamebucks_sku2_attachment", "xy": [10,72], "dimensions": [191,31], "array": [1,6], "array_offset": [0,29] },
+            "dividers": {"show": 0, "kind": "Line", "xy": [10,101], "dimensions": [191,0], "color":  [0.33,0.33,0.33,0.5], "stroke_width": 1,
+                         "array": [1,6], "array_offset": [0,29]},
 
             "folder_icon": {"show": 0, "kind": "StaticImage", "xy":[105,146], "dimensions":[50,50], "asset": "inventory_folder" },
 
@@ -5038,14 +5042,20 @@
                       "ui_name_unmet": "Requires: %s"
                     },
 
-            "cooldown_label": { "show": 0, "kind": "TextField", "xy": [23,212], "dimensions": [163, 18], "text_size": 13, "text_style": "bold",
+            "cooldown_label": { "show": 0, "kind": "TextField",
+                                "xy": [23,212], "xy_with_attachments": [20,43],
+                                "dimensions": [163, 18], "text_size": 13, "text_style": "bold",
                                 "text_hjustify": "left", "text_vjustify": "center", "ui_name_cd": "Cooldown",
                                 "ui_name_rebuy": "Re-buy in",
                                 "ui_name_available": "Available in",
                                 "ui_name_availability_ends": "Availability ends in",
                                 "ui_name_expires": "Offer ends in" },
-            "cooldown_time": { "show": 0, "kind": "TextField", "xy": [23,227], "dimensions": [163, 18], "text_size": 13, "text_style": "bold",
-                               "text_hjustify": "left", "text_vjustify": "center",
+            "cooldown_time": { "show": 0, "kind": "TextField",
+                               "xy": [23,227], "xy_with_attachments": [110,43],
+                               "dimensions": [163, 18], "dimensions_with_attachments": [84,18],
+                               "text_size": 13, "text_style": "bold",
+                               "text_hjustify": "left", "text_hjustify_with_attachments": "right",
+                               "text_vjustify": "center",
                                "text_color_cd": [0.5,0.5,0.5,1], "text_color_rebuy": [1,0.7,0,1], "text_color_expires": [1,0.7,0,1]
                              },
 

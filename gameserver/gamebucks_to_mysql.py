@@ -219,7 +219,10 @@ if __name__ == '__main__':
                     else:
                         spellarg = SpinJSON.loads(spellarg_str)
                     skudata = spellarg['skudata']
-                    keyvals.append(('item', skudata['item']))
+                    if 'loot_table' in skudata:
+                        keyvals.append(('item', skudata['loot_table'])) # abuse "item" to include loot tables as well
+                    elif 'item' in skudata:
+                        keyvals.append(('item', skudata['item']))
                     keyvals.append(('stack', skudata.get('stack',1)))
                     if spellarg.get('ui_index',-1) >= 0:
                         keyvals.append(('ui_index', spellarg['ui_index']))

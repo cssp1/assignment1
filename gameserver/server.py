@@ -14062,9 +14062,10 @@ class Store(object):
     def buy_item_find_skudata(cls, spellarg, player):
         catpath = spellarg.get('catpath',None)
         specname = spellarg['skudata'].get('item',None)
-        if (not catpath) or (not specname): return None
-        stack = spellarg['skudata'].get('stack', 1)
-        level = spellarg['skudata'].get('level', 1)
+        tablename = spellarg['skudata'].get('loot_table',None)
+        if (not catpath) or (not specname and not tablename): return None
+        stack = spellarg['skudata'].get('stack', 1) if specname else 1
+        level = spellarg['skudata'].get('level', 1) if specname else 1
         melt_time = spellarg['skudata'].get('melt_time',-1)
         melt_dur = spellarg['skudata'].get('melt_duration',-1)
         tm = player.get_absolute_time()
@@ -14088,12 +14089,16 @@ class Store(object):
         ret = None
         pr = -1
 
-        def sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
+        def sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm):
+            assert (specname and not tablename) or (tablename and not specname) # either one, not both
             if ('price' not in skudata): return False
             if (melt_time > 0) and (tm >= melt_time): return False
             if ('expire_time' in skudata) and (tm >= skudata['expire_time']): return False
             if ('start_time' in skudata) and (tm < skudata['start_time']): return False
-            if (skudata.get('item',None) != specname) or (skudata.get('stack',1) != stack) or (skudata.get('level',1) != level): return False
+            if specname:
+                if (skudata.get('item',None) != specname) or (skudata.get('stack',1) != stack) or (skudata.get('level',1) != level): return False
+            elif tablename:
+                if skudata.get('loot_table',None) != tablename: return False
             if (skudata.get('melt_time',-1) != melt_time): return False
             if (skudata.get('melt_duration',-1) != melt_dur): return False
             if ('show_if' in skudata) and (not Predicates.read_predicate(skudata['show_if']).is_satisfied(player, None)): return False
@@ -14101,7 +14106,7 @@ class Store(object):
             return True
 
         for skudata in cat['skus']:
-            if sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
+            if sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm):
                 if pr < 0 or skudata['price'] < pr:
                     ret = skudata
                     pr = skudata['price']
@@ -14114,7 +14119,7 @@ class Store(object):
                     if ('extra_store_specials' in data):
                         extras = data['extra_store_specials'];
                         for skudata in extras:
-                            if sku_match(skudata, player, specname, level, stack, melt_time, melt_dur, tm):
+                            if sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm):
                                 if pr < 0 or skudata['price'] < pr:
                                     ret = skudata
                                     pr = skudata['price']
@@ -14156,14 +14161,21 @@ class Store(object):
 
             stack = spellarg.get('stack',1)
             assert stack >= 1
-            if spellarg['skudata']['item'] not in gamedata['items']:
-                error_reason.append('item "%s" does not exist' % spellarg['skudata']['item'])
-                return -1, p_currency
-            spec = gamedata['items'][spellarg['skudata']['item']]
 
-            if ('store_requires' in spec) and (not Predicates.read_predicate(spec['store_requires']).is_satisfied(session.player, None)):
-                error_reason.append('item "%s" store_requires predicate failed' % spellarg['spec'])
-                return -1, p_currency
+            if 'item' in spellarg['skudata']:
+                if spellarg['skudata']['item'] not in gamedata['items']:
+                    error_reason.append('item "%s" does not exist' % spellarg['skudata']['item'])
+                    return -1, p_currency
+                spec = gamedata['items'][spellarg['skudata']['item']]
+
+                if ('store_requires' in spec) and (not Predicates.read_predicate(spec['store_requires']).is_satisfied(session.player, None)):
+                    error_reason.append('item "%s" store_requires predicate failed' % spellarg['spec'])
+                    return -1, p_currency
+
+            elif 'loot_table' in spellarg['skudata']:
+                if spellarg['skudata']['loot_table'] not in gamedata['loot_tables']:
+                    error_reason.append('loot table "%s" does not exist' % spellarg['skudata']['loot_table'])
+                    return -1, p_currency
 
             p_currency = skudata.get('price_currency', p_currency)
             return skudata['price'], p_currency
@@ -15580,7 +15592,8 @@ class Store(object):
 
         elif spellname == "BUY_ITEM":
             assert gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_item')
-            session.increment_player_metric('item:'+spellarg['skudata']['item']+':purchased', int(spellarg['skudata'].get('stack',1)), time_series = False)
+            if 'item' in spellarg['skudata']:
+                session.increment_player_metric('item:'+spellarg['skudata']['item']+':purchased', int(spellarg['skudata'].get('stack',1)), time_series = False)
             session.increment_player_metric('items_purchased', 1, time_series = False)
             session.increment_player_metric(record_spend_type+'_spent_on_items', record_amount)
 
@@ -18698,24 +18711,33 @@ class GAMEAPI(resource.Resource):
         elif spellname == "BUY_ITEM":
             skudata = Store.buy_item_find_skudata(spellarg, session.player)
             assert skudata
-            stack = int(skudata.get('stack',1))
-            item = {'spec':skudata['item'], 'stack': stack}
-            if 'level' in skudata: item['level'] = skudata['level']
 
-            expire_time = -1
-            melt_time = int(skudata.get('melt_time',-1))
-            melt_dur = int(skudata.get('melt_duration',-1))
-            if melt_dur > 0:
-                expire_time = server_time + melt_dur
-            elif melt_time > 0:
-                expire_time = melt_time
+            on_purchase_cons = None
 
-            expire_time = session.get_item_spec_forced_expiration(gamedata['items'][item['spec']], prev_expire_time = expire_time)
-            if expire_time > 0:
-                assert expire_time >= server_time # don't sell an expired item
-                item['expire_time'] = expire_time
+            if 'loot_table' in skudata:
+                loot_table = gamedata['loot_tables'][skudata['loot_table']]
+                items = session.get_loot_items(session.player, loot_table['loot'], -1, -1)
+                on_purchase_cons = Store.buy_gamebucks_sku_get_loot_table_parameter(session, session.player, loot_table, 'on_purchase')
 
-            items = [item,]
+            elif 'item' in skudata:
+                stack = int(skudata.get('stack',1))
+                item = {'spec':skudata['item'], 'stack': stack}
+                if 'level' in skudata: item['level'] = skudata['level']
+
+                expire_time = -1
+                melt_time = int(skudata.get('melt_time',-1))
+                melt_dur = int(skudata.get('melt_duration',-1))
+                if melt_dur > 0:
+                    expire_time = server_time + melt_dur
+                elif melt_time > 0:
+                    expire_time = melt_time
+
+                expire_time = session.get_item_spec_forced_expiration(gamedata['items'][item['spec']], prev_expire_time = expire_time)
+                if expire_time > 0:
+                    assert expire_time >= server_time # don't sell an expired item
+                    item['expire_time'] = expire_time
+
+                items = [item,]
 
             # for metrics only
             price = skudata['price']
@@ -18733,14 +18755,17 @@ class GAMEAPI(resource.Resource):
                                                            'code':5120, 'ui_index':spellarg.get('ui_index',-1),
                                                            'items':items, 'price':price, 'price_currency':price_currency})
 
-            retmsg.append(["ITEM_PURCHASED", items, -1])
+            #retmsg.append(["ITEM_PURCHASED", items, -1])
+            discovered_where = None
 
             if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
-               session.player.find_object_by_type(gamedata['inventory_building']):
+               session.player.find_object_by_type(gamedata['inventory_building']) and \
+               not skudata.get('send_by_mail', False):
                 session.player.loot_buffer += items
                 for item in items:
                     session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), item.get('level',None), reason='store')
                 retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+                discovered_where = 'loot_buffer'
 
             else:
                 purchase_text = string.join([(('%dx ' % item['stack']) if item.get('stack',1) > 1 else '') + gamedata['items'][item['spec']]['ui_name'] for item in items], '\n')
@@ -18751,9 +18776,19 @@ class GAMEAPI(resource.Resource):
                     headline = ('%dx ' % items[0]['stack'])+headline
 
                 session.player.send_loot_mail(purchase_text, headline, items, retmsg, mail_template = gamedata['strings']['buy_item_mail'])
+                discovered_where = 'messages'
 
-            if 'on_purchase' in skudata:
-                session.execute_consequent_safe(skudata['on_purchase'], session.player, retmsg, reason='on_purchase')
+            if discovered_where:
+                retmsg.append(["ITEMS_DISCOVERED", items, -1, discovered_where])
+
+            if 'on_purchase' in skudata: # add to the one in the loot table
+                if on_purchase_cons:
+                    on_purchase_cons = {'consequent':'AND', 'subconsequents':[on_purchase_cons, skudata['on_purchase']]}
+                else:
+                    on_purchase_cons = skudata['on_purchase']
+
+            if on_purchase_cons:
+                session.execute_consequent_safe(on_purchase_cons, session.player, retmsg, reason='on_purchase')
 
         elif ('code' in spell) and (spell['code'] == 'projectile_attack'):
             if not session.has_attacked:
