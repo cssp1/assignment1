@@ -375,6 +375,17 @@ InvokeMissionsDialogConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeMailDialogConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(InvokeMailDialogConsequent, Consequent);
+InvokeMailDialogConsequent.prototype.execute = function(state) {
+    change_selection_ui(null);
+    invoke_mail_dialog(false);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function InvokeStoreConsequent(data) {
     goog.base(this, data);
     this.category = data['category'] || null;
@@ -795,6 +806,7 @@ function read_consequent(data) {
     else if(kind === 'VISIT_BASE') { return new VisitBaseConsequent(data); }
     else if(kind === 'CAST_CLIENT_SPELL') { return new CastClientSpellConsequent(data); }
     else if(kind === 'INVOKE_MISSIONS_DIALOG') { return new InvokeMissionsDialogConsequent(data); }
+    else if(kind === 'INVOKE_MAIL_DIALOG') { return new InvokeMailDialogConsequent(data); }
     else if(kind === 'INVOKE_STORE_DIALOG') { return new InvokeStoreConsequent(data); }
     else if(kind === 'INVOKE_BUY_GAMEBUCKS_DIALOG') { return new InvokeBuyGamebucksConsequent(data); }
     else if(kind === 'INVOKE_LOTTERY_DIALOG') { return new InvokeLotteryConsequent(data); }
