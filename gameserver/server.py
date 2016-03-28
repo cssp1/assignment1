@@ -15667,6 +15667,7 @@ class Store(object):
 
         # case 2 - master loot table indirects exactly once to another table
         if len(master_table['loot']) < 1: return None # empty
+        if 'multi' in master_table['loot'][0]: return None # literal table
         if 'cond' not in master_table['loot'][0]: raise Exception('unexpected master loot table structure: %r' % master_table['loot'])
         table_ref = Predicates.eval_cond_or_literal(master_table['loot'][0]['cond'], session, player)
         if table_ref:
