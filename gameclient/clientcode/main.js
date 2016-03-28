@@ -37833,6 +37833,11 @@ function new_store_allow_sku(skudata) {
         if('store_requires' in spec && !read_predicate(spec['store_requires']).is_satisfied(player, null)) {
             return false;
         }
+    } else if('loot_table' in skudata) {
+        // drop the SKU if its table yields no loot
+        if(session.get_loot_items(player, gamedata['loot_tables_client'][skudata['loot_table']]['loot']).item_list.length < 1) {
+            return false;
+        }
     }
     if(('start_time' in skudata) && (player.get_absolute_time() < skudata['start_time'])) { return false; }
     if(('expire_time' in skudata) && (player.get_absolute_time() >= skudata['expire_time'])) { return false; }
@@ -38506,6 +38511,14 @@ function update_new_store_sku(d) {
             var item_result = session.get_loot_items(player, gamedata['loot_tables_client'][skudata['loot_table']]['loot']);
             if(item_result.predicate) {
                 var etime = read_predicate(item_result.predicate).ui_expire_time(player);
+                if(etime > 0) {
+                    expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
+                }
+            }
+            // additional restriction on expiration time from SKU's show_if predicate - should be checked for item SKUs too,
+            // but needs testing to make sure it doesn't break anything in special event catalogs
+            if('show_if' in skudata) {
+                var etime = read_predicate(skudata['show_if']).ui_expire_time(player);
                 if(etime > 0) {
                     expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
                 }
