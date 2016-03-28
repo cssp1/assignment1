@@ -8470,7 +8470,7 @@
             "close_button": { "kind": "ActionButton", "xy": [411,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "RichTextField", "xy": [93,14], "dimensions": [313,68], "clip_to": [93,14,313,68],
                              "text_hjustify": "left",  "text_size": 15,
-                             "text_vjustify": "top", "ui_name": "Replay: %attacker vs %defender\nTime %cur_time of %total_time\nClick \"X\" to exit." },
+                             "text_vjustify": "top", "ui_name": "Replay: %attacker vs %defender\nTime %cur_time of %total_time. Click \"X\" to exit." },
             "share_button": { "kind": "ActionButton", "xy": [150,83], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
             "get_link_button": { "kind": "ActionButton", "xy": [290,83], "dimensions": [134, 28], "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Get Link"}
         }
