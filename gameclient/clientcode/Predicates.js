@@ -1635,6 +1635,21 @@ InventoryPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function GamebucksBalancePredicate(data) {
+    goog.base(this, data);
+    this.value = data['value'];
+    this.method = data['method'] || '>=';
+}
+goog.inherits(GamebucksBalancePredicate, Predicate);
+GamebucksBalancePredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.method != '>=') { throw Error('unhandled method: '+this.method); }
+    return player.resource_state['gamebucks'] >= this.value;
+};
+/** @override */
+GamebucksBalancePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
 function HasItemPredicate(data) {
     goog.base(this, data);
     this.item_name = data['item_name'];
@@ -1943,6 +1958,8 @@ function read_predicate(data) {
         return new ForemanIsBusyPredicate(data);
     } else if(kind === 'INVENTORY') {
         return new InventoryPredicate(data);
+    } else if(kind === 'GAMEBUCKS_BALANCE') {
+        return new GamebucksBalancePredicate(data);
     } else if(kind === 'HAS_ITEM') {
         return new HasItemPredicate(data);
     } else if(kind === 'HAS_ITEM_SET') {

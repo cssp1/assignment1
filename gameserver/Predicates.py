@@ -755,6 +755,15 @@ class RegionPropertyPredicate(Predicate):
         if not data: return False
         return data.get(self.key, self.default) == self.value
 
+class GamebucksBalancePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.value = data['value']
+        self.method = data.get('method', '>=')
+        assert self.method == '>='
+    def is_satisfied(self, player, qdata):
+        return player.resources.gamebucks >= self.value
+
 class HasItemPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1003,6 +1012,8 @@ def read_predicate(data):
         return HomeRegionPredicate(data)
     elif kind == 'REGION_PROPERTY':
         return RegionPropertyPredicate(data)
+    elif kind == 'GAMEBUCKS_BALANCE':
+        return GamebucksBalancePredicate(data)
     elif kind == 'HAS_ITEM':
         return HasItemPredicate(data)
     elif kind == 'HAS_ITEM_SET':

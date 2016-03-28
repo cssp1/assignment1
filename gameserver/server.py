@@ -11384,6 +11384,7 @@ class LivePlayer(Player):
             snap = self.resources.calc_snapshot()
             session.execute_consequent_safe(quest.reward_consequent, self, retmsg,
                                             {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                             'cur_gamebucks': snap.gamebucks,
                                              'largest_purchase': self.history.get('largest_purchase', 0),
                                              'largest_purchase_gamebucks': self.history.get('largest_purchase_gamebucks', 0)},
                                             reason='give_quest_rewards')
@@ -23354,6 +23355,7 @@ class GAMEAPI(resource.Resource):
             snap = session.player.resources.calc_snapshot()
             session.execute_consequent_safe(on_login_cons, session.player, retmsg,
                                             context = {'max_inventory': snap.max_inventory(), 'cur_inventory': snap.cur_inventory(),
+                                                       'cur_gamebucks': snap.gamebucks,
                                                        'largest_purchase': session.player.history.get('largest_purchase', 0),
                                                        'largest_purchase_gamebucks': session.player.history.get('largest_purchase_gamebucks', 0)},
                                             reason='on_login_pre_hello')
