@@ -4,12 +4,14 @@
 
 // download a full server backup
 // set up ~/.aws/credentials, then
-/usr/bin/aws s3 cp s3://spinpunch-backups/summonersgate-player-data-20150909 . --recursive  --exclude='*' --include='mongo*'
-for F in *.cpio.gz; do tar zxf $F; done
+/usr/bin/aws s3 cp s3://spinpunch-backups/MYGAME-player-data-20150909 . --recursive  --exclude='*' --include='mongo*'
+for F in *.tar.gz; do tar zxf $F; done
 rm -rf admin
 
 // restore the backup
-mongorestore -u root -p `cat /home/ec2-user/.ssh/XXX-mongo-root-password` --authenticationDatabase admin .
+mongorestore -u root -p `cat /home/ec2-user/.ssh/MYGAME-mongo-root-password` --authenticationDatabase admin .
+
+// alternative: don't delete "admin", and don't use credentials for mongorestore
 
 //////////////////////////////
 // 2014 Feb 2 TR database migration
