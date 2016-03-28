@@ -5062,7 +5062,7 @@
 
     "item_discovered": {
         "clip_children": 0,
-        "dimensions": [300,452],
+        "dimensions": [300,482],
         "default_button": "close_button",
         "widgets": {
             "bg_blanker": { "kind": "SolidRect", "xy": [-2000,-2000], "dimensions": [4000,4000], "color":[0.012,0.012,0.012,0.85] },
@@ -5079,7 +5079,7 @@
                         },
 
             "sku_glow": { "kind":"StaticImage","bg_image_resizable":1,
-                          "xy":[39,27], "dimensions":[222,288],
+                          "xy":[39,27], "dimensions":[222,317],
                           "asset": "dialog_glow_thinner", // "dialog_glow_thin_resizable",
                           "composite_mode": "lighter", "alpha": 0.5,
                           "array": [0,1], "array_offset": [216,0], "array_offset_collapsed": [10,8] // these are created dynamically in JavaScript
@@ -5090,22 +5090,22 @@
                      "xy_collapsed": [10, 10]
                    },
 
-            "close_button": { "kind": "ActionButton", "xy": [73,333], "dimensions": [154,30], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "push_bg_image": 1,
+            "close_button": { "kind": "ActionButton", "xy": [73,363], "dimensions": [154,30], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "push_bg_image": 1,
                               "ui_name_messages": "Send to Messages",
                               "ui_name_inventory": "Store in %inventory_building", // warehouse
                               "ui_name_inventory_fungible": "Add to Storage", // storage
                               "ui_name": "Accept",
                               "text_size": 13, "text_style": "bold"},
 
-            "expiry": { "kind": "TextField", "xy": [0,381], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
+            "expiry": { "kind": "TextField", "xy": [0,411], "dimensions": [300, 12], "text_size": 13, "text_style": "normal", "text_color": [1,0,0,1],
                         "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Message expires in %d days" },
-            "store_soon": { "show": 0, "kind": "TextField", "xy": [0,401], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store item soon" },
+            "store_soon": { "show": 0, "kind": "TextField", "xy": [0,431], "dimensions": [300, 12], "text_size": 13, "text_style": "normal",
+                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Store item(s) soon" },
 
             // this is a COPY of the buttons on the lottery_dialog, for player convenience
-            "lottery_price_display": { "show":0, "kind": "ActionButton", "xy": [24,379], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
+            "lottery_price_display": { "show":0, "kind": "ActionButton", "xy": [24,409], "dimensions": [120,32], "text_offset": [8,1], "text_size": 13, "text_style": "thick",
                                        "bg_image": "price_display", "ui_tooltip": "", "tooltip_delay": 0 }, // PRICE
-            "lottery_button": { "show":0, "kind": "ActionButton", "xy": [146,378], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+            "lottery_button": { "show":0, "kind": "ActionButton", "xy": [146,408], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
                                 "bg_image": "action_button_resizable", "text_style": "bold",
                                 "bg_image_resizable": 1,
                                 "min_wait": 1.6, // wait at least this long for scan result even if it comes in immediately
