@@ -1133,7 +1133,20 @@ SPUI.Dialog.prototype.apply_layout = function() {
                              this.wh[1] - this.data['dimensions'][1] + widget.data['dimensions'][1]];
             }
 
-            var orig_xy = this.data['widgets'][wname]['xy'];
+            var orig_xy;
+            if('array' in widget.data) { // widget knows its own original location, and is an array
+                if(!widget.array_pos) { throw Error('no array_pos for '+wname); }
+                orig_xy = vec_add(widget.data['xy'], vec_mul(widget.array_pos,
+                                                             widget.data['array_offset']));
+            } else if('xy' in widget.data) { // widget knows its own original location
+                orig_xy = widget.data['xy'];
+            } else if(wname in this.data['widgets']) { // widget is its own SPUI.Dialog
+                // (and therefore does not know its own base position)
+                orig_xy = this.data['widgets'][wname]['xy'];
+            } else { // arrays of SPUI.Dialog subwidgets not supported!
+                throw Error('cannot determine orig_xy for '+wname);
+            }
+
             if(layout['hjustify'] == 'center') {
                 widget.xy = [Math.floor((this.wh[0] - this.data['dimensions'][0])/2) + orig_xy[0],
                              widget.xy[1]];
@@ -1151,8 +1164,8 @@ SPUI.Dialog.prototype.apply_layout = function() {
             }
 
             if(widget.fixed_tooltip_offset) {
-                widget.fixed_tooltip_offset = [widget.data['fixed_tooltip_offset'][0] + (widget.xy[0]-widget.data['xy'][0]),
-                                               widget.data['fixed_tooltip_offset'][1] + (widget.xy[1]-widget.data['xy'][1])];
+                widget.fixed_tooltip_offset = [widget.data['fixed_tooltip_offset'][0] + (widget.xy[0]-orig_xy[0]),
+                                               widget.data['fixed_tooltip_offset'][1] + (widget.xy[1]-orig_xy[1])];
             }
         }
     }, this);
