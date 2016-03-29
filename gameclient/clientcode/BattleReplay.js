@@ -51,10 +51,15 @@ BattleReplay.invoke = function(log) {
     @constructor @struct
     @param {!World.World} world
     @param {string} token
+    @param {number} end_client_time - cut off recording at this client_time (-1 for unlimited)
+    Normally the battle should end and recording should stop before this. But if the client's
+    clock is wonky, we might still send snapshots past that time. Currently we continue to
+    record and upload snapshots, but the player will just ignore anything with tick_time beyond the end.
 */
-BattleReplay.Recorder = function(world, token) {
+BattleReplay.Recorder = function(world, token, end_client_time) {
     this.world = world;
     this.token = token;
+    this.end_client_time = end_client_time;
     this.snapshots = []; // cleared after each flush
     this.snapshot_count = 0;
     this.listen_keys = {};
@@ -74,6 +79,9 @@ BattleReplay.Recorder.prototype.start = function() {
     this.header = {'replay_version': gamedata['replay_version'] || 0,
                    'server_time_according_to_client': server_time // unreliable
                   };
+    if(this.end_client_time > 0) {
+        this.header['end_client_time'] = this.end_client_time;
+    }
     if(this.world.base.base_landlord_id === session.user_id) {
         // defending
         this.header['attacker_name'] = session.incoming_attacker_name || 'Unknown';
@@ -260,6 +268,29 @@ BattleReplay.replay = function(recorder) {
 */
 BattleReplay.Player = function(header, snapshots) {
     if(snapshots.length < 1) { throw Error('no snapshots'); }
+
+    // chop off excess snapshots that were recorded after end_client_time
+    if(snapshots.length > 2 && 'end_client_time' in header &&
+       header['end_client_time'] > 0 && header['end_client_time'] < snapshots[snapshots.length-1]['tick_time']) {
+        var last_index = goog.array.binarySelect(snapshots, function(entry) {
+            if(entry['tick_time'] > header['end_client_time']) {
+                return -1;
+            } else if(entry['tick_time'] < header['end_client_time']) {
+                return 1;
+            }
+            return 0;
+        });
+        if(last_index < 0) { // no exact match
+            last_index = Math.max(1, Math.min(-(last_index+1) - 1, snapshots.length-1));
+        }
+        if(last_index < snapshots.length - 1) {
+            if(player.is_developer()) {
+                console.log('chopping to '+last_index.toString());
+            }
+            snapshots = snapshots.slice(0, last_index+1);
+        }
+    }
+
     if(!('base' in snapshots[0])) { throw Error('first snapshot does not contain base'); }
     this.header = header;
     this.snapshots = BattleReplay.Player.migrate_snapshots(snapshots);

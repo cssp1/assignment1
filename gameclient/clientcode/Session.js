@@ -427,10 +427,12 @@ Session.Session.prototype.for_each_real_object = function(func, opt_obj) {
 /** @return {boolean} */
 Session.Session.prototype.is_recording = function() { return this.replay_recorder !== null; };
 
-/** @param {string} token for the upload */
-Session.Session.prototype.start_recording = function(token) {
-    if(!read_predicate(gamedata['client']['enable_replay_recording']).is_satisfied(player, null)) { return; }
-    this.replay_recorder = new BattleReplay.Recorder(this.get_real_world(), token);
+/** @param {string} token for the upload
+    @param {number} end_client_time - cut off recording at this client_time (-1 for unlimited) */
+Session.Session.prototype.start_recording = function(token, end_client_time) {
+    if((end_client_time > 0 && end_client_time < client_time) ||
+       !read_predicate(gamedata['client']['enable_replay_recording']).is_satisfied(player, null)) { return; }
+    this.replay_recorder = new BattleReplay.Recorder(this.get_real_world(), token, end_client_time);
     this.replay_recorder.start();
 };
 Session.Session.prototype.flush_recording = function() {

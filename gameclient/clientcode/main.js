@@ -45317,7 +45317,7 @@ function handle_server_message(data) {
         }
 
         if(replay_token && !session.is_recording()) {
-            session.start_recording(replay_token);
+            session.start_recording(replay_token, client_time + (finish_time - server_time) + 5); // approximate battle end client_time, plus some fudge
         }
     } else if(msg == "PLAYER_ATTACK_WAVE_DEPLOYED") {
         var finish_time = data[1];
@@ -45338,7 +45338,7 @@ function handle_server_message(data) {
         }
 
         if(replay_token && !session.is_recording()) {
-            session.start_recording(replay_token);
+            session.start_recording(replay_token, client_time + (finish_time - server_time) + 5); // approximate battle end client_time, plus some fudge
         }
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];
