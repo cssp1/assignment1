@@ -1163,9 +1163,9 @@ SPUI.Dialog.prototype.apply_layout = function() {
                              this.wh[1] - this.data['dimensions'][1] + orig_xy[1]];
             }
 
-            if(widget.fixed_tooltip_offset) {
-                widget.fixed_tooltip_offset = [widget.data['fixed_tooltip_offset'][0] + (widget.xy[0]-orig_xy[0]),
-                                               widget.data['fixed_tooltip_offset'][1] + (widget.xy[1]-orig_xy[1])];
+            if(widget.fixed_tooltip_offset && 'xy' in widget.data) {
+                // note: use widget.data['xy'] instead of orig_xy here, this should be relative to the array offset
+                widget.fixed_tooltip_offset = vec_add(widget.data['fixed_tooltip_offset'], vec_sub(widget.xy, widget.data['xy']));
             }
         }
     }, this);
