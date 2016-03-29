@@ -11367,36 +11367,32 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
 
     // token count update
     var shift = [0,0]; // shift other widgets over to make room
-    if('resource_bar_tokens' in dialog.widgets) {
-        var token_name = player.get_any_abtest_value('show_item_quantity', gamedata['store']['show_item_quantity']);
-        var show_tokens = !!token_name;
-        dialog.widgets['resource_bar_tokens'].show =
-            dialog.widgets['resource_bar_tokens_icon'].show =
-            dialog.widgets['resource_bar_tokens_expire_icon'].show =
-            dialog.widgets['resource_bar_tokens_amount'].show = show_tokens;
+    if('resource_bar_tokens' in dialog.data['widgets']) {
+        var token_names = player.get_any_abtest_value('show_item_quantity', gamedata['store']['show_item_quantity']);
+        // can be undefined, null, string, or Array - canonicalize to Array
+        if(!(token_names instanceof Array)) { token_names = (token_names ? [token_names] : []); }
 
-        if(show_tokens) {
-            var spec = ItemDisplay.get_inventory_item_spec(token_name);
-            var qty_expr = player.inventory_item_quantity_and_expiration(token_name);
-            var qty = qty_expr[0], expr = qty_expr[1];
-            dialog.widgets['resource_bar_tokens_expire_icon'].show = (expr > 0);
-            dialog.widgets['resource_bar_tokens_icon'].asset = spec['store_icon'];
-            dialog.widgets['resource_bar_tokens_amount'].str = pretty_print_number(qty);
-            dialog.widgets['resource_bar_tokens'].tooltip.str = dialog.data['widgets']['resource_bar_tokens']['ui_tooltip'].replace('%d0', pretty_print_number(qty)).replace('%s1', spec['ui_name_plural'] || spec['ui_name']).replace('%s2', spec['ui_name_plural'] || spec['ui_name']).replace('%expire', (expr > 0 ? dialog.data['widgets']['resource_bar_tokens']['ui_tooltip_expire'].replace('%s', pretty_print_time(expr-server_time)) : ''));
+        for(var y = 0; y < dialog.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
+            for(var x = 0; x < dialog.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
+                var index = y * dialog.data['widgets']['resource_bar_tokens']['array'][0] + x;
+                goog.array.forEach(['resource_bar_tokens','resource_bar_tokens_icon',
+                                    'resource_bar_tokens_expire_icon',
+                                    'resource_bar_tokens_amount'],
+                                   function(wname) {
+                                       dialog.widgets[SPUI.get_array_widget_name(wname, dialog.data['widgets'][wname]['array'], [x,y])].show = (index < token_names.length);
+                                   });
 
-        }
-        // update other widget positions
-        /*
-        var shift = (show_tokens ? dialog.data['widgets']['resource_bar_tokens']['shift_other_bars'] : [0,0]);
-        for(var wname in dialog.widgets) {
-            if(wname.indexOf('resource_bar_') == 0 && wname.indexOf('resource_bar_tokens') == -1) {
-                dialog.widgets[wname].xy = vec_add(dialog.data['widgets'][wname]['xy'], shift);
-                if(dialog.widgets[wname].tooltip) {
-                    dialog.widgets[wname].tooltip.xy = vec_add(dialog.xy, vec_add(shift, dialog.data['widgets'][wname]['fixed_tooltip_offset']));
+                if(index < token_names.length) {
+                    var spec = ItemDisplay.get_inventory_item_spec(token_names[index]);
+                    var qty_expr = player.inventory_item_quantity_and_expiration(token_names[index]);
+                    var qty = qty_expr[0], expr = qty_expr[1];
+                    dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_expire_icon', dialog.data['widgets']['resource_bar_tokens_expire_icon']['array'], [x,y])].show = (expr > 0);
+                    dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', dialog.data['widgets']['resource_bar_tokens_icon']['array'], [x,y])].asset = spec['store_icon'];
+                    dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', dialog.data['widgets']['resource_bar_tokens_amount']['array'], [x,y])].str = pretty_print_number(qty);
+                    dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens', dialog.data['widgets']['resource_bar_tokens']['array'], [x,y])].tooltip.str = dialog.data['widgets']['resource_bar_tokens']['ui_tooltip'].replace('%d0', pretty_print_number(qty)).replace('%s1', spec['ui_name_plural'] || spec['ui_name']).replace('%s2', spec['ui_name_plural'] || spec['ui_name']).replace('%expire', (expr > 0 ? dialog.data['widgets']['resource_bar_tokens']['ui_tooltip_expire'].replace('%s', pretty_print_time(expr-server_time)) : ''));
                 }
             }
         }
-        */
     }
 
     // tooltips
@@ -12802,10 +12798,14 @@ function update_desktop_dialogs() {
                 dialog.widgets['map_event_info'].show =
                 dialog.widgets['attacker_info_button'].show =
                 dialog.widgets['map_battle_bg'].show =
-                dialog.widgets['map_battle_button'].show =
-                dialog.widgets['resource_bar_tokens'].show =
-                dialog.widgets['resource_bar_tokens_icon'].show =
-                dialog.widgets['resource_bar_tokens_amount'].show = false;
+                dialog.widgets['map_battle_button'].show = false;
+        for(var y = 0; y < dialog.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
+            for(var x = 0; x < dialog.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
+                goog.array.forEach(['resource_bar_tokens','resource_bar_tokens_icon','resource_bar_tokens_amount'], function(wname) {
+                    dialog.widgets[SPUI.get_array_widget_name(wname, dialog.data['widgets'][wname]['array'], [x,y])].show = false;
+                });
+            }
+        }
 
         // info about incoming AI attack the player is about to suffer
         // WAS: session.incoming_attack_pending() && (!selection.ui || !selection.ui.user_data || selection.ui.user_data['dialog'] != 'daily_attack_dialog')
@@ -12844,35 +12844,56 @@ function update_desktop_dialogs() {
                         d.widgets['info_button'].show = !!props['info_action'];
 
                         if(props['token_item']) {
-                            var ispec = ItemDisplay.get_inventory_item_spec(props['token_item']);
-                            d.widgets['resource_bar_tokens'].tooltip.str = d.widgets['resource_bar_tokens'].data['ui_tooltip'].replace('%s', ispec['ui_name_plural']);
-                            d.widgets['resource_bar_tokens_icon'].asset = ispec['store_icon'];
-                            d.widgets['resource_bar_tokens_icon'].state = 'normal';
-                            d.widgets['resource_bar_tokens_amount'].str = pretty_print_number(player.inventory_item_quantity_and_expiration(props['token_item'])[0]);
+                            var item_list = (props['token_item'] instanceof Array ? props['token_item'] : [props['token_item']]);
+                            for(var y = 0; y < d.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
+                                for(var x = 0; x < d.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
+                                    var index = y*d.data['widgets']['resource_bar_tokens']['array'][0] + x;
+                                    if(index < item_list.length) {
+                                        var ispec = ItemDisplay.get_inventory_item_spec(item_list[index]);
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].tooltip.str = d.data['widgets']['resource_bar_tokens']['ui_tooltip'].replace('%s', ispec['ui_name_plural']);
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', d.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].asset = ispec['store_icon'];
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', d.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].state = 'normal';
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].str = pretty_print_number(player.inventory_item_quantity_and_expiration(item_list[index])[0]);
+                                    }
+                                    d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].onclick = props['prizes_action'] || null;
+                                }
+                            }
+
                         } else if(props['stat']) {
-                            var stat_data = gamedata['strings']['leaderboard']['categories'][props['stat']['name']];
-                            d.widgets['resource_bar_tokens'].tooltip.str = stat_data['title'] + ':\n' + stat_data['description'];
-                            d.widgets['resource_bar_tokens_icon'].asset = props['portrait_asset'];
-                            d.widgets['resource_bar_tokens_icon'].state = 'resource_icon';
+                            var stat_list = [props['stat']];
+                            for(var y = 0; y < d.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
+                                for(var x = 0; x < d.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
+                                    var index = y*d.data['widgets']['resource_bar_tokens']['array'][0] + x;
+                                    if(index < stat_list.length) {
+                                        var stat_config = stat_list[index];
+                                        var stat_data = gamedata['strings']['leaderboard']['categories'][stat_config['name']];
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].tooltip.str = stat_data['title'] + ':\n' + stat_data['description'];
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', d.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].asset = props['portrait_asset'];
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', d.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].state = 'resource_icon';
 
-                            d.widgets['resource_bar_tokens_amount'].show = false;
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].show = false;
 
-                            if(!('point_count' in d.user_data)) {
-                                d.user_data['point_count'] = null; // mark pending
-                                d.widgets['resource_bar_tokens_spinner'].show = true;
-                                query_player_scores([session.user_id], [[props['stat']['name'], props['stat']['time_scope']]],
-                                                    (function (_d) { return function(ids, results) {
-                                                        if(!_d.is_visible()) { return; }
-                                                        _d.widgets['resource_bar_tokens_spinner'].show = false;
-                                                        _d.user_data['point_count'] = results[0][0] ? results[0][0]['absolute'] : 0;
-                                                    }; })(d));
-                            } else if(d.user_data['point_count'] !== null) {
-                                d.widgets['resource_bar_tokens_amount'].show = true;
-                                d.widgets['resource_bar_tokens_amount'].str = pretty_print_number(d.user_data['point_count']);
+                                        if(!('point_counts' in d.user_data)) {
+                                            d.user_data['point_counts'] = {};
+                                        }
+                                        if(!(stat_config['name'] in d.user_data['point_counts'])) {
+                                            d.user_data['point_counts'][stat_config['name']] = null; // mark pending
+                                            d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_spinner', d.data['widgets']['resource_bar_tokens_spinner']['array'],[x,y])].show = true;
+                                            query_player_scores([session.user_id], [[stat_config['name'], stat_config['time_scope']]],
+                                                                (function (_d, _x, _y, _stat_config) { return function(ids, results) {
+                                                                    if(!_d.is_visible()) { return; }
+                                                                    _d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_spinner', _d.data['widgets']['resource_bar_tokens_spinner']['array'],[_x,_y])].show = false;
+                                                                    _d.user_data['point_counts'][_stat_config['name']] = results[0][0] ? results[0][0]['absolute'] : 0;
+                                                                }; })(d,x,y,stat_config));
+                                        } else if(d.user_data['point_counts'][stat_config['name']] !== null) {
+                                            d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].show = true;
+                                            d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].str = pretty_print_number(d.user_data['point_counts'][stat_config['name']]);
+                                        }
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].onclick = props['prizes_action'];
+                                    }
+                                }
                             }
                         }
-
-                        d.widgets['resource_bar_tokens'].onclick = props['prizes_action'];
 
                     } else {
                         // old-style predicate event info
@@ -12885,10 +12906,23 @@ function update_desktop_dialogs() {
                                 dialog.widgets['resource_bar_tokens_icon'].show =
                                 dialog.widgets['resource_bar_tokens_amount'].show = true;
 
-                            var ispec = ItemDisplay.get_inventory_item_spec(props['token_item']);
-                            dialog.widgets['resource_bar_tokens'].tooltip.str = dialog.widgets['resource_bar_tokens'].data['ui_tooltip'].replace('%s', ispec['ui_name_plural']);
-                            dialog.widgets['resource_bar_tokens_icon'].asset = ispec['store_icon'];
-                            dialog.widgets['resource_bar_tokens_amount'].str = pretty_print_number(player.inventory_item_quantity_and_expiration(props['token_item'])[0]);
+                            if(props['token_item']) {
+                                var item_list = (props['token_item'] instanceof Array ? props['token_item'] : [props['token_item']]);
+                                for(var y = 0; y < dialog.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
+                                    for(var x = 0; x < dialog.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
+                                        var index = y*dialog.data['widgets']['resource_bar_tokens']['array'][0] + x;
+                                        if(index < item_list.length) {
+                                            var ispec = ItemDisplay.get_inventory_item_spec(item_list[index]);
+                                            dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens', dialog.data['widgets']['resource_bar_tokens']['array'],[x,y])].tooltip.str = dialog.data['widgets']['resource_bar_tokens']['ui_tooltip'].replace('%s', ispec['ui_name_plural']);
+                                            dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', dialog.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].asset = ispec['store_icon'];
+                                            dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', dialog.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].state = 'normal';
+                                            dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', dialog.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].str = pretty_print_number(player.inventory_item_quantity_and_expiration(item_list[index])[0]);
+                                        }
+                                        dialog.widgets[SPUI.get_array_widget_name('resource_bar_tokens', dialog.data['widgets']['resource_bar_tokens']['array'],[x,y])].onclick = props['prizes_action'] || null;
+                                    }
+                                }
+                            }
+
                             dialog.widgets['map_battle_button'].show = !!props['map_battle_action'];
                             dialog.widgets['map_battle_button'].str = (props['map_battle_ui_name'] || dialog.data['widgets']['map_battle_button']['ui_name']);
                             if(props['map_battle_pred'] && !props['map_battle_pred'].is_satisfied(player, null)) {
@@ -44969,8 +45003,8 @@ function handle_server_message(data) {
                     var event = player.current_stat_tournament_event();
                     if(event && goog.array.contains(['strongpoint_resources', 'quarry_resources'], event['stat']['name'])) {
                         var dialog = desktop_dialogs['desktop_bottom'];
-                        if('point_count' in dialog.widgets['map_event_info'].user_data) {
-                            delete dialog.widgets['map_event_info'].user_data['point_count'];
+                        if('point_counts' in dialog.widgets['map_event_info'].user_data) {
+                            delete dialog.widgets['map_event_info'].user_data['point_counts'];
                         }
                     }
                 }
