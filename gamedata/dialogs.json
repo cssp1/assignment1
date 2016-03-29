@@ -4779,7 +4779,7 @@
             "label_bg_shine": {"kind": "SolidRect", "xy":[15,118], "dimensions":[170,32], "color": [0,0,0,1], "gradient_color": [0.2,0.2,0.2,1],
                                "gradient": "vinout", "gradient_midpoint": 0.75 },
 
-            "label": { "kind": "TextField", "xy": [10,116], "dimensions": [180, 32], "text_size": 23, "text_style": "bold",
+            "label": { "kind": "TextField", "xy": [10,116], "dimensions": [180, 32], "text_size": 21, "text_style": "bold",
                        "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Resources" },
 
             "jewel": { "kind": "Dialog", "xy": [166,20], "dimensions": [17,14], "dialog": "notification_jewel" },
