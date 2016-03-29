@@ -6308,6 +6308,8 @@ player.squad_speedups_enabled = function() { return player.get_territory_setting
 player.map_home_combat_enabled = function() { return player.get_territory_setting('enable_map_home_combat'); };
 /** @return {boolean} */
 player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
+/** @return {boolean} */
+player.raids_enabled = function() { return player.get_territory_setting('enable_raids'); };
 
 /** @return {string} */
 player.squad_block_mode = function() {
@@ -40353,6 +40355,12 @@ function update_upgrade_dialog(dialog) {
                 feature_list.push('limit');
             }
             if('on_destroy' in spec) { feature_list.push('on_destroy'); }
+
+            if(player.raids_enabled()) { // raids - show cargo stats
+                goog.object.forEach(gamedata['resources'], function(resdata, resname) {
+                    if(('cargo_'+resname) in spec) { feature_list.push('cargo_'+resname); }
+                });
+            }
         } else if('associated_item' in tech) {
             var item_spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level)));
             var auto_spell = get_auto_spell_for_item(item_spec);

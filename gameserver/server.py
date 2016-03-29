@@ -5685,6 +5685,7 @@ class GameObjectSpec(Spec):
         ] + resource_fields("produces") + [
         ["production_capacity", 0],
         ] + resource_fields("storage") + [
+        ] + resource_fields("cargo") + [
         ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
         ] + resource_fields("specific_pvp_loot_fraction", default = -1) + [
         ["spells", []],
@@ -8503,6 +8504,7 @@ class Player(AbstractPlayer):
     def squad_speedups_enabled(self): return self.get_territory_setting('enable_squad_speedups')
     def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
+    def raids_enabled(self): return self.get_territory_setting('enable_raids')
 
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
