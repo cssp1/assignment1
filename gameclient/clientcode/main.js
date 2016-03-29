@@ -20791,12 +20791,6 @@ function invoke_region_map(target_loc) {
         dialog.widgets['map'].pan_to_cell(target_loc);
     }
 
-    // check for token event
-    var event = player.get_event_data('current_event', null, null, true);
-    if(event && ('token_item' in event)) {
-        dialog.widgets['map'].token_icon = gamedata['items'][event['token_item']]['store_icon'];
-    }
-
     if(player.get_any_abtest_value('region_map_scroll_help', gamedata['territory']['scroll_help']) &&
        !player.check_feature_use('region_map_scroll_help_closed')) {
         invoke_region_map_scroll_help(dialog);
@@ -21111,10 +21105,10 @@ function region_map_finder_update(dialog, kind, state) {
         dialog.widgets['map'].region.for_each_feature(function(f) {
             var found = null;
 
-            // hive: attackable hive with ui_tokens
+            // hive: attackable hive with ui_tokens2
             if(kind == 'hive_finder') {
                 if(f['base_type'] == 'hive' && ('base_template' in f) && (f['base_template'] in gamedata['hives_client']['templates']) &&
-                   gamedata['hives_client']['templates'][f['base_template']]['ui_tokens']) {
+                   gamedata['hives_client']['templates'][f['base_template']]['ui_tokens2']) {
                     var pred = (!player.is_cheater && ('activation' in gamedata['hives_client']['templates'][f['base_template']]) ? read_predicate(gamedata['hives_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
                         // locked

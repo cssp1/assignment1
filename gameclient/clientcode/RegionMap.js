@@ -11,6 +11,7 @@ goog.provide('RegionMap');
 goog.require('SPUI');
 goog.require('SPFX');
 goog.require('GameArt');
+goog.require('ItemDisplay');
 goog.require('SquadControlDialog');
 goog.require('PlayerInfoDialog');
 goog.require('goog.array');
@@ -489,7 +490,6 @@ RegionMap.RegionMap = function(data, fxworld) {
     this.follow_travel = true;
     this.zoom_in_button = null;
     this.zoom_out_button = null;
-    this.token_icon = null;
     this.font = SPUI.make_font(14, 17, 'thick');
     this.cursor = null;
 
@@ -1484,8 +1484,10 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
             // default
             descr = gamedata['strings']['regional_map'][ftype+'_descr'].replace('%s',feature['base_ui_name']);
             var ls = [];
-            if(template['ui_tokens']) {
-                ls.push(gamedata['strings']['regional_map']['with_tokens'].replace('%d', (typeof(template['ui_tokens']) === 'number' ? pretty_print_number(template['ui_tokens']) : template['ui_tokens'])));
+            if(template['ui_tokens2']) {
+                var spec = ItemDisplay.get_inventory_item_spec(template['ui_tokens2']['spec']);
+                var thousands = template['ui_tokens2']['stack']/1000.0;
+                ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
             }
             if(template['kill_points']) {
                 var points = template['kill_points'];
@@ -1516,7 +1518,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     } else {
         descr = gamedata['strings']['regional_map']['unknown_name'];
     }
-    ui.widgets['description'].str = descr;
+    ui.widgets['description'].set_text_with_linebreaking_and_shrink_font_to_fit(descr);
     // only clip description if quarry stat widgets are showing
     ui.widgets['description'].clip_to = (ui.widgets['qstat'].show ? ui.data['widgets']['description']['clip_to'] : null);
 
@@ -2246,7 +2248,7 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 GameArt.assets['region_tiles'].states[icon_type].draw_topleft([base_xy[0]-cover[0], base_xy[1]-cover[1]-2], 0, 0);
             }
 
-            var show_bubble = false, show_padlock = false, show_token_icon = false, show_strength = false;
+            var show_bubble = false, show_padlock = false, token_icon = null, show_strength = false;
             var show_trophy = this.winnable_ladder_points(feature);
 
             if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] == feature['base_landlord_id'] && (feature['base_landlord_id'] != session.user_id ||
@@ -2270,8 +2272,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             }
 
             if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates'])) {
-                if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens']) {
-                    show_token_icon = true;
+                if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens2']) {
+                    token_icon = ItemDisplay.get_inventory_item_spec(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens2']['spec'])['store_icon'];
+                    // if the template specifies its own token_icon, override the default one here
+                    if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['token_icon']) {
+                        token_icon = gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['token_icon'];
+                    }
                 }
                 if(!player.is_cheater && ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
                    !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
@@ -2283,14 +2289,14 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 show_strength = true;
             }
 
-            if(show_token_icon && this.token_icon) {
+            if(token_icon) {
                 //var offset = [0.05,-0.20];
                 var offset = [0.3,-0.25];
                 SPUI.ctx.save();
                 var scale = 1.3;
                 var xy = vec_add(base_xy, vec_mul(offset,gamedata['territory']['cell_size']));
                 SPUI.ctx.transform(scale,0,0,scale,xy[0],xy[1]);
-                GameArt.assets[this.token_icon].states['normal'].draw_topleft([0,0],0,0);
+                GameArt.assets[token_icon].states['normal'].draw_topleft([0,0],0,0);
                 SPUI.ctx.restore();
             }
 
@@ -2427,8 +2433,10 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 subtitle = gamedata['strings']['regional_map'][feature['base_type']+'_label'].replace('%s',feature['base_ui_name']);
 
                 var ls = [];
-                if(template['ui_tokens']) {
-                    ls.push(gamedata['strings']['regional_map']['with_tokens'].replace('%d', (typeof(template['ui_tokens']) === 'number' ? pretty_print_number(template['ui_tokens']) : template['ui_tokens'])));
+                if(template['ui_tokens2']) {
+                    var spec = ItemDisplay.get_inventory_item_spec(template['ui_tokens2']['spec']);
+                    var thousands = template['ui_tokens2']['stack']/1000.0;
+                    ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
                 }
                 if(template['kill_points']) {
                     var points = template['kill_points'];

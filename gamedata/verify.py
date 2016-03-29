@@ -1054,6 +1054,10 @@ def check_item(itemname, spec):
     if ('store_icon' in spec):
         error |= require_art_asset(spec['store_icon'], itemname+':store_icon')
 
+    if spec.get('category') == 'token':
+        if 'store_icon' not in spec:
+            error |= 1; print '%s: token-like items should have a "store_icon" (for Region Map display)' % (itemname,)
+
     if 'requires' in spec:
         error |= check_predicate(spec['requires'], reason = 'item %s: requires' % itemname)
 

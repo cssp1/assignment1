@@ -8345,7 +8345,7 @@
                       "ui_name_rarity": ["Common", "Uncommon", "Rare", "Epic", "Legendary"],
                       "text_style": "bold", "drop_shadow": 1 },
 
-            "description": {"kind": "ActionButton", "xy":[69,26], "dimensions": [129,13],
+            "description": {"kind": "ActionButton", "xy":[69,26], "dimensions": [270,15],
                             "clip_to": [69,26,129,17],
                             "text_size": 13,"text_hjustify":"left","text_style":"bold","ui_name":"Unknown",
                             "text_color": [1,1,1,1] },

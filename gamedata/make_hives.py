@@ -18,26 +18,54 @@ def _get_kill_points(cons):
     elif cons['consequent'] == 'AND':
         return max([_get_kill_points(sub) for sub in cons['subconsequents']])
     return 0
-
 def get_kill_points(template):
     if 'completion' in template:
         return _get_kill_points(template['completion'])
     return 0
 
-def make_client_hive_template(template):
+def _get_loot_tokens(loot_array):
+    for entry in loot_array:
+        if 'spec' in entry and 'token' in entry['spec']:
+            return entry
+        elif 'multi' in entry:
+            ret = _get_loot_tokens(entry['multi'])
+            if ret: return ret
+    return None
+def _get_tokens(cons):
+    if cons['consequent'] == 'GIVE_LOOT':
+        return _get_loot_tokens(cons['loot'])
+    elif cons['consequent'] == 'AND':
+        for sub in cons['subconsequents']:
+            ret = _get_tokens(sub)
+            if ret: return ret
+    return None
+def get_tokens(template):
+    if 'completion' in template:
+        return _get_tokens(template['completion'])
+    return 0
+def make_client_hive_template(template_name, template):
     out = {'ui_name': template['ui_name'],
            'icon': template['icon']}
     ui_loot_rarity = template.get('ui_loot_rarity',-1)
     if ui_loot_rarity >= 0:
         out['ui_loot_rarity'] = ui_loot_rarity
-    for FIELD in ('activation', 'show_if', 'ui_tokens', 'base_resource_loot'):
+    for FIELD in ('activation', 'show_if', 'base_resource_loot'):
         if FIELD in template: out[FIELD] = template[FIELD]
     kill_points = get_kill_points(template)
     if kill_points > 0:
         out['kill_points'] = kill_points
+    token_item = get_tokens(template)
+
+    # How tokens are shown on the regionamp :
+    # the obsolete legacy format is to use "ui_tokens": "19.6k" and then the item name hard-coded from gamedata['strings']['regional_map']['with_tokens']
+    # we've replaced this with an automatically-extracted "ui_tokens2" item value like {"spec": "mytok", "stack": 12345}
+    if 'ui_tokens' in template and not token_item:
+        raise Exception('unable to parse tokens for hive '+template_name)
+    if token_item:
+        out['ui_tokens2'] = token_item
     return out
 
-def make_server_hive_template(template):
+def make_server_hive_template(template_name, template):
     out = copy.copy(template)
     for FIELD in ('units','scenery','buildings'):
         if FIELD in out:
@@ -73,9 +101,9 @@ if __name__ == '__main__':
     for id in ids:
         template = hives['templates'][id]
         if mode is MODE_CLIENT:
-            out['templates'][id] = make_client_hive_template(template)
+            out['templates'][id] = make_client_hive_template(id, template)
         elif mode is MODE_SERVER:
-            out['templates'][id] = make_server_hive_template(template)
+            out['templates'][id] = make_server_hive_template(id, template)
 
     SpinJSON.dump(out, out_fd.fd, pretty = True, newline = True)
     out_fd.complete()

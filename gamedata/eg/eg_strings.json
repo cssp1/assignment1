@@ -431,7 +431,6 @@
         "hive_label": "", // no label by default
         "raid_descr": "Raid",
         "raid_label": "", // no label by default
-        "with_tokens": "%d ONP",
         "with_kill_points": "%d KP",
         "mystery": "Spy satellites cannot detect\nbase owner",
         "arriving_in": "Arriving in %s",
