@@ -36733,7 +36733,20 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         dialog.widgets['redeem_gift_card_warning'].show = dialog.widgets['redeem_gift_card_button'].show = dialog.widgets['redeem_gift_card_icon'].show = true;
         dialog.widgets['redeem_gift_card_warning'].str = dialog.data['widgets']['redeem_gift_card_warning']['ui_name'].replace('%s', gamedata['store']['gamebucks_ui_name']);
         dialog.widgets['redeem_gift_card_button'].tooltip.str = dialog.data['widgets']['redeem_gift_card_button']['ui_tooltip'].replace('%s', gamedata['store']['gamebucks_ui_name']);
-        dialog.widgets['redeem_gift_card_button'].onclick = function(w) { Store.redeem_fb_gift_card( function() { change_selection(null); }, null); };
+        dialog.widgets['redeem_gift_card_button'].onclick = function(w) {
+            var s = gamedata['strings']['fb_gift_card_confirm'];
+            var descr = s['ui_description'];
+            while(descr.indexOf('%GAMEBUCKS') >= 0) {
+                descr = descr.replace('%GAMEBUCKS', Store.gamebucks_ui_name());
+            }
+            invoke_child_message_dialog(s['ui_title'], descr,
+                                        {'cancel_button': true,
+                                         'dialog': 'message_dialog_big',
+                                         'ok_button_ui_name': s['ui_button'],
+                                         'on_ok': function() {
+                                             Store.redeem_fb_gift_card( function() { change_selection(null); }, null);
+                                         }});
+        };
     }
 
     if(Store.trialpay_available() && player.get_any_abtest_value('enable_trialpay', eval_cond_or_literal(gamedata['store']['enable_trialpay']||false, player, null))) {

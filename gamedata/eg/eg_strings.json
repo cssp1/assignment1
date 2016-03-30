@@ -856,6 +856,10 @@
     "post_screenshot_success": { "ui_title": "Screenshot Posted!",
                                  "ui_description": "Visit your Facebook profile to see the post." },
 
+    "fb_gift_card_confirm": { "ui_title": "Use Facebook Gift Card?",
+                              "ui_button": "Understood",
+                              "ui_description": "Gift Card purchases are not eligible for special sale prices, and do not include any bonus %GAMEBUCKS or items. You will only receive %GAMEBUCKS worth the face value of the card.\n\nTo take advantage of sales and earn bonus %GAMEBUCKS and items, choose a different payment method." },
+
     "auto_resolve_confirm": { "ui_title": "Automatically finish battle?",
                               "ui_button": "Proceed",
                               "ui_description": "Winner will be determined automatically. Beware, combat results may differ from your manual battles." },
