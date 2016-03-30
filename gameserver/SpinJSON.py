@@ -8,6 +8,7 @@
 
 # preference is ujson (really fast, but no ordering support) > simplejson > Python-shipped json
 import os
+import OverflowChecker
 
 has_simplejson = False
 try:
@@ -66,7 +67,11 @@ def loads(s, ordered = False):
 
 def dump(obj, fd, pretty = False, newline = False, size_hint = 0, double_precision = 5, ordered = False):
     if has_ujson and (not ordered):
-        ujson.dump(obj, fd, DJM_append_newline = newline, DJM_size_hint = size_hint, DJM_pretty = pretty, double_precision = double_precision, ensure_ascii = True)
+        try:
+            ujson.dump(obj, fd, DJM_append_newline = newline, DJM_size_hint = size_hint, DJM_pretty = pretty, double_precision = double_precision, ensure_ascii = True) # XXX ensure_ascii can probably be set to False now
+        except OverflowError as e:
+            # try to get some more details about what overflowed
+            raise Exception('%r: %r' % (e, OverflowChecker.OverflowChecker(obj)))
     else:
         separators = (', ', ': ') if pretty else (',',':')
         if has_simplejson:
@@ -78,7 +83,11 @@ def dump(obj, fd, pretty = False, newline = False, size_hint = 0, double_precisi
 
 def dumps(obj, pretty = False, newline = False, size_hint = 0, double_precision = 5, ordered = False):
     if has_ujson and (not ordered):
-        return ujson.dumps(obj, DJM_append_newline = newline, DJM_size_hint = size_hint, DJM_pretty = pretty, double_precision = double_precision, ensure_ascii = True)
+        try:
+            return ujson.dumps(obj, DJM_append_newline = newline, DJM_size_hint = size_hint, DJM_pretty = pretty, double_precision = double_precision, ensure_ascii = True) # XXX ensure_ascii can probably be set to False now
+        except OverflowError as e:
+            # try to get some more details about what overflowed
+            raise Exception('%r: %r' % (e, OverflowChecker.OverflowChecker(obj)))
     else:
         separators = (', ', ': ') if pretty else (',',':')
         if has_simplejson:
