@@ -8732,7 +8732,7 @@ class Player(AbstractPlayer):
             gamesite.exception_log.event(server_time, ("player %d ping_squads PRE-RECALL: map_object_data:\n" % self.user_id)+'\n'.join(map(repr, map_object_data))+"\nhome_objects_by_squad:\n"+'\n'.join(map(repr, home_objects_by_squad.values()))+"\nmap_objects_by_squad:\n"+'\n'.join(map(repr, map_objects_by_squad.values())))
 
         for squad_id in to_recall:
-            success, affected_objects, map_features, error_code = self.squad_exit_map(session, squad_id, force = True, originator=originator, reason='ping_squads(%s)'%reason)
+            success, map_features, error_code = self.squad_exit_map(session, squad_id, force = True, originator=originator, reason='ping_squads(%s)'%reason)
             if map_features: ret_features += map_features
             if error_code:
                 gamesite.exception_log.event(server_time, 'player %d squad %d recall error: %s' % \
@@ -8995,28 +8995,28 @@ class Player(AbstractPlayer):
         return rollback_feature
 
     def squad_enter_map(self, squad_id, coords):
-        if self.isolate_pvp: return False, [], [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
+        if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
         if (not (gamesite.nosql_client and self.home_region)):
-            return False, [], [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
+            return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
         if self.num_deployed_squads() >= self.stattab.max_deployed_squads:
-            return False, [], [], ["CANNOT_DEPLOY_SQUAD_LIMIT_REACHED", squad_id]
+            return False, [], ["CANNOT_DEPLOY_SQUAD_LIMIT_REACHED", squad_id]
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
         assert type(coords) is list and len(coords) == 2 and type(coords[0]) is int and type(coords[1]) is int
 
         rollback_feature = self.squad_get_rollback_props(squad_id)
-        if not rollback_feature: return False, [], [], ["INVALID_SQUAD"] # squad doesn't even exist
+        if not rollback_feature: return False, [], ["INVALID_SQUAD"] # squad doesn't even exist
 
         squad = self.verify_squad(squad_id)
-        if not squad: return False, [], [rollback_feature], ["INVALID_SQUAD"] # squad is already deployed
+        if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad is already deployed
 
-        if self.squad_is_under_repair(squad_id): return False, [], [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
+        if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
 
         if coords[0] < 0 or coords[0] >= gamedata['regions'][self.home_region]['dimensions'][0] or \
            coords[1] < 0 or coords[1] >= gamedata['regions'][self.home_region]['dimensions'][1] or \
            hex_distance(self.my_home.base_map_loc, coords) != 1 or \
            Region(gamedata, self.home_region).obstructs_squads(coords):
             # deployment hex is invalid, or not adjacent to home base
-            return False, [], [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, coords]
+            return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, coords]
 
         # gather units we are going to deploy
         to_remove = []
@@ -9039,8 +9039,8 @@ class Player(AbstractPlayer):
                 assert speed > 0
                 travel_speed = min(travel_speed, speed) if (travel_speed > 0) else speed
 
-        if len(to_remove) < 1: return False, [], [rollback_feature], ["INVALID_SQUAD"] # cannot deploy empty squad
-        if total_hp < 1: return False, [], [rollback_feature], ["CANNOT_DEPLOY_SQUAD_DEAD", squad_id] # cannot deploy dead squad
+        if len(to_remove) < 1: return False, [rollback_feature], ["INVALID_SQUAD"] # cannot deploy empty squad
+        if total_hp < 1: return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_DEAD", squad_id] # cannot deploy dead squad
 
         feature = {'base_id': self.squad_base_id(squad_id),
                    'base_type': 'squad',
@@ -9060,7 +9060,7 @@ class Player(AbstractPlayer):
         if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
             # map location already occupied - send update on what's blocking us
             results = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords, reason='squad_enter_map(fail)'))
-            return False, [], ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id]
+            return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id]
 
         for object in to_remove:
             self.home_base_remove(object)
@@ -9072,21 +9072,21 @@ class Player(AbstractPlayer):
         squad['travel_speed'] = travel_speed
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
-        return True, to_remove, [feature], None
+        return True, [feature], None
 
     def squad_step(self, squad_id, coords):
         assert (gamesite.nosql_client and self.home_region)
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
 
         rollback_feature = self.squad_get_rollback_props(squad_id)
-        if not rollback_feature: return False, [], [], ["INVALID_SQUAD"] # squad doesn't even exist
+        if not rollback_feature: return False, [], ["INVALID_SQUAD"] # squad doesn't even exist
 
         squad = self.verify_squad(squad_id, require_at_home = False, require_away = True)
-        if not squad: return False, [], [rollback_feature], ["INVALID_SQUAD"] # squad was not deployed into map yet
+        if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad was not deployed into map yet
 
         if coords:
             if ('map_path' in squad) and (squad['map_path'][-1]['eta'] >= server_time):
-                return False, [], [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad is currently in motion, cannot accept a non-halt path
+                return False, [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad is currently in motion, cannot accept a non-halt path
 
             check_path = True
             next_eta = server_time
@@ -9102,7 +9102,7 @@ class Player(AbstractPlayer):
                    (i > 0 and hex_distance(waypoint, coords[i-1]) != 1) or \
                    Region(gamedata, self.home_region).obstructs_squads(waypoint):
                     # waypoint is outside of map, or not a neighbor of the previous waypoint
-                    return False, [], [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'waypoint', waypoint]
+                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'waypoint', waypoint]
 
                 # construct new path
                 next_eta += 0 if self.travel_override else float(1.0/(gamedata['territory']['unit_travel_speed_factor']*self.stattab.get_player_stat('travel_speed')*squad.get('travel_speed',1.0)))
@@ -9111,7 +9111,7 @@ class Player(AbstractPlayer):
         else:
             # player wants to halt the squad - is it halted already?
             if ('map_path' not in squad) or (squad['map_path'][-1]['eta'] < server_time):
-                return False, [], [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad already halted
+                return False, [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad already halted
             # compute path up to where the squad is right now
             new_path = []
             for waypoint in squad['map_path']:
@@ -9128,7 +9128,7 @@ class Player(AbstractPlayer):
         lock_id = SpinDB.base_lock_id(self.home_region, self.squad_base_id(squad_id))
         state = gamesite.nosql_client.map_feature_lock_acquire(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='squad_step')
         if state != Player.LockState.being_attacked: # mutex locked
-            return False, [], [rollback_feature], ["CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK", squad_id]
+            return False, [rollback_feature], ["CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK", squad_id]
 
         new_lock_gen = -1
 
@@ -9138,7 +9138,7 @@ class Player(AbstractPlayer):
             if not entry:
                 gamesite.exception_log.event(server_time, 'player %d squad %d trying to step, but not found on map' % \
                                              (self.user_id, squad_id))
-                return False, [], [rollback_feature], ["INVALID_SQUAD"] # in-memory state said it's on the map, but database says no!
+                return False, [rollback_feature], ["INVALID_SQUAD"] # in-memory state said it's on the map, but database says no!
 
             # get rid of lock info, as if we return the feature, it'll definitely be unlocked
             for FIELD in ('LOCK_STATE', 'LOCK_OWNER'):
@@ -9151,7 +9151,7 @@ class Player(AbstractPlayer):
             if entry['base_map_loc'][0] != squad['map_loc'][0] or entry['base_map_loc'][1] != squad['map_loc'][1]:
                 gamesite.exception_log.event(server_time, 'player %d squad %d trying to step, but base location mismatches: squad %s map_cache %s' % \
                                              (self.user_id, squad_id, repr(squad['map_loc']), repr(entry['base_map_loc'])))
-                return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id, 'mismatch', squad['map_loc'], entry['base_map_loc']] # database position disagrees with in-memory state
+                return False, [entry], ["INVALID_MAP_LOCATION", squad_id, 'mismatch', squad['map_loc'], entry['base_map_loc']] # database position disagrees with in-memory state
 
             new_entry = copy.copy(entry)
 
@@ -9171,7 +9171,7 @@ class Player(AbstractPlayer):
                 elif squad_block_mode == 'never':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], exclude_filter = exclude_filter, reason = 'squad_step')
                 if blocked:
-                    return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
+                    return False, [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
 
             # try to place squad at its final destination hex
             new_entry['base_map_loc'] = destination
@@ -9194,7 +9194,7 @@ class Player(AbstractPlayer):
                     for c in conflict_list: # add explicit nulls for client
                         if 'base_map_path' not in c:
                             c['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
-                    return False, [], [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination] # map location already occupied
+                    return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination] # map location already occupied
 
             new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
             squad['map_loc'] = new_entry['base_map_loc']
@@ -9206,7 +9206,7 @@ class Player(AbstractPlayer):
                                                                generation = new_lock_gen,
                                                                do_hook = False, reason='squad_step')
 
-        return True, [], [new_entry], None
+        return True, [new_entry], None
 
     def squad_exit_map(self, session, squad_id, force = False, originator = None, reason = ''):
         # note! change_region() splits self.home_region away from self.my_home.base_region temporarily,
@@ -9216,10 +9216,10 @@ class Player(AbstractPlayer):
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
 
         rollback_feature = self.squad_get_rollback_props(squad_id)
-        if not rollback_feature: return False, [], [], ["INVALID_SQUAD"] # squad doesn't even exist
+        if not rollback_feature: return False, [], ["INVALID_SQUAD"] # squad doesn't even exist
 
         squad = self.verify_squad(squad_id, require_at_home = False, require_away = (not force))
-        if not squad: return False, [], [rollback_feature], ["INVALID_SQUAD"] # squad is at home and we're only looking for away squads
+        if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad is at home and we're only looking for away squads
 
         entry = gamesite.nosql_client.get_map_feature_by_base_id(self.home_region, self.squad_base_id(squad_id), reason = 'squad_exit_map')
         if not entry:
@@ -9227,12 +9227,12 @@ class Player(AbstractPlayer):
                 if gamedata['server'].get('log_nosql',0) >= 0:
                     gamesite.exception_log.event(server_time, 'player %d squad %d trying to exit, but not found on map' % \
                                                  (self.user_id, squad_id))
-                return False, [], [rollback_feature], ["INVALID_SQUAD"] # database doesn't have the squad
+                return False, [rollback_feature], ["INVALID_SQUAD"] # database doesn't have the squad
             else:
                 entry = {'base_id': self.squad_base_id(squad_id), 'DELETED':1}
 
         if (not force) and (hex_distance(entry['base_map_loc'], self.my_home.base_map_loc) > 1):
-            return False, [], [entry], ["INVALID_MAP_LOCATION", squad_id] # squad is not adjacent to home base
+            return False, [entry], ["INVALID_MAP_LOCATION", squad_id] # squad is not adjacent to home base
 
         if gamedata['server'].get('log_nosql',0) >= 2:
             gamesite.exception_log.event(server_time, 'player %d squad_exit_map %d has_write_lock %d' % \
@@ -9243,7 +9243,7 @@ class Player(AbstractPlayer):
             # if it's the non-playing owner, the only thing we can do is blow the base off the map
             # the owner has to log in to reclaim the objects into the base
             gamesite.nosql_client.drop_map_feature(self.home_region, self.squad_base_id(squad_id), originator = originator, reason='squad_exit_map')
-            return True, [], [{'base_id': self.squad_base_id(squad_id), 'DELETED':1}], None
+            return True, [{'base_id': self.squad_base_id(squad_id), 'DELETED':1}], None
 
         lock_id = SpinDB.base_lock_id(self.home_region, self.squad_base_id(squad_id))
         if session and session.viewing_squad_locks and (lock_id in session.viewing_squad_locks):
@@ -9253,7 +9253,7 @@ class Player(AbstractPlayer):
             lock_state = gamesite.nosql_client.map_feature_lock_acquire(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='squad_exit_map')
             if lock_state != Player.LockState.being_attacked: # mutex locked
                 if not force:
-                    return False, [], [entry], ["CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK", squad_id]
+                    return False, [entry], ["CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK", squad_id]
                 else:
                     # possible cases:
                     # - the squad was killed by an attacker, so that it no longer exists in the map, but its objects do. This is totally normal.
@@ -9264,20 +9264,10 @@ class Player(AbstractPlayer):
                                                      (self.user_id, session.player.user_id if session else -1, reason, squad_id))
                     lock_id = None
 
-        to_add = []
-
         try:
-            for state in gamesite.nosql_client.get_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map'):
-                assert state['kind'] == 'mobile'
-                assert state['owner_id'] == self.user_id
-                if ('obj_id' in state) and self.get_object_by_obj_id(state['obj_id'], fail_missing = False):
-                    if gamedata['server'].get('log_nosql',0) >= 2:
-                        gamesite.exception_log.event(server_time, 'player %d squad_exit_map %d already has object %s at home, skipping' % \
-                                                     (self.user_id, squad_id, state['obj_id']))
-                    continue
-                to_add.append(reconstitute_object(self, self, state, context = 'player %d squad_exit_map %d' % (self.user_id, squad_id)))
-            for object in to_add:
-                self.home_base_add(object)
+            to_add = list(gamesite.nosql_client.get_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map'))
+            self.squad_dock_units(to_add)
+
             gamesite.nosql_client.drop_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map')
             gamesite.nosql_client.drop_map_feature(self.home_region, self.squad_base_id(squad_id), originator=self.user_id, reason='squad_exit_map')
             # lock was blown away
@@ -9294,7 +9284,25 @@ class Player(AbstractPlayer):
         finally:
             if lock_id: gamesite.nosql_client.map_feature_lock_release(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='squad_exit_map')
 
-        return True, to_add, [entry], None
+        return True, [entry], None
+
+    # return a list of units from the map (JSON states) into home base
+    def squad_dock_units(self, state_list):
+        for state in state_list:
+            if state['kind'] != 'mobile' or state['owner_id'] != self.user_id:
+                gamesite.exception_log.event(server_time, 'player %d squad_dock_units bad state: %r' % (self.user_id, state))
+                continue
+
+            # force items with squad_ids not in player.squads into reserves, to avoid accidentally giving the player more squads than allowed
+            if 'squad_id' in state and str(state['squad_id']) not in self.squads:
+                state['squad_id'] = -1
+
+            if ('obj_id' in state) and self.get_object_by_obj_id(state['obj_id'], fail_missing = False):
+                if gamedata['server'].get('log_nosql',0) >= 2:
+                    gamesite.exception_log.event(server_time, 'player %d squad_dock_units %d already has object %s at home, skipping' % \
+                                                 (self.user_id, state['squad_id'], state['obj_id']))
+            self.home_base_add(reconstitute_object(self, self, state, context = 'player %d squad_dock_units' % (self.user_id,)))
+
 
     # get level-dependent quantity (based on PLAYER level)
     def get_leveled_quantity(self, qty, do_clamp = True):
@@ -12920,7 +12928,7 @@ class LivePlayer(Player):
             for squad_sid in self.squads.iterkeys():
                 squad_id = int(squad_sid)
                 if self.squad_is_deployed(squad_id):
-                    success, affected_objects, map_features, error_code = self.squad_exit_map(None, squad_id, force = True, originator=self.user_id, reason='change_region')
+                    success, map_features, error_code = self.squad_exit_map(None, squad_id, force = True, originator=self.user_id, reason='change_region')
 
             if self.my_home.base_region != old_region:
                 # remove from old region (drops old lock as well)
@@ -26992,7 +27000,7 @@ class GAMEAPI(resource.Resource):
                     return
                 squad_id = int(spellargs[0])
                 coords = spellargs[1]
-                success, affected_objects, map_features, error_code = session.player.squad_enter_map(squad_id, coords)
+                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords)
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
@@ -27004,7 +27012,7 @@ class GAMEAPI(resource.Resource):
                 map_dimensions = gamedata['regions'][session.player.home_region]['dimensions']
                 max_steps = map_dimensions[0]+map_dimensions[1]
                 coords = spellargs[1][:max_steps] if spellargs[1] else None # may be null
-                success, affected_objects, map_features, error_code = session.player.squad_step(squad_id, coords)
+                success, map_features, error_code = session.player.squad_step(squad_id, coords)
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
@@ -27014,7 +27022,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
                     return
                 squad_id = int(spellargs[0])
-                success, affected_objects, map_features, error_code = session.player.squad_exit_map(session, squad_id, originator = session.player.user_id, reason='SQUAD_EXIT_MAP')
+                success, map_features, error_code = session.player.squad_exit_map(session, squad_id, originator = session.player.user_id, reason='SQUAD_EXIT_MAP')
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
