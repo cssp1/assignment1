@@ -21,7 +21,6 @@ import sys, getopt, time, random, copy, math
 time_now = int(time.time())
 event_time_override = None
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
-gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
 
 # XXX make db_client a global
 nosql_client = None
@@ -314,6 +313,9 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
         level = src.get('force_level', -1)
         if level <= 0:
             # auto-compute level by table
+            if 'ai_bases' not in gamedata:
+                gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
+
             if spec['name'] in gamedata['ai_bases']['auto_level']:
                 ls = gamedata['ai_bases']['auto_level'][spec['name']]
                 index = min(max(owner_level-1, 0), len(ls)-1)
@@ -645,7 +647,7 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
     if 'tech' in template:
         owner_tech = template['tech']
     else:
-        owner_tech = gamedata['ai_bases']['bases'][str(owner_id)].get('tech',{})
+        owner_tech = {} # this was never used gamedata['ai_bases']['bases'][str(owner_id)].get('tech',{})
 
     # optionally apply a random rotation
     if template.get('rotatable',False) or force_rotation:
@@ -1064,11 +1066,11 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
                dry_run = True):
 
     owner_id = template['owner_id']
-    owner_level = gamedata['ai_bases']['bases'][str(owner_id)]['resources']['player_level']
+    owner_level = gamedata['ai_bases_client']['bases'][str(owner_id)]['resources']['player_level']
     if 'tech' in template:
         owner_tech = template['tech']
     else:
-        owner_tech = gamedata['ai_bases']['bases'][str(owner_id)].get('tech', {})
+        owner_tech = {} # this was never used gamedata['ai_bases']['bases'][str(owner_id)].get('tech', {})
 
     region_min_level = hives.get('region_min_level',{}).get(region_id,0)
     if owner_level < region_min_level: return
