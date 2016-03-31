@@ -187,7 +187,7 @@ class LockManager (object):
     def acquire(self, region_id, base_id):
         lock = (region_id, base_id)
         if self.dry_run: return True
-        if nosql_client.map_feature_lock_acquire(region_id, base_id, self.SETUP_LOCK_OWNER) != self.BEING_ATTACKED:
+        if nosql_client.map_feature_lock_acquire(region_id, base_id, self.SETUP_LOCK_OWNER, do_hook = False) != self.BEING_ATTACKED:
             if self.verbose: print 'ACQUIRE (fail) ', lock
             return False
         if self.verbose: print 'ACQUIRE', lock
@@ -215,7 +215,7 @@ class LockManager (object):
         lock = (region_id, base_id)
         del self.locks[lock]
         if self.verbose: print 'RELEASE', lock
-        nosql_client.map_feature_lock_release(region_id, base_id, self.SETUP_LOCK_OWNER, generation = base_generation)
+        nosql_client.map_feature_lock_release(region_id, base_id, self.SETUP_LOCK_OWNER, generation = base_generation, do_hook = False)
     def release_player(self, user_id, generation = -1):
         if self.dry_run: return
         del self.player_locks[user_id]
