@@ -200,7 +200,7 @@ Region.Region.prototype.feature_shown = function(feature) {
 
 /** @return {boolean} */
 Region.Region.prototype.feature_blocks_map = function(feature) {
-    return (feature['base_type'] !== 'squad' || player.squad_block_mode() !== 'never');
+    return (feature['base_type'] !== 'squad' || (!feature['raid'] && player.squad_block_mode() !== 'never'));
 };
 
 /** note: just checking for presence of base_map_path is not correct, because sometimes squads

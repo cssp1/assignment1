@@ -622,7 +622,7 @@ class HandleSquadDockUnits(Handler):
         player['my_base'] += new_obj_list # append atomically
 
         # update player.squads cache to show the squad as at home now
-        for FIELD in ('map_loc', 'map_path', 'travel_speed'):
+        for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
             if FIELD in squad: del squad[FIELD]
 
         return ReturnValue(result = 'ok')

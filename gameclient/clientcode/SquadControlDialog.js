@@ -341,7 +341,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                             }
                             // perform deployment
                             player.squads[squad_id.toString()]['pending'] = true;
-                            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at]);
+                            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at, null]);
 
                             if(!vec_equals(deploy_at, to_loc)) {
                                 // queue movement

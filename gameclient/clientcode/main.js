@@ -29135,7 +29135,20 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     /** @type AStar.PathChecker */
     var path_checker = null;
-    if(player.squad_block_mode() === 'after_move') {
+    if(player.squad_is_raid(squad_id)) {
+        // only blocked by non-squads
+        path_checker = function (_squad_id, _dest) { return function(cell, path) {
+            if(cell.block_count > 0) {
+                for(var i = 0; i < cell.blockers.length; i++) {
+                    var feature = cell.blockers[i];
+                    if(feature['base_type'] !== 'squad') {
+                        return AStar.NOPASS;
+                    }
+                }
+            }
+            return AStar.PASS;
+        }; };
+    } else if(player.squad_block_mode() === 'after_move') {
         path_checker = function (_squad_id, _dest) { return function(cell, path) {
             if(cell.block_count > 0) {
                 for(var i = 0; i < cell.blockers.length; i++) {
@@ -29207,6 +29220,10 @@ player.squad_is_moving = function(squad_id) {
     return (('map_loc' in squad_data) &&
             (('map_path' in squad_data) && (squad_data['map_path'][squad_data['map_path'].length-1]['eta'] > server_time)));
 };
+player.squad_is_raid = function(squad_id) {
+    var squad_data = player.squads[squad_id.toString()];
+    return ('raid' in squad_data && squad_data['raid']);
+};
 player.squad_interpolate_pos_and_heading = function(squad_id) {
     var squad_data = player.squads[squad_id.toString()];
     if(player.squad_is_moving(squad_id)) {
@@ -29246,24 +29263,38 @@ player.squad_recall_move = function(squad_id, path) {
 
     // note: we can't just use home_base_loc here, because we need to path-find to it!
     var home_feature = session.region.find_home_feature();
-    if(home_feature) {
-        if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= 1) {
-            player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1}); // trigger SQUAD_EXIT_MAP at next opportunity
-            return;
-        }
-
-        if(!path) { path = player.squad_find_path_adjacent_to(squad_id, player.home_base_loc); }
-
-        if(path) {
-            player.squad_move(squad_id, path);
-            player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1}); // trigger SQUAD_EXIT_MAP at next opportunity
-            return;
-        }
-
-        // uh oh, no way home!
-        var s = gamedata['errors']['CANNOT_RECALL_SQUAD_MAP_BLOCKED'];
-        invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
+    if(!home_feature) {
+        return;
     }
+    var max_dist = (player.squad_is_raid(squad_id) ? 0 : 1); // raids need to be on top of base to exit
+    var cur_dist = hex_distance(squad_data['map_loc'], player.home_base_loc);
+    if(cur_dist <= max_dist) {
+        // already in position. trigger SQUAD_EXIT_MAP at next opportunity.
+        player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1});
+        return;
+    } else if(cur_dist == 1) {
+        // one step away - for raids
+        path = [player.home_base_loc];
+    }
+
+    if(!path) {
+        path = player.squad_find_path_adjacent_to(squad_id, player.home_base_loc);
+        if(path && player.squad_is_raid(squad_id)) {
+            // add final step manually
+            path.push(player.home_base_loc);
+        }
+    }
+
+    if(path) {
+        player.squad_move(squad_id, path);
+        // trigger SQUAD_EXIT_MAP at next opportunity after the move
+        player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1});
+        return;
+    }
+
+    // uh oh, no way home!
+    var s = gamedata['errors']['CANNOT_RECALL_SQUAD_MAP_BLOCKED'];
+    invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
 };
 
 player.squad_halt = function(squad_id) {
@@ -29341,7 +29372,8 @@ player.advance_squads = function() {
                 player.squad_clear_client_data(squad_data['id']);
             } else {
                 // not moving
-                if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= 1 &&
+                var max_dist = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit
+                if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist &&
                    !squad_data['pending']) {
                     squad_data['pending'] = true;
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_EXIT_MAP", squad_data['id']]);

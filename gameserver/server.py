@@ -5283,7 +5283,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         if (not dest_feature) or \
            (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
            (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
-           (dest_feature['base_type'] == 'squad' and not player.squad_combat_enabled()) or \
+           (dest_feature['base_type'] == 'squad' and (not player.squad_combat_enabled()) or dest_feature.get('raid')) or \
            (dest_feature['base_type'] == 'home' and not player.map_home_combat_enabled()):
             return None
         return dest_feature
@@ -5297,6 +5297,7 @@ class SessionChangeNew(SessionChange): # new basedb path
             squad_features = list(gamesite.nosql_client.get_map_features_by_landlord_and_type(player.home_region, player.user_id, 'squad', reason='change_session(query_deployable_squads)'))
 
             for squad_feature in squad_features:
+                if squad_feature.get('raid'): continue # cannot participate in RTS battles
                 if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
                 if squad_feature.get('LOCK_STATE',0) > 0 and \
                    squad_feature.get('LOCK_OWNER',-1) != player.user_id:
@@ -5337,6 +5338,7 @@ class SessionChangeNew(SessionChange): # new basedb path
             defense_features = [x for x in gamesite.nosql_client.get_map_features_by_loc(player.home_region, dest_feature['base_map_loc'], reason='change_session(guards)') if x.get('base_type',None)=='squad']
 
             for squad_feature in defense_features:
+                if squad_feature.get('raid'): continue # cannot participate in RTS battles
                 if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
                     continue # squad has not arrived at its destination yet
                 if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
@@ -8718,7 +8720,7 @@ class Player(AbstractPlayer):
                     to_recall.append(squad_id)
             else:
                 # it should be at home base
-                for FIELD in ('map_loc', 'map_path', 'travel_speed'):
+                for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
                     if FIELD in squad: del squad[FIELD]
                 if (squad_id in map_objects_by_squad):
                     # this can happen after an attack where we lose a squad, but we need the player to log in to recall it into home_base_iter
@@ -8997,7 +8999,8 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def squad_enter_map(self, squad_id, coords):
+    def squad_enter_map(self, squad_id, coords, raid_info):
+        if raid_info and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
         if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
         if (not (gamesite.nosql_client and self.home_region)):
             return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
@@ -9053,14 +9056,19 @@ class Player(AbstractPlayer):
                    'base_map_loc': coords,
                    'base_map_path': None # explicit null for client's benefit
                    }
-
-        if self.squad_block_mode() == 'never':
+        if raid_info:
+            feature['raid'] = 1
+            exclusive = -1 # no collision checks
+            exclude_filter = None
+        elif self.squad_block_mode() == 'never':
+            exclusive = 0
             exclude_filter = {'base_type': {'$ne': 'squad'}}
         else:
+            exclusive = 0
             exclude_filter = None
 
         # note: to avoid two successive map update broadcasts, wait until after lock release to send
-        if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
+        if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
             # map location already occupied - send update on what's blocking us
             results = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords, reason='squad_enter_map(fail)'))
             return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id]
@@ -9073,6 +9081,8 @@ class Player(AbstractPlayer):
 
         squad['map_loc'] = feature['base_map_loc']
         squad['travel_speed'] = travel_speed
+        if raid_info:
+            squad['raid'] = 1
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
         return True, [feature], None
@@ -9159,20 +9169,27 @@ class Player(AbstractPlayer):
             new_entry = copy.copy(entry)
 
             squad_block_mode = self.squad_block_mode()
-            if squad_block_mode == 'never':
+
+            if entry.get('raid'):
+                exclusive = -1 # never blocked at destination
+                exclude_filter = {'base_type': {'$ne': 'squad'}} # blocked at intermediate waypoints by non-squads
+            elif squad_block_mode == 'never':
+                exclusive = 0 # blocked by any feature that's not a squad
                 exclude_filter = {'base_type': {'$ne': 'squad'}}
             else:
+                exclusive = 0 # blocked by any feature
                 exclude_filter = None
 
             if check_path and coords and (len(coords) > 1) and (not gamedata['server'].get('trust_client_map_path', False)):
                 # This is a race-prone check to find conflicting features at intermediate waypoints (not including the final waypoint)
                 # We don't really care about squads crossing each other. The final waypoint is checked atomically below.
-                if squad_block_mode == 'after_move':
+                if entry.get('raid') or squad_block_mode == 'never':
+                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], exclude_filter = exclude_filter, reason = 'squad_step')
+                elif squad_block_mode == 'after_move':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check_dynamic(self.home_region, new_path[1:-1], reason = 'squad_step')
                 elif squad_block_mode == 'always':
                     blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], reason = 'squad_step')
-                elif squad_block_mode == 'never':
-                    blocked = gamesite.nosql_client.map_feature_occupancy_check(self.home_region, coords[:-1], exclude_filter = exclude_filter, reason = 'squad_step')
+
                 if blocked:
                     return False, [entry], ["INVALID_MAP_LOCATION", squad_id, 'path', coords[:-1]] # map location already occupied
 
@@ -9181,7 +9198,7 @@ class Player(AbstractPlayer):
             new_entry['base_map_path'] = new_path
             if not gamesite.nosql_client.move_map_feature(self.home_region, new_entry['base_id'], new_entry,
                                                           old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
-                                                          exclusive=0, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
+                                                          exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
                 # conflict - check if we're moving into a friendly quarry with no other squad there
                 if self.quarry_guards_enabled():
                     conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
@@ -9197,7 +9214,7 @@ class Player(AbstractPlayer):
                     for c in conflict_list: # add explicit nulls for client
                         if 'base_map_path' not in c:
                             c['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
-                    return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination] # map location already occupied
+                    return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination, [c.get('base_id') for c in conflict_list]] # map location already occupied
 
             new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
             squad['map_loc'] = new_entry['base_map_loc']
@@ -9308,7 +9325,7 @@ class Player(AbstractPlayer):
 
         if squad:
             # update in-memory version of the squad (under player.squads)
-            for FIELD in ('map_loc', 'map_path', 'travel_speed'):
+            for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
                 if FIELD in squad: del squad[FIELD]
 
     # get level-dependent quantity (based on PLAYER level)
@@ -27007,7 +27024,8 @@ class GAMEAPI(resource.Resource):
                     return
                 squad_id = int(spellargs[0])
                 coords = spellargs[1]
-                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords)
+                raid_info = spellargs[2]
+                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords, raid_info)
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
