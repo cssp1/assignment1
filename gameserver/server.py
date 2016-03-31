@@ -21946,6 +21946,7 @@ class GAMEAPI(resource.Resource):
 
     def object_combat_updates(self, session, retmsg, arg):
         # update hitpoints and (for mobile units only) XY position and movement orders
+        ncells = session.viewing_base.ncells()
 
         # Processes many object updates together in a batch in order
         # to minimize the number of player state updates we have to do.
@@ -22005,15 +22006,17 @@ class GAMEAPI(resource.Resource):
 
             # update XY coordinates, movement orders, and patrol flag (for mobile objects only, and not for attackers)
             if obj.is_mobile() and (owning_user is session.viewing_user):
+                def clean_xy(xy):
+                    return [min(max(int(xy[0]),0),ncells[0]-1),
+                            min(max(int(xy[1]),0),ncells[1]-1)]
                 if newxy:
-                    obj.x = int(newxy[0])
-                    obj.y = int(newxy[1])
+                    obj.x, obj.y = clean_xy(newxy)
                 if neworders is not None:
                     if type(neworders) is list:
                         obj.orders = neworders[0:gamedata['client']['max_unit_orders']]
                         for order in obj.orders:
                             if ('dest' in order) and (order['dest'] is not None):
-                                order['dest'] = map(int, order['dest'])
+                                order['dest'] = clean_xy(order['dest'])
                     else:
                         gamesite.exception_log.event(server_time, 'player %d received object orders for %d\'s %s not a list: %s' % \
                                                      (session.user.user_id, owning_user.user_id if owning_user else -1, obj.spec.name, repr(neworders)))
