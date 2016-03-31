@@ -541,7 +541,8 @@ class MessageSender(Handler):
 
 class HandleGiveItem(MessageSender):
     def make_message(self):
-        assert self.args['spec'] in self.gamedata['items']
+        if self.args['spec'] not in self.gamedata['items']:
+            raise Exception('Invalid item name (item not found in gamedata.items): %r' % self.args['spec'])
         item_spec = self.gamedata['items'][self.args['spec']]
         item = {'spec':self.args['spec']}
         stack = int(self.args.get('stack','1'))
