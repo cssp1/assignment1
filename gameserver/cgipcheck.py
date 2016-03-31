@@ -7,7 +7,7 @@
 # CGI script for customer support and server management
 
 import os, sys, subprocess, traceback, time, re, copy
-import cgi, cgitb, socket
+import cgi, cgitb
 import urllib, urllib2
 import SpinFacebook
 import SpinNoSQL
@@ -17,12 +17,16 @@ import SpinJSON
 import SpinGoogleAuth
 import SpinLog
 import FastGzipFile
+import ControlAPI
 
 time_now = int(time.time())
 
 # generic parameters for flot time graphs
 time_axis_params = {'mode':'time', 'timeformat': '%b %d %H:00', 'minTickSize': [1, "hour"]}
 
+# this file assumes JSON decoding on raw CONTROLAPI calls
+def do_CONTROLAPI(*args, **kwargs): return SpinJSON.loads(ControlAPI.CONTROLAPI_raw(*args, **kwargs))
+def do_CONTROLAPI_checked(*args, **kwargs): return ControlAPI.CONTROLAPI(*args, **kwargs)
 
 def print_html_headers():
     print 'Content-Type: text/html'
@@ -565,30 +569,6 @@ def do_google_translate(from_language, to_language, text):
     if 'detectedSourceLanguage' in translation:
         ret['source_language'] = translation['detectedSourceLanguage']
     return ret
-
-def do_CONTROLAPI(args, host = None, http_port = None, ssl_port = None):
-    host = host or SpinConfig.config['proxyserver'].get('internal_listen_host',
-                                                        SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
-    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
-    url = '%s://%s:%d/CONTROLAPI' % (proto, host,
-                                     (ssl_port or SpinConfig.config['proxyserver']['external_ssl_port']) if proto == 'https' else \
-                                     (http_port or SpinConfig.config['proxyserver']['external_http_port'])
-                                     )
-    args['secret'] = SpinConfig.config['proxy_api_secret']
-    try:
-        response = urllib2.urlopen(url+'?'+urllib.urlencode(args)).read().strip()
-        return SpinJSON.loads(response)
-    except urllib2.HTTPError as e:
-        args['secret']='...'
-        raise Exception('CONTROLAPI connection failed: %d %r for %s?%s' % (e.code, e.read(), url, urllib.urlencode(args)))
-
-# this version assumes the CustomerSupport return value conventions
-def do_CONTROLAPI_checked(args):
-    ret = do_CONTROLAPI(args)
-    if 'error' in ret:
-        raise Exception('CONTROLAPI method failed: ' + (ret['error'] if isinstance(ret['error'], basestring) else repr(ret['error'])))
-    else:
-        return ret['result']
 
 def do_lookup(args):
     cmd_args = ['--live']

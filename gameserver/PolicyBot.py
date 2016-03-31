@@ -6,10 +6,11 @@
 
 # Script that runs externally to main server process to enforce anti-alt/anti-refresh policies.
 
-import sys, time, urllib, requests, getopt, traceback, random, socket
+import sys, time, getopt, traceback, random
 import SpinConfig, SpinJSON, SpinParallel
 import SpinNoSQL, SpinLog, SpinNoSQLLog
 import SpinSingletonProcess
+import ControlAPI
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -21,20 +22,8 @@ BATCH_SIZE = 5
 time_now = int(time.time())
 
 def do_CONTROLAPI(args):
-    host = SpinConfig.config['proxyserver'].get('internal_listen_host',
-                                                SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
-    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
-    url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
     args['ui_reason'] = 'PolicyBot'
-    args['spin_user'] = 'PolicyBot'
-    args['secret'] = SpinConfig.config['proxy_api_secret']
-    response = requests.post(url+'?'+urllib.urlencode(args))
-    assert response.status_code == 200
-    ret = SpinJSON.loads(response.text)
-    if 'error' in ret:
-        raise Exception('CONTROLAPI error: %r' % ret['error'])
-
-    return ret
+    return ControlAPI.CONTROLAPI(args, 'PolicyBot')
 
 # given two pcache entries for an alt pair, return the entry that is the more senior "master" account
 def master_account(a, b):
@@ -160,7 +149,7 @@ class AntiRefreshPolicy(Policy):
         # check repeat offender status via cooldown
         # note: anti-refresh uses a stacked cooldown for repeat offenses
 
-        active_stacks = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_active', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result']
+        active_stacks = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_active', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
         repeat_offender_level = max(active_stacks, 0)
 
         # things we might do to the player...
@@ -222,27 +211,27 @@ class AntiRefreshPolicy(Policy):
         if not self.dry_run:
             # region change should go first, since if it fails, we don't want to leave player in a strange state
             if new_region:
-                assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']})['result'] == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
             if clear_repeat_stacks:
-                assert do_CONTROLAPI({'user_id':user_id, 'method':'clear_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result'] == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'clear_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME}) == 'ok'
 
             if add_repeat_stack:
-                assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'add_stack': 1, 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION})['result'] == 'ok'
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'add_stack': 1, 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
 
             if do_banish:
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
-                                      'data':SpinJSON.dumps({'tag':'anti_refresh'})})['result'] == 'ok'
+                                      'data':SpinJSON.dumps({'tag':'anti_refresh'})}) == 'ok'
 
             # always give player a fresh start on the idle check
-            assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'})['result'] == 'ok'
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'}) == 'ok'
 
             if message_body:
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
                                       'message_body': message_body,
                                       'message_subject': 'Anti-Refresh Policy',
-                                      })['result'] == 'ok'
+                                      }) == 'ok'
 
         event_props = {'user_id': user_id, 'event_name': event_name, 'code': int(event_name[0:4]),
                        'reason':'anti_refresh_violation', 'repeat_offender': repeat_offender_level}
@@ -367,7 +356,7 @@ class AntiAltPolicy(Policy):
         is_majority_anti_alt_game = len(anti_alt_regions) > len(pro_alt_regions)
 
         # check repeat offender status via cooldown
-        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})['result']
+        togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
         is_repeat_offender = (togo > 0)
 
         # pick destination region
@@ -396,15 +385,15 @@ class AntiAltPolicy(Policy):
             assert new_region['id'] != cur_region_name
 
         if not self.dry_run:
-            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION})['result'] == 'ok'
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME, 'duration': self.REPEAT_OFFENDER_COOLDOWN_DURATION}) == 'ok'
 
             if is_repeat_offender:
                 # only repeat offenders get the banishment aura
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'apply_aura', 'aura_name':'region_banished',
                                       'duration': self.REGION_BANISH_DURATION,
-                                      'data':SpinJSON.dumps({'tag':'anti_alt'})})['result'] == 'ok'
+                                      'data':SpinJSON.dumps({'tag':'anti_alt'})}) == 'ok'
 
-            assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']})['result'] == 'ok'
+            assert do_CONTROLAPI({'user_id':user_id, 'method':'change_region', 'new_region':new_region['id']}) == 'ok'
 
 
         # player messages are slightly different depending on whether the game is majority anti-alt (DV) or not (WSE,TR,etc).
@@ -423,7 +412,7 @@ class AntiAltPolicy(Policy):
             assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
                                   'message_body': message_body,
                                   'message_subject': 'Alt Account Policy',
-                                  })['result'] == 'ok'
+                                  }) == 'ok'
 
         event_props = {'user_id': user_id, 'event_name': '7301_policy_bot_punished', 'code':7301,
                        'old_region': cur_region_name, 'new_region': new_region['id'],
@@ -470,7 +459,7 @@ def my_slave(input):
         print >> msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id)
 
         try:
-            player = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_player'})['result']
+            player = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_player'})
             for check in checks:
                 check.check_player(user_id, player)
         except KeyboardInterrupt:

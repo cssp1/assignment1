@@ -11,10 +11,12 @@ import SpinNoSQL
 import SpinConfig
 import SpinJSON
 import SpinS3
+import ControlAPI
+
+def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
 
 # load some standard Python libraries
 import sys, time, getopt, string
-import requests, urllib, socket
 
 time_now = int(time.time())
 
@@ -211,20 +213,6 @@ def check_bloat(input, min_size = 1024, print_max = 20):
     sizes = sorted(sizes, key = lambda x: -x[1])
     for key, slen in sizes[0:print_max]:
         print '%-50s %-10.2f kB' % (key, slen/1024.0)
-
-def do_CONTROLAPI(args):
-    host = SpinConfig.config['proxyserver'].get('internal_listen_host',
-                                                SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
-    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
-    url = '%s://%s:%d/CONTROLAPI' % (proto, host, SpinConfig.config['proxyserver']['external_http_port' if proto == 'http' else 'external_ssl_port'])
-    args['spin_user'] = 'check_player.py'
-    args['secret'] = SpinConfig.config['proxy_api_secret']
-    response = requests.post(url+'?'+urllib.urlencode(args))
-    assert response.status_code == 200
-    ret = SpinJSON.loads(response.text)
-    if 'error' in ret:
-        raise Exception('CONTROLAPI error: %r' % ret['error'])
-    return ret['result']
 
 # main program
 if __name__ == '__main__':
