@@ -13,10 +13,13 @@ import SpinConfig
 import SpinJSON
 import SpinNoSQLId
 import SpinSingletonProcess
+import ControlAPI
 import AIBaseRandomizer
 from Region import Region
 import Sobol
 import sys, getopt, time, random, copy, math
+
+def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, spin_user = 'maptool', verbose = False)
 
 time_now = int(time.time())
 event_time_override = None
@@ -156,7 +159,7 @@ def nosql_read_all_objects(region_id, base_id, base_landlord_id):
                   'spec': state['spec']
                   }
         for FIELD in ('level', 'hp_ratio', 'tag', 'metadata', 'creation_time', 'repair_finish_time', 'disarmed',
-                      'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time',
+                      'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time', 'squad_id',
                       'orders','patrol','equipment','produce_start_time','produce_rate','contents'):
             if FIELD in state:
                 props[FIELD] = state[FIELD]
@@ -390,51 +393,33 @@ def make_valentina_mail(user_id, subject='', body='', days_to_claim=3, attachmen
     return message
 
 def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui_name = '', reason = 'expired', dry_run = True):
+    if len(objlist) < 1: return # nothing to return
     if user_id < 1100: return # AI user
+    if feature['base_type'] != 'squad':
+        raise Exception('cannot refund units from a feature that is not a squad')
+    squad_id = int(feature['base_id'].split('_')[1])
 
-    # first try to refund units directly to my_base - if it works, don't send them as attachments
-    if feature['base_type'] == 'squad':
-        to_add = []
-        squad_id = int(feature['base_id'].split('_')[1])
-        for obj in objlist:
-            if obj['spec'] not in gamedata['units']: continue
-            props = {'spec': obj['spec'],
-                     'xy': [90,90],
-                     'squad_id': squad_id}
-            for FIELD in ('obj_id', 'hp_ratio', 'level', 'equipment'):
-                if FIELD in obj:
-                    props[FIELD] = obj[FIELD]
-            to_add.append(props)
+    # two paths: first choice is to use CONTROLAPI CustomerSupport to return the squad intact
+    # if that fails (e.g. if server is not running), then break the squad and send the units by mail
 
-        if to_add and lock_manager.acquire_player(user_id):
-            try:
-                player_data = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
+    try:
+        if verbose: print 'DOCK', pretty_feature(feature), 'to', user_id, repr(objlist)
+        if not dry_run:
+            do_CONTROLAPI({'user_id': user_id, 'method': 'squad_dock_units', 'units': SpinJSON.dumps(objlist), 'squad_id': squad_id})
+        del objlist[:] # clear them out
+        return # done!
+    except ControlAPI.ControlAPIException: pass
+    except ControlAPI.ControlAPIGameException: pass
 
-                # force items with squad_ids not in player.squads into reserves, to avoid accidentally giving the player more squads than allowed
-                player_squads = player_data.get('squads',{})
-                for item in to_add:
-                    if str(item['squad_id']) not in player_squads:
-                        item['squad_id'] = -1
-
-                if verbose: print 'REFUND (my_base)', pretty_feature(feature), 'to', user_id, repr(to_add)
-                player_data['my_base'] += to_add
-                player_data['generation'] = player_data.get('generation',0)+1
-
-                if not dry_run:
-                    SpinUserDB.driver.sync_write_player(user_id, SpinJSON.dumps(player_data, pretty=True, newline=True, double_precision=5))
-
-                objlist = [] # hand off ownership to avoid duping
-
-            finally:
-                lock_manager.release_player(user_id, generation = player_data.get('generation',-1))
+    # fallback path: send by mail
 
     units = {}
-    to_remove = []
     for obj_data in objlist:
         if obj_data['spec'] not in gamedata['units']: continue
         spec = gamedata['units'][obj_data['spec']]
         units[spec['name']] = 1 + units.get(spec['name'],0)
-        to_remove.append(obj_data)
+
+    if not units: return # no units
 
     attachments = []
     for name, qty in units.iteritems():
@@ -470,10 +455,7 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
                                   body = message_body, attachments = attachments)
 
     if not dry_run:
-        # send the mail and do the object removal as atomically as possible to avoid duping
         nosql_client.msg_send([message])
-        for obj_data in to_remove: objlist.remove(obj_data)
-        nosql_client.drop_mobile_objects_by_base(region_id, feature['base_id'])
 
 def expire_all_quarries(db, lock_manager, region_id, dry_run = True):
     map_cache = get_existing_map_by_type(db, region_id, 'quarry')
@@ -489,7 +471,8 @@ def expire_quarry(db, lock_manager, region_id, base_id, feature, dry_run = True)
 
     objlist = nosql_read_all_objects(region_id, base_id, feature.get('base_landlord_id',-1)) # actually only needs mobile objects
 
-    refund_units(db, region_id, feature, objlist, feature.get('base_landlord_id',-1), ui_name = feature.get('base_ui_name','unknown'), days_to_claim = 7, reason = 'expired', dry_run = dry_run)
+    # should not be needed - can't put units into a quarry base (only a guard squad)
+    # refund_units(db, region_id, feature, objlist, feature.get('base_landlord_id',-1), ui_name = feature.get('base_ui_name','unknown'), days_to_claim = 7, reason = 'expired', dry_run = dry_run)
 
     if not dry_run:
         nosql_client.drop_all_objects_by_base(region_id, base_id)
@@ -527,7 +510,9 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
     feature['base_last_conquer_time'] = base_data['base_last_conquer_time'] = time_now
     feature['base_last_landlord_id'] = base_data['base_last_landlord_id'] = owner_id
 
-    refund_units(db, region_id, feature, base_objects, owner_id, ui_name = feature.get('base_ui_name','unknown'), days_to_claim = days_to_claim_units, reason = 'abandoned', dry_run = dry_run)
+    # should not be needed - can't put units into a quarry base (only a guard squad)
+    # refund_units(db, region_id, feature, base_objects, owner_id, ui_name = feature.get('base_ui_name','unknown'), days_to_claim = days_to_claim_units, reason = 'abandoned', dry_run = dry_run)
+    # if refund_units() is used, need to individual drop the returned ones
 
     if not dry_run:
         new_props = {'base_landlord_id':base_data['base_landlord_id'],
