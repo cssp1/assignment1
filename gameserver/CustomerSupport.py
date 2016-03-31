@@ -58,7 +58,7 @@ class Handler(object):
             ui_reason = log_args['ui_reason']
             del log_args['ui_reason']
         else:
-            ui_reason = 'Not specified'
+            ui_reason = None
         if 'spin_user' in log_args:
             spin_user = log_args['spin_user']
             del log_args['spin_user']
@@ -67,8 +67,8 @@ class Handler(object):
         if 'user_id' in log_args: del log_args['user_id']
         entry = {'time': self.time_now,
                  'spin_user': spin_user,
-                 'method': call_name,
-                 'ui_reason': ui_reason}
+                 'method': call_name}
+        if ui_reason: entry['ui_reason'] = ui_reason
         if log_args: entry['args'] = log_args
         return entry
 
