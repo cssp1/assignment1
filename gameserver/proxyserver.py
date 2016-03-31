@@ -1972,7 +1972,7 @@ class GameProxy(proxy.ReverseProxyResource):
             if not fwd:
                 request.setResponseCode(http.BAD_GATEWAY)
                 exception_log.event(proxy_time, 'cannot find server for CONTROLAPI call: '+log_request(request))
-                return ''
+                return '502 Bad Gateway'
             return self.render_via_proxy(fwd, request)
 
         elif self.path == '/KGAPI':
@@ -2122,7 +2122,7 @@ class GameProxy(proxy.ReverseProxyResource):
             if not fwd:
                 request.setResponseCode(http.BAD_GATEWAY)
                 exception_log.event(proxy_time, 'cannot find server for OGPAPI call: '+log_request(request))
-                return ''
+                return '502 Bad Gateway'
 
             return self.render_via_proxy(fwd, request)
 
