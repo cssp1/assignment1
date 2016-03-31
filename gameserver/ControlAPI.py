@@ -31,7 +31,7 @@ class ControlAPIGameException(Exception):
         return 'CONTROLAPI bad request: %r' + (self.ret_error if isinstance(self.ret_error, basestring) else repr(self.ret_error))
 
 # makes no assumption about return value conventions - used for legacy non-CustomerSupport methods
-def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_port = None):
+def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_port = None, verbose = False):
     host = host or SpinConfig.config['proxyserver'].get('internal_listen_host',
                                                         SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
     proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
@@ -42,6 +42,8 @@ def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_po
     args = copy.copy(args)
     if spin_user:
         args['spin_user'] = spin_user
+    if verbose:
+        print 'CONTROLAPI', url, args
     args['secret'] = SpinConfig.config['proxy_api_secret']
     try:
         response = requests.post(url, data = args)
@@ -56,8 +58,8 @@ def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_po
     return response.text
 
 # this version assumes the CustomerSupport return value conventions
-def CONTROLAPI(args, spin_user = None):
-    ret = SpinJSON.loads(CONTROLAPI_raw(args, spin_user = spin_user))
+def CONTROLAPI(args, spin_user = None, verbose = False):
+    ret = SpinJSON.loads(CONTROLAPI_raw(args, spin_user = spin_user, verbose = verbose))
     if 'error' in ret:
         raise ControlAPIGameException(ret['error'])
     return ret['result']

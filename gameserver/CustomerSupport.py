@@ -607,7 +607,7 @@ class HandleSquadDockUnits(Handler):
                 if state['obj_id'] in home_objects_by_id:
                     if self.gamedata['server'].get('log_nosql',0) >= 2:
                         self.gamesite.exception_log.event(self.time_now, 'player %d HandleSquadDockUnits %d already has object %s at home, skipping' % \
-                                                          (self.user_id, state['squad_id'], state['obj_id']))
+                                                          (self.user_id, self.squad_id, state['obj_id']))
                     continue
                 home_objects_by_id[state['obj_id']] = state
 
