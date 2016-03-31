@@ -28,10 +28,9 @@ def upload_battle_archive(filename, bucketname):
 
 
 def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucket = None):
-    if filename.endswith('-chat.json') or \
-       filename.endswith('-pcheck.json') or \
-       filename.endswith('-gamebucks.json') or \
-       filename.endswith('-metrics.json') or \
+    # "precious" files that should be kept as long as possible
+    # (financial / auditing related things)
+    if filename.endswith('-pcheck.json') or \
        filename.endswith('-credits.json') or \
        filename.endswith('-fbrtapi.txt') or \
        filename.endswith('-xsapi.txt') or \
@@ -52,6 +51,7 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
         else:
             print 'keeping vital', filename
 
+    # special case for exceptions log
     elif filename.endswith('-exceptions.txt'):
         if ((not is_sandbox) and (os.path.getmtime(filename) >= (time_now - SAVE_EXCEPTIONS))) or \
            (is_sandbox and (os.path.getmtime(filename) >= (time_now - SAVE_RECENT))):
@@ -61,7 +61,11 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
             if not dry_run:
                 os.unlink(filename)
 
-    elif filename.endswith('-dbserver.txt') or \
+    # normal log files that should be kept temporarily only
+    elif filename.endswith('-chat.json') or \
+         filename.endswith('-gamebucks.json') or \
+         filename.endswith('-metrics.json') or \
+         filename.endswith('-dbserver.txt') or \
          filename.endswith('-proxyserver.txt') or \
          filename.endswith('-purchase_ui.json') or \
          filename.endswith('-traces.txt') or \
@@ -80,6 +84,7 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
                 if not dry_run:
                     os.unlink(filename)
 
+    # special cases for battle logs
     elif filename.endswith('-battles'):
         if os.path.getmtime(filename) >= (time_now - SAVE_BATTLES):
             print 'keeping recent', filename
@@ -108,6 +113,7 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
         if not dry_run:
             os.unlink(filename)
 
+    # special cases for battle replays
     elif filename.endswith('-replays'):
         if os.path.getmtime(filename) >= (time_now - SAVE_REPLAYS):
             print 'keeping recent', filename
@@ -116,6 +122,7 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
             if not dry_run:
                 subprocess.check_call(["rm", "-r", filename])
 
+    # obsolete log files that should be deleted immediately
     elif filename.endswith('-sessions.json') or \
          filename.endswith('-machine.json'):
         print 'DELETING', filename
