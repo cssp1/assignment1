@@ -6149,8 +6149,11 @@ class GameObject:
         assert self.obj_id # should have already been set up by reconstitute_object() or the constructor
         if 'obj_id' in state: assert state['obj_id'] == self.obj_id
 
-        self.x = state['xy'][0]
-        self.y = state['xy'][1]
+        if 'xy' in state:
+            self.x, self.y = state['xy']
+        else:
+            self.x, self.y = 0, 0
+
         self.level = min(max(state.get('level',1), 1), self.spec.maxlevel)
         self.equipment = state.get('equipment', None)
 
@@ -9266,7 +9269,7 @@ class Player(AbstractPlayer):
 
         try:
             to_add = list(gamesite.nosql_client.get_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map'))
-            self.squad_dock_units(to_add)
+            self.squad_dock_units(squad_id, to_add, force = force)
 
             gamesite.nosql_client.drop_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map')
             gamesite.nosql_client.drop_map_feature(self.home_region, self.squad_base_id(squad_id), originator=self.user_id, reason='squad_exit_map')
@@ -9277,25 +9280,23 @@ class Player(AbstractPlayer):
             # reformat map_cache entry for client-side deletion
             entry = {'base_id': self.squad_base_id(squad_id), 'DELETED': 1}
 
-            # update in-memory version of the squad (under player.squads)
-            for FIELD in ('map_loc', 'map_path', 'travel_speed'):
-                if FIELD in squad: del squad[FIELD]
-
         finally:
             if lock_id: gamesite.nosql_client.map_feature_lock_release(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='squad_exit_map')
 
         return True, [entry], None
 
     # return a list of units from the map (JSON states) into home base
-    def squad_dock_units(self, state_list):
+    def squad_dock_units(self, squad_id, state_list, force = False):
+        squad = self.verify_squad(squad_id, require_at_home = False, require_away = (not force))
         for state in state_list:
-            if state['kind'] != 'mobile' or state['owner_id'] != self.user_id:
+            if ('kind' in state and state['kind'] != 'mobile') or ('owner_id' in state and state['owner_id'] != self.user_id):
                 gamesite.exception_log.event(server_time, 'player %d squad_dock_units bad state: %r' % (self.user_id, state))
                 continue
 
             # force items with squad_ids not in player.squads into reserves, to avoid accidentally giving the player more squads than allowed
-            if 'squad_id' in state and str(state['squad_id']) not in self.squads:
-                state['squad_id'] = -1
+            if 'squad_id' in state:
+                if state['squad_id'] != squad_id or str(state['squad_id']) not in self.squads:
+                    state['squad_id'] = -1
 
             if ('obj_id' in state) and self.get_object_by_obj_id(state['obj_id'], fail_missing = False):
                 if gamedata['server'].get('log_nosql',0) >= 2:
@@ -9305,6 +9306,10 @@ class Player(AbstractPlayer):
 
             self.home_base_add(reconstitute_object(self, self, state, context = 'player %d squad_dock_units' % (self.user_id,)))
 
+        if squad:
+            # update in-memory version of the squad (under player.squads)
+            for FIELD in ('map_loc', 'map_path', 'travel_speed'):
+                if FIELD in squad: del squad[FIELD]
 
     # get level-dependent quantity (based on PLAYER level)
     def get_leveled_quantity(self, qty, do_clamp = True):

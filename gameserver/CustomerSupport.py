@@ -574,6 +574,57 @@ class HandleSendMessage(MessageSender):
                 'subject':self.args.get('message_subject', 'Support Issue'),
                 'body': self.args['message_body']}
 
+class HandleSquadDockUnits(Handler):
+    need_user = False
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.squad_id = int(self.args['squad_id'])
+        self.state_list = SpinJSON.loads(self.args['units']) if 'units' in self.args else []
+    def do_exec_online(self, session, retmsg):
+        session.player.squad_dock_units(self.squad_id, self.state_list, force = False) # shouldn't need to force here
+        session.send([["SQUADS_UPDATE", session.player.squads]])
+        # note: we don't send any army updates here, because the player "should" know about the units from a previous map ping
+        return ReturnValue(result = 'ok')
+    def do_exec_offline(self, user, player):
+        # DO accept units from unknown squads, but put them into reserves
+        squad = player['squads'].get(str(self.squad_id), {})
+        home_objects_by_id = dict((obj['obj_id'], obj) for obj in player['my_base'])
+        new_obj_list = []
+
+        for state in self.state_list:
+            if ('kind' in state and state['kind'] != 'mobile') or ('owner_id' in state and state['owner_id'] != self.user_id):
+                self.gamesite.exception_log.event(self.time_now, 'player %d HandleSquadDockUnits bad state: %r' % (self.user_id, state))
+                continue
+
+            # force items with squad_ids not in player.squads into reserves, to avoid accidentally giving the player more squads than allowed
+            if 'squad_id' in state:
+                if state['squad_id'] != self.squad_id or str(state['squad_id']) not in player['squads']:
+                    state['squad_id'] = -1
+
+            if ('obj_id' in state):
+                if state['obj_id'] in home_objects_by_id:
+                    if self.gamedata['server'].get('log_nosql',0) >= 2:
+                        self.gamesite.exception_log.event(self.time_now, 'player %d HandleSquadDockUnits %d already has object %s at home, skipping' % \
+                                                          (self.user_id, state['squad_id'], state['obj_id']))
+                    continue
+                home_objects_by_id[state['obj_id']] = state
+
+            # slightly mutate object state to conform NoSQL format to playerdb format
+            assert 'spec' in state
+            for FIELD in ('owner_id','kind'):
+                if FIELD in state: del state[FIELD]
+            if 'xy' not in state: state['xy'] = [0,0] # will be fixed on next load
+
+            new_obj_list.append(state)
+
+        player['my_base'] += new_obj_list # append atomically
+
+        # update player.squads cache to show the squad as at home now
+        for FIELD in ('map_loc', 'map_path', 'travel_speed'):
+            if FIELD in squad: del squad[FIELD]
+
+        return ReturnValue(result = 'ok')
+
 class HandleChangeRegion(Handler):
     def __init__(self, *pargs, **pkwargs):
         Handler.__init__(self, *pargs, **pkwargs)
@@ -963,6 +1014,7 @@ methods = {
     'chat_ungag': HandleChatUngag,
     'give_item': HandleGiveItem,
     'send_message': HandleSendMessage,
+    'squad_dock_units': HandleSquadDockUnits,
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
