@@ -22,7 +22,7 @@ BATCH_SIZE = 5
 time_now = int(time.time())
 
 def do_CONTROLAPI(args):
-    args['ui_reason'] = 'PolicyBot'
+    args['ui_reason'] = 'PolicyBot' # for CustomerSupport action log entries
     return ControlAPI.CONTROLAPI(args, 'PolicyBot')
 
 # given two pcache entries for an alt pair, return the entry that is the more senior "master" account

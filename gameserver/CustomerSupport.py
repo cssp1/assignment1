@@ -581,12 +581,13 @@ class HandleSquadDockUnits(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.squad_id = int(self.args['squad_id'])
         self.state_list = SpinJSON.loads(self.args['units']) if 'units' in self.args else []
-    def do_exec_online(self, session, retmsg):
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
         session.player.squad_dock_units(self.squad_id, self.state_list, force = False) # shouldn't need to force here
         session.send([["SQUADS_UPDATE", session.player.squads]])
         # note: we don't send any army updates here, because the player "should" know about the units from a previous map ping
         return ReturnValue(result = 'ok')
-    def do_exec_offline(self, user, player):
+    def exec_offline(self, user, player):
         # DO accept units from unknown squads, but put them into reserves
         squad = player['squads'].get(str(self.squad_id), {})
         home_objects_by_id = dict((obj['obj_id'], obj) for obj in player['my_base'])
