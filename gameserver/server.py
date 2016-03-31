@@ -9301,6 +9301,8 @@ class Player(AbstractPlayer):
                 if gamedata['server'].get('log_nosql',0) >= 2:
                     gamesite.exception_log.event(server_time, 'player %d squad_dock_units %d already has object %s at home, skipping' % \
                                                  (self.user_id, state['squad_id'], state['obj_id']))
+                continue
+
             self.home_base_add(reconstitute_object(self, self, state, context = 'player %d squad_dock_units' % (self.user_id,)))
 
 
