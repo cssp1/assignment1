@@ -9057,7 +9057,8 @@ class Player(AbstractPlayer):
                    'base_ui_name': squad['ui_name'], # denormalized for ease of querying
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
-                   'base_map_path': None # explicit null for client's benefit
+                   'base_map_path': None, # explicit null for client's benefit
+                   'travel_speed': travel_speed
                    }
         if is_raid:
             feature['raid'] = 1
