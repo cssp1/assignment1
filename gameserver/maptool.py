@@ -16,6 +16,7 @@ import SpinSingletonProcess
 import ControlAPI
 import AIBaseRandomizer
 from Region import Region
+from AStar import SquadPathfinder, hex_distance
 import Sobol
 import sys, getopt, time, random, copy, math
 
@@ -229,6 +230,9 @@ class LockManager (object):
 
 def get_existing_map_by_type(db, region_id, base_type):
     return dict([(x['base_id'], x) for x in nosql_client.get_map_features_by_type(region_id, base_type)])
+def get_existing_map_by_type_spatially(db, region_id, base_type):
+    return dict([(tuple(x['base_map_loc']), x) for x in nosql_client.get_map_features_by_type(region_id, base_type)])
+
 def get_existing_map_by_base_id(db, region_id, base_id):
     x = nosql_client.get_map_feature_by_base_id(region_id, base_id)
     if not x: return {}
@@ -469,9 +473,8 @@ def expire_quarry(db, lock_manager, region_id, base_id, feature, dry_run = True)
         print '(locked, skipping)'
         return
 
-    objlist = nosql_read_all_objects(region_id, base_id, feature.get('base_landlord_id',-1)) # actually only needs mobile objects
-
     # should not be needed - can't put units into a quarry base (only a guard squad)
+    # objlist = nosql_read_all_objects(region_id, base_id, feature.get('base_landlord_id',-1)) # actually only needs mobile objects
     # refund_units(db, region_id, feature, objlist, feature.get('base_landlord_id',-1), ui_name = feature.get('base_ui_name','unknown'), days_to_claim = 7, reason = 'expired', dry_run = dry_run)
 
     if not dry_run:
@@ -1496,8 +1499,81 @@ def recall_squad(db, lock_manager, region_id, user_id, base_id, days_to_claim_un
 
     lock_manager.forget(region_id, base_id)
 
-    print 'RECALLED', pretty_feature(feature)
+    if verbose:
+        print 'RECALLED', pretty_feature(feature)
     return True
+
+def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
+    region = Region(gamedata, region_id)
+    pf = SquadPathfinder(region)
+    home_cache = get_existing_map_by_type_spatially(db, region_id, 'home')
+    quarry_cache = get_existing_map_by_type_spatially(db, region_id, 'quarry')
+    hive_cache = get_existing_map_by_type_spatially(db, region_id, 'hive')
+    raid_cache = get_existing_map_by_type_spatially(db, region_id, 'hive')
+    squad_cache = get_existing_map_by_type_spatially(db, region_id, 'squad')
+
+    # set up map occupancy
+    for cache in home_cache, quarry_cache, hive_cache, raid_cache, squad_cache:
+        for loc, feature in cache.iteritems():
+            if region.feature_blocks_map(feature, 'never'): # squad_block_mode
+                pf.occupancy.block_hex(loc, 1, feature)
+
+    FUDGE_TIME = 5.0 # allow client some time to move the squad after it gets to its destination
+
+    for squad in squad_cache.itervalues():
+        if not squad.get('raid'): continue # not a raid
+        if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - FUDGE_TIME:
+            continue # still moving
+        loc = tuple(squad['base_map_loc'])
+        owner_id, squad_id = map(int, squad['base_id'][1:].split('_'))
+        assert squad['base_landlord_id'] == owner_id
+
+        if verbose: print 'RAID SQUAD', pretty_feature(squad), 'stationary'
+
+        if loc in home_cache:
+            home = home_cache[loc]
+            if home['base_landlord_id'] == owner_id: # it's home!
+                recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
+                continue
+            else:
+                print 'unhandled case - squad is at an enemy home base!'
+
+        # auto-navigate the squad towards home
+        home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
+        if not home:
+            # squad's home base not found on map - just dock immediately
+            recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
+            continue
+        else:
+            home = home_cache[tuple(home['base_map_loc'])] # look it up again so the dest_feature identity check works
+
+        path = pf.squad_find_path_adjacent_to(loc, home['base_map_loc'], dest_feature = home, is_raid = True)
+        if not path or len(path) < 1 or hex_distance(path[-1], home['base_map_loc']) != 0:
+            print 'Squad return pathfinding unsuccessful!', pretty_feature(squad), path
+            recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
+            continue
+
+        # set squad moving
+        next_eta = int(time.time())
+        new_path = [{'xy': squad['base_map_loc'], 'eta': next_eta}]
+        for i in xrange(len(path)):
+            waypoint = path[i]
+            next_eta += float(1.0/(gamedata['territory']['unit_travel_speed_factor']*squad.get('travel_speed',1.0)))
+            new_path.append({'xy': waypoint, 'eta': next_eta})
+
+        if not lock_manager.acquire(region_id, squad['base_id']): # yes, there's a race condition here
+            if verbose: print 'Squad locked, skipping'
+            continue
+        try:
+            if verbose: print 'Squad pathing back to home', path
+            # note: this will wait until the NEXT run of resolve() to actually dock the squad and units
+            if not dry_run:
+                nosql_client.move_map_feature(region_id, squad['base_id'], {'base_map_loc': home['base_map_loc'],
+                                                                            'base_map_path': new_path},
+                                              old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
+                                              exclusive = -1, reason = 'resolve')
+        finally:
+            lock_manager.release(region_id, squad['base_id'])
 
 def abandon_quarries_and_remove_player_from_map(db, lock_manager, region_id, user_id, home_feature = None,
                                                 skip_quarry_owners = False, days_to_claim_units = 30, reason = None, dry_run = True):
@@ -1739,39 +1815,46 @@ if __name__ == '__main__':
             # MASTER PER-REGION MAINTENANCE JOB
             with SpinSingletonProcess.SingletonProcess('maptool-region-maint-%s-%s' % (SpinConfig.config['game_id'], region_id)):
                 assert base_type == 'ALL'
+                raids_enabled = gamedata['regions'][region_id].get('spawn_raids', True) and len(gamedata['raids_client']['templates']) > 0
+
                 print "====== %s ======" % region_id
 
-                # 1. run low-level database maintenance (bust stale locks)
+                # 10. run low-level database maintenance (bust stale locks)
                 print "%s: busting stale map feature locks..." % region_id
                 nosql_client.do_region_maint(region_id)
 
-                # 2. weed expired bases
+                # 20. weed expired bases
                 print "%s: weeding expired hives/quarries/raids..." % region_id
                 weed_expired_bases(db, lock_manager, region_id, ['hive','quarry','raid'], dry_run=dry_run)
 
-                # 3. weed churned players
+                # 30. weed churned players
                 print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
                 weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
 
-                # 4. weed orphaned squads
+                # 40. weed orphaned squads
                 print "%s: weeding orphan squads..." % region_id
                 weed_orphan_squads(db, lock_manager, region_id, dry_run=dry_run)
 
-                # 5. weed orphaned units
+                # 50. weed orphaned units
                 print "%s: weeding orphan objects..." % region_id
                 weed_orphan_objects(db, lock_manager, region_id, dry_run=dry_run)
 
-                # 6. update turf war
+                # 55. resolve raid squad issues
+                if raids_enabled:
+                    print "%s: resolving raid squads..." % region_id
+                    resolve_raid_squads(db, lock_manager, region_id, dry_run=dry_run)
+
+                # 60. update turf war
                 if 'alliance_turf' in gamedata['quarries_client'] and gamedata['regions'][region_id].get('enable_turf_control',False):
                     print "%s: turf update..." % region_id
                     update_turf(db, lock_manager, region_id, dry_run=dry_run)
 
-                # 7. respawn hives/quarries
+                # 70. respawn hives/quarries/raids
                 print "%s: spawning hives..." % region_id
                 spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
                 print "%s: spawning quarries..." % region_id
                 spawn_all_quarries(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
-                if gamedata['regions'][region_id].get('spawn_raids', True) and len(gamedata['raids_client']['templates']) > 0:
+                if raids_enabled:
                     print "%s: spawning raids..." % region_id
                     spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
 
@@ -1798,7 +1881,11 @@ if __name__ == '__main__':
                 if base_id is not None:
                     recall_squad(db, lock_manager, region_id, int(base_id.split('_')[0][1:]), base_id, dry_run=dry_run)
                 else:
-                    print 'please specitfy base_id'
+                    print 'please specify base_id'
+            elif action == 'resolve':
+                assert base_id is None
+                resolve_raid_squads(db, lock_manager, region_id, dry_run=dry_run)
+
             else:
                 print 'unknown action '+action
         elif base_type == 'hive':
