@@ -29118,7 +29118,8 @@ player.squad_travel_time = function(squad_id, path) {
     return (path.length/(gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*(squad_data['travel_speed']||1)));
 };
 
-// return a path that leads to hex "dest", or immediately adjacent to it
+// return a path that ends on hex "dest", or if "dest" is blocked, an open hex immediately adjacent to it
+// returns null if no path exists.
 player.squad_find_path_adjacent_to = function(squad_id, dest) {
     if(!session.region || !session.region.data) { return null; }
     if(player.squad_is_moving(squad_id)) { throw Error('squad '+squad_id.toString()+' is still moving'); }
