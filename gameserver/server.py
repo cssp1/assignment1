@@ -8999,8 +8999,8 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def squad_enter_map(self, squad_id, coords, raid_info):
-        if raid_info and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
+    def squad_enter_map(self, squad_id, coords, is_raid):
+        if is_raid and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
         if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
         if (not (gamesite.nosql_client and self.home_region)):
             return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
@@ -9018,7 +9018,7 @@ class Player(AbstractPlayer):
         if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
 
         # raids deploy at base, otherwise squads deploy next to base
-        required_dist = 0 if raid_info else 1
+        required_dist = 0 if is_raid else 1
 
         if coords[0] < 0 or coords[0] >= gamedata['regions'][self.home_region]['dimensions'][0] or \
            coords[1] < 0 or coords[1] >= gamedata['regions'][self.home_region]['dimensions'][1] or \
@@ -9059,7 +9059,7 @@ class Player(AbstractPlayer):
                    'base_map_loc': coords,
                    'base_map_path': None # explicit null for client's benefit
                    }
-        if raid_info:
+        if is_raid:
             feature['raid'] = 1
             exclusive = -1 # no collision checks
             exclude_filter = None
@@ -9084,13 +9084,13 @@ class Player(AbstractPlayer):
 
         squad['map_loc'] = feature['base_map_loc']
         squad['travel_speed'] = travel_speed
-        if raid_info:
+        if is_raid:
             squad['raid'] = 1
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
         return True, [feature], None
 
-    def squad_step(self, squad_id, coords):
+    def squad_step(self, squad_id, coords, is_raid_launch):
         assert (gamesite.nosql_client and self.home_region)
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
 
@@ -9099,6 +9099,19 @@ class Player(AbstractPlayer):
 
         squad = self.verify_squad(squad_id, require_at_home = False, require_away = True)
         if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad was not deployed into map yet
+
+        if squad.get('raid'):
+            if is_raid_launch:
+                # initial map entry. Make sure raid is going somewhere useful.
+                if (not coords) or \
+                   (hex_distance(coords[-1], self.my_home.base_map_loc) != 0 and \
+                    not any(x.get('base_type') in ('raid',) \
+                            for x in gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)'))):
+                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_invalid_destination', coords[-1] if coords else None]
+            else:
+                # prevent re-directing raids anywhere other than back to home base
+                if (not coords) or hex_distance(coords[-1], self.my_home.base_map_loc) != 0:
+                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_cannot_redirect', coords[-1] if coords else None]
 
         if coords:
             if ('map_path' in squad) and (squad['map_path'][-1]['eta'] >= server_time):
@@ -27030,8 +27043,23 @@ class GAMEAPI(resource.Resource):
                     return
                 squad_id = int(spellargs[0])
                 coords = spellargs[1]
-                raid_info = spellargs[2]
-                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords, raid_info)
+                raid_info = spellargs[2] # None for regular squads, {'path':[[x,y],...]} for raids
+                is_raid = bool(raid_info)
+                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords, is_raid)
+                if is_raid and (not error_code):
+                    # raid squads: continue immediately with step
+                    # (this is the only chance to step towards something other than home base)
+                    raid_path = raid_info['path']
+                    step_success = True
+                    try:
+                        step_success, step_map_features, error_code = session.player.squad_step(squad_id, raid_path, True)
+                        map_features += step_map_features
+                    finally:
+                        if not step_success:
+                            # dock it immediately
+                            exit_success, exit_map_features, exit_error_code = session.player.squad_exit_map(session, squad_id, originator = session.player.user_id, force = True, reason='SQUAD_ENTER_MAP(raid failure)')
+                            map_features += exit_map_features
+
                 if error_code:
                     retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
@@ -27043,7 +27071,7 @@ class GAMEAPI(resource.Resource):
                 map_dimensions = gamedata['regions'][session.player.home_region]['dimensions']
                 max_steps = map_dimensions[0]+map_dimensions[1]
                 coords = spellargs[1][:max_steps] if spellargs[1] else None # may be null
-                success, map_features, error_code = session.player.squad_step(squad_id, coords)
+                success, map_features, error_code = session.player.squad_step(squad_id, coords, False)
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
