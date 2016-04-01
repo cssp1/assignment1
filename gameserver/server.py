@@ -9017,9 +9017,12 @@ class Player(AbstractPlayer):
 
         if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
 
+        # raids deploy at base, otherwise squads deploy next to base
+        required_dist = 0 if raid_info else 1
+
         if coords[0] < 0 or coords[0] >= gamedata['regions'][self.home_region]['dimensions'][0] or \
            coords[1] < 0 or coords[1] >= gamedata['regions'][self.home_region]['dimensions'][1] or \
-           hex_distance(self.my_home.base_map_loc, coords) != 1 or \
+           hex_distance(self.my_home.base_map_loc, coords) != required_dist or \
            Region(gamedata, self.home_region).obstructs_squads(coords):
             # deployment hex is invalid, or not adjacent to home base
             return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, coords]
