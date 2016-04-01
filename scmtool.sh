@@ -161,11 +161,11 @@ function do_version_git {
 function do_last_commit_message_git {
     SUBPATH="$2" # optional - path underneath the root to query the version for
     if [ "$SUBPATH" != "" ]; then
-	(cd "${ROOT}/${SUBPATH}" && git log --oneline -1 HEAD)
+    (cd "${ROOT}/${SUBPATH}" && git log --oneline -1 HEAD)
     else
-	for dir in $GIT_DIRS; do
-	    (cd $dir && git log --oneline -1 HEAD)
-	done
+    for dir in $GIT_DIRS; do
+        (cd $dir && git log --oneline -1 HEAD)
+    done
     fi
 }
 function do_stat_git {
@@ -220,7 +220,7 @@ else
                 ;;
             version)
                 do_version_git $@
-		;;
+        ;;
             last-commit-message)
                 do_last_commit_message_git $@
                 ;;
