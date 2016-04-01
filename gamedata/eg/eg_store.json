@@ -175,7 +175,7 @@
               "enable_attachment_pulsing": 1,
               "enable_bundle_value": 1
              }
-     },
+    },
 
     // GUI text for "Buy Gamebucks" dialog
     "ui_buy_gamebucks_warning": [
