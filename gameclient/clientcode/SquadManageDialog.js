@@ -126,10 +126,10 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     var pred_ok = rpred.is_satisfied(player, null);
     var pred_help = (!pred_ok ? get_requirements_help(rpred) : null);
 
-    // separate predicate check to deploy one addtional squad
+    // separate predicate check to deploy one additional squad
     var deploy_pred_ok, deploy_pred_help;
     if(SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id'])) {
-        var deploy_pred = {'predicate':'AND', 'subpredicates': [pred, get_squad_deployment_predicate()]};
+        var deploy_pred = {'predicate':'AND', 'subpredicates': [pred, get_squad_deployment_predicate(false /* is_raid */)]};
         var deploy_rpred = read_predicate(deploy_pred);
         deploy_pred_ok = deploy_rpred.is_satisfied(player, null);
         deploy_pred_help = (!deploy_pred_ok ? get_requirements_help(deploy_rpred) : null);

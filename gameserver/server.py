@@ -5668,6 +5668,7 @@ class GameObjectSpec(Spec):
         ["max_individual_donation_space", 0],
         ["provides_squads", 0],
         ["provides_deployed_squads", 0],
+        ["provides_deployed_raids", 0],
         ["provides_squad_space", 0],
         ["provides_total_space", 0],
         ["consumes_space", 0],
@@ -8520,6 +8521,8 @@ class Player(AbstractPlayer):
         return len(self.squads)-1 # don't count base defenders
     def num_deployed_squads(self):
         return len([d for d in self.squads.itervalues() if ('map_loc' in d)])
+    def num_deployed_raids(self):
+        return len([d for d in self.squads.itervalues() if ('map_loc' in d) and d.get('raid')])
 
     def which_squad_is_under_repair(self):
         squad_under_repair = None
@@ -9006,6 +9009,8 @@ class Player(AbstractPlayer):
             return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
         if self.num_deployed_squads() >= self.stattab.max_deployed_squads:
             return False, [], ["CANNOT_DEPLOY_SQUAD_LIMIT_REACHED", squad_id]
+        if self.num_deployed_raids() >= self.stattab.max_deployed_raids:
+            return False, [], ["CANNOT_DEPLOY_RAID_LIMIT_REACHED", squad_id]
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
         assert type(coords) is list and len(coords) == 2 and type(coords[0]) is int and type(coords[1]) is int
 
@@ -10306,6 +10311,7 @@ class Player(AbstractPlayer):
 
             self.max_squads = 0 # max number of mobile squads NOT counting base_defenders or reserves
             self.max_deployed_squads = 0 # max number of deployed mobile squads
+            self.max_deployed_raids = 0 # max number of deployed mobile squads that are raids
             self.squad_space = 0 # max space for a mobile squad
             self.main_squad_space = 0 # max space for base_defenders
             self.total_space = 0 # max space for all of the player's units
@@ -10319,6 +10325,7 @@ class Player(AbstractPlayer):
                     if use_squads:
                         self.max_squads += obj.get_leveled_quantity(obj.spec.provides_squads)
                         self.max_deployed_squads += obj.get_leveled_quantity(obj.spec.provides_deployed_squads)
+                        self.max_deployed_raids += obj.get_leveled_quantity(obj.spec.provides_deployed_raids)
                         self.squad_space += obj.get_leveled_quantity(obj.spec.provides_squad_space)
                         self.total_space += obj.get_leveled_quantity(obj.spec.provides_total_space)
 
@@ -10453,6 +10460,7 @@ class Player(AbstractPlayer):
             return {
                     'max_squads': self.max_squads,
                     'max_deployed_squads': self.max_deployed_squads,
+                    'max_deployed_raids': self.max_deployed_raids,
                     'squad_space': self.squad_space,
                     'main_squad_space': self.main_squad_space,
                     'total_space': self.total_space,

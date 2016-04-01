@@ -1429,6 +1429,7 @@
             "max_individual_donation_space": { "ui_name": "Send Size", "ui_tooltip": "Maximum space of a unit you can donate to your clanmates", "display": "integer" },
 
             "provides_deployed_squads": { "ui_name": "Deployments", "ui_tooltip": "Number of battalions you can have deployed on the map at once", "display": "integer" },
+            "provides_deployed_raids": { "ui_name": "Raids", "ui_tooltip": "Number of raids you can have deployed on the map at once", "display": "integer" },
             "provides_inventory": { "ui_name": "Item Space", "ui_tooltip": "Slots to store items", "display": "integer" },
             "provides_power": { "ui_name": "Output", "ui_tooltip": "Power generated", "display": "integer" },
             "provides_quarry_control": { "ui_name": "Quarry Limit", "ui_tooltip": "Maximum number of quarries you can control", "display": "integer" },

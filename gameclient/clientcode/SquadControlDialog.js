@@ -55,7 +55,7 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
             if(!can_do_action) {
                 msg = "CANNOT_DEPLOY_SQUADS_ALL_BUSY";
             } else if(needs_additional_deployment) {
-                if(resolve_squad_deployment_problem()) { return null; }
+                if(resolve_squad_deployment_problem(false /* is_raid */)) { return null; }
             }
         }
         if(msg) {
@@ -282,7 +282,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
         // special modes
         if(dlg_mode == 'deploy') {
             d.widgets['deploy_button'].onclick = function(w) {
-                if(resolve_squad_deployment_problem()) { return; }
+                if(resolve_squad_deployment_problem(false /* is_raid */)) { return; }
 
                 // navigate back to the regional map
                 // parent is squad_tile, parent.parent is squad_control, parent.parent.parent is map dialog
@@ -324,7 +324,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                             // queue movement
                             player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
                         } else {
-                            if(resolve_squad_deployment_problem()) { return; }
+                            if(resolve_squad_deployment_problem(false /* is_raid */)) { return; }
 
                             // find a place to deploy the squad
                             var neighbors = session.region.get_neighbors(player.home_base_loc);

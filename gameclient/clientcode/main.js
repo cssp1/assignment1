@@ -6332,7 +6332,11 @@ player.num_deployed_squads = function() {
     goog.object.forEach(player.squads, function(d) { if('map_loc' in d) { count += 1; } });
     return count;
 };
-
+player.num_deployed_raids = function() {
+    var count = 0;
+    goog.object.forEach(player.squads, function(d) { if('map_loc' in d && d['raid']) { count += 1; } });
+    return count;
+};
 /** returns whether or not all foremen are in use
  * @returns {boolean} */
 player.foreman_is_busy = function() {
@@ -24523,8 +24527,9 @@ function resolve_building_problem(specname, allow_upgrading) {
     return false;
 }
 
-// if player is limited from deploying an additional squad, get a predicate that explains why
-function get_squad_deployment_predicate() {
+/** @param {boolean} is_raid
+    if player is limited from deploying an additional squad, get a predicate that explains why */
+function get_squad_deployment_predicate(is_raid) {
     if(player.num_deployed_squads() >= player.stattab['max_deployed_squads']) {
         var cur_level = player.history[gamedata['squad_building']+'_level']||1;
         var next_level = get_next_level_with_stat_increase(gamedata['buildings'][gamedata['squad_building']], 'provides_deployed_squads', cur_level);
@@ -24537,11 +24542,30 @@ function get_squad_deployment_predicate() {
                     'ui_title': gamedata['errors']['CANNOT_DEPLOY_SQUAD_LIMIT_REACHED']['ui_title'],
                     'ui_name': gamedata['errors']['CANNOT_DEPLOY_SQUAD_LIMIT_REACHED']['ui_name']};
         }
+    } else if(is_raid && player.num_deployed_raids() >= player.stattab['max_deployed_raids']) {
+        // assume it's a single building you upgrade
+        for(var specname in gamedata['buildings']) {
+            var spec = gamedata['buildings'][specname];
+            if('provides_deployed_raids' in spec) {
+                var cur_level = player.history[specname+'_level'] || 0;
+                var next_level = get_next_level_with_stat_increase(spec, 'provides_deployed_raids', cur_level);
+                if(cur_level > 0 && next_level < 0) {
+                    return {'predicate': 'ALWAYS_FALSE',
+                            'ui_title': gamedata['errors']['CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED']['ui_title'],
+                            'ui_name': gamedata['errors']['CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED']['ui_name']};
+                } else {
+                    return {'predicate': 'BUILDING_LEVEL', 'building_type': specname, 'trigger_level': next_level,
+                            'ui_title': gamedata['errors']['CANNOT_DEPLOY_RAID_LIMIT_REACHED']['ui_title'],
+                            'ui_name': gamedata['errors']['CANNOT_DEPLOY_RAID_LIMIT_REACHED']['ui_name']};
+                }
+            }
+        }
     }
     return {'predicate':'ALWAYS_TRUE'};
 }
-function resolve_squad_deployment_problem() {
-    var rpred = read_predicate(get_squad_deployment_predicate());
+/** @param {boolean} is_raid */
+function resolve_squad_deployment_problem(is_raid) {
+    var rpred = read_predicate(get_squad_deployment_predicate(is_raid));
     if(!rpred.is_satisfied(player,null)) {
         var helper = get_requirements_help(rpred);
         if(helper) { helper(); }
@@ -40441,6 +40465,9 @@ function update_upgrade_dialog(dialog) {
             if('provides_space' in unit.spec) { feature_list.push('provides_space'); }
             if('provides_squads' in unit.spec) { feature_list.push('provides_squads'); }
             if('provides_deployed_squads' in unit.spec) { feature_list.push('provides_deployed_squads'); }
+            if(player.raids_enabled()) {
+                if('provides_deployed_raids' in unit.spec) { feature_list.push('provides_deployed_raids'); }
+            }
             if('provides_squad_space' in unit.spec) { feature_list.push('provides_squad_space'); }
         } else {
             if('provides_space' in unit.spec) { feature_list.push('provides_space'); }

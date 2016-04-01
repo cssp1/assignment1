@@ -205,7 +205,9 @@
     "CANNOT_ALTER_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be edited while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be deployed while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Reserves Bay cannot support more deployed battalions. Upgrade Reserves Bay to raise limit." },
+    "CANNOT_DEPLOY_RAID_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Logistics Dispatch cannot support more deployed raids. Upgrade Logistics Dispatch to raise limit." },
     "CANNOT_DEPLOY_SQUAD_MAX_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "No more battalions can be deployed.\n\nRecall another existing battalion to base first." },
+    "CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "No more raids can be deployed.\n\nRecall another existing raid to base first." },
     "CANNOT_DEPLOY_SQUAD_DEAD": { "ui_title": "Battalion Destroyed", "ui_name": "This battalion cannot be deployed because all units are destroyed. Repair the battalion, then try again." },
     "CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED": { "ui_title": "PvP Isolated", "ui_name": "Your account has been isolated from PvP for Terms of Service violations. You may not deploy battalions onto the map.\n\nYou may still fight against AI enemies on the Single Player menu." },
 
