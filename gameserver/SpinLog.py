@@ -226,14 +226,14 @@ def MetricsLogFilter(child):
                                   '0800_abtest_joined',
 
                                   '1500_server_restart',
-                                  '3832_battle_replay_uploaded',
+                                  # '3832_battle_replay_uploaded', # temporary - causes bloat, but useful for looking at replay size
                                   '3833_battle_replay_downloaded',
                                   '3870_loot_given',
                                   '4701_change_region_success',
                                   '4702_region_close_notified',
                                   #'5120_buy_item', # obsolete - use gamebucks log
 
-                                  # thsese can be turned on temporarily for analytics
+                                  # these can be turned on temporarily for analytics
                                   '3350_no_miss_hack',
                                   #'4010_quest_complete',
                                   #'4011_quest_complete_again',
