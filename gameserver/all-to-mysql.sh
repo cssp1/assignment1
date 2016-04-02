@@ -23,6 +23,8 @@ if [[ "$FREQ" == "hourly" ]] && [ -e /tmp/spin-singleton-backup-mysql-${GAME_ID}
 fi
 
 RUN_START_TS=`date +%s`
+RUN_START_DAY_OF_WEEK=`date -d "@${RUN_START_TS}" +%a`
+RUN_START_UI_TIME=`date -d "@${RUN_START_TS}"`
 
 echo `date` "${GAME_ID} === ${FREQ} ETL run ${RUN_ID} start ===" >> ${LOG}
 
@@ -102,6 +104,16 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./upcache_to_mysql.py -q --parallel 8 $UPCACHE_FLAGS
   run_it ./cur_levels_to_sql.py -q # requires upcache
   run_it ./acquisitions_to_sql.py -q # requires upcache and analytics-views
+
+  # send SpinReminder notification
+  # TR/DV: Mon/Tue/Wed/Thu/Fri, others: Mon/Thu
+  # DAY_OF_WEEK is (1..7); 1 is Monday
+
+  if [[ (("${GAME_ID}" == "tr" || "${GAME_ID}" == "dv") && ($RUN_START_DAY_OF_WEEK <= 5)) || \
+	    ($RUN_START_DAY_OF_WEEK == 1) || ($RUN_START_DAY_OF_WEEK == 4) ]]; then
+      ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "daily SQL analytics update is finished. Input data was complete starting from ${RUN_START_UI_TIME}." \
+                         --recipients "`./SpinConfig.py --getvar analytics_recipients`"
+  fi
 
   # END daily
 
