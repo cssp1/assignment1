@@ -9023,7 +9023,7 @@ class Player(AbstractPlayer):
             return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
         if self.num_deployed_squads() >= self.stattab.max_deployed_squads:
             return False, [], ["CANNOT_DEPLOY_SQUAD_LIMIT_REACHED", squad_id]
-        if self.num_deployed_raids() >= self.stattab.max_deployed_raids:
+        if is_raid and self.num_deployed_raids() >= self.stattab.max_deployed_raids:
             return False, [], ["CANNOT_DEPLOY_RAID_LIMIT_REACHED", squad_id]
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
         assert type(coords) is list and len(coords) == 2 and type(coords[0]) is int and type(coords[1]) is int
