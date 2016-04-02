@@ -204,6 +204,8 @@
     "CANNOT_CREATE_SQUAD_MAX_LIMIT_REACHED": { "ui_name": "No more battalions can be created." },
     "CANNOT_ALTER_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be edited while under repair. Finish or cancel repairs, then try again." },
     "CANNOT_DEPLOY_SQUAD_UNDER_REPAIR": { "ui_title": "Battalion Under Repair", "ui_name": "Battalions cannot be deployed while under repair. Finish or cancel repairs, then try again." },
+    "CANNOT_DEPLOY_RAID_DIST_LIMIT": { "ui_title": "Target Too Far", "ui_name": "Transmitter cannot support a raid at this distance. Upgrade Transmitter to raise limit." },
+    "CANNOT_DEPLOY_RAID_MAX_DIST_LIMIT": { "ui_title": "Target Too Far", "ui_name": "Transmitter cannot support a raid at this distance." },
     "CANNOT_DEPLOY_SQUAD_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Reserves Bay cannot support more deployed battalions. Upgrade Reserves Bay to raise limit." },
     "CANNOT_DEPLOY_RAID_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "Logistics Dispatch cannot support more deployed raids. Upgrade Logistics Dispatch to raise limit." },
     "CANNOT_DEPLOY_SQUAD_MAX_LIMIT_REACHED": { "ui_title": "Deployment Limit Reached", "ui_name": "No more battalions can be deployed.\n\nRecall another existing battalion to base first." },

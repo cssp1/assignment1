@@ -5669,6 +5669,8 @@ class GameObjectSpec(Spec):
         ["provides_squads", 0],
         ["provides_deployed_squads", 0],
         ["provides_deployed_raids", 0],
+        ["raid_range_pvp", 0],
+        ["raid_range_pve", 0],
         ["provides_squad_space", 0],
         ["provides_total_space", 0],
         ["consumes_space", 0],
@@ -6680,6 +6682,13 @@ class Building(GameObject):
                (self.is_crafting() and any(entry.craft_state['recipe'] in gamedata['crafting']['recipes'] and \
                                            gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0)>0 \
                                            for entry in self.crafting.queue))
+
+    def affects_player_stattab(self):
+        return self.spec.manufacture_category or self.spec.provides_space or self.spec.provides_squad_space or \
+               self.spec.provides_total_space or \
+               self.spec.raid_range_pvp or self.spec.raid_range_pve or \
+               self.spec.provides_deployed_squads or self.spec.provides_deployed_raids or \
+               self.is_producer() or self.spec.provides_foremen
 
     def is_producer(self):
         return (self.get_leveled_quantity(self.spec.production_capacity) > 0)
@@ -9114,11 +9123,19 @@ class Player(AbstractPlayer):
         if squad.get('raid'):
             if is_raid_launch:
                 # initial map entry. Make sure raid is going somewhere useful.
-                if (not coords) or \
-                   (hex_distance(coords[-1], self.my_home.base_map_loc) != 0 and \
-                    not any(x.get('base_type') in ('raid',) \
-                            for x in gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)'))):
-                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_invalid_destination', coords[-1] if coords else None]
+                if not coords:
+                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_no_destination', None]
+
+                if(hex_distance(coords[-1], self.my_home.base_map_loc) == 0):
+                    pass # returning back to base is always allowed
+                else:
+                    dest_features = gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)')
+                    if not any(x.get('base_type') in ('raid',) for x in dest_features):
+                        return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_invalid_destination', coords[-1]]
+                    range_limit = self.stattab.raid_range_pvp if any(x.get('base_type') == 'home' for x in dest_features) else \
+                                  self.stattab.raid_range_pve
+                    if hex_distance(coords[-1], self.my_home.base_map_loc) > range_limit:
+                        return False, [rollback_feature], ["CANNOT_DEPLOY_RAID_DIST_LIMIT", squad_id, 'raid_destination_too_far', coords[-1]]
             else:
                 # prevent re-directing raids anywhere other than back to home base
                 if (not coords) or hex_distance(coords[-1], self.my_home.base_map_loc) != 0:
@@ -10317,6 +10334,8 @@ class Player(AbstractPlayer):
             self.max_squads = 0 # max number of mobile squads NOT counting base_defenders or reserves
             self.max_deployed_squads = 0 # max number of deployed mobile squads
             self.max_deployed_raids = 0 # max number of deployed mobile squads that are raids
+            self.raid_range_pvp = 0 # max raiding range for PvP
+            self.raid_range_pve = 0 # max raiding range for PvE
             self.squad_space = 0 # max space for a mobile squad
             self.main_squad_space = 0 # max space for base_defenders
             self.total_space = 0 # max space for all of the player's units
@@ -10331,6 +10350,8 @@ class Player(AbstractPlayer):
                         self.max_squads += obj.get_leveled_quantity(obj.spec.provides_squads)
                         self.max_deployed_squads += obj.get_leveled_quantity(obj.spec.provides_deployed_squads)
                         self.max_deployed_raids += obj.get_leveled_quantity(obj.spec.provides_deployed_raids)
+                        self.raid_range_pvp = max(self.raid_range_pvp, obj.get_leveled_quantity(obj.spec.raid_range_pvp))
+                        self.raid_range_pve = max(self.raid_range_pve, obj.get_leveled_quantity(obj.spec.raid_range_pve))
                         self.squad_space += obj.get_leveled_quantity(obj.spec.provides_squad_space)
                         self.total_space += obj.get_leveled_quantity(obj.spec.provides_total_space)
 
@@ -10466,6 +10487,8 @@ class Player(AbstractPlayer):
                     'max_squads': self.max_squads,
                     'max_deployed_squads': self.max_deployed_squads,
                     'max_deployed_raids': self.max_deployed_raids,
+                    'raid_range_pvp': self.raid_range_pvp,
+                    'raid_range_pve': self.raid_range_pve,
                     'squad_space': self.squad_space,
                     'main_squad_space': self.main_squad_space,
                     'total_space': self.total_space,
@@ -19118,8 +19141,7 @@ class GAMEAPI(resource.Resource):
 
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
-                if object.spec.manufacture_category or object.spec.provides_space or object.spec.provides_total_space or \
-                   object.is_producer() or object.spec.provides_foremen:
+                if object.affects_player_stattab():
                     object.owner.recalc_stattab(session.player)
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)
@@ -19404,7 +19426,7 @@ class GAMEAPI(resource.Resource):
         if object.spec.provides_inventory:
             session.player.send_inventory_update(retmsg)
 
-        if object.spec.manufacture_category or object.spec.provides_space or object.spec.provides_total_space or object.is_producer() or object.spec.provides_foremen:
+        if object.affects_player_stattab():
             session.player.recalc_stattab(session.player)
             session.player.stattab.send_update(session, retmsg)
 

@@ -24532,44 +24532,59 @@ function resolve_building_problem(specname, allow_upgrading) {
 }
 
 /** @param {boolean} is_raid
+    @param {number=} raid_distance - if is_raid, number of hexes away from base we want to travel
+    @param {string=} raid_type - "pve" or "pvp"
     if player is limited from deploying an additional squad, get a predicate that explains why */
-function get_squad_deployment_predicate(is_raid) {
+function get_squad_deployment_predicate(is_raid, raid_distance, raid_type) {
+    var critical_stat = null;
+    var critical_value = null;
+    var error_upgrade = null, error_final = null;
+
+    // this assumes the resolution is always to upgrade a single building
     if(player.num_deployed_squads() >= player.stattab['max_deployed_squads']) {
-        var cur_level = player.history[gamedata['squad_building']+'_level']||1;
-        var next_level = get_next_level_with_stat_increase(gamedata['buildings'][gamedata['squad_building']], 'provides_deployed_squads', cur_level);
-        if(next_level < 0) {
-            return {'predicate': 'ALWAYS_FALSE',
-                    'ui_title': gamedata['errors']['CANNOT_DEPLOY_SQUAD_MAX_LIMIT_REACHED']['ui_title'],
-                    'ui_name': gamedata['errors']['CANNOT_DEPLOY_SQUAD_MAX_LIMIT_REACHED']['ui_name']};
-        } else {
-            return {'predicate': 'BUILDING_LEVEL', 'building_type': gamedata['squad_building'], 'trigger_level': next_level,
-                    'ui_title': gamedata['errors']['CANNOT_DEPLOY_SQUAD_LIMIT_REACHED']['ui_title'],
-                    'ui_name': gamedata['errors']['CANNOT_DEPLOY_SQUAD_LIMIT_REACHED']['ui_name']};
-        }
+        critical_stat = 'provides_deployed_squads';
+        error_upgrade = 'CANNOT_DEPLOY_SQUAD_LIMIT_REACHED';
+        error_final = 'CANNOT_DEPLOY_SQUAD_MAX_LIMIT_REACHED';
     } else if(is_raid && player.num_deployed_raids() >= player.stattab['max_deployed_raids']) {
         // assume it's a single building you upgrade
+        critical_stat = 'provides_deployed_raids';
+        error_upgrade = 'CANNOT_DEPLOY_RAID_LIMIT_REACHED';
+        error_final = 'CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED';
+    } else if(is_raid && raid_distance > player.stattab['raid_range_'+raid_type]) {
+        critical_stat = 'raid_range_'+raid_type;
+        critical_value = raid_distance;
+        error_upgrade = 'CANNOT_DEPLOY_RAID_DIST_LIMIT';
+        error_final = 'CANNOT_DEPLOY_RAID_MAX_DIST_LIMIT';
+    }
+
+    if(critical_stat) {
         for(var specname in gamedata['buildings']) {
             var spec = gamedata['buildings'][specname];
-            if('provides_deployed_raids' in spec) {
+            if(critical_stat in spec) {
                 var cur_level = player.history[specname+'_level'] || 0;
-                var next_level = get_next_level_with_stat_increase(spec, 'provides_deployed_raids', cur_level);
-                if(cur_level > 0 && next_level < 0) {
+                var next_level = get_next_level_with_stat_increase(spec, critical_stat, cur_level);
+                console.log('cur_level '+cur_level+' next_level '+next_level);
+                if((cur_level > 0 && next_level < 0) ||
+                   (critical_value !== null && critical_value > get_leveled_quantity(spec[critical_stat], get_max_level(spec)))) {
+                    // no further increase available, or can never get high enough
                     return {'predicate': 'ALWAYS_FALSE',
-                            'ui_title': gamedata['errors']['CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED']['ui_title'],
-                            'ui_name': gamedata['errors']['CANNOT_DEPLOY_RAID_MAX_LIMIT_REACHED']['ui_name']};
+                            'ui_title': gamedata['errors'][error_final]['ui_title'],
+                            'ui_name': gamedata['errors'][error_final]['ui_name']};
                 } else {
                     return {'predicate': 'BUILDING_LEVEL', 'building_type': specname, 'trigger_level': next_level,
-                            'ui_title': gamedata['errors']['CANNOT_DEPLOY_RAID_LIMIT_REACHED']['ui_title'],
-                            'ui_name': gamedata['errors']['CANNOT_DEPLOY_RAID_LIMIT_REACHED']['ui_name']};
+                            'ui_title': gamedata['errors'][error_upgrade]['ui_title'],
+                            'ui_name': gamedata['errors'][error_upgrade]['ui_name']};
                 }
             }
         }
     }
     return {'predicate':'ALWAYS_TRUE'};
 }
-/** @param {boolean} is_raid */
-function resolve_squad_deployment_problem(is_raid) {
-    var rpred = read_predicate(get_squad_deployment_predicate(is_raid));
+/** @param {boolean} is_raid
+    @param {number=} raid_distance - if is_raid, number of hexes away from base we want to travel
+    @param {string=} raid_type - "pve" or "pvp" */
+function resolve_squad_deployment_problem(is_raid, raid_distance, raid_type) {
+    var rpred = read_predicate(get_squad_deployment_predicate(is_raid, raid_distance, raid_type));
     if(!rpred.is_satisfied(player,null)) {
         var helper = get_requirements_help(rpred);
         if(helper) { helper(); }
@@ -40471,6 +40486,8 @@ function update_upgrade_dialog(dialog) {
             if('provides_deployed_squads' in unit.spec) { feature_list.push('provides_deployed_squads'); }
             if(player.raids_enabled()) {
                 if('provides_deployed_raids' in unit.spec) { feature_list.push('provides_deployed_raids'); }
+                if('raid_range_pve' in unit.spec) { feature_list.push('raid_range_pve'); }
+                if('raid_range_pvp' in unit.spec) { feature_list.push('raid_range_pvp'); }
             }
             if('provides_squad_space' in unit.spec) { feature_list.push('provides_squad_space'); }
         } else {

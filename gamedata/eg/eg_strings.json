@@ -1437,6 +1437,8 @@
             "provides_squads": { "ui_name": "Battalions", "ui_tooltip": "Number of battalions you can form", "display": "integer" },
             "provides_squad_space": { "ui_name": "Battalion Size", "ui_tooltip": "Space available within each deployable battalion", "display": "integer" },
             "provides_total_space": { "ui_name": "Army Size", "ui_tooltip": "Total space available for your entire army", "display": "integer" },
+            "raid_range_pve": { "ui_name": "Raid Dist (PvE)", "ui_tooltip": "Maximum distance, in map hexes, from your home base at which you can raid AI bases and quarries"},
+            "raid_range_pvp": { "ui_name": "Raid Dist (PvP)", "ui_tooltip": "Maximum distance, in map hexes, from your home base at which you can raid other players' home bases"},
 
             "storage_iron": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
             "storage_water": { "ui_name": "Capacity", "ui_tooltip": "Storage capacity", "display": "integer" },
