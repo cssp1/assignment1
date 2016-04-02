@@ -8676,7 +8676,12 @@ class Player(AbstractPlayer):
             if str(squad_id) not in self.squads:
                 gamesite.exception_log.event(server_time, 'player %d has squad %d on map, but not in player.squads - adding' % \
                                              (self.user_id, squad_id))
-                self.squads[str(squad_id)] = {'id':squad_id, 'ui_name': 'Unknown'}
+                squad_data = {'id':squad_id, 'ui_name': 'Unknown'}
+                if squad_feature.get('raid'):
+                    squad_data['raid'] = 1
+                if squad_feature.get('ui_name'):
+                    squad_data['ui_name'] = squad_feature['ui_name']
+                self.squads[str(squad_id)] = squad_data
 
         to_recall = [] # list of squads to recall to base
 
