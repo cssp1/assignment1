@@ -29302,20 +29302,23 @@ player.squad_recall = function(squad_id, path) {
     }
 };
 
-player.squad_recall_move = function(squad_id, path) {
+/** @param {number} squad_id - must be idle
+    @param {Array<Array<number>>|null=} path to take back to home base (if null, find a new one)
+    @return {boolean} true if we found a path home. False if squad is blocked from returning. */
+player._squad_recall_move = function(squad_id, path) {
     var squad_data = player.squads[squad_id.toString()];
 
     // note: we can't just use home_base_loc here, because we need to path-find to it!
     var home_feature = session.region.find_home_feature();
     if(!home_feature) {
-        return;
+        return false;
     }
     var max_dist = (player.squad_is_raid(squad_id) ? 0 : 1); // raids need to be on top of base to exit
     var cur_dist = hex_distance(squad_data['map_loc'], player.home_base_loc);
     if(cur_dist <= max_dist) {
         // already in position. trigger SQUAD_EXIT_MAP at next opportunity.
         player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1});
-        return;
+        return true;
     } else if(cur_dist == 1) {
         // one step away - for raids
         path = [player.home_base_loc];
@@ -29333,12 +29336,20 @@ player.squad_recall_move = function(squad_id, path) {
         player.squad_move(squad_id, path);
         // trigger SQUAD_EXIT_MAP at next opportunity after the move
         player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1});
-        return;
+        return true;
+    } else {
+        // uh oh, no way home!
+        return false;
     }
-
-    // uh oh, no way home!
-    var s = gamedata['errors']['CANNOT_RECALL_SQUAD_MAP_BLOCKED'];
-    invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
+};
+/** @param {number} squad_id - must be idle
+    @param {Array<Array<number>>|null=} path to take back to home base (if null, find a new one)
+    Same as above, but invokes a modal GUI error message when no path is found */
+player.squad_recall_move = function(squad_id, path) {
+    if(!player._squad_recall_move(squad_id, path)) {
+        var s = gamedata['errors']['CANNOT_RECALL_SQUAD_MAP_BLOCKED'];
+        invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
+    }
 };
 
 player.squad_halt = function(squad_id) {
@@ -29402,13 +29413,14 @@ player.advance_squads = function() {
         if(!session.home_base) { return; }
 
         var orders = player.squad_get_client_data(squad_data['id'], 'squad_orders');
-        if(!orders) { return; }
-        if('recall_after_halt' in orders) {
+        var max_dist_to_exit_map = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit
+
+        if(orders && 'recall_after_halt' in orders) {
             if(!player.squad_is_moving(squad_data['id'])) {
                 player.squad_set_client_data(squad_data['id'], 'squad_orders', null);
                 player.squad_recall_move(squad_data['id'], orders['recall_path']);
             }
-        } else if('recall' in orders) {
+        } else if(orders && 'recall' in orders) {
             if(player.squad_is_moving(squad_data['id'])) {
                 // wait til it stops (assumes recall is preceded by a halt)
             } else if(!player.squad_is_deployed(squad_data['id'])) {
@@ -29416,15 +29428,13 @@ player.advance_squads = function() {
                 player.squad_clear_client_data(squad_data['id']);
             } else {
                 // not moving
-                var max_dist = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit
-                if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist &&
-                   !squad_data['pending']) {
+                if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist_to_exit_map && !squad_data['pending']) {
                     squad_data['pending'] = true;
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_EXIT_MAP", squad_data['id']]);
                     player.squad_clear_client_data(squad_data['id']);
                 }
             }
-        } else if('move' in orders) {
+        } else if(orders && 'move' in orders) {
             var dest = orders['move'];
             if(player.squad_is_deployed(squad_data['id']) && !player.squad_is_moving(squad_data['id'])) {
                 if(hex_distance(squad_data['map_loc'], dest) <= 1) {
@@ -29439,6 +29449,27 @@ player.advance_squads = function() {
                     }
                 }
                 player.squad_clear_client_data(squad_data['id']);
+            }
+        } else if(squad_data['raid'] && !player.squad_is_moving(squad_data['id'])) {
+            // stationary raid - need to resolve, recall, or dock at base
+            if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist_to_exit_map && !squad_data['pending']) {
+                squad_data['pending'] = true;
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_EXIT_MAP", squad_data['id']]);
+                player.squad_clear_client_data(squad_data['id']);
+            } else {
+                var features = session.region.find_features_at_coords(squad_data['map_loc']);
+                var need_resolve = false;
+                for(var i = 0; i < features.length; i++) {
+                    var feature = features[i];
+                    if(feature['base_type'] == 'raid') {
+                        need_resolve = true;
+                        break;
+                    }
+                }
+                if(!need_resolve) {
+                    console.log('Auto-recalling idle raid squad '+squad_data['id'].toString());
+                    player._squad_recall_move(squad_data['id']); // use underscore variant to avoid GUI error spam
+                }
             }
         }
     });
