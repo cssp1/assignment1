@@ -109,8 +109,8 @@ if [[ "$FREQ" == "daily" ]]; then
   # TR/DV: Mon/Tue/Wed/Thu/Fri, others: Mon/Thu
   # DAY_OF_WEEK is (1..7); 1 is Monday
 
-  if [[ (("${GAME_ID}" == "tr" || "${GAME_ID}" == "dv") && ($RUN_START_DAY_OF_WEEK <= 5)) || \
-	    ($RUN_START_DAY_OF_WEEK == 1) || ($RUN_START_DAY_OF_WEEK == 4) ]]; then
+  if [[ (("${GAME_ID}" == "tr" || "${GAME_ID}" == "dv") && ($RUN_START_DAY_OF_WEEK -le 5)) || \
+	    ($RUN_START_DAY_OF_WEEK -eq 1) || ($RUN_START_DAY_OF_WEEK -eq 4) ]]; then
       ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "daily SQL analytics update is finished. Input data was complete starting from ${RUN_START_UI_TIME}." \
                          --recipients "`./SpinConfig.py --getvar analytics_recipients`"
   fi
