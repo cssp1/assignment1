@@ -429,7 +429,7 @@ World.World.prototype.run_unit_ticks = function() {
 
         goog.array.forEach(obj_list, function(obj) {
             obj.run_control_shooting(this);
-            obj.run_control_facing();
+            obj.run_control_facing(this);
 
             if(obj.is_mobile()) {
                 obj.add_movement_effect(this.fxworld);
@@ -442,7 +442,7 @@ World.World.prototype.run_unit_ticks = function() {
         goog.array.forEach(this.fxworld.get_phantom_objects(), function(obj) {
             obj.run_control_prep();
             obj.run_control_pathing(this);
-            obj.run_control_facing();
+            obj.run_control_facing(this);
             obj.add_movement_effect(this.fxworld);
         }, this);
 

@@ -1754,6 +1754,9 @@ GameObject.prototype.update_stats = function(world) {
     }
 };
 
+/** @param {!Base.Base} base */
+GameObject.prototype.combat_power_factor = function(base) { return 1; };
+
 // Return true if the ability identified by 'key' (usually spell name) is able to be used
 /** @param {string} key
     @return {boolean} */
@@ -1914,15 +1917,16 @@ function get_as_array(qty) {
 // get a spec quantity that is possibly level-dependent (list indexed by level-1)
 GameObject.prototype.get_leveled_quantity = function(qty) { return get_leveled_quantity(qty, this.level); }
 
-/** Set new next_facing based on cur_facing and target_facing */
-GameObject.prototype.run_control_facing = function() {
+/** Set new next_facing based on cur_facing and target_facing
+    @param {!World.World} world */
+GameObject.prototype.run_control_facing = function(world) {
     if('turn_rate' in this.spec) {
 
         if(this.is_building() && this.control_state === control_states.CONTROL_STOP &&
            !this.combat_stats.stunned && !(this.is_upgrading() || this.is_repairing() || this.disarmed)) {
             // idle turrets - rotate them around slowly
             var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
-            incr *= this.combat_power_factor(); // turn more slowly if depowered
+            incr *= this.combat_power_factor(world.base); // turn more slowly if depowered
             if(this.anim_offset > 0.5) { incr *= -1; }
             this.target_facing = normalize_angle(this.cur_facing + incr*TICK_INTERVAL);
         }
@@ -2331,7 +2335,7 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
     if('cooldown' in spell) {
         var cd_seconds = this.get_leveled_quantity(spell['cooldown']);
         if(this.is_building()) {
-            cd_seconds /= this.combat_power_factor(); // increase cooldown if power_factor < 1
+            cd_seconds /= this.combat_power_factor(world.base); // increase cooldown if power_factor < 1
         }
         var cd_ticks = Math.floor(cd_seconds/TICK_INTERVAL);
         visual_cooldown = client_time + (cd_ticks+1)*TICK_INTERVAL;
@@ -2630,7 +2634,7 @@ GameObject.prototype.run_control_shooting = function(world) {
             var cooldown = get_leveled_quantity(spell['cooldown'], spell_level);
 
             var cd = cooldown/this.combat_stats.rate_of_fire;
-            cd /= this.combat_power_factor(); // increase cooldown if power_factor < 1
+            cd /= this.combat_power_factor(world.base); // increase cooldown if power_factor < 1
             this.control_cooldown = Math.floor(cd/TICK_INTERVAL);
 
             if('cooldown_name' in spell) {
@@ -5212,9 +5216,10 @@ Building.prototype.interpolate_contents = function() {
     return estimate;
 };
 
-Building.prototype.combat_power_factor = function() {
+/** @override */
+Building.prototype.combat_power_factor = function(base) {
     if(gamedata['enable_power']) {
-        var powerfac = session.viewing_base.power_factor();
+        var powerfac = base.power_factor();
         if(powerfac < 1) {
             var min_fac = gamedata['minimum_combat_power_factor'];
             return min_fac + (1-min_fac)*powerfac;
@@ -8039,7 +8044,6 @@ Mobile.prototype.is_temporary = function() { return !!this.temporary; };
 Mobile.prototype.is_flying = function() { return this.spec['flying'] || false; };
 Mobile.prototype.passes_through_walls = function() { return this.spec['flying'] || this.spec['noclip']; };
 Mobile.prototype.is_under_repair = function() { return this.under_repair_finish > 0; };
-Mobile.prototype.combat_power_factor = function() { return 1; };
 
 // return true if the object should be invisible to opponents
 Mobile.prototype.is_invisible = function() {
@@ -12415,9 +12419,9 @@ function update_desktop_dialogs() {
         update_resource_bars(dialog, true, false, false);
 
         dialog.widgets['low_power_bg'].show =
-            dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.tutorial_state == "COMPLETE" && session.viewing_base.power_factor() < 1);
+            dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.tutorial_state == "COMPLETE" && session.get_draw_world().base.power_factor() < 1);
         if(dialog.widgets['low_power_message'].show) {
-            dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.viewing_base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
+            dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.get_draw_world().base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
         }
 
         dialog.widgets['user_abtest_message'].show = (player.tutorial_state == "COMPLETE" &&
@@ -48435,7 +48439,7 @@ function do_draw() {
 
         } // END only do these if actually running, not timed out or waiting for session change
 
-        var powerfac = (session.viewing_base ? session.viewing_base.power_factor() : 1);
+        var powerfac = world.base.power_factor();
 
         if(mouse_state.hovering_over && mouse_tooltip) {
             mouse_tooltip.activation_check();
@@ -49854,7 +49858,7 @@ function draw_unit(world, unit) {
             // calculate the spell's final cooldown value, accounting for things like unit rate of fire and power loss
             var cooldown = unit.get_leveled_quantity(spell['cooldown']);
             cooldown = cooldown / unit.combat_stats.rate_of_fire;
-            cooldown = cooldown / unit.combat_power_factor();
+            cooldown = cooldown / unit.combat_power_factor(world.base);
 
             var animation_progress = -1;
             if('melee_cycle_duration' in spell) {

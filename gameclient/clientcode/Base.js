@@ -14,7 +14,7 @@ goog.require('GameTypes');
 
 /** parallel to the Base class in gameserver
     @constructor @struct
-    @implements {GameTypes.ISerializable}
+    @implements {GameTypes.IIncrementallySerializable}
     @param {string} id
     @param {Object|null=} base_data */
 Base.Base = function(id, base_data) {
@@ -35,12 +35,16 @@ Base.Base = function(id, base_data) {
 
     this.power_state = [0,0]; // power [produced,consumed]
     this.power_factor_cache = 0; // must be reset when power_state changes
+    this.power_state_last_serialized = null; // for incremental serialization
 
     /** @type {!Climate} */
     this.climate = new Climate(this.base_climate_data); // initialize to blank climate
 
     if(base_data) {
         this.receive_state(base_data);
+        if('power_state' in base_data) { // for replays only - not part of server-transmitted state
+            this.update_power_state(base_data['power_state']);
+        }
     }
 };
 
@@ -64,6 +68,7 @@ Base.Base.prototype.receive_state = function(base_data) {
 
 /** @override */
 Base.Base.prototype.serialize = function() {
+    this.power_state_last_serialized = [this.power_state[0], this.power_state[1]];
     return {'base_id': this.base_id,
             'deployment_buffer': this.deployment_buffer,
             'base_landlord_id': this.base_landlord_id,
@@ -77,11 +82,30 @@ Base.Base.prototype.serialize = function() {
             'power_state': this.power_state};
 };
 
+/** @override
+    power_state is the only thing that can change over time */
+Base.Base.prototype.serialize_incremental = function() {
+    if(!this.power_state_last_serialized ||
+       this.power_state[0] != this.power_state_last_serialized[0] ||
+       this.power_state[1] != this.power_state_last_serialized[1]) {
+        this.power_state_last_serialized = [this.power_state[0], this.power_state[1]];
+        return {'power_state': this.power_state};
+    } else {
+        return null;
+    }
+};
+
 /** @override */
 Base.Base.prototype.apply_snapshot = function(snap) {
-    this.base_id = snap['base_id'];
-    this.receive_state(snap);
-    this.update_power_state(snap['power_state']);
+    if('base_id' in snap) { // full serialization
+        this.base_id = snap['base_id'];
+        this.receive_state(snap);
+        this.update_power_state(snap['power_state']);
+    } else { // incremental
+        if('power_state' in snap) {
+            this.update_power_state(snap['power_state']);
+        }
+    }
 };
 
 Base.Base.prototype.ncells = function() {

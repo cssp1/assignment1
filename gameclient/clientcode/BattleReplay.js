@@ -119,8 +119,14 @@ BattleReplay.Recorder.prototype.before_control = function() {
     var snap = {'tick_time': this.world.last_tick_time,
                 'objects': this.world.objects.serialize_incremental()};
     if(this.snapshots.length < 1) {
-        // grab base on first snapshot only
+        // grab full base on first snapshot only
         snap['base'] = this.world.base.serialize();
+    } else {
+        // look for base power state changes
+        var base_snap = this.world.base.serialize_incremental();
+        if(base_snap) {
+            snap['base'] = base_snap;
+        }
     }
     this.snapshots.push(snap);
     this.snapshot_count += 1;
@@ -322,6 +328,10 @@ BattleReplay.Player.prototype.before_control = function(event) {
     }
     if(player.is_developer()) {
         console.log('Applying snapshot '+this.index.toString()+' of tick '+this.snapshots[this.index]['combat_engine']['cur_tick'].toString());
+    }
+
+    if('base' in this.snapshots[this.index]) {
+        this.world.base.apply_snapshot(this.snapshots[this.index]['base']);
     }
     this.world.objects.apply_snapshot(this.snapshots[this.index]['objects']);
 };
