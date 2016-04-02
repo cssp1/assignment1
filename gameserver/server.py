@@ -5519,7 +5519,8 @@ class ObjectCollection:
         # counter for unique object IDs
         self.objects = {}
     def add_object(self, obj):
-        assert (obj.obj_id not in self.objects)
+        if obj.obj_id in self.objects:
+            raise Exception('ObjectCollection: double-added object ID %r' % obj.obj_id)
         self.objects[obj.obj_id] = obj
         return obj
     def rem_object(self, id):
