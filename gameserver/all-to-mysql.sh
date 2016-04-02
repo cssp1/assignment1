@@ -23,7 +23,7 @@ if [[ "$FREQ" == "hourly" ]] && [ -e /tmp/spin-singleton-backup-mysql-${GAME_ID}
 fi
 
 RUN_START_TS=`date +%s`
-RUN_START_DAY_OF_WEEK=`date -d "@${RUN_START_TS}" +%a`
+RUN_START_DAY_OF_WEEK=`date -d "@${RUN_START_TS}" +%u`
 RUN_START_UI_TIME=`date -d "@${RUN_START_TS}"`
 
 echo `date` "${GAME_ID} === ${FREQ} ETL run ${RUN_ID} start ===" >> ${LOG}
