@@ -1012,36 +1012,43 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             var squad_id = parseInt(squad_sid,10);
             var squad_data = player.squads[squad_sid];
             if(squad_data && player.squad_is_deployed(squad_id)) {
-                if(player.squad_is_moving(squad_id)) {
+                // HALT button
+                if(player.squad_is_moving(squad_id) && !feature['raid']) {
                     buttons.push([gamedata['strings']['regional_map']['halt'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
                         player.squad_halt(_squad_data['id']);
                     }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'halt_pending')) ? 'disabled' : 'normal')]);
+                }
+                // SPEED UP (movement) button
+                if(player.squad_is_moving(squad_id) && player.squad_speedups_enabled()) {
+                    buttons.push([gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY']['ui_name'], (function(_squad_id) { return function() {
+                        RegionMap.invoke_squad_speedup_dialog(_squad_id);
+                    }; })(squad_id), 'normal']);
+                }
 
-                    if(player.squad_speedups_enabled()) {
-                        buttons.push([gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY']['ui_name'], (function(_squad_id) { return function() {
-                            RegionMap.invoke_squad_speedup_dialog(_squad_id);
-                        }; })(squad_id), 'normal']);
-                    }
+                // VISIT button
+                if(!player.squad_is_moving(squad_id) && player.squad_combat_enabled() && !feature['raid']) {
+                    buttons.push([gamedata['strings']['regional_map']['instant_visit_own_squad'],
+                                  (function(_feature) { return function() {
+                                      do_visit_base(-1, {base_id:_feature['base_id']});
+                                  }; })(feature)]);
+                }
 
-                } else {
-                    if(player.squad_combat_enabled()) {
-                        buttons.push([gamedata['strings']['regional_map']['instant_visit_own_squad'],
-                                      (function(_feature) { return function() {
-                                          do_visit_base(-1, {base_id:_feature['base_id']});
-                                      }; })(feature)]);
-                    }
-
+                // MOVE button
+                if(!player.squad_is_moving(squad_id) && !feature['raid']) {
                     buttons.push([gamedata['strings']['regional_map']['move'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
                         _mapwidget.cursor = new RegionMap.MoveCursor(_mapwidget, _squad_data['map_loc'], _squad_data['id'], _feature['base_icon']);
                     }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending')) ? 'disabled' : 'normal')]);
+                }
 
+                // RECALL button
+                if(!player.squad_is_moving(squad_id) ||
+                   (feature['raid'] && !vec_equals(feature['base_map_loc'], player.home_base_loc))) {
                     buttons.push([gamedata['strings']['regional_map']['recall'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
                         player.squad_recall(_squad_data['id']);
                     }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending')) ? 'disabled' : 'passive')]);
-
                 }
             }
 
