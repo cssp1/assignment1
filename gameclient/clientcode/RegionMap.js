@@ -2403,6 +2403,11 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 }
             }
 
+            // XXX temporary hack for raids
+            if(feature['base_type'] == 'raid' || (feature['base_type'] == 'squad' && feature['raid'])) {
+                label = '(R) '+label;
+            }
+
             if(classification+'_blink' in gamedata['territory']['label_colors']) {
                 if((client_time % gamedata['territory']['label_blink_period']) < gamedata['territory']['label_blink_on']) {
                     classification = classification+'_blink';

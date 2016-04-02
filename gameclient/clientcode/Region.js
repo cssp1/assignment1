@@ -190,6 +190,9 @@ Region.Region.prototype.for_each_feature = function(cb, cb_this) {
 
 Region.Region.prototype.feature_shown = function(feature) {
     if(!('base_map_loc' in feature)) { return false; }
+    // hide raid squads not owned by you
+    if(!player.is_developer() && feature['base_type'] == 'squad' && feature['raid'] && feature['base_landlord_id'] != session.user_id) { return false; }
+
     if(feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
        ('show_if' in gamedata['hives_client']['templates'][feature['base_template']]) &&
        !read_predicate(gamedata['hives_client']['templates'][feature['base_template']]['show_if']).is_satisfied(player,null)) {
