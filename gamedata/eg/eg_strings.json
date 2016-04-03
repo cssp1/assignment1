@@ -403,6 +403,7 @@
         "recall": "Return to Base",
         "deploy": "Deploy Battalion",
         "call": "Call Battalion",
+        "call_raid": "Launch Raid",
         "move": "Move",
         "halt": "Halt",
         "guard": "Guard",

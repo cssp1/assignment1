@@ -23,8 +23,9 @@ SquadControlDialog.update_receivers_serial = 1;
 /** @param {!Array.<number>} coords */
 SquadControlDialog.invoke_deploy = function(coords) { return SquadControlDialog.do_invoke('deploy', {'deploy_from': coords}); };
 
-/** @param {!Array.<number>} coords */
-SquadControlDialog.invoke_call = function(coords) { return SquadControlDialog.do_invoke('call', {'call_to': coords}); };
+/** @param {!Array.<number>} coords
+    @param {Object<string,?>|null} feature at destination */
+SquadControlDialog.invoke_call = function(coords, feature) { return SquadControlDialog.do_invoke('call', {'to_coords': coords, 'to_feature': feature || null}); };
 
 SquadControlDialog.invoke_manage = function() { return SquadControlDialog.do_invoke('manage', null); };
 SquadControlDialog.invoke_normal = function() { return SquadControlDialog.do_invoke('normal', null); };
@@ -86,7 +87,9 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
     } else {
         dialog.widgets['army_dialog_buttons_army'].show = false;
     }
-    dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_'+dlg_mode];
+
+    var title_mode = (dlg_mode == 'call' && dlg_mode_data['to_feature'] && dlg_mode_data['to_feature']['base_type'] === 'raid' ? 'call_raid' : dlg_mode);
+    dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_'+title_mode];
 
     dialog.user_data['receiver_serial'] = SquadControlDialog.update_receivers_serial++;
     SquadControlDialog.update_receivers[dialog.user_data['receiver_serial']] = (function (_dialog) { return function() {
@@ -318,32 +321,59 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                     var squad_data = player.squads[squad_id.toString()];
                     var _squad_control = _squad_tile.parent;
                     if(_squad_control) {
-                        var to_loc = _squad_control.user_data['call_to'];
+                        var to_loc = _squad_control.user_data['to_coords'];
+                        var to_feature = _squad_control.user_data['to_feature'];
+                        var is_raid = (to_feature && to_feature['base_type'] === 'raid');
+                        var raid_distance = -1, raid_type = null;
+                        if(is_raid) {
+                            raid_distance = hex_distance(to_loc, player.home_base_loc);
+                            raid_type = (to_feature['base_type'] === 'home' ? 'pvp' : 'pve');
+                        }
+
                         // note: most error cases are handled by the 'can_do_action' logic in update_squad_tile
                         if(player.squad_is_deployed(squad_id)) {
                             // queue movement
                             player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
                         } else {
-                            if(resolve_squad_deployment_problem(false /* is_raid */)) { return; }
+                            if(resolve_squad_deployment_problem(is_raid, raid_distance, raid_type)) { return; }
 
                             // find a place to deploy the squad
-                            var neighbors = session.region.get_neighbors(player.home_base_loc);
                             var deploy_at = null;
-                            goog.array.forEach(neighbors, function(xy) {
-                                if(!session.region.occupancy.is_blocked(xy)) {
-                                    deploy_at = xy;
-                                }
-                            });
+                            if(!is_raid) {
+                                var neighbors = session.region.get_neighbors(player.home_base_loc);
+                                goog.array.forEach(neighbors, function(xy) {
+                                    if(!session.region.occupancy.is_blocked(xy)) {
+                                        deploy_at = xy;
+                                    }
+                                });
+                            } else {
+                                deploy_at = player.home_base_loc;
+                            }
+
                             if(!deploy_at) {
                                 var s = gamedata['errors']['INVALID_MAP_LOCATION'];
                                 invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']), {'dialog':'message_dialog_big'});
                                 return;
                             }
+
+                            var raid_info = null;
+                            if(is_raid) {
+                                // find path to target
+                                var raid_path = player.raid_find_path_to(player.home_base_loc, to_feature);
+                                if(!raid_path) {
+                                    var s = gamedata['errors']['INVALID_MAP_LOCATION'];
+                                    invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']), {'dialog':'message_dialog_big'});
+                                    return;
+                                }
+                                raid_info = {'path': raid_path};
+                            }
+
                             // perform deployment
                             player.squads[squad_id.toString()]['pending'] = true;
-                            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at, null]);
 
-                            if(!vec_equals(deploy_at, to_loc)) {
+                            send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, deploy_at, raid_info]);
+
+                            if(!is_raid && !vec_equals(deploy_at, to_loc)) {
                                 // queue movement
                                 player.squad_set_client_data(squad_id, 'squad_orders', {'move': to_loc});
                             }

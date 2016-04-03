@@ -24533,7 +24533,7 @@ function resolve_building_problem(specname, allow_upgrading) {
 
 /** @param {boolean} is_raid
     @param {number=} raid_distance - if is_raid, number of hexes away from base we want to travel
-    @param {string=} raid_type - "pve" or "pvp"
+    @param {string|null=} raid_type - "pve" or "pvp"
     if player is limited from deploying an additional squad, get a predicate that explains why */
 function get_squad_deployment_predicate(is_raid, raid_distance, raid_type) {
     var critical_stat = null;
@@ -24582,7 +24582,7 @@ function get_squad_deployment_predicate(is_raid, raid_distance, raid_type) {
 }
 /** @param {boolean} is_raid
     @param {number=} raid_distance - if is_raid, number of hexes away from base we want to travel
-    @param {string=} raid_type - "pve" or "pvp" */
+    @param {string|null=} raid_type - "pve" or "pvp" */
 function resolve_squad_deployment_problem(is_raid, raid_distance, raid_type) {
     var rpred = read_predicate(get_squad_deployment_predicate(is_raid, raid_distance, raid_type));
     if(!rpred.is_satisfied(player,null)) {
@@ -29161,11 +29161,44 @@ player.squad_travel_time = function(squad_id, path) {
     return (path.length/(gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*(squad_data['travel_speed']||1)));
 };
 
-// return a path that ends on hex "dest", or if "dest" is blocked, an open hex immediately adjacent to it
-// returns null if no path exists.
+/** Return a path that ends on this feature.
+    Avoids other features that block the map OTHER than the passed "feature".
+    Returns null if no path exists.
+    @param {!Array<number>} start_loc
+    @param {!Object<string,?>} dest_feature
+    @return {Array<Array<number>>|null} */
+player.raid_find_path_to = function(start_loc, dest_feature) {
+    if(!session.region || !session.region.data) { return null; }
+
+    /** @type AStar.PathChecker */
+    var raid_path_checker = function(cell, path) {
+        if(cell.block_count > 0) {
+            for(var i = 0; i < cell.blockers.length; i++) {
+                var feature = cell.blockers[i];
+                if(feature !== dest_feature && feature['base_type'] !== 'squad') {
+                    return AStar.NOPASS;
+                }
+            }
+        }
+        return AStar.PASS;
+    };
+
+    var path = session.region.hstar_context.search(start_loc, dest_feature['base_map_loc'], raid_path_checker);
+    if(path && path.length >= 1 && hex_distance(path[path.length-1], dest_feature['base_map_loc']) == 0) {
+        return path; // good path
+    }
+    return null;
+};
+
+/** Return a path that ends on hex "dest", or if "dest" is blocked, an open hex immediately adjacent to it
+    Returns null if no path exists.
+    @param {number} squad_id
+    @param {!Array<number>} dest
+    @return {Array<Array<number>>|null} */
 player.squad_find_path_adjacent_to = function(squad_id, dest) {
     if(!session.region || !session.region.data) { return null; }
     if(player.squad_is_moving(squad_id)) { throw Error('squad '+squad_id.toString()+' is still moving'); }
+    if(player.squad_is_raid(squad_id)) { throw Error('squad_find_path_adjacent_to() should not be used for raids'); }
     var squad_data = player.squads[squad_id.toString()];
 
     if(!squad_data['map_loc']) { throw Error('squad '+squad_id.toString()+' is not deployed'); }
@@ -29179,20 +29212,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     /** @type AStar.PathChecker */
     var path_checker = null;
-    if(player.squad_is_raid(squad_id)) {
-        // only blocked by non-squads
-        path_checker = function (_squad_id, _dest) { return function(cell, path) {
-            if(cell.block_count > 0) {
-                for(var i = 0; i < cell.blockers.length; i++) {
-                    var feature = cell.blockers[i];
-                    if(feature['base_type'] !== 'squad') {
-                        return AStar.NOPASS;
-                    }
-                }
-            }
-            return AStar.PASS;
-        }; };
-    } else if(player.squad_block_mode() === 'after_move') {
+     if(player.squad_block_mode() === 'after_move') {
         path_checker = function (_squad_id, _dest) { return function(cell, path) {
             if(cell.block_count > 0) {
                 for(var i = 0; i < cell.blockers.length; i++) {
@@ -29325,10 +29345,10 @@ player._squad_recall_move = function(squad_id, path) {
     }
 
     if(!path) {
-        path = player.squad_find_path_adjacent_to(squad_id, player.home_base_loc);
-        if(path && player.squad_is_raid(squad_id)) {
-            // add final step manually
-            path.push(player.home_base_loc);
+        if(player.squad_is_raid(squad_id)) {
+            path = player.raid_find_path_to(squad_data['map_loc'], home_feature);
+        } else {
+            path = player.squad_find_path_adjacent_to(squad_id, player.home_base_loc);
         }
     }
 

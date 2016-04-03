@@ -159,6 +159,7 @@ RegionMap.MoveCursor = function(map, from_loc, squad_id, icon_specname) {
     this.from_loc = from_loc;
     this.squad_id = squad_id;
     this.icon_unit_spec = (icon_specname ? gamedata['units'][icon_specname] : null);
+    /** @type {Array<!Array<number>>|null} */
     this.path = null;
 
     this.cached_dest = null;
@@ -1120,7 +1121,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         buttons.push([gamedata['strings']['regional_map']['call'],
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
-                                          SquadControlDialog.invoke_call(_feature['base_map_loc']);
+                                          SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
                                       }; })(mapwidget, feature), 'passive']);
                     }
                 }
@@ -1143,7 +1144,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 buttons.push([gamedata['strings']['regional_map']['call'],
                               (function(_mapwidget, _feature) { return function() {
                                   _mapwidget.set_popup(null);
-                                  SquadControlDialog.invoke_call(_feature['base_map_loc']);
+                                  SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
                               }; })(mapwidget, feature), 'passive']);
             }
             buttons.push(mapwidget.make_bookmark_button(feature));
@@ -1171,7 +1172,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
             buttons.push([gamedata['strings']['regional_map']['call'],
                           (function(_mapwidget, _feature) { return function() {
                               _mapwidget.set_popup(null);
-                              SquadControlDialog.invoke_call(_feature['base_map_loc']);
+                              SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
                           }; })(mapwidget, feature), 'passive']);
         }
         // GET INFO
@@ -1198,11 +1199,11 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 }
                 if(feature['base_type'] !== 'home' || player.map_home_combat_enabled()) {
                     // CALL SQUAD
-                    buttons.push([gamedata['strings']['regional_map']['call'],
+                    buttons.push([gamedata['strings']['regional_map'][(feature['base_type'] == 'raid' ? 'call_raid' : 'call')],
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
-                                      SquadControlDialog.invoke_call(_feature['base_map_loc']);
-                                  }; })(mapwidget, feature), 'passive']);
+                                      SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
+                                  }; })(mapwidget, feature), (feature['base_type'] == 'raid' ? 'active' : 'passive')]);
                 }
             } else {
                 buttons.push([gamedata['strings']['regional_map']['spy'],  (function(_mapwidget, _feature) { return function() {

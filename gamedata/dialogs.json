@@ -6963,7 +6963,7 @@
         "widgets": {
             "title": { "kind": "TextField", "xy": [18,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name_normal": "!TX Army", "ui_name_manage": "Battalions",
-                       "ui_name_deploy": "Deploy Battalion", "ui_name_call": "Call Battalion" },
+                       "ui_name_deploy": "Deploy Battalion", "ui_name_call": "Call Battalion", "ui_name_call_raid": "Launch Raid" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "sunken": {"kind": "StaticImage", "xy":[29,64], "dimensions":[677,350], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
