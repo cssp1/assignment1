@@ -1467,15 +1467,20 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('combat_stats' in snap) { this.combat_stats.apply_snapshot(snap['combat_stats']); }
     if('auras' in snap) { this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this); }
     if('cooldowns' in snap) {
-        this.cooldowns = goog.object.map(snap['cooldowns'], function(v) {
+        this.cooldowns = {};
+        for(var k in snap['cooldowns']) {
+            var v = snap['cooldowns'][k];
+            if(!('start_tick' in v)) { continue; } // bad legacy data
+            var val;
             if(typeof(v['start_tick']) === 'object' && 'count' in v['start_tick']) { // bad legacy data where we forgot to decode tickcounts
-                return {start_tick: new GameTypes.TickCount(v['start_tick']['count']),
-                        expire_tick: new GameTypes.TickCount(v['expire_tick']['count'])};
+                val = {start_tick: new GameTypes.TickCount(v['start_tick']['count']),
+                       expire_tick: new GameTypes.TickCount(v['expire_tick']['count'])};
             } else {
-                return {start_tick: new GameTypes.TickCount(v['start_tick']),
-                        expire_tick: new GameTypes.TickCount(v['expire_tick'])};
+                val = {start_tick: new GameTypes.TickCount(v['start_tick']),
+                       expire_tick: new GameTypes.TickCount(v['expire_tick'])};
             }
-        }, this);
+            this.cooldowns[k] = val;
+        }
     }
     if('cur_facing' in snap) {
         this.cur_facing = snap['cur_facing'];
