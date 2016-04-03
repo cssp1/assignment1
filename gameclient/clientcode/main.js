@@ -1410,7 +1410,10 @@ GameObject.prototype.serialize = function() {
         ret['control_cooldown'] = this.control_cooldown;
         ret['auras'] = goog.array.map(this.auras, function(aura) { return aura.serialize(); }, this);
         ret['combat_stats'] = this.combat_stats.serialize();
-        ret['cooldowns'] = deepcopy_obj(this.cooldowns);
+        ret['cooldowns'] = goog.object.map(this.cooldowns, function(v) {
+            return {'start_tick': v.start_tick.get(), // translate from tick counts
+                    'expire_tick': v.expire_tick.get()};
+        }, this);
         if('turn_rate' in this.spec) {
             ret['cur_facing'] = serialize_number(this.cur_facing, 2);
             ret['target_facing'] = serialize_number(this.target_facing, 2);
@@ -1463,7 +1466,17 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('control_cooldown' in snap) { this.control_cooldown = snap['control_cooldown']; }
     if('combat_stats' in snap) { this.combat_stats.apply_snapshot(snap['combat_stats']); }
     if('auras' in snap) { this.auras = goog.array.map(snap['auras'], function(s) { return Aura.unserialize(s); }, this); }
-    if('cooldowns' in snap) { this.cooldowns = snap['cooldowns']; }
+    if('cooldowns' in snap) {
+        this.cooldowns = goog.object.map(snap['cooldowns'], function(v) {
+            if(typeof(v['start_tick']) === 'object' && 'count' in v['start_tick']) { // bad legacy data where we forgot to decode tickcounts
+                return {start_tick: new GameTypes.TickCount(v['start_tick']['count']),
+                        expire_tick: new GameTypes.TickCount(v['expire_tick']['count'])};
+            } else {
+                return {start_tick: new GameTypes.TickCount(v['start_tick']),
+                        expire_tick: new GameTypes.TickCount(v['expire_tick'])};
+            }
+        }, this);
+    }
     if('cur_facing' in snap) {
         this.cur_facing = snap['cur_facing'];
         // set next_facing only for the very first tick after application of the initial snapshot
@@ -29312,7 +29325,8 @@ player.squad_interpolate_pos_and_heading = function(squad_id) {
 /** @param {number} squad_id
     @param {Array.<Array.<number>>|null=} path */
 player.squad_recall = function(squad_id, path) {
-    if(player.squad_is_moving(squad_id)) {
+    // non-raids must halt before moving again
+    if(/*!player.squad_is_raid(squad_id) &&*/ player.squad_is_moving(squad_id)) {
         if(!player.squad_get_client_data(squad_id, 'halt_pending')) {
             player.squad_halt(squad_id);
         }
