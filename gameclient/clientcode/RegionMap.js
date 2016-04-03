@@ -1203,7 +1203,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
                                       SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                                  }; })(mapwidget, feature), (feature['base_type'] == 'raid' ? 'active' : 'passive')]);
+                                  }; })(mapwidget, feature), (feature['base_type'] == 'raid' ? 'normal' : 'passive')]);
                 }
             } else {
                 buttons.push([gamedata['strings']['regional_map']['spy'],  (function(_mapwidget, _feature) { return function() {

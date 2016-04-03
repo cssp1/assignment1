@@ -139,6 +139,7 @@ SquadControlDialog.refresh = function(dialog) {
 
     goog.array.forEach(squad_ids, function (id) {
         if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
+        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['to_feature'] && dialog.user_data['to_feature']['base_type'] == 'raid' && player.squad_is_deployed(id)) { return; }
         make_squad_tile_args.push({squad_id: id, template: 'squad_tile'});
     });
 
