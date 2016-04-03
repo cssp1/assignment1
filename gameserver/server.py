@@ -9314,7 +9314,10 @@ class Player(AbstractPlayer):
                 entry = {'base_id': self.squad_base_id(squad_id), 'DELETED':1}
 
         if (not force) and (hex_distance(entry['base_map_loc'], self.my_home.base_map_loc) > 1):
-            return False, [entry], ["INVALID_MAP_LOCATION", squad_id] # squad is not adjacent to home base
+            return False, [entry], ["INVALID_MAP_LOCATION", squad_id, 'out_of_range'] # squad is not adjacent to home base
+
+        if (not force) and Region(gamedata, self.home_region).feature_is_moving(entry, server_time, assume_moving = False):
+            return False, [entry], ["INVALID_MAP_LOCATION", squad_id, 'still_moving'] # squad is still moving
 
         if gamedata['server'].get('log_nosql',0) >= 2:
             gamesite.exception_log.event(server_time, 'player %d squad_exit_map %d has_write_lock %d' % \
