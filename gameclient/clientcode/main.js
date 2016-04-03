@@ -47730,7 +47730,7 @@ function on_keypress(e) {
             }
         } else if(str === 'f') {
             fps_counter.show = !fps_counter.show;
-        } else if(str === 'm') {
+        } else if(str === 'm' && world) {
             if(!selection.unit) { toggle_region_map(); }
         } else if(str === 'z' && player.is_developer() && world) {
             world.control_paused = !world.control_paused;
