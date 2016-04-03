@@ -16,7 +16,7 @@ import SpinSingletonProcess
 import ControlAPI
 import AIBaseRandomizer
 from Region import Region
-from AStar import SquadPathfinder, hex_distance
+from AStar import SquadPathfinder
 import Sobol
 import sys, getopt, time, random, copy, math
 
@@ -25,6 +25,7 @@ def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, spin_user = 'maptool
 time_now = int(time.time())
 event_time_override = None
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
+gamedata['server'] = SpinConfig.load_fd(open(SpinConfig.gamedata_component_filename('server.json')))
 
 # XXX make db_client a global
 nosql_client = None
@@ -1516,22 +1517,21 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
     for cache in home_cache, quarry_cache, hive_cache, raid_cache, squad_cache:
         for loc, feature in cache.iteritems():
             if region.feature_blocks_map(feature, 'never'): # squad_block_mode
-                pf.occupancy.block_hex(loc, 1, feature)
-
-    FUDGE_TIME = 5.0 # allow client some time to move the squad after it gets to its destination
+                pf.occupancy.block_hex(feature['base_map_loc'], 1, feature)
 
     for squad in squad_cache.itervalues():
         if not squad.get('raid'): continue # not a raid
-        if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - FUDGE_TIME:
+        if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - gamedata['server'].get('map_path_fudge_time',4.0):
             continue # still moving
-        loc = tuple(squad['base_map_loc'])
+        loc = squad['base_map_loc']
+        loc_key = tuple(loc)
         owner_id, squad_id = map(int, squad['base_id'][1:].split('_'))
         assert squad['base_landlord_id'] == owner_id
 
         if verbose: print 'RAID SQUAD', pretty_feature(squad), 'stationary'
 
-        if loc in home_cache:
-            home = home_cache[loc]
+        if loc_key in home_cache:
+            home = home_cache[loc_key]
             if home['base_landlord_id'] == owner_id: # it's home!
                 recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
                 continue
@@ -1547,14 +1547,14 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
         else:
             home = home_cache[tuple(home['base_map_loc'])] # look it up again so the dest_feature identity check works
 
-        path = pf.squad_find_path_adjacent_to(loc, home['base_map_loc'], dest_feature = home, is_raid = True)
-        if not path or len(path) < 1 or hex_distance(path[-1], home['base_map_loc']) != 0:
-            print 'Squad return pathfinding unsuccessful!', pretty_feature(squad), path
+        path = pf.raid_find_path_to(loc, home)
+        if not path:
+            print 'Squad return pathfinding unsuccessful!', pretty_feature(squad)
             recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
             continue
 
         # set squad moving
-        next_eta = int(time.time())
+        next_eta = time.time()
         new_path = [{'xy': squad['base_map_loc'], 'eta': next_eta}]
         for i in xrange(len(path)):
             waypoint = path[i]

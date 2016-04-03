@@ -37,7 +37,7 @@ def path_checker_to_cell_checker(path_checker, cur_path):
 
 class AStarCell(object):
     def __init__(self, pos):
-        self.pos = pos
+        self.pos = tuple(pos) # immutable
         self.block_count = 0 # count of obstacles overlapping this point
 
         # list of references to obstacles that are blocking here
@@ -120,12 +120,12 @@ class AStarHexMap(AStarMap):
     def get_unblocked_neighbors(self, node, checker, ret):
         x, y = node.pos
         odd = (y%2) > 0
-        ret[0] = self.cell_if_unblocked([x-1,y], checker) # left
-        ret[1] = self.cell_if_unblocked([x+1,y], checker) # right
-        ret[2] = self.cell_if_unblocked([x+odd-1,y-1], checker) # upper-left
-        ret[3] = self.cell_if_unblocked([x+odd,y-1], checker) # upper-right
-        ret[4] = self.cell_if_unblocked([x+odd-1,y+1], checker) # lower-left
-        ret[5] = self.cell_if_unblocked([x+odd,y+1], checker) # lower-right
+        ret[0] = self.cell_if_unblocked((x-1,y), checker) # left
+        ret[1] = self.cell_if_unblocked((x+1,y), checker) # right
+        ret[2] = self.cell_if_unblocked((x+odd-1,y-1), checker) # upper-left
+        ret[3] = self.cell_if_unblocked((x+odd,y-1), checker) # upper-right
+        ret[4] = self.cell_if_unblocked((x+odd-1,y+1), checker) # lower-left
+        ret[5] = self.cell_if_unblocked((x+odd,y+1), checker) # lower-right
     def unblock_hex_maybe(self, xy, blocker):
         if self.is_blocked(xy):
             cell = self.cell(xy)
@@ -274,43 +274,17 @@ class SquadPathfinder(object):
         self.occupancy = AStarHexMap(region.dimensions(), terrain_func = region.obstructs_squads)
         self.hstar_context = AStarContext(self.occupancy, heuristic_name = 'manhattan')
 
-    # only blocked by non-squads
-    def make_raid_path_checker(self, ignore_feature):
-        return lambda cell, path, _ign = ignore_feature: \
-            NOPASS if cell.block_count > 0 and any(feature is not _ign and feature['base_type'] != 'squad' for feature in cell.blockers) else PASS
-
     # return a path that ends on hex "dest", or if "dest" is blocked, an open hex immediately adjacent to it
-    def squad_find_path_adjacent_to(self, src, dest, dest_feature = None, is_raid = False):
-        assert is_raid # only handles the raid-squad special case for now
-        path_checker = self.make_raid_path_checker(dest_feature)
-        cell_checker = lambda cell: path_checker(cell, None)
+    def raid_find_path_to(self, start_loc, dest_feature):
+        raid_path_checker = lambda cell, path: \
+          NOPASS if cell.block_count > 0 and any(feature is not dest_feature and feature['base_type'] != 'squad' for feature in cell.blockers) else PASS
 
         # if dest is not blocked, try going directly there
-        if not self.occupancy.is_blocked(dest, checker = cell_checker):
-            path = self.hstar_context.search(src, dest, path_checker)
-            if path and len(path) >= 1 and hex_distance(path[-1], dest) == 0:
-                return path # good path
+        path = self.hstar_context.search(start_loc, dest_feature['base_map_loc'], raid_path_checker)
+        if path and len(path) >= 1 and hex_distance(path[-1], dest_feature['base_map_loc']) == 0:
+            return path # good path
 
-        # try aiming for neighbor squares around "dest"
-        best_path = None
-        best_travel_time = -1
-        for n in self.region.get_neighbors(dest):
-            if not self.occupancy.is_blocked(n, checker = cell_checker):
-                path = self.hstar_context.search(src, n, path_checker)
-                # path must lead INTO n
-                if path and len(path) >= 1 and hex_distance(path[-1], n) == 0:
-                    # good path
-                    # trim off unnecessary extra moves at the end of the path that just circle around the destination hex
-                    # note: need to check for blockage on this intermediate waypoint before changing the final destination to it,
-                    # because it might be the destination of another moving squad, where we aren't allowed to land.
-                    while len(path) >= 2 and hex_distance(path[-2], dest) == 1 and not self.occupancy.is_blocked(path[-2], checker = cell_checker):
-                        path = path[0:len(path)-1]
-
-                    travel_time = len(path) # player.squad_travel_time(squad_id, path)
-                    if best_path is None or travel_time < best_travel_time:
-                        best_path = path
-                        best_travel_time = travel_time
-        return best_path
+        return None
 
 # test code
 if __name__ == '__main__':
@@ -323,5 +297,5 @@ if __name__ == '__main__':
     for feature in features:
         pf.occupancy.block_hex(feature['base_map_loc'], 1, feature)
 
-    print pf.squad_find_path_adjacent_to([131,137], [135,137], is_raid = True)
-    print pf.squad_find_path_adjacent_to([131,137], [134,137], dest_feature = features[1], is_raid = True)
+    print pf.raid_find_path_to([131,137], {'base_map_loc':[135,137]})
+    print pf.raid_find_path_to([131,137], features[1])
