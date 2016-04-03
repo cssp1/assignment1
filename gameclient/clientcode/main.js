@@ -46043,7 +46043,9 @@ function handle_server_message(data) {
                 invoke_speedup_dialog('crafting');
             }
         } else if(name == "INVALID_MAP_LOCATION" || name == "CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK" ||
-                  name == "SQUAD_RACE_CONDITION" || name.indexOf("CANNOT_DEPLOY_SQUAD") == 0) {
+                  name == "SQUAD_RACE_CONDITION" ||
+                  name.indexOf("CANNOT_DEPLOY_SQUAD") == 0 ||
+                  name.indexOf("CANNOT_DEPLOY_RAID") == 0) {
             // stop whatever AI action the squad was trying to do
             if(argument && (argument.toString() in player.squads)) {
                 var squad = player.squads[argument.toString()];
