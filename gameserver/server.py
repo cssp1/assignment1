@@ -8700,7 +8700,18 @@ class Player(AbstractPlayer):
             if squad_id in map_squads:
                 # it should be on the map
                 map_data = map_squads[int(squad_id)]
+
+                # harmonize local cache of movement data
                 squad['map_loc'] = map_data['base_map_loc']
+                if 'base_map_path' in map_data:
+                    squad['map_path'] = map_data['base_map_path']
+                elif 'map_path' in squad:
+                    del squad['map_path']
+
+                for FIELD in ('travel_speed','raid'):
+                    if FIELD in map_data:
+                        squad[FIELD] = map_data[FIELD]
+
                 must_recall = False
                 # check that no objects are at home
                 if (squad_id in home_objects_by_squad):
