@@ -42,3 +42,9 @@ class Region:
         return self.read_climate(xy).get('obstructs_squads',False)
     def feature_blocks_map(self, feature, squad_block_mode):
         return feature['base_type'] != 'squad' or (not feature.get('raid') and squad_block_mode != 'never')
+    def feature_is_moving(self, feature, time_now, assume_moving = False):
+        # add extra fudge time to reduce chance of race conditions
+        # "assume_moving" is a hint to favor the most likely case for this check (giving "benefit of the doubt")
+        fudge_time = (-1 if assume_moving else 1) * self.gamedata['server'].get('map_path_fudge_time',4.0)
+        return ('base_map_path' in feature) and \
+               feature['base_map_path'][-1]['eta'] > time_now + fudge_time

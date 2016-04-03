@@ -3835,7 +3835,7 @@ class Session(object):
                         if ('base_map_loc' in feature) and \
                            (feature['base_map_loc'][0] == viewing_base.base_map_loc[0]) and \
                            (feature['base_map_loc'][1] == viewing_base.base_map_loc[1]) and \
-                           (('map_path' not in feature) or (feature['map_path'][-1]['eta'] < server_time)):
+                           (not Region(gamedata, viewing_base.base_region).feature_is_moving(feature, server_time, assume_moving = True)):
                             if feature.get('LOCK_OWNER',-1) == viewing_base.base_landlord_id:
                                 err = "CANNOT_ATTACK_THEIR_SQUAD_OFFENSE"
                             else:
@@ -5281,7 +5281,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         assert gamesite.nosql_client and player.home_region # map path
         dest_feature = gamesite.nosql_client.get_map_feature_by_base_id(player.home_region, dest_base_id, reason='change_session(query_dest_feature)')
         if (not dest_feature) or \
-           (('base_map_path' in dest_feature) and (dest_feature['base_map_path'][-1]['eta']>server_time)) or \
+           Region(gamedata, player.home_region).feature_is_moving(dest_feature, server_time, assume_moving = False) or \
            (dest_feature['base_type'] not in ('hive', 'quarry', 'home', 'squad')) or \
            (dest_feature['base_type'] == 'squad' and (not player.squad_combat_enabled()) or dest_feature.get('raid')) or \
            (dest_feature['base_type'] == 'home' and not player.map_home_combat_enabled()):
@@ -5298,7 +5298,7 @@ class SessionChangeNew(SessionChange): # new basedb path
 
             for squad_feature in squad_features:
                 if squad_feature.get('raid'): continue # cannot participate in RTS battles
-                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time): continue # squad not arrived yet
+                if Region(gamedata, player.home_region).feature_is_moving(squad_feature, server_time, assume_moving = False): continue # squad not arrived yet
                 if squad_feature.get('LOCK_STATE',0) > 0 and \
                    squad_feature.get('LOCK_OWNER',-1) != player.user_id:
 #                           ((not session.viewing_squad_locks) or (SpinDB.base_lock_id(player.home_region, player.squad_base_id(squad_id)) not in session.viewing_squad_locks)):
@@ -5339,7 +5339,7 @@ class SessionChangeNew(SessionChange): # new basedb path
 
             for squad_feature in defense_features:
                 if squad_feature.get('raid'): continue # cannot participate in RTS battles
-                if ('base_map_path' in squad_feature) and (squad_feature['base_map_path'][-1]['eta'] > server_time):
+                if Region(gamedata, player.home_region).feature_is_moving(squad_feature, server_time, assume_moving = False):
                     continue # squad has not arrived at its destination yet
                 if squad_feature['base_landlord_id'] != dest_feature['base_landlord_id']:
                     # "defending" squad, but it's owned by someone other than the quarry owner
@@ -8045,6 +8045,13 @@ class Player(AbstractPlayer):
     def squad_is_deployed(self, squad_id):
         squad = self.squads.get(str(squad_id), None)
         return (squad and ('map_loc' in squad))
+    def squad_is_moving(self, squad_id, assume_moving = False):
+        squad = self.squads[str(squad_id)]
+        # add extra fudge time to reduce chance of race conditions
+        # "assume_moving" is a hint to favor the most likely case for this check (giving "benefit of the doubt")
+        fudge_time = (-1 if assume_moving else 1) * gamedata['server'].get('map_path_fudge_time',4.0)
+        return ('map_path' in squad) and \
+               squad['map_path'][-1]['eta'] > server_time + fudge_time
 
     def bust_expired_locks(self):
         if self.lock_state == Player.LockState.open:
@@ -9000,13 +9007,12 @@ class Player(AbstractPlayer):
         return ret
 
     # look up a (non-base-defenders, non-reserve) squad by ID. If it exists and is at home, return the squad, else return None
-    def verify_squad(self, squad_id, require_at_home = True, require_away = False, require_move_finished = False):
+    def verify_squad(self, squad_id, require_at_home = True, require_away = False):
         squad = self.squads.get(str(squad_id), None)
         if not squad: return None
         is_away = bool(squad.get('map_loc',None))
         if require_at_home and is_away: return None
         if require_away and (not is_away): return None
-        if require_move_finished and ('map_path' in squad) and (squad['map_path'][-1]['eta'] > server_time): return None
         return squad
 
     def squad_get_rollback_props(self, squad_id):
@@ -9154,7 +9160,7 @@ class Player(AbstractPlayer):
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_cannot_redirect', coords[-1] if coords else None]
 
         if coords:
-            if ('map_path' in squad) and (squad['map_path'][-1]['eta'] >= server_time):
+            if self.squad_is_moving(squad_id, assume_moving = False):
                 return False, [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad is currently in motion, cannot accept a non-halt path
 
             check_path = True
@@ -9179,7 +9185,7 @@ class Player(AbstractPlayer):
 
         else:
             # player wants to halt the squad - is it halted already?
-            if ('map_path' not in squad) or (squad['map_path'][-1]['eta'] < server_time):
+            if not self.squad_is_moving(squad_id, assume_moving = True):
                 return False, [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad already halted
             # compute path up to where the squad is right now
             new_path = []
@@ -14434,7 +14440,7 @@ class Store(object):
             squad_id = spellarg
             p_currency = 'gamebucks'
             squad = session.player.verify_squad(squad_id, require_at_home = False, require_away = True)
-            if ('map_path' in squad) and (squad['map_path'][-1]['eta'] >= server_time):
+            if session.player.squad_is_moving(squad_id, assume_moving = True):
                 time_to_finish = max(squad['map_path'][-1]['eta'] - server_time, 1)
             else:
                 time_to_finish = 1 # minimum time
