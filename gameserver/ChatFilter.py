@@ -171,7 +171,7 @@ class ChatFilter(object):
             if self.is_diacritic(codepoint):
                 # disallow repetition of any single nonspacing mark
                 if next_codepoint and codepoint == next_codepoint and \
-                   codepoint not in (0x0e48,): # special exception: THAI CHARACTER MAI EK
+                   codepoint not in (0x0e48,0x0e49): # special exception: Thai diacritics
                     return True
                 # disallow continuous sequences of 5 or more nonspacing marks
                 nonspacing_run += 1
