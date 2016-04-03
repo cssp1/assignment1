@@ -9128,7 +9128,15 @@ class Player(AbstractPlayer):
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
         return True, [feature], None
 
-    def squad_step(self, squad_id, coords, is_raid_launch):
+    # limit # of steps to prevent DDOS
+    def squad_path_sanitize(self, coords):
+        map_dimensions = gamedata['regions'][self.home_region]['dimensions']
+        max_steps = map_dimensions[0]+map_dimensions[1]
+        return coords[:max_steps]
+
+    def squad_step(self, squad_id, coords, is_raid_launch, path_choices = None):
+        # path_choices is an optional dictionary of possible paths {"x,y": path...}
+        # when the client is not sure exactly where a moving squad will halt before embarking on the new path.
         assert (gamesite.nosql_client and self.home_region)
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
 
@@ -9138,10 +9146,30 @@ class Player(AbstractPlayer):
         squad = self.verify_squad(squad_id, require_at_home = False, require_away = True)
         if not squad: return False, [rollback_feature], ["INVALID_SQUAD"] # squad was not deployed into map yet
 
+        # where is the squad now?
+        if self.squad_is_moving(squad_id, assume_moving = False):
+            start_point = squad['map_path'][0]['xy']
+            for waypoint in squad['map_path']:
+                if waypoint['eta'] > server_time:
+                    break
+                start_point = waypoint['xy']
+        else:
+            start_point = squad['map_loc']
+
+        # if the client offers multiple paths, pick the one that starts from where the squad is now
+        if path_choices is not None:
+            assert coords is None
+            key = '%d,%d' % (start_point[0], start_point[1])
+            if key in path_choices:
+                coords = path_choices[key]
+                # note: coords might become an empty array here, if squad is to remain where it is now
+            else:
+                return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'no_choice_matches', start_point]
+
         if squad.get('raid'):
             if is_raid_launch:
                 # initial map entry. Make sure raid is going somewhere useful.
-                if not coords:
+                if not coords: # None or empty list
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_no_destination', None]
 
                 if(hex_distance(coords[-1], self.my_home.base_map_loc) == 0):
@@ -9156,16 +9184,18 @@ class Player(AbstractPlayer):
                         return False, [rollback_feature], ["CANNOT_DEPLOY_RAID_DIST_LIMIT", squad_id, 'raid_destination_too_far', coords[-1]]
             else:
                 # prevent re-directing raids anywhere other than back to home base
-                if (not coords) or hex_distance(coords[-1], self.my_home.base_map_loc) != 0:
+                if (coords is None) or \
+                   (len(coords) == 0 and hex_distance(start_point, self.my_home.base_map_loc) != 0) or \
+                   (len(coords) >= 1 and hex_distance(coords[-1], self.my_home.base_map_loc) != 0):
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_cannot_redirect', coords[-1] if coords else None]
 
-        if coords:
-            if self.squad_is_moving(squad_id, assume_moving = False):
+        if coords is not None:
+            if self.squad_is_moving(squad_id, assume_moving = False) and (path_choices is None):
                 return False, [rollback_feature], ["SQUAD_RACE_CONDITION", squad_id] # squad is currently in motion, cannot accept a non-halt path
 
             check_path = True
             next_eta = server_time
-            new_path = [{'xy': squad['map_loc'], 'eta': next_eta}]
+            new_path = [{'xy': start_point, 'eta': next_eta}]
 
             assert type(coords) is list
             for i in xrange(len(coords)):
@@ -9173,7 +9203,7 @@ class Player(AbstractPlayer):
                 assert type(waypoint) is list and len(waypoint) == 2 and type(waypoint[0]) is int and type(waypoint[1]) is int
                 if waypoint[0] < 0 or waypoint[0] >= gamedata['regions'][self.home_region]['dimensions'][0] or \
                    waypoint[1] < 0 or waypoint[1] >= gamedata['regions'][self.home_region]['dimensions'][1] or \
-                   (i == 0 and hex_distance(waypoint, squad['map_loc']) != 1) or \
+                   (i == 0 and hex_distance(waypoint, start_point) != 1) or \
                    (i > 0 and hex_distance(waypoint, coords[i-1]) != 1) or \
                    Region(gamedata, self.home_region).obstructs_squads(waypoint):
                     # waypoint is outside of map, or not a neighbor of the previous waypoint
@@ -27124,11 +27154,16 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == 'SQUAD_STEP':
                 squad_id = int(spellargs[0])
-                # limit # of steps to prevent DDOS
-                map_dimensions = gamedata['regions'][session.player.home_region]['dimensions']
-                max_steps = map_dimensions[0]+map_dimensions[1]
-                coords = spellargs[1][:max_steps] if spellargs[1] else None # may be null
+                coords = session.player.squad_path_sanitize(spellargs[1]) if spellargs[1] else None # may be null
                 success, map_features, error_code = session.player.squad_step(squad_id, coords, False)
+                if error_code: retmsg.append(["ERROR"] + error_code)
+                if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
+                retmsg.append(["SQUADS_UPDATE", session.player.squads])
+
+            elif spellname == 'SQUAD_STEP_MULTIPLE_CHOICE':
+                squad_id = int(spellargs[0])
+                path_choices = dict((k,session.player.squad_path_sanitize(v)) for k,v in spellargs[1].iteritems())
+                success, map_features, error_code = session.player.squad_step(squad_id, None, False, path_choices = path_choices)
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])

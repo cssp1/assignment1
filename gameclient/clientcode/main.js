@@ -29195,7 +29195,9 @@ player.raid_find_path_to = function(start_loc, dest_feature) {
         }
         return AStar.PASS;
     };
-
+    if(hex_distance(start_loc, dest_feature['base_map_loc']) === 0) {
+        return []; // already there
+    }
     var path = session.region.hstar_context.search(start_loc, dest_feature['base_map_loc'], raid_path_checker);
     if(path && path.length >= 1 && hex_distance(path[path.length-1], dest_feature['base_map_loc']) == 0) {
         return path; // good path
@@ -29325,14 +29327,17 @@ player.squad_interpolate_pos_and_heading = function(squad_id) {
 /** @param {number} squad_id
     @param {Array.<Array.<number>>|null=} path */
 player.squad_recall = function(squad_id, path) {
-    // non-raids must halt before moving again
-    if(/*!player.squad_is_raid(squad_id) &&*/ player.squad_is_moving(squad_id)) {
+    // moving non-raids must halt before moving again
+    if(!player.squad_is_moving(squad_id)) { // simple case - squad not moving. Just move.
+        player.squad_recall_move(squad_id, path);
+    } else if(player.squad_is_raid(squad_id)) {
+        player.squad_recall_redirect(squad_id); // complex case - raid moving. Redirect.
+    } else {
+        // complex case - non-raid moving. Halt then move.
         if(!player.squad_get_client_data(squad_id, 'halt_pending')) {
             player.squad_halt(squad_id);
         }
         player.squad_set_client_data(squad_id, 'squad_orders', {'recall_after_halt': 1, 'recall_path': path || null});
-    } else {
-        player.squad_recall_move(squad_id, path);
     }
 };
 
@@ -29423,6 +29428,52 @@ player.squad_move = function(squad_id, path) {
     }
 };
 
+/** Special function for recalling a moving raid to base. Since this
+    must halt and then step atomically (i.e. redirect a moving squad),
+    we have to plot multiple paths to base, depending on exactly where
+    the server stopped it.
+    @param {number} squad_id - must be a MOVING raid
+    @return {boolean} true if we found a path home. False if squad is blocked from returning. */
+player.squad_recall_redirect = function(squad_id) {
+    var squad_data = player.squads[squad_id.toString()];
+
+    // note: we can't just use home_base_loc here, because we need to path-find to it!
+    var home_feature = session.region.find_home_feature();
+    if(!home_feature) {
+        return false;
+    }
+
+    // compute a return-to-home path from every hex at which the raid might stop
+    var paths = {};
+    goog.array.forEach(squad_data['map_path'], function(waypoint) {
+        // ignore waypoints way out of the time window
+        if(waypoint['eta'] < server_time - 5 ||waypoint['eta'] > server_time + 10) { return; }
+        var path = player.raid_find_path_to(waypoint['xy'], home_feature);
+        if(path !== null) { // might be empty list if squad is at home_feature
+            var key = waypoint['xy'][0].toFixed(0)+','+waypoint['xy'][1].toFixed(0);
+            paths[key] = path;
+        }
+    });
+
+    if(goog.object.isEmpty(paths)) {
+        // uh oh, no way home!
+        var s = gamedata['errors']['CANNOT_RECALL_SQUAD_MAP_BLOCKED'];
+        invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
+        return false;
+    }
+
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_STEP_MULTIPLE_CHOICE", squad_id, paths]);
+    player.squad_clear_client_data(squad_id); // erase current movement orders
+    player.squad_set_client_data(squad_id, 'move_pending', squad_data['map_loc']); // wait for squad to move before issuing new orders - remember original loc
+    // trigger SQUAD_EXIT_MAP at next opportunity after the move
+    player.squad_set_client_data(squad_id, 'squad_orders', {'recall':1});
+
+    // note: don't attempt to client-side predict this
+    squad_data['pending'] = true;
+
+    return true;
+};
+
 player.advance_squads = function() {
     goog.object.forEach(player.squads, function(squad_data) {
         // don't touch squads that are involved in the current battle
@@ -29490,7 +29541,7 @@ player.advance_squads = function() {
                 squad_data['pending'] = true;
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_EXIT_MAP", squad_data['id']]);
                 player.squad_clear_client_data(squad_data['id']);
-            } else {
+            } else if(!session.region.dirty) {
                 var features = session.region.find_features_at_coords(squad_data['map_loc']);
                 var need_resolve = false;
                 for(var i = 0; i < features.length; i++) {
