@@ -169,8 +169,11 @@ class ChatFilter(object):
 
             # disallow nonsense duplications of nonspacing marks (e.g. Arabic diacritics)
             if self.is_diacritic(codepoint):
-                if next_codepoint and codepoint == next_codepoint:
+                # disallow repetition of any single nonspacing mark
+                if next_codepoint and codepoint == next_codepoint and \
+                   codepoint not in (0x0e48,): # special exception: THAI CHARACTER MAI EK
                     return True
+                # disallow continuous sequences of 5 or more nonspacing marks
                 nonspacing_run += 1
                 if nonspacing_run >= 5:
                     return True
@@ -182,7 +185,7 @@ class ChatFilter(object):
     def is_diacritic(self, codepoint):
         # see http://www.unicode.org/reports/tr44/tr44-4.html#General_Category_Values
         if codepoint < 0x80: return False # ASCII stuff is OK
-        if codepoint in (0xbf, 0xa1, 0x61f): return False # Spanish/Arabic question/exclamation marks are OK
+        if codepoint in (0xbf, 0xa1, 0x61f, 0x60c): return False # Spanish/Arabic question/exclamation/comma marks are OK
         return unicodedata.category(unichr(codepoint)) in ('Mn','Po')
 
         # see https://en.wikipedia.org/wiki/Arabic_(Unicode_block)
@@ -239,4 +242,7 @@ if __name__ == '__main__':
     assert not cf.is_ugly(u'\u0647\u064a \u0627\u0644\u062e\u0631\u064a\u0637\u0629 \u062f\u064a \u0645\u0641\u064a\u0647\u0627\u0634 \u062d\u062f \u0646\u0647\u062c\u0645 \u0639\u0644\u064a\u0647 \u0646\u062c\u064a\u0628 \u0645\u0646\u0647 \u0645\u0648\u0627\u0631\u062f \u064a\u0627 \u062c\u0645\u0627\u0639\u0629 \u0643\u0644\u0647\u0645 \u0623\u0635\u062f\u0642\u0627\u0621 \u064a\u0639\u0646\u064a\u061f\u061f\u061f\u061f\u061f')
     assert not cf.is_ugly('u\xbf\xbf\xbf\xbf\xbf')
     assert not cf.is_ugly(u'hola a todos espero ser de utilidad entro paar aportar lo mio\xa1\xa1\xa1')
+    assert not cf.is_ugly(u'\u0e2d\u0e30\u0e21\u0e32\u0e01 \u0e04\u0e23\u0e31\u0e1a \u0e17\u0e35\u0e48\u0e48')
+
+    assert not cf.is_ugly(u'\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0634\u0628\u0627\u0628\u060c\u060c \u0627\u0634\u0648 \u0645\u0627\u0643\u0648 \u0644\u0627 \u062a\u0631\u0642\u064a\u0647 \u0644\u0627 \u0634\u064a \u0628\u0647\u0630\u0627 \u0627\u0644\u0643\u0644\u064a\u0646 \u0628\u0633 \u0627\u062f\u0627\u0641\u0639 \u0648 \u0627\u0633\u0647\u0631 \u0648 \u0643\u0644\u0634\u064a \u0645\u0627\u0643\u0648')
     print 'OK'
