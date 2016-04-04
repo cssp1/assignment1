@@ -2697,10 +2697,22 @@ class PlayerTable:
                       ('base_resource_loot', None, None),
                       ('my_base',
                        lambda mybase: [x.persist_state() for x in mybase],
-                       lambda player, observer, data: filter(lambda x: x is not None, [reconstitute_object(observer, player, state, context='PlayerTable:parse(home)') for state in data])
+                       lambda player, observer, data: filter(lambda x: x is not None, (reconstitute_object(observer, player, state, context='PlayerTable:parse(home)') for state in PlayerTable.filter_duplicate_obj_ids(data, player.user_id)))
                        ),
                       ]
 
+    @staticmethod
+    def filter_duplicate_obj_ids(state_list, user_id):
+        # avoid permanent corruption of playerdb when my_base includes duplicate objects
+        seen = set()
+        for state in state_list:
+            if 'obj_id' in state:
+                if state['obj_id'] in seen:
+                    gamesite.exception_log.event(server_time, 'PlayerTable: player %d dropping duplicate object ID %r (%r)' % \
+                                                 (user_id, state['obj_id'], state.get('spec')))
+                    continue
+                seen.add(state['obj_id'])
+            yield state
 
     def __init__(self):
         # keep track of current in-flight async I/O
