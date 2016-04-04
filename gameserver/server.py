@@ -8727,7 +8727,7 @@ class Player(AbstractPlayer):
                 elif 'map_path' in squad:
                     del squad['map_path']
 
-                for FIELD in ('travel_speed','raid'):
+                for FIELD in ('travel_speed','raid','max_cargo'):
                     if FIELD in map_data:
                         squad[FIELD] = map_data[FIELD]
 
@@ -8768,7 +8768,7 @@ class Player(AbstractPlayer):
                     to_recall.append(squad_id)
             else:
                 # it should be at home base
-                for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
+                for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
                     if FIELD in squad: del squad[FIELD]
                 if (squad_id in map_objects_by_squad):
                     # this can happen after an attack where we lose a squad, but we need the player to log in to recall it into home_base_iter
@@ -9082,8 +9082,9 @@ class Player(AbstractPlayer):
         icon_unit_specname = None
         total_hp = 0
 
-        # compute travel speed here, while we have all the units in memory
+        # compute travel speed and max cargo here, while we have all the units in memory
         travel_speed = -1
+        max_cargo = {}
 
         for object in self.home_base_iter():
             if object.is_mobile() and (object.squad_id or 0) == squad_id:
@@ -9097,6 +9098,11 @@ class Player(AbstractPlayer):
                 assert speed > 0
                 travel_speed = min(travel_speed, speed) if (travel_speed > 0) else speed
 
+                for res in gamedata['resources']:
+                    amount = object.get_leveled_quantity(getattr(object.spec, 'cargo_'+res))
+                    if amount > 0:
+                        max_cargo[res] = max_cargo.get(res,0) + amount
+
         if len(to_remove) < 1: return False, [rollback_feature], ["INVALID_SQUAD"] # cannot deploy empty squad
         if total_hp < 1: return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_DEAD", squad_id] # cannot deploy dead squad
 
@@ -9107,10 +9113,10 @@ class Player(AbstractPlayer):
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
                    'base_map_path': None, # explicit null for client's benefit
-                   'travel_speed': travel_speed
-                   }
+                   'travel_speed': travel_speed}
         if is_raid:
             feature['raid'] = 1
+            feature['max_cargo'] = max_cargo
             exclusive = -1 # no collision checks
             exclude_filter = None
         elif self.squad_block_mode() == 'never':
@@ -9136,6 +9142,7 @@ class Player(AbstractPlayer):
         squad['travel_speed'] = travel_speed
         if is_raid:
             squad['raid'] = 1
+            squad['max_cargo'] = max_cargo
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
         return True, [feature], None
@@ -9393,7 +9400,9 @@ class Player(AbstractPlayer):
 
         try:
             to_add = list(gamesite.nosql_client.get_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map'))
-            self.squad_dock_units(squad_id, to_add, force = force)
+            self.squad_dock_units(squad_id, to_add, cargo = entry.get('cargo'), cargo_source = entry.get('cargo_source'), force = force)
+            if session and entry.get('cargo'):
+                session.deferred_player_state_update = True
 
             gamesite.nosql_client.drop_mobile_objects_by_base(self.home_region, self.squad_base_id(squad_id), reason='squad_exit_map')
             gamesite.nosql_client.drop_map_feature(self.home_region, self.squad_base_id(squad_id), originator=self.user_id, reason='squad_exit_map')
@@ -9410,7 +9419,7 @@ class Player(AbstractPlayer):
         return True, [entry], None
 
     # return a list of units from the map (JSON states) into home base
-    def squad_dock_units(self, squad_id, state_list, force = False):
+    def squad_dock_units(self, squad_id, state_list, cargo = None, cargo_source = None, force = False):
         squad = self.verify_squad(squad_id, require_at_home = False, require_away = (not force))
         for state in state_list:
             if ('kind' in state and state['kind'] != 'mobile') or ('owner_id' in state and state['owner_id'] != self.user_id):
@@ -9432,8 +9441,15 @@ class Player(AbstractPlayer):
 
         if squad:
             # update in-memory version of the squad (under player.squads)
-            for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
+            for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
                 if FIELD in squad: del squad[FIELD]
+        if cargo:
+            self.squad_collect_cargo(cargo, cargo_source)
+
+    def squad_collect_cargo(self, cargo, cargo_source):
+        gained = self.resources.gain_res(dict((res, cargo.get(res,0)) for res in gamedata['resources']), reason = cargo_source or '')
+        if cargo_source:
+            admin_stats.econ_flow_res(self, 'loot', cargo_source, gained)
 
     # get level-dependent quantity (based on PLAYER level)
     def get_leveled_quantity(self, qty, do_clamp = True):
@@ -21713,6 +21729,11 @@ class GAMEAPI(resource.Resource):
                         cons = gamedata.get('chat_report_recv_action', None)
                         if cons:
                             session.execute_consequent_safe(cons, session.player, retmsg, context = {'report_stack':msg.get('report_stack',1)}, reason='chat_report_recv_action')
+                    to_ack.append(msg['msg_id'])
+
+                elif msg['type'] == 'squad_cargo':
+                    session.player.squad_collect_cargo(msg['cargo'], msg['cargo_source'])
+                    session.deferred_player_state_update = True
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'i_attacked_you':

@@ -581,9 +581,13 @@ class HandleSquadDockUnits(Handler):
         Handler.__init__(self, *args, **kwargs)
         self.squad_id = int(self.args['squad_id'])
         self.state_list = SpinJSON.loads(self.args['units']) if 'units' in self.args else []
+        self.cargo = SpinJSON.loads(self.args['cargo']) if 'cargo' in self.args else None
+        self.cargo_source = SpinJSON.loads(self.args['cargo_source']) if 'cargo_source' in self.args else None
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        session.player.squad_dock_units(self.squad_id, self.state_list, force = False) # shouldn't need to force here
+        session.player.squad_dock_units(self.squad_id, self.state_list, cargo = self.cargo, cargo_source = self.cargo_source, force = False) # shouldn't need to force here
+        if self.cargo:
+            session.deferred_player_state_update = True
         session.send([["SQUADS_UPDATE", session.player.squads]])
         # note: we don't send any army updates here, because the player "should" know about the units from a previous map ping
         return ReturnValue(result = 'ok')
@@ -621,8 +625,15 @@ class HandleSquadDockUnits(Handler):
 
         player['my_base'] += new_obj_list # append atomically
 
+        # add resources - code path for this is complex to implement off-line, so queue as message
+        # (could re-implement later as a totally off-line operation though)
+        if self.cargo:
+            self.gamesite.msg_client.msg_send([{'to': [self.user_id], 'type':'squad_cargo', 'expire_time': self.time_now + 7*86400,
+                                                'squad_id': self.squad_id, 'cargo': self.cargo, 'cargo_source': self.cargo_source
+                                                }])
+
         # update player.squads cache to show the squad as at home now
-        for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid'):
+        for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
             if FIELD in squad: del squad[FIELD]
 
         return ReturnValue(result = 'ok')

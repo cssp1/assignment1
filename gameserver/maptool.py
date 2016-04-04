@@ -17,6 +17,7 @@ import ControlAPI
 import AIBaseRandomizer
 from Region import Region
 from AStar import SquadPathfinder
+import Raid
 import Sobol
 import sys, getopt, time, random, copy, math
 
@@ -257,10 +258,10 @@ def clear_all(db, lock_manager, region_id, base_type, dry_run = True):
     for base_id, feature in map_cache.iteritems():
         clear_base(db, lock_manager, region_id, base_id, dry_run=dry_run)
 
-def clear_base(db, lock_manager, region_id, base_id, dry_run = True):
+def clear_base(db, lock_manager, region_id, base_id, dry_run = True, already_locked = False):
     print 'CLEAR', base_id
     if not dry_run:
-        if not lock_manager.acquire(region_id, base_id):
+        if (not already_locked) and (not lock_manager.acquire(region_id, base_id)):
             print '(locked, skipping)'
             return
         nosql_client.drop_all_objects_by_base(region_id, base_id)
@@ -403,14 +404,20 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
     if feature['base_type'] != 'squad':
         raise Exception('cannot refund units from a feature that is not a squad')
     squad_id = int(feature['base_id'].split('_')[1])
+    cargo = feature.get('cargo',None)
+    cargo_source = feature.get('cargo_source',None)
 
     # two paths: first choice is to use CONTROLAPI CustomerSupport to return the squad intact
     # if that fails (e.g. if server is not running), then break the squad and send the units by mail
 
     try:
-        if verbose: print 'DOCK', pretty_feature(feature), 'to', user_id, repr(objlist)
+        if verbose: print 'DOCK', pretty_feature(feature), 'to', user_id, repr(objlist), 'cargo', cargo
         if not dry_run:
-            do_CONTROLAPI({'user_id': user_id, 'method': 'squad_dock_units', 'units': SpinJSON.dumps(objlist), 'squad_id': squad_id})
+            do_CONTROLAPI({'user_id': user_id, 'method': 'squad_dock_units',
+                           'units': SpinJSON.dumps(objlist),
+                           'cargo': SpinJSON.dumps(cargo),
+                           'cargo_source': SpinJSON.dumps(cargo_source),
+                           'squad_id': squad_id})
         del objlist[:] # clear them out
         return # done!
     except ControlAPI.ControlAPIException: pass
@@ -424,7 +431,7 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
         spec = gamedata['units'][obj_data['spec']]
         units[spec['name']] = 1 + units.get(spec['name'],0)
 
-    if not units: return # no units
+    if (not units) and (not cargo): return # nothing to return
 
     attachments = []
     for name, qty in units.iteritems():
@@ -436,6 +443,9 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
             if stack > 1: at['stack'] = stack
             attachments.append(at)
             qty -= stack
+    if cargo:
+        for res, amount in cargo.iteritems():
+            attachments.append({'spec': res, 'stack': amount})
 
     if attachments and verbose: print 'REFUND (mail)', pretty_feature(feature), 'to', user_id, repr(attachments)
 
@@ -1510,7 +1520,7 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
     home_cache = get_existing_map_by_type_spatially(db, region_id, 'home')
     quarry_cache = get_existing_map_by_type_spatially(db, region_id, 'quarry')
     hive_cache = get_existing_map_by_type_spatially(db, region_id, 'hive')
-    raid_cache = get_existing_map_by_type_spatially(db, region_id, 'hive')
+    raid_cache = get_existing_map_by_type_spatially(db, region_id, 'raid')
     squad_cache = get_existing_map_by_type_spatially(db, region_id, 'squad')
 
     # set up map occupancy
@@ -1519,7 +1529,15 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
             if region.feature_blocks_map(feature, 'never'): # squad_block_mode
                 pf.occupancy.block_hex(feature['base_map_loc'], 1, feature)
 
-    for squad in squad_cache.itervalues():
+    # ignore non-raid squads
+    raid_squads = filter(lambda squad: squad.get('raid'), squad_cache.itervalues())
+    # ignore moving squads
+    raid_squads = filter(lambda squad: ('base_map_path' not in squad) or (squad['base_map_path'][-1]['eta'] < time_now - gamedata['server'].get('map_path_fudge_time',4.0)), raid_squads)
+
+    # for proper resolution ordering, sort by arrival time, earliest first
+    raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
+
+    for squad in raid_squads:
         if not squad.get('raid'): continue # not a raid
         if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - gamedata['server'].get('map_path_fudge_time',4.0):
             continue # still moving
@@ -1537,6 +1555,36 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 continue
             else:
                 print 'unhandled case - squad is at an enemy home base!'
+
+        elif loc_key in raid_cache:
+            raid = raid_cache[loc_key]
+            print 'resolving raid at', pretty_feature(raid)
+            squad_lock = lock_manager.acquire(region_id, squad['base_id'])
+            raid_lock = lock_manager.acquire(region_id, raid['base_id'])
+            if not (squad_lock and raid_lock):
+                print 'could not get locks for both squad and raid, skipping'
+                continue
+            try:
+                squad_update, raid_update = Raid.resolve(squad, raid)
+                if verbose: print 'squad_update', squad_update, 'raid_update', raid_update
+                if raid_update is None:
+                    clear_base(db, lock_manager, region_id, raid['base_id'], dry_run = dry_run, already_locked = True)
+                    raid_lock = None
+                    del raid_cache[loc_key]
+                    raid = None
+                elif raid_update:
+                    raid.update(raid_update)
+                    if not dry_run:
+                        nosql_client.update_map_feature(region_id, raid['base_id'], raid_update)
+
+                if squad_update:
+                    squad.update(squad_update)
+                    if not dry_run:
+                        nosql_client.update_map_feature(region_id, squad['base_id'], squad_update)
+
+            finally:
+                if squad_lock: lock_manager.release(region_id, squad['base_id'])
+                if raid_lock: lock_manager.release(region_id, raid['base_id'])
 
         # auto-navigate the squad towards home
         home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
