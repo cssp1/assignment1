@@ -23659,11 +23659,11 @@ class GAMEAPI(resource.Resource):
         # note: sends both SQUADS_UPDATE and PLAYER_ARMY_UPDATE
         session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='SERVER_HELLO')
 
-        self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addCallback(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(d, session, retmsg))
+        self.change_session(session, retmsg, dest_user_id = user.user_id, force = True).addCallbacks(lambda success, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(success, d, session, retmsg), lambda err, self=self, session=session, retmsg=retmsg, d=d: self.complete_client_hello2(False, d, session, retmsg))
         return d
 
     @admin_stats.measure_latency('complete_client_hello2')
-    def complete_client_hello2(self, d, session, retmsg):
+    def complete_client_hello2(self, success, d, session, retmsg):
         # there's a race window where terminate_session() is called between change_session() and here,
         # and the invalidation doesn't work since we past CLIENT_HELLO but not in the session table yet.
         # XXX band-aid fix for now - need to untangle the login path later...
@@ -23676,14 +23676,15 @@ class GAMEAPI(resource.Resource):
             d.callback(session) # return session so that complete_async_request gets called
             return
 
-        try:
-            self.do_complete_client_hello2(d, session, retmsg)
-            return
-        except:
-            retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
-            gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc().strip()) # OK
+        if success:
+            try:
+                self.do_complete_client_hello2(d, session, retmsg)
+                return
+            except:
+                gamesite.exception_log.event(server_time, ('complete_client_hello2 Exception (player %d): ' % session.user.user_id) + traceback.format_exc().strip()) # OK
 
         # failure path
+        retmsg[:] = [["ERROR", "SERVER_EXCEPTION"]] # blow away old message, because session is not going to be set up
         ascdebug('UNLOCKED player %d (complete_client_hello2 failure)' % session.user.user_id)
         gamesite.lock_client.player_lock_release(session.user.user_id, -1, Player.LockState.logged_in, expected_owner_id = session.user.user_id)
         d.callback(None) # return error instead of session
