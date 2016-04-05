@@ -43,6 +43,7 @@ def get_tokens(template):
     if 'completion' in template:
         return _get_tokens(template['completion'])
     return 0
+
 def make_client_hive_template(template_name, template):
     out = {'ui_name': template['ui_name'],
            'icon': template['icon']}
@@ -70,6 +71,9 @@ def make_server_hive_template(template_name, template):
     for FIELD in ('units','scenery','buildings'):
         if FIELD in out:
             del out[FIELD]
+    token_item = get_tokens(template)
+    if token_item:
+        out['ui_tokens2'] = token_item
     return out
 
 MODE_CLIENT = 0

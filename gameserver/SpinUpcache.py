@@ -632,7 +632,7 @@ def classify_ai_base(gamedata, ai_id):
 
 def classify_hive(gamedata, template):
     if (template in gamedata['hives_server']['templates']) and \
-       gamedata['hives_server']['templates'][template].get('ui_tokens',None):
+       gamedata['hives_server']['templates'][template].get('ui_tokens2',None):
         return 'pve_event_hive'
     else:
         return 'pve_immortal_hive'
