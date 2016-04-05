@@ -25579,6 +25579,7 @@ function battle_history_change_page(dialog, page) {
             var at_quarry = (summary['base_type'] == 'quarry');
             var at_hive = (summary['base_type'] == 'hive');
             var at_squad = (summary['base_type'] == 'squad');
+            var at_raid = (summary['base_type'].indexOf('raid') === 0);
             var at_my_home = (summary['base_type'] == 'home' && summary['base_id'] == ('h'+session.user_id.toString()));
             var ladder_state = summary['ladder_state'] || null;
             var user_id = summary[opprole+'_id'];
@@ -25657,10 +25658,10 @@ function battle_history_change_page(dialog, page) {
                 var base_ui_name = summary['base_ui_name'];
                 if(base_ui_name) {
                     if(at_squad) { base_ui_name = gamedata['strings']['squads']['squad']+' '+base_ui_name; }
-                    if(at_quarry || at_hive || at_squad) {
+                    if(at_quarry || at_hive || at_squad || at_raid) {
                         if(summary['base_map_loc']) {
-                            if((at_quarry || at_hive) && (!('base_id' in summary) || (session.region.data && !session.region.feature_exists_at(summary['base_id'], summary['base_ui_name'], summary['base_map_loc'])))) {
-                                base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_'+(at_quarry ? 'quarry_depleted' : 'hive_destroyed')];
+                            if((at_quarry || at_hive || at_raid) && (!('base_id' in summary) || (session.region.data && !session.region.feature_exists_at(summary['base_id'], summary['base_ui_name'], summary['base_map_loc'])))) {
+                                base_ui_name += '\n'+dialog.data['widgets']['row_location']['ui_name_'+(at_raid ? 'raid_depleted': (at_quarry ? 'quarry_depleted' : 'hive_destroyed'))];
                             } else {
                                 base_ui_name += '\n('+summary['base_map_loc'][0].toString()+','+summary['base_map_loc'][1].toString()+')';
                                 dialog.widgets['row_location'+row].onclick = (function (_loc) { return function() {
@@ -25686,7 +25687,7 @@ function battle_history_change_page(dialog, page) {
             }
 
             var myout = summary[myrole+'_outcome'];
-            var ui_outcome = gamedata['strings']['battle_end'][(ladder_state ? 'ladder' : (at_squad ? 'squad' : (at_quarry ? 'quarry' : 'away')))][myout]['log_outcome'][myrole];
+            var ui_outcome = gamedata['strings']['battle_end'][(ladder_state ? 'ladder' : (at_squad ? 'squad' : (at_quarry ? 'quarry' : (at_raid ? 'raid' : 'away'))))][myout]['log_outcome'][myrole];
 
             // the "outcome" displayed here is the basic You Won/You Lost PLUS battle stars and PvP point delta
             if(dialog.widgets['row_outcome'+row].show) {
@@ -25955,7 +25956,11 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
         dialog.widgets['location'].set_text_with_linebreaking(summary['base_ui_name']);
     }
 
-    dialog.widgets['base_damage'].str = Math.floor(100.0*summary['base_damage']).toFixed(0)+'%';
+    dialog.widgets['base_damage_label'].show =
+        dialog.widgets['base_damage'].show = ('base_damage' in summary);
+    if('base_damage' in summary) {
+        dialog.widgets['base_damage'].str = Math.floor(100.0*summary['base_damage']).toFixed(0)+'%';
+    }
     dialog.widgets['outcome'].str = summary['ui_outcome'];
     if(summary['loot'] && 'battle_stars' in summary['loot']) {
         var star_count = goog.object.getCount(summary['loot']['battle_stars']);
@@ -26039,8 +26044,12 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
 
     battle_log_change_page(dialog, 0);
 
-    get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null, signature,
-                   (function (_dialog) { return function(result) { receive_battle_log_result(_dialog, result); }; })(dialog));
+    if(summary['battle_type'] !== 'raid') {
+        dialog.widgets['loading_rect'].show =
+            dialog.widgets['loading_text'].show = true;
+        get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null, signature,
+                       (function (_dialog) { return function(result) { receive_battle_log_result(_dialog, result); }; })(dialog));
+    }
 
     return dialog;
 };

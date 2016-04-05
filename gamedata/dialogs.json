@@ -6373,7 +6373,7 @@
                             "array": [1,5], "array_offset": [0,56] },
             "row_location": {"kind": "ActionButton", "xy":[301,112], "dimensions": [113,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
                              "text_hjustify":"left","text_vjustify":"top",
-                             "ui_name": "Home Base", "ui_name_quarry_depleted": "(Quarry depleted)", "ui_name_hive_destroyed": "(Hive destroyed)",
+                             "ui_name": "Home Base", "ui_name_quarry_depleted": "(Quarry depleted)", "ui_name_hive_destroyed": "(Hive destroyed)", "ui_name_raid_depleted": "(Raid depleted)",
                              "ui_name_points": "%d Points",
                              "array": [1,5], "array_offset": [0,56] },
 
@@ -6489,8 +6489,8 @@
             "log": { "kind": "ScrollingTextField", "xy": [186,172], "dimensions": [492,221], "text_size": 13, "text_hjustify": "left",
                      "text_vjustify": "top", "ui_name": "" },
 
-            "loading_rect": { "kind": "SolidRect", "xy": [205,150], "dimensions": [336,128], "color":[0,0,0,0.33] },
-            "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 30, "text_style": "bold", "text_color":[1,1,1,1],
+            "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [205,150], "dimensions": [336,128], "color":[0,0,0,0.33] },
+            "loading_text": { "show": 0, "kind": "TextField", "xy": [0,0], "dimensions": [736,423], "text_size": 30, "text_style": "bold", "text_color":[1,1,1,1],
                               "ui_name": "Loading...", "ui_name_unavailable": "Log Unavailable" }
 
         }

@@ -62,6 +62,7 @@ if __name__ == '__main__':
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
     gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = game_id)))
     gamedata['hives_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_server.json', override_game_id = game_id)))
+    gamedata['raids_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('raids_server.json', override_game_id = game_id)))
     gamedata['quarries_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_server.json', override_game_id = game_id)))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id)))
 

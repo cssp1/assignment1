@@ -637,6 +637,13 @@ def classify_hive(gamedata, template):
     else:
         return 'pve_immortal_hive'
 
+def classify_raid(gamedata, template):
+    if (template in gamedata['raids_server']['templates']) and \
+       gamedata['raids_server']['templates'][template].get('ui_tokens2',None):
+        return 'pve_event_raid'
+    else:
+        return 'pve_immortal_raid'
+
 def classify_quarry(gamedata, template):
     if template and (template in gamedata['quarries_server']['templates']) and \
        gamedata['quarries_server']['templates'][template].get('turf_points',None):

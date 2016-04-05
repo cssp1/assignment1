@@ -1036,6 +1036,13 @@
                                             "log_outcome": { "attacker": "Withdrew", "defender": "Quarry\nLost" },
                                             "ui_description": "You failed to destroy all defending units and turrets." }
                               },
+                    "raid": { "victory":  { "ui_title": "Victory!",
+                                            "log_outcome": { "attacker": "Raid\nSuccess", "defender": "Raid\nDefended" },
+                                            "ui_description": "The enemy has no more defenses." },
+                              "defeat": { "ui_title": "Withdraw",
+                                          "log_outcome": { "attacker": "Withdrew", "defender": "Raid\nLost" },
+                                          "ui_description": "You failed to overcome the enemy defenses." }
+                            },
                     "squad": { "victory":  { "ui_title": "Victory!",
                                              "log_outcome": { "attacker": "Battalion\nDestroyed", "defender": "Battalion\nDefended" },
                                              "ui_description": "You destroyed the entire battalion. Excellent job, Commander." },

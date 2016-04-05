@@ -245,7 +245,7 @@ DROP FUNCTION IF EXISTS get_analytics_tag;
 CREATE FUNCTION get_analytics_tag (base_type VARCHAR(8), base_template VARCHAR(32), user_id INT4, t INT8)
 RETURNS VARCHAR(32) DETERMINISTIC
 RETURN (SELECT DISTINCT(analytics_tag) FROM $GAME_ID_ai_analytics_tag_assignments assign
-           WHERE ((base_type = 'hive' AND
+           WHERE (((base_type = 'hive' OR SUBSTRING(base_type, 1, 4) = 'raid') AND
                    assign.base_type = base_type AND
                    assign.base_template = base_template AND
                    assign.user_id = -1)

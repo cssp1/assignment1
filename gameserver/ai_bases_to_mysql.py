@@ -69,6 +69,7 @@ def new_analytics_tag_info(tag, event_klass):
             'difficulties': [],
             'base_ids': [],
             'hives': [],
+            'raids': [],
             'start_end_times': None, # array of all applicable [start,end] times
             'start_time': None, # earliest of all applicable start_times
             'end_time': None, # latest of all applicable end_times
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     gamedata['ai_bases_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('ai_bases_server.json', override_game_id = game_id)))
     gamedata['quarries_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('quarries_server.json', override_game_id = game_id)))
     gamedata['hives_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('hives_server.json', override_game_id = game_id)))
+    gamedata['raids_server'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('raids_server.json', override_game_id = game_id)))
     gamedata['loot_tables'] = SpinJSON.load(open(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id)))
 
     sql_util = SpinSQLUtil.MySQLUtil()
@@ -171,13 +173,14 @@ if __name__ == '__main__':
                 if start_end_times:
                     apply_timing_info(info, start_end_times)
 
-        for kind, dir in (('quarry', 'quarries_server'), ('hive', 'hives_server')):
+        for kind, dir in (('quarry', 'quarries_server'), ('hive', 'hives_server'), ('raid', 'raids_server')):
             for name, data in gamedata[dir]['templates'].iteritems():
                 owner_id = data.get('owner_id', None)
                 owner_base = gamedata['ai_bases_server']['bases'].get(str(owner_id), None) if owner_id else None
                 tag = data.get('analytics_tag', owner_base.get('analytics_tag',None) if owner_base else None)
                 klass = {'quarry': SpinUpcache.classify_quarry,
-                         'hive': SpinUpcache.classify_hive}[kind](gamedata, name)
+                         'hive': SpinUpcache.classify_hive,
+                         'raid': SpinUpcache.classify_raid}[kind](gamedata, name)
                 ai_base_templates_rows.append([('base_type', kind),
                                                ('base_template', name),
                                                ('owner_id', owner_id),
@@ -190,7 +193,7 @@ if __name__ == '__main__':
                     if tag not in analytics_tag_info:
                         analytics_tag_info[tag] = new_analytics_tag_info(tag, event_klass)
                     info = analytics_tag_info[tag]
-                    info['hives'].append(name)
+                    info[kind+'s'].append(name)
                     start_end_times = SpinUpcache.hive_timings(gamedata, name)
                     if start_end_times:
                         apply_timing_info(info, start_end_times)
@@ -255,19 +258,20 @@ if __name__ == '__main__':
                                                  ('difficulty_step', difficulty_step),
                                                  ('progression_step', progression_step),
                                                  ))
-                for hive in entry['hives']:
-                    for start_time, end_time, reset_interval, repeat_interval in start_end_times:
-                        assignments_keys.append(('hive', hive, -1, start_time))
-                        assignments_rows.append((('base_type', 'hive'),
-                                                 ('base_template', hive),
-                                                 ('user_id', -1),
-                                                 ('start_time', start_time),
-                                                 ('end_time', end_time),
-                                                 ('reset_interval', reset_interval),
-                                                 ('repeat_interval', repeat_interval),
-                                                 ('analytics_tag', entry['analytics_tag']),
-                                                 ('difficulty', None),
-                                                 ('difficulty_step', None),
+                for kind in ('hive', 'raid'):
+                    for template_name in entry[kind+'s']:
+                        for start_time, end_time, reset_interval, repeat_interval in start_end_times:
+                            assignments_keys.append((kind, template_name, -1, start_time))
+                            assignments_rows.append((('base_type', kind),
+                                                     ('base_template', template_name),
+                                                     ('user_id', -1),
+                                                     ('start_time', start_time),
+                                                     ('end_time', end_time),
+                                                     ('reset_interval', reset_interval),
+                                                     ('repeat_interval', repeat_interval),
+                                                     ('analytics_tag', entry['analytics_tag']),
+                                                     ('difficulty', None),
+                                                     ('difficulty_step', None),
                                                  ('progression_step', None)))
             cur.executemany("DELETE FROM "+sql_util.sym(ai_analytics_tag_assignments_table)+" WHERE base_type = %s AND base_template = %s AND user_id = %s AND start_time = %s",
                             assignments_keys)

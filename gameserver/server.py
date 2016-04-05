@@ -24065,6 +24065,8 @@ class GAMEAPI(resource.Resource):
                        'account_creation_time': session.user.account_creation_time,
                        'last_login_time': session.user.last_login_time,
                        'last_login_ip': session.user.last_login_ip,
+                       'country': session.user.country,
+                       'developer': 1 if session.player.is_developer() else None,
                        'uninstalled': None,
                        'last_mtime': server_time,
                        'money_spent': session.player.history.get('money_spent',0.0),
@@ -27228,7 +27230,7 @@ class GAMEAPI(resource.Resource):
 
                 @admin_stats.measure_latency('do_squad_resolve')
                 def do_squad_resolve(region_id, loc):
-                    Raid.resolve_loc(gamesite.nosql_client, region_id, loc, server_time)
+                    Raid.resolve_loc(gamedata, gamesite.nosql_client, region_id, loc, server_time)
 
                 reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
 

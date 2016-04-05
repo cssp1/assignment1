@@ -69,7 +69,7 @@ if __name__ == '__main__':
         if not data.get('enable_map', True): continue
 
         # count hives and quarries by template
-        for KIND in ('hive', 'quarry'):
+        for KIND in ('hive', 'quarry', 'raid'):
             count_by_template = nosql_client.region_table(name, 'map').aggregate([{'$match':{'base_type':KIND}},
                                                                                   {'$project':{'base_template':1}},
                                                                                   {'$group':{'_id': '$base_template',

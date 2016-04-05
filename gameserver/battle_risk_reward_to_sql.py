@@ -400,7 +400,7 @@ if __name__ == '__main__':
                                 "       SUM(loot_items_value + IF(loot_iron_value>0,loot_iron_value,0) + IF(loot_water_value>0,loot_water_value,0) + IF(loot_res3_value>0,loot_res3_value,0)) AS total_reward," + \
                                 "       SUM(loot_items_value + IF(loot_iron_value>0,loot_iron_value,0) + IF(loot_water_value>0,loot_water_value,0) + IF(loot_res3_value>0,loot_res3_value,0)) + SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_profit " + \
                                 "FROM "+sql_util.sym(battles_risk_reward_table)+" rw " + \
-                                "WHERE time >= %s AND time < %s+%s AND base_type IN ('home','hive','quarry') " + \
+                                "WHERE time >= %s AND time < %s+%s AND (base_type IN ('home','hive','quarry') OR SUBSTRING(base_type,1,4) = 'raid') " + \
                                 ("" if interval != 'hour' else "AND townhall_level >= 5 ") + \
                                 "GROUP BY "+sql_util.sym(interval)+"," + \
                                 ("frame_platform, country_tier, townhall_level, spend_bracket, IF(SUBSTRING(base_region FROM 1 FOR 6) = 'ladder','ladder',base_region)," if interval != 'hour' else "townhall_level,") + \
@@ -467,7 +467,7 @@ if __name__ == '__main__':
                                 "       SUM(loot_items_value + IF(loot_iron_value>0,loot_iron_value,0) + IF(loot_water_value>0,loot_water_value,0) + IF(loot_res3_value>0,loot_res3_value,0)) AS total_reward," + \
                                 "       SUM(loot_items_value + IF(loot_iron_value>0,loot_iron_value,0) + IF(loot_water_value>0,loot_water_value,0) + IF(loot_res3_value>0,loot_res3_value,0)) + SUM(consumed_items_value + IF(loot_iron_value<0,loot_iron_value,0) + IF(loot_water_value<0,loot_water_value,0) + IF(loot_res3_value<0,loot_res3_value,0) + damage_iron_value + damage_water_value + damage_res3_value + damage_time_value) AS total_profit " + \
                                 "FROM "+sql_util.sym(battles_risk_reward_table)+" rw " + \
-                                "WHERE time >= %s AND time < %s+%s AND base_type IN ('home','hive','quarry') " + \
+                                "WHERE time >= %s AND time < %s+%s AND (base_type IN ('home','hive','quarry') OR SUBSTRING(base_type,1,4) = 'raid') " + \
                                 "GROUP BY "+sql_util.sym(interval)+"," + \
                                 "frame_platform, country_tier, townhall_level, spend_bracket, base_type, analytics_tag ORDER BY NULL",
                                 [dt,origin,dt,origin,

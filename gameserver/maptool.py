@@ -1513,8 +1513,23 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 print 'could not get locks for both squad and raid, skipping'
                 continue
             try:
-                squad_update, raid_update = Raid.resolve_raid(squad, raid)
+                raid_units = nosql_client.get_mobile_objects_by_base(region_id, raid['base_id']) + \
+                             nosql_client.get_fixed_objects_by_base(region_id, raid['base_id'])
+                squad_units = nosql_client.get_mobile_objects_by_base(region_id, squad['base_id'])
+
+                squad_update, raid_update, loot = Raid.resolve_raid(squad, raid, squad_units, raid_units)
                 if verbose: print 'squad_update', squad_update, 'raid_update', raid_update
+
+                if squad_update or raid_update or (raid_update is None):
+                    # metrics - keep in sync between Raid.py and maptool.py implementations!
+                    summary = Raid.make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
+                                                       squad['base_landlord_id'], raid['base_landlord_id'],
+                                                       'victory', 'defeat',
+                                                       squad_units, raid_units, loot)
+                    if verbose: print SpinJSON.dumps(summary, pretty = True)
+                    if not dry_run:
+                        nosql_client.battle_record(summary, reason = 'resolve_raid_squads')
+
                 if raid_update is None:
                     clear_base(db, lock_manager, region_id, raid['base_id'], dry_run = dry_run, already_locked = True)
                     raid_lock = None
