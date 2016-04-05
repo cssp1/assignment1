@@ -171,7 +171,8 @@ class ChatFilter(object):
             if self.is_diacritic(codepoint):
                 # disallow repetition of any single nonspacing mark
                 if next_codepoint and codepoint == next_codepoint and \
-                   codepoint not in (0x0e48,0x0e49): # special exception: Thai diacritics
+                   codepoint not in (0x0e35,0x0e48,0x0e49): # special exception: Thai diacritics and vowel marks
+                    #print "DUPE", hex(codepoint)
                     return True
                 # disallow continuous sequences of 5 or more nonspacing marks
                 nonspacing_run += 1
@@ -245,4 +246,6 @@ if __name__ == '__main__':
     assert not cf.is_ugly(u'\u0e2d\u0e30\u0e21\u0e32\u0e01 \u0e04\u0e23\u0e31\u0e1a \u0e17\u0e35\u0e48\u0e48')
 
     assert not cf.is_ugly(u'\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0634\u0628\u0627\u0628\u060c\u060c \u0627\u0634\u0648 \u0645\u0627\u0643\u0648 \u0644\u0627 \u062a\u0631\u0642\u064a\u0647 \u0644\u0627 \u0634\u064a \u0628\u0647\u0630\u0627 \u0627\u0644\u0643\u0644\u064a\u0646 \u0628\u0633 \u0627\u062f\u0627\u0641\u0639 \u0648 \u0627\u0633\u0647\u0631 \u0648 \u0643\u0644\u0634\u064a \u0645\u0627\u0643\u0648')
+    assert not cf.is_ugly(u'\u0e1a\u0e2d\u0e01\u0e1e\u0e35\u0e35\u0e48\u0e21\u0e32\u0e0b\u0e34')
+
     print 'OK'
