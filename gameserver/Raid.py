@@ -59,6 +59,75 @@ def backtrack(squad_feature, time_now):
     return {'base_map_loc': home_loc,
             'base_map_path': home_path}
 
+# below has dependencies on SpinNoSQL stuff; above does not
+import SpinNoSQLLockManager
+
+# online function for resolving action at a map hex
+# intended to be usable both by server and maptool
+# intended to be self-contained with respect to locking and logging
+# this assumes that the nosql_client you provide has been set up with hooks to properly broadcast map updates
+def resolve_loc(nosql_client, region_id, loc, time_now, dry_run = False):
+    features = nosql_client.get_map_features_by_loc(region_id, loc)
+    # filter out not-arrived-yet moving features (use strict time comparison)
+    features = filter(lambda feature: ('base_map_path' not in feature) or \
+                      feature['base_map_path'][-1]['eta'] < time_now, features)
+    raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and feature.get('raid'), features)
+    if not raid_squads: return # no raids to process
+
+    targets = filter(lambda x: x['base_type'] == 'raid', features)
+    if not targets: return # no targets to process
+    raid = targets[0] # select first target
+
+    # for proper resolution ordering, sort by arrival time, earliest first
+    raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
+
+    lock_manager = SpinNoSQLLockManager.LockManager(nosql_client, dry_run = dry_run)
+    for squad in raid_squads:
+        owner_id, squad_id = map(int, squad['base_id'][1:].split('_'))
+        assert squad['base_landlord_id'] == owner_id
+        if not raid: break # target doesn't exist anymore
+
+        squad_lock = lock_manager.acquire(region_id, squad['base_id'])
+        raid_lock = lock_manager.acquire(region_id, raid['base_id'])
+        if not (squad_lock and raid_lock):
+            continue # XXX could not lock both squad and raid
+        try:
+            squad_update, raid_update = resolve_raid(squad, raid)
+            if raid_update is None:
+                # clear the raid
+                if not dry_run:
+                    nosql_client.drop_all_objects_by_base(region_id, raid['base_id'])
+                    nosql_client.drop_map_feature(region_id, raid['base_id'])
+                    lock_manager.forget(region_id, raid['base_id'])
+                raid = raid_lock = None # target doesn't exist anymore
+            elif raid_update:
+                raid.update(raid_update)
+                if not dry_run:
+                    nosql_client.update_map_feature(region_id, raid['base_id'], raid_update)
+
+            if squad_update:
+                squad.update(squad_update)
+                if not dry_run:
+                    nosql_client.update_map_feature(region_id, squad['base_id'], squad_update)
+
+            # send the squad towards home
+            home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
+            if not home:
+                continue # XXX squad's home base not found on map
+
+            if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
+                # good backtrack path
+                path_update = backtrack(squad, time_now)
+            else:
+                continue # XXX no path found to home base
+            if not dry_run:
+                nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
+                                              old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
+                                              exclusive = -1, reason = 'resolve_loc')
+        finally:
+            if squad_lock: lock_manager.release(region_id, squad['base_id'])
+            if raid_lock: lock_manager.release(region_id, raid['base_id'])
+
 if __name__ == '__main__':
     # test code
     test_path = [{'xy':[0,0],'eta':0},

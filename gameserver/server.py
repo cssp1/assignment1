@@ -69,6 +69,7 @@ import SpinNoSQLId
 import SpinNoSQL
 import SpinNoSQLLog
 import SpinSQLBattles
+import Raid
 import Scores2
 import CustomerSupport
 import ActivityClassifier
@@ -27209,6 +27210,24 @@ class GAMEAPI(resource.Resource):
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
+
+            elif spellname == 'SQUAD_RESOLVE':
+                # this is just a hint that "hey, you should check this hex and resolve anything there"
+                # all the action happens asynchronously
+                loc = spellargs[0]
+                assert session.player.home_region and session.player.raids_enabled()
+
+                # check that the player actually has a stationary raid squad here
+                if not any(squad_data.get('raid') and \
+                           session.player.squad_is_deployed(int(squad_sid)) and \
+                           (not session.player.squad_is_moving(int(squad_sid))) and \
+                           squad_data.get('map_loc') == loc \
+                           for squad_sid, squad_data in session.player.squads.iteritems()):
+                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+                    return
+
+                reactor.callLater(0, lambda _region_id=session.player.home_region, _loc=loc: \
+                                  Raid.resolve_loc(gamesite.nosql_client, _region_id, _loc, server_time))
 
             elif spellname == 'SQUAD_EXIT_MAP':
                 if session.has_attacked:

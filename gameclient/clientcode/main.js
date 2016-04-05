@@ -29312,10 +29312,13 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 };
 
 
-player.squad_is_moving = function(squad_id) {
+/** @param {number} squad_id
+    @param {boolean=} assume_moving - if true, fudge time comparison in favor of "still moving" */
+player.squad_is_moving = function(squad_id, assume_moving) {
     var squad_data = player.squads[squad_id.toString()];
+    var fudge_time = (assume_moving ? -1 : 0) * 1.0; // map_path_fudge_time
     return (('map_loc' in squad_data) &&
-            (('map_path' in squad_data) && (squad_data['map_path'][squad_data['map_path'].length-1]['eta'] > server_time)));
+            (('map_path' in squad_data) && (squad_data['map_path'][squad_data['map_path'].length-1]['eta'] > server_time + fudge_time)));
 };
 player.squad_is_raid = function(squad_id) {
     var squad_data = player.squads[squad_id.toString()];
@@ -29553,7 +29556,7 @@ player.advance_squads = function() {
                 }
                 player.squad_clear_client_data(squad_data['id']);
             }
-        } else if(squad_data['raid'] && !player.squad_is_moving(squad_data['id'])) {
+        } else if(squad_data['raid'] && !player.squad_is_moving(squad_data['id'], true)) {
             // stationary raid - need to resolve, recall, or dock at base
             if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist_to_exit_map && !squad_data['pending']) {
                 squad_data['pending'] = true;
@@ -29569,7 +29572,12 @@ player.advance_squads = function() {
                         break;
                     }
                 }
-                if(!need_resolve) {
+                if(need_resolve) {
+                    if(!squad_data['pending']) {
+                        squad_data['pending'] = true;
+                        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RESOLVE", squad_data['map_loc']]);
+                    }
+                } else {
                     console.log('Auto-recalling idle raid squad '+squad_data['id'].toString());
                     player._squad_recall_move(squad_data['id']); // use underscore variant to avoid GUI error spam
                 }
