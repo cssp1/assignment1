@@ -223,6 +223,7 @@
     "INVALID_SQUAD": { "ui_name": "Battalion is not available for this action." },
     "INVALID_MAP_LOCATION": { "ui_title": "Battalion Cannot Reach Target", "ui_name": "The path may be blocked by enemies, friendlies, or mountains - check the Regional Map." },
     "CANNOT_RECALL_SQUAD_MAP_BLOCKED": { "ui_title": "Cannot Recall Battalion", "ui_name": "The path home may be blocked by friendlies, enemies or mountains. Try moving other battalions out of the way first." },
+    "TOO_MANY_BOOKMARKS": { "ui_title": "Bookmark Limit Reached", "ui_name": "You can have at most %d bookmarks per map region. Please remove some old bookmarks before adding new ones." },
     "SERVER_PROTOCOL": { "ui_name": "Server communication protocol error" },
     "SERVER_EXCEPTION": { "ui_name": "Server encountered an exception while processing this request" },
     "SERVER_LOCKING_ERROR": { "ui_name": "Server encountered a database locking error" },

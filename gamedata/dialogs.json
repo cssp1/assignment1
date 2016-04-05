@@ -9203,10 +9203,13 @@
 
             "icon":  { "kind": "StaticImage", "xy": [52,91], "dimensions": [50,50], "asset_random": "inventory_random",
                        "array": [1,5], "array_offset": [0,54] },
-            "name": { "kind": "TextField", "xy": [128,94], "dimensions": [100,22], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top",
+            "name": { "kind": "TextField", "xy": [112,94], "dimensions": [196,22], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top",
                       "array": [1,5], "array_offset": [0,54] },
-            "coords": { "kind": "TextField", "xy": [128,114], "dimensions": [100,22], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top",
+            "coords": { "kind": "TextField", "xy": [112,114], "dimensions": [196,22], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top",
                         "text_color": [0.8,0.8,0.8,1], "ui_name": "(%x,%y)",
+                        "array": [1,5], "array_offset": [0,54] },
+            "time": { "kind": "TextField", "xy": [112,114], "dimensions": [196,22], "text_size": 15, "text_hjustify": "right", "text_vjustify": "top",
+                        "text_color": [0.8,0.8,0.8,1], "ui_name": "Added %s ago",
                         "array": [1,5], "array_offset": [0,54] },
 
             "go_button": { "kind": "ActionButton", "xy": [320,101], "dimensions": [134,28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",

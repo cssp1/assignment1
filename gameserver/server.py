@@ -26253,6 +26253,7 @@ class GAMEAPI(resource.Resource):
             region = arg[1]
             ui_name = SpinHTTP.unwrap_string(arg[2])[:24].strip()
             coords = map(int, arg[3])
+            new_time = int(arg[4]) if len(arg) >= 5 else None
             assert region in gamedata['regions']
             assert len(coords) == 2
             if ui_name == 'DELETED':
@@ -26271,8 +26272,15 @@ class GAMEAPI(resource.Resource):
                         break
                 if entry:
                     entry['ui_name'] = ui_name
+                    if new_time:
+                        entry['time'] = new_time
+                    elif 'time' in entry:
+                        del entry['time']
+
                 else:
-                    session.player.map_bookmarks[region].append({'region':region, 'coords':coords, 'ui_name':ui_name})
+                    new_entry = {'region':region, 'coords':coords, 'ui_name':ui_name}
+                    if new_time: new_entry['time'] = new_time
+                    session.player.map_bookmarks[region].append(new_entry)
                     if len(session.player.map_bookmarks[region]) > gamedata['client']['map_bookmarks_max']:
                         session.player.map_bookmarks[region].remove(session.player.map_bookmarks[region][0])
 

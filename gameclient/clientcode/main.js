@@ -6711,13 +6711,20 @@ player.map_bookmark_create = function(region_id, ui_name, coords) {
     for(var i = 0; i < player.map_bookmarks[region_id].length; i++) {
         if(vec_equals(coords, player.map_bookmarks[region_id][i]['coords'])) {
             player.map_bookmarks[region_id][i]['ui_name'] = ui_name;
+            player.map_bookmarks[region_id][i]['time'] = server_time;
             found = true; break;
         }
     }
     if(!found) {
-        player.map_bookmarks[region_id].push({'region':region_id, 'coords':coords, 'ui_name':ui_name});
+        if(goog.object.getCount(player.map_bookmarks[region_id]) >= gamedata['client']['map_bookmarks_max']) {
+            var err = gamedata['errors']['TOO_MANY_BOOKMARKS'];
+            invoke_child_message_dialog(err['ui_title'], err['ui_name'].replace('%d', pretty_print_number(gamedata['client']['map_bookmarks_max'])),
+                                        {'dialog':'message_dialog_big'});
+            return;
+        }
+        player.map_bookmarks[region_id].push({'region':region_id, 'coords':coords, 'ui_name':ui_name, 'time': server_time});
     }
-    send_to_server.func(["MAP_BOOKMARK_UPDATE", region_id, SPHTTP.wrap_string(ui_name), coords]);
+    send_to_server.func(["MAP_BOOKMARK_UPDATE", region_id, SPHTTP.wrap_string(ui_name), coords, server_time]);
 };
 player.map_bookmark_rename = player.map_bookmark_create;
 player.map_bookmark_find = function(region_id, coords) {
@@ -21923,6 +21930,7 @@ function map_bookmarks_dialog_setup_row(dialog, row, rowdata) {
         dialog.widgets['icon'+row].show =
         dialog.widgets['name'+row].show =
         dialog.widgets['coords'+row].show =
+        dialog.widgets['time'+row].show =
         dialog.widgets['delete_button'+row].show =
         dialog.widgets['rename_button'+row].show =
         dialog.widgets['go_button'+row].show = (rowdata !== null);
@@ -21930,6 +21938,11 @@ function map_bookmarks_dialog_setup_row(dialog, row, rowdata) {
     if(rowdata !== null) {
         dialog.widgets['name'+row].str = rowdata['ui_name'];
         dialog.widgets['coords'+row].str = dialog.data['widgets']['coords']['ui_name'].replace('%x', rowdata['coords'][0].toString()).replace('%y', rowdata['coords'][1].toString());
+        dialog.widgets['time'+row].show = ('time' in rowdata);
+        if('time' in rowdata) {
+            dialog.widgets['time'+row].str = dialog.data['widgets']['time']['ui_name'].replace('%s', pretty_print_time_brief(server_time - rowdata['time']));
+        }
+
         dialog.widgets['delete_button'+row].onclick = (function (_rowdata) { return function(w) {
             var _dialog = w.parent;
             var msg = gamedata['strings']['map_bookmark_delete_confirm'];
