@@ -12,6 +12,7 @@ import SpinUserDB
 import SpinConfig
 import SpinJSON
 import SpinNoSQLId
+import SpinNoSQLLockManager
 import SpinSingletonProcess
 import ControlAPI
 import AIBaseRandomizer
@@ -176,59 +177,6 @@ def nosql_read_all_objects(region_id, base_id, base_landlord_id):
 
         ret.append(props)
     return ret
-
-class LockManager (object):
-    SETUP_LOCK_OWNER = 667 # fake user_id we will use to take locks with
-    BEING_ATTACKED = 2 # lock state constant
-
-    def __init__(self, db, dry_run):
-        self.db = db
-        self.dry_run = dry_run
-        self.locks = {}
-        self.player_locks = {}
-        self.verbose = 0
-    def acquire(self, region_id, base_id):
-        lock = (region_id, base_id)
-        if self.dry_run: return True
-        if nosql_client.map_feature_lock_acquire(region_id, base_id, self.SETUP_LOCK_OWNER, do_hook = False) != self.BEING_ATTACKED:
-            if self.verbose: print 'ACQUIRE (fail) ', lock
-            return False
-        if self.verbose: print 'ACQUIRE', lock
-        self.locks[lock] = 1
-        return True
-    def create(self, region, base_id):
-        lock = (region_id, base_id)
-        if self.dry_run: return
-        if self.verbose: print 'CREATE', lock
-        self.locks[lock] = 1
-    def acquire_player(self, user_id):
-        if self.dry_run: return True
-        if nosql_client.player_lock_acquire_attack(user_id, -1, owner_id = self.SETUP_LOCK_OWNER) != self.BEING_ATTACKED:
-            if self.verbose: print 'ACQUIRE PLAYER (fail)', user_id
-            return False
-        if self.verbose: print 'ACQUIRE PLAYER', user_id
-        self.player_locks[user_id] = 1
-        return True
-    def forget(self, region_id, base_id):
-        if self.dry_run: return
-        lock = (region_id, base_id)
-        del self.locks[lock]
-    def release(self, region_id, base_id, base_generation = -1):
-        if self.dry_run: return
-        lock = (region_id, base_id)
-        del self.locks[lock]
-        if self.verbose: print 'RELEASE', lock
-        nosql_client.map_feature_lock_release(region_id, base_id, self.SETUP_LOCK_OWNER, generation = base_generation, do_hook = False)
-    def release_player(self, user_id, generation = -1):
-        if self.dry_run: return
-        del self.player_locks[user_id]
-        if self.verbose: print 'RELEASE PLAYER', user_id
-        nosql_client.player_lock_release(user_id, generation, self.BEING_ATTACKED, expected_owner_id = self.SETUP_LOCK_OWNER)
-    def release_all(self):
-        for lock in self.locks.keys():
-            self.release(lock[0], lock[1])
-        for user_id in self.player_locks.keys():
-            self.release_player(user_id)
 
 def get_existing_map_by_type(db, region_id, base_type):
     return dict([(x['base_id'], x) for x in nosql_client.get_map_features_by_type(region_id, base_type)])
@@ -784,7 +732,7 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
         if not assign_climate:
             base_info['base_climate'] = Region(gamedata, region_id).read_climate_name(base_info['base_map_loc'])
         if dry_run: break
-        if nosql_client.create_map_feature(region_id, base_id, base_info, originator = LockManager.SETUP_LOCK_OWNER, exclusive = 1):
+        if nosql_client.create_map_feature(region_id, base_id, base_info, originator = SpinNoSQLLockManager.LockManager.SETUP_LOCK_OWNER, exclusive = 1):
             lock_manager.create(region_id, base_id)
             break
         base_info['base_map_loc'] = None
@@ -1191,7 +1139,7 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
             continue
 
         if dry_run: break
-        if nosql_client.create_map_feature(region_id, base_id, feature, originator = LockManager.SETUP_LOCK_OWNER, exclusive = 1):
+        if nosql_client.create_map_feature(region_id, base_id, feature, originator = SpinNoSQLLockManager.LockManager.SETUP_LOCK_OWNER, exclusive = 1):
             lock_manager.create(region_id, base_id)
             break
         feature['base_map_loc'] = None
@@ -1407,7 +1355,7 @@ def spawn_raid(raids, map_cache, db, lock_manager, region_id, id_num, name_idx, 
             continue
 
         if dry_run: break
-        if nosql_client.create_map_feature(region_id, base_id, feature, originator = LockManager.SETUP_LOCK_OWNER, exclusive = 1):
+        if nosql_client.create_map_feature(region_id, base_id, feature, originator = SpinNoSQLLockManager.LockManager.SETUP_LOCK_OWNER, exclusive = 1):
             lock_manager.create(region_id, base_id)
             break
         feature['base_map_loc'] = None
@@ -1830,7 +1778,7 @@ if __name__ == '__main__':
     nosql_client.set_time(time_now)
     db = nosql_client
 
-    lock_manager = LockManager(db, dry_run)
+    lock_manager = SpinNoSQLLockManager.LockManager(nosql_client, dry_run)
 
     if ('chatserver' in SpinConfig.config) and action not in ('info', 'leaderboard', 'count'):
         # hook up chatserver so we can send broadcast notifications
