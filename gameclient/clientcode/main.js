@@ -7891,7 +7891,11 @@ function relative_time_to_tick(t) {
 var player_combat_time_scale = 1.0; // additional time scaling applied by playfield speed bar controls
 var player_playfield_speed = 0; // incremental version, used to drive player_combat_time_scale
 function update_player_combat_time_scale(new_speed) { // note: caller's responsibility to check against limits.
-    player_playfield_speed = new_speed;
+    player_playfield_speed = new_speed | 0; // integer-ize
+    if(!(player_playfield_speed.toFixed(0) in gamedata['client']['playfield_speeds'])) {
+        // fix playfield invalid speed
+        player_playfield_speed = 0;
+    }
     player_combat_time_scale = gamedata['client']['playfield_speeds'][player_playfield_speed.toFixed(0)] || 1;
     //session.set_attack_finish_time(session.true_attack_finish_time);
 };
