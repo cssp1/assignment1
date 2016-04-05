@@ -187,7 +187,7 @@
         "drip_deployment_rate": 2.5, // default rate of units/sec dropped by the "dripper" (before acceleration)
         "drip_startup_delay": 0.20, // number of seconds we wait between mousedown and deploying the first unit (in case player wants to scroll instead)
 
-        "map_bookmarks_max": 64, // max # of bookmarks per region
+        "map_bookmarks_max": 100, // max # of bookmarks per region
 
         // SQUAD MAP DEPLOYMENT
         "squad_deploy_spread": 15, // initial spread radius of squad units when deployed onto the map
