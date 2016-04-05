@@ -1491,7 +1491,6 @@ class NoSQLClient (object):
         if region not in self.seen_regions:
             self._table(self.region_table_name(region, 'map')).create_index('base_landlord_id') # base_id is primary key for this
             self._table(self.region_table_name(region, 'map')).create_index([('base_map_loc',pymongo.GEO2D)], min=0, max=1024, bits=16)
-            self._table(self.region_table_name(region, 'map')).create_index('base_landlord_id') # base_id is primary key for this
             self._table(self.region_table_name(region, 'map')).create_index('base_map_loc_flat') # used to speed up occupancy checks
 
             self._table(self.region_table_name(region, 'map_deletions')).create_index('millitime', expireAfterSeconds=3*3600) # should be about as long as max session length
@@ -1537,8 +1536,8 @@ class NoSQLClient (object):
         # mongo sometimes turns these into floats :(
         if 'base_map_loc' in props: props['base_map_loc'] = [int(props['base_map_loc'][0]), int(props['base_map_loc'][1])]
 
-        # omit path data for moving features that have already arrived at their destination by now
-        if props.get('base_map_path') and props['base_map_path'][-1]['eta'] < self.time:
+        # omit path data for (non-raid) moving features that have already arrived at their destination by now
+        if props.get('base_map_path') and props['base_map_path'][-1]['eta'] < self.time - 4 and not props.get('raid'): # map_path_fudge_time
             del props['base_map_path']
 
         # omit unwanted fields
@@ -1858,20 +1857,13 @@ class NoSQLClient (object):
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}}
         self.region_table(region, 'map').update_many({'$and':[LOCK_IS_TAKEN, LOCK_IS_STALE]},
                                                      {'$unset':{'LOCK_STATE':1,'LOCK_OWNER':1,'LOCK_TIME':1,'LOCK_GENERATION':1}})
-        # get rid of path data for moving features that have already arrived at their destination by now
-        self.region_table(region, 'map').update_many({'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
-                                                              {'base_map_path_eta':{'$exists':True, '$lt': self.time}}]},
-                                                     {'$unset':{'base_map_path':1,'base_map_path_eta':1}})
 
-        if 1: # clean up legacy features with no base_map_path_eta
-            self.region_table(region, 'map').update_many({'$and':[{'base_map_path':{'$exists':True}},
-                                                                  {'base_map_path_eta':{'$exists':False}},
-                                                                  {'base_map_path':{'$all':[{'$elemMatch': {'eta': {'$lt': self.time}}}]}}
-                                                                  ]},
-                                                         {'$unset':{'base_map_path':1}})
-        if 1: # clean up legacy features that have a field that should not have been written to the DB
-            self.region_table(region, 'map').update_many({'preserve_locks': {'$exists':True}},
-                                                         {'$unset':{'preserve_locks':1}})
+        # get rid of path data for moving features that have already arrived at their destination by now
+        self.region_table(region, 'map').update_many({'$and': [{'raid':{'$exists':False}}, # don't delete paths for raids, since they are short-term, and need to know how to get home
+                                                               {'$or': [{'base_map_path':{'$exists':True, '$type':10}}, # somehow a null path got left in here
+                                                                        {'base_map_path_eta':{'$exists':True, '$lt': self.time - 4}}]}, # map_path_fudge_time
+                                                               ]},
+                                                     {'$unset':{'base_map_path':1,'base_map_path_eta':1}})
 
     ###### MAP OBJECTS (FIXED/MOBILE) TABLES ######
 
