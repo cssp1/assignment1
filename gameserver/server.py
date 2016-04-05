@@ -27226,8 +27226,11 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
                     return
 
-                reactor.callLater(0, lambda _region_id=session.player.home_region, _loc=loc: \
-                                  Raid.resolve_loc(gamesite.nosql_client, _region_id, _loc, server_time))
+                @admin_stats.measure_latency('do_squad_resolve')
+                def do_squad_resolve(region_id, loc):
+                    Raid.resolve_loc(gamesite.nosql_client, region_id, loc, server_time)
+
+                reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
 
             elif spellname == 'SQUAD_EXIT_MAP':
                 if session.has_attacked:
