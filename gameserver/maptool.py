@@ -1513,7 +1513,7 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 print 'could not get locks for both squad and raid, skipping'
                 continue
             try:
-                squad_update, raid_update = Raid.resolve(squad, raid)
+                squad_update, raid_update = Raid.resolve_raid(squad, raid)
                 if verbose: print 'squad_update', squad_update, 'raid_update', raid_update
                 if raid_update is None:
                     clear_base(db, lock_manager, region_id, raid['base_id'], dry_run = dry_run, already_locked = True)
@@ -1543,28 +1543,32 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
         else:
             home = home_cache[tuple(home['base_map_loc'])] # look it up again so the dest_feature identity check works
 
-        path = pf.raid_find_path_to(loc, home)
-        if not path:
-            print 'Squad return pathfinding unsuccessful!', pretty_feature(squad)
-            recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
-            continue
+        if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
+            if verbose: print 'using backtrack path'
+            new_path = Raid.backtrack(squad, time.time())['base_map_path']
+        else:
+            if verbose: print 'pathfinding from scratch...'
+            astar_solution = pf.raid_find_path_to(loc, home)
+            if not astar_solution:
+                print 'Squad return pathfinding unsuccessful!', pretty_feature(squad)
+                recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
+                continue
 
-        # set squad moving
-        next_eta = time.time()
-        new_path = [{'xy': squad['base_map_loc'], 'eta': next_eta}]
-        for i in xrange(len(path)):
-            waypoint = path[i]
-            next_eta += float(1.0/(gamedata['territory']['unit_travel_speed_factor']*squad.get('travel_speed',1.0)))
-            new_path.append({'xy': waypoint, 'eta': next_eta})
+            # set squad moving
+            next_eta = time.time()
+            new_path = [{'xy': squad['base_map_loc'], 'eta': next_eta}]
+            for i, xy in enumerate(astar_solution):
+                next_eta += float(1.0/(gamedata['territory']['unit_travel_speed_factor']*squad.get('travel_speed',1.0)))
+                new_path.append({'xy': xy, 'eta': next_eta})
 
         if not lock_manager.acquire(region_id, squad['base_id']): # yes, there's a race condition here
             if verbose: print 'Squad locked, skipping'
             continue
         try:
-            if verbose: print 'Squad pathing back to home', path
+            if verbose: print 'Squad moving back to home'
             # note: this will wait until the NEXT run of resolve() to actually dock the squad and units
             if not dry_run:
-                nosql_client.move_map_feature(region_id, squad['base_id'], {'base_map_loc': home['base_map_loc'],
+                nosql_client.move_map_feature(region_id, squad['base_id'], {'base_map_loc': new_path[-1]['xy'],
                                                                             'base_map_path': new_path},
                                               old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
                                               exclusive = -1, reason = 'resolve')
