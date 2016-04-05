@@ -364,6 +364,13 @@ def parse_mongodb_config(dbname, cfg, parent = None):
         raise Exception('invalid mongodb config for "%s": %s' % (dbname, repr(cfg)))
 
     table_prefix = cfg.get('table_prefix', parent.get('table_prefix', ''))
+
+    # MongoDB doesn't like special characters in these strings :(
+    for check_name, to_check in {'username': username, 'password': password, 'dbname': dbname}.iteritems():
+        for c in to_check:
+            if (not c.isalnum()) and (c not in ('!','_','-')):
+                raise Exception('invalid special character in MongoDB %s for database %s' % (check_name, dbname))
+
     connect_url = 'mongodb://%s:%s@%s/%s' % (username,password,host_string,dbname)
     connect_args = []
     connect_kwargs = {'host':connect_url}
