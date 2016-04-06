@@ -6587,7 +6587,8 @@ class Building(GameObject):
 
     def halt_crafting(self, force): # if force is false, do not halt recipes that are marked unhaltable (by damage)
         if self.crafting:
-            if not gamedata['crafting']['categories'][gamedata['crafting']['recipes'][self.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('haltable',True):
+            if self.crafting.queue[0].craft_state['recipe'] in gamedata['crafting']['recipes'] and \
+               (not gamedata['crafting']['categories'][gamedata['crafting']['recipes'][self.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('haltable',True)):
                 return False # cannot be halted by damage
             return self.crafting.halt(server_time)
         return False
@@ -11073,6 +11074,22 @@ class Player(AbstractPlayer):
                         to_remove.append(item)
                 for item in to_remove:
                     obj.manuf_queue.remove(item)
+
+            # remove invalid recipes from crafting queues
+            if obj.is_building() and obj.is_crafter() and obj.is_crafting():
+                to_remove = []
+                for entry in obj.crafting.queue:
+                    if entry.craft_state['recipe'] not in gamedata['crafting']['recipes']:
+                        to_remove.append(entry)
+                if to_remove:
+                    for entry in to_remove:
+                        obj.crafting.queue.remove(entry)
+                    if len(obj.crafting.queue) < 1:
+                        obj.crafting = None
+                    else:
+                        # update times on other queued items
+                        obj.halt_crafting(True)
+                        obj.update_crafting(-1)
 
             # find any objects with invalid squad ids
             if obj.is_mobile() and SQUAD_IDS.is_mobile_squad_id(obj.squad_id) and (str(obj.squad_id) not in self.squads):
