@@ -6639,8 +6639,12 @@ class Building(GameObject):
 
     def update_crafting(self, undamaged_time):
         if not self.crafting: return False
-        if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][self.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('haltable',True) and \
-           (self.repair_finish_time > 0 or self.is_damaged()): return False
+        recipe_name = self.crafting.queue[0].craft_state['recipe']
+        if recipe_name in gamedata['crafting']['recipes']:
+            category_name = gamedata['crafting']['recipes'][recipe_name]['crafting_category']
+            if category_name in gamedata['crafting']['categories']:
+                if gamedata['crafting']['categories'][category_name].get('haltable',True) and \
+                   (self.repair_finish_time > 0 or self.is_damaged()): return False
         return self.crafting.resume(undamaged_time, server_time)
 
     # note! does not update_production! (should it?)
