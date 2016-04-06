@@ -449,6 +449,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     var squad_is_deployed = player.squad_is_deployed(squad_data['id']);
     var squad_is_under_repair = player.squad_is_under_repair(squad_data['id']);
     var squad_in_battle = player.squad_is_in_battle(squad_data['id']);
+    var squad_can_speedup = player.squad_speedups_enabled() && squad_is_deployed && !squad_in_battle && player.squad_is_moving(squad_data['id']);
 
     dialog.widgets['space_bar'].show = dialog.widgets['space_label'].show =
         dialog.widgets['hp_bar'].show = dialog.widgets['hp_label'].show =
@@ -456,7 +457,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     dialog.widgets['space_bar'].progress = cur_space / Math.max(max_space,1);
     dialog.widgets['hp_bar'].progress = (max_hp > 0 ? (cur_hp/max_hp) : 0);
 
-    var my_status, my_status_s = '';
+    var my_status, my_status_s = '', my_status_time = '';
     if(squad_data['id'] === SQUAD_IDS.RESERVES) {
         my_status = 'in_reserve';
     } else if(squad_data['id'] === SQUAD_IDS.BASE_DEFENDERS) {
@@ -477,6 +478,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                 my_status = 'traveling';
                 my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
             }
+            my_status_time = pretty_print_time_brief(Math.max(squad_data['map_path'][squad_data['map_path'].length-1]['eta'] - server_time, 1));
         } else {
             var feat = (session.region.map_enabled() ? session.region.find_feature_at_coords(squad_data['map_loc']) : null);
             if(feat && feat['base_type'] == 'quarry') {
@@ -484,7 +486,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                 my_status_s = feat['base_ui_name'];
             } else {
                 my_status = 'deployed';
-                my_status_s = '('+squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString()+')';
+                my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
             }
         }
     } else if(squad_is_under_repair) {
@@ -494,7 +496,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     } else {
         my_status = 'ready';
     }
-    dialog.widgets['status'].str = gamedata['strings']['squads']['status'][my_status].replace('%s', my_status_s);
+    dialog.widgets['status'].str = gamedata['strings']['squads']['status'][my_status].replace('%s', my_status_s).replace('%time', my_status_time);
     dialog.widgets['bg'].color = SPUI.make_colorv(dialog.data['widgets']['bg']['color_'+my_status]);
     dialog.widgets['status'].text_color = dialog.widgets['bg'].outline_color = SPUI.make_colorv(dialog.data['widgets']['bg']['outline_color_'+my_status]);
     dialog.widgets['name'].text_color = SPUI.make_colorv(dialog.data['widgets']['name'][('text_color_'+my_status in dialog.data['widgets']['name'] ? 'text_color_'+my_status : 'text_color')]);
@@ -544,10 +546,10 @@ SquadControlDialog.update_squad_tile = function(dialog) {
 
     dialog.widgets['repair_remain_bg'].show =
         dialog.widgets['repair_remain_icon'].show =
-        dialog.widgets['repair_remain_value'].show =
-        dialog.widgets['finish_button'].show =
-        dialog.widgets['price_display'].show = (dlg_mode=='normal') && squad_is_under_repair && !squad_in_battle;
-    dialog.widgets['price_spinner'].show = (dialog.widgets['price_display'].show && !repair_in_sync);
+        dialog.widgets['repair_remain_value'].show = (dlg_mode=='normal') && squad_is_under_repair && !squad_in_battle;
+    dialog.widgets['finish_button'].show =
+        dialog.widgets['price_display'].show = (dlg_mode=='normal') && (squad_is_under_repair || squad_can_speedup) && !squad_in_battle;
+    dialog.widgets['price_spinner'].show = (dialog.widgets['price_display'].show && (!repair_in_sync || squad_data['pending']));
     dialog.widgets['cancel_button'].show = (dlg_mode=='normal') && squad_is_under_repair && !squad_in_battle && hover;
 
     if(squad_is_under_repair && !squad_in_battle) {
@@ -588,6 +590,26 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                 dialog.widgets['finish_button'].state = 'disabled';
                 dialog.widgets['price_display'].onclick = null;
             }
+        }
+    } else if(squad_can_speedup) {
+        var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY'], dialog.user_data['squad_id']);
+        dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_short_asset', gamedata['store']['price_display_short_asset']);
+        dialog.widgets['price_display'].state = Store.get_user_currency();
+        dialog.widgets['price_display'].str = (squad_data['pending'] ? '' : Store.display_user_currency_price(price, 'compact')); // PRICE
+        dialog.widgets['finish_button'].str = dialog.data['widgets']['finish_button']['ui_name'+(squad_data['pending'] ? '_pending': '')];
+        dialog.widgets['price_display'].tooltip.str = (squad_data['pending'] ? null : Store.display_user_currency_price_tooltip(price));
+        if(price >= 0) {
+            dialog.widgets['finish_button'].onclick = function(w) {
+                var dialog = w.parent;
+                if(Store.place_user_currency_order(GameObject.VIRTUAL_ID, "SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY", dialog.user_data['squad_id'], null)) {
+                    player.squads[dialog.user_data['squad_id'].toString()]['pending'] = true;
+                }
+            };
+            dialog.widgets['finish_button'].state = (!squad_data['pending'] ? 'normal' : 'disabled');
+            dialog.widgets['price_display'].onclick = (squad_data['pending'] ? null: dialog.widgets['finish_button'].onclick);
+        } else {
+            dialog.widgets['finish_button'].state = 'disabled';
+            dialog.widgets['price_display'].onclick = null;
         }
     }
 
