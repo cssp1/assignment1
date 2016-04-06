@@ -18299,7 +18299,7 @@ class GAMEAPI(resource.Resource):
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
                       'facebook_id', 'kg_id', 'ag_id',
-                      'facebook_name', 'facebook_first_name', # remove later
+                      'facebook_name', 'facebook_first_name', 'last_fb_notification_time', 'enable_fb_notifications', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
 
         result = gamesite.pcache_client.player_cache_lookup_batch(user_ids, fields = fields, reason = reason)
@@ -24102,6 +24102,12 @@ class GAMEAPI(resource.Resource):
 
         if session.user.social_id: cache_props['social_id'] = session.user.social_id
         if session.user.frame_platform: cache_props['frame_platform'] = session.user.frame_platform
+        if session.user.frame_platform == 'fb':
+            # publish a 0 here if FB notifications are off, otherwise None->null meaning they are on
+            cache_props['enable_fb_notifications'] = 0 if (session.player.player_preferences and \
+                                                           type(session.player.player_preferences) is dict and \
+                                                           not session.player.player_preferences.get('enable_fb_notifications', True)) \
+                                                           else None
         if session.user.facebook_id: cache_props['facebook_id'] = session.user.facebook_id
         if session.user.ag_id: cache_props['ag_id'] = session.user.ag_id
         if session.user.ag_avatar_url: cache_props['ag_avatar_url'] = session.user.ag_avatar_url
@@ -25503,9 +25509,8 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ALLIANCE_UPDATE", my_alliance_info['id'] if my_alliance_info else -1, True, my_alliance_info, my_alliance_membership, False])
 
 
-                # send FB notifications XXXXXX need to rewrite this path so that it respects enable_fb_notifications preference
                 config = gamedata['fb_notifications']['notifications'].get('alliance_promoted' if new_role > old_role else 'alliance_demoted',None)
-                if config and pcache_data.get('facebook_id'):
+                if config and pcache_data.get('facebook_id') and pcache_data.get('enable_fb_notifications', True):
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                     session.player.do_send_fb_notification_to(pcache_data['facebook_id'], notif_text, config, config['ref'])
 

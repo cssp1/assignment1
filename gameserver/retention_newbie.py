@@ -214,6 +214,11 @@ class Sender(object):
             print >> self.msg_fd, '(player_cache says) player uninstalled'
             return
 
+        if not pcache.get('enable_fb_notifications', True):
+            print >> self.msg_fd, '(player_cache says) player turned off FB notifications'
+            return
+
+
         if (time_now - pcache.get('last_fb_notification_time', -1)) < gamedata['fb_notifications']['min_interval']:
             print >> self.msg_fd, '(player_cache says) has already been notified less than min_interval seconds ago'
             return
@@ -420,6 +425,7 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
     pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['tutorial_complete',
                                                                        'facebook_id','social_id','frame_platform',
                                                                        'last_login_time','last_mtime', 'uninstalled',
+                                                                       'enable_fb_notifications',
                                                                        'last_fb_notification_time', 'LOCK_STATE'])
     for i in xrange(len(batch)):
         try:
