@@ -26907,19 +26907,13 @@ class GAMEAPI(resource.Resource):
                 # will then route it to whatever game server is
                 # handling the player, or a random server to do an
                 # offline mutation.
-
-                rq = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, lambda x: gamesite.exception_log.event(server_time, x))
-                d = make_deferred(spellname)
-                def finish(self, d, session, retmsg, spellname, target_id, response_or_error):
+                d = gamesite.do_CONTROLAPI({'method': spellname.lower(), 'user_id': target_id})
+                def finish(response_or_error, retmsg, spellname, target_id):
                     retmsg.append([spellname+"_RESULT", target_id, True])
-                    d.callback(True)
-                host = SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host)
-                port = SpinConfig.config['proxyserver']['external_http_port']
-                rq.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode({'method':spellname.lower(),
-                                                                                                           'user_id':target_id,
-                                                                                                           'secret':SpinConfig.config['proxy_api_secret']}),
-                                 functools.partial(finish, self, d, session, retmsg, spellname, target_id),
-                                 error_callback = functools.partial(finish, self, d, session, retmsg, spellname, target_id))
+
+                d.addErrback(report_and_absorb_deferred_failure, session)
+                d.addCallback(finish, retmsg, spellname, target_id)
+
                 return session.start_async_request(d) # go async
 
             elif spellname == "ALLIANCE_CREATE" or spellname == "ALLIANCE_MODIFY":
@@ -27730,6 +27724,9 @@ class GameSite(server.Site):
                                                              self.log_xsolla_exception,
                                                              max_tries = data['max_tries'],
                                                              retry_delay = data['retry_delay'])
+        # for making async cross-server IPC calls (FB notifications etc)
+        self.AsyncHTTP_CONTROLAPI = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, self.log_async_exception)
+
         self.nosql_id_generator = SpinNoSQLId.Generator()
 
         self.nosql_client = None
@@ -28300,6 +28297,18 @@ class GameSite(server.Site):
             last_activity = max(client.connect_time, client.last_request_time)
             if server_time - last_activity > gamedata['server']['http_connection_timeout']:
                 client.close_connection_aggressively()
+
+    def do_CONTROLAPI(self, caller_args):
+        d = make_deferred('CONTROLAPI:'+caller_args['method'])
+        host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
+        port = SpinConfig.config['proxyserver']['external_http_port']
+        args = copy.copy(caller_args)
+        args['secret'] = SpinConfig.config['proxy_api_secret']
+        self.AsyncHTTP_CONTROLAPI.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode(args),
+                                                lambda response, _d=d: d.callback(response),
+                                                error_callback = lambda err, _d=d: d.errback(err))
+        return d
+
 
 # glue code that links GAMEAPI to WebSocket
 
