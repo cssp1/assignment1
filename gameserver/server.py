@@ -1455,6 +1455,9 @@ class User:
                     ref = ref.replace(IGNORE, '')
                 if ref.endswith('_n') or ref.endswith('_e'): ref = ref[:-2]
                 dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
+                # reset unacked counter
+                if 'notification:'+ref+':unacked' in player.history:
+                    del player.history['notification:'+ref+':unacked']
 
             if 'skynet_retarget' in data:
                 if self.skynet_retargets is None: self.skynet_retargets = []
@@ -25052,6 +25055,16 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "UPDATE_PREFERENCES":
             assert type(arg[1]) == dict
             session.player.player_preferences = arg[1]
+        elif arg[0] == "RESET_NOTIFICATION":
+            ref = arg[1]
+            if ref == 'ALL':
+                for key in session.player.history.keys():
+                    if key.startswith('notification:') and (key.endswith(':unacked') or key.endswith(':last_time')):
+                        del session.player.history[key]
+            else:
+                for key in ('notification:'+ref+':unacked', 'notification:'+ref+':last_time'):
+                    if key in session.player.history:
+                        del session.player.history[key]
 
         elif arg[0] == "QUERY_RECENT_ATTACKERS":
             self.query_recent_attackers(session, retmsg, arg)

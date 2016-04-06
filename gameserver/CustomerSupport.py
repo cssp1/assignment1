@@ -981,6 +981,8 @@ class HandleSendNotification(Handler):
         if not self.config and not self.ref_override:
             raise Exception('ref= parameter is required if no config= is used')
 
+        self.simulate = bool(int(self.args.get('simulate','0'))) # for testing, act as if we actually transmitted the notification
+
     # no logging
     def exec_online(self, session, retmsg):
 
@@ -1006,11 +1008,17 @@ class HandleSendNotification(Handler):
                 if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
                     return ReturnValue(result = 'already notified since last logout')
 
-            # do not send notification if one was sent since min_minterval ago
+            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
             # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
             if self.config and \
-               (self.time_now - session.player.last_fb_notification_time) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, notification sent within min_interval ago')
+               (self.time_now - session.player.history.get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+            if self.config and self.config.get('auto_mute',0) > 0:
+                mute_key = 'notification:'+self.config['ref']+':unacked'
+                if session.player.history.get(mute_key,0) >= self.config['auto_mute']:
+                    session.player.player_preferences[self.config['mute_preference_key']] = 0
+                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
@@ -1022,12 +1030,16 @@ class HandleSendNotification(Handler):
             fb_ref = self.ref_override
 
         if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, session.user.facebook_id, self.text, self.config_name or self.ref_override, fb_ref,
-                                                            session.player.get_denormalized_summary_props('brief')):
+                                                            session.player.get_denormalized_summary_props('brief')) or self.simulate:
             session.player.last_fb_notification_time = self.time_now
             session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
             if self.config:
                 key = 'fb_notification:'+self.config['ref']+':sent'
                 session.player.history[key] = session.player.history.get(key,0)+1
+                key = 'notification:'+self.config['ref']+':unacked'
+                session.player.history[key] = session.player.history.get(key,0)+1
+                key = 'notification:'+self.config['ref']+':last_time'
+                session.player.history[key] = self.time_now
 
         return ReturnValue(result = 'ok')
 
@@ -1056,11 +1068,18 @@ class HandleSendNotification(Handler):
                 if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
                     return ReturnValue(result = 'already notified since last logout')
 
-            # do not send notification if one was sent since min_minterval ago
+            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
             # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
             if self.config and \
-               (self.time_now - player.get('last_fb_notification_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, notification sent within min_interval ago')
+               (self.time_now - player['history'].get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+            if self.config and self.config.get('auto_mute',0) > 0:
+                mute_key = 'notification:'+self.config['ref']+':unacked'
+                if player['history'].get(mute_key,0) >= self.config['auto_mute']:
+                    if 'player_preferences' not in player: player['player_preferences'] = {}
+                    player['player_preferences'][self.config['mute_preference_key']] = 0
+                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
@@ -1072,12 +1091,16 @@ class HandleSendNotification(Handler):
             fb_ref = self.ref_override
 
         if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, user['facebook_id'], self.text, self.config_name or self.ref_override, fb_ref,
-                                                            self.get_denormalized_summary_props_offline(user, player)):
+                                                            self.get_denormalized_summary_props_offline(user, player)) or self.simulate:
             player['last_fb_notification_time'] = self.time_now
             player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
             if self.config:
                 key = 'fb_notification:'+self.config['ref']+':sent'
                 player['history'][key] = player['history'].get(key,0)+1
+                key = 'notification:'+self.config['ref']+':unacked'
+                player['history'][key] = player['history'].get(key,0)+1
+                key = 'notification:'+self.config['ref']+':last_time'
+                player['history'][key] = self.time_now
 
         return ReturnValue(result = 'ok')
 

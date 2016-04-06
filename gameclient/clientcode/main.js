@@ -32792,6 +32792,10 @@ function update_fishing_dialog(dialog) {
     dialog.widgets['notify_choice'].onclick = function(w) {
         player.preferences['enable_fishing_notifications'] = (w.state == 'active' ? 0 : 1);
         send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+        if(player.preferences['enable_fishing_notifications'] &&
+           gamedata['fb_notifications']['notifications']['fishing_complete']) {
+            send_to_server.func(["RESET_NOTIFICATION", gamedata['fb_notifications']['notifications']['fishing_complete']['ref']]);
+        }
         invoke_ui_locker();
     };
 
@@ -35956,6 +35960,11 @@ function invoke_settings_dialog() {
         dialog.widgets['apply_button'].str = dialog.data['widgets']['apply_button']['ui_name_applying'];
 
         send_to_server.func(["UPDATE_PREFERENCES", dialog.user_data['preferences']]);
+
+        // special case to re-enable unacked notifications
+        if(dialog.user_data['preferences']['enable_fb_notifications']) {
+            send_to_server.func(["RESET_NOTIFICATION", 'ALL']);
+        }
 
         if(dialog.user_data['requires_reload']) {
             flush_message_queue(true);
