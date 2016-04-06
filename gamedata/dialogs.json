@@ -8146,30 +8146,6 @@
                                 "text_hjustify": "right", "ui_name": "Highlighted: %ALLIANCE",
                                 "layout": { "hjustify": "right", "vjustify": "bottom" } },
 
-            "attacker_finder": { "kind": "ActionButton", "xy": [50, 243], "dimensions": [140,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                 "text_size": 14, "text_style": "bold", "ui_name": "Find Attacker", "show": 0, "state": "attack",
-                                 "ui_tooltip": "Find the nearest player who attacked you recently", "tooltip_delay": 0.2,
-                                 "layout": { "hjustify": "left", "vjustify": "bottom" } },
-            "attacker_finder_spinner": { "kind": "StaticImage", "xy":[58,250], "dimensions":[16,16], "asset":"loading_spinner", "show": 0,
-                                         "layout": { "hjustify": "left", "vjustify": "bottom" } },
-
-            "hive_finder": { "kind": "ActionButton", "xy": [50, 278], "dimensions": [140,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                             "text_size": 14, "text_style": "bold", "ui_name": "Find Event Base", "show": 0,
-                             "ui_tooltip": "Find the nearest base you can attack to win special event rewards", "tooltip_delay": 0.2,
-                             "ui_tooltip_locked": "To fight special event bases:\n%s",
-                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
-
-            "strongpoint_finder": { "kind": "ActionButton", "xy": [50, 313], "dimensions": [140,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                    "text_size": 14, "text_style": "bold", "ui_name": "Find Strongpoint", "show": 0,
-                                    "ui_tooltip": "Find the nearest Strongpoint quarry you can attack for resources and Alliance bonuses", // see localiziation for Alliance->Clan
-                                    "tooltip_delay": 0.2,
-                                    "ui_tooltip_locked": "To fight a Strongpoint quarry:\n%s",
-                                    "layout": { "hjustify": "left", "vjustify": "bottom" } },
-
-            "home_button": { "kind": "ActionButton", "xy": [50, 362], "dimensions": [70,32], "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
-                             "text_size": 14, "text_style": "bold", "ui_name": "Home",
-                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
-
             "refresh_text":  { "kind": "TextField", "xy": [135,362], "dimensions": [100,32], "text_size": 13, "text_color":[0.33,0.33,0.33,1], "text_hjustify": "left",
                                "ui_name_anim": "10|9|8|7|6|5|4|3|2|1|Satellite|Refreshing|Map Data|Map Data.|Map Data..|Map Data...|Map Data....",
                                "random_skip": 6, // skip up to this many initial animation steps
@@ -8189,6 +8165,51 @@
                                       "text_size": 13, "text_style": "bold", "ui_name": "Battalions",
                                       "layout": { "hjustify": "right", "vjustify": "bottom" } },
 
+            // FINDER BUTTONS
+            "attacker_finder": { "kind": "ActionButton", "xy": [50, 277], "dimensions": [140,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "text_size": 14, "text_style": "bold", "ui_name": "Find Attacker", "show": 0, "state": "attack",
+                                 "ui_tooltip": "Find the nearest player who attacked you recently", "tooltip_delay": 0.2,
+                                 "layout": { "hjustify": "left", "vjustify": "bottom" } },
+            "attacker_finder_spinner": { "kind": "StaticImage", "xy":[57,284], "dimensions":[16,16], "asset":"loading_spinner", "show": 0,
+                                         "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            "finder_toggle": { "kind": "ActionButton", "xy": [50, 313], "dimensions": [140,30], "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                               "text_size": 14, "text_style": "bold",
+                               "ui_name_collapsed": "Find Targets... >",
+                               "ui_name_expanded": "Find Targets... <",
+                               "state_collapsed": "active", "state_expanded": "normal",
+                               "ui_tooltip": "Search for a target to attack",
+                               "tooltip_delay": 0.2,
+                               "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            // CHILD FINDER BUTTONS
+            "finder_bgrect": { "kind":"StaticImage", "xy":[196,340], "dimensions": [166,10],
+                               "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1
+                               // "layout": { "hjustify": "left", "vjustify": "bottom" } // doesn't work for upward expansion :(
+                             },
+
+            "misc_finder": { "show": 0, "kind": "ActionButton", "xy": [209, 313], "dimensions": [140,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                             "text_size": 14, "text_style": "bold",
+                             "ui_name_attacker": "Find Attacker",
+                             "ui_name_hive": "Find Event Base",
+                             "ui_name_raid": "Find Raid Site",
+                             "ui_name_strongpoint": "Find Strongpoint",
+                             "ui_name_quarry": "Find %s Quarry",
+                             "ui_tooltip_attacker": "Find the nearest player who attacked you recently",
+                             "ui_tooltip_hive": "Find the nearest base you can attack to win special event rewards",
+                             "ui_tooltip_raid": "Find the nearest site you can raid for resources",
+                             "ui_tooltip_strongpoint": "Find the nearest Strongpoint quarry you can attack for resources and Alliance bonuses", // see localiziation for Alliance->Clan
+                             "ui_tooltip_quarry": "Find the nearest quarry you can conquer to collect %s over time",
+                             "ui_tooltip": "", "tooltip_delay": 0.1,
+                             "ui_tooltip_locked": "To fight:\n%s",
+                             "array": [1,6], "array_offset": [0,-36],
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
+
+            // END FINDER BUTTONS
+
+            "home_button": { "kind": "ActionButton", "xy": [50, 362], "dimensions": [70,32], "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                             "text_size": 14, "text_style": "bold", "ui_name": "Home",
+                             "layout": { "hjustify": "left", "vjustify": "bottom" } },
             "cursor_coords":  { "show": 0,
                                 "kind": "TextField", "xy": [300,371], "dimensions": [100,20], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
                                 "text_hjustify": "left", "text_color": [0.8,0.8,0.8,1], "ui_name": "Cursor Coordinates: %CURSOR",

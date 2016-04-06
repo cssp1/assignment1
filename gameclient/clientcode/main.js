@@ -18110,6 +18110,27 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             if(index >= 0) {
                 found_widget_name = 'button'+index.toString();
             }
+        } else if(widget_name && widget_name.indexOf('MAP_FINDER:') == 0) {
+            var kind = widget_name.split(':')[1];
+            found_widget_name = null;
+            if('finder_states' in parent.user_data &&
+               (kind in parent.user_data['finder_states']) &&
+               !(parent.widgets.map.popup)) {
+                var upd = region_map_finder_update(parent, kind, parent.user_data['finder_states'][kind]);
+                if(upd.show) {
+                    if(parent.user_data['finder_expanded']) {
+                        if(kind in parent.user_data['finder_button_indexes']) {
+                            var index = parent.user_data['finder_button_indexes'][kind];
+                            if(index >= 0) {
+                                found_widget_name = 'misc_finder'+index.toString();
+                            }
+                        }
+                    } else {
+                        // point to expand button
+                        found_widget_name = 'finder_toggle';
+                    }
+                }
+            }
         }
 
 
@@ -20770,9 +20791,17 @@ function invoke_region_map(target_loc) {
     dialog.user_data['dialog'] = 'region_map_dialog';
     dialog.user_data['first_fetch'] = false;
     dialog.user_data['last_map_ping_time'] = -1;
-    dialog.user_data['hive_finder_state'] = region_map_finder_state_init();
-    dialog.user_data['strongpoint_finder_state'] = region_map_finder_state_init();
-    dialog.user_data['attacker_finder_state'] = region_map_finder_state_init();
+    dialog.user_data['finder_expanded'] = false;
+    dialog.user_data['finder_states'] = {
+        'attacker': region_map_finder_state_init(),
+        'hive': region_map_finder_state_init(),
+        'raid': region_map_finder_state_init(),
+        'strongpoint': region_map_finder_state_init()
+    };
+    for(var res in gamedata['resources']) {
+        dialog.user_data['finder_states']['quarry_'+res] = region_map_finder_state_init();
+    }
+    dialog.user_data['finder_button_indexes'] = {}; // for tutorial arrows, maps kind to misc_finder button index
     dialog.user_data['recent_attacker_ids'] = null; // for attacker finder
 
     dialog.user_data['refresh_text_start_time'] = -1;
@@ -20813,6 +20842,10 @@ function invoke_region_map(target_loc) {
         var dialog = w.parent;
         dialog.widgets['map'].follow_travel = false;
         dialog.widgets['map'].go_home({do_select:true, slowly:true, with_zoom:true});
+    }
+    dialog.widgets['finder_toggle'].onclick = function(w) {
+        var dialog = w.parent;
+        dialog.user_data['finder_expanded'] = !dialog.user_data['finder_expanded'];
     }
     dialog.widgets['manage_squads_button'].onclick = function(w) {
         SquadControlDialog.invoke_manage();
@@ -21094,9 +21127,47 @@ function update_region_map(dialog) {
     // update bookmarks state
     dialog.widgets['bookmarks_button'].state = ((dialog.widgets['map'].region && (dialog.widgets['map'].region.data['id'] in player.map_bookmarks) && (player.map_bookmarks[dialog.widgets['map'].region.data['id']].length >= 1)) ? 'normal' : 'disabled');
 
-    region_map_finder_update(dialog, 'hive_finder', dialog.user_data['hive_finder_state']);
-    region_map_finder_update(dialog, 'strongpoint_finder', dialog.user_data['strongpoint_finder_state']);
-    region_map_finder_update(dialog, 'attacker_finder', dialog.user_data['attacker_finder_state']);
+    // get finder state updates
+    var finder_updates = goog.object.map(dialog.user_data['finder_states'], function(state, kind) {
+        if(kind == 'attacker' || dialog.user_data['finder_expanded']) {
+            return region_map_finder_update(dialog, kind, state);
+        } else {
+            return null; // don't bother updating if hidden
+        }
+    });
+
+    // attacker_finder is always available even if the other buttons are collapsed
+    finder_updates['attacker'].apply_to_button(dialog.widgets['attacker_finder']);
+    dialog.widgets['attacker_finder_spinner'].show = finder_updates['attacker'].show && finder_updates['attacker'].pending;
+
+    dialog.widgets['finder_toggle'].str = dialog.data['widgets']['finder_toggle'][dialog.user_data['finder_expanded'] ? 'ui_name_expanded' : 'ui_name_collapsed'];
+    dialog.widgets['finder_toggle'].state = dialog.data['widgets']['finder_toggle'][dialog.user_data['finder_expanded'] ? 'state_expanded' : 'state_collapsed'];
+    dialog.widgets['finder_bgrect'].show = dialog.user_data['finder_expanded'];
+    var n_finders_shown = 0;
+    dialog.user_data['finder_button_indexes'] = {};
+    if(dialog.user_data['finder_expanded']) {
+        var kinds = goog.object.getKeys(finder_updates);
+        // note: sort order must match update_p
+        kinds.sort();
+        goog.array.forEach(kinds, function(kind, i) {
+            if(kind == 'attacker') { return; }
+            var update = finder_updates[kind];
+            if(!update) { return; }
+            if(n_finders_shown >= dialog.data['widgets']['misc_finder']['array'][1]) { return; } // can't show
+            if(update.show) {
+                update.apply_to_button(dialog.widgets['misc_finder'+n_finders_shown.toString()]);
+                dialog.user_data['finder_button_indexes'][kind] = n_finders_shown;
+                n_finders_shown += 1;
+            }
+        });
+
+        // resize bgrect to fit around visible buttons
+        dialog.widgets['finder_bgrect'].wh = [dialog.data['widgets']['finder_bgrect']['dimensions'][0],
+                                              dialog.data['widgets']['finder_bgrect']['dimensions'][1] + n_finders_shown * Math.abs(dialog.data['widgets']['misc_finder']['array_offset'][1])];
+    }
+    for(var i = n_finders_shown; i < dialog.data['widgets']['misc_finder']['array'][1]; i++) {
+        dialog.widgets['misc_finder'+i.toString()].show = false;
+    }
 
     // dynamic resizing, making room for chat
     var console_shift = get_console_shift();
@@ -21106,6 +21177,13 @@ function update_region_map(dialog) {
 //    dialog.auto_center();
     dialog.xy = vec_floor(vec_add(vec_scale(0.05, [canvas_width,canvas_height]), [Math.floor(console_shift),0]));
     dialog.on_resize();
+
+    if(dialog.user_data['finder_expanded']) {
+        // manual reposition, since layout doesn't work for an upwardly-expanding box
+        dialog.widgets['finder_bgrect'].xy = [dialog.data['widgets']['finder_bgrect']['xy'][0],
+                                              dialog.wh[1] - dialog.data['dimensions'][1] + dialog.data['widgets']['finder_bgrect']['xy'][1] -
+                                              n_finders_shown * Math.abs(dialog.data['widgets']['misc_finder']['array_offset'][1])];
+    }
 }
 
 /** Add a new message to the notification widget
@@ -21119,15 +21197,39 @@ function region_map_display_notification(dialog, bbcode, props) {
 }
 
 function region_map_finder_state_init() { return {'time':-1, 'found':null, 'index':-1, 'pred':null}; };
-function region_map_finder_update(dialog, kind, state) {
-    // hive/attacker finder button
-    if(!player.get_any_abtest_value('region_map_'+kind, gamedata['territory'][kind])) { return; }
 
-    if(kind == 'attacker_finder') {
+/** @constructor @struct
+    @param {boolean} show
+    @param {boolean} pending
+    @param {string|null} button_name
+    @param {string|null} button_state
+    @param {string|null} tooltip_str
+    @param {function(!SPUI.DialogWidget=)|null} onclick */
+function RegionMapFinderUpdateResult(show, pending, button_name, button_state, tooltip_str, onclick) {
+    this.show = show;
+    this.pending = pending;
+    this.button_name = button_name;
+    this.button_state = button_state;
+    this.tooltip_str = tooltip_str;
+    this.onclick = onclick;
+};
+/** @param {!SPUI.ActionButton} w */
+RegionMapFinderUpdateResult.prototype.apply_to_button = function(w) {
+    w.show = this.show;
+    if(this.show) {
+        w.state = this.button_state || 'disabled';
+        w.str = this.button_name;
+        w.tooltip.str = this.tooltip_str;
+        w.onclick = this.onclick;
+    }
+};
+
+/** @return {!RegionMapFinderUpdateResult} */
+function region_map_finder_update(dialog, kind, state) {
+    if(kind == 'attacker') {
         // send battle history query
         if(dialog.user_data['recent_attacker_ids'] === null ||
            dialog.user_data['recent_attacker_ids']['pending']) {
-            dialog.widgets[kind+'_spinner'].show = true;
             if(dialog.user_data['recent_attacker_ids'] === null) {
                 dialog.user_data['recent_attacker_ids'] = {'pending':1};
                 query_recent_attackers((function (_dialog) { return function(attacker_id_list) {
@@ -21139,9 +21241,7 @@ function region_map_finder_update(dialog, kind, state) {
                     });
                 }; })(dialog));
             }
-            return;
-        } else {
-            dialog.widgets[kind+'_spinner'].show = false;
+            return new RegionMapFinderUpdateResult(true, true, dialog.data['widgets']['attacker_finder']['ui_name'], 'disabled', dialog.data['widgets']['attacker_finder']['ui_tooltip'], null);
         }
     }
 
@@ -21161,10 +21261,12 @@ function region_map_finder_update(dialog, kind, state) {
             var found = null;
 
             // hive: attackable hive with ui_tokens2
-            if(kind == 'hive_finder') {
-                if(f['base_type'] == 'hive' && ('base_template' in f) && (f['base_template'] in gamedata['hives_client']['templates']) &&
-                   gamedata['hives_client']['templates'][f['base_template']]['ui_tokens2']) {
-                    var pred = (!player.is_cheater && ('activation' in gamedata['hives_client']['templates'][f['base_template']]) ? read_predicate(gamedata['hives_client']['templates'][f['base_template']]['activation']) : null);
+            if(goog.array.contains(['hive','raid'], kind)) {
+                if(f['base_type'] == kind &&
+                   (kind == 'raid' ||
+                    (kind == 'hive' && ('base_template' in f) && (f['base_template'] in gamedata[kind+'s_client']['templates']) &&
+                     gamedata[kind+'s_client']['templates'][f['base_template']]['ui_tokens2']))) {
+                    var pred = (!player.is_cheater && ('activation' in gamedata[kind+'s_client']['templates'][f['base_template']]) ? read_predicate(gamedata[kind+'s_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
                         // locked
                         // remember the "easiest" unsatisfied predicate, so that players see the least amount of work they need to do to unlock any hive
@@ -21178,10 +21280,12 @@ function region_map_finder_update(dialog, kind, state) {
                     // unlocked
                     found = f;
                 }
-            } else if(kind == 'strongpoint_finder') {
+            } else if(kind == 'strongpoint' || kind.indexOf('quarry_') == 0) {
                 if(f['base_landlord_id'] != session.user_id &&
-                   f['base_type'] == 'quarry' && ('base_template' in f) && (f['base_template'] in gamedata['quarries_client']['templates']) &&
-                   gamedata['quarries_client']['templates'][f['base_template']]['turf_points']) {
+                   f['base_type'] == 'quarry' &&
+                   ((kind == 'strongpoint' && ('base_template' in f) && (f['base_template'] in gamedata['quarries_client']['templates']) &&
+                     gamedata['quarries_client']['templates'][f['base_template']]['turf_points']) ||
+                    (kind.indexOf('quarry_')==0 && f['base_icon'] == kind.split('_')[1]))) {
 
                     if(session.is_in_alliance()) {
                         var info = PlayerCache.query_sync_fetch(f['base_landlord_id']);
@@ -21190,7 +21294,7 @@ function region_map_finder_update(dialog, kind, state) {
                         }
                     }
 
-                    var pred = (!player.is_cheater && ('activation' in gamedata['quarries_client']['templates'][f['base_template']]) ? read_predicate(gamedata['quarries_client']['templates'][f['base_template']]['activation']) : null);
+                    var pred = (!player.is_cheater && (f['base_template'] in gamedata['quarries_client']['templates']) && ('activation' in gamedata['quarries_client']['templates'][f['base_template']]) ? read_predicate(gamedata['quarries_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
                         // locked
                         state['pred'] = pred;
@@ -21199,7 +21303,7 @@ function region_map_finder_update(dialog, kind, state) {
                     // unlocked
                     found = f;
                 }
-            } else if(kind == 'attacker_finder') {
+            } else if(kind == 'attacker') {
                 // attacker: someone who attacked us recently
                 if(f['base_type'] == 'home' && f['base_landlord_id'] && (f['base_landlord_id'] in dialog.user_data['recent_attacker_ids'])) {
                     found = f;
@@ -21225,15 +21329,28 @@ function region_map_finder_update(dialog, kind, state) {
         });
     }
 
-    dialog.widgets[kind].show = ((state['found'] !== null && state['found'].length > 0) || !!state['pred']);
-    if(dialog.widgets[kind].show) {
+    var show = ((state['found'] !== null && state['found'].length > 0) || !!state['pred']);
+    var button_name;
+    var button_state = 'disabled';
+    var tooltip_str;
+    var onclick;
+    if(show) {
         if(state['found'] !== null && state['found'].length > 0) {
             // valid base
-            dialog.widgets[kind].state = (kind == 'attacker_finder' ? dialog.data['widgets'][kind]['state'] : 'normal');
-            dialog.widgets[kind].tooltip.str = dialog.data['widgets'][kind]['ui_tooltip'];
-            player.record_feature_use(kind+'_seen');
-            dialog.widgets[kind].onclick = (function (_kind, _state) { return function(w) {
-                player.record_feature_use(_kind+'_used');
+            button_state = (kind == 'attacker' ? 'attack' : 'normal');
+            if(kind.indexOf('quarry_') == 0) {
+                var res = kind.split('_')[1];
+                var ui_res = gamedata['resources'][res]['ui_name'];
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+                player.record_feature_use('quarry_finder_seen');
+            } else {
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind];
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_'+kind];
+                player.record_feature_use(kind+'_finder_seen');
+            }
+            onclick = (function (_kind, _state) { return function(w) {
+                player.record_feature_use(_kind.indexOf('quarry_') == 0 ? 'quarry_finder_used' : (_kind+'_finder_used'));
                 var dialog = w.parent;
                 var idx = (_state['index']+1) % _state['found'].length;
                 var feature = _state['found'][idx];
@@ -21246,16 +21363,18 @@ function region_map_finder_update(dialog, kind, state) {
             }; })(kind, state);
         } else {
             // all locked
-            dialog.widgets[kind].tooltip.str = dialog.data['widgets'][kind]['ui_tooltip_locked'].replace('%s', state['pred'].ui_describe(player, null));
+            tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_locked'].replace('%s', state['pred'].ui_describe(player, null));
             var helper = get_requirements_help(state['pred'], null);
             if(helper) {
-                dialog.widgets[kind].state = 'disabled_clickable';
-                dialog.widgets[kind].onclick = (function (_helper) { return function(w) { _helper(); }; })(helper);
+                button_state = 'disabled_clickable';
+                onclick = (function (_helper) { return function(w) { _helper(); }; })(helper);
             } else {
-                dialog.widgets[kind].state = 'disabled';
+                button_state = 'disabled';
             }
         }
     }
+
+    return new RegionMapFinderUpdateResult(show, false, button_name, button_state, tooltip_str, onclick);
 }
 
 function update_map_dialog_header_buttons(dialog) {

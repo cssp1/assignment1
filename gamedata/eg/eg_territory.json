@@ -129,9 +129,6 @@
 
     "scroll_help": 1, // whether to enable help dialog that teaches scrolling
 
-    "hive_finder": 1, // whether to enable "Find nearest token hive" button
-    "attacker_finder": 1, // whether to enable "Find nearest attacker" button
-    "strongpoint_finder": 1, // whether to enable "Find nearest Strongpoint" button
     "finder_reset_time": 30, // reset list of already-found bases if this much time has passed since last click on finder button
 
     "escaping_soon_time": 3600, // mark hives as "escaping soon" when this many seconds or fewer remain before expiration
