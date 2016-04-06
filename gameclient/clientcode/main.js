@@ -5173,9 +5173,19 @@ Building.prototype.crafting_progress_one = function() {
     var queue = this.get_crafting_queue();
     for(var i = 0; i < queue.length; i++) {
         var bus = queue[i];
-        var cat = gamedata['crafting']['categories'][gamedata['crafting']['recipes'][bus['craft']['recipe']]['crafting_category']];
+        var recipe_name = bus['craft']['recipe'];
+        var auto_collect = true;
+        if(recipe_name in gamedata['crafting']['recipes']) {
+            var category_name = gamedata['crafting']['recipes'][recipe_name]['crafting_category'];
+            if(category_name in gamedata['crafting']['categories']) {
+                var cat = gamedata['crafting']['categories'][category_name];
+                if(('auto_collect' in cat) && !cat['auto_collect']) {
+                    auto_collect = false;
+                }
+            }
+        }
         var prog = (bus['done_time'] + (bus['start_time'] > 0 ? (server_time - bus['start_time']) : 0))/bus['total_time'];
-        if(prog >= 1 && ('auto_collect' in cat) && !cat['auto_collect']) {
+        if(prog >= 1 && !auto_collect) {
             continue; // SKIP non-auto-collect entries
         }
         return prog;
