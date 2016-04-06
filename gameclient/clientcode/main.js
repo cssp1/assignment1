@@ -20794,12 +20794,15 @@ function invoke_region_map(target_loc) {
     dialog.user_data['finder_expanded'] = false;
     dialog.user_data['finder_states'] = {
         'attacker': region_map_finder_state_init(),
-        'hive': region_map_finder_state_init(),
+        'hive_token': region_map_finder_state_init(),
         'raid': region_map_finder_state_init(),
         'strongpoint': region_map_finder_state_init()
     };
     for(var res in gamedata['resources']) {
         dialog.user_data['finder_states']['quarry_'+res] = region_map_finder_state_init();
+        if(gamedata['resources'][res]['show_hive_finder']) {
+            dialog.user_data['finder_states']['hive_'+res] = region_map_finder_state_init();
+        }
     }
     dialog.user_data['finder_button_indexes'] = {}; // for tutorial arrows, maps kind to misc_finder button index
     dialog.user_data['recent_attacker_ids'] = null; // for attacker finder
@@ -21226,6 +21229,9 @@ RegionMapFinderUpdateResult.prototype.apply_to_button = function(w) {
 
 /** @return {!RegionMapFinderUpdateResult} */
 function region_map_finder_update(dialog, kind, state) {
+    var kind_root = kind.split('_')[0]; // raid, hive, quarry, etc
+    var kind_res = (kind.indexOf('_') > 0 ? kind.split('_')[1] : null);
+
     if(kind == 'attacker') {
         // send battle history query
         if(dialog.user_data['recent_attacker_ids'] === null ||
@@ -21260,13 +21266,15 @@ function region_map_finder_update(dialog, kind, state) {
         dialog.widgets['map'].region.for_each_feature(function(f) {
             var found = null;
 
-            // hive: attackable hive with ui_tokens2
-            if(goog.array.contains(['hive','raid'], kind)) {
-                if(f['base_type'] == kind &&
-                   (kind == 'raid' ||
-                    (kind == 'hive' && ('base_template' in f) && (f['base_template'] in gamedata[kind+'s_client']['templates']) &&
-                     gamedata[kind+'s_client']['templates'][f['base_template']]['ui_tokens2']))) {
-                    var pred = (!player.is_cheater && ('activation' in gamedata[kind+'s_client']['templates'][f['base_template']]) ? read_predicate(gamedata[kind+'s_client']['templates'][f['base_template']]['activation']) : null);
+            // hive_token: attackable hive with ui_tokens2
+            if(kind_root == 'raid' || kind_root == 'hive') {
+                if(f['base_type'] == kind_root &&
+                   (kind_root == 'raid' ||
+                    (kind_res == 'token' && ('base_template' in f) && (f['base_template'] in gamedata[kind_root+'s_client']['templates']) &&
+                     gamedata[kind_root+'s_client']['templates'][f['base_template']]['ui_tokens2']) ||
+                    (kind_res && kind_res in gamedata['resources'] && ('base_resource_loot' in f) && f['base_resource_loot'][kind_res] || 0)
+                   )) {
+                    var pred = (!player.is_cheater && ('activation' in gamedata[kind_root+'s_client']['templates'][f['base_template']]) ? read_predicate(gamedata[kind_root+'s_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
                         // locked
                         // remember the "easiest" unsatisfied predicate, so that players see the least amount of work they need to do to unlock any hive
@@ -21280,12 +21288,12 @@ function region_map_finder_update(dialog, kind, state) {
                     // unlocked
                     found = f;
                 }
-            } else if(kind == 'strongpoint' || kind.indexOf('quarry_') == 0) {
+            } else if(kind_root == 'strongpoint' || kind_root == 'quarry') {
                 if(f['base_landlord_id'] != session.user_id &&
                    f['base_type'] == 'quarry' &&
-                   ((kind == 'strongpoint' && ('base_template' in f) && (f['base_template'] in gamedata['quarries_client']['templates']) &&
+                   ((kind_root == 'strongpoint' && ('base_template' in f) && (f['base_template'] in gamedata['quarries_client']['templates']) &&
                      gamedata['quarries_client']['templates'][f['base_template']]['turf_points']) ||
-                    (kind.indexOf('quarry_')==0 && f['base_icon'] == kind.split('_')[1]))) {
+                    (kind_root == 'quarry' && kind_res && f['base_icon'] == kind_res))) {
 
                     if(session.is_in_alliance()) {
                         var info = PlayerCache.query_sync_fetch(f['base_landlord_id']);
@@ -21338,15 +21346,23 @@ function region_map_finder_update(dialog, kind, state) {
         if(state['found'] !== null && state['found'].length > 0) {
             // valid base
             button_state = (kind == 'attacker' ? 'attack' : 'normal');
-            if(kind.indexOf('quarry_') == 0) {
-                var res = kind.split('_')[1];
-                var ui_res = gamedata['resources'][res]['ui_name'];
+
+            var ui_res = '';
+            if(kind_res) {
+                if(kind_res in gamedata['resources']) {
+                    ui_res = gamedata['resources'][kind_res]['ui_name'];
+                } else if(kind_res in gamedata['items']) {
+                    ui_res = gamedata['items'][kind_res]['ui_name'];
+                }
+            }
+
+            if(kind_root == 'quarry') {
                 button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
                 tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
                 player.record_feature_use('quarry_finder_seen');
             } else {
-                button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind];
-                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_'+kind];
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_'+kind].replace('%s', ui_res);
                 player.record_feature_use(kind+'_finder_seen');
             }
             onclick = (function (_kind, _state) { return function(w) {
