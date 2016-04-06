@@ -258,6 +258,10 @@
     "SCREENSHOT_FAILED": { "ui_name": "The game was unable to take a screenshot due to browser security settings. Please reload the page and try again.\n\nIf this problem persists, please use the \"Contact Support\" link at the bottom of the page to send us a support request.",
                            "dialog": "message_dialog_big",
                            "ui_title": "Screenshot not available" },
+    "NOTIFICATIONS_DISABLED": { "ui_name": "You are not getting any notifications because the global notification setting is Off.\n\nEnable notifications now?",
+                                "dialog": "message_dialog_big",
+                                "ui_title": "Enable Notifications?", "ui_button": "Enable" },
+
 
 #include_stripped "$GAME_ID/$GAME_ID_errors_gamespecific.json"
 }

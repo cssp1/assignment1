@@ -32787,17 +32787,42 @@ function fishing_dialog_get_ui_priority(dialog, recipe) {
     return bases[recipe['name']];
 }
 
+function update_notification_choice_button(w, pref_key, config_name) {
+    var notifications_enabled = get_preference_setting(player.preferences, pref_key);
+    w.state = (notifications_enabled ? 'active' : 'normal');
+    if(!get_preference_setting(player.preferences, 'enable_fb_notifications')) {
+        // warn that the global switch disables it
+        w.text_color = SPUI.make_colorv(w.data['text_color_hidden']);
+        w.tooltip.str = w.data['ui_tooltip_hidden'];
+        w.onclick = (function (_pref_key) { return function(w) {
+            var s = gamedata['errors']['NOTIFICATIONS_DISABLED'];
+            invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog': s['dialog'],
+                                                                      'on_ok': (function (__pref_key) { return function() {
+                                                                          player.preferences['enable_fb_notifications'] = 1;
+                                                                          player.preferences[__pref_key] = 1;
+                                                                          send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+                                                                          send_to_server.func(["RESET_NOTIFICATION", 'ALL']);
+                                                                      }; })(_pref_key),
+                                                                      'ok_button_ui_name': s['ui_button'],
+                                                                      'cancel_button': true});
+        }; })(pref_key);
+    } else {
+        w.text_color = SPUI.make_colorv(w.data['text_color']);
+        w.tooltip.str = null;
+        w.onclick = (function (_pref_key, _config_name) { return function(w) {
+            player.preferences[_pref_key] = (w.state == 'active' ? 0 : 1);
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+            if(player.preferences[_pref_key] &&
+               gamedata['fb_notifications']['notifications'][_config_name]) {
+                send_to_server.func(["RESET_NOTIFICATION", gamedata['fb_notifications']['notifications'][_config_name]['ref']]);
+            }
+            invoke_ui_locker();
+        }; })(pref_key, config_name);
+    }
+}
+
 function update_fishing_dialog(dialog) {
-    dialog.widgets['notify_choice'].state = (get_preference_setting(player.preferences, 'enable_fishing_notifications') ? 'active' : 'normal');
-    dialog.widgets['notify_choice'].onclick = function(w) {
-        player.preferences['enable_fishing_notifications'] = (w.state == 'active' ? 0 : 1);
-        send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
-        if(player.preferences['enable_fishing_notifications'] &&
-           gamedata['fb_notifications']['notifications']['fishing_complete']) {
-            send_to_server.func(["RESET_NOTIFICATION", gamedata['fb_notifications']['notifications']['fishing_complete']['ref']]);
-        }
-        invoke_ui_locker();
-    };
+    update_notification_choice_button(dialog.widgets['notify_choice'], 'enable_fishing_notifications', 'fishing_complete');
 
     var builder = dialog.user_data['builder'];
     dialog.user_data['rowdata'] = [];
@@ -35939,7 +35964,7 @@ function invoke_settings_dialog() {
     player.record_feature_use('settings_dialog');
     var dialog = new SPUI.Dialog(gamedata['dialogs']['settings_dialog']);
     dialog.user_data['dialog'] = 'settings_dialog';
-    change_selection_ui(dialog);
+    install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
@@ -35951,7 +35976,7 @@ function invoke_settings_dialog() {
 
     dialog.widgets['sprobe_button'].onclick = function() { invoke_sprobe_dialog(); };
 
-    dialog.widgets['close_button'].onclick = function() { change_selection(null); };
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
     dialog.widgets['apply_button'].onclick = function(w) {
         var dialog = w.parent;
         if(!dialog) { return; }

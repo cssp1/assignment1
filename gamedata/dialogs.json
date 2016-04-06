@@ -2313,6 +2313,7 @@
 
     "fishing_dialog": {
         "dimensions": [736,436],
+        "clip_children": 0,
         "collection_time": 1.5, // how long to keep rows displayed after clicking "Collect"
         "widgets": {
             "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,436], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
@@ -2345,8 +2346,13 @@
                              "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.5,0.5,0.5,1] },
 
             "notify_choice": { "kind": "ActionButton", "xy": [370,394], "dimensions": [233,26], "bg_image_offset": [0,4], "push_text": 0,
-                               "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
+                               "bg_image": "checkbox_button",
+                               "text_color": [0.5,0.5,0.5,1],
+                               "text_color_hidden": [0.5,0,0,1],
+                               "text_size": 13,
                                "ui_name": "Send notification when 4h+ dispatches complete", // note: actual settings for this are in gameserver/retention_newbie.py, search for "fishing_complete" there
+                               "ui_tooltip": "", "tooltip_delay": 0,
+                               "ui_tooltip_hidden": "Global notification setting is disabled. Click to enable.",
                                "text_offset": [24,0],
                                "text_hjustify": "left", "text_vjustify": "center"
                              },
