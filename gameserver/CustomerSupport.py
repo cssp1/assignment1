@@ -12,6 +12,7 @@
 # player is currently logged in or not.
 
 import SpinJSON
+import SpinConfig
 import random
 from Region import Region
 
@@ -953,6 +954,143 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
         return ReturnValue(result = 'ok')
 
+class HandleSendNotification(Handler):
+    # useful for sending one-off
+
+    def __init__(self, *pargs, **pkwargs):
+        Handler.__init__(self, *pargs, **pkwargs)
+
+        # refers to an entry in gamedata['fb_notifications']['notifications']
+        self.config_name = self.args.get('config',None)
+        if self.config_name:
+            self.config = self.gamedata['fb_notifications']['notifications'].get(self.config_name, None)
+            if self.config is None:
+                raise Exception('notification config not found in gamedata.fb_notifications')
+        else:
+            self.config = None # arbitrary message
+
+        # "force" means "ignore all frequency checks, just send it!" (e.g. for payment confirmations)
+        self.force = bool(int(self.args.get('force','0')))
+        # enable sending notification even if one was already sent since last logout
+        self.multi_per_logout = bool(int(self.args.get('multi_per_logout','0')))
+
+        self.text = self.args['text']
+
+        # optional override of the "ref" referer parameter. Only used if no "config" is selected.
+        self.ref_override = self.args.get('ref',None)
+        if not self.config and not self.ref_override:
+            raise Exception('ref= parameter is required if no config= is used')
+
+    # no logging
+    def exec_online(self, session, retmsg):
+
+        if not session.user.facebook_id:
+            return ReturnValue(result = 'no social network to send notification')
+        if (not session.player.get_any_abtest_value('enable_fb_notifications', self.gamedata['enable_fb_notifications'])):
+            return ReturnValue(result = 'disabled by global enable_fb_notifications setting')
+        if session.player.player_preferences and type(session.player.player_preferences) is dict and \
+           (not session.player.player_preferences.get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
+            return ReturnValue(result = 'disabled by player preference')
+
+        is_elder = (len(session.player.history.get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+
+        if not self.force: # "soft" enable/disable checks
+
+            if self.config and \
+               (is_elder and (not self.config.get('enable_elder', True))) or \
+               ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+            if not self.multi_per_logout:
+                last_logout = session.player.last_logout_time()
+                if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
+                    return ReturnValue(result = 'already notified since last logout')
+
+            # do not send notification if one was sent since min_minterval ago
+            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+            if self.config and \
+               (self.time_now - session.player.last_fb_notification_time) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                return ReturnValue(result = 'too frequent, notification sent within min_interval ago')
+
+        # going to send!
+        if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
+            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+        elif self.config:
+            fb_ref = self.config['ref']
+        else:
+            assert self.ref_override
+            fb_ref = self.ref_override
+
+        if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, session.user.facebook_id, self.text, self.config_name or self.ref_override, fb_ref,
+                                                            session.player.get_denormalized_summary_props('brief')):
+            session.player.last_fb_notification_time = self.time_now
+            session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
+            if self.config:
+                key = 'fb_notification:'+self.config['ref']+':sent'
+                session.player.history[key] = session.player.history.get(key,0)+1
+
+        return ReturnValue(result = 'ok')
+
+    def exec_offline(self, user, player):
+        if not user.get('facebook_id'):
+            return ReturnValue(result = 'no social network to send notification')
+        if not self.gamedata['enable_fb_notifications']:
+            return ReturnValue(result = 'disabled by global enable_fb_notifications setting')
+        if player.get('player_preferences') and type(player['player_preferences']) is dict and \
+           (not player['player_preferences'].get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
+            return ReturnValue(result = 'disabled by player preference')
+
+        is_elder = (len(player['history'].get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+
+        if not self.force: # "soft" enable/disable checks
+
+            if self.config and \
+               (is_elder and (not self.config.get('enable_elder', True))) or \
+               ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+            if not self.multi_per_logout:
+                last_logout = -1
+                if player['history'].get('sessions'):
+                    last_logout = player['history']['sessions'][-1][1]
+                if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
+                    return ReturnValue(result = 'already notified since last logout')
+
+            # do not send notification if one was sent since min_minterval ago
+            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+            if self.config and \
+               (self.time_now - player.get('last_fb_notification_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                return ReturnValue(result = 'too frequent, notification sent within min_interval ago')
+
+        # going to send!
+        if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
+            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+        elif self.config:
+            fb_ref = self.config['ref']
+        else:
+            assert self.ref_override
+            fb_ref = self.ref_override
+
+        if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, user['facebook_id'], self.text, self.config_name or self.ref_override, fb_ref,
+                                                            self.get_denormalized_summary_props_offline(user, player)):
+            player['last_fb_notification_time'] = self.time_now
+            player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
+            if self.config:
+                key = 'fb_notification:'+self.config['ref']+':sent'
+                player['history'][key] = player['history'].get(key,0)+1
+
+        return ReturnValue(result = 'ok')
+
+    def get_denormalized_summary_props_offline(self, user, player):
+        ret = {'cc': player['history'].get(self.gamedata['townhall']+'_level',1),
+               'plat': user.get('frame_platform','fb'),
+               'rcpt': player['history'].get('money_spent', 0),
+               'ct': user.get('country','unknown'),
+               'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
+        if user.get('developer'):
+            ret['developer'] = 1
+        return ret
+
 class HandlePlayerBatch(Handler):
     read_only = True
     need_user = False
@@ -1038,6 +1176,7 @@ methods = {
     'client_eval': HandleClientEval,
     'offer_payer_promo': HandleOfferPayerPromo,
     'invoke_facebook_auth': HandleInvokeFacebookAuth,
+    'send_notification': HandleSendNotification,
     'player_batch': HandlePlayerBatch,
     # not implemented yet: join_abtest, clear_abtest
 }

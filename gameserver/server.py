@@ -11324,76 +11324,6 @@ class Player(AbstractPlayer):
         props['sum'] = self.get_denormalized_summary_props('brief')
         metric_event_coded(self.user_id, event_name, props)
 
-    def send_fb_notification(self, user, text, config, force = False):
-        if not user.facebook_id: return # not on Facebook
-
-        if (not self.has_write_lock):
-            gamesite.exception_log.event(server_time, 'attempt to send_fb_notification without write lock! %d' % self.user_id)
-            return
-
-
-        if (not self.get_any_abtest_value('enable_fb_notifications', gamedata['enable_fb_notifications'])):
-            return
-
-        if self.player_preferences and type(self.player_preferences) is dict:
-            if (not self.player_preferences.get('enable_fb_notifications', gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # XXX doesn't handle predicate chains
-                return
-
-        elder = (len(self.history.get('sessions', [])) >= gamedata['fb_notifications']['elder_threshold'])
-        if (elder and (not config.get('enable_elder', True))) or \
-           ((not elder) and (not config.get('enable_newbie', True))):
-            return
-
-        if (not force):
-            # do not send notification if one has already been sent since the last logout
-            last_logout = -1
-            if 'sessions' in self.history and len(self.history['sessions']) > 0:
-                last_logout = self.history['sessions'][-1][1]
-            if last_logout < 0 or self.last_fb_notification_time > last_logout:
-                return
-
-            # do not send notification if one was sent since min_minterval ago
-            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
-            if (server_time - self.last_fb_notification_time) < config.get('min_interval', gamedata['fb_notifications']['min_interval']):
-                return
-
-        if gamedata['fb_notifications']['elder_suffix'] and config.get('elder_suffix',True):
-            fb_ref = config['ref'] + ('_e' if elder else '_n')
-        else:
-            fb_ref = config['ref']
-
-        if self.do_send_fb_notification_to(user.facebook_id, text, config, fb_ref):
-            self.last_fb_notification_time = server_time
-            dict_increment(self.history, 'fb_notifications_sent', 1)
-            dict_increment(self.history, 'fb_notification:'+config['ref']+':sent', 1)
-
-    def do_send_fb_notification_to(self, to_facebook_id, text, config, fb_ref):
-        # see http://developers.facebook.com/docs/app_notifications/
-        # config["ref"] = our internal ref parameter
-        # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix
-
-        # deal with Unicode garbage
-        try:
-            text = text.encode('utf-8')
-        except:
-            return False
-
-        params = {'access_token': SpinConfig.config['facebook_app_access_token'],
-                  'href': '',
-                  'ref': fb_ref,
-                  'template': text }
-        query = urllib.urlencode(params)
-        url = SpinFacebook.versioned_graph_endpoint('notification', str(to_facebook_id)+'/notifications')
-
-        if not SpinConfig.config['enable_facebook']:
-            gamesite.exception_log.event(server_time, 'Facebook disabled: do_send_fb_notification(POST %s query %s)' % (url, query))
-            return False
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = query)
-        metric_event_coded(self.user_id, '7130_fb_notification_sent', {'sum': self.get_denormalized_summary_props('brief'),
-                                                                       'ref': config['ref'],
-                                                                       'fb_ref': fb_ref})
-        return True
-
     def send_fb_score_update(self, facebook_id, value):
         assert self.has_write_lock
         if (server_time - self.last_fb_score_update) < gamedata['fb_scores']['min_interval']:
@@ -15698,11 +15628,11 @@ class Store(object):
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
                     if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        session.player.do_send_fb_notification_to(session.user.facebook_id, notif_text, config, config['ref'])
+                        gamesite.gameapi.do_send_fb_notification_to(session.user.user_id, session.user.facebook_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        session.player.do_send_fb_notification_to(entry['recipient_facebook_id'], notif_text, config, config['ref'])
+                        gamesite.do_CONTROLAPI({'method':'send_notification','user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
 
                 retmsg.append(["YOU_SENT_GIFT_ORDER", gift_order])
 
@@ -16791,7 +16721,6 @@ class GAMEAPI(resource.Resource):
                     session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
 
                     # send real-time Facebook notification to the victim
-                    # XXX not working for quarries or squads because we have no way to write viewing_player.last_fb_notification_time as global state
                     config = gamedata['fb_notifications']['notifications']['you_got_attacked']
                     notif_text = config['ui_name']
 
@@ -16803,7 +16732,8 @@ class GAMEAPI(resource.Resource):
                         notif_attacker = session.user.get_ui_name(session.player)
 
                     notif_text = notif_text.replace('%ATTACKER', notif_attacker)
-                    session.viewing_player.send_fb_notification(session.viewing_user, notif_text, config)
+                    gamesite.do_CONTROLAPI({'method': 'send_notification', 'user_id': session.viewing_user.user_id,
+                                            'text': notif_text, 'config': 'you_got_attacked'})
 
                 # END is human home base
 
@@ -21573,6 +21503,34 @@ class GAMEAPI(resource.Resource):
         data_str = open(SpinConfig.gamedata_filename()).read()
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
+    def do_send_fb_notification_to(self, to_user_id, to_facebook_id, text, sp_ref, fb_ref, summary_props):
+        # see http://developers.facebook.com/docs/app_notifications/
+        # "sp_ref" = our internal ref parameter
+        # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
+
+        # deal with Unicode garbage
+        try:
+            text = text.encode('utf-8')
+        except:
+            return False
+
+        params = {'href': '',
+                  'ref': fb_ref,
+                  'template': text }
+        url = SpinFacebook.versioned_graph_endpoint('notification', str(to_facebook_id)+'/notifications')
+
+        if not SpinConfig.config['enable_facebook']:
+            gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r sum %r' % (url, params, summary_props))
+            return False
+
+        params['access_token'] = SpinConfig.config['facebook_app_access_token'] # add secret at the last moment
+
+        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
+        metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
+                                                                     'ref': sp_ref,
+                                                                     'fb_ref': fb_ref})
+        return True
+
     def do_send_gifts(self, session, retmsg, arg):
         if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
             return
@@ -21800,7 +21758,7 @@ class GAMEAPI(resource.Resource):
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
                         if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                            session.player.do_send_fb_notification_to(msg['from_fbid'], notif_text, config, config['ref'])
+                            gamesite.do_CONTROLAPI({'method':'send_notification','user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
 
                     gift_order_refund = msg.get('gift_order_refund', None)
                     if gift_order_refund:
@@ -25509,10 +25467,11 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ALLIANCE_UPDATE", my_alliance_info['id'] if my_alliance_info else -1, True, my_alliance_info, my_alliance_membership, False])
 
 
-                config = gamedata['fb_notifications']['notifications'].get('alliance_promoted' if new_role > old_role else 'alliance_demoted',None)
-                if config and pcache_data.get('facebook_id') and pcache_data.get('enable_fb_notifications', True):
+                config_name = 'alliance_promoted' if new_role > old_role else 'alliance_demoted'
+                config = gamedata['fb_notifications']['notifications'].get(config_name,None)
+                if config:
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
-                    session.player.do_send_fb_notification_to(pcache_data['facebook_id'], notif_text, config, config['ref'])
+                    gamesite.do_CONTROLAPI({'method':'send_notification','user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
 
             retmsg.append(["ALLIANCE_PROMOTE_RESULT", alliance_id, promotee_id, success, tag])
 
