@@ -2810,6 +2810,11 @@ def check_events(events):
         if ('activation' in data) and check_predicate(data['activation'], reason = 'event:'+key+':activation'):
             error |= 1
             print 'event %s has bad activation predicate' % (key)
+        for CONS in ('prizes_action', 'fight_button_action', 'map_battle_button_action'):
+            if CONS in data:
+                if CONS == 'fight_button_action' and 'region_map' in data[CONS]: continue # old legacy option
+                error |= check_consequent(data[CONS], reason = 'event:'+key+':'+CONS)
+
         if ('chain' in data):
             for pred, ch in data['chain']:
                 if check_predicate(pred, reason='event:chain'):
