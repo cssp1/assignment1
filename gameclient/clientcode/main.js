@@ -5053,8 +5053,14 @@ Building.prototype.is_using_foreman = function() {
     if(this.is_crafting()) {
         var craft_queue = this.get_crafting_queue();
         for(var i = 0; i < craft_queue.length; i++) {
-            if(gamedata['crafting']['categories'][gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['crafting_category']]['foreman']) {
-                return true;
+            var recipe_name = craft_queue[i]['craft']['recipe'];
+            if(recipe_name in gamedata['crafting']['recipes']) {
+                var category_name = gamedata['crafting']['recipes'][recipe_name]['crafting_category'];
+                if(category_name in gamedata['crafting']['categories']) {
+                    if(gamedata['crafting']['categories'][category_name]['foreman']) {
+                        return true;
+                    }
+                }
             }
         }
     }
