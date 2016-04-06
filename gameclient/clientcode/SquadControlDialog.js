@@ -109,6 +109,8 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
         }; })(dialog));
     }
 
+    dialog.widgets['notify_choice'].show = (dlg_mode == 'normal' && spin_frame_platform == 'fb' && player.raids_enabled());
+
     return dialog;
 }
 
@@ -212,6 +214,10 @@ SquadControlDialog.update = function(dialog) {
                 dialog.widgets[wname].xy = vec_add(vec_add(vec_mul([grid_x,grid_y], dialog.data['widgets']['squad']['array_offset']), [-dialog.user_data['scroll_pos'],0]), dialog.data['widgets']['squad']['xy']);
             }
         }
+    }
+
+    if(dialog.widgets['notify_choice'].show) {
+        update_notification_choice_button(dialog.widgets['notify_choice'], 'enable_raid_notifications', 'raid_complete');
     }
 };
 

@@ -6963,10 +6963,12 @@
 
     // squad_control dialog can be used for "normal" squad control or as a limited-use "squad picker"
     "squad_control": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "clip_children": 0,
         "widgets": {
+            // oversized a bit for notify_choice...
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,446], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+
             "title": { "kind": "TextField", "xy": [18,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name_normal": "!TX Army", "ui_name_manage": "Battalions",
                        "ui_name_deploy": "Deploy Battalion", "ui_name_call": "Call Battalion", "ui_name_call_raid": "Launch Raid" },
@@ -6982,6 +6984,18 @@
                        "kind": "Dialog", "xy": [34,73], "dimensions": [164,164], "dialog": "squad_tile",
                        "array": [0,2], "array_max": [4,2], // note: widget is created in JS code
                        "array_offset": [168,168] },
+
+            "notify_choice": { "kind": "ActionButton", "xy": [455,415], "dimensions": [233,26], "bg_image_offset": [0,4], "push_text": 0,
+                               "bg_image": "checkbox_button",
+                               "text_color": [0.5,0.5,0.5,1],
+                               "text_color_hidden": [0.5,0,0,1],
+                               "text_size": 13,
+                               "ui_name": "Send notification when raids complete",
+                               "ui_tooltip": "", "tooltip_delay": 0,
+                               "ui_tooltip_hidden": "Global notification setting is disabled. Click to enable.",
+                               "text_offset": [24,0],
+                               "text_hjustify": "left", "text_vjustify": "center"
+                             },
 
             "loading_rect": { "kind": "SolidRect", "xy": [32,64], "dimensions": [672,347], "color":[0,0,0,0.5], "transparent_to_mouse": 0, "show": 0 },
             "loading_text": { "kind": "TextField", "xy": [0,0], "dimensions": [736,480], "text_offset": [0,-15], "text_size": 19, "text_style": "bold", "text_color":[1,1,1,1],

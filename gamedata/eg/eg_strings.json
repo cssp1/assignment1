@@ -652,7 +652,12 @@
                                              [{"predicate": "ALWAYS_TRUE"}, 1]
                                          ],
                                          "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
-                                         "choices": []}
+                                         "choices": []},
+        "enable_raid_notifications": {"name": "enable_raid_notifications",
+                                      "ui_description": "FB Notifications for Raids:", "preference_key": "enable_raid_notifications", "requires_reload": 0,
+                                      "default_val": 1,
+                                      "show_if": {"predicate": "ALWAYS_FALSE"}, // internal use only
+                                      "choices": []}
     },
 
     "inventory_intro_mail": { "ui_from": "Narrator", // sender,

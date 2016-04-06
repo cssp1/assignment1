@@ -1500,6 +1500,17 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
             home = home_cache[loc_key]
             if home['base_landlord_id'] == owner_id: # it's home!
                 recall_squad(db, lock_manager, region_id, owner_id, squad['base_id'], feature = squad, dry_run = dry_run)
+
+                # send notification to player
+                if squad.get('cargo_source') == 'raid' and ('raid_complete' in gamedata['fb_notifications']['notifications']):
+                    try:
+                        config = gamedata['fb_notifications']['notifications']['raid_complete']
+                        notification_text = config['ui_name'].replace('%SQUADNAME', squad.get('base_ui_name', ''))
+                        do_CONTROLAPI({'user_id': owner_id, 'method': 'send_notification',
+                                       'config': 'raid_complete', 'text': notification_text})
+                    except Exception as e:
+                        print 'raid_complete notification error', e
+
                 continue
             else:
                 print 'unhandled case - squad is at an enemy home base!'

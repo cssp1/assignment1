@@ -20,6 +20,15 @@
             "ui_name": "%ATTACKER attacked your base! Take revenge now?"
         },
 
+        "raid_complete": {
+            "ref": "raid_complete", "priority": 50,
+            "enable_newbie": 1,
+            "enable_elder": 1,
+            "min_interval": 300,
+            "auto_mute": 2, "mute_preference_key": "enable_raid_notifications",
+            "ui_name": "Raid battalion %SQUADNAME returned to base! Collect rewards?"
+        },
+
         "you_sent_gift_order": {
             "ref": "you_sent_gift_order", "priority": 100, "elder_suffix": 0, "ui_name": "You sent %GAMEBUCKS_AMOUNT %GAMEBUCKS_NAME to %RECEIVER."
         },
