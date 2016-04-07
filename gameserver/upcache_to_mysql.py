@@ -390,14 +390,14 @@ def do_slave(input):
                 ts_key = gamedata['townhall']+'_level_at_time'
                 if ts_key in user:
                     cur.executemany("INSERT INTO " +sql_util.sym(input['townhall_table']) + \
-                                    " (user_id,townhall_level,time) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
-                                    [(user['user_id'], level, user['account_creation_time'] + int(sage)) for sage, level in user[ts_key].iteritems()]
+                                    " (user_id,townhall_level,time,age) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
+                                    [(user['user_id'], level, user['account_creation_time'] + int(sage), int(sage)) for sage, level in user[ts_key].iteritems()]
                                     )
 
             # parse tech unlock timing
             if input['do_tech']:
-                cur.executemany("INSERT INTO "+sql_util.sym(input['tech_table']) + " (user_id, tech_name, level, time) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
-                                [(user['user_id'], tech, level, user['account_creation_time'] + int(sage)) \
+                cur.executemany("INSERT INTO "+sql_util.sym(input['tech_table']) + " (user_id, tech_name, level, time, age) VALUES (%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
+                                [(user['user_id'], tech, level, user['account_creation_time'] + int(sage), int(sage)) \
                                  for tech in gamedata['tech'] \
                                  for sage, level in user.get('tech:'+tech+'_at_time', {}).iteritems()
                                  ])
@@ -415,8 +415,8 @@ def do_slave(input):
 
             # parse building upgrade timing
             if input['do_buildings']:
-                cur.executemany("INSERT INTO "+sql_util.sym(input['buildings_table']) + " (user_id, building, max_level, time) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
-                                [(user['user_id'], building, level, user['account_creation_time'] + int(sage)) \
+                cur.executemany("INSERT INTO "+sql_util.sym(input['buildings_table']) + " (user_id, building, max_level, time, age) VALUES (%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
+                                [(user['user_id'], building, level, user['account_creation_time'] + int(sage), int(sage)) \
                                  for building in gamedata['buildings'] \
                                  for sage, level in user.get(building+'_level_at_time', user.get('building:'+building+':max_level_at_time', {})).iteritems()
                                  ])
@@ -715,6 +715,7 @@ if __name__ == '__main__':
                 sql_util.ensure_table(cur, townhall_table+'_temp',
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('time','INT8 NOT NULL'),
+                                                  ('age','INT8 NOT NULL'),
                                                   ('townhall_level','INT4 NOT NULL')]}) # make index after load
 
             if do_tech:
@@ -722,6 +723,7 @@ if __name__ == '__main__':
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('level','INT4 NOT NULL'),
                                                   ('time','INT8 NOT NULL'),
+                                                  ('age','INT8 NOT NULL'),
                                                   ('tech_name','VARCHAR(200) NOT NULL')],
                                        # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
                                        'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
@@ -733,6 +735,7 @@ if __name__ == '__main__':
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('max_level','INT4 NOT NULL'),
                                                   ('time','INT8 NOT NULL'),
+                                                  ('age','INT8 NOT NULL'),
                                                   ('building','VARCHAR(64) NOT NULL')],
                                        # note: make index incrementally rather than all at once at the end, to avoid long lockup of the database
                                        'indices': {'lev_then_time': {'unique': False, # technically unique, but don't waste time enforcing it
