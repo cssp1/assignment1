@@ -15635,7 +15635,7 @@ class Store(object):
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        gamesite.do_CONTROLAPI({'method':'send_notification','user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
+                        gamesite.do_CONTROLAPI(session, {'method':'send_notification','user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
 
                 retmsg.append(["YOU_SENT_GIFT_ORDER", gift_order])
 
@@ -16735,8 +16735,16 @@ class GAMEAPI(resource.Resource):
                         notif_attacker = session.user.get_ui_name(session.player)
 
                     notif_text = notif_text.replace('%ATTACKER', notif_attacker)
-                    gamesite.do_CONTROLAPI({'method': 'send_notification', 'user_id': session.viewing_user.user_id,
-                                            'text': notif_text, 'config': 'you_got_attacked'})
+                    notif_args = {'method': 'send_notification', 'user_id': session.viewing_user.user_id,
+                                  'text': notif_text, 'config': 'you_got_attacked'}
+
+                    # send the notification AFTER the victim's lock is dropped! otherwise it'll just hit an offline-locked error
+                    def sendit(result, session, notif_args):
+                        gamesite.do_CONTROLAPI(session, notif_args)
+                        return result # pass through
+
+                    session.complete_attack_d.addCallback(sendit, session, notif_args)
+
 
                 # END is human home base
 
@@ -21771,7 +21779,7 @@ class GAMEAPI(resource.Resource):
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
                         if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                            gamesite.do_CONTROLAPI({'method':'send_notification','user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
+                            gamesite.do_CONTROLAPI(session, {'method':'send_notification','user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
 
                     gift_order_refund = msg.get('gift_order_refund', None)
                     if gift_order_refund:
@@ -25494,7 +25502,7 @@ class GAMEAPI(resource.Resource):
                 config = gamedata['fb_notifications']['notifications'].get(config_name,None)
                 if config:
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
-                    gamesite.do_CONTROLAPI({'method':'send_notification','user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
+                    gamesite.do_CONTROLAPI(session, {'method':'send_notification','user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
 
             retmsg.append(["ALLIANCE_PROMOTE_RESULT", alliance_id, promotee_id, success, tag])
 
@@ -26889,7 +26897,7 @@ class GAMEAPI(resource.Resource):
                 # will then route it to whatever game server is
                 # handling the player, or a random server to do an
                 # offline mutation.
-                d = gamesite.do_CONTROLAPI({'method': spellname.lower(), 'user_id': target_id})
+                d = gamesite.do_CONTROLAPI(session, {'method': spellname.lower(), 'user_id': target_id})
                 def finish(response_or_error, retmsg, spellname, target_id):
                     retmsg.append([spellname+"_RESULT", target_id, True])
 
@@ -27778,6 +27786,7 @@ class GameSite(server.Site):
         self.exception_log = SpinLog.MultiLog([SpinLog.DailyRawLog(spin_log_dir+'/', '-exceptions.txt'),
                                                SpinLog.ServerExceptionLogFilter(SpinNoSQLLog.NoSQLRawLog(self.nosql_client, 'log_exceptions'))])
 
+        self.controlapi_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-controlapi.txt')
         self.facebook_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-facebook.txt')
         self.armorgames_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-armorgames.txt')
         self.kongregate_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-kongregate.txt')
@@ -28280,12 +28289,12 @@ class GameSite(server.Site):
             if server_time - last_activity > gamedata['server']['http_connection_timeout']:
                 client.close_connection_aggressively()
 
-    def do_CONTROLAPI(self, caller_args):
-        d = make_deferred('CONTROLAPI:'+caller_args['method'])
+    def do_CONTROLAPI(self, session, caller_args):
         host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
         port = SpinConfig.config['proxyserver']['external_http_port']
+        base_url = 'http://%s:%d/CONTROLAPI?' % (host,port)
         args = copy.copy(caller_args)
-        args['secret'] = SpinConfig.config['proxy_api_secret']
+
         # ensure all string args are UTF-8 encoded str()s, which urllib.urlencode() will turn into percent-escaped UTF-8
         for k, v in args.items():
             if type(v) is str:
@@ -28301,9 +28310,29 @@ class GameSite(server.Site):
                     gamesite.exception_log.event(server_time, 'error UTF-8 encoding text for CONTROLAPI call: %r %r\n%r' % (type(v), v, e))
                     raise
 
-        self.AsyncHTTP_CONTROLAPI.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode(args),
-                                                lambda response, _d=d: d.callback(response),
-                                                error_callback = lambda err, _d=d: d.errback(err))
+        # log without the secret
+        full_url = base_url + urllib.urlencode(args)
+        gamesite.controlapi_log.event(server_time, full_url)
+        args['secret'] = SpinConfig.config['proxy_api_secret']
+
+        full_url = base_url + urllib.urlencode(args)
+        d = make_deferred('CONTROLAPI:'+caller_args['method'])
+        self.AsyncHTTP_CONTROLAPI.queue_request(server_time, full_url,
+                                                lambda response, _d=d: _d.callback(response),
+                                                error_callback = lambda err, _d=d: _d.errback(err))
+
+        # note: an associated session is required just for deferred failure reporting
+        d.addErrback(report_and_reraise_deferred_failure, session)
+
+        # assumes modern CustomerSupport return conventions
+        def check_result(result, session):
+            ret = SpinJSON.loads(result)
+            if 'error' in ret:
+                raise Exception('AsyncHTTP_CONTROLAPI %r error on behalf of player %d: %r' % \
+                                (caller_args['method'], session.user.user_id, ret['error']))
+            return ret['result']
+        d.addCallback(check_result, session)
+
         return d
 
 
