@@ -21511,11 +21511,17 @@ class GAMEAPI(resource.Resource):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
-        # deal with Unicode garbage
-        try:
-            text = text.encode('utf-8')
-        except:
-            return False
+        # text has to be unicode(), which urllib.urlencode() will turn into percent-escaped UTF-8
+        if type(text) is str:
+            try:
+                text = text.decode('utf-8')
+            except Exception as e:
+                gamesite.exception_log.event(server_time, 'error UTF-8 decoding text for FB notification: %r %r\n%r' % (type(text), text, e))
+                return False
+        elif type(text) is unicode:
+            pass
+        else:
+            raise Exception('unhandled text type %r' % type(text))
 
         params = {'href': '',
                   'ref': fb_ref,
@@ -28276,6 +28282,15 @@ class GameSite(server.Site):
         port = SpinConfig.config['proxyserver']['external_http_port']
         args = copy.copy(caller_args)
         args['secret'] = SpinConfig.config['proxy_api_secret']
+        # ensure all string args are unicode(), which urllib.urlencode() will turn into percent-escaped UTF-8
+        for k, v in args.items():
+            if type(v) is str:
+                try:
+                    args[k] = v.decode('utf-8')
+                except Exception as e:
+                    gamesite.exception_log.event(server_time, 'error UTF-8 decoding text for CONTROLAPI call: %r %r\n%r' % (type(v), v, e))
+                    raise
+
         self.AsyncHTTP_CONTROLAPI.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode(args),
                                                 lambda response, _d=d: d.callback(response),
                                                 error_callback = lambda err, _d=d: d.errback(err))
