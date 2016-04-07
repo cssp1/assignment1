@@ -21511,15 +21511,19 @@ class GAMEAPI(resource.Resource):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
-        # text has to be unicode(), which urllib.urlencode() will turn into percent-escaped UTF-8
+        # ensure text is a UTF-8 encoded str(), which urllib.urlencode() will turn into percent-escaped UTF-8
         if type(text) is str:
             try:
-                text = text.decode('utf-8')
+                text = text.decode('utf-8').encode('utf-8')
             except Exception as e:
-                gamesite.exception_log.event(server_time, 'error UTF-8 decoding text for FB notification: %r %r\n%r' % (type(text), text, e))
+                gamesite.exception_log.event(server_time, 'error UTF-8 decoding-encoding text for FB notification: %r %r\n%r' % (type(text), text, e))
                 return False
         elif type(text) is unicode:
-            pass
+            try:
+                text = text.encode('utf-8')
+            except Exception as e:
+                gamesite.exception_log.event(server_time, 'error UTF-8 encoding text for FB notification: %r %r\n%r' % (type(text), text, e))
+                return False
         else:
             raise Exception('unhandled text type %r' % type(text))
 
@@ -28282,13 +28286,19 @@ class GameSite(server.Site):
         port = SpinConfig.config['proxyserver']['external_http_port']
         args = copy.copy(caller_args)
         args['secret'] = SpinConfig.config['proxy_api_secret']
-        # ensure all string args are unicode(), which urllib.urlencode() will turn into percent-escaped UTF-8
+        # ensure all string args are UTF-8 encoded str()s, which urllib.urlencode() will turn into percent-escaped UTF-8
         for k, v in args.items():
             if type(v) is str:
                 try:
-                    args[k] = v.decode('utf-8')
+                    args[k] = v.decode('utf-8').encode('utf-8')
                 except Exception as e:
-                    gamesite.exception_log.event(server_time, 'error UTF-8 decoding text for CONTROLAPI call: %r %r\n%r' % (type(v), v, e))
+                    gamesite.exception_log.event(server_time, 'error UTF-8 decoding-encoding text for CONTROLAPI call: %r %r\n%r' % (type(v), v, e))
+                    raise
+            elif type(v) is unicode:
+                try:
+                    args[k] = v.encode('utf-8')
+                except Exception as e:
+                    gamesite.exception_log.event(server_time, 'error UTF-8 encoding text for CONTROLAPI call: %r %r\n%r' % (type(v), v, e))
                     raise
 
         self.AsyncHTTP_CONTROLAPI.queue_request(server_time, 'http://%s:%d/CONTROLAPI?' % (host,port) + urllib.urlencode(args),
