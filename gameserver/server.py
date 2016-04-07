@@ -3129,7 +3129,7 @@ class DamageLog(object):
     def _record(self, state, obj):
         if obj.obj_id not in state:
             if gamedata['server'].get('log_damage_log',1) >= 1:
-                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object obs %d at %s owner %d: spec %s obj_id %s squad %d' % (self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name, obj.obj_id, obj.squad_id))
+                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object obs %d at %s owner %d: spec %s obj_id %s squad %r' % (self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name, obj.obj_id, obj.squad_id if obj.is_mobile() else None))
             return
         state[obj.obj_id]['cur_health'] = obj.hp/float(obj.max_hp)
     def finalize(self):
