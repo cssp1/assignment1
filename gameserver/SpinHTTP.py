@@ -58,6 +58,12 @@ def set_access_control_headers_for_cdn(request, max_age):
         origin = '*'
     _set_access_control_headers(request, origin, max_age)
 
+def set_service_unavailable(request):
+    request.setResponseCode(503) # 503 Service Unavailable
+    request.setHeader('Retry-After', '600') # suggest retrying in 10 minutes
+
+service_unavailable_response_body = '503 Service Unavailable, please try again later'
+
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
 

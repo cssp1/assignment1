@@ -1970,9 +1970,9 @@ class GameProxy(proxy.ReverseProxyResource):
                 fwd = self.get_any_game_server()
 
             if not fwd:
-                request.setResponseCode(http.BAD_GATEWAY)
+                SpinHTTP.set_service_unavailable(request)
                 exception_log.event(proxy_time, 'cannot find server for CONTROLAPI call: '+log_request(request))
-                return '502 Bad Gateway'
+                return SpinHTTP.service_unavailable_response_body
             return self.render_via_proxy(fwd, request)
 
         elif self.path == '/KGAPI':
@@ -2120,9 +2120,9 @@ class GameProxy(proxy.ReverseProxyResource):
             fwd = self.get_any_game_server()
 
             if not fwd:
-                request.setResponseCode(http.BAD_GATEWAY)
+                SpinHTTP.set_service_unavailable(request)
                 exception_log.event(proxy_time, 'cannot find server for OGPAPI call: '+log_request(request))
-                return '502 Bad Gateway'
+                return SpinHTTP.service_unavailable_response_body
 
             return self.render_via_proxy(fwd, request)
 
@@ -2236,6 +2236,10 @@ class GameProxy(proxy.ReverseProxyResource):
         self.host = str(hostport[0]) # Twisted barfs if the hostname is Unicode
         self.port = hostport[1]
         return proxy.ReverseProxyResource.render(self, request)
+
+    def render_HEAD(self, request):
+        request.setResponseCode(http.BAD_REQUEST)
+        return ''
 
     def render(self, request):
         try:
