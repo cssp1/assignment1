@@ -1760,7 +1760,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
             # for the other accounts, notify via CONTROLAPI
             if SpinConfig.config['proxyserver'].get('alt_ip_notify', True):
-                if len(possible_alts) >= SpinConfig.config['proxyserver'].get('alt_ip_notify_log_min', 2):
+                if len(possible_alts) >= SpinConfig.config['proxyserver'].get('alt_ip_notify_log_min', 5):
                     raw_log.event(proxy_time, 'long possible alt list for %r: %r from %s' % (session.user_id, possible_alts, log_request(request)))
                 for alt_user_id in possible_alts:
                     fwd = None
