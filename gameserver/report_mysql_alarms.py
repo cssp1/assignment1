@@ -17,7 +17,7 @@ from SpinLog import pretty_time
 time_now = int(time.time())
 
 # return a list of strings describing metrics alerts
-def get_issues(data):
+def get_issues(data, game_id):
     issues = []
     if data['hau'] > 10:
         hau = float(data['hau']) # denominator for per-HAU metrics
@@ -25,7 +25,9 @@ def get_issues(data):
             issues.append('CDN Issues per HAU >= 0.2')
         if data['browser_fails'] and float(data['browser_fails'])/hau >= 0.2:
             issues.append('Browser Issues per HAU >= 0.2')
-        if data['fb_notifications_sent_24h'] > 5000: # alert only on 5k+/day notifications
+
+        # alert only on 5k+/day notifications. SG has auto-targeting enabled, so no warning is needed.
+        if data['fb_notifications_sent_24h'] > 5000 and game_id != 'sg':
             ctr = float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h'])
 
             # Add an 8% "fudge factor" to account for notification clicks that don't result
@@ -106,7 +108,7 @@ if __name__ == '__main__':
 
     con.commit()
 
-    issues = get_issues(raw_data)
+    issues = get_issues(raw_data, game_id)
 
     subject = '%s: Automated alert from %s' % (game_id.upper(), socket.gethostname())
     body = None
