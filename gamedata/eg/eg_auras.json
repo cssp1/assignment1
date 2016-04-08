@@ -191,6 +191,16 @@
         // effects happen via AURA_(IN)ACTIVE predicates
     },
 
+    "null_sale": {
+        "name": "null_sale",
+        // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.
+        "icon": "gamebucks_inventory_icon",
+        "client": 0, "server": 0,
+        "help": 1, "cancelable": 0, "limited": 0, "show": 0, "show_in_battle_log": 0,
+        "ui_name": "Null Sale",
+        "ui_description": "Place-holder for sale offer"
+        // effects happen via AURA_(IN)ACTIVE predicates
+    },
     "flash_sale": {
         "name": "flash_sale",
         // note: data attributes "kind" and "duration" are mandatory for metrics logging. "tag" is optional.

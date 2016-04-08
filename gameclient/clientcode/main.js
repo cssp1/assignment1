@@ -36471,7 +36471,7 @@ function purchase_ui_event(event_name, extra_props) {
 
     // look for an active flash sale
     var aura = goog.array.find(player.player_auras, function(a) {
-        return goog.array.contains(['flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
+        return goog.array.contains(['null_sale', 'flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
     });
     if(aura && ('data' in aura)) {
         goog.array.forEach(['kind','duration','tag'], function(field) {

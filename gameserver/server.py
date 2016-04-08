@@ -15689,7 +15689,7 @@ class Store(object):
                                            'gui_look': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store'].get('buy_gamebucks_dialog_look',None)), session, session.player),
                                            }
                 for aura in session.player.player_auras:
-                    if aura['spec'] in ('flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
+                    if aura['spec'] in ('null_sale','flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
                         for FIELD in ('kind', 'duration', 'tag'):
                             if FIELD in aura['data']:
                                 purchase_ui_event_props['flash_sale_'+FIELD] = aura['data'][FIELD]
