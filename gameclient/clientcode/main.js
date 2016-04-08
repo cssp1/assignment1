@@ -29392,6 +29392,39 @@ player.raid_find_path_to = function(start_loc, dest_feature) {
     return null;
 };
 
+/** NOT TO BE USED FOR RAIDS
+    @param {number} squad_id
+    @param {!Array<number>} dest
+    @return {AStar.PathChecker|null} */
+player.make_squad_path_checker = function(squad_id, dest) {
+    // only applies to after_move mode
+    if(player.squad_block_mode() !== 'after_move') { return null; }
+    return function(cell, path) {
+        if(cell.block_count > 0) {
+            for(var i = 0; i < cell.blockers.length; i++) {
+                var feature = cell.blockers[i];
+                if(session.region.feature_is_moving(feature)) {
+                    var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
+                    var their_arrival_time = last_waypoint['eta'];
+                    var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
+
+                    if(!vec_equals(last_waypoint['xy'], cell.pos)) {
+                        throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
+                    }
+
+                    console.log('time '+server_time.toFixed(0)+' travel '+player.squad_travel_time(squad_id, path).toFixed(0)+' theirs '+their_arrival_time.toFixed(0));
+                    if(!vec_equals(dest, cell.pos) && // this exception does not apply to our final destination cell
+                       their_arrival_time > server_time + player.squad_travel_time(squad_id, path) + fudge_time) {
+                        continue; // not necessarily blocked! (there might be another feature here though)
+                    }
+                }
+                return AStar.NOPASS; // blocked by this feature
+            }
+        }
+        return AStar.PASS; // not blocked
+    };
+};
+
 /** Return a path that ends on hex "dest", or if "dest" is blocked, an open hex immediately adjacent to it
     Returns null if no path exists.
     @param {number} squad_id
@@ -29412,37 +29445,9 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     // of another squad before its arrival time. This requires a path-dependent blockage check, since the
     // arrival time to check against depends on how long it takes us to get ther.
 
-    /** @type AStar.PathChecker */
-    var path_checker = null;
-     if(player.squad_block_mode() === 'after_move') {
-        path_checker = function (_squad_id, _dest) { return function(cell, path) {
-            if(cell.block_count > 0) {
-                for(var i = 0; i < cell.blockers.length; i++) {
-                    var feature = cell.blockers[i];
-                    if(session.region.feature_is_moving(feature)) {
-                        var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
-                        var their_arrival_time = last_waypoint['eta'];
-                        var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
-
-                        if(!vec_equals(last_waypoint['xy'], cell.pos)) {
-                            throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
-                        }
-
-                        if(!vec_equals(_dest, cell.pos) && // this exception does not apply to our final destination cell
-                           their_arrival_time > server_time + player.squad_travel_time(_squad_id, path) + fudge_time) {
-                            continue; // not necessarily blocked! (there might be another feature here though)
-                        }
-                    }
-                    return AStar.NOPASS; // blocked by this feature
-                }
-            }
-            return AStar.PASS; // not blocked
-        }; };
-    }
-
     // if dest is not blocked, try going directly there
     if(!session.region.occupancy.is_blocked(dest)) {
-        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, path_checker ? path_checker(squad_id, dest) : null);
+        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             return path; // good path
         }
@@ -29456,7 +29461,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
         if(!session.region.occupancy.is_blocked(n)) {
-            var path = session.region.hstar_context.search(squad_data['map_loc'], n, path_checker ? path_checker(squad_id, n) : null);
+            var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n));
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
                 // good path
