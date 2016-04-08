@@ -29412,7 +29412,6 @@ player.make_squad_path_checker = function(squad_id, dest) {
                         throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
                     }
 
-                    console.log('time '+server_time.toFixed(0)+' travel '+player.squad_travel_time(squad_id, path).toFixed(0)+' theirs '+their_arrival_time.toFixed(0));
                     if(!vec_equals(dest, cell.pos) && // this exception does not apply to our final destination cell
                        their_arrival_time > server_time + player.squad_travel_time(squad_id, path) + fudge_time) {
                         continue; // not necessarily blocked! (there might be another feature here though)
