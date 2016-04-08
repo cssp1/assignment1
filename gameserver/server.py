@@ -27078,7 +27078,10 @@ class GAMEAPI(resource.Resource):
 
             elif spellname == 'SQUAD_DELETE':
                 squad_id = int(spellargs[0])
-                assert SQUAD_IDS.is_mobile_squad_id(squad_id)
+                if not SQUAD_IDS.is_mobile_squad_id(squad_id):
+                    gamesite.exception_log.event(server_time, 'SQUAD_DELETE of non-mobile squad_id %r' % squad_id)
+                    retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+                    return
                 if session.has_attacked:
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
                     return
@@ -27715,7 +27718,9 @@ class GameSite(server.Site):
                                                              max_tries = data['max_tries'],
                                                              retry_delay = data['retry_delay'])
         # for making async cross-server IPC calls (FB notifications etc)
-        self.AsyncHTTP_CONTROLAPI = AsyncHTTP.AsyncHTTPRequester(-1, -1, 10, 0, self.log_async_exception)
+        self.AsyncHTTP_CONTROLAPI = AsyncHTTP.AsyncHTTPRequester(-1, -1, 30, # timeout = 30s
+                                                                 0, self.log_async_exception,
+                                                                 max_tries = 1, retry_delay = 10)
 
         self.nosql_id_generator = SpinNoSQLId.Generator()
 
@@ -28319,7 +28324,9 @@ class GameSite(server.Site):
         d = make_deferred('CONTROLAPI:'+caller_args['method'])
         self.AsyncHTTP_CONTROLAPI.queue_request(server_time, full_url,
                                                 lambda response, _d=d: _d.callback(response),
-                                                error_callback = lambda err, _d=d: _d.errback(err))
+                                                error_callback = lambda err, _d=d, _method=caller_args['method'], _user_id=session.user_id: \
+                                                _d.errback(failure.Failure(Exception('AsyncHTTP_CONTROLAPI %r failure on behalf of player %d: %r' % \
+                                                                                     (_method, _user_id, err)))))
 
         # note: an associated session is required just for deferred failure reporting
         d.addErrback(report_and_reraise_deferred_failure, session)
