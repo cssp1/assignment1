@@ -82,7 +82,7 @@ RegionMap.DeployCursor.prototype.draw = function() {
 
         if(is_obstacle || is_blocked) {
             var blocker = this.map.region.find_feature_at_coords(loc);
-            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id && player.squad_combat_enabled()) {
+            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id && player.squad_combat_enabled() && !this.map.region.feature_is_moving(blocker)) {
                 text_color = 'rgba(255,255,0,';
                 text_str = gamedata['strings']['regional_map']['fight_to_escape'];
             } else {
@@ -128,7 +128,7 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
 
         if(this.map.region.occupancy.is_blocked(cell)) {
             var blocker = this.map.region.find_feature_at_coords(cell);
-            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id) {
+            if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id && !this.map.region.feature_is_moving(blocker)) {
                 if(player.squad_combat_enabled()) {
                     do_visit_base(-1, {base_id: blocker['base_id']});
                 }
