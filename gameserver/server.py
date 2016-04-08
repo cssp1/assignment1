@@ -7981,7 +7981,7 @@ class Player(AbstractPlayer):
 
         # in-playerdb battle history
         # obsolete now - replaced by SpinNoSQL battles table (and optionally cold SQL storage)
-        self.battle_history = {} # dictionary { "1112": { "count": xx, "victory": yy, "defeat": zz } }
+        self.battle_history = {}
 
         # how many attacks occurred against this player since the last expiration of his protection timer
         self.protection_attack_count = 0
@@ -10894,9 +10894,9 @@ class Player(AbstractPlayer):
                                                                             'trophies_pvv':gamedata['trophy_display_offset'].get('pvv',0)},
                                                                            reason = reason)
 
-    # after a battle, stick the summary info into self.battle_history and increment history/time series counters
+    # after a battle, increment history/time series counters
     # works for both attacking and defending
-    def append_battle_summary(self, session, opponent_id, summary):
+    def increment_battle_statistics(self, session, opponent_id, summary):
         if summary['attacker_id'] == self.user_id:
             myrole = 'attacker'
             oprole = 'defender'
@@ -10904,38 +10904,11 @@ class Player(AbstractPlayer):
             myrole = 'defender'
             oprole = 'attacker'
         else:
-            gamesite.exception_log.event(server_time, 'append_battle_summary: %d is neither defender %d nor attacker %d!' % \
+            gamesite.exception_log.event(server_time, 'increment_battle_statistics: %d is neither defender %d nor attacker %d!' % \
                                          (self.user_id, summary['defender_id'], summary['attacker_id']))
             return
 
         opponent_type = 'ai' if summary.get(oprole+'_is_ai', False) else 'human'
-
-        # create/update entry in self.battle_history
-        if gamedata['battle_log_max_age'] > 0:
-            key = str(opponent_id)
-            if not self.battle_history.has_key(key):
-                self.battle_history[key] = {}
-            hist = self.battle_history[key]
-            hist['last_time'] = summary.get('time', server_time)
-
-            dict_increment(hist, 'count', 1)
-
-            # update victory/defeat and defense_victory/defense_defeat counters
-            if (summary.get('base_type','home') == 'home'):
-                dict_increment(hist, summary[myrole+'_outcome'], 1)
-                if myrole == 'defender':
-                    dict_increment(hist, 'defense_'+summary[myrole+'_outcome'], 1)
-
-            # append summary to self.battle_history.summary
-            if not hist.has_key('summary'):
-                hist['summary'] = []
-            sumlist = hist['summary']
-            # prune old entries
-            while len(sumlist) > gamedata['battle_log_max_summary_num']:
-                sumlist.pop(0)
-            while len(sumlist) > 0 and (server_time - sumlist[0]['time']) > gamedata['battle_log_max_summary_age']:
-                sumlist.pop(0)
-            sumlist.append(summary)
 
         # update history counters/time series
         if myrole == 'attacker':
@@ -11938,50 +11911,8 @@ class LivePlayer(Player):
 
     # delete oldest entries in the battle history to avoid explosive growth of playerdb files
     def prune_battle_history(self):
-        max_summary_num = gamedata['battle_log_max_summary_num']
-        max_summary_age = gamedata['battle_log_max_summary_age']
-        max_age = gamedata['battle_log_max_age']
-
-        if max_age < 0:
+        if self.battle_history:
             self.battle_history = {} # blow it away
-            return
-
-        # compile list of all held summaries, sort by age
-        all = []
-        for sid, data in self.battle_history.iteritems():
-            if 'summary' not in data: continue
-            for s in data['summary']:
-                if (server_time - s['time']) > max_summary_age: continue # omit very old summaries
-                all.append((sid, s))
-
-        # sort summaries by age, newest first
-        all.sort(key = lambda sid_s: -1*(sid_s[1]['time']))
-
-        # cut off summaries beyond the number limit
-        all = all[0:max_summary_num]
-
-        # reverse so oldest are first now
-        all.reverse()
-
-        # index by sid
-        all_idx = {}
-        for sid, s in all:
-            if sid not in all_idx:
-                all_idx[sid] = []
-            all_idx[sid].append(s)
-
-        # recreate the history, including only the new entries and summaries
-        new_hist = {}
-        for sid, data in self.battle_history.iteritems():
-            if ('last_time' not in data) or (server_time - data['last_time']) > max_age:
-                continue
-            new_hist[sid] = data.copy()
-            if 'summary' in new_hist[sid]:
-                del new_hist[sid]['summary']
-            if sid in all_idx:
-                new_hist[sid]['summary'] = all_idx[sid]
-
-        self.battle_history = new_hist
 
     def detect_login_abuse(self, cur_session_length = 0):
         # sets lockout_until and lockout_message fields if player is a login abuser
@@ -17196,7 +17127,7 @@ class GAMEAPI(resource.Resource):
             # finalize battle summary
             if summary:
                 summary['loot'] = copy.deepcopy(session.loot) # grab loot here since completion consequent may have modified it
-                session.player.append_battle_summary(session, summary['attacker_id'] if summary['battle_type'] == 'defense' else summary['defender_id'], summary)
+                session.player.increment_battle_statistics(session, summary['attacker_id'] if summary['battle_type'] == 'defense' else summary['defender_id'], summary)
 
                 # send log to MongoDB
                 if gamedata['server'].get('nosql_battle_record',True) and summary.get('attack_type',None) != 'tutorial' and summary['defender_id'] != LION_STONE_ID:
@@ -21748,7 +21679,7 @@ class GAMEAPI(resource.Resource):
                         # show battle history upon login when there are new entries NOT reflected in the "You've been Attacked" message
                         ret['was_attacked'] = False # disable this for now, let the client do it
 
-                    session.player.append_battle_summary(session, summary['attacker_id'], summary)
+                    session.player.increment_battle_statistics(session, summary['attacker_id'], summary)
                     retmsg.append(["NEW_BATTLE_HISTORIES", 1])
 
                     to_ack.append(msg['msg_id'])
