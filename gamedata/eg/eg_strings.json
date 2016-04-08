@@ -450,7 +450,8 @@
         "msg_squad_is_under_attack": "%defender_pos Battalion %basename is under attack by %attacker!",
         "msg_squad_was_attacked_victory": "%defender_pos Battalion %basename repelled the attack by %attacker!",
         "msg_squad_was_attacked_defeat": "%defender_pos Battalion %basename was destroyed by %attacker!",
-        "msg_squad_was_diverted": "%defender_pos Battalion %basename was diverted to home base because its destination was conquered by %attacker"
+        "msg_squad_was_diverted": "%defender_pos Battalion %basename was diverted to home base because its destination was conquered by %attacker",
+        "msg_squad_was_bumped": "%defender_pos Battalion %basename will stop short of its destination because %attacker got there first with another battalion"
     },
 
     "inventory": {

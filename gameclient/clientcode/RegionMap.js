@@ -75,7 +75,7 @@ RegionMap.DeployCursor.prototype.draw = function() {
     var neighbors = this.map.region.get_neighbors(this.from_loc);
     goog.array.forEach(neighbors, function(loc) {
         var is_obstacle = this.map.region.obstructs_squads(loc);
-        var is_blocked = this.map.region.occupancy.is_blocked(loc);
+        var is_blocked = this.map.region.occupancy.is_blocked(loc, player.make_squad_cell_checker());
         var text_color = null, text_str = null;
         var text_alpha = (this.map.hovercell && vec_equals(loc, this.map.hovercell) ? '1.0 ' : '0.7');
         var cell_alpha = (this.map.hovercell && vec_equals(loc, this.map.hovercell) ? '0.4' : '0.2');
@@ -103,7 +103,7 @@ RegionMap.DeployCursor.prototype.draw = function() {
 
     // transparent unit icon
     if(this.map.hovercell && hex_distance(this.map.hovercell, this.from_loc) == 1) {
-        if(!this.map.region.occupancy.is_blocked(this.map.hovercell)) {
+        if(!this.map.region.occupancy.is_blocked(this.map.hovercell, player.make_squad_cell_checker())) {
             var hover_xy = this.map.cell_to_field(this.map.hovercell);
             SPUI.ctx.globalAlpha = 0.8;
             GameArt.assets[this.icon_assetname].states['normal'].draw(vec_add(hover_xy, vec_scale(0.5,gamedata['territory']['cell_size'])), 0, 0);
@@ -126,7 +126,7 @@ RegionMap.DeployCursor.prototype.on_mouseup = function(cell, button) {
     if(hex_distance(cell, this.from_loc) == 1) {
         if(this.map.region.obstructs_squads(cell)) { return true; } // obstructed
 
-        if(this.map.region.occupancy.is_blocked(cell)) {
+        if(this.map.region.occupancy.is_blocked(cell, player.make_squad_cell_checker())) {
             var blocker = this.map.region.find_feature_at_coords(cell);
             if(blocker && blocker['base_type'] == 'squad' && blocker['base_landlord_id'] != session.user_id && !this.map.region.feature_is_moving(blocker)) {
                 if(player.squad_combat_enabled()) {
@@ -198,7 +198,7 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
         }
 
         var feature_list;
-        var is_my_home = false, is_my_quarry = false, is_blocked = false;
+        var is_my_home = false, is_my_quarry = false, is_blocked = false, is_bumpable = false;
 
         if(this.map.region.obstructs_squads(cell)) { // mountain?
             is_blocked = true; feature_list = [];
@@ -217,7 +217,11 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
             } else if(f['base_type'] == 'squad' && f['base_landlord_id'] == session.user_id && parseInt(f['base_id'].split('_')[1],10) == this.squad_id) {
                 return; // don't block ourself
             } else if(this.map.region.feature_blocks_map(f)) {
-                is_blocked = true;
+                if(f['base_type'] == 'squad' && this.map.region.feature_is_moving(f) && player.squad_bumping_enabled()) {
+                    is_bumpable = true;
+                } else {
+                    is_blocked = true;
+                }
             }
         }, this);
 

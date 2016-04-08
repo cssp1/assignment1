@@ -6356,6 +6356,8 @@ player.squad_block_mode = function() {
     if(!goog.array.contains(['always', 'after_move', 'never'], mode)) { throw Error('bad squad_block_mode '+mode); }
     return mode;
 };
+/** @return {boolean} */
+player.squad_bumping_enabled = function() { return player.get_territory_setting('enable_squad_bumping'); };
 
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
@@ -29397,8 +29399,10 @@ player.raid_find_path_to = function(start_loc, dest_feature) {
     @param {!Array<number>} dest
     @return {AStar.PathChecker|null} */
 player.make_squad_path_checker = function(squad_id, dest) {
-    // only applies to after_move mode
+    // only applies to after_move mode; otherwise any blocker blocks.
     if(player.squad_block_mode() !== 'after_move') { return null; }
+    var bumping_enabled = player.squad_bumping_enabled();
+
     return function(cell, path) {
         if(cell.block_count > 0) {
             for(var i = 0; i < cell.blockers.length; i++) {
@@ -29412,8 +29416,35 @@ player.make_squad_path_checker = function(squad_id, dest) {
                         throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
                     }
 
-                    if(!vec_equals(dest, cell.pos) && // this exception does not apply to our final destination cell
+                    if((bumping_enabled || !vec_equals(dest, cell.pos)) && // this exception does not apply to our final destination cell, unless bumping is enabled
                        their_arrival_time > server_time + player.squad_travel_time(squad_id, path) + fudge_time) {
+                        continue; // not necessarily blocked! (there might be another feature here though)
+                    }
+                }
+                return AStar.NOPASS; // blocked by this feature
+            }
+        }
+        return AStar.PASS; // not blocked
+    };
+};
+/** NOT TO BE USED FOR RAIDS
+    @return {AStar.BlockChecker|null} */
+player.make_squad_cell_checker = function() {
+    if(!player.squad_bumping_enabled()) { return null; } // any blocker blocks
+    return function(cell) {
+        if(cell.block_count > 0) {
+            for(var i = 0; i < cell.blockers.length; i++) {
+                var feature = cell.blockers[i];
+                if(session.region.feature_is_moving(feature)) {
+                    var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
+                    var their_arrival_time = last_waypoint['eta'];
+                    var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
+
+                    if(!vec_equals(last_waypoint['xy'], cell.pos)) {
+                        throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
+                    }
+
+                    if(their_arrival_time > server_time + fudge_time) {
                         continue; // not necessarily blocked! (there might be another feature here though)
                     }
                 }
@@ -29445,7 +29476,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     // arrival time to check against depends on how long it takes us to get ther.
 
     // if dest is not blocked, try going directly there
-    if(!session.region.occupancy.is_blocked(dest)) {
+    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker())) {
         var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             return path; // good path
@@ -29459,7 +29490,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
-        if(!session.region.occupancy.is_blocked(n)) {
+        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker())) {
             var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n));
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
@@ -29468,7 +29499,8 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
                 // trim off unnecessary extra moves at the end of the path that just circle around the destination hex
                 // note: need to check for blockage on this intermediate waypoint before changing the final destination to it,
                 // because it might be the destination of another moving squad, where we aren't allowed to land.
-                while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1 && !session.region.occupancy.is_blocked(path[path.length-2])) {
+                while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1 &&
+                      !session.region.occupancy.is_blocked(path[path.length-2], player.make_squad_cell_checker())) {
                     goog.array.removeAt(path, path.length-1);
                 }
                 var travel_time = player.squad_travel_time(squad_id, path);
@@ -45967,7 +45999,7 @@ function handle_server_message(data) {
             // ignore updates if we're not on a map
             console.log('ignoring spurious REGION_MAP_UPDATES'); console.log(data[1]);
         }
-    } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT") {
+    } else if(msg == "REGION_MAP_ATTACK_START" || msg == "REGION_MAP_ATTACK_COMPLETE" || msg == "REGION_MAP_ATTACK_DIVERT" || msg == "REGION_MAP_ATTACK_BUMP") {
         var region_id = data[1], feature = data[2], attacker_id = data[3], defender_id = data[4], summary = data[5], pcache_data = data[6], map_time = data[7];
 
         if(session.region.data && session.region.data['id'] == region_id) {
@@ -45979,6 +46011,8 @@ function handle_server_message(data) {
                     var what_happened;
                     if(msg == "REGION_MAP_ATTACK_DIVERT") {
                         what_happened = 'was_diverted';
+                    } else if(msg == "REGION_MAP_ATTACK_BUMP") {
+                        what_happened = 'was_bumped';
                     } else if(msg == "REGION_MAP_ATTACK_COMPLETE") {
                         what_happened = 'was_attacked_' + summary['defender_outcome'];
                     } else {

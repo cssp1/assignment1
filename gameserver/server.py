@@ -8550,6 +8550,7 @@ class Player(AbstractPlayer):
     def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
     def raids_enabled(self): return self.get_territory_setting('enable_raids')
+    def squad_bumping_enabled(self): return self.get_territory_setting('enable_squad_bumping')
 
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
@@ -9056,7 +9057,7 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def squad_enter_map(self, squad_id, coords, is_raid):
+    def squad_enter_map(self, session, squad_id, coords, is_raid):
         if is_raid and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
         if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
         if (not (gamesite.nosql_client and self.home_region)):
@@ -9136,11 +9137,29 @@ class Player(AbstractPlayer):
             exclusive = 0
             exclude_filter = None
 
-        # note: to avoid two successive map update broadcasts, wait until after lock release to send
-        if not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
+        # note: to avoid two successive map update broadcasts, wait until after lock release to fire the hook
+        attempt = 1
+        while not gamesite.nosql_client.create_map_feature(self.home_region, feature['base_id'], feature, exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, do_hook=False, reason='squad_enter_map'):
             # map location already occupied - send update on what's blocking us
             results = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords, reason='squad_enter_map(fail)'))
-            return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id]
+
+            if (not self.squad_bumping_enabled()) or (attempt >= 2):
+                # give up
+                return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id, 'deployment_hex_occupied']
+
+            # try to bump offending squads
+            bump_count = 0
+            for bumpee in results:
+                if bumpee['base_type'] == 'squad' and Region(gamedata, self.home_region).feature_is_moving(bumpee, server_time, assume_moving = False):
+                    if not self.squad_bump(session, bumpee):
+                        # give up
+                        return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id, 'bumping_impossible']
+                    bump_count += 1
+            if bump_count < 1:
+                # give up
+                return False, ([rollback_feature]+results), ["INVALID_MAP_LOCATION", squad_id, 'nothing_to_bump']
+
+            attempt += 1
 
         for object in to_remove:
             self.home_base_remove(object)
@@ -9163,7 +9182,7 @@ class Player(AbstractPlayer):
         max_steps = map_dimensions[0]+map_dimensions[1]
         return coords[:max_steps]
 
-    def squad_step(self, squad_id, coords, is_raid_launch, path_choices = None):
+    def squad_step(self, session, squad_id, coords, is_raid_launch, path_choices = None):
         # path_choices is an optional dictionary of possible paths {"x,y": path...}
         # when the client is not sure exactly where a moving squad will halt before embarking on the new path.
         assert (gamesite.nosql_client and self.home_region)
@@ -9317,25 +9336,45 @@ class Player(AbstractPlayer):
             # try to place squad at its final destination hex
             new_entry['base_map_loc'] = destination
             new_entry['base_map_path'] = new_path
-            if not gamesite.nosql_client.move_map_feature(self.home_region, new_entry['base_id'], new_entry,
-                                                          old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
-                                                          exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
+            attempt = 1
+            while not gamesite.nosql_client.move_map_feature(self.home_region, new_entry['base_id'], new_entry,
+                                                             old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
+                                                             exclusive=exclusive, exclude_filter=exclude_filter, originator=self.user_id, reason='squad_step'):
                 # conflict - check if we're moving into a friendly quarry with no other squad there
-                if self.quarry_guards_enabled():
+                if self.quarry_guards_enabled() or self.squad_bumping_enabled():
                     conflict_list = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, destination, reason='squad_step(conflict)'))
                 else:
                     conflict_list = []
+
+                for c in conflict_list: # add explicit nulls for client
+                    if 'base_map_path' not in c:
+                        c['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
+
                 if (len(conflict_list) == 1) and (conflict_list[0].get('base_type',None) == 'quarry') and \
                    (conflict_list[0].get('base_landlord_id',None) == self.user_id):
                     # guarding a friendly quarry - force the update
                     assert gamesite.nosql_client.move_map_feature(self.home_region, new_entry['base_id'], new_entry,
                                                                   old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
                                                                   exclusive=-1, originator=self.user_id, reason='squad_step')
-                else:
-                    for c in conflict_list: # add explicit nulls for client
-                        if 'base_map_path' not in c:
-                            c['base_map_path'] = None # XXX move this to client-side? (assume a map_loc update without path nulls the path?)
+                    break
+
+                if (not self.squad_bumping_enabled()) or (attempt >= 2):
+                    # give up
                     return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination, [c.get('base_id') for c in conflict_list]] # map location already occupied
+
+                # try to bump offending squads
+                bump_count = 0
+                for bumpee in conflict_list:
+                    if bumpee['base_type'] == 'squad' and Region(gamedata, self.home_region).feature_is_moving(bumpee, server_time, assume_moving = False):
+                        if not self.squad_bump(session, bumpee):
+                            # give up
+                            return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination, [c.get('base_id') for c in conflict_list]]
+                        bump_count += 1
+                if bump_count < 1:
+                    # give up
+                    return False, [entry] + conflict_list, ["INVALID_MAP_LOCATION", squad_id, 'dest', destination, [c.get('base_id') for c in conflict_list]]
+
+                attempt += 1
 
             new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
             squad['map_loc'] = new_entry['base_map_loc']
@@ -9348,6 +9387,66 @@ class Player(AbstractPlayer):
                                                                do_hook = False, reason='squad_step')
 
         return True, [new_entry], None
+
+    def squad_bump(self, session, feature):
+        state = gamesite.nosql_client.map_feature_lock_acquire(self.home_region, feature['base_id'], self.user_id, do_hook = False, reason='squad_bump')
+        if state != Player.LockState.being_attacked: # mutex locked
+            return False # bump unsuccessful - locked
+
+        new_lock_gen = -1
+        try:
+            # XXX re-query the feature under the lock?
+            # get rid of lock info, as if we return the feature, it'll definitely be unlocked
+            for FIELD in ('LOCK_STATE', 'LOCK_OWNER'):
+                if FIELD in feature: del feature[FIELD]
+
+            squad_block_mode = self.squad_block_mode()
+
+            if feature.get('raid'): return False # can't bump a raid
+            elif squad_block_mode == 'never':
+                exclusive = 0 # blocked by any feature that's not a squad
+                exclude_filter = {'base_type': {'$ne': 'squad'}}
+            else:
+                exclusive = 0 # blocked by any feature (don't cascade)
+                exclude_filter = None
+
+            if ('base_map_path' not in feature):
+                return False # bump unsuccessful - path not long enough
+            old_path = feature['base_map_path']
+            old_loc = feature['base_map_loc']
+
+            while True:
+                if len(feature['base_map_path']) < 3: # 2?
+                    return False # bump unsuccessful - path not long enough
+
+                # trim off one waypoint
+                feature['base_map_path'] = feature['base_map_path'][:-1]
+                feature['base_map_loc'] = feature['base_map_path'][-1]['xy']
+                if feature['base_map_path'][-1]['eta'] < server_time:
+                    return False # bump unsuccessful - already arrived
+                if gamesite.nosql_client.move_map_feature(self.home_region, feature['base_id'], feature,
+                                                          old_loc=old_loc, old_path=old_path,
+                                                          exclusive=exclusive, exclude_filter=exclude_filter,
+                                                          originator=None, # note: want the hook to inform the player, so no originator!
+                                                          reason='squad_bump'):
+                    # success!
+                    new_lock_gen = feature.get('LOCK_GENERATION',-1)+1
+                    break
+
+            if new_lock_gen < 0:
+                return False # bump unsuccessful - ran out of path to try
+
+        finally:
+            gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id,
+                                                           generation = new_lock_gen,
+                                                           do_hook = False, reason='squad_bump')
+
+        gamesite.gameapi.broadcast_map_attack(self.home_region, feature, self.user_id, feature['base_landlord_id'],
+                                              None,
+                                              [gamesite.gameapi.get_player_cache_props(session.user,session.player,session.alliance_id_cache),
+                                               gamesite.gameapi.do_query_player_cache(session, [feature['base_landlord_id']], reason='squad_bump')[0]],
+                                              msg = "REGION_MAP_ATTACK_BUMP")
+        return True # bump successful
 
     def squad_exit_map(self, session, squad_id, force = False, originator = None, reason = ''):
         # note! change_region() splits self.home_region away from self.my_home.base_region temporarily,
@@ -27142,7 +27241,7 @@ class GAMEAPI(resource.Resource):
                 coords = spellargs[1]
                 raid_info = spellargs[2] # None for regular squads, {'path':[[x,y],...]} for raids
                 is_raid = bool(raid_info)
-                success, map_features, error_code = session.player.squad_enter_map(squad_id, coords, is_raid)
+                success, map_features, error_code = session.player.squad_enter_map(session, squad_id, coords, is_raid)
                 if is_raid and (not error_code):
                     # raid squads: continue immediately with step
                     # (this is the only chance to step towards something other than home base)
@@ -27165,7 +27264,7 @@ class GAMEAPI(resource.Resource):
             elif spellname == 'SQUAD_STEP':
                 squad_id = int(spellargs[0])
                 coords = session.player.squad_path_sanitize(spellargs[1]) if spellargs[1] else None # may be null
-                success, map_features, error_code = session.player.squad_step(squad_id, coords, False)
+                success, map_features, error_code = session.player.squad_step(session, squad_id, coords, False)
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])

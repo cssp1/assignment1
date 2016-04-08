@@ -349,7 +349,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                             if(!is_raid) {
                                 var neighbors = session.region.get_neighbors(player.home_base_loc);
                                 goog.array.forEach(neighbors, function(xy) {
-                                    if(!session.region.occupancy.is_blocked(xy)) {
+                                    if(!session.region.occupancy.is_blocked(xy, player.make_squad_cell_checker())) {
                                         deploy_at = xy;
                                     }
                                 });
