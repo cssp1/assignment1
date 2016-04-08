@@ -3409,6 +3409,7 @@ class Session(object):
         self.deferred_ladder_point_decay_check = False
         self.deferred_stattab_update = False
         self.deferred_history_update = False
+        self.deferred_battle_history_update = False
         self.deferred_mailbox_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
@@ -11509,6 +11510,17 @@ class LivePlayer(Player):
                           self.history.iteritems()))
         retmsg.append(["PLAYER_HISTORY_UPDATE", msg])
 
+    def send_battle_history_update(self, retmsg):
+        # send count of new battles since the last one the client acknowledged seeing
+        if gamedata['server'].get('battle_history_source','nosql/sql') in ('nosql','nosql/sql'):
+            # get summary data from database
+            count = gamesite.nosql_client.battles_get_count(self.user_id, -1, -1, -1, time_range = [max(self.battle_history_seen+1, server_time - gamedata['server'].get('nosql_recent_attackers_time_limit',7*86400)), server_time],
+                                                            ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_ALL,
+                                                            passive_only = True,
+                                                            reason = 'send_battle_history_update')
+            if count > 0:
+                retmsg.append(["NEW_BATTLE_HISTORIES", count])
+
     def strip_fields_for_army_update(self, state):
         assert 'obj_id' in state
         if state.get('temporary', None): return None # don't persist temporary objects
@@ -17133,6 +17145,11 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server'].get('nosql_battle_record',True) and summary.get('attack_type',None) != 'tutorial' and summary['defender_id'] != LION_STONE_ID:
                     gamesite.nosql_client.battle_record(summary, reason=summary['battle_type'])
 
+                # battle history jewel update gets to defender because either
+                # 1) we're attacking their home base, and they're logged out - they will see it on login
+                # or
+                # 2) we're attacking their squad/quarry, and broadcast_map_attack will trigger it
+
                 if summary['battle_type'] == 'attack': # offensive attack
                     if not summary['defender_is_ai']: # PvP
                         # mail the victim a "you've been attacked" message and battle summary
@@ -18071,7 +18088,6 @@ class GAMEAPI(resource.Resource):
         assert is_error in (None, 'partial', 'offline') # "partial" means we have some data, "offline" means none
         ret = []
         pcache_data = None
-        latest_returned_time = -1 # timestamp of most recent battle summary returned
 
         if not isinstance(summaries, list):
             raise Exception('unexpected summaries: %r ' % summaries)
@@ -18091,15 +18107,9 @@ class GAMEAPI(resource.Resource):
 
             # extract the fields we want from the summaries
             ret = [dict((k,s[k]) for k in self.BATTLE_HISTORY_FIELDS if k in s) for s in summaries]
-            latest_returned_time = max(s.get('time',-1) for s in summaries)
 
             # sort summaries by time
             ret.sort(key = lambda r: -r.get('time',-1))
-
-        # update battle_history_seen
-        if source and source == session.user.user_id:
-            session.player.battle_history_seen = max(session.player.battle_history_seen, latest_returned_time)
-            session.send([["NEW_BATTLE_HISTORIES", 0]])
 
         session.send([["QUERY_BATTLE_HISTORY_RESULT", tag, ret,
                        [self.sign_battle_history(r.get('time',-1), r.get('attacker_id',-1), r.get('defender_id',-1), r.get('base_id',None)) for r in ret],
@@ -21680,7 +21690,8 @@ class GAMEAPI(resource.Resource):
                         ret['was_attacked'] = False # disable this for now, let the client do it
 
                     session.player.increment_battle_statistics(session, summary['attacker_id'], summary)
-                    retmsg.append(["NEW_BATTLE_HISTORIES", 1])
+                    if not is_login: # login path sends this unconditionally
+                        session.deferred_battle_history_update = True
 
                     to_ack.append(msg['msg_id'])
 
@@ -22859,6 +22870,10 @@ class GAMEAPI(resource.Resource):
             session.deferred_history_update = False
             session.player.send_history_update(retmsg)
 
+        if session.deferred_battle_history_update:
+            session.deferred_battle_history_update = False
+            session.player.send_battle_history_update(retmsg)
+
         if session.deferred_object_state_updates:
             updates = session.deferred_object_state_updates
             session.deferred_object_state_updates = set()
@@ -23712,6 +23727,9 @@ class GAMEAPI(resource.Resource):
 
         # note: history update should come AFTER receiving mail and promo codes, since that updates history
         session.player.send_history_update(retmsg)
+
+        # queue battle history jewel update
+        session.player.send_battle_history_update(retmsg)
 
         # note: achievements update should come AFTER history update, so that client will resolve PLAYER_HISTORY predicates in achievements correctly
         retmsg.append(["ACHIEVEMENTS_UPDATE", session.player.achievements])
@@ -24883,6 +24901,9 @@ class GAMEAPI(resource.Resource):
             # client tells us the timestamps of last seen messages
             assert type(arg[1]) is dict
             session.player.chat_seen = arg[1]
+
+        elif arg[0] == "UPDATE_BATTLE_HISTORY_SEEN":
+            session.player.battle_history_seen = int(arg[1])
 
         elif arg[0] == "PING_PLAYER":
             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
@@ -27482,6 +27503,11 @@ class GAMEAPI(resource.Resource):
             if session.player.home_region == region_id:
                 if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
                     session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
+
+                # the passive defender needs to ping their battle history
+                if summary and session.player.user_id == defender_id:
+                    session.deferred_battle_history_update = True
+
 
         if send_to_net:
             gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],

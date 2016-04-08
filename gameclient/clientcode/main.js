@@ -25648,6 +25648,11 @@ function query_recent_attackers(callback) {
 
 function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, siglist, is_final, is_error) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
+
+    // reset jewels on any successful query
+    player.new_battle_histories = 0;
+    send_to_server.func(["UPDATE_BATTLE_HISTORY_SEEN", server_time]);
+
     var oldest = battle_history_oldest(dialog);
     if((oldest < 0 && q_time_range) || (oldest > 0 && (!q_time_range || q_time_range[0] != -1 || q_time_range[1] != oldest))) {
         return; // not adjacent to current sumlist

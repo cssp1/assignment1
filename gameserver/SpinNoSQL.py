@@ -753,10 +753,12 @@ class NoSQLClient (object):
     BATTLES_HUMAN_ONLY = 2
     # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
     # and the limit gets hit part-way through). Might need GUID-based paging.
-    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
+    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming))
-    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, fields, oldest_first, limit, streaming):
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, fields, oldest_first, limit, streaming, False))
+    def battles_get_count(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, reason=''):
+        return self.instrument('battles_get_count(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, None, False, -1, False, True))
+    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, fields, oldest_first, limit, streaming, count_only):
         qs = {'$and': []}
         for player_id in (player_id_A, player_id_B):
             if player_id > 0:
@@ -776,6 +778,11 @@ class NoSQLClient (object):
             qs['$and'].append({'$or':[{'$and':[{'attacker_type':'human'},{'defender_type':'human'}]},
                                       {'$and':[{'ladder_state':{'$exists':True}},{'ladder_state':{'$ne':None}}]}]}) # list AI ladder battles here
 
+        if passive_only and player_id_A:
+            # filter out battles where player_id_A was at the controls
+            # this is used for the query that drives the "# unseen battles" jewel in the GUI
+            qs['$and'].append({'attacker_id':{'$ne': player_id_A}})
+            qs['$and'].append({'attacker_type':'human'})
 
         if fields:
             q_fields = {'_id':1} # DO request _id so we can convert it to battle_id
@@ -784,6 +791,8 @@ class NoSQLClient (object):
         else:
             q_fields = None
         cursor = self.battles_table().find(qs, q_fields)
+        if count_only:
+            return cursor.count()
         cursor = cursor.sort([('time',pymongo.ASCENDING if oldest_first else pymongo.DESCENDING)])
         if limit > 0:
             cursor = cursor.limit(limit)
