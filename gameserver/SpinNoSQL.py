@@ -781,8 +781,9 @@ class NoSQLClient (object):
         if passive_only and player_id_A:
             # filter out battles where player_id_A was at the controls
             # this is used for the query that drives the "# unseen battles" jewel in the GUI
-            qs['$and'].append({'attacker_id':{'$ne': player_id_A}})
-            qs['$and'].append({'attacker_type':'human'})
+            qs['$and'].append({'$or': [{'battle_type': 'raid'},
+                                       {'$and': [{'attacker_id':{'$ne': player_id_A}},
+                                                 {'attacker_type':'human'}]}]})
 
         if fields:
             q_fields = {'_id':1} # DO request _id so we can convert it to battle_id

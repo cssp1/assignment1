@@ -1533,13 +1533,37 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
 
                 if squad_update or raid_update or (raid_update is None):
                     # metrics - keep in sync between Raid.py and maptool.py implementations!
+
+                    # query player_cache for metadata on the attacker and
+                    # defender. Not absolutely 100% guaranteed to be up to date with
+                    # online server data, but close enough.
+                    attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([owner_id, raid['base_landlord_id']], reason = 'resolve_raid_squads')
+
                     summary = Raid.make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
                                                        squad['base_landlord_id'], raid['base_landlord_id'],
+                                                       attacker_pcinfo, defender_pcinfo,
                                                        'victory', 'defeat',
                                                        squad_units, raid_units, loot)
                     if verbose: print SpinJSON.dumps(summary, pretty = True)
                     if not dry_run:
                         nosql_client.battle_record(summary, reason = 'resolve_raid_squads')
+                        # broadcast map attack for GUI and battle history jewel purposes
+
+                        if chat_client:
+                            chat_client.chat_send({'channel':'CONTROL', 'sender':
+                                                   {'secret':SpinConfig.config['proxy_api_secret'],
+                                                    'server':'maptool',
+                                                    'method':'broadcast_map_attack',
+                                                    'args': { 'msg': "REGION_MAP_ATTACK_COMPLETE",
+                                                              'region_id': region_id, 'feature': raid,
+                                                              'attacker_id': owner_id, 'defender_id': raid['base_landlord_id'],
+                                                              'summary': summary, 'pcache_info': [attacker_pcinfo, defender_pcinfo],
+                                                              # note: time is boxed here in "args" since it refers to the region map update time,
+                                                              # which could conceivably be on a different clock than the chat message time
+                                                              'map_time': time_now,
+                                                              'server': 'maptool' },
+                                                    },
+                                                   'text': ''}, log = False)
 
                 if raid_update is None:
                     clear_base(db, lock_manager, region_id, raid['base_id'], dry_run = dry_run, already_locked = True)

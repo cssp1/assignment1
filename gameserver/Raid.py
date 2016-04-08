@@ -63,14 +63,15 @@ def backtrack(squad_feature, time_now):
     return {'base_map_loc': home_loc,
             'base_map_path': home_path}
 
-# below has dependencies on SpinNoSQL stuff; above does not
+# below has dependencies on SpinNoSQL and ChatChannels stuff; above does not
+import SpinConfig
 import SpinNoSQLLockManager
 
 # online function for resolving action at a map hex
 # intended to be usable both by server and maptool
 # intended to be self-contained with respect to locking and logging
 # this assumes that the nosql_client you provide has been set up with hooks to properly broadcast map updates
-def resolve_loc(gamedata, nosql_client, region_id, loc, time_now, dry_run = False):
+def resolve_loc(gamedata, nosql_client, chat_mgr, region_id, loc, time_now, dry_run = False):
     features = nosql_client.get_map_features_by_loc(region_id, loc)
     # filter out not-arrived-yet moving features (use strict time comparison)
     features = filter(lambda feature: ('base_map_path' not in feature) or \
@@ -104,13 +105,34 @@ def resolve_loc(gamedata, nosql_client, region_id, loc, time_now, dry_run = Fals
 
             if squad_update or raid_update or (raid_update is None):
                 # metrics - keep in sync between Raid.py and maptool.py implementations!
+
+                # query player_cache for metadata on the attacker and
+                # defender. Not absolutely 100% guaranteed to be up to date with
+                # online server data, but close enough.
+                attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([owner_id, raid['base_landlord_id']], reason = 'Raid.resolve_loc')
+
                 summary = make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
                                               squad['base_landlord_id'], raid['base_landlord_id'],
+                                              attacker_pcinfo, defender_pcinfo,
                                               'victory', 'defeat',
                                               squad_units, raid_units, loot)
                 if not dry_run:
                     nosql_client.battle_record(summary, reason = 'Raid.resolve_loc')
 
+                    # broadcast map attack for GUI and battle history jewel purposes
+                    if chat_mgr:
+                        chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
+                                                        'server':'Raid.py',
+                                                        'method':'broadcast_map_attack',
+                                                        'args': { 'msg': "REGION_MAP_ATTACK_COMPLETE",
+                                                                  'region_id': region_id, 'feature': raid,
+                                                                  'attacker_id': owner_id, 'defender_id': raid['base_landlord_id'],
+                                                                  'summary': summary, 'pcache_info': [attacker_pcinfo, defender_pcinfo],
+                                                                  # note: time is boxed here in "args" since it refers to the region map update time,
+                                                                  # which could conceivably be on a different clock than the chat message time
+                                                                  'map_time': time_now,
+                                                                  'server': 'Raid.py' },
+                                                        }, '', log = False)
             if raid_update is None:
                 # clear the raid
                 if not dry_run:
@@ -146,8 +168,6 @@ def resolve_loc(gamedata, nosql_client, region_id, loc, time_now, dry_run = Fals
             if squad_lock: lock_manager.release(region_id, squad['base_id'])
             if raid_lock: lock_manager.release(region_id, raid['base_id'])
 
-import SpinConfig
-
 def get_denormalized_summary_props_from_pcache(gamedata, pcinfo):
     ret = {'cc': pcinfo.get(gamedata['townhall']+'_level',1),
            'plat' : pcinfo.get('social_id','fb')[0:2],
@@ -163,6 +183,7 @@ def get_denormalized_summary_props_from_pcache(gamedata, pcinfo):
 def make_battle_summary(gamedata, nosql_client,
                         time_now, region_id, squad, base,
                         attacker_id, defender_id,
+                        attacker_pcinfo, defender_pcinfo,
                         attacker_outcome, defender_outcome,
                         attacker_units, defender_units, # object state list
                         loot):
@@ -219,12 +240,6 @@ def make_battle_summary(gamedata, nosql_client,
 			}
 		}
 	}
-
-    # query player_cache for metadata on the attacker and
-    # defender. Not absolutely 100% guaranteed to be up to date with
-    # online server data, but close enough.
-
-    attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([attacker_id, defender_id], reason = 'Raid.make_battle_summary')
 
     for role, user_id, pcinfo in (('attacker', attacker_id, attacker_pcinfo), ('defender', defender_id, defender_pcinfo)):
         is_ai = 0 if user_id > 1100 else 1 # XXX really need to fix this sometime

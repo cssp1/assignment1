@@ -27195,7 +27195,7 @@ class GAMEAPI(resource.Resource):
 
                 @admin_stats.measure_latency('do_squad_resolve')
                 def do_squad_resolve(region_id, loc):
-                    Raid.resolve_loc(gamedata, gamesite.nosql_client, region_id, loc, server_time)
+                    Raid.resolve_loc(gamedata, gamesite.nosql_client, gamesite.chat_mgr, region_id, loc, server_time)
 
                 reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
 
@@ -27501,13 +27501,15 @@ class GAMEAPI(resource.Resource):
         upd = [msg, region_id, feature, attacker_id, defender_id, summary, pcache_info, map_time or server_time]
         for session in iter_sessions():
             if session.player.home_region == region_id:
-                if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
-                    session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
-                # the passive defender needs to ping their battle history
-                if summary and session.player.user_id == defender_id:
+                # if session.player is a passive participant (defender, or either role in a raid),
+                # ping their battle history so the GUI will display a jewel
+                if summary and (session.player.user_id == defender_id or
+                                (summary.get('battle_type')=='raid') and session.player.user_id == attacker_id):
                     session.deferred_battle_history_update = True
 
+                if gamedata['server'].get('broadcast_thirdparty_map_attack', True) or (session.user.user_id in (attacker_id, defender_id)):
+                    session.send([upd], flush_now = (session.user.user_id in (attacker_id, defender_id)))
 
         if send_to_net:
             gamesite.chat_mgr.send('CONTROL', None, {'secret':SpinConfig.config['proxy_api_secret'],
