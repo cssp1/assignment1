@@ -28324,7 +28324,7 @@ class GameSite(server.Site):
         d = make_deferred('CONTROLAPI:'+caller_args['method'])
         self.AsyncHTTP_CONTROLAPI.queue_request(server_time, full_url,
                                                 lambda response, _d=d: _d.callback(response),
-                                                error_callback = lambda err, _d=d, _method=caller_args['method'], _user_id=session.user_id: \
+                                                error_callback = lambda err, _d=d, _method=caller_args['method'], _user_id=session.user.user_id: \
                                                 _d.errback(failure.Failure(Exception('AsyncHTTP_CONTROLAPI %r failure on behalf of player %d: %r' % \
                                                                                      (_method, _user_id, err)))))
 
