@@ -16765,18 +16765,14 @@ class GAMEAPI(resource.Resource):
 
                     session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
 
-                    # send real-time Facebook notification to the victim
-                    config = gamedata['fb_notifications']['notifications']['you_got_attacked']
-                    notif_text = config['ui_name']
+                # END is human home base
 
-                    # use first name only if it's a stranger
-                    if False and (session.viewing_user.is_friends_with(session.user.social_id)):
-                        # Facebook says template functionality is going away, so stop using this
-                        notif_attacker = '{'+str(session.user.facebook_id)+'}'
-                    else:
-                        notif_attacker = session.user.get_ui_name(session.player)
-
-                    notif_text = notif_text.replace('%ATTACKER', notif_attacker)
+                # send real-time Facebook notification to the victim
+                config = gamedata['fb_notifications']['notifications']['you_got_attacked']
+                notif_text = config.get('ui_name_'+session.viewing_base.base_type)
+                if notif_text:
+                    notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(session.player))
+                    notif_text = notif_text.replace('%BASE_UI_NAME', session.viewing_base.base_ui_name)
                     notif_args = {'method': 'send_notification', 'user_id': session.viewing_user.user_id,
                                   'text': notif_text, 'config': 'you_got_attacked'}
 
@@ -16786,9 +16782,6 @@ class GAMEAPI(resource.Resource):
                         return result # pass through
 
                     session.complete_attack_d.addCallback(sendit, session, notif_args)
-
-
-                # END is human home base
 
             # END is human
 

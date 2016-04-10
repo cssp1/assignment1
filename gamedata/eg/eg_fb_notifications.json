@@ -17,7 +17,9 @@
             "enable_newbie": 0,
             "enable_elder": 1,
             "min_interval": 0, // note: for this notification only, its own min_interval overrides the global one
-            "ui_name": "%ATTACKER attacked your base! Take revenge now?"
+            "ui_name_home": "%ATTACKER attacked your base! Watch the replay and adjust your defenses!",
+            "ui_name_squad": "%ATTACKER attacked your battalion %BASE_UI_NAME! Fight back now?",
+            "ui_name_quarry": "%ATTACKER attacked your quarry! Fight back now?"
         },
 
         "raid_complete": {
