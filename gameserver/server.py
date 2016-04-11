@@ -16777,7 +16777,7 @@ class GAMEAPI(resource.Resource):
                     notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(session.player))
                     if '%BASE_UI_NAME' in notif_text:
                         if not session.viewing_base.base_ui_name:
-                            gamesite.exception_log.event(server_time, 'BASE_UI_NAME not available for %s' % session.viewing_base.base_id)
+                            pass # gamesite.exception_log.event(server_time, 'BASE_UI_NAME not available for %s' % session.viewing_base.base_id)
                         notif_text = notif_text.replace('%BASE_UI_NAME', session.viewing_base.base_ui_name or '')
                     notif_args = {'method': 'send_notification', 'user_id': session.viewing_user.user_id,
                                   'text': notif_text, 'config': 'you_got_attacked'}
