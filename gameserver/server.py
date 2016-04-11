@@ -16772,7 +16772,8 @@ class GAMEAPI(resource.Resource):
                 notif_text = config.get('ui_name_'+session.viewing_base.base_type)
                 if notif_text:
                     notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(session.player))
-                    notif_text = notif_text.replace('%BASE_UI_NAME', session.viewing_base.base_ui_name)
+                    if '%BASE_UI_NAME' in notif_text:
+                        notif_text = notif_text.replace('%BASE_UI_NAME', session.viewing_base.base_ui_name.get('Unknown'))
                     notif_args = {'method': 'send_notification', 'user_id': session.viewing_user.user_id,
                                   'text': notif_text, 'config': 'you_got_attacked'}
 
