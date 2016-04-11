@@ -27256,7 +27256,7 @@ class GAMEAPI(resource.Resource):
                     raid_path = raid_info['path']
                     step_success = True
                     try:
-                        step_success, step_map_features, error_code = session.player.squad_step(squad_id, raid_path, True)
+                        step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, True)
                         map_features += step_map_features
                     finally:
                         if not step_success:
@@ -27280,7 +27280,7 @@ class GAMEAPI(resource.Resource):
             elif spellname == 'SQUAD_STEP_MULTIPLE_CHOICE':
                 squad_id = int(spellargs[0])
                 path_choices = dict((k,session.player.squad_path_sanitize(v)) for k,v in spellargs[1].iteritems())
-                success, map_features, error_code = session.player.squad_step(squad_id, None, False, path_choices = path_choices)
+                success, map_features, error_code = session.player.squad_step(session, squad_id, None, False, path_choices = path_choices)
                 if error_code: retmsg.append(["ERROR"] + error_code)
                 if map_features: retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, map_features, server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
