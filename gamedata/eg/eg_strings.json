@@ -437,6 +437,8 @@
         "arriving_in": "Arriving in %s",
         "this_region_is": "REGION: %s",
         "cursor": "Cursor Coordinates: %s",
+        "incoming": "Incoming! %time",
+        "incoming_time_1m": "<1m", // used when 1 minute or less, to obscure exact time
         "you_control": "You Control",
         "you_control_quarries": "You Control (%cur/%max Quarries)",
 
