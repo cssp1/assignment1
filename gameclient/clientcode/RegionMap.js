@@ -2331,6 +2331,16 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                                         ['+'+show_trophy.toString()], 'rgba(255,180,0,1)', 1);
             }
 
+            // show time of any incoming raids
+            if(player.raids_enabled() && this.zoom >= gamedata['territory']['show_alliance_membership_above_zoom']) { // abuse this option
+                var incoming_togo = this.region.feature_incoming_raid_togo(feature);
+                if(incoming_togo > 0) {
+                    var ui_time = (incoming_togo <= 60 ? gamedata['strings']['regional_map']['incoming_time_1m'] : pretty_print_time_very_brief(incoming_togo));
+                    var offset = [0.37,-0.20];
+                    this.draw_feature_label(vec_add(vec_add(base_xy, vec_mul(offset, gamedata['territory']['cell_size'])), [10,-12]),
+                                            [gamedata['strings']['regional_map']['incoming'].replace('%time', ui_time)], 'rgba(255,255,0,1)', 1);
+                }
+            }
             var busy_asset = null;
 
             if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] != session.user_id && (feature['base_type'] != 'home' || feature['LOCK_OWNER'] != feature['base_landlord_id'])) {

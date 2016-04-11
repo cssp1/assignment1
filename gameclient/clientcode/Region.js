@@ -206,6 +206,28 @@ Region.Region.prototype.feature_blocks_map = function(feature) {
     return (feature['base_type'] !== 'squad' || (!feature['raid'] && player.squad_block_mode() !== 'never'));
 };
 
+/** Check a feature's location for incoming raids (by other players).
+    Return the seconds-to-go for the earliest arrival, or -1 if none.
+    @return {number} */
+Region.Region.prototype.feature_incoming_raid_togo = function(feature) {
+    var flist = this.find_features_at_coords(feature['base_map_loc']);
+    var min_togo = -1;
+    goog.array.forEach(flist, function(f) {
+        if(f !== feature && f['base_type'] === 'squad' && f['raid'] && f['base_landlord_id'] !== session.user_id &&
+           this.feature_is_moving(f)) {
+            var eta = f['base_map_path'][f['base_map_path'].length-1]['eta'];
+            if(eta > server_time) {
+                var togo = eta - server_time;
+                if(min_togo < 0 || togo < min_togo) {
+                    min_togo = togo;
+                }
+            }
+        }
+    }, this);
+    return min_togo;
+};
+
+
 /** note: just checking for presence of base_map_path is not correct, because sometimes squads
     get to where they're going, and the base_map_path on the server side disappears, but that
     deletion does not make it out to the client, so we may see a stale value.
