@@ -65,9 +65,9 @@ GameObjectCollection.GameObjectCollection.prototype.add_object = function(obj) {
     this.dispatchEvent(new GameObjectCollection.AddedEvent('added', this, obj));
 
     if(obj.id in this.dirty_removed) {
+        // XXX will this de-synchronize? the object is going to forget which part of its state is dirty...
         delete this.dirty_removed[obj.id];
-    }
-    if(!(obj.id in this.dirty_added)) {
+    } else if(!(obj.id in this.dirty_added)) {
         this.dirty_added[obj.id] = true;
     }
 };
