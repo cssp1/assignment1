@@ -23,7 +23,7 @@ time_now = int(time.time())
 
 def do_CONTROLAPI(args):
     args['ui_reason'] = 'PolicyBot' # for CustomerSupport action log entries
-    return ControlAPI.CONTROLAPI(args, 'PolicyBot')
+    return ControlAPI.CONTROLAPI(args, 'PolicyBot', max_tries = 3) # allow some retries
 
 # given two pcache entries for an alt pair, return the entry that is the more senior "master" account
 def master_account(a, b):
