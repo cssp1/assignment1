@@ -275,7 +275,7 @@ Region.Region.prototype.feature_exists_at = function(base_id, base_ui_name, loc)
 }
 
 /** @param {Array.<number>} cell
-  * @param {{include_moving_squads:(boolean|undefined)}} options */
+  * @param {{include_moving_squads:(boolean|undefined)}=} options */
 Region.Region.prototype.find_features_at_coords = function(cell, options) {
     var feature_list = [];
     if(cell) {
@@ -316,7 +316,7 @@ Region.Region.prototype.find_features_at_coords = function(cell, options) {
 
 // find the "primary" feature at this cell
 /** @param {Array.<number>} cell
-  * @param {{include_moving_squads:(boolean|undefined)}} options */
+  * @param {{include_moving_squads:(boolean|undefined)}=} options */
 
 Region.Region.prototype.find_feature_at_coords = function(cell, options) {
     var ls = this.find_features_at_coords(cell, options);

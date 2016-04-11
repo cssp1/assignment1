@@ -12,6 +12,7 @@ goog.require('Base');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('BattleReplay');
+goog.require('Region');
 goog.require('World');
 goog.require('goog.object');
 goog.require('goog.array');
@@ -32,6 +33,7 @@ Session.Session = function() {
     this.session_id = spin_session_id; // unique ID for this connection to the server
     this.alliance_id = -1; // player's current alliance ID, <= 0 is invalid
     this.alliance_membership = null; // player's current alliance membership info (alliance_members row), null for no membership
+    /** @type {Region.Region|null} */
     this.region = null; // world map region we are connected to
 
     this.minefield_tags_by_obj_id = {}; // mapping from obj_id to tag of player minefield buildings, used for GUI purposes only

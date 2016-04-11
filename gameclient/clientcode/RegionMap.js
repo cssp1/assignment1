@@ -14,12 +14,14 @@ goog.require('GameArt');
 goog.require('ItemDisplay');
 goog.require('SquadControlDialog');
 goog.require('PlayerInfoDialog');
+goog.require('Region');
 goog.require('goog.array');
 goog.require('goog.string');
 
 // note: this references some stuff from main.js (player.travel_state etc)
 
-/** @constructor @struct */
+/** @constructor @struct
+    @param {!RegionMap.RegionMap} map */
 RegionMap.Cursor = function(map) {
     this.map = map;
 };
@@ -469,6 +471,7 @@ RegionMap.RelocateCursor.prototype.on_mouseup = function(cell, button) {
 RegionMap.RegionMap = function(data, fxworld) {
     goog.base(this, data);
     this.gfx_detail = 99;
+    /** @type {Region.Region|null} */
     this.region = null;
     this.time = -1; // the caller should update this per-frame
     this.hstar_context = null;
@@ -530,6 +533,7 @@ RegionMap.RegionMap.prototype.set_popup = function(newui) {
     if(this.popup) { this.parent.add(this.popup); }
 };
 
+/** @param {Region.Region|null} region */
 RegionMap.RegionMap.prototype.set_region = function(region) {
     this.region = region;
     this.hstar_context = region.hstar_context;
