@@ -29761,7 +29761,9 @@ player.advance_squads = function() {
                 }
                 player.squad_clear_client_data(squad_data['id']);
             }
-        } else if(squad_data['raid'] && !player.squad_is_moving(squad_data['id'], true)) {
+        } else if(squad_data['raid'] &&
+                  player.squad_is_deployed(squad_data['id']) &&
+                  !player.squad_is_moving(squad_data['id'], true)) {
             // stationary raid - need to resolve, recall, or dock at base
             if(hex_distance(squad_data['map_loc'], player.home_base_loc) <= max_dist_to_exit_map && !squad_data['pending']) {
                 squad_data['pending'] = true;

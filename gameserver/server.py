@@ -8718,7 +8718,7 @@ class Player(AbstractPlayer):
                                              (self.user_id, squad_id))
                 squad_data = {'id':squad_id, 'ui_name': 'Unknown'}
                 if squad_feature.get('raid'):
-                    squad_data['raid'] = 1
+                    squad_data['raid'] = squad_feature['raid']
                 if squad_feature.get('ui_name'):
                     squad_data['ui_name'] = squad_feature['ui_name']
                 self.squads[str(squad_id)] = squad_data
@@ -8738,7 +8738,7 @@ class Player(AbstractPlayer):
                 elif 'map_path' in squad:
                     del squad['map_path']
 
-                for FIELD in ('travel_speed','raid','max_cargo'):
+                for FIELD in ('travel_speed','max_cargo'):
                     if FIELD in map_data:
                         squad[FIELD] = map_data[FIELD]
 
@@ -8779,7 +8779,7 @@ class Player(AbstractPlayer):
                     to_recall.append(squad_id)
             else:
                 # it should be at home base
-                for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
+                for FIELD in ('map_loc', 'map_path', 'travel_speed', 'max_cargo'):
                     if FIELD in squad: del squad[FIELD]
                 if (squad_id in map_objects_by_squad):
                     # this can happen after an attack where we lose a squad, but we need the player to log in to recall it into home_base_iter
@@ -9550,7 +9550,7 @@ class Player(AbstractPlayer):
 
         if squad:
             # update in-memory version of the squad (under player.squads)
-            for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
+            for FIELD in ('map_loc', 'map_path', 'travel_speed', 'max_cargo'):
                 if FIELD in squad: del squad[FIELD]
         if cargo:
             self.squad_collect_cargo(cargo, cargo_source)
