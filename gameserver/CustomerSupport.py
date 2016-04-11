@@ -21,16 +21,21 @@ from Region import Region
 # there is also a "kill_session" option that tells the server to (asynchronously) log the player out after we return.
 # and an "async" Deferred to hold the CONTROLAPI request until an async operation finishes
 class ReturnValue(object):
-    def __init__(self, result = None, error = None, kill_session = False, async = None):
+    def __init__(self, result = None, error = None, http_status = None, retry_after = None, kill_session = False, async = None):
         assert (result is not None) or (error is not None) or (async is not None)
         self.result = result
         self.error = error
+        self.http_status = http_status
+        self.retry_after = retry_after
         self.kill_session = kill_session
         self.async = async
     def as_body(self):
         assert not self.async
         if self.error:
             ret = {'error':self.error}
+            # optional additional properties for an error
+            if self.retry_after:
+                ret['retry_after'] = self.retry_after
         else:
             ret = {'result':self.result}
         return SpinJSON.dumps(ret, newline = True)

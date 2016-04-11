@@ -13958,22 +13958,26 @@ class CONTROLAPI(resource.Resource):
                         val.async.addErrback(online_error, session, method_name, args)
 
                         session.start_async_request(val.async)
-                        val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request))
+                        val.async.addCallback(lambda async_result, request=request: SpinHTTP.complete_deferred_request(async_result.as_body(), request, http_status = async_result.http_status))
 
                     else:
                         if val.kill_session:
+                            assert not val.http_status # awkward to pass this
                             ret = self.kill_session(request, session, body = val.as_body()) # this adds complete_deferred_request() when necessary
                         else:
                             ret = val.as_body()
                         session.queue_flush_outgoing_messages()
-                        SpinHTTP.complete_deferred_request(ret, request)
+                        SpinHTTP.complete_deferred_request(ret, request, http_status = val.http_status)
 
                 d = make_deferred('CustomerSupport:'+method_name+'(online)')
 
                 # if player logged out, this is going to fail
                 def handle_online_race(request, fail):
                     fail.trap(Session.AlreadyLoggedOut)
-                    SpinHTTP.complete_deferred_request(CustomerSupport.ReturnValue(error = 'Race condition: Player just logged out. Please try again.').as_body(), request)
+                    return_val = CustomerSupport.ReturnValue(error = 'Race condition: Player %d just logged out. Please try again.' % user_id,
+                                                             http_status = 503, # service unavailable
+                                                             retry_after = 15)
+                    SpinHTTP.complete_deferred_request(return_val.as_body(), request, http_status = return_val.http_status)
 
                 d.addCallbacks(functools.partial(handle_online, request, session, handler, method_name, args),
                                functools.partial(handle_online_race, request))
@@ -13989,7 +13993,12 @@ class CONTROLAPI(resource.Resource):
                     # get lock
                     state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
                     if state != Player.LockState.being_attacked:
-                        ret = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id).as_body()
+                        return_val = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id,
+                                                                 http_status = 503, # service unavailable
+                                                                 retry_after = 15)
+                        ret = return_val.as_body()
+                        if return_val.http_status:
+                            request.setResponseCode(return_val.http_status)
                     else:
                         def unlock(val, uid):
                             gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
@@ -13997,7 +14006,7 @@ class CONTROLAPI(resource.Resource):
                         d.addBoth(unlock, user_id) # OK
 
                 if ret is None: # no lock error
-                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request))
+                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request, http_status = val.http_status))
 
                     self.AsyncSupport(user_id, method_name, handler, d).start()
                     ret = server.NOT_DONE_YET
@@ -27777,7 +27786,8 @@ class GameSite(server.Site):
         # for making async cross-server IPC calls (FB notifications etc)
         self.AsyncHTTP_CONTROLAPI = AsyncHTTP.AsyncHTTPRequester(-1, -1, 30, # timeout = 30s
                                                                  0, self.log_async_exception,
-                                                                 max_tries = 1, retry_delay = 10)
+                                                                 # need retries for "offline but locked" issues
+                                                                 max_tries = 3, retry_delay = 15)
 
         self.nosql_id_generator = SpinNoSQLId.Generator()
 
@@ -28393,7 +28403,7 @@ class GameSite(server.Site):
             ret = SpinJSON.loads(result)
             if 'error' in ret:
                 raise Exception('AsyncHTTP_CONTROLAPI %r error on behalf of player %d: %r' % \
-                                (caller_args['method'], session.user.user_id, ret['error']))
+                                (caller_args['method'], session.user.user_id, ret))
             return ret['result']
         d.addCallback(check_result, session)
 

@@ -144,10 +144,12 @@ def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = Tru
 # this is the final Deferred callback that finishes asynchronous HTTP request handling
 # note that "body" is inserted by Twisted as the return value of the callback chain BEFORE other args.
 
-def complete_deferred_request(body, request):
+def complete_deferred_request(body, request, http_status = None):
     if body == NOT_DONE_YET:
         return body
     assert type(body) in (str, unicode)
     if hasattr(request, '_disconnected') and request._disconnected: return
+    if http_status:
+        request.setResponseCode(http_status)
     request.write(body)
     request.finish()

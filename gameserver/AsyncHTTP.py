@@ -149,7 +149,7 @@ class AsyncHTTPRequester(object):
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester got response for', request
             if self.verbosity >= 3:
-                print 'AsyncHTTPRequester response was: ', response
+                print 'AsyncHTTPRequester response was:', 'status', getter.status, 'headers', getter.response_headers, 'body', response
         try:
             if request.callback_type == self.CALLBACK_FULL:
                 request.callback(body = response, headers = getter.response_headers, status = getter.status)
