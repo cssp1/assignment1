@@ -384,7 +384,16 @@
         "normal": { "images": ["art/ui/menu_buttons14.png"], "dimensions": [27,21], "origins": [267,63], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 },
         "highlight": { "images": ["art/ui/menu_buttons14.png"], "dimensions": [27,21], "origins": [267,42], "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25, "load_priority": 20 }
     } },
-
+    "small_scroll_left": { "states": {
+        "normal": { "subassets": [{"name": "small_scroll_up", "state": "normal", "transform": [0,1,1,0,0,0]}]},
+        "highlight": { "subassets": [{"name": "small_scroll_up", "state": "highlight", "transform": [0,1,1,0,0,0]}]},
+        "disabled": { "subassets": [{"name": "small_scroll_up", "state": "disabled", "transform": [0,1,1,0,0,0]}]}
+    } },
+    "small_scroll_right": { "states": {
+        "normal": { "subassets": [{"name": "small_scroll_down", "state": "normal", "transform": [0,1,1,0,0,0]}]},
+        "highlight": { "subassets": [{"name": "small_scroll_down", "state": "highlight", "transform": [0,1,1,0,0,0]}]},
+        "disabled": { "subassets": [{"name": "small_scroll_down", "state": "disabled", "transform": [0,1,1,0,0,0]}]}
+    } },
     "dialog_sunken_153x164": { "states": { "normal": { "images": ["art/ui/menu_buttons14.png"], "origins": [200,572], "dimensions": [153,164],
                                                        "style": "corners", "corner_width": 16, "load_priority": 100 } } }, // tutorial
 

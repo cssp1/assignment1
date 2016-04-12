@@ -7192,6 +7192,130 @@
         }
     },
 
+    "raid_dialog": {
+        "dimensions": [770,485],
+        "default_button": "ok_button",
+        "clip_children": 0,
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "title": {"kind": "TextField", "xy": [0,1], "dimensions":[770,47], "text_size":30, "text_style":"thick", "ui_name": "Raid"},
+            "close_button": {"kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "sunken_left": {"kind":"StaticImage","xy":[16,50],"dimensions":[322,290], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "sunken_right": {"kind":"StaticImage","xy":[432,50],"dimensions":[322,384], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "topbar_left": {"kind": "SolidRect", "xy": [17,52], "dimensions": [320,32], "color": [0,0,0,0.25]},
+            "topbar_right": {"kind": "SolidRect", "xy": [433,52], "dimensions": [320,32], "color": [0,0,0,0.25]},
+
+            "name_left": {"kind": "TextField", "xy": [28,51], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "Attacker"},
+
+            "squad_name": {"kind": "TextField", "xy": [160,51], "dimensions": [160,36], "text_size": 13, "text_style": "bold", "ui_name": "(Unnamed)"},
+
+            "squad_scroll_left": {"kind": "ActionButton", "xy": [171,55], "dimensions": [26,27], "bg_image": "small_scroll_left", "push_bg_image": 1},
+            "squad_scroll_right": {"kind": "ActionButton", "xy": [284,55], "dimensions": [26,27], "bg_image": "small_scroll_right", "push_bg_image": 1},
+
+            "squad_decoration": { "kind": "SolidRect", "xy": [180,95], "dimensions": [220,110], "color": [0,0.33,0,0.1],
+                                  "outline_width": 1, "outline_color": [0,0.33,0,1],
+                                  "path": [[60,0], [120,18], [120,54], [60,72], [0,54], [0,18], [60,0]] },
+            "site_decoration": { "kind": "SolidRect", "xy": [466,95], "dimensions": [220,110], "color": [0.33,0,0,0.1],
+                                 "outline_width": 1, "outline_color": [0.33,0,0,1],
+                                 "path": [[60,0], [120,18], [120,54], [60,72], [0,54], [0,18], [60,0]] },
+
+            "squad_unit_icon": { "kind": "StaticImage", "xy": [185,92], "dimensions": [112,100], "bg_image_offset": [0,-8], "bg_image_justify": "center",
+                                 "asset": "", "state": "normal" },
+
+            "site_name": {"kind": "TextField", "xy": [442,51], "dimensions": [161,36], "text_size": 13, "text_style": "bold", "ui_name": "Site"},
+
+            "site_icon": { "kind": "StaticImage", "xy": [470,85], "dimensions": [112,100], "bg_image_offset": [0,-8], "bg_image_justify": "center",
+                           "asset": "region_tiles", "state": "base" },
+
+            "name_right": {"kind": "TextField", "xy": [621,51], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "Loading..."},
+
+            "portrait_left": {"kind": "FriendPortrait", "xy":[62,100], "dimensions": [50,50], "push_bg_image": 1 },
+            "portrait_outline_left": { "kind": "SolidRect", "xy":[62,100], "dimensions":[50,50],
+                                       "color": [0,0,0,0], "outline_color": [0.4,0.4,0.4,1], "outline_width": 1 },
+            "level_left": {"kind": "TextField", "xy": [28,158], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
+
+            "portrait_right": {"kind": "FriendPortrait", "xy":[654,100], "dimensions": [50,50], "push_bg_image": 1 },
+            "portrait_outline_right": { "kind": "SolidRect", "xy":[654,100], "dimensions":[50,50],
+                                       "color": [0,0,0,0], "outline_color": [0.4,0.4,0.4,1], "outline_width": 1 },
+            "level_right": {"kind": "TextField", "xy": [621,158], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
+
+
+            "coords_left": {"kind": "TextField", "xy": [157,158], "dimensions": [159,36], "text_size": 13,
+                            "text_hjustify": "right", "ui_name": "123,456"},
+            "coords_right": {"kind": "TextField", "xy": [449,158], "dimensions": [159,36], "text_size": 13,
+                             "text_hjustify": "right", "ui_name": "123,456"},
+            "site_size": {"kind": "TextField", "xy": [451,158], "dimensions": [159,36], "text_size": 13, "text_style": "bold",
+                          "text_hjustify": "left", "ui_name": "Size: %qsize"},
+
+            "vs": {"kind": "TextField", "xy": [385,50], "dimensions": [0,36], "text_size": 19, "ui_name": "vs", "drop_shadow": 1},
+
+            "travel_time": {"kind": "TextField", "xy": [385,110], "dimensions": [0,64], "text_size": 13, "drop_shadow": 1,
+                            "ui_name": "Travel Time\n%time", "ui_name_blocked": "Path\nBlocked!"},
+
+            "advantage_label": {"kind": "TextField", "xy": [385,214], "dimensions": [0,32], "text_size": 13, "drop_shadow": 1, "ui_name": "Advantage"},
+            "advantage": {"kind": "RichTextField", "xy": [285,234], "dimensions": [200,32], "text_size": 17, "drop_shadow": 1,
+                          "ui_name": "[color=#808080]?[/color]",
+                          "ui_name_neutral": "[color=#ffff00]-[/color]",
+                          "ui_name_good": "[color=#00ff00]<[/color]",
+                          "ui_name_very_good": "[color=#00ff00]<<[/color]",
+                          "ui_name_best": "[color=#00ff00]<<<[/color]",
+                          "ui_name_bad": "[color=#ff0000]>[/color]",
+                          "ui_name_very_bad": "[color=#ff0000]>>[/color]",
+                          "ui_name_worst": "[color=#ff0000]>>>[/color]"
+                         },
+
+            "str_sunken_left": {"kind":"StaticImage","xy":[160,198],"dimensions":[160,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "str_sunken_right": {"kind":"StaticImage","xy":[450,198],"dimensions":[160,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "scout_time": {"kind": "TextField", "xy": [450,323], "dimensions": [160,32], "text_size": 13,
+                           "ui_name": "No scouting info", "ui_name_scouted": "Scouted %time ago",
+                           "text_color": [0.5,0.5,0.5]},
+
+
+            "cargo_label": {"kind": "TextField", "xy": [28,193], "dimensions": [120,32], "text_size": 13, "ui_name": "Cargo Space"},
+
+            "cargo_bar": {"kind": "StaticImage", "xy": [28,225], "dimensions": [120,28], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1,
+                          "array": [1,3], "array_offset": [0,34]},
+            "cargo_prog": { "kind": "ProgressBar", "xy": [37, 230], "dimensions": [105, 17],
+                            "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                            "array": [1,3], "array_offset": [0,34]},
+            "cargo_icon": { "kind": "StaticImage", "xy": [32,228], "dimensions": [21,21], "asset": "resource_icon_water",
+                            "array": [1,3], "array_offset": [0,34]},
+            "cargo_amount": { "kind": "TextField", "xy": [50,228], "dimensions": [96,21],
+                              "text_size": 13, "drop_shadow": 1, "text_style": "thick",
+                              "array": [1,3], "array_offset": [0,34], "ui_name": "9,999,999"},
+
+            "loot_label": {"kind": "TextField", "xy": [621,193], "dimensions": [120,32], "text_size": 13, "ui_name": "Loot"},
+
+            "loot_bar": {"kind": "StaticImage", "xy": [621,225], "dimensions": [120,28], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1,
+                          "array": [1,3], "array_offset": [0,34]},
+            "loot_prog": { "kind": "ProgressBar", "xy": [630, 230], "dimensions": [105, 17],
+                            "empty_color": [0.015,0.015,0.015,1], "outline_color": [0.015,0.015,0.015,1], "outline_width": 2,
+                            "array": [1,3], "array_offset": [0,34]},
+            "loot_icon": { "kind": "StaticImage", "xy": [625,228], "dimensions": [21,21], "asset": "resource_icon_water",
+                            "array": [1,3], "array_offset": [0,34]},
+            "loot_amount": { "kind": "TextField", "xy": [643,228], "dimensions": [96,21],
+                              "text_size": 13, "drop_shadow": 1, "text_style": "thick",
+                              "array": [1,3], "array_offset": [0,34], "ui_name": "9,999,999"},
+
+            "item_loot_label": {"kind": "TextField", "xy": [613,323], "dimensions": [144,32], "text_size": 13, "ui_name": "Item Loot"},
+
+            "description": { "kind": "RichTextField", "xy":[18,354],"dimensions":[322,135],
+                             "text_hjustify": "left",  "text_size": 13, // "text_leading": 17,
+                             "text_vjustify": "top",
+                             "ui_name_pickup": "[b]No opposition[/b]: Battalion will return with as much loot as fits in Cargo.",
+                             "ui_name_attack": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage.",
+                             "ui_name_scout": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage."
+                           },
+
+            "ok_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
+                           "bg_image": "action_button_resizable", "bg_image_resizable": 1, "state": "attack", "ui_name": "Launch" },
+            "cancel_button": { "kind": "ActionButton", "xy": [438,443], "dimensions": [148,30],
+                               "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                               "text_size": 13, "text_style": "bold", "ui_name": "Cancel" }
+        }
+    },
+
     "unit_icon": {
         "dimensions": [50,50],
         "widgets": {

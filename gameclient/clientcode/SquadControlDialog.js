@@ -11,6 +11,7 @@ goog.provide('SquadControlDialog');
 goog.require('goog.array');
 goog.require('goog.object');
 goog.require('SPUI');
+goog.require('RaidDialog');
 
 // tightly coupled to main.js, sorry!
 
