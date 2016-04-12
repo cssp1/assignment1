@@ -27787,7 +27787,7 @@ class GameSite(server.Site):
         self.AsyncHTTP_CONTROLAPI = AsyncHTTP.AsyncHTTPRequester(-1, -1, 30, # timeout = 30s
                                                                  0, self.log_async_exception,
                                                                  # need retries for "offline but locked" issues
-                                                                 max_tries = 3, retry_delay = 15)
+                                                                 max_tries = 10, retry_delay = 60)
 
         self.nosql_id_generator = SpinNoSQLId.Generator()
 
