@@ -225,21 +225,21 @@ def make_battle_summary(gamedata, nosql_client,
         #'xp' : 0, 'iron': 1000, 'water': 1000 }
 
     if 0: # XXX for later
-	ret['damage'] = {
-            str(attacker_id) : {
-			'marine:L8' : {
-				'count' : 6,
-				'water' : 2172,
-				'iron' : 1020,
-				'time' : 42
-			},
-			'chaingunner:L8' : {
-				'water' : 5026,
-				'iron' : 2835,
-				'time' : 119
-			}
-		}
-	}
+        ret['damage'] = {
+                str(attacker_id) : {
+                'marine:L8' : {
+                    'count' : 6,
+                    'water' : 2172,
+                    'iron' : 1020,
+                    'time' : 42
+                },
+                'chaingunner:L8' : {
+                    'water' : 5026,
+                    'iron' : 2835,
+                    'time' : 119
+                }
+            }
+        }
 
     for role, user_id, pcinfo in (('attacker', attacker_id, attacker_pcinfo), ('defender', defender_id, defender_pcinfo)):
         is_ai = 0 if user_id > 1100 else 1 # XXX really need to fix this sometime
