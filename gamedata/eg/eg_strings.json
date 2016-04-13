@@ -693,6 +693,11 @@
                                     "ui_subject": "Army Units Returned",
                                     "ui_body": "Greetings Commander,\n\nBattalion %level had more units than our Reserves Bay can control!\n\nI've returned the extra %s unit(s) to reserves." },
 
+    "squad_turnaround_mail": { "ui_from": "Narrator",
+                               "duration": 259200, // 3 days
+                               "ui_subject": "Battalion %s Returning",
+                               "ui_body": "Battalion %s found no target and will return home. The original target expired, or was cleared out first by another player."},
+
     // generic refund message, e.g. for credit card chargebacks
     "gamebucks_refund_mail": { "ui_from": "Narrator",
                                "duration": -1,

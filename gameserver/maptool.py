@@ -333,20 +333,16 @@ def extend_all_quarries(db, lock_manager, region_id, dry_run = True):
             nosql_client.update_map_feature(region_id, base_id, {'base_expire_time':base_data.get('base_expire_time',-1)})
             lock_manager.release(region_id, base_id, base_generation = base_data.get('base_generation',-1))
 
-
-valentina_mail_serial = 0
 def make_valentina_mail(user_id, subject='', body='', days_to_claim=3, attachments=[]):
-    global valentina_mail_serial
-    valentina_mail_serial += 1
     message = {'type':'mail',
                'expire_time': (time_now + days_to_claim*24*60*60) if (days_to_claim >= 0) else -1,
-               'from_name': 'Valentina', 'to': [user_id],
+               'from_name': 'Map Manager', 'to': [user_id],
                'subject': subject, 'body': body }
     if attachments:
         message['attachments'] = attachments
     return message
 
-def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui_name = '', reason = 'expired', dry_run = True):
+def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui_name = '', reason = 'expired', force_message = False, dry_run = True):
     if len(objlist) < 1: return # nothing to return
     if user_id < 1100: return # AI user
     if feature['base_type'] != 'squad':
@@ -367,7 +363,8 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
                            'cargo_source': SpinJSON.dumps(cargo_source),
                            'squad_id': squad_id})
         del objlist[:] # clear them out
-        return # done!
+        cargo = None
+
     except ControlAPI.ControlAPIException: pass
     except ControlAPI.ControlAPIGameException: pass
 
@@ -379,7 +376,7 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
         spec = gamedata['units'][obj_data['spec']]
         units[spec['name']] = 1 + units.get(spec['name'],0)
 
-    if (not units) and (not cargo): return # nothing to return
+    if (not units) and (not cargo) and (not force_message): return # nothing to return
 
     attachments = []
     for name, qty in units.iteritems():
@@ -412,6 +409,8 @@ def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui
 
     if attachments:
         message_body += '\n\nOur forces have returned. We should re-deploy them soon, before they expire.'
+    else:
+        attachments = None
 
     message = make_valentina_mail(user_id, days_to_claim = days_to_claim,
                                   subject = message_subject,
@@ -1463,6 +1462,8 @@ def recall_squad(db, lock_manager, region_id, user_id, base_id, days_to_claim_un
     return True
 
 def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
+    # XXX this should be unified with Raid.py resolver
+
     region = Region(gamedata, region_id)
     pf = SquadPathfinder(region)
     home_cache = get_existing_map_by_type_spatially(db, region_id, 'home')
@@ -1495,6 +1496,8 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
         assert squad['base_landlord_id'] == owner_id
 
         if verbose: print 'RAID SQUAD', pretty_feature(squad), 'stationary'
+
+        send_turnaround_message = False # whether the player should be sent a message that the squad had to turn around unexpectedly
 
         if loc_key in home_cache:
             home = home_cache[loc_key]
@@ -1584,6 +1587,9 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 if squad_lock: lock_manager.release(region_id, squad['base_id'])
                 if raid_lock: lock_manager.release(region_id, raid['base_id'])
 
+        else:
+             send_turnaround_message = True # unknown reason for recall
+
         # auto-navigate the squad towards home
         home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
         if not home:
@@ -1618,10 +1624,20 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
             if verbose: print 'Squad moving back to home'
             # note: this will wait until the NEXT run of resolve() to actually dock the squad and units
             if not dry_run:
-                nosql_client.move_map_feature(region_id, squad['base_id'], {'base_map_loc': new_path[-1]['xy'],
-                                                                            'base_map_path': new_path},
-                                              old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
-                                              exclusive = -1, reason = 'resolve')
+                success = nosql_client.move_map_feature(region_id, squad['base_id'], {'base_map_loc': new_path[-1]['xy'],
+                                                                                      'base_map_path': new_path},
+                                                        old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
+                                                        exclusive = -1, reason = 'resolve')
+            else:
+                success = True
+
+            if success and send_turnaround_message:
+                message = make_valentina_mail(owner_id, days_to_claim = 3,
+                                              subject = gamedata['strings']['squad_turnaround_mail']['ui_subject'].replace('%s',squad.get('base_ui_name','(Unnamed)')),
+                                              body = gamedata['strings']['squad_turnaround_mail']['ui_body'].replace('%s',squad.get('base_ui_name','(Unnamed)')))
+                if not dry_run:
+                    nosql_client.msg_send([message])
+
         finally:
             lock_manager.release(region_id, squad['base_id'])
 
