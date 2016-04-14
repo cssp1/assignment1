@@ -8,7 +8,7 @@
 # implementation to install a latency monitor to track all "non-waiting"
 # CPU time taken by a server process
 
-import sys, time
+import sys, time, types
 
 g_latency_func = None
 
@@ -84,4 +84,22 @@ class InstrumentedDeferred(defer.Deferred):
         # depends on the guts of Deferred.__repr__() :(
         fields = r.split(' ')
         fields[0] += '("'+self.latency_tag+'")'
-        return ' '.join(fields)
+        ret = ' '.join(fields)
+
+        if True: # add detailed info on the callback chain
+            def format_cb(cb):
+                if cb is defer.passthru:
+                    return '-'
+                elif isinstance(cb, types.FunctionType):
+                    if cb.func_name == '<lambda>': # show file and line number for lambdas
+                        return 'lambda(%s:%d)' % (cb.func_code.co_filename, cb.func_code.co_firstlineno)
+                    else:
+                        return cb.func_name
+                else:
+                    return repr(cb)
+
+            for item in self.callbacks:
+                cb, cb_args, cb_kwargs = item[0]
+                eb, eb_args, eb_kwargs = item[1]
+                ret += '->(%s,%s)' % (format_cb(cb), format_cb(eb))
+        return ret

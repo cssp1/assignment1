@@ -808,14 +808,14 @@ class IOSystem (object):
 
     # helper to return an async read as a deferred
     def async_read_deferred(self, filename, reason = None, procnum = None):
-        d = defer.Deferred()
+        d = make_deferred('IOSystem.async_read')
         self.async_read(filename,
                         lambda buf, d=d: d.callback(buf),
                         lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_read() error: %r' % err_reason))),
                         reason = reason, procnum = procnum)
         return d
     def async_exists_deferred(self, filename, reason = None, procnum = None):
-        d = defer.Deferred()
+        d = make_deferred('IOSystem.async_exists')
         self.async_exists(filename,
                           lambda buf, d=d: d.callback(buf),
                           lambda err_reason, d=d: d.errback(failure.Failure(Exception('async_exists() error: %r' % err_reason))),
