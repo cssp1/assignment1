@@ -78,7 +78,8 @@ class AsyncHTTPRequester(object):
         self.idle_cb = None
 
         self.n_dropped = 0
-        self.n_attempted = 0
+        self.n_accepted = 0
+        self.n_fired = 0
         self.n_ok = 0
         self.n_errors = 0
         self.n_retries = 0
@@ -105,6 +106,8 @@ class AsyncHTTPRequester(object):
             self.n_dropped += 1
             return
 
+        self.n_accepted += 1
+
         if max_tries is None:
             max_tries = self.default_max_tries
         else:
@@ -125,7 +128,7 @@ class AsyncHTTPRequester(object):
         request = self.queue.popleft()
         if request.preflight_callback: # allow caller to adjust headers/url/etc at the last minute before transmission
             request.preflight_callback(request)
-        self.n_attempted += 1
+        self.n_fired += 1
         self.on_wire.add(request)
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester opening connection %s, %d now in queue, %d now on wire' % (repr(request), len(self.queue), len(self.on_wire))
@@ -225,7 +228,8 @@ class AsyncHTTPRequester(object):
         queue = [x.get_stats() for x in self.queue] if expose_info else []
         on_wire = [x.get_stats() for x in self.on_wire] if expose_info else []
         waiting_for_retry = [x.get_stats() for x in self.waiting_for_retry] if expose_info else []
-        return {'attempted':self.n_attempted,
+        return {'accepted':self.n_accepted,
+                'fired':self.n_fired,
                 'ok':self.n_ok,
                 'dropped':self.n_dropped,
                 'errors':self.n_errors,
@@ -252,7 +256,7 @@ class AsyncHTTPRequester(object):
     @staticmethod
     def stats_to_html(stats, cur_time, expose_info = True):
         ret = '<table border="1" cellspacing="0">'
-        for key in ('dropped', 'attempted', 'ok', 'errors', 'retries', 'num_on_wire','num_in_queue','num_waiting_for_retry'):
+        for key in ('dropped', 'accepted', 'fired', 'ok', 'errors', 'retries', 'num_on_wire','num_in_queue','num_waiting_for_retry'):
             ret += '<tr><td>%s</td><td>%s</td></tr>' % (key, str(stats[key]))
         ret += '</table><p>'
 
