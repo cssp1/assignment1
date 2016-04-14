@@ -23922,7 +23922,7 @@ class GAMEAPI(resource.Resource):
                 return defer.succeed(True) # probably OK to return session.logout_d, but that might have exceptions on it
             elif force:
                 # do not wait for complete_attack(), just kill the session
-                gamesite.exception_log.event(server_time, 'log_out_async: force-dropping broken session for player %d - possible data loss!' % (session.user.user_id))
+                gamesite.exception_log.event(server_time, 'log_out_async: force-dropping broken session for player %d - possible data loss! logout_d %r' % (session.user.user_id, session.logout_d))
                 session.logout_in_progress.wrote_user = True
                 session.logout_in_progress.wrote_player = True
                 reactor.callLater(0, session.logout_in_progress.try_finish)
