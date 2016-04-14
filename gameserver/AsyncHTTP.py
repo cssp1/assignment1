@@ -4,6 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
+import twisted.python.failure
 import twisted.internet.defer
 import twisted.internet.protocol
 import twisted.internet.reactor
@@ -11,6 +12,42 @@ import twisted.web.client
 import twisted.web.error
 import traceback
 from collections import deque
+
+# Wrap Twisted's HTTP Client with a strict watchdog timer
+# Twisted's own "timeout" parameter doesn't always fire reliably, meaning it does not guarantee
+# that a request's deferred fires with either callback or errback within the timeout interval.
+# We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
+# SSL negotiation.
+
+def make_web_getter(*args, **kwargs):
+    # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
+    # and not just its .deferred member, since we want to access the response headers as well as the body.
+    getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
+
+    if kwargs and 'timeout' in kwargs:
+        # set up our own watchdog timer
+
+        # add slop time to allow Twisted's own timeout to fire first if it wants
+        delay = kwargs['timeout'] + 5 # seconds
+
+        def watchdog_func(getter):
+            if getter.deferred.called: return # somehow it succeeded
+
+            # swap a fresh Deferred into getter so that Twisted won't call the original one again
+            d, getter.deferred = getter.deferred, twisted.internet.defer.Deferred()
+            d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
+
+        watchdog = twisted.internet.reactor.callLater(delay, watchdog_func, getter)
+
+        # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
+        def cancel_watchdog_and_continue(_, watchdog):
+            if watchdog.active(): # we might be called downstream from the watchdog firing itself
+                watchdog.cancel()
+            return _
+
+        getter.deferred.addBoth(cancel_watchdog_and_continue, watchdog)
+
+    return getter
 
 class AsyncHTTPRequester(object):
     # there are two "modes" for the callbacks on a request:
@@ -133,14 +170,12 @@ class AsyncHTTPRequester(object):
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester opening connection %s, %d now in queue, %d now on wire' % (repr(request), len(self.queue), len(self.on_wire))
 
-        # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
-        # and not just its .deferred member, since we want access to response headers.
-        getter = twisted.web.client._makeGetterFactory(bytes(request.url), twisted.web.client.HTTPClientFactory,
-                                                       method=request.method,
-                                                       headers=request.headers,
-                                                       agent='spinpunch game server',
-                                                       timeout=self.request_timeout,
-                                                       postdata=request.postdata)
+        getter = make_web_getter(bytes(request.url), twisted.web.client.HTTPClientFactory,
+                                 method=request.method,
+                                 headers=request.headers,
+                                 agent='spinpunch game server',
+                                 timeout=self.request_timeout,
+                                 postdata=request.postdata)
         d = getter.deferred
         d.addCallback(self.on_response, getter, request)
         d.addErrback(self.on_error, getter, request)
@@ -197,10 +232,11 @@ class AsyncHTTPRequester(object):
                 self.reactor.callLater(self.retry_delay, self.retry, request)
             return
 
-        if self.verbosity >= 0:
+        self.n_errors += 1
+
+        if self.verbosity >= 0: # XXX maybe disable this if there's a reliable error_callback?
             self.log_exception_func('AsyncHTTPRequester error: ' + reason.getTraceback() + ' for %s (after %d tries)' % (repr(request), request.tries))
 
-        self.n_errors += 1
         if request.error_callback:
             try:
                 # transform the Failure object to a human-readable string
@@ -229,11 +265,15 @@ class AsyncHTTPRequester(object):
         on_wire = [x.get_stats() for x in self.on_wire] if expose_info else []
         waiting_for_retry = [x.get_stats() for x in self.waiting_for_retry] if expose_info else []
         return {'accepted':self.n_accepted,
-                'fired':self.n_fired,
-                'ok':self.n_ok,
                 'dropped':self.n_dropped,
-                'errors':self.n_errors,
+
+                'fired':self.n_fired,
                 'retries':self.n_retries,
+
+                'done_ok':self.n_ok,
+                'done_error':self.n_errors,
+                # all accepted requests should either be in flight, or end with OK/Error. Otherwise we're "leaking" requests.
+                'missing': self.n_accepted - (self.n_ok + self.n_errors + len(self.queue) + len(self.on_wire)),
 
                 'queue':queue, 'num_in_queue': len(self.queue),
                 'on_wire':on_wire, 'num_on_wire': len(self.on_wire),
@@ -256,8 +296,11 @@ class AsyncHTTPRequester(object):
     @staticmethod
     def stats_to_html(stats, cur_time, expose_info = True):
         ret = '<table border="1" cellspacing="0">'
-        for key in ('dropped', 'accepted', 'fired', 'ok', 'errors', 'retries', 'num_on_wire','num_in_queue','num_waiting_for_retry'):
-            ret += '<tr><td>%s</td><td>%s</td></tr>' % (key, str(stats[key]))
+        for key in ('accepted', 'dropped', 'fired', 'retries', 'done_ok', 'done_error', 'missing', 'num_on_wire','num_in_queue','num_waiting_for_retry'):
+            val = str(stats[key])
+            if key == 'missing' and stats[key] > 0:
+                val = '<font color="#ff0000">'+val+'</font>'
+            ret += '<tr><td>%s</td><td>%s</td></tr>' % (key, val)
         ret += '</table><p>'
 
         if expose_info:
