@@ -5160,7 +5160,7 @@ class SessionChange(object):
     # to pass to change_session_complete()
 
     def __init__(self, session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack):
-        self.d = make_deferred('SessionChange') # deferred to fire upon completion
+        self.d = make_deferred(self.__class__.__name__) # deferred to fire upon completion
         self.session = session
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
@@ -5170,6 +5170,7 @@ class SessionChange(object):
         self.pre_attack = pre_attack
 
     def begin(self):
+        self.d.add_debug_data('begin')
         delay = self.delay
 
         cooldown = self.session.player.get_any_abtest_value('attack_spam_cooldown', gamedata['server']['attack_spam_cooldown'])
@@ -5210,6 +5211,7 @@ class SessionChangeHome(SessionChange): # simple case for going back to your own
         assert self.dest_user_id == self.session.user.user_id
 
     def really_begin(self):
+        self.d.add_debug_data('really_begin')
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.session.user, self.session.player,
                          None, None, self.new_ladder_state,
                          self.default_deployable_squads(self.session.player),
@@ -5226,7 +5228,9 @@ class SessionChangeOld(SessionChange): # non-map path
         self.got_player = False
         self.got_user = False
         self.is_ai = is_ai_user_id_range(self.dest_user_id)
+
     def really_begin(self):
+        self.d.add_debug_data('really_begin')
         if self.is_ai:
             # check for AI instances first, then fall back to regular player_table
             ai_instance_table.lookup_async(self.session.player,
@@ -5238,6 +5242,8 @@ class SessionChangeOld(SessionChange): # non-map path
         user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
 
     def ai_instance_cb(self, success, player):
+        self.d.add_debug_data('ai_instance_cb(%r)' % bool(player))
+
         # fails gracefully if player is None
         if player:
             # got instance - do not auto-level
@@ -5249,6 +5255,8 @@ class SessionChangeOld(SessionChange): # non-map path
             player_table.lookup_async(self.session.player, self.dest_user_id, False, self.player_cb, 'change_session')
 
     def player_cb(self, success, player):
+        self.d.add_debug_data('player_cb(%r)' % bool(player))
+
         # fails gracefully if player is None
         self.got_player = True
         self.dest_player = player
@@ -5257,6 +5265,8 @@ class SessionChangeOld(SessionChange): # non-map path
         self.try_finish()
 
     def user_cb(self, success, user):
+        self.d.add_debug_data('user_cb(%r)' % bool(user))
+
         self.got_user = True
         # will use None if success == False, and fall back gracefully
         self.dest_user = user
@@ -5264,7 +5274,11 @@ class SessionChangeOld(SessionChange): # non-map path
 
     # once user and player requests have both completed, re-enter gameapi and finish the request
     def try_finish(self):
-        if (not self.got_player) or (not self.got_user): return
+        if (not self.got_player) or (not self.got_user):
+            self.d.add_debug_data('try_finish(False)')
+            return
+        self.d.add_debug_data('try_finish(True)')
+
         if self.dest_player:
             if self.dest_user:
                 self.dest_player.frame_platform = self.dest_user.frame_platform # XXX awkward
@@ -5375,6 +5389,7 @@ class SessionChangeNew(SessionChange): # new basedb path
         return new_defending_squads
 
     def really_begin(self):
+        self.d.add_debug_data('really_begin')
 
         # query for target feature (to verify type and location)
         dest_feature = self.query_dest_feature(self.session.player, self.dest_base_id)
@@ -5457,6 +5472,8 @@ class SessionChangeNew(SessionChange): # new basedb path
             base_table.lookup_async(self.session.player.home_region, self.dest_base_id, None, # do NOT send dest_feature, it's obsoleted by complete_attack!
                                     self.base_cb, 'change_session')
     def base_cb(self, success, base, landlord_id):
+        self.d.add_debug_data('base_cb(%r)' % bool(base))
+
         self.got_base = True
         self.dest_base_pre = base
         if self.dest_base_pre:
@@ -5476,10 +5493,12 @@ class SessionChangeNew(SessionChange): # new basedb path
             self.got_user = True
         self.try_finish()
     def player_cb(self, success, player):
+        self.d.add_debug_data('player_cb(%r)' % bool(player))
         self.got_player = True
         self.dest_player = player
         self.try_finish()
     def user_cb(self, success, user):
+        self.d.add_debug_data('user_cb(%r)' % bool(user))
         self.got_user = True
         self.dest_user = user
         self.try_finish()
@@ -5506,13 +5525,17 @@ class SessionChangeNew(SessionChange): # new basedb path
             else:
                 self.dest_base = None
 
-        if (not self.got_base) or (not self.got_player) or (not self.got_user): return
+        if (not self.got_base) or (not self.got_player) or (not self.got_user):
+            self.d.add_debug_data('try_finish_home(notready)')
+            return
 
         # note: this actually calls back into the "old" player.my_home path!
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
     def try_finish_remote(self):
-        if (not self.got_base) or (not self.got_player) or (not self.got_user): return
+        if (not self.got_base) or (not self.got_player) or (not self.got_user):
+            self.d.add_debug_data('try_finish_remote(notready)')
+            return
         if self.dest_player:
             if self.dest_user:
                 self.dest_player.frame_platform = self.dest_user.frame_platform # XXX awkward

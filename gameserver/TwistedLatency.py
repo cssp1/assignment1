@@ -72,6 +72,15 @@ class InstrumentedDeferred(defer.Deferred):
     def __init__(self, latency_tag):
         defer.Deferred.__init__(self)
         self.latency_tag = latency_tag
+
+        # for tracking progress of Deferreds that wait for other non-Deferred things to complete
+        # (like legacy callbacks), allow the caller to accumulate a list of "checkpoints".
+        self.debug_data = None
+
+    def add_debug_data(self, new_data):
+        if self.debug_data is None:
+            self.debug_data = []
+        self.debug_data.append(new_data)
     def _runCallbacks(self):
         start_time = time.time()
         ret = defer.Deferred._runCallbacks(self)
@@ -80,10 +89,12 @@ class InstrumentedDeferred(defer.Deferred):
             g_latency_func('(d)'+self.latency_tag, end_time - start_time)
         return ret
     def __repr__(self):
-        cname = self.__class__.__name__ + '("'+self.latency_tag+'")'
+        ret = '<'+ self.__class__.__name__ + '("'+self.latency_tag+'"'
+        if self.debug_data:
+            ret += ' '+repr(self.debug_data)
+        ret += ')'
         result = getattr(self, 'result', defer._NO_RESULT)
 
-        ret = '<' + cname
 
         if self._chainedTo is not None:
             ret += ' waiting on \n'+repr(self._chainedTo)+'\n'
