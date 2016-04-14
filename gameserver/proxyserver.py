@@ -2579,7 +2579,7 @@ class FBPortraitProxy(PortraitProxy):
         for key, val in qs.iteritems():
             if key not in ('v', 'spin_origin'):
                 return None
-        return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)
+        return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)+'?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token']})
 
 class KGPortraitProxy(PortraitProxy):
     def __init__(self):
