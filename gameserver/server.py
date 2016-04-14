@@ -3551,7 +3551,7 @@ class Session(object):
         if not self.async_ds: return # it got cleared up asynchronously (? XXXXXX not sure why this happens - post-logout?)
 
         self.async_ds_watchdog_fired = True
-        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout at %f async_ds %r after_async %r' % (self.user.user_id, time.time(), self.async_ds, self.after_async))
+        gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout! async_ds %r after_async %r' % (self.user.user_id, self.async_ds, self.after_async))
 
         # not sure what to do here...
 

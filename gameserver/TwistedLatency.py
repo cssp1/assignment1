@@ -80,16 +80,22 @@ class InstrumentedDeferred(defer.Deferred):
             g_latency_func('(d)'+self.latency_tag, end_time - start_time)
         return ret
     def __repr__(self):
-        r = defer.Deferred.__repr__(self)
-        # depends on the guts of Deferred.__repr__() :(
-        fields = r.split(' ')
-        fields[0] += '("'+self.latency_tag+'")'
-        ret = ' '.join(fields)
+        cname = self.__class__.__name__ + '("'+self.latency_tag+'")'
+        result = getattr(self, 'result', defer._NO_RESULT)
+
+        ret = '<' + cname
+
+        if self._chainedTo is not None:
+            ret += ' waiting on \n'+repr(self._chainedTo)+'\n'
+        elif result is not defer._NO_RESULT:
+            ret += ' current result: '+repr(result)
 
         if True: # add detailed info on the callback chain
             def format_cb(cb):
                 if cb is defer.passthru:
                     return '-'
+                elif cb is defer._CONTINUE:
+                    return '^'
                 elif isinstance(cb, types.FunctionType):
                     if cb.func_name == '<lambda>': # show file and line number for lambdas
                         return 'lambda(%s:%d)' % (cb.func_code.co_filename, cb.func_code.co_firstlineno)
@@ -101,5 +107,6 @@ class InstrumentedDeferred(defer.Deferred):
             for item in self.callbacks:
                 cb, cb_args, cb_kwargs = item[0]
                 eb, eb_args, eb_kwargs = item[1]
-                ret += '->(%s,%s)' % (format_cb(cb), format_cb(eb))
-        return ret
+                ret += ' ->(%s,%s)' % (format_cb(cb), format_cb(eb))
+
+        return ret + '>'
