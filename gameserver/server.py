@@ -3553,6 +3553,8 @@ class Session(object):
         self.async_ds_watchdog_fired = True
         gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout! async_ds %r after_async %r' % (self.user.user_id, self.async_ds, self.after_async))
         gamesite.exception_log.event(server_time, SessionChange.debug_dump())
+        if isinstance(io_system, S3IOSystem):
+            gamesite.exception_log.event(server_time, repr(io_system.s3_req.get_stats()))
 
         # not sure what to do here...
 
