@@ -11,43 +11,8 @@ import twisted.internet.reactor
 import twisted.web.client
 import twisted.web.error
 import traceback
+import time
 from collections import deque
-
-# Wrap Twisted's HTTP Client with a strict watchdog timer
-# Twisted's own "timeout" parameter doesn't always fire reliably, meaning it does not guarantee
-# that a request's deferred fires with either callback or errback within the timeout interval.
-# We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
-# SSL negotiation.
-
-def make_web_getter(*args, **kwargs):
-    # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
-    # and not just its .deferred member, since we want to access the response headers as well as the body.
-    getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
-
-    if kwargs and 'timeout' in kwargs:
-        # set up our own watchdog timer
-
-        # add slop time to allow Twisted's own timeout to fire first if it wants
-        delay = kwargs['timeout'] + 5 # seconds
-
-        def watchdog_func(getter):
-            if getter.deferred.called: return # somehow it succeeded
-
-            # swap a fresh Deferred into getter so that Twisted won't call the original one again
-            d, getter.deferred = getter.deferred, twisted.internet.defer.Deferred()
-            d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
-
-        watchdog = twisted.internet.reactor.callLater(delay, watchdog_func, getter)
-
-        # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
-        def cancel_watchdog_and_continue(_, watchdog):
-            if watchdog.active(): # we might be called downstream from the watchdog firing itself
-                watchdog.cancel()
-            return _
-
-        getter.deferred.addBoth(cancel_watchdog_and_continue, watchdog)
-
-    return getter
 
 class AsyncHTTPRequester(object):
     # there are two "modes" for the callbacks on a request:
@@ -170,16 +135,55 @@ class AsyncHTTPRequester(object):
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester opening connection %s, %d now in queue, %d now on wire' % (repr(request), len(self.queue), len(self.on_wire))
 
-        getter = make_web_getter(bytes(request.url), twisted.web.client.HTTPClientFactory,
-                                 method=request.method,
-                                 headers=request.headers,
-                                 agent='spinpunch game server',
-                                 timeout=self.request_timeout,
-                                 postdata=request.postdata)
+        getter = self.make_web_getter(bytes(request.url), twisted.web.client.HTTPClientFactory,
+                                      method=request.method,
+                                      headers=request.headers,
+                                      agent='spinpunch game server',
+                                      timeout=self.request_timeout,
+                                      postdata=request.postdata)
         d = getter.deferred
         d.addCallback(self.on_response, getter, request)
         d.addErrback(self.on_error, getter, request)
         return d
+
+    # Wrap Twisted's HTTP Client with a strict watchdog timer
+    # Twisted's own "timeout" parameter doesn't always fire reliably, meaning it does not guarantee
+    # that a request's deferred fires with either callback or errback within the timeout interval.
+    # We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
+    # SSL negotiation.
+
+    def make_web_getter(self, *args, **kwargs):
+        # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
+        # and not just its .deferred member, since we want to access the response headers as well as the body.
+        getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
+
+        if kwargs and 'timeout' in kwargs:
+            # set up our own watchdog timer
+
+            # add slop time to allow Twisted's own timeout to fire first if it wants
+            delay = kwargs['timeout'] + 5 # seconds
+
+            def watchdog_func(self, getter):
+                if getter.deferred.called: return # somehow it succeeded
+
+                # swap a fresh Deferred into getter so that Twisted won't call the original one again
+                d, getter.deferred = getter.deferred, twisted.internet.defer.Deferred()
+
+                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r' % time.time())
+
+                d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
+
+            watchdog = twisted.internet.reactor.callLater(delay, watchdog_func, self, getter)
+
+            # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
+            def cancel_watchdog_and_continue(_, watchdog):
+                if watchdog.active(): # we might be called downstream from the watchdog firing itself
+                    watchdog.cancel()
+                return _
+
+            getter.deferred.addBoth(cancel_watchdog_and_continue, watchdog)
+
+        return getter
 
     def on_response(self, response, getter, request):
         self.n_ok += 1
@@ -323,7 +327,7 @@ class AsyncHTTPRequester(object):
 # TEST CODE
 
 if __name__ == '__main__':
-    import sys, time
+    import sys
     from twisted.python import log
     from twisted.internet import reactor
 

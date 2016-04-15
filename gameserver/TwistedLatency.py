@@ -80,7 +80,7 @@ class InstrumentedDeferred(defer.Deferred):
     def add_debug_data(self, new_data):
         if self.debug_data is None:
             self.debug_data = []
-        self.debug_data.append(new_data)
+        self.debug_data.append((time.time(), new_data))
     def _runCallbacks(self):
         start_time = time.time()
         ret = defer.Deferred._runCallbacks(self)

@@ -3552,6 +3552,7 @@ class Session(object):
 
         self.async_ds_watchdog_fired = True
         gamesite.exception_log.event(server_time, 'player %d async_ds watchdog timeout! async_ds %r after_async %r' % (self.user.user_id, self.async_ds, self.after_async))
+        gamesite.exception_log.event(server_time, SessionChange.debug_dump())
 
         # not sure what to do here...
 
@@ -5159,8 +5160,23 @@ class SessionChange(object):
     # begin() returns a Deferred that will later fire with a list of arguments
     # to pass to change_session_complete()
 
+    # for debugging overly-long session changes, keep a set of outstanding requests
+    master_set = set()
+    @classmethod
+    def debug_dump(cls):
+        now = time.time()
+        return ','.join(('%s (%d->%r %r %s)' % (c.__class__.__name__,
+                                                c.session.user.user_id, c.dest_user_id, c.dest_base_id,
+                                                SpinConfig.pretty_print_time(now - c.start_time))) \
+                        for c in cls.master_set)
+
     def __init__(self, session, retmsg, dest_user_id, dest_base_id, new_ladder_state, delay, pre_attack):
+
+        SessionChange.master_set.add(self)
+
+        self.start_time = server_time
         self.d = make_deferred(self.__class__.__name__) # deferred to fire upon completion
+        self.d.add_debug_data('%r %r' % (dest_user_id, dest_base_id))
         self.session = session
         self.retmsg = retmsg
         self.dest_user_id = dest_user_id
@@ -5212,6 +5228,7 @@ class SessionChangeHome(SessionChange): # simple case for going back to your own
 
     def really_begin(self):
         self.d.add_debug_data('really_begin')
+        SessionChange.master_set.remove(self)
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.session.user, self.session.player,
                          None, None, self.new_ladder_state,
                          self.default_deployable_squads(self.session.player),
@@ -5286,6 +5303,7 @@ class SessionChangeOld(SessionChange): # non-map path
                 self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
                 self.dest_player.developer = self.dest_user.developer
             self.dest_player.migrate_proxy()
+        SessionChange.master_set.remove(self)
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
                          None, None, self.new_ladder_state,
                          self.default_deployable_squads(self.session.player),
@@ -5399,6 +5417,7 @@ class SessionChangeNew(SessionChange): # new basedb path
             else:
                 gamesite.exception_log.event(server_time, 'NoSQL spy error: player %d dest_base_id %s: result %s' % (self.session.player.user_id, self.dest_base_id, repr(dest_feature)))
             self.retmsg.append(["ERROR", "CANNOT_SPY_BASE_NOT_FOUND", self.dest_base_id, 'change_session'])
+            SessionChange.master_set.remove(self)
             self.d.callback(None) # fail now
             return
 
@@ -5409,6 +5428,7 @@ class SessionChangeNew(SessionChange): # new basedb path
            hex_distance(dest_feature['base_map_loc'], self.session.player.my_home.base_map_loc) != 1:
             # no squads in range, cannot spy on hostile base
             self.retmsg.append(["ERROR", "CANNOT_SPY_NO_NEARBY_SQUADS"])
+            SessionChange.master_set.remove(self)
             self.d.callback(None) # fail now
             return
 
@@ -5429,6 +5449,7 @@ class SessionChangeNew(SessionChange): # new basedb path
                 else:
                     err = "CANNOT_ATTACK_THEIR_SQUAD_MOVED" # probably can't get here (due to the dest_feature check above), but just in case
                 self.retmsg.append(["ERROR", err, "VISIT_BASE2_pre_attack"])
+                SessionChange.master_set.remove(self)
                 self.d.callback(None) # abort the spy attempt
                 return
 
@@ -5529,6 +5550,8 @@ class SessionChangeNew(SessionChange): # new basedb path
             self.d.add_debug_data('try_finish_home(notready)')
             return
 
+        SessionChange.master_set.remove(self)
+
         # note: this actually calls back into the "old" player.my_home path!
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, None, None, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
@@ -5551,6 +5574,9 @@ class SessionChangeNew(SessionChange): # new basedb path
         if self.dest_base_pre and self.dest_player:
             # complete parsing of the base using the landlord Player
             self.dest_base = base_table.parse(self.session.player.home_region, self.dest_base_id, self.dest_base_pre, self.dest_player, self.session.player, reason='visit')
+
+        SessionChange.master_set.remove(self)
+
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player, self.dest_base_id, self.dest_base, self.new_ladder_state, self.new_deployable_squads, self.new_defending_squads, self.pre_attack])
 
 # A collection of game objects indexed by ID
