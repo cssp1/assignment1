@@ -29756,7 +29756,7 @@ player.advance_squads = function() {
                         player.squad_move(squad_data['id'], path);
                     } else {
                         var s = gamedata['errors']['INVALID_MAP_LOCATION'];
-                        invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']), {'dialog':'message_dialog_big'});
+                        invoke_squad_error(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']));
                     }
                 }
                 player.squad_clear_client_data(squad_data['id']);

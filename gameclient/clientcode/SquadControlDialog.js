@@ -360,7 +360,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
 
                             if(!deploy_at) {
                                 var s = gamedata['errors']['INVALID_MAP_LOCATION'];
-                                invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']), {'dialog':'message_dialog_big'});
+                                invoke_squad_error(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']));
                                 return;
                             }
 
@@ -370,7 +370,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                                 var raid_path = player.raid_find_path_to(player.home_base_loc, to_feature);
                                 if(!raid_path) {
                                     var s = gamedata['errors']['INVALID_MAP_LOCATION'];
-                                    invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']), {'dialog':'message_dialog_big'});
+                                    invoke_squad_error(s['ui_title'], s['ui_name'].replace('%BATNAME', squad_data['ui_name']));
                                     return;
                                 }
                                 raid_info = {'path': raid_path};
