@@ -33,6 +33,7 @@ class AsyncHTTPRequester(object):
             self.callback = callback
             self.error_callback = error_callback
             self.preflight_callback = preflight_callback
+            self.callback_called = 0 # for debugging only
             self.postdata = postdata
             self.fire_time = qtime
             self.max_tries = max_tries
@@ -41,7 +42,7 @@ class AsyncHTTPRequester(object):
         def __hash__(self): return hash((self.url, self.method, self.fire_time, self.callback))
         def __repr__(self): return self.method + ' ' + self.url
         def get_stats(self):
-            return {'method':self.method, 'url':self.url, 'time':self.fire_time, 'tries': self.tries}
+            return {'method':self.method, 'url':self.url, 'time':self.fire_time, 'tries': self.tries, 'callback': self.callback_called}
 
     def __init__(self, concurrent_request_limit, total_request_limit, request_timeout, verbosity, log_exception_func,
                  max_tries = 1, retry_delay = 0, error_on_404 = True):
@@ -142,15 +143,17 @@ class AsyncHTTPRequester(object):
         if self.verbosity >= 1:
             print 'AsyncHTTPRequester opening connection %s, %d now in queue, %d now on wire' % (repr(request), len(self.queue), len(self.on_wire))
 
-        getter = self.make_web_getter(bytes(request.url), twisted.web.client.HTTPClientFactory,
+        getter = self.make_web_getter(request, bytes(request.url), twisted.web.client.HTTPClientFactory,
                                       method=request.method,
                                       headers=request.headers,
                                       agent='spinpunch game server',
                                       timeout=self.request_timeout,
                                       postdata=request.postdata)
         d = getter.deferred
-        d.addCallback(self.on_response, getter, request)
-        d.addErrback(self.on_error, getter, request)
+        assert not d.called
+        d.addCallbacks(self.on_response, errback = self.on_error,
+                       callbackArgs = (getter, request),
+                       errbackArgs = (getter, request))
         return d
 
     # Wrap Twisted's HTTP Client with a strict watchdog timer
@@ -159,10 +162,11 @@ class AsyncHTTPRequester(object):
     # We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
     # SSL negotiation.
 
-    def make_web_getter(self, *args, **kwargs):
+    def make_web_getter(self, request, *args, **kwargs):
         # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
         # and not just its .deferred member, since we want to access the response headers as well as the body.
         getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
+        assert not getter.deferred.called
 
         if kwargs and 'timeout' in kwargs:
             # set up our own watchdog timer
@@ -171,8 +175,8 @@ class AsyncHTTPRequester(object):
             # add slop time to allow Twisted's own timeout to fire first if it wants
             delay = kwargs['timeout'] + 5 # seconds
 
-            def watchdog_func(self, getter):
-                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r)' % (time.time(), getter.deferred.called))
+            def watchdog_func(self, getter, request):
+                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r) for %r' % (time.time(), getter.deferred.called, request.get_stats()))
 
                 if getter.deferred.called:
                     # callback or errback were already called, so we don't need to do anything
@@ -186,7 +190,7 @@ class AsyncHTTPRequester(object):
 
                 d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
 
-            watchdog = self.reactor.callLater(delay, watchdog_func, self, getter)
+            watchdog = self.reactor.callLater(delay, watchdog_func, self, getter, request)
 
             # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
             def cancel_watchdog_and_continue(_, self, watchdog):
@@ -210,6 +214,7 @@ class AsyncHTTPRequester(object):
             if self.verbosity >= 3:
                 print 'AsyncHTTPRequester response was:', 'status', getter.status, 'headers', getter.response_headers, 'body', response
         try:
+            request.callback_called = 1
             if request.callback_type == self.CALLBACK_FULL:
                 request.callback(body = response, headers = getter.response_headers, status = getter.status)
             else:
@@ -232,9 +237,10 @@ class AsyncHTTPRequester(object):
 
     def on_error(self, reason, getter, request):
         # note: "reason" here is a twisted.python.failure.Failure object that wraps the exception that was thrown
+        assert isinstance(reason, twisted.python.failure.Failure)
 
         # for HTTP errors, extract the HTTP status code
-        if (reason.type is twisted.web.error.Error):
+        if isinstance(reason.value, twisted.web.error.Error):
             http_code = int(reason.value.status) # note! "status" is returned as a string, not an integer!
             if http_code == 404 and (not self.error_on_404):
                 # received a 404, but the client wants to treat it as success with buf = 'NOTFOUND'
@@ -244,6 +250,7 @@ class AsyncHTTPRequester(object):
                 return self.on_response('', getter, request)
 
         self.on_wire.remove(request)
+
         if request.tries < request.max_tries:
             # retry the request by putting it back on the queue
             self.waiting_for_retry.add(request)
@@ -258,10 +265,11 @@ class AsyncHTTPRequester(object):
         if self.verbosity >= 0: # XXX maybe disable this if there's a reliable error_callback?
             self.log_exception_func('AsyncHTTPRequester error: ' + reason.getTraceback() + ' for %s (after %d tries)' % (repr(request), request.tries))
 
+        request.callback_called = 2
         if request.error_callback:
             try:
                 # transform the Failure object to a human-readable string
-                if (reason.type is twisted.web.error.Error):
+                if isinstance(reason.value, twisted.web.error.Error):
                     # for HTTP errors, we want the status AND any explanatory response that came with it
                     # (since APIs like Facebook and S3 usually have useful info in the response body when returning errors)
                     ui_reason = 'twisted.web.error.Error(HTTP %s (%s): "%s")' % (reason.value.status, reason.value.message, reason.value.response)
