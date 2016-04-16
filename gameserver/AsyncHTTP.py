@@ -176,7 +176,8 @@ class AsyncHTTPRequester(object):
             delay = kwargs['timeout'] + 5 # seconds
 
             def watchdog_func(self, getter, request):
-                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r) for %r' % (time.time(), getter.deferred.called, request.get_stats()))
+                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r paused %r result %s) for %r' % \
+                                        (time.time(), getter.deferred.called, getter.deferred.paused, repr(getter.deferred.result)[:500] if getter.deferred.called else '-', request.get_stats()))
 
                 if getter.deferred.called:
                     # callback or errback were already called, so we don't need to do anything
