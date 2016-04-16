@@ -86,6 +86,13 @@ class AsyncHTTPRequester(object):
         self.n_errors = 0
         self.n_retries = 0
 
+        # watchdog debug counters
+        self.n_watchdog_created = 0
+        self.n_watchdog_cancelled = 0
+        self.n_watchdog_fired_late = 0
+        self.n_watchdog_fired_real = 0
+        self.n_watchdog_cancel_omitted = 0
+
     def num_on_wire(self): return len(self.on_wire)
 
     def call_when_idle(self, cb):
@@ -159,29 +166,39 @@ class AsyncHTTPRequester(object):
 
         if kwargs and 'timeout' in kwargs:
             # set up our own watchdog timer
+            self.n_watchdog_created += 1
 
             # add slop time to allow Twisted's own timeout to fire first if it wants
             delay = kwargs['timeout'] + 5 # seconds
 
             def watchdog_func(self, getter):
-                if getter.deferred.called: return # somehow it succeeded
+                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r)' % (time.time(), getter.deferred.called))
+
+                if getter.deferred.called:
+                    # callback or errback were already called, so we don't need to do anything
+                    self.n_watchdog_fired_late += 1
+                    return
+
+                self.n_watchdog_fired_real += 1
 
                 # swap a fresh Deferred into getter so that Twisted won't call the original one again
                 d, getter.deferred = getter.deferred, twisted.internet.defer.Deferred()
-
-                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r' % time.time())
 
                 d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
 
             watchdog = self.reactor.callLater(delay, watchdog_func, self, getter)
 
             # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
-            def cancel_watchdog_and_continue(_, watchdog):
+            def cancel_watchdog_and_continue(_, self, watchdog):
                 if watchdog.active(): # we might be called downstream from the watchdog firing itself
+                    self.n_watchdog_cancelled += 1
                     watchdog.cancel()
+                else:
+                    self.n_watchdog_cancel_omitted += 1
+
                 return _
 
-            getter.deferred.addBoth(cancel_watchdog_and_continue, watchdog)
+            getter.deferred.addBoth(cancel_watchdog_and_continue, self, watchdog)
 
         return getter
 
@@ -279,6 +296,13 @@ class AsyncHTTPRequester(object):
                 # all accepted requests should either be in flight, or end with OK/Error. Otherwise we're "leaking" requests.
                 'missing': self.n_accepted - (self.n_ok + self.n_errors + len(self.queue) + len(self.on_wire)),
 
+                # watchdog debug counters
+                'watchdog_created': self.n_watchdog_created,
+                'watchdog_cancelled': self.n_watchdog_cancelled,
+                'watchdog_fired_late': self.n_watchdog_fired_late,
+                'watchdog_fired_real': self.n_watchdog_fired_real,
+                'watchdog_cancel_omitted': self.n_watchdog_cancel_omitted,
+
                 'queue':queue, 'num_in_queue': len(self.queue),
                 'on_wire':on_wire, 'num_on_wire': len(self.on_wire),
                 'waiting_for_retry':waiting_for_retry, 'num_waiting_for_retry' : len(self.waiting_for_retry),
@@ -300,7 +324,7 @@ class AsyncHTTPRequester(object):
     @staticmethod
     def stats_to_html(stats, cur_time, expose_info = True):
         ret = '<table border="1" cellspacing="0">'
-        for key in ('accepted', 'dropped', 'fired', 'retries', 'done_ok', 'done_error', 'missing', 'num_on_wire','num_in_queue','num_waiting_for_retry'):
+        for key in ('accepted', 'dropped', 'fired', 'retries', 'done_ok', 'done_error', 'missing', 'num_on_wire','num_in_queue','num_waiting_for_retry', 'watchdog_created', 'watchdog_cancelled', 'watchdog_fired_late', 'watchdog_fired_real', 'watchdog_cancel_omitted'):
             val = str(stats[key])
             if key == 'missing' and stats[key] > 0:
                 val = '<font color="#ff0000">'+val+'</font>'
