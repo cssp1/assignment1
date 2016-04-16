@@ -173,7 +173,7 @@ class AsyncHTTPRequester(object):
 
                 d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
 
-            watchdog = twisted.internet.reactor.callLater(delay, watchdog_func, self, getter)
+            watchdog = self.reactor.callLater(delay, watchdog_func, self, getter)
 
             # cancel the watchdog as soon as getter.deferred fires, regardless of whether it's a callback or errback
             def cancel_watchdog_and_continue(_, watchdog):
