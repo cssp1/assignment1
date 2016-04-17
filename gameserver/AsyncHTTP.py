@@ -176,20 +176,15 @@ class AsyncHTTPRequester(object):
             delay = kwargs['timeout'] + 5 # seconds
 
             def watchdog_func(self, getter, request):
-                self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r paused %r result %s) for %r' % \
-                                        (time.time(), getter.deferred.called, getter.deferred.paused, repr(getter.deferred.result)[:500] if getter.deferred.called else '-', request.get_stats()))
-
-#                if getter.deferred.called and not isinstance(getter.deferred.result, twisted.internet.defer.Deferred):
-#                    # callback or errback were already called with a valid result, so we don't need to do anything
-#                    self.n_watchdog_fired_late += 1
-#                    return
+                if self.verbosity >= 1:
+                    self.log_exception_func('AsyncHTTP getter watchdog timeout at %r (deferred.called %r paused %r result %s) for %r' % \
+                                            (time.time(), getter.deferred.called, getter.deferred.paused, repr(getter.deferred.result)[:500] if getter.deferred.called else '-', request.get_stats()))
 
                 self.n_watchdog_fired_real += 1
+
+                # abort the request and errback it with a failure, if it hasn't called back yet
                 getter.deferred.cancel()
 
-                # swap a fresh Deferred into getter so that Twisted won't call the original one again
-                #d, getter.deferred = getter.deferred, twisted.internet.defer.Deferred()
-                #d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP getter watchdog timeout')))
 
             watchdog = self.reactor.callLater(delay, watchdog_func, self, getter, request)
 

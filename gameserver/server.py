@@ -3561,10 +3561,11 @@ class Session(object):
 
         # not sure what to do here...
 
-        gamesite.gameapi.log_out_async(self, 'async_ds_timeout', force = True)
-#        d_list, self.async_ds = self.async_ds, []
-#        for d in d_list:
-#            d.errback(failure.Failure(Exception('async_ds watchdog timeout')))
+        #gamesite.gameapi.log_out_async(self, 'async_ds_timeout', force = True)
+        d_list, self.async_ds = self.async_ds, []
+        for d in d_list:
+            d.cancel()
+            #d.errback(failure.Failure(Exception('async_ds watchdog timeout')))
 
     # exception to pass to after_async_request callbacks that fire after logout has begun
     class AlreadyLoggedOut(Exception): pass
