@@ -24,6 +24,7 @@ time_now = int(time.time())
 
 constrain_resources = True # enable resource system
 constrain_power = True # enable power system
+constrain_foreman = False # XXXXXX foreman accounting
 
 is_payer = False # if true, player is willing to spend gamebucks where possible
 free_resources = False # if true, assume player can get unlimited amounts of iron/water for free (via alts or battle)
@@ -153,6 +154,9 @@ class State(object):
         # special-case hack for SG, which requires using gamebucks on the CCL1->2 upgrade during the tutorial
         if game_id == 'sg':
             self.player.my_base[0].level = 2
+
+    def serialize(self):
+        return {'t': self.t, 'townhall_level': self.player.get_townhall_level() }
 
     def clone(self):
         new = State()
@@ -518,8 +522,10 @@ if __name__ == '__main__':
     to_cc_level = None
     max_iter = 9999999
     heuristic = 'random'
+    output_filename = None
+
     opts, args = getopt.gnu_getopt(sys.argv, 'g:vpf', ['verbose','payer','free-resources','take-breaks',
-                                                       'to-cc-level=','heuristic=',
+                                                       'to-cc-level=','heuristic=','output=',
                                                        'max-iter='])
     for key,val in opts:
         if key == '-g': game_id = val
@@ -531,6 +537,7 @@ if __name__ == '__main__':
         elif key == '--heuristic':
             assert val in ('random', 'first')
             heuristic = val
+        elif key == '--output': output_filename = val
         elif key == '--max-iter': max_iter = int(val)
 
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -593,3 +600,6 @@ if __name__ == '__main__':
     print 'Total time: %d sec (= %.1f days, %.1f days optimal) (= %d gamebucks)' % \
           (state.t, (state.t/86400.0), (state.optimal_t/86400.0), cost_of_time(state.optimal_t, 'default'))
 
+    if output_filename:
+        with open(output_filename, 'a+') as fd:
+            SpinJSON.dump(state.serialize(), fd, newline = True)
