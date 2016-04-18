@@ -263,10 +263,13 @@ class BuildingQuantityPredicate(Predicate):
         Predicate.__init__(self, data)
         self.building_type = data['building_type']
         self.trigger_qty = data['trigger_qty']
+        self.under_construction_ok = data.get('under_construction_ok', False)
+
     def is_satisfied(self, player, qdata):
         howmany = 0
         for obj in player.home_base_iter():
-            if obj.spec.kind == 'building' and obj.spec.name == self.building_type and (not obj.is_under_construction()) and obj.owner is player:
+            if obj.spec.kind == 'building' and obj.spec.name == self.building_type and \
+               ((not obj.is_under_construction()) or self.under_construction_ok):
                 howmany += 1
         return (howmany >= self.trigger_qty)
 
@@ -281,7 +284,6 @@ class BuildingLevelPredicate(Predicate):
         count = 0
         for obj in player.home_base_iter():
             if obj.spec.kind == 'building' and obj.spec.name == self.building_type and \
-               (obj.owner is player) and \
                (not obj.is_under_construction()):
                 if (obj.level >= self.trigger_level):
                     count += 1
