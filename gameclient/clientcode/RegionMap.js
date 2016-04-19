@@ -257,7 +257,8 @@ RegionMap.MoveCursor.prototype.do_get_path = function(cell) {
                     'ui_name': gamedata['strings']['regional_map']['movement_blocked'],
                     'text_color': 'rgba(255,0,0,1.0)'};
         } else {
-            this.path = player.squad_find_path_adjacent_to(this.squad_id, cell);
+            // allow you to bump your own moving squads only when using manual cursor movement
+            this.path = player.squad_find_path_adjacent_to(this.squad_id, cell, {bump_self: true});
             if(!this.path || this.path.length<1 || !vec_equals(this.path[this.path.length-1], cell)) {
                 return {'action':'blocked',
                         'ui_name': gamedata['strings']['regional_map']['movement_blocked'],

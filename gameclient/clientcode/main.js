@@ -29397,8 +29397,9 @@ player.raid_find_path_to = function(start_loc, dest_feature) {
 /** NOT TO BE USED FOR RAIDS
     @param {number} squad_id
     @param {!Array<number>} dest
+    @param {{bump_self:(boolean|undefined)}=} options
     @return {AStar.PathChecker|null} */
-player.make_squad_path_checker = function(squad_id, dest) {
+player.make_squad_path_checker = function(squad_id, dest, options) {
     // only applies to after_move mode; otherwise any blocker blocks.
     if(player.squad_block_mode() !== 'after_move') { return null; }
     var bumping_enabled = player.squad_bumping_enabled();
@@ -29407,7 +29408,8 @@ player.make_squad_path_checker = function(squad_id, dest) {
         if(cell.block_count > 0) {
             for(var i = 0; i < cell.blockers.length; i++) {
                 var feature = cell.blockers[i];
-                if(session.region.feature_is_moving(feature)) {
+                if(((options && options.bump_self) || feature['base_landlord_id'] !== session.user_id) &&
+                   session.region.feature_is_moving(feature)) {
                     var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
                     var their_arrival_time = last_waypoint['eta'];
                     var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
@@ -29428,14 +29430,16 @@ player.make_squad_path_checker = function(squad_id, dest) {
     };
 };
 /** NOT TO BE USED FOR RAIDS
+    @param {{bump_self:(boolean|undefined)}=} options
     @return {AStar.BlockChecker|null} */
-player.make_squad_cell_checker = function() {
+player.make_squad_cell_checker = function(options) {
     if(!player.squad_bumping_enabled()) { return null; } // any blocker blocks
     return function(cell) {
         if(cell.block_count > 0) {
             for(var i = 0; i < cell.blockers.length; i++) {
                 var feature = cell.blockers[i];
-                if(session.region.feature_is_moving(feature)) {
+                if(((options && options.bump_self) || feature['base_landlord_id'] !== session.user_id) &&
+                   session.region.feature_is_moving(feature)) {
                     var last_waypoint = feature['base_map_path'][feature['base_map_path'].length-1];
                     var their_arrival_time = last_waypoint['eta'];
                     var fudge_time = gamedata['territory']['pass_moving_squads_fudge_time'] || 0; // give some conservative leeway for network latency, otherwise players could get frustrated
@@ -29459,8 +29463,9 @@ player.make_squad_cell_checker = function() {
     Returns null if no path exists.
     @param {number} squad_id
     @param {!Array<number>} dest
+    @param {{bump_self:(boolean|undefined)}=} options
     @return {Array<Array<number>>|null} */
-player.squad_find_path_adjacent_to = function(squad_id, dest) {
+player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
     if(!session.region || !session.region.data) { return null; }
     if(player.squad_is_moving(squad_id)) { throw Error('squad '+squad_id.toString()+' is still moving'); }
     if(player.squad_is_raid(squad_id)) { throw Error('squad_find_path_adjacent_to() should not be used for raids'); }
@@ -29476,8 +29481,8 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
     // arrival time to check against depends on how long it takes us to get ther.
 
     // if dest is not blocked, try going directly there
-    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker())) {
-        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest));
+    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker(options))) {
+        var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest, options));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             return path; // good path
         }
@@ -29490,17 +29495,16 @@ player.squad_find_path_adjacent_to = function(squad_id, dest) {
 
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
-        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker())) {
-            var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n));
+        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker(options))) {
+            var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n, options));
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
                 // good path
-
                 // trim off unnecessary extra moves at the end of the path that just circle around the destination hex
                 // note: need to check for blockage on this intermediate waypoint before changing the final destination to it,
                 // because it might be the destination of another moving squad, where we aren't allowed to land.
                 while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1 &&
-                      !session.region.occupancy.is_blocked(path[path.length-2], player.make_squad_cell_checker())) {
+                      !session.region.occupancy.is_blocked(path[path.length-2], player.make_squad_cell_checker(options))) {
                     goog.array.removeAt(path, path.length-1);
                 }
                 var travel_time = player.squad_travel_time(squad_id, path);
