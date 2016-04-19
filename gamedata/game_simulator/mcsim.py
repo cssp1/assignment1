@@ -10,13 +10,13 @@
 
 # Run in gameserver/ directory as:
 
-# PYTHONPATH=. ../gamedata/game_simulator/mcsim.py --to-cc-level=5 --heuristic=priority --take-breaks -f
+# PYTHONPATH=. ../gamedata/game_simulator/mcsim.py --to-cc-level 5 --heuristic=discounted-coolness -v -g tr --take-breaks -f
 
 import SpinJSON
 import SpinConfig
 import ResPrice
 import Predicates # share code with gameserver!
-import sys, getopt, copy, time, random
+import sys, getopt, copy, time, random, math
 
 verbose = 0
 gamedata = None # will be loaded below
@@ -31,6 +31,32 @@ is_payer = False # if true, player is willing to spend gamebucks where possible
 free_resources = False # if true, assume player can get unlimited amounts of iron/water for free (via alts or battle)
 take_breaks = False # if true, waits above 15m turn into longer breaks
 collect_quests = False # if true, player always immediately collects quest rewards XXX buggy since we don't support all predicates
+discount_tau = 0.25 # coolness decays by tau/e per hour
+
+COOLNESS = {
+    # CONSTANT
+    'fix_low_power': 10000000.0,
+    'harvester_new': 1000.0,
+    'factory_new': 1000.0,
+    'lab_new': 1000.0,
+    'generator': 0.001,
+
+    # VARIABLE
+    'townhall': 20.0,
+    'tech_unlock': 1000.0,
+
+    'harvester': 4.0,
+    'storage': 10.0, 'storage_res3': 1.0,
+    'lab': 2.0, 'factory': 2.0,
+    'tech_upgrade': 0.5,
+
+    'turret': 0.5, 'turret_new': 1.1,
+    'warehouse': 0.1,
+
+    'default': 1.0,
+    }
+
+def pretty_print_priority(p): return 'P%.9g' % p
 
 def get_leveled_quantity(qty, level):
     if type(qty) is list:
@@ -115,6 +141,38 @@ class MockSpec(object):
         self.json_spec = json_spec
     def __getattr__(self, name):
         return self.json_spec.get(name, self.DEFAULTS.get(name, 0))
+
+    def get_building_coolness(self, level):
+        if self.name == gamedata['townhall']:
+            return COOLNESS['townhall']
+        elif any(getattr(self, 'produces_'+res, 0) for res in gamedata['resources']):
+            for res in gamedata['resources']:
+                if getattr(self, 'produces_'+res, 0):
+                    return COOLNESS['harvester_new'] if level == 1 else COOLNESS['harvester']
+
+        elif any(getattr(self, 'storage_'+res, 0) for res in gamedata['resources']):
+            for res in gamedata['resources']:
+                if getattr(self, 'storage_'+res, 0):
+                    return COOLNESS.get('storage_'+res, COOLNESS['storage'])
+
+        elif self.research_categories:
+            return COOLNESS['lab_new'] if level == 1 else COOLNESS['lab']
+        elif self.manufacture_category:
+            return COOLNESS['factory_new'] if level == 1 else COOLNESS['factory']
+        elif self.spells and self.spells[0].endswith('SHOOT'):
+            return COOLNESS['turret_new'] if level == 1 else COOLNESS['turret']
+        elif self.provides_power:
+            return COOLNESS['generator']
+        elif self.provides_inventory:
+            return COOLNESS['warehouse']
+        else:
+            return COOLNESS.get('default', 1.0)
+
+    def get_tech_coolness(self, level):
+        if level == 1:
+            return COOLNESS['tech_unlock'] # higher priority for first unlock of something
+        else:
+            return COOLNESS['tech_upgrade']
 
 class MockQuest(object):
     def __init__(self, json_spec):
@@ -259,11 +317,23 @@ class State(object):
             new.player.resources[res] -= qty
         return new
 
-    def advance_time(self, min_dt, actual_dt):
+    def advance_time(self, min_dt, actual_dt, reason = None):
         # min_dt is the optimal "speedup-able" wait time
         # acutal_dt is how long the player actually waits
 
-        if min_dt >= 3600: print '-'*30
+        if verbose >= 2:
+            if True:
+                lines = int(actual_dt) // 3600
+            elif actual_dt >= 86400: # 1day+
+                lines = 4
+            elif actual_dt >= 8*3600: # 8 hours+
+                lines = 2
+            elif actual_dt >= 15*60: # 15min+
+                lines = 1
+            else:
+                lines = 0
+            for i in xrange(lines):
+                print '.'*6, reason or ''
 
         new = self.clone()
         new.t += actual_dt
@@ -290,19 +360,33 @@ class State(object):
 
         # update building states
         new_base = []
+        m_and_m = None
+
         for obj in new.player.my_base:
             if obj.research_finish_time > 0 and new.t >= obj.research_finish_time:
                 obj = obj.clone()
                 techname, obj.research_item, obj.research_finish_time = obj.research_item, None, -1
                 new.player.tech = copy.copy(new.player.tech)
                 new.player.tech[techname] = new.player.tech.get(techname,0) + 1
+                reward = ResearchTechAction(techname, new.player.tech[techname], 0)
+                if (not m_and_m) or (reward.coolness > m_and_m.coolness):
+                    m_and_m = reward
+
             if obj.upgrade_finish_time > 0 and new.t >= obj.upgrade_finish_time:
                 obj = obj.clone()
                 obj.upgrade_finish_time = -1
                 obj.level += 1
+                reward = UpgradeBuildingAction(obj.spec.name, obj.level, 0)
+                if (not m_and_m) or (reward.coolness > m_and_m.coolness):
+                    m_and_m = reward
+
             new_base.append(obj)
 
         new.player.my_base = new_base
+
+        if verbose and m_and_m and m_and_m.coolness >= 1:
+            print '*'*min(10, int(m_and_m.coolness)), m_and_m.coolness, m_and_m
+
         return new
 
     def upgrade_tech(self, techname, newlevel):
@@ -381,22 +465,25 @@ class State(object):
         return new
 
 class Action(object):
-    def __init__(self, implied_wait, priority):
+    def __init__(self, implied_wait, coolness):
         # for strategy choice only - how long this action takes, for comparison vs. other possible actions
         self.implied_wait = implied_wait
-        self.priority = priority
+        self.coolness = coolness
+    def priority(self):
+        #print self.coolness, self.implied_wait, self.implied_wait/3600.0, -((self.implied_wait/3600.0) * discount_tau)
+        return self.coolness * math.exp(-((self.implied_wait/3600.0) * discount_tau))
 
 class WaitAction(Action):
-    def __init__(self, duration, reason, override_priority = None):
+    def __init__(self, duration, reason, override_coolness = None):
         Action.__init__(self,
-                        duration if override_priority else float('inf'),
-                        override_priority or float('-inf')) # just waiting is the worst choice
+                        duration,
+                        override_coolness or float('-inf')) # just waiting is the worst choice
 
         self.min_duration = duration
 
-        # if simulating human attention span, turn any 15m+ wait
+        # if simulating human attention span, turn any 29m+ wait
         # into a random number of hours
-        if take_breaks and duration > 15*60 and (duration > 6*60 or random.random() < 0.5):
+        if take_breaks and duration > 29*60 and (duration > 6*60 or random.random() < 0.25):
             self.actual_duration = max(duration, random.randint(0,24)* 3600)
         else:
             self.actual_duration = self.min_duration
@@ -405,35 +492,29 @@ class WaitAction(Action):
 
     def __repr__(self):
         if take_breaks:
-            return 'Wait %s (actual %s) (%s) P%f' % (SpinConfig.pretty_print_time(self.min_duration),
-                                                     SpinConfig.pretty_print_time(self.actual_duration),
-                                                     self.reason, self.priority)
+            return 'Wait %s (actual %s) (%s) %s' % (SpinConfig.pretty_print_time(self.min_duration),
+                                                    SpinConfig.pretty_print_time(self.actual_duration),
+                                                    self.reason, pretty_print_priority(self.priority()))
         else:
-            return 'Wait %s (%s) P%f' % (SpinConfig.pretty_print_time(self.min_duration), self.reason, self.priority)
+            return 'Wait %s (%s) %s' % (SpinConfig.pretty_print_time(self.min_duration), self.reason, pretty_print_priority(self.priority()))
 
     def apply(self, state):
-        return state.advance_time(self.min_duration, self.actual_duration)
+        return state.advance_time(self.min_duration, self.actual_duration, reason = self.reason)
 
 class ConstructBuildingAction(Action):
-    def __init__(self, specname, override_priority = None):
+    def __init__(self, specname, override_coolness = None):
         spec = MockSpec(gamedata['buildings'][specname])
         build_time = get_leveled_quantity(spec.build_time, 1)
 
-        if override_priority:
-            priority = override_priority
-        elif any(getattr(spec, 'produces_'+res, 0) for res in gamedata['resources']):
-            priority = 310 # check vs townhall
-        elif any(getattr(spec, 'storage_'+res, 0) for res in gamedata['resources'] if res != 'res3'):
-            priority = 320
-        elif spec.research_categories or spec.manufacture_category: # emphasize labs/factories
-            priority = 400
+        if override_coolness:
+            coolness = override_coolness
         else:
-            priority = 300
+            coolness = spec.get_building_coolness(1)
 
-        Action.__init__(self, build_time, priority)
+        Action.__init__(self, build_time, coolness)
         self.specname = specname
 
-    def __repr__(self): return 'Construct "%s" L%d P%f' % (self.specname, 1, self.priority)
+    def __repr__(self): return 'Construct "%s" L%d %s' % (self.specname, 1, pretty_print_priority(self.priority()))
     def apply(self, state):
         spec = MockSpec(gamedata['buildings'][self.specname])
 
@@ -451,27 +532,21 @@ class ConstructBuildingAction(Action):
         return state
 
 class UpgradeBuildingAction(Action):
-    def __init__(self, specname, newlevel, idx, override_priority = None):
+    def __init__(self, specname, newlevel, idx, override_coolness = None):
         spec = MockSpec(gamedata['buildings'][specname])
         build_time = get_leveled_quantity(spec.build_time, newlevel)
 
-        if override_priority:
-            priority = override_priority
-        elif spec.name == gamedata['townhall']:
-            priority = 300
-        elif any(getattr(spec, 'produces_'+res, 0) for res in gamedata['resources']):
-            priority = 300 # check vs townhall
-        elif any(getattr(spec, 'storage_'+res, 0) for res in gamedata['resources'] if res != 'res3'):
-            priority = 320
+        if override_coolness:
+            coolness = override_coolness
         else:
-            priority = 100
+            coolness = spec.get_building_coolness(newlevel)
 
-        Action.__init__(self, build_time, priority)
+        Action.__init__(self, build_time, coolness)
         self.specname = specname
         self.newlevel = newlevel
         self.idx = idx
 
-    def __repr__(self): return 'Upgrade "%s" L%d #%d P%f' % (self.specname, self.newlevel, self.idx, self.priority)
+    def __repr__(self): return 'Upgrade "%s" L%d #%d %s' % (self.specname, self.newlevel, self.idx, pretty_print_priority(self.priority()))
     def apply(self, state):
         spec = MockSpec(gamedata['buildings'][self.specname])
 
@@ -504,17 +579,14 @@ class ResearchTechAction(Action):
         spec = MockSpec(gamedata['tech'][specname])
         research_time = get_leveled_quantity(spec.research_time, newlevel)
 
-        if newlevel == 1:
-            priority = 200 # higher priority for first unlock of something
-        else:
-            priority = 50
+        coolness = spec.get_tech_coolness(newlevel)
 
-        Action.__init__(self, research_time, priority)
+        Action.__init__(self, research_time, coolness)
         self.specname = specname
         self.newlevel = newlevel
         self.lab_idx = lab_idx
 
-    def __repr__(self): return 'Research "%s" L%d P%f' % (self.specname, self.newlevel, self.priority)
+    def __repr__(self): return 'Research "%s" L%d %s' % (self.specname, self.newlevel, pretty_print_priority(self.priority()))
     def apply(self, state):
         spec = MockSpec(gamedata['tech'][self.specname])
         assert state.player.tech.get(self.specname,0) == self.newlevel - 1
@@ -578,7 +650,7 @@ def get_possible_actions(state, strategy):
                    for res in gamedata['resources']):
                 continue # resource cost failed
 
-            ret_construct.append(ConstructBuildingAction(specname, override_priority = 999 if is_low_power and spec.provides_power else None))
+            ret_construct.append(ConstructBuildingAction(specname, override_coolness = COOLNESS['fix_low_power'] if is_low_power and spec.provides_power else None))
 
         # building upgrade
         if (not strategy) or (not ret_construct): # if strategy is enabled, always construct before upgrade
@@ -600,16 +672,18 @@ def get_possible_actions(state, strategy):
                     continue # not allowed to Use Resources
 
                 action = UpgradeBuildingAction(spec.name, newlevel, i,
-                                               override_priority = 999 if is_low_power and spec.provides_power else None)
+                                               override_coolness = COOLNESS['fix_low_power'] if is_low_power and spec.provides_power else None)
 
                 if constrain_resources and \
                    any(cost[res] > player.resources[res] for res in gamedata['resources']):
                     # resource cost failed
-                    if action.priority >= 125:
+                    if action.coolness > COOLNESS.get('default',1.0):
                         # but, it might be important enough to wait for...
                         if not any(cost[res] > storage_cap[res] for res in gamedata['resources']):
                             action = WaitAction(state.get_time_to_reach_resources(cost),
-                                                'for resources for '+str(action), override_priority = action.priority-1)
+                                                'for resources for '+str(action),
+                                                # note: discount by action time PLUS wait time
+                                                override_coolness = action.priority())
                             ret_wait.append(action)
                             continue
                         else:
@@ -668,7 +742,7 @@ def apply_gamedata_hacks(gamedata):
             # yards L4 slow down progress to CC3
             gamedata['buildings'][specname]['requires'][4-1] = { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 }
             # yards L6 (L4 if free resources) slow down progress to CC4
-            gamedata['buildings'][specname]['requires'][4-1] = { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 4 }
+            gamedata['buildings'][specname]['requires'][6-1] = { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 4 }
             # yards L7 slow down progress to CC5
             gamedata['buildings'][specname]['requires'][7-1] = { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 5 }
 
@@ -692,7 +766,7 @@ if __name__ == '__main__':
         elif key == '--take-breaks': take_breaks = True
         elif key == '--to-cc-level': to_cc_level = int(val)
         elif key == '--heuristic':
-            assert val in ('random', 'first', 'fastest', 'priority')
+            assert val in ('random', 'first', 'fastest', 'discounted-coolness')
             heuristic = val
         elif key == '--strategy':
             strategy = val
@@ -707,6 +781,11 @@ if __name__ == '__main__':
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
     apply_gamedata_hacks(gamedata)
 
+    if 0:
+        print ResearchTechAction('m109_production', 6, 0).priority()
+        print ResearchTechAction('m2bradley_production', 1, 0).priority()
+        sys.exit(0)
+
     state = State()
     state.init_starting_conditions()
 
@@ -715,8 +794,6 @@ if __name__ == '__main__':
     while i < max_iter:
 
         cc_level = state.player.get_townhall_level()
-        if to_cc_level and cc_level >= to_cc_level:
-            break
 
         storage_cap = state.player.get_resource_storage_cap()
 
@@ -724,6 +801,11 @@ if __name__ == '__main__':
             #print '-'*80
             print '%4d CC%2d %13s %52s' % \
                   (i, cc_level, SpinConfig.pretty_print_time(state.t), ', '.join('%s: %8d/%8d' % (res, state.player.resources[res], storage_cap[res]) for res in gamedata['resources'] if res != 'res3')),
+
+        if to_cc_level and cc_level >= to_cc_level:
+            if verbose:
+                print 'DONE!'
+            break
 
         actions = get_possible_actions(state, strategy)
         if not actions:
@@ -739,11 +821,11 @@ if __name__ == '__main__':
         elif heuristic == 'fastest':
             actions.sort(key = lambda a: a.implied_wait)
             action = actions[0]
-        elif heuristic == 'priority':
-            actions.sort(key = lambda a: (-a.priority, a.implied_wait))
+        elif heuristic == 'discounted-coolness':
+            actions.sort(key = lambda a: -a.priority())
             action = actions[0]
 
-        if verbose >= 2:
+        if verbose >= 3:
             print
             print '\n'.join(map(str,actions))
 
