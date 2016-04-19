@@ -24,7 +24,7 @@ time_now = int(time.time())
 
 constrain_resources = True # enable resource system
 constrain_power = True # enable power system
-constrain_foreman = False # XXXXXX foreman accounting
+constrain_foremen = True # foreman accounting
 
 is_payer = False # if true, player is willing to spend gamebucks where possible
 free_resources = False # if true, assume player can get unlimited amounts of iron/water for free (via alts or battle)
@@ -94,6 +94,16 @@ class MockPlayer(object):
     def get_townhall_level(self):
         assert self.my_base[0].spec.name == gamedata['townhall']
         return self.my_base[0].level
+    def foreman_is_free(self):
+        total = 0
+        in_use = 0
+        for obj in self.home_base_iter():
+            if obj.spec.provides_foremen:
+                total += obj.get_leveled_quantity(obj.spec.provides_foremen)
+            if obj.is_under_construction() or obj.is_upgrading():
+                in_use += 1
+        total = max(total, 1) # min 1 foreman
+        return in_use < total
 
 class MockSpec(object):
     DEFAULTS = {'research_credit_cost': -1,
@@ -168,15 +178,19 @@ class State(object):
 
     def get_min_wait(self):
         min_wait = -1
+        wait_reason = None
+
         for obj in self.player.my_base:
             if obj.research_finish_time > 0:
                 togo = max(obj.research_finish_time - self.t, 0)
                 if min_wait < 0 or togo < min_wait:
                     min_wait = togo
+                    wait_reason = 'Research "%s" L%d' % (obj.research_item, self.player.tech.get(obj.research_item,0)+1)
             if obj.upgrade_finish_time > 0:
                 togo = max(obj.upgrade_finish_time - self.t, 0)
                 if min_wait < 0 or togo < min_wait:
                     min_wait = togo
+                    wait_reason = 'Upgrade "%s" L%d' % (obj.spec.name, obj.level+1)
 
         if min_wait < 0: # no buildings to wait on - check for harvesting
             cap = self.player.get_resource_storage_cap()
@@ -189,10 +203,15 @@ class State(object):
                                 if to_harvest > 0:
                                     rate = obj.get_leveled_quantity(getattr(obj.spec, 'produces_'+res))
                                     togo = max(to_harvest * (3600.0/rate), 1)
+
+                                    # cap this at ~2 hours though
+                                    togo = min(togo, 7200)
+
                                     if min_wait < 0 or togo < min_wait:
                                         min_wait = togo
+                                        wait_reason = 'Harvest resources'
 
-        return min_wait
+        return min_wait, wait_reason
 
     def spend_resources(self, amounts):
         new = self.clone()
@@ -225,7 +244,7 @@ class State(object):
                         if getattr(obj.spec, 'produces_'+res, 0):
                             rate = obj.get_leveled_quantity(getattr(obj.spec, 'produces_'+res))
                             amount = int(rate*(actual_dt/3600.0))
-                            new.player.resources[res] = max(cap[res], new.player.resources[res] + amount)
+                            new.player.resources[res] = min(cap[res], new.player.resources[res] + amount)
 
         # update building states
         new_base = []
@@ -319,32 +338,45 @@ class State(object):
                 new.player.resources[res] = min(cap[res], new.player.resources[res] + quest.get('reward_'+res,0))
         return new
 
-class Action(object): pass
+class Action(object):
+    def __init__(self, implied_wait):
+        # for strategy choice only - how long this action takes, for comparison vs. other possible actions
+        self.implied_wait = implied_wait
 
 class WaitAction(Action):
-    def __init__(self, duration):
+    def __init__(self, duration, reason):
+        Action.__init__(self, float('inf')) # just waiting is the worst choice
+
         self.min_duration = duration
 
         # if simulating human attention span, turn any 15m+ wait
         # into a random number of hours
-        if take_breaks and duration > 15*60:
+        if take_breaks and duration > 15*60 and (duration > 6*60 or random.random() < 0.5):
             self.actual_duration = max(duration, random.randint(0,24)* 3600)
         else:
             self.actual_duration = self.min_duration
 
+        self.reason = reason
+
     def __repr__(self):
         if take_breaks:
-            return 'Wait %s (actual %s)' % (SpinConfig.pretty_print_time(self.min_duration),
-                                            SpinConfig.pretty_print_time(self.actual_duration))
+            return 'Wait %s (actual %s) (%s)' % (SpinConfig.pretty_print_time(self.min_duration),
+                                                 SpinConfig.pretty_print_time(self.actual_duration),
+                                                 self.reason)
         else:
-            return 'Wait %s' % SpinConfig.pretty_print_time(self.min_duration)
+            return 'Wait %s (%s)' % (SpinConfig.pretty_print_time(self.min_duration), self.reason)
 
     def apply(self, state):
         return state.advance_time(self.min_duration, self.actual_duration)
 
 class ConstructBuildingAction(Action):
     def __init__(self, specname):
+        spec = MockSpec(gamedata['buildings'][specname])
+        build_time = get_leveled_quantity(spec.build_time, 1)
+
+        Action.__init__(self, build_time)
         self.specname = specname
+
     def __repr__(self): return 'Construct "%s" L%d' % (self.specname, 1)
     def apply(self, state):
         spec = MockSpec(gamedata['buildings'][self.specname])
@@ -364,9 +396,14 @@ class ConstructBuildingAction(Action):
 
 class UpgradeBuildingAction(Action):
     def __init__(self, specname, newlevel, idx):
+        spec = MockSpec(gamedata['buildings'][specname])
+        build_time = get_leveled_quantity(spec.build_time, newlevel)
+
+        Action.__init__(self, build_time)
         self.specname = specname
         self.newlevel = newlevel
         self.idx = idx
+
     def __repr__(self): return 'Upgrade "%s" L%d #%d' % (self.specname, self.newlevel, self.idx)
     def apply(self, state):
         spec = MockSpec(gamedata['buildings'][self.specname])
@@ -397,9 +434,14 @@ class UpgradeBuildingAction(Action):
 
 class ResearchTechAction(Action):
     def __init__(self, specname, newlevel, lab_idx):
+        spec = MockSpec(gamedata['tech'][specname])
+        research_time = get_leveled_quantity(spec.research_time, newlevel)
+
+        Action.__init__(self, research_time)
         self.specname = specname
         self.newlevel = newlevel
         self.lab_idx = lab_idx
+
     def __repr__(self): return 'Research "%s" L%d' % (self.specname, self.newlevel)
     def apply(self, state):
         spec = MockSpec(gamedata['tech'][self.specname])
@@ -427,92 +469,105 @@ class ResearchTechAction(Action):
 
         return state
 
-def get_possible_actions(state):
-    ret = []
+def get_possible_actions(state, strategy):
     player = state.player
     current_power = state.player.get_power_state()
     cc_level = state.player.get_townhall_level()
-    gen = gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']
+    #gen = gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']
+
+    ret_construct = []
+    ret_upgrade = []
+    ret_tech = []
+    ret_wait = []
+
+    if (not constrain_foremen) or player.foreman_is_free():
+
+        # building construction
+        for specname, json_spec in gamedata['buildings'].iteritems():
+            if specname in ('barrier', 'minefield'): continue # skip these for now
+            spec = MockSpec(json_spec)
+            if spec.developer_only: continue
+
+            if constrain_power and \
+               (not spec.provides_power) and current_power[0] < current_power[1]: continue
+
+            limit = get_leveled_quantity(spec.limit, cc_level)
+            if Predicates.read_predicate({'predicate': 'BUILDING_QUANTITY', 'building_type': specname, 'trigger_qty': limit, 'under_construction_ok': 1}).is_satisfied(player, None): continue
+            if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, 1)).is_satisfied(player, None)) \
+                   for pred in (spec.show_if, spec.requires, spec.activation)):
+                continue # predicate failed
+            if (not is_payer) and \
+               any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) < 0 \
+                   for res in gamedata['resources']):
+                continue # not allowed to Use Resources
+            if constrain_resources and \
+               any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) > player.resources[res] \
+                   for res in gamedata['resources']):
+                continue # resource cost failed
+            ret_construct.append(ConstructBuildingAction(specname))
+
+        # building upgrade
+        if (not strategy) or (not ret_construct): # if strategy is enabled, always construct before upgrade
+
+            for i, obj in enumerate(player.home_base_iter()):
+                if obj.is_busy(): continue
+                if obj.spec.name == 'barrier': continue # skip for now
+                if obj.level >= len(obj.spec.build_time): continue # maxed level
+                newlevel = obj.level + 1
+                spec = obj.spec
+                if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, newlevel)).is_satisfied(player, None)) \
+                       for pred in (spec.show_if, spec.requires, spec.activation)):
+                    continue # predicate failed
+                if (not is_payer) and \
+                   any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) < 0 \
+                       for res in gamedata['resources']):
+                    continue # not allowed to Use Resources
+                if constrain_resources and \
+                   any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), newlevel) > player.resources[res] \
+                       for res in gamedata['resources']):
+                    continue # resource cost failed
+                ret_upgrade.append(UpgradeBuildingAction(spec.name, newlevel, i))
+
+                # if strategy is enabled, always prefer townhall upgrades over all others
+                if strategy and spec.name == gamedata['townhall']:
+                    break
 
     # tech research
-    for techname, json_spec in gamedata['tech'].iteritems():
-        spec = MockSpec(json_spec)
-        if spec.developer_only: continue
-        newlevel = player.tech.get(spec.name,0)+1
-        if newlevel > len(spec.research_time): continue # already at max level
+    # if strategy is enabled, don't research if there is construction available
+    if (not strategy) or ((not ret_construct)): #  and (not ret_upgrade)):
+        for techname, json_spec in gamedata['tech'].iteritems():
+            spec = MockSpec(json_spec)
+            if spec.developer_only: continue
+            newlevel = player.tech.get(spec.name,0)+1
+            if newlevel > len(spec.research_time): continue # already at max level
 
-        pred_ok = True
-        if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, newlevel)).is_satisfied(player, None)) \
-               for pred in (spec.show_if, spec.requires, spec.activation)):
-            continue # predicate failed
-        if constrain_resources and \
-           any(get_leveled_quantity(getattr(spec, 'cost_'+res, 0), newlevel) > player.resources[res] \
-               for res in gamedata['resources']):
-            continue # resource cost failed
+            if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, newlevel)).is_satisfied(player, None)) \
+                   for pred in (spec.show_if, spec.requires, spec.activation)):
+                continue # predicate failed
+            if constrain_resources and \
+               any(get_leveled_quantity(getattr(spec, 'cost_'+res, 0), newlevel) > player.resources[res] \
+                   for res in gamedata['resources']):
+                continue # resource cost failed
 
-        # find open lab
-        lab = None
-        lab_idx = -1
-        for idx, obj in enumerate(player.home_base_iter()):
-            if obj.spec.research_categories and \
-               spec.research_category in obj.spec.research_categories and \
-               (not obj.is_busy()):
-                lab = obj; lab_idx = idx; break
-        if not lab: continue # no lab
+            # find open lab
+            lab = None
+            lab_idx = -1
+            for idx, obj in enumerate(player.home_base_iter()):
+                if obj.spec.research_categories and \
+                   spec.research_category in obj.spec.research_categories and \
+                   (not obj.is_busy()):
+                    lab = obj; lab_idx = idx; break
+            if not lab: continue # no lab
 
-        ret.append(ResearchTechAction(techname, newlevel, lab_idx))
+            ret_tech.append(ResearchTechAction(techname, newlevel, lab_idx))
 
-    # building construction
-    for specname, json_spec in gamedata['buildings'].iteritems():
-        if specname in ('barrier', 'minefield'): continue # skip these for now
-        spec = MockSpec(json_spec)
-        if spec.developer_only: continue
-
-        if constrain_power and \
-           (not spec.provides_power) and current_power[0] < current_power[1]: continue
-
-        limit = get_leveled_quantity(spec.limit, cc_level)
-        if Predicates.read_predicate({'predicate': 'BUILDING_QUANTITY', 'building_type': specname, 'trigger_qty': limit, 'under_construction_ok': 1}).is_satisfied(player, None): continue
-        if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, 1)).is_satisfied(player, None)) \
-               for pred in (spec.show_if, spec.requires, spec.activation)):
-            continue # predicate failed
-        if (not is_payer) and \
-           any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) < 0 \
-               for res in gamedata['resources']):
-            continue # not allowed to Use Resources
-        if constrain_resources and \
-           any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) > player.resources[res] \
-               for res in gamedata['resources']):
-            continue # resource cost failed
-        ret.append(ConstructBuildingAction(specname))
-
-    # building upgrade
-    for i, obj in enumerate(player.home_base_iter()):
-        if obj.is_busy(): continue
-        if obj.spec.name == 'barrier': continue # skip for now
-        if obj.level >= len(obj.spec.build_time): continue # maxed level
-        newlevel = obj.level + 1
-        spec = obj.spec
-        if any(pred and (not Predicates.read_predicate(get_leveled_quantity(pred, newlevel)).is_satisfied(player, None)) \
-               for pred in (spec.show_if, spec.requires, spec.activation)):
-            continue # predicate failed
-        if (not is_payer) and \
-           any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), 1) < 0 \
-               for res in gamedata['resources']):
-            continue # not allowed to Use Resources
-        if constrain_resources and \
-           any(get_leveled_quantity(getattr(spec, 'build_cost_'+res, 0), newlevel) > player.resources[res] \
-               for res in gamedata['resources']):
-            continue # resource cost failed
-        ret.append(UpgradeBuildingAction(spec.name, newlevel, i))
-
-    if not ret:
-        # do nothing (only if no other options are possible)
-        min_wait = state.get_min_wait()
+    if (not strategy) or (not (ret_tech or ret_construct or ret_upgrade)):
+        # do nothing for a while
+        min_wait, wait_reason = state.get_min_wait()
         if min_wait >= 0:
-            ret.append(WaitAction(min_wait))
+            ret_wait.append(WaitAction(min_wait, wait_reason))
 
-    return ret
+    return ret_tech + ret_construct + ret_upgrade + ret_wait
 
 #            return {'action':'build_new_building','building_type':gen, 'level':1}
 #            return {'action':'upgrade_existing_building','building_type':gen,'building_index':get_index_of_lowest(gen,state), 'level':state['base'][get_index_of_lowest(gen,state)]['level']+1}
@@ -522,11 +577,13 @@ if __name__ == '__main__':
     to_cc_level = None
     max_iter = 9999999
     heuristic = 'random'
+    strategy = None
     output_filename = None
 
     opts, args = getopt.gnu_getopt(sys.argv, 'g:vpf', ['verbose','payer','free-resources','take-breaks',
-                                                       'to-cc-level=','heuristic=','output=',
-                                                       'max-iter='])
+                                                       'to-cc-level=','heuristic=','strategy=','output=',
+                                                       'max-iter=',
+                                                       'constrain-resources=','constrain-power=','constrain-foremen='])
     for key,val in opts:
         if key == '-g': game_id = val
         elif key == '-v' or key == '--verbose': verbose += 1
@@ -535,10 +592,17 @@ if __name__ == '__main__':
         elif key == '--take-breaks': take_breaks = True
         elif key == '--to-cc-level': to_cc_level = int(val)
         elif key == '--heuristic':
-            assert val in ('random', 'first')
+            assert val in ('random', 'first', 'fastest')
             heuristic = val
+        elif key == '--strategy':
+            strategy = val
         elif key == '--output': output_filename = val
         elif key == '--max-iter': max_iter = int(val)
+        elif key.startswith('--constrain-'):
+            val = True if val in ('1','yes') else False
+            if key == '--constrain-resources': constrain_resources = val
+            elif key == '--constrain-power': constrain_power = val
+            elif key == '--constrain-foremen': constrain_foremen = val
 
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
 
@@ -556,24 +620,31 @@ if __name__ == '__main__':
         storage_cap = state.player.get_resource_storage_cap()
 
         if verbose:
-            print '-'*80
-            print 'i', i, 't', SpinConfig.pretty_print_time(state.t), ', '.join('%s: %d/%d' % (res, state.player.resources[res], storage_cap[res]) for res in gamedata['resources'])
+            #print '-'*80
+            print '%4d t %13s %52s' % \
+                  (i, SpinConfig.pretty_print_time(state.t), ', '.join('%s: %8d/%8d' % (res, state.player.resources[res], storage_cap[res]) for res in gamedata['resources'] if res != 'res3')),
 
-        actions = get_possible_actions(state)
+        actions = get_possible_actions(state, strategy)
         if not actions:
             print 'no actions!'
             break
 
         if verbose >= 2:
+            print
             print '\n'.join(map(str,actions))
+
+        # pick an action
 
         if heuristic == 'first':
             action = actions[0]
         elif heuristic == 'random':
             action = actions[random.randint(0, len(actions)-1)]
+        elif heuristic == 'fastest':
+            actions.sort(key = lambda a: a.implied_wait)
+            action = actions[0]
 
         if verbose:
-            print action
+            print ' *', action
 
         new_state = action.apply(state)
 
@@ -585,7 +656,8 @@ if __name__ == '__main__':
         state = new_state
         i += 1
 
-    if verbose:
+    if verbose >= 2:
+
         print 'Final tech levels:'
         for techname, level in sorted(state.player.tech.items()):
             print '    %-30s  %d' % (techname, level)
