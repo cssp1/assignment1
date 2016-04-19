@@ -19,6 +19,7 @@
     "enable_map_home_combat": 1, // squads can fight home bases
     "squad_block_mode": "after_move", // allow passing through the destination hex of a moving squad before the squad settles down there
     "pass_moving_squads_fudge_time": 5.0, // add some conservative leeway for network latency, otherwise players could get frustrated
+    "enable_squad_bumping": 1, // squads can cut off movement of other squads if they arrive first
 
     "quarry_requirement": { "predicate": "LIBRARY", "name": "quarry_requirement" },
     "quarry_play_requirement": { "predicate": "LIBRARY", "name": "quarry_play_requirement" },
