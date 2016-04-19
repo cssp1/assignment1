@@ -31,6 +31,7 @@ is_payer = False # if true, player is willing to spend gamebucks where possible
 free_resources = False # if true, assume player can get unlimited amounts of iron/water for free (via alts or battle)
 take_breaks = False # if true, waits above 15m turn into longer breaks
 collect_quests = False # if true, player always immediately collects quest rewards XXX buggy since we don't support all predicates
+min_foremen = 1 # minimum number of foremen available - useful for "what if" scenarios with multiple builders
 discount_tau = 0.25 # coolness decays by tau/e per hour
 
 COOLNESS = {
@@ -129,7 +130,7 @@ class MockPlayer(object):
                 total += obj.get_leveled_quantity(obj.spec.provides_foremen)
             if obj.is_under_construction() or obj.is_upgrading():
                 in_use += 1
-        total = max(total, 1) # min 1 foreman
+        total = max(total, min_foremen)
         return in_use < total
 
 class MockSpec(object):
