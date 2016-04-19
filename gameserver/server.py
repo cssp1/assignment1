@@ -8793,9 +8793,11 @@ class Player(AbstractPlayer):
                 elif 'map_path' in squad:
                     del squad['map_path']
 
-                for FIELD in ('travel_speed','max_cargo'):
+                for FIELD in ('travel_speed','max_cargo','raid'):
                     if FIELD in map_data:
                         squad[FIELD] = map_data[FIELD]
+                    elif FIELD in squad:
+                        del squad[FIELD]
 
                 must_recall = False
                 # check that no objects are at home
