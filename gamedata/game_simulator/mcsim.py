@@ -43,13 +43,13 @@ COOLNESS = {
     'generator': 0.001,
 
     # VARIABLE
-    'townhall': 20.0,
+    'townhall': 50.0,
     'tech_unlock': 1000.0,
 
     'harvester': 4.0,
     'storage': 10.0, 'storage_res3': 1.0,
     'lab': 2.0, 'factory': 2.0,
-    'tech_upgrade': 0.5,
+    'tech_upgrade': 0.01,
 
     'turret': 0.5, 'turret_new': 1.1,
     'warehouse': 0.1,
@@ -243,19 +243,19 @@ class State(object):
 
     def get_min_wait(self):
         min_wait = -1
-        wait_reason = None
+        wait_reasons = []
 
         for obj in self.player.my_base:
             if obj.research_finish_time > 0:
                 togo = max(obj.research_finish_time - self.t, 0)
                 if min_wait < 0 or togo < min_wait:
                     min_wait = togo
-                    wait_reason = 'Research "%s" L%d' % (obj.research_item, self.player.tech.get(obj.research_item,0)+1)
+                    wait_reasons.append((togo, 'Research "%s" L%d' % (obj.research_item, self.player.tech.get(obj.research_item,0)+1)))
             if obj.upgrade_finish_time > 0:
                 togo = max(obj.upgrade_finish_time - self.t, 0)
                 if min_wait < 0 or togo < min_wait:
                     min_wait = togo
-                    wait_reason = 'Upgrade "%s" L%d' % (obj.spec.name, obj.level+1)
+                    wait_reasons.append((togo, 'Upgrade "%s" L%d' % (obj.spec.name, obj.level+1)))
 
         if min_wait < 0: # no buildings to wait on - check for harvesting
             cap = self.player.get_resource_storage_cap()
@@ -274,9 +274,10 @@ class State(object):
 
                                     if min_wait < 0 or togo < min_wait:
                                         min_wait = togo
-                                        wait_reason = 'Harvest resources'
+                                        wait_reasons.append((togo, 'Harvest resources'))
 
-        return min_wait, wait_reason
+        wait_reasons.sort()
+        return min_wait, ', '.join(r[1] for r in wait_reasons)
 
     def get_time_to_reach_resources(self, target):
         rates = dict((res,0) for res in gamedata['resources'])
@@ -310,6 +311,9 @@ class State(object):
         return min_wait
 
     def spend_resources(self, amounts):
+        if free_resources:
+            return self
+
         new = self.clone()
         new.player = new.player.clone()
         new.player.resources = copy.copy(new.player.resources)
@@ -322,9 +326,9 @@ class State(object):
         # min_dt is the optimal "speedup-able" wait time
         # acutal_dt is how long the player actually waits
 
-        if verbose >= 2:
+        if verbose >= 1:
             if True:
-                lines = int(actual_dt) // 3600
+                lines = int(actual_dt) // (10*60)
             elif actual_dt >= 86400: # 1day+
                 lines = 4
             elif actual_dt >= 8*3600: # 8 hours+
@@ -342,22 +346,23 @@ class State(object):
         new.player = new.player.clone()
 
         # add resources we can harvest in 'time'
-        if actual_dt > 0:
-            new.player.resources = copy.copy(new.player.resources)
-            cap = new.player.get_resource_storage_cap()
-            if free_resources:
-                new.player.resources = cap
-            else:
-                for obj in new.player.home_base_iter():
-                    if obj.is_busy(): continue
-                    for res in gamedata['resources']:
-                        if getattr(obj.spec, 'produces_'+res, 0):
-                            rate = obj.get_leveled_quantity(getattr(obj.spec, 'produces_'+res))
-                            amount = int(rate*(actual_dt/3600.0))
-                            if constrain_harvester_capacity:
-                                amount = min(amount, obj.get_leveled_quantity(obj.spec.production_capacity))
-                            #print obj.spec.name, obj.level, amount
-                            new.player.resources[res] = min(cap[res], new.player.resources[res] + amount)
+
+        new.player.resources = copy.copy(new.player.resources)
+        cap = new.player.get_resource_storage_cap()
+
+        if free_resources:
+            new.player.resources = cap
+        elif actual_dt > 0:
+            for obj in new.player.home_base_iter():
+                if obj.is_busy(): continue
+                for res in gamedata['resources']:
+                    if getattr(obj.spec, 'produces_'+res, 0):
+                        rate = obj.get_leveled_quantity(getattr(obj.spec, 'produces_'+res))
+                        amount = int(rate*(actual_dt/3600.0))
+                        if constrain_harvester_capacity:
+                            amount = min(amount, obj.get_leveled_quantity(obj.spec.production_capacity))
+                        #print obj.spec.name, obj.level, amount
+                        new.player.resources[res] = min(cap[res], new.player.resources[res] + amount)
 
         # update building states
         new_base = []
@@ -385,7 +390,7 @@ class State(object):
 
         new.player.my_base = new_base
 
-        if verbose and m_and_m and m_and_m.coolness >= 1:
+        if False and verbose and m_and_m and m_and_m.coolness >= 1:
             print '*'*min(10, int(m_and_m.coolness)), m_and_m.coolness, m_and_m
 
         return new
@@ -547,7 +552,9 @@ class UpgradeBuildingAction(Action):
         self.newlevel = newlevel
         self.idx = idx
 
-    def __repr__(self): return 'Upgrade "%s" L%d #%d %s' % (self.specname, self.newlevel, self.idx, pretty_print_priority(self.priority()))
+    def __repr__(self): return 'Upgrade "%s" L%d #%d %s %s' % (self.specname, self.newlevel, self.idx,
+                                                               SpinConfig.pretty_print_time(self.implied_wait),
+                                                               pretty_print_priority(self.priority()))
     def apply(self, state):
         spec = MockSpec(gamedata['buildings'][self.specname])
 
@@ -587,7 +594,9 @@ class ResearchTechAction(Action):
         self.newlevel = newlevel
         self.lab_idx = lab_idx
 
-    def __repr__(self): return 'Research "%s" L%d %s' % (self.specname, self.newlevel, pretty_print_priority(self.priority()))
+    def __repr__(self): return 'Research "%s" L%d %s %s' % (self.specname, self.newlevel,
+                                                            SpinConfig.pretty_print_time(self.implied_wait),
+                                                            pretty_print_priority(self.priority()))
     def apply(self, state):
         spec = MockSpec(gamedata['tech'][self.specname])
         assert state.player.tech.get(self.specname,0) == self.newlevel - 1
