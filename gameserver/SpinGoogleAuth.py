@@ -19,7 +19,7 @@ def google_auth_prompt_redirect(client_id, redirect_uri, scope = 'email', csrf_s
               'scope':'email',
               'state':csrf_state,
               'approval_prompt':'auto'}
-    url = 'https://accounts.google.com/o/oauth2/auth?'+urllib.urlencode(params)
+    url = 'https://accounts.google.com/o/oauth2/v2/auth?'+urllib.urlencode(params)
     return '<html><body onload="location.href = \'%s\';"></body></html>' % url
 
 def exchange_code_for_access_token(client_id, client_secret, redirect_uri, params, csrf_state_checker = None):
@@ -33,7 +33,7 @@ def exchange_code_for_access_token(client_id, client_secret, redirect_uri, param
     if 'error' in params:
         return {'error':params['error'][-1]}
     try:
-        response = urllib2.urlopen(urllib2.Request('https://accounts.google.com/o/oauth2/token',
+        response = urllib2.urlopen(urllib2.Request('https://www.googleapis.com/oauth2/v4/token',
                                                    urllib.urlencode({'code':params['code'][-1],
                                                                      'client_id':client_id,
                                                                      'client_secret':client_secret,
@@ -53,7 +53,7 @@ def exchange_code_for_access_token(client_id, client_secret, redirect_uri, param
             'final_url':final_url}
 
 def get_google_user_info(access_token):
-    return SpinJSON.loads(urllib2.urlopen('https://www.googleapis.com/oauth2/v1/userinfo?'+urllib.urlencode({'access_token':access_token})).read())
+    return SpinJSON.loads(urllib2.urlopen('https://www.googleapis.com/oauth2/v3/userinfo?'+urllib.urlencode({'access_token':access_token})).read())
 
 # Game engine specific code here
 
@@ -71,7 +71,7 @@ def spin_auth_redirect(final_url):
     return '<html><body onload="window.setTimeout(function(){location.href = \'%s\';},1000)">Logging in for %s via %s...</body></html>' % (url, final_url, auth_endpoint)
 
 def auth_spinpunch_user(access_token, expires_in, user_info, spin_users, realm, realm_secret, time_now):
-    google_id = user_info['id']
+    google_id = user_info['sub']
     spin_user = None
 
     # match on google_id
