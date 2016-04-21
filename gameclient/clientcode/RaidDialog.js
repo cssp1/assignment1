@@ -227,7 +227,8 @@ RaidDialog.update_loot = function(dialog, feature) {
 RaidDialog.update_squad_scrollers = function(dialog, squad_id) {
     // sort all raid squads in numerical order
     var squad_list = goog.array.map(goog.object.getKeys(player.squads), function(sid) { return parseInt(sid,10); });
-    squad_list = goog.array.filter(squad_list, function(id) { return player.squad_is_raid(id) && !player.squad_is_deployed(id); });
+    squad_list = goog.array.filter(squad_list, function(id) { return SQUAD_IDS.is_mobile_squad_id(id) &&
+                                                              !player.squad_is_deployed(id); });
     squad_list.sort();
     var cur_index = squad_list.indexOf(squad_id);
     dialog.widgets['squad_scroll_left'].state = (cur_index > 0 ? 'normal' : 'disabled');

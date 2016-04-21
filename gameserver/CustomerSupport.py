@@ -639,7 +639,7 @@ class HandleSquadDockUnits(Handler):
                                                 }])
 
         # update player.squads cache to show the squad as at home now
-        for FIELD in ('map_loc', 'map_path', 'travel_speed', 'max_cargo'):
+        for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
             if FIELD in squad: del squad[FIELD]
 
         return ReturnValue(result = 'ok')
