@@ -7194,7 +7194,7 @@
 
     "raid_dialog": {
         "dimensions": [770,485],
-        "default_button": "ok_button",
+        // "default_button": "attack_button", // set by code in RaidDialog.js
         "clip_children": 0,
         "widgets": {
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset": "dialog_resizable", "bg_image_resizable": 1 },
@@ -7304,13 +7304,21 @@
                              "text_hjustify": "left",  "text_size": 13, // "text_leading": 17,
                              "text_vjustify": "top",
                              "ui_name_pickup": "[b]No opposition[/b]: Battalion will return with as much loot as fits in Cargo.",
-                             "ui_name_attack": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage.",
-                             "ui_name_scout": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage."
+                             "ui_name_attack": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage.",
+                             "ui_name_defend": "[b]If you win[/b]: Enemy units are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n[b]If you lose[/b]: Your units are destroyed. Enemy units may suffer some damage.",
+                             "ui_name_scout": "[b]If you win[/b]: Enemy defense strength is revealed. Your scounting units may suffer some damage.\n\n[b]If you lose[/b]: Your scounting units are destroyed.",
+                             "ui_name_unable": "Battalion unable to act on this target."
                            },
 
-            "ok_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
-                           "bg_image": "action_button_resizable", "bg_image_resizable": 1, "state": "attack", "ui_name": "Launch" },
-            "cancel_button": { "kind": "ActionButton", "xy": [438,443], "dimensions": [148,30],
+            "attack_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
+                               "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                               "state": "attack", "ui_name": "Attack" },
+            "pickup_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
+                               "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                               "state": "normal", "ui_name": "Retrieve Loot" },
+            "scout_button": { "kind": "ActionButton", "xy": [438,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
+                              "bg_image": "action_button_resizable", "bg_image_resizable": 1, "state": "normal", "ui_name": "Scout" },
+            "cancel_button": { "kind": "ActionButton", "xy": [272,443], "dimensions": [148,30],
                                "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
                                "text_size": 13, "text_style": "bold", "ui_name": "Cancel" }
         }

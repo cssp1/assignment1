@@ -25868,6 +25868,7 @@ function battle_history_change_page(dialog, page) {
             summary['ui_outcome'] = ui_outcome; // save for later
             summary['at_quarry'] = at_quarry;
             summary['at_squad'] = at_squad;
+            summary['at_raid'] = at_raid;
 
 
             dialog.widgets['row_loot'+row].show = true;
@@ -26108,9 +26109,9 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
     };
 
     // pre-fill summary info
-    dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = (!summary['at_quarry'] && !summary['at_squad']);
-    dialog.widgets['location'].show = ((summary['at_quarry'] || summary['at_squad']) && summary['base_ui_name']);
-    if((summary['at_quarry'] || summary['at_squad']) && summary['base_ui_name']) {
+    dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = (!summary['at_quarry'] && !summary['at_squad'] && !summary['at_raid']);
+    dialog.widgets['location'].show = ((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']);
+    if((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']) {
         dialog.widgets['location'].set_text_with_linebreaking(summary['base_ui_name']);
     }
 
@@ -29342,6 +29343,123 @@ player.squad_is_empty = function(squad_id) {
     }
     return true;
 };
+player.squad_is_raid = function(squad_id) {
+    var squad_data = player.squads[squad_id.toString()];
+    return ('raid' in squad_data && squad_data['raid']);
+};
+
+/** @constructor @struct */
+var SquadCapabilities = function() {
+    this.can_raid_offense = false;
+    this.can_raid_defense = false;
+    this.can_raid_scout = false;
+    this.can_raid_pickup = false;
+    /** @type {string|null} */
+    this.icon_asset = null;
+    /** @type {!Object<string,number>} */
+    this.max_cargo = {};
+    /** @type {!Object<string,number>} */
+    this.total_raid_offense = {};
+    /** @type {!Object<string,number>} */
+    this.total_raid_defense = {};
+};
+
+/** Check if a map feature is always defenseless, i.e. subject to raid pickup
+    @private
+    @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.feature_is_defenseless = function(feature) {
+    if('base_template' in feature && feature['base_template'] in gamedata['raids_client']['templates']) {
+        var template = gamedata['raids_client']['templates'][feature['base_template']];
+        if(!template['has_units'] && !template['has_buildings']) {
+            return true;
+        }
+    }
+    return false;
+};
+
+/** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_pickup_feature = function(feature) {
+    // "pickup" is allowed when the original template lists no defending units or buildings
+    return this.can_raid_pickup && SquadCapabilities.feature_is_defenseless(feature);
+};
+/** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_attack_feature = function(feature) {
+    return this.can_raid_offense && !SquadCapabilities.feature_is_defenseless(feature);
+};
+/** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_scout_feature = function(feature) {
+    return this.can_raid_scout && !SquadCapabilities.feature_is_defenseless(feature);
+};
+    /** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_defend_feature = function(feature) { return false; } // not implemented
+/** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_raid_feature = function(feature) {
+    return (this.can_attack_feature(feature) ||
+            this.can_scout_feature(feature) ||
+            this.can_defend_feature(feature) ||
+            this.can_pickup_feature(feature));
+};
+
+/** For each mobile squad, return what types of raids it can do.
+    Returns mapping of string(id) -> capabilities
+    @return {!Object<string, !SquadCapabilities>} */
+player.get_mobile_squad_capabilities = function() {
+    var ret = {};
+    for(var id in player.my_army) {
+        var obj = player.my_army[id];
+        var obj_level = obj['level'] || 1;
+        var squad_id = obj['squad_id'] || 0;
+        if(!SQUAD_IDS.is_mobile_squad_id(squad_id)) { continue; }
+        var key = squad_id.toString();
+        if(!(key in ret)) {
+            ret[key] = new SquadCapabilities();
+        }
+        var entry = ret[key];
+        var spec = gamedata['units'][obj['spec']];
+        entry.icon_asset = get_leveled_quantity(spec['art_asset'], obj_level);
+
+        // check offense/defense stats, including scouting
+        goog.array.forEach([['raid_offense', entry.total_raid_offense],
+                            ['raid_defense', entry.total_raid_defense]],
+                           function(x) {
+                               var spec_key = x[0], total = x[1];
+                               if(spec_key in spec) {
+                                   var val_dict = get_leveled_quantity(spec[spec_key], obj_level);
+                                   for(var k in val_dict) {
+                                       var val = get_leveled_quantity(val_dict[k], obj_level);
+                                       if(val) {
+                                           total[k] = (total[k] || 0) + val;
+                                           if(k === 'scout') {
+                                               entry.can_raid_scout = true;
+                                           } else if(spec_key === 'raid_offense') {
+                                               entry.can_raid_offense = true;
+                                           } else if(spec_key === 'raid_defense') {
+                                               entry.can_raid_defense = true;
+                                           }
+                                       }
+                                   }
+                               }
+                           });
+        // check cargo space
+        for(var res in gamedata['resources']) {
+            if('cargo_'+res in spec) {
+                var val = get_leveled_quantity(spec['cargo_'+res], obj_level);
+                if(val) {
+                    entry.max_cargo[res] = (entry.max_cargo[res] || 0) + val;
+                    entry.can_raid_pickup = true;
+                }
+            }
+        }
+    }
+    return ret;
+};
+
 player.squad_set_client_data = function(squad_id, k, v) {
     var key = squad_id.toString();
     if(!(key in player.squad_client_data)) { player.squad_client_data[key] = {}; }
@@ -29529,10 +29647,7 @@ player.squad_is_moving = function(squad_id, assume_moving) {
     return (('map_loc' in squad_data) &&
             (('map_path' in squad_data) && (squad_data['map_path'][squad_data['map_path'].length-1]['eta'] > server_time + fudge_time)));
 };
-player.squad_is_raid = function(squad_id) {
-    var squad_data = player.squads[squad_id.toString()];
-    return ('raid' in squad_data && squad_data['raid']);
-};
+
 player.squad_interpolate_pos_and_heading = function(squad_id) {
     var squad_data = player.squads[squad_id.toString()];
     if(player.squad_is_moving(squad_id)) {

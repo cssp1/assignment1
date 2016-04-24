@@ -140,9 +140,19 @@ SquadControlDialog.refresh = function(dialog) {
     // Base Defenders + other squads, sorted by ID
     var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x,10); }).sort();
 
+    var caps = player.get_mobile_squad_capabilities();
+
     goog.array.forEach(squad_ids, function (id) {
         if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
-        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['to_feature'] && dialog.user_data['to_feature']['base_type'] == 'raid' && player.squad_is_deployed(id)) { return; }
+
+        // call to raid
+        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['to_feature'] && dialog.user_data['to_feature']['base_type'] == 'raid') {
+            if(player.squad_is_deployed(id)) { return; } // can only raid from non-deployed squads
+            var cap = caps[id.toString()] || null;
+            // check for any available raid mode
+            if(!cap || !cap.can_raid_feature(dialog.user_data['to_feature'])) { return; }
+        }
+
         make_squad_tile_args.push({squad_id: id, template: 'squad_tile'});
     });
 
@@ -159,7 +169,7 @@ SquadControlDialog.refresh = function(dialog) {
     var need_tiles = make_squad_tile_args.length;
     dialog.user_data['columns'] = (need_tiles <= (dialog.data['widgets']['squad']['array_max'][0]*dialog.data['widgets']['squad']['array_max'][1]) ? Math.min(dialog.data['widgets']['squad']['array_max'][0], need_tiles) : Math.floor((need_tiles+1)/2));
 
-    // creawte the tiles
+    // create the tiles
     var grid_x = 0, grid_y = 0;
     goog.array.forEach(make_squad_tile_args, function(args) {
         SquadControlDialog.make_squad_tile(dialog, args.squad_id, [grid_x, grid_y], dialog.user_data['dlg_mode'], args.template);
@@ -374,6 +384,11 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                                     return;
                                 }
                                 raid_info = {'path': raid_path};
+
+                                // switch over to RaidDialog
+                                close_parent_dialog(_squad_tile);
+                                RaidDialog.invoke(squad_id, to_feature['base_id']);
+                                return;
                             }
 
                             // perform deployment

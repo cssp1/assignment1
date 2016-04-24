@@ -9114,14 +9114,14 @@ class Player(AbstractPlayer):
             rollback_feature['base_map_path'] = squad.get('map_path',None) # same here
         return rollback_feature
 
-    def squad_enter_map(self, session, squad_id, coords, is_raid):
-        if is_raid and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
+    def squad_enter_map(self, session, squad_id, coords, raid_mode):
+        if raid_mode and not self.raids_enabled(): return False, [], ["SERVER_PROTOCOL"]
         if self.isolate_pvp: return False, [], ["CANNOT_DEPLOY_SQUAD_YOU_ARE_ISOLATED", squad_id]
         if (not (gamesite.nosql_client and self.home_region)):
             return False, [], ["CANNOT_DEPLOY_SQUAD_NO_NOSQL", squad_id]
         if self.num_deployed_squads() >= self.stattab.max_deployed_squads:
             return False, [], ["CANNOT_DEPLOY_SQUAD_LIMIT_REACHED", squad_id]
-        if is_raid and self.num_deployed_raids() >= self.stattab.max_deployed_raids:
+        if raid_mode and self.num_deployed_raids() >= self.stattab.max_deployed_raids:
             return False, [], ["CANNOT_DEPLOY_RAID_LIMIT_REACHED", squad_id]
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
         assert type(coords) is list and len(coords) == 2 and type(coords[0]) is int and type(coords[1]) is int
@@ -9135,7 +9135,7 @@ class Player(AbstractPlayer):
         if self.squad_is_under_repair(squad_id): return False, [rollback_feature], ["CANNOT_DEPLOY_SQUAD_UNDER_REPAIR", squad_id] # cannot deploy squad while under repair
 
         # raids deploy at base, otherwise squads deploy next to base
-        required_dist = 0 if is_raid else 1
+        required_dist = 0 if raid_mode else 1
 
         if coords[0] < 0 or coords[0] >= gamedata['regions'][self.home_region]['dimensions'][0] or \
            coords[1] < 0 or coords[1] >= gamedata['regions'][self.home_region]['dimensions'][1] or \
@@ -9182,8 +9182,8 @@ class Player(AbstractPlayer):
                    'base_map_loc': coords,
                    'base_map_path': None, # explicit null for client's benefit
                    'travel_speed': travel_speed}
-        if is_raid:
-            feature['raid'] = 1
+        if raid_mode:
+            feature['raid'] = raid_mode
             feature['max_cargo'] = max_cargo
             exclusive = -1 # no collision checks
             exclude_filter = None
@@ -9226,8 +9226,8 @@ class Player(AbstractPlayer):
 
         squad['map_loc'] = feature['base_map_loc']
         squad['travel_speed'] = travel_speed
-        if is_raid:
-            squad['raid'] = 1
+        if raid_mode:
+            squad['raid'] = raid_mode
             squad['max_cargo'] = max_cargo
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
@@ -27305,13 +27305,18 @@ class GAMEAPI(resource.Resource):
                     return
                 squad_id = int(spellargs[0])
                 coords = spellargs[1]
-                raid_info = spellargs[2] # None for regular squads, {'path':[[x,y],...]} for raids
+                raid_info = spellargs[2] # None for regular squads, {'path':[[x,y],...], 'mode':...} for raids
                 is_raid = bool(raid_info)
-                success, map_features, error_code = session.player.squad_enter_map(session, squad_id, coords, is_raid)
+                if is_raid:
+                    assert raid_info['mode'] in ('pickup','attack','defend','scout')
+                    raid_mode = raid_info['mode']
+                    raid_path = raid_info['path']
+                else:
+                    raid_mode = None
+                success, map_features, error_code = session.player.squad_enter_map(session, squad_id, coords, raid_mode)
                 if is_raid and (not error_code):
                     # raid squads: continue immediately with step
                     # (this is the only chance to step towards something other than home base)
-                    raid_path = raid_info['path']
                     step_success = True
                     try:
                         step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, True)

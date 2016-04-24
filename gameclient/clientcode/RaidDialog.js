@@ -25,43 +25,51 @@ RaidDialog.invoke = function(squad_id, feature_id) {
     dialog.user_data['squad_id'] = squad_id;
     dialog.user_data['feature_id'] = feature_id;
     dialog.user_data['icon_unit_specname'] = null; // updated by ondraw
+    dialog.user_data['caps'] = null; // cache of squad capabilities, updated by ondraw
 
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = dialog.widgets['cancel_button'].onclick = close_parent_dialog;
-    dialog.widgets['ok_button'].onclick = function(w) {
-        var dialog = w.parent;
 
-        var squad_id = dialog.user_data['squad_id'];
-        var squad = player.squads[squad_id.toString()];
-        var feature = session.region.find_feature_by_id(dialog.user_data['feature_id']);
-        if(!squad || !feature) { close_dialog(dialog); return; }
+    dialog.widgets['attack_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'attack'); };
+    dialog.widgets['scout_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'scout'); };
+    dialog.widgets['pickup_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'pickup'); };
 
-        // find path to target
-        var raid_path = player.raid_find_path_to(player.home_base_loc, feature);
-        if(!raid_path) {
-            var s = gamedata['errors']['INVALID_MAP_LOCATION'];
-            invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad['ui_name'] || ''), {'dialog':'message_dialog_big'});
-            return;
-        }
-
-        // perform deployment
-        squad['pending'] = true;
-        var raid_info = {'path': raid_path};
-        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, player.home_base_loc, raid_info]);
-
-        // play movement sound
-        if(dialog.user_data['icon_unit_specname']) {
-            var spec = gamedata['units'][dialog.user_data['icon_unit_specname']];
-            if('sound_destination' in spec) {
-                GameArt.play_canned_sound(spec['sound_destination']);
-            }
-        }
-        close_dialog(dialog);
-    };
     dialog.ondraw = RaidDialog.update;
     return dialog;
+};
+
+/** @param {!SPUI.Dialog} dialog
+    @param {string} raid_mode ("attack", "defend", "scout", "pickup") */
+RaidDialog.launch = function(dialog, raid_mode) {
+    var squad_id = dialog.user_data['squad_id'];
+    var squad = player.squads[squad_id.toString()];
+    var feature = session.region.find_feature_by_id(dialog.user_data['feature_id']);
+    if(!squad || !feature) { close_dialog(dialog); return; }
+
+    // find path to target
+    var raid_path = player.raid_find_path_to(player.home_base_loc, feature);
+    if(!raid_path) {
+        var s = gamedata['errors']['INVALID_MAP_LOCATION'];
+        invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%BATNAME', squad['ui_name'] || ''), {'dialog':'message_dialog_big'});
+        return;
+    }
+
+    // perform deployment
+    squad['pending'] = true;
+    var raid_info = {'path': raid_path,
+                     'mode': raid_mode};
+    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_ENTER_MAP", squad_id, player.home_base_loc, raid_info]);
+
+    // play movement sound
+    if(dialog.user_data['icon_unit_specname']) {
+        var spec = gamedata['units'][dialog.user_data['icon_unit_specname']];
+        if('sound_destination' in spec) {
+            GameArt.play_canned_sound(spec['sound_destination']);
+        }
+    }
+    close_dialog(dialog);
 };
 
 /** @param {!SPUI.Dialog} dialog */
@@ -69,34 +77,19 @@ RaidDialog.update = function(dialog) {
     var squad_id = dialog.user_data['squad_id'];
     var squad = player.squads[squad_id.toString()];
     var feature = session.region.find_feature_by_id(dialog.user_data['feature_id']);
-    if(!squad || !feature) { close_dialog(dialog); return; }
+    var caps = dialog.user_data['caps'] = player.get_mobile_squad_capabilities();
+    var cap = caps[squad_id.toString()];
+
+    if(!squad || !feature || !cap || !cap.can_raid_feature(feature) || player.squad_is_deployed(squad_id)) {
+        close_dialog(dialog); return;
+    }
 
     dialog.widgets['name_left'].str = player.ui_name;
     dialog.widgets['squad_name'].str = squad['ui_name'] || dialog.data['widgets']['squad_name']['ui_name']; // "Unnamed"
+    dialog.widgets['squad_unit_icon'].asset = cap.icon_asset;
+
     RaidDialog.update_squad_scrollers(dialog, squad_id);
 
-    // scan squad for raid mode, cargo capacity, and unit icon
-    var raid_mode = 'pickup'; // XXX could be 'scout'
-    /** @type {Object<string,number>|null} */
-    var cargo_cap = null;
-
-    for(var obj_id in player.my_army) {
-        var obj = player.my_army[obj_id];
-        if(obj['squad_id'] === squad_id) {
-            // update squad unit icon using any unit from the squad
-            var spec = gamedata['units'][obj['spec']]
-            dialog.user_data['icon_unit_specname'] = obj['spec'];
-            dialog.widgets['squad_unit_icon'].asset = get_leveled_quantity(spec['art_asset'], obj['level']||1);
-            for(var res in gamedata['resources']) {
-                var amount = get_leveled_quantity(spec['cargo_'+res] || 0, obj['level']||1);
-                if(amount > 0) {
-                    raid_mode = 'pickup';
-                    if(cargo_cap === null) { cargo_cap = {}; }
-                    cargo_cap[res] = (cargo_cap[res] || 0) + amount;
-                }
-            }
-        }
-    }
     dialog.widgets['site_name'].str = feature['base_ui_name'];
     dialog.widgets['site_icon'].state = (feature['base_type'] == 'quarry' ?
                                          'quarry_'+feature['base_icon'] :
@@ -125,6 +118,18 @@ RaidDialog.update = function(dialog) {
         dialog.widgets['travel_time'].str = dialog.data['widgets']['travel_time']['ui_name_blocked'];
     }
 
+    var raid_mode = null;
+    if(cap.can_pickup_feature(feature)) {
+        raid_mode = 'pickup';
+    } else if(cap.can_scout_feature(feature) &&
+              (dialog.widgets['scout_button'].mouse_enter_time > 0 || !cap.can_attack_feature(feature))) {
+        raid_mode = 'scout';
+    } else if(cap.can_attack_feature(feature)) {
+        raid_mode = 'attack';
+    } else {
+        raid_mode = 'unable';
+    }
+
     if(raid_mode == 'attack' || raid_mode == 'scout') {
         dialog.widgets['advantage'].show =
             dialog.widgets['advantage_label'].show = true;
@@ -136,17 +141,27 @@ RaidDialog.update = function(dialog) {
     }
 
     var scout_time = -1;
+    // XXX implement scouting
     dialog.widgets['scout_time'].str = (scout_time > 0 ? dialog.data['widgets']['scout_time']['ui_name_scouted'].replace('%time', pretty_print_time_brief(server_time - scout_time)) : dialog.data['widgets']['scout_time']['ui_name']);
-    dialog.widgets['scout_time'].show = false; // XXX implement scouting
+    dialog.widgets['scout_time'].show = false;
 
     // XXX implement raid combat stats
     dialog.widgets['str_sunken_left'].show =
         dialog.widgets['str_sunken_right'].show = false;
 
-    RaidDialog.update_cargo(dialog, squad_id, cargo_cap);
-    RaidDialog.update_loot(dialog, feature);
+    RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
+    RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
 
     dialog.widgets['description'].set_text_bbcode(dialog.data['widgets']['description']['ui_name_'+raid_mode]);
+
+    dialog.widgets['scout_button'].show = cap.can_scout_feature(feature);
+    dialog.widgets['pickup_button'].show = cap.can_pickup_feature(feature);
+    dialog.widgets['attack_button'].show = !dialog.widgets['pickup_button'].show && cap.can_attack_feature(feature);
+    if(raid_mode != 'unable') {
+        dialog.default_button = dialog.widgets[raid_mode+'_button'];
+    } else {
+        dialog.default_button = null;
+    }
 };
 
 /** @param {!SPUI.Dialog} dialog
@@ -154,8 +169,8 @@ RaidDialog.update = function(dialog) {
     @param {Object<string,number>|null} cargo_cap */
 RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
     var row = 0;
-    dialog.widgets['cargo_label'].show = !!cargo_cap;
-    if(cargo_cap) {
+    dialog.widgets['cargo_label'].show = cargo_cap && (goog.object.getCount(cargo_cap) > 0);
+    if(dialog.widgets['cargo_label'].show) {
         // normalize to highest amount of any resource
         var max_amount = 1;
         for(var res in cargo_cap) {
@@ -188,11 +203,11 @@ RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
 };
 
 /** @param {!SPUI.Dialog} dialog
-    @param {!Object<string,?>} feature */
+    @param {Object<string,?>|null} feature */
 RaidDialog.update_loot = function(dialog, feature) {
     var row = 0;
-    dialog.widgets['loot_label'].show = ('base_resource_loot' in feature);
-    if('base_resource_loot' in feature) {
+    dialog.widgets['loot_label'].show = (feature && 'base_resource_loot' in feature);
+    if(feature && 'base_resource_loot' in feature) {
         // normalize to highest amount of any remaining resource
         var max_amount = 1;
         for(var res in feature['base_resource_loot']) {
@@ -201,6 +216,10 @@ RaidDialog.update_loot = function(dialog, feature) {
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
             var amount = feature['base_resource_loot'][res] || 0;
+            dialog.widgets['loot_bar'+row.toString()].show =
+                dialog.widgets['loot_prog'+row.toString()].show =
+                dialog.widgets['loot_icon'+row.toString()].show =
+                dialog.widgets['loot_amount'+row.toString()].show = true;
             dialog.widgets['loot_icon'+row.toString()].asset = resdata['icon_small'];
             dialog.widgets['loot_prog'+row.toString()].progress = amount/max_amount;
             dialog.widgets['loot_prog'+row.toString()].full_color = SPUI.make_colorv(resdata['bar_full_color']);
@@ -208,7 +227,6 @@ RaidDialog.update_loot = function(dialog, feature) {
             row += 1;
             if(row >= dialog.data['widgets']['loot_bar']['array'][1]) { break; }
         }
-    } else {
     }
 
     while(row < dialog.data['widgets']['loot_bar']['array'][1]) {
@@ -225,10 +243,15 @@ RaidDialog.update_loot = function(dialog, feature) {
 /** @param {!SPUI.Dialog} dialog
     @param {number} squad_id */
 RaidDialog.update_squad_scrollers = function(dialog, squad_id) {
+    var caps = dialog.user_data['caps']; // assumes this is already updated
+    var feature = session.region.find_feature_by_id(dialog.user_data['feature_id']);
+
     // sort all raid squads in numerical order
     var squad_list = goog.array.map(goog.object.getKeys(player.squads), function(sid) { return parseInt(sid,10); });
     squad_list = goog.array.filter(squad_list, function(id) { return SQUAD_IDS.is_mobile_squad_id(id) &&
-                                                              !player.squad_is_deployed(id); });
+                                                              !player.squad_is_deployed(id) &&
+                                                              caps[id.toString()] &&
+                                                              caps[id.toString()].can_raid_feature(feature); });
     squad_list.sort();
     var cur_index = squad_list.indexOf(squad_id);
     dialog.widgets['squad_scroll_left'].state = (cur_index > 0 ? 'normal' : 'disabled');

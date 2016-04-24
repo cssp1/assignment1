@@ -13,31 +13,41 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units):
     assert squad_feature['base_type'] == 'squad' and squad_feature.get('raid')
     assert raid_feature['base_type'] == 'raid'
 
+    raid_mode = squad_feature['raid']
+    assert raid_mode in ('pickup','attack','defend','scout')
+
     squad_update = {}
     raid_update = {}
     loot = {}
 
-    base_resource_loot = raid_feature.get('base_resource_loot', {})
-    max_cargo = squad_feature.get('max_cargo', {})
-    cur_cargo = squad_feature.get('cargo', {})
+    # scouting
+    if raid_mode == 'scout':
+        # add something here just to trigger a mutation
+        squad_update['scouted'] = 1
 
-    for res in base_resource_loot:
-        if (base_resource_loot[res] > 0) and (res in max_cargo) and (cur_cargo.get(res,0) < max_cargo[res]):
-            amount = min(base_resource_loot[res], max_cargo[res] - cur_cargo.get(res,0))
-            base_resource_loot[res] -= amount
-            cur_cargo[res] = cur_cargo.get(res,0) + amount
-            loot[res] = amount
+    # looting
+    if raid_mode != 'scout':
+        base_resource_loot = raid_feature.get('base_resource_loot', {})
+        max_cargo = squad_feature.get('max_cargo', {})
+        cur_cargo = squad_feature.get('cargo', {})
 
-            # apply mutated versions
-            raid_update['base_resource_loot'] = base_resource_loot
-            if 'base_times_attacked' not in raid_update:
-                raid_update['base_times_attacked'] = raid_feature.get('base_times_attacked',0) + 1
-            squad_update['cargo'] = cur_cargo
-            squad_update['cargo_source'] = 'raid'
+        for res in base_resource_loot:
+            if (base_resource_loot[res] > 0) and (res in max_cargo) and (cur_cargo.get(res,0) < max_cargo[res]):
+                amount = min(base_resource_loot[res], max_cargo[res] - cur_cargo.get(res,0))
+                base_resource_loot[res] -= amount
+                cur_cargo[res] = cur_cargo.get(res,0) + amount
+                loot[res] = amount
 
-    if sum(base_resource_loot.itervalues(), 0) < 1:
-        # nothing more to loot - delete the raid site
-        raid_update = None
+                # apply mutated versions
+                raid_update['base_resource_loot'] = base_resource_loot
+                if 'base_times_attacked' not in raid_update:
+                    raid_update['base_times_attacked'] = raid_feature.get('base_times_attacked',0) + 1
+                squad_update['cargo'] = cur_cargo
+                squad_update['cargo_source'] = 'raid'
+
+        if sum(base_resource_loot.itervalues(), 0) < 1:
+            # nothing more to loot - delete the raid site
+            raid_update = None
 
     return squad_update, raid_update, loot
 

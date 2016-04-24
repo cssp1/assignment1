@@ -52,6 +52,11 @@ def make_client_raid_template(template):
         out['ui_loot_rarity'] = ui_loot_rarity
     for FIELD in ('activation', 'show_if', 'base_resource_loot'):
         if FIELD in template: out[FIELD] = template[FIELD]
+
+    # client needs to know if the site is always defenseless
+    for FIELD in ('units', 'buildings'):
+        if FIELD in template: out['has_'+FIELD] = 1
+
     kill_points = get_kill_points(template)
     if kill_points > 0:
         out['kill_points'] = kill_points
