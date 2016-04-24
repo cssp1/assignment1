@@ -1546,7 +1546,7 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                                                        squad['base_landlord_id'], raid['base_landlord_id'],
                                                        attacker_pcinfo, defender_pcinfo,
                                                        'victory', 'defeat',
-                                                       squad_units, raid_units, loot)
+                                                       squad_units, raid_units, loot, raid_mode = squad['raid'])
                     if verbose: print SpinJSON.dumps(summary, pretty = True)
                     if not dry_run:
                         nosql_client.battle_record(summary, reason = 'resolve_raid_squads')

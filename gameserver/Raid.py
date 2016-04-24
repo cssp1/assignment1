@@ -7,6 +7,11 @@
 # library for resolving raid outcomes
 # used by both maptool (for offline resolution) and server (for online resolution)
 
+def get_leveled_quantity(qty, level): # XXX duplicate
+    if type(qty) == list:
+        return qty[level-1]
+    return qty
+
 def resolve_raid(squad_feature, raid_feature, squad_units, raid_units):
     # * assumes that you already have all the proper mutex locks on squad and raid!
     # returns (update_map_feature) mutations of squad, raid, loot
@@ -125,7 +130,7 @@ def resolve_loc(gamedata, nosql_client, chat_mgr, region_id, loc, time_now, dry_
                                               squad['base_landlord_id'], raid['base_landlord_id'],
                                               attacker_pcinfo, defender_pcinfo,
                                               'victory', 'defeat',
-                                              squad_units, raid_units, loot)
+                                              squad_units, raid_units, loot, raid_mode = squad['raid'])
                 if not dry_run:
                     nosql_client.battle_record(summary, reason = 'Raid.resolve_loc')
 
@@ -196,7 +201,7 @@ def make_battle_summary(gamedata, nosql_client,
                         attacker_pcinfo, defender_pcinfo,
                         attacker_outcome, defender_outcome,
                         attacker_units, defender_units, # object state list
-                        loot):
+                        loot, raid_mode = None):
     ret = {'time' : time_now,
            'base_region' : region_id,
            'base_map_loc' : base['base_map_loc'],
@@ -213,6 +218,7 @@ def make_battle_summary(gamedata, nosql_client,
            'deployable_squads' : [ squad['base_id'], ],
 
            'battle_type' : 'raid',
+           'raid_mode': raid_mode,
            'home_base' : True if base['base_id'][0] == 'h' else False,
            'attacker_outcome': attacker_outcome,
            'defender_outcome': defender_outcome,
@@ -223,6 +229,22 @@ def make_battle_summary(gamedata, nosql_client,
         deployed_units[obj['spec']] = deployed_units.get(obj['spec'],0) + 1
 
     ret['deployed_units'] = deployed_units
+
+    # record remaining strength of defender
+    for obj in defender_units:
+        spec = gamedata['units'][obj['spec']]
+        stack = obj.get('stack', 1)
+        level = obj.get('level', 1)
+        hp_ratio = obj.get('hp_ratio', 1)
+        for kind in ('raid_offense', 'raid_defense'):
+            if kind in spec:
+                val = get_leveled_quantity(spec[kind], level)
+                for k, v in val.iteritems():
+                    v = get_leveled_quantity(v, level)
+                    v = stack * hp_ratio * v # ??
+                    if v > 0:
+                        if ('new_'+kind) not in ret: ret['new_'+kind] = {}
+                        ret['new_'+kind][k] = ret['new_'+kind].get(k,0) + v
 
     ret['loot'] = loot
     # { 'damage_inflicted' : 5445,
