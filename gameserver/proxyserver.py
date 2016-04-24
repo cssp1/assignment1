@@ -22,7 +22,7 @@ from twisted.internet import reactor, task, defer, protocol, utils
 from twisted.web import proxy, resource, static, http, twcgi
 import twisted.web.error
 import twisted.web.server
-from twisted.python import log
+from twisted.python import log, failure
 
 # handle different Twisted versions that moved NoResource around
 if hasattr(twisted.web.resource, 'NoResource'):
@@ -51,6 +51,7 @@ import SpinPasswordProtection
 import SpinSignature
 import SpinGoogleAuth
 import SpinGeoIP
+import SpinBrotli
 
 proxy_daemonize = ('-n' not in sys.argv)
 verbose_in_argv = ('-v' in sys.argv)
@@ -2351,6 +2352,33 @@ class AdminStats(object):
 
 admin_stats = AdminStats()
 
+# tool to run slow Brotli compression asynchronously
+class BrotliCompressorProcess(protocol.ProcessProtocol):
+    def __init__(self, d, data):
+        self.d = d
+        self.data = data
+        self.out = ''
+        self.error = ''
+    def connectionMade(self):
+        self.transport.write(self.data)
+        self.transport.closeStdin()
+    def errReceived(self, data):
+        self.error += data
+    def outReceived(self, data):
+        self.out += data
+    def processEnded(self, status):
+        if not isinstance(status.value, twisted.internet.error.ProcessDone):
+            self.d.errback(failure.Failure(Exception('error running BrotliCompressor: %s\n%s' % (repr(status), self.error))))
+        else:
+            self.d.callback(self.out)
+
+# Brotli-compress data asynchronously, returned as a Deferred
+def brotli_compress_async(data):
+    d = defer.Deferred()
+    exe = './SpinBrotli.py'
+    reactor.spawnProcess(BrotliCompressorProcess(d, data), exe, args = [exe, '-c'], env = os.environ)
+    return d
+
 # special kind of HTTP resource for compiled-client.js and gamedata.js
 # these have checksums appended to the filenames, and are set for long cache lifetimes
 # to ensure browsers and the CDN use the right version of JavaScript resources
@@ -2375,6 +2403,7 @@ class CachedJSFile(resource.Resource):
         self.checksum_value = ''
         self.contents = None
         self.contents_gz = None
+        self.contents_br = None
         self.build_date = None
         self.update()
 
@@ -2413,11 +2442,22 @@ class CachedJSFile(resource.Resource):
                 if match:
                     self.build_date = match.group(1)
 
+                self.checksum_value = checksum.hexdigest()
+                self.checksum_time = file_time
+
                 self.contents = str(buf.getvalue())
                 self.contents_gz = str(gz_buf.getvalue())
 
-                self.checksum_value = checksum.hexdigest()
-                self.checksum_time = file_time
+                # Brotli compression is slow, so run it asynchronously
+                self.contents_br = None
+                if SpinBrotli.enabled():
+                    def receive_contents_br(output, self, csum):
+                        if csum != self.checksum_value: return # stale output
+                        self.contents_br = output
+
+                    d = brotli_compress_async(buf.getvalue())
+                    d.addCallback(receive_contents_br, self, self.checksum_value)
+
                 if exception_log:
                     exception_log.event(proxy_time, 'proxyserver updated checksum of %s -> %s build %s' % (self.filename, self.checksum_value, repr(self.build_date)))
 
@@ -2450,11 +2490,14 @@ class CachedJSFile(resource.Resource):
         accept_encoding = request.getHeader('Accept-Encoding')
         if accept_encoding:
             encodings = accept_encoding.split(',')
-            for encoding in encodings:
-                name = encoding.split(';')[0].strip()
-                if name == 'gzip':
-                    request.setHeader('Content-Encoding','gzip')
-                    return self.contents_gz
+            encodings = map(lambda x: x.split(';')[0].strip(), encodings)
+            if self.contents_br and ('br' in encodings):
+                request.setHeader('Content-Encoding','br')
+                return self.contents_br
+            elif self.contents_gz and ('gzip' in encodings):
+                request.setHeader('Content-Encoding','gzip')
+                return self.contents_gz
+
         return self.contents
 
 class UncachedJSFile(static.File):

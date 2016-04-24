@@ -5,7 +5,7 @@ GAME_ID_LONG=$2
 
 YUMPACKAGES="git munin-node nscd patch pinentry screen sendmail-cf strace subversion xfsprogs"
 YUMPACKAGES+=" libffi libffi-devel libxml2 libxml2-devel"
-YUMPACKAGES+=" gcc autoconf automake libtool"
+YUMPACKAGES+=" gcc gcc-c++ autoconf automake libtool"
 YUMPACKAGES+=" postgresql postgresql-devel python-psycopg2" # note: Postgres client + python libs only
 YUMPACKAGES+=" mongodb-org-shell mongodb-org-tools" # note: client only
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
@@ -98,6 +98,7 @@ echo "pip install --upgrade pyOpenSSL service_identity certifi" # override syste
 echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
+echo "pip install --upgrade brotlipy"
 
 # FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
 echo "pip install --upgrade geoip2"
