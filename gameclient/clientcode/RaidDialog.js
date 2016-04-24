@@ -18,7 +18,9 @@ goog.require('SPUI');
     @return {SPUI.Dialog|null} */
 RaidDialog.invoke = function(squad_id, feature_id) {
     var squad = player.squads[squad_id.toString()];
-    if(!squad) { return null; }
+    var feature = session.region.find_feature_by_id(feature_id);
+
+    if(!squad || !feature) { return null; }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['raid_dialog']);
     dialog.user_data['dialog'] = 'raid_dialog';
@@ -26,6 +28,14 @@ RaidDialog.invoke = function(squad_id, feature_id) {
     dialog.user_data['feature_id'] = feature_id;
     dialog.user_data['icon_unit_specname'] = null; // updated by ondraw
     dialog.user_data['caps'] = null; // cache of squad capabilities, updated by ondraw
+    dialog.user_data['scout_data'] = null; // pending
+
+    if(!SquadCapabilities.feature_is_defenseless(feature)) {
+        dialog.user_data['scout_data_pending'] = true;
+        query_scout_reports(feature['base_id'], goog.partial(RaidDialog.receive_scout_reports, dialog));
+    } else {
+        dialog.user_data['scout_data_pending'] = false;
+    }
 
     install_child_dialog(dialog);
     dialog.auto_center();
@@ -38,6 +48,15 @@ RaidDialog.invoke = function(squad_id, feature_id) {
 
     dialog.ondraw = RaidDialog.update;
     return dialog;
+};
+
+/** @param {!SPUI.Dialog} dialog
+    @param {Object<string,?>|null} result */
+RaidDialog.receive_scout_reports = function(dialog, result) {
+    dialog.user_data['scout_data_pending'] = false;
+    if(result && (('new_raid_offense' in result) || ('new_raid_defense' in result))) {
+        dialog.user_data['scout_data'] = result;
+    }
 };
 
 /** @param {!SPUI.Dialog} dialog
@@ -140,14 +159,32 @@ RaidDialog.update = function(dialog) {
             dialog.widgets['advantage_label'].show = false;
     }
 
-    var scout_time = -1;
-    // XXX implement scouting
-    dialog.widgets['scout_time'].str = (scout_time > 0 ? dialog.data['widgets']['scout_time']['ui_name_scouted'].replace('%time', pretty_print_time_brief(server_time - scout_time)) : dialog.data['widgets']['scout_time']['ui_name']);
-    dialog.widgets['scout_time'].show = false;
+    if(!SquadCapabilities.feature_is_defenseless(feature)) {
+        dialog.widgets['scout_time'].show = true;
+        dialog.widgets['scout_spinner'].show = !!dialog.user_data['scout_data_pending'];
 
-    // XXX implement raid combat stats
-    dialog.widgets['str_sunken_left'].show =
-        dialog.widgets['str_sunken_right'].show = false;
+        if(dialog.user_data['scout_data_pending']) {
+            dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_pending'];
+        } else {
+            var scout_data = dialog.user_data['scout_data'];
+
+            if(scout_data) {
+                var scout_time = scout_data['time'];
+                dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_scouted'].replace('%time', pretty_print_time_brief(server_time - scout_time));
+            } else {
+                dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_unscouted'];
+            }
+            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null), (raid_mode === 'scout'));
+
+        }
+
+    } else { // defenseless feature, no scouting necessary
+        dialog.widgets['scout_spinner'].show =
+            dialog.widgets['scout_time'].show = false;
+        RaidDialog.update_strength(dialog, 'right', null, false);
+    }
+
+    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_offense), (raid_mode === 'scout'));
 
     RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
     RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
@@ -162,6 +199,20 @@ RaidDialog.update = function(dialog) {
     } else {
         dialog.default_button = null;
     }
+};
+
+
+/** @param {!SPUI.Dialog} dialog
+    @param {string} side
+    @param {Object<string,number>|null} strength
+    @param {boolean} scout_only */
+RaidDialog.update_strength = function(dialog, side, strength, scout_only) {
+    // XXX implement raid combat stat display
+    if(!strength) {
+        dialog.widgets['str_sunken_'+side].show = false;
+        return;
+    }
+    dialog.widgets['str_sunken_'+side].show = true;
 };
 
 /** @param {!SPUI.Dialog} dialog

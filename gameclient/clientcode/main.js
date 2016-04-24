@@ -25648,7 +25648,7 @@ function query_recent_attackers(callback) {
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
 /** @param {string} base_id
-    @param {function(Object<string,?>|null)} callback */
+    @param {function((Object<string,?>|null))} callback */
 function query_scout_reports(base_id, callback) {
     last_query_tag += 1;
     var tag = 'qsr'+last_query_tag.toString();
@@ -29374,7 +29374,6 @@ var SquadCapabilities = function() {
 };
 
 /** Check if a map feature is always defenseless, i.e. subject to raid pickup
-    @private
     @param {!Object<string,?>} feature
     @return {boolean} */
 SquadCapabilities.feature_is_defenseless = function(feature) {
@@ -29422,7 +29421,6 @@ player.get_mobile_squad_capabilities = function() {
     var ret = {};
     for(var id in player.my_army) {
         var obj = player.my_army[id];
-        var obj_level = obj['level'] || 1;
         var squad_id = obj['squad_id'] || 0;
         if(!SQUAD_IDS.is_mobile_squad_id(squad_id)) { continue; }
         var key = squad_id.toString();
@@ -29431,6 +29429,10 @@ player.get_mobile_squad_capabilities = function() {
         }
         var entry = ret[key];
         var spec = gamedata['units'][obj['spec']];
+        var obj_level = obj['level'] || 1;
+        var cur_max_hp = army_unit_hp(obj);
+        var hp_ratio = cur_max_hp[0] / cur_max_hp[1];
+
         entry.icon_asset = get_leveled_quantity(spec['art_asset'], obj_level);
 
         // check offense/defense stats, including scouting
@@ -29442,7 +29444,8 @@ player.get_mobile_squad_capabilities = function() {
                                    var val_dict = get_leveled_quantity(spec[spec_key], obj_level);
                                    for(var k in val_dict) {
                                        var val = get_leveled_quantity(val_dict[k], obj_level);
-                                       if(val) {
+                                       val *= hp_ratio; // ??
+                                       if(val > 0) {
                                            total[k] = (total[k] || 0) + val;
                                            if(k === 'scout') {
                                                entry.can_raid_scout = true;
