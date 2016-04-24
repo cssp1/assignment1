@@ -1933,7 +1933,7 @@ if 0: # test code
     sys.exit(0)
 
 
-def check_hives(hives):
+def check_hives_and_raids(kind, hives):
     error = 0
     max_region_pop = max(hives.get('region_pop',{}).values() + [1,])
 
@@ -2015,7 +2015,7 @@ def check_hives(hives):
             #print spawn_pop[i:]
 
     for strid, data in hives['templates'].iteritems():
-        error |= check_hive('hive:'+strid, data)
+        error |= check_hive_or_raid(kind, kind+':'+strid, data)
     return error
 
 # keep track of other bases upon which this base depends
@@ -2345,42 +2345,42 @@ def check_turf_reward(reward):
     return error
 
 
-def check_hive(strid, base):
+def check_hive_or_raid(kind, strid, base):
     error = 0
 
     if str(base['owner_id']) not in gamedata['ai_bases']['bases']:
         error |= 1
-        print 'Hive %s owner %s refers to an invalid AI base' % (strid, base['owner_id'])
+        print '%s owner %s refers to an invalid AI base' % (strid, base['owner_id'])
         return error
 
     if 'analytics_tag' not in base and base.get('activation',{}).get('predicate',None) != 'ALWAYS_FALSE':
         if gamedata['game_id'] != 'mf': # ignore MF
             error |= 1
-            print 'Hive %s missing analytics_tag' % (strid)
+            print '%s missing analytics_tag' % (strid,)
 
     if 'tech' in base:
         for tech_name in base['tech']:
             if tech_name not in gamedata['tech']:
                 error |= 1
-                print 'Hive %s (%s) refers to missing tech "%s"' % (strid, base['ui_name'], tech_name)
+                print '%s (%s) refers to missing tech "%s"' % (strid, base['ui_name'], tech_name)
 
     if 'completion' in base:
-        error |= check_consequent(base['completion'], reason = 'AI hive %s (%s): completion' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_consequent(base['completion'], reason = 'AI %s (%s): completion' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
         #complist = get_base_complist(base['completion'])
     if 'failure' in base:
-        error |= check_consequent(base['failure'], reason = 'AI hive %s (%s): failure' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_consequent(base['failure'], reason = 'AI %s (%s): failure' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
     if 'on_visit' in base:
-        error |= check_consequent(base['on_visit'], reason = 'AI hive %s (%s): on_visit' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_consequent(base['on_visit'], reason = 'AI %s (%s): on_visit' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
     if 'on_attack' in base:
-        error |= check_consequent(base['on_attack'], reason = 'AI hive %s (%s): on_attack' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_consequent(base['on_attack'], reason = 'AI %s (%s): on_attack' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
     if 'activation' in base:
-        error |= check_predicate(base['activation'], reason = 'AI hive %s (%s): activation' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_predicate(base['activation'], reason = 'AI %s (%s): activation' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
         deplist = []
-        get_base_deps(base['activation'], deplist, reason = 'AI hive %s (%s): activation' % (strid, base['ui_name']))
+        get_base_deps(base['activation'], deplist, reason = 'AI %s (%s): activation' % (strid, base['ui_name']))
     if 'show_if' in base:
-        error |= check_predicate(base['show_if'], reason = 'AI hive %s (%s): show_if' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
+        error |= check_predicate(base['show_if'], reason = 'AI %s (%s): show_if' % (strid, base['ui_name']), context = 'ai_base', context_data = base)
 
-    error |= check_ai_base_contents(strid, base, gamedata['ai_bases']['bases'][str(base['owner_id'])], 'hive')
+    error |= check_ai_base_contents(strid, base, gamedata['ai_bases']['bases'][str(base['owner_id'])], kind)
     return error
 
 def check_ai_base(strid, base):
@@ -3422,7 +3422,8 @@ def main(args):
 
     for strid, data in gamedata['quarries']['templates'].iteritems():
         error |= check_quarry('quarry:'+strid, data)
-    error |= check_hives(gamedata['hives'])
+    error |= check_hives_and_raids('hive', gamedata['hives'])
+    error |= check_hives_and_raids('raid', gamedata['raids'])
 
     error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
 
