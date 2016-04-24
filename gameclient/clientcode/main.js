@@ -25647,6 +25647,15 @@ function query_recent_attackers(callback) {
     battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
     send_to_server.func(["QUERY_RECENT_ATTACKERS", tag]);
 }
+/** @param {string} base_id
+    @param {function(Object<string,?>|null)} callback */
+function query_scout_reports(base_id, callback) {
+    last_query_tag += 1;
+    var tag = 'qsr'+last_query_tag.toString();
+    // need this adaptor to pull the .result property out of the event object
+    battle_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
+    send_to_server.func(["QUERY_SCOUT_REPORTS", base_id, tag]);
+}
 
 function receive_battle_history_result(dialog, q_chapter, q_time_range, sumlist, siglist, is_final, is_error) {
     if(q_chapter != dialog.user_data['chapter']) { return; } // wrong chapter
@@ -46012,7 +46021,7 @@ function handle_server_message(data) {
 
     } else if(msg == "NEW_BATTLE_HISTORIES") {
         player.new_battle_histories = data[1];
-    } else if(msg == "QUERY_RECENT_ATTACKERS_RESULT") {
+    } else if(msg == "QUERY_RECENT_ATTACKERS_RESULT" || msg == "QUERY_SCOUT_REPORTS_RESULT") {
         var tag = data[1], result = data[2], pcache_data = data[3];
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
         battle_history_receiver.dispatchEvent({type: tag, result: result, signatures: null, is_final: true, is_error: false});

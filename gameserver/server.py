@@ -18062,6 +18062,25 @@ class GAMEAPI(resource.Resource):
 
         return defer.succeed(not cannot_spy) # success
 
+    def query_scout_reports(self, session, retmsg, arg):
+        base_id, tag = arg[1], arg[2]
+        assert session.player.home_region and base_id
+
+        summary = None
+        if gamedata['server'].get('battle_history_source','nosql/sql') in ('nosql','nosql/sql'):
+            # get summary data from database
+            summaries = gamesite.nosql_client.battles_get(session.user.user_id, -1, -1, -1,
+                                                          time_range = [server_time - gamedata['server'].get('nosql_scout_reports_time_limit',8*3600), server_time],
+                                                          limit = 1,
+                                                          base_region = session.player.home_region,
+                                                          base_id = base_id, base_type = 'raid',
+                                                          fields = ('time','new_raid_offense','new_raid_defense'),
+                                                          reason = 'query_scout_reports')
+            if summaries:
+                summary = summaries[0]
+
+        retmsg.append(["QUERY_SCOUT_REPORTS_RESULT", tag, summary, None])
+
     def query_recent_attackers(self, session, retmsg, arg):
         tag = arg[1]
 
@@ -25201,6 +25220,8 @@ class GAMEAPI(resource.Resource):
                     if key in session.player.history:
                         del session.player.history[key]
 
+        elif arg[0] == "QUERY_SCOUT_REPORTS":
+            self.query_scout_reports(session, retmsg, arg)
         elif arg[0] == "QUERY_RECENT_ATTACKERS":
             self.query_recent_attackers(session, retmsg, arg)
         elif arg[0] == "QUERY_BATTLE_HISTORY":
