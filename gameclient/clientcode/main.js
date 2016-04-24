@@ -29788,11 +29788,10 @@ player.advance_squads = function() {
                         squad_data['pending'] = true;
                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RESOLVE", squad_data['map_loc']]);
                     }
-                } else {
+                } else if(!squad_data['pending']) {
                     console.log('Auto-recalling idle raid squad '+squad_data['id'].toString());
                     // use underscore variant to avoid GUI error spam
                     if(player._squad_recall_move(squad_data['id'])) {
-
                         // XXX this is not symmetrical with maptool's resolution. Maybe unify into Raid.py?
                         invoke_squad_error(gamedata['strings']['squad_turnaround_mail']['ui_subject'].replace('%s',squad_data['ui_name'] || '?'),
                                            gamedata['strings']['squad_turnaround_mail']['ui_body'].replace('%s',squad_data['ui_name'] || '?'));

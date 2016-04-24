@@ -1031,9 +1031,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                 }
                 // SPEED UP (movement) button
                 if(player.squad_is_moving(squad_id) && player.squad_speedups_enabled()) {
-                    buttons.push([gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY']['ui_name'], (function(_squad_id) { return function() {
+                    buttons.push([gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY']['ui_name'], (function(_mapwidget, _squad_id) { return function() {
+                        _mapwidget.set_popup(null);
                         RegionMap.invoke_squad_speedup_dialog(_squad_id);
-                    }; })(squad_id), 'normal']);
+                    }; })(mapwidget, squad_id), 'normal']);
                 }
 
                 // VISIT button

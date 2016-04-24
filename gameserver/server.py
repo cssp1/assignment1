@@ -15363,8 +15363,9 @@ class Store(object):
             new_lock_gen = -1
             # copy path and set ETAs into the past
             new_path = squad['map_path'][:]
+            delta = (server_time - 1) - squad['map_path'][-1]['eta'] # time shift to make squad land at destination now
             for waypt in new_path:
-                waypt['eta'] = server_time - 1
+                waypt['eta'] += delta
 
             state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, session.player.squad_base_id(squad_id), session.player.user_id, do_hook = False, reason='SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY')
             if state != Player.LockState.being_attacked: # mutex locked
