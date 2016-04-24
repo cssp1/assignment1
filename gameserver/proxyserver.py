@@ -2826,6 +2826,41 @@ def do_main():
         if not os.path.exists(d):
             os.mkdir(d)
 
+    # init server list
+    reload_static_includes()
+    reconfig_loading_screens()
+
+    myport_http = SpinConfig.config['proxyserver']['external_http_port']
+    myport_ssl  = SpinConfig.config['proxyserver'].get('external_ssl_port',-1)
+
+    print 'Proxy server running on ports %d (HTTP) %d (SSL)' % (myport_http, myport_ssl)
+
+    if proxy_daemonize:
+        Daemonize.daemonize()
+
+        # update PID file with new PID
+        open(proxy_pidfile, 'w').write('%d\n' % os.getpid())
+
+        # turn on Twisted logging
+        def log_exceptions(eventDict):
+            if eventDict['isError']:
+                if 'failure' in eventDict:
+                    text = ((eventDict.get('why') or 'Unhandled Error')
+                            + '\n' + eventDict['failure'].getTraceback().strip())
+                else:
+                    text = ' '.join([str(m) for m in eventDict['message']])
+                if exception_log:
+                    exception_log.event(proxy_time, text)
+        def log_raw(eventDict):
+            text = log.textFromEventDict(eventDict)
+            if text is None:
+                return
+            if raw_log:
+                raw_log.event(proxy_time, text)
+
+        log.startLoggingWithObserver(log_raw)
+        log.addObserver(log_exceptions)
+
     # connect to database server
     global db_client
     db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
@@ -2835,12 +2870,6 @@ def do_main():
     global social_id_table
     social_id_table = SocialIDCache.SocialIDCache(db_client)
 
-    # init server list
-    reload_static_includes()
-    reconfig_loading_screens()
-
-    myport_http = SpinConfig.config['proxyserver']['external_http_port']
-    myport_ssl  = SpinConfig.config['proxyserver'].get('external_ssl_port',-1)
     backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()
     reactor.listenTCP(myport_http, proxysite, backlog=backlog)
@@ -2926,32 +2955,6 @@ def do_main():
 
     signal.signal(signal.SIGUSR1, handle_SIGUSR1)
     signal.signal(signal.SIGHUP, handle_SIGHUP)
-
-    print 'Proxy server up and running on ports %d (HTTP) %d (SSL)' % (myport_http, myport_ssl)
-
-    if proxy_daemonize:
-        Daemonize.daemonize()
-
-        # update PID file with new PID
-        open(proxy_pidfile, 'w').write('%d\n' % os.getpid())
-
-        # turn on Twisted logging
-        def log_exceptions(eventDict):
-            if eventDict['isError']:
-                if 'failure' in eventDict:
-                    text = ((eventDict.get('why') or 'Unhandled Error')
-                            + '\n' + eventDict['failure'].getTraceback().strip())
-                else:
-                    text = ' '.join([str(m) for m in eventDict['message']])
-                exception_log.event(proxy_time, text)
-        def log_raw(eventDict):
-            text = log.textFromEventDict(eventDict)
-            if text is None:
-                return
-            raw_log.event(proxy_time, text)
-
-        log.startLoggingWithObserver(log_raw)
-        log.addObserver(log_exceptions)
 
     TwistedLatency.setup(reactor, admin_stats.record_latency)
 
