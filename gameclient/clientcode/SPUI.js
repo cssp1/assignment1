@@ -2876,6 +2876,7 @@ SPUI.ProgressBar = function(data) {
     this.ticks = null;
     this.clip_to = data['clip_to'] || null;
     this.alpha = data['alpha'] || 1;
+    this.orientation = data['orientation'] || 'horizontal';
     this.progress = 0.5;
     this.mouse_enter_time = -1;
     this.onclick = null;
@@ -2899,7 +2900,7 @@ SPUI.ProgressBar.prototype.do_draw = function(offset) {
     SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], this.wh[0], this.wh[1]);
     this.progress = Math.min(Math.max(this.progress, 0), 1);
 
-    var end = Math.floor(this.progress*this.wh[0]);
+    var end = Math.floor(this.progress*this.wh[(this.orientation === 'vertical' ? 1 : 0)]);
     if(this.progress > 0) {
         var col;
         if(this.low_color) {
@@ -2908,7 +2909,11 @@ SPUI.ProgressBar.prototype.do_draw = function(offset) {
             col = this.full_color;
         }
         SPUI.ctx.fillStyle = (this.full_mouseover_color && this.mouse_enter_time > 0) ? this.full_mouseover_color.str() : col.str();
-        SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], end, this.wh[1]);
+        if(this.orientation === 'vertical') {
+            SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1]+this.wh[1]-end, this.wh[0], end);
+        } else {
+            SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], end, this.wh[1]);
+        }
     }
     if(this.outline_width > 0) {
         SPUI.ctx.lineWidth = this.outline_width;
