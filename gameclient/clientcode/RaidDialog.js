@@ -149,15 +149,7 @@ RaidDialog.update = function(dialog) {
         raid_mode = 'unable';
     }
 
-    if(raid_mode == 'attack' || raid_mode == 'scout') {
-        dialog.widgets['advantage'].show =
-            dialog.widgets['advantage_label'].show = true;
-        var adv = 'very_good'; // "neutral","good","very_good","best","bad","very_bad","worst"
-        dialog.widgets['advantage'].set_text_bbcode(dialog.data['widgets']['advantage']['ui_name_'+adv]);
-    } else {
-        dialog.widgets['advantage'].show =
-            dialog.widgets['advantage_label'].show = false;
-    }
+    var scout_data = null;
 
     if(!SquadCapabilities.feature_is_defenseless(feature)) {
         dialog.widgets['scout_time'].show = true;
@@ -165,8 +157,10 @@ RaidDialog.update = function(dialog) {
 
         if(dialog.user_data['scout_data_pending']) {
             dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_pending'];
+            RaidDialog.update_strength(dialog, 'right', null, false, null);
+
         } else {
-            var scout_data = dialog.user_data['scout_data'];
+            scout_data = dialog.user_data['scout_data'] || null;
 
             if(scout_data) {
                 var scout_time = scout_data['time'];
@@ -174,17 +168,29 @@ RaidDialog.update = function(dialog) {
             } else {
                 dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_unscouted'];
             }
-            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null), (raid_mode === 'scout'));
+            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null),
+                                       (raid_mode === 'scout'), null);
 
         }
 
+        dialog.widgets['str_unknown_right'].show = (scout_data === null);
+
+        dialog.widgets['advantage'].show =
+            dialog.widgets['advantage_label'].show = true;
+        var adv = (scout_data ? 'unknown' : 'unknown'); // "neutral","good","very_good","best","bad","very_bad","worst"
+        dialog.widgets['advantage'].set_text_bbcode(dialog.data['widgets']['advantage']['ui_name_'+adv]);
+
     } else { // defenseless feature, no scouting necessary
-        dialog.widgets['scout_spinner'].show =
+        dialog.widgets['advantage'].show =
+            dialog.widgets['advantage_label'].show =
+            dialog.widgets['scout_spinner'].show =
             dialog.widgets['scout_time'].show = false;
-        RaidDialog.update_strength(dialog, 'right', null, false);
+        RaidDialog.update_strength(dialog, 'right', null, false, null);
+        dialog.widgets['str_unknown_right'].show = false;
     }
 
-    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_offense), (raid_mode === 'scout'));
+    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_offense), (raid_mode === 'scout'),
+                               (scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null));
 
     RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
     RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
@@ -205,14 +211,73 @@ RaidDialog.update = function(dialog) {
 /** @param {!SPUI.Dialog} dialog
     @param {string} side
     @param {Object<string,number>|null} strength
-    @param {boolean} scout_only */
-RaidDialog.update_strength = function(dialog, side, strength, scout_only) {
-    // XXX implement raid combat stat display
-    if(!strength) {
-        dialog.widgets['str_sunken_'+side].show = false;
-        return;
+    @param {Object<string,number>|null} opponent_strength - for normalizing against
+    @param {boolean} scout_only
+*/
+RaidDialog.update_strength = function(dialog, side, strength, scout_only, opponent_strength) {
+    dialog.widgets['str_sunken_'+side].show =
+        dialog.widgets['str_line_'+side].show = (strength !== null);
+    for(var x = 0; x < dialog.data['widgets']['str_prog_left']['array'][0]; x++) {
+        dialog.widgets['str_prog_'+side+x.toString()].show =
+            dialog.widgets['damage_vs_'+side+x.toString()].show = false;
     }
-    dialog.widgets['str_sunken_'+side].show = true;
+
+    if(strength === null) { return; }
+
+    // normalize strengths
+    var norm = 0.001;
+    for(var k in strength) {
+        var q = strength[k] || 0;
+        if(q > norm) {
+            norm = q;
+        }
+    }
+    if(opponent_strength) {
+        for(var k in opponent_strength) {
+            var q = opponent_strength[k] || 0;
+            if(q > norm) {
+                norm = q;
+            }
+        }
+    }
+
+    // all normal categories, minus buildings, plus scout
+    var CATS = gamedata['strings']['damage_vs_categories'].concat([["scout","scout"]]);
+    var x = 0;
+    for(var i = 0; i < CATS.length; i++) {
+        var key = CATS[i][0], catname = CATS[i][1];
+        if(key === 'building') { continue; } // skip buildings
+
+        var widget = dialog.widgets['damage_vs_'+side+x.toString()];
+
+        var q = strength[key] || 0;
+        if(scout_only && key !== 'scout') { // deactivate non-scouting units
+            q = 0;
+            widget.show = false;
+            dialog.widgets['str_prog_'+side+x.toString()].show = false;
+        } else {
+            widget.show = true;
+            dialog.widgets['str_prog_'+side+x.toString()].show = (q > 0);
+            dialog.widgets['str_prog_'+side+x.toString()].progress = q/norm;
+        }
+
+        widget.asset = 'damage_vs_'+key;
+        widget.state = gamedata['strings']['damage_vs_qualities'][(q <= 0 ? 0 : 3)]; // XXX hard-code color for now
+
+        var ui_name;
+        if(catname in gamedata['strings']['manufacture_categories']) {
+            ui_name = gamedata['strings']['manufacture_categories'][catname]['plural'];
+        } else if(catname in gamedata['strings']['object_kinds']) {
+            ui_name = gamedata['strings']['object_kinds'][catname]['plural'];
+        } else if(catname === 'scout') {
+            ui_name = gamedata['strings']['scout'];
+        } else {
+            throw Error('unknown manuf category or object kind '+catname);
+        }
+        widget.tooltip.str = widget.data['ui_tooltip'].replace('%CATNAME', ui_name).replace('%d', pretty_print_number(q));
+        x += 1;
+        if(x >= dialog.data['widgets']['str_prog_left']['array'][0]) { break; }
+    }
 };
 
 /** @param {!SPUI.Dialog} dialog

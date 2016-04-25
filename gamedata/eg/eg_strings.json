@@ -13,6 +13,7 @@
         "units": { "singular": "unit", "plural": "units" },
         "buildings": { "singular": "building", "plural": "Buildings" } // note: capitalize, for damage_vs UI display
     },
+    "scout": "Scouting", // for RaidDialog's damage_vs
 
     "manufacture_categories": {
         "rovers": { "singular": "Infantry", "plural": "Infantry", "ui_color": [1,1,0] },

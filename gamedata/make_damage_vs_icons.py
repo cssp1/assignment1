@@ -7,7 +7,7 @@
 try: import simplejson as json
 except: import json
 
-TARGETS = ['rover', 'transport', 'starcraft', 'building']
+TARGETS = ['rover', 'transport', 'starcraft', 'building', 'splash', 'scout']
 QUALITIES = ['ineffective', 'poor', 'good', 'excellent']
 
 for i in xrange(len(TARGETS)):
@@ -17,7 +17,7 @@ for i in xrange(len(TARGETS)):
     for j in xrange(len(QUALITIES)):
         qual = QUALITIES[j]
         data['states'][qual] = {
-            'images': ['art/ui/damage_vs_icons3.png'],
+            'images': ['art/ui/damage_vs_icons5.png'],
             'dimensions': [21,21],
             'load_priority': 70,
             'origins': [21*j,21*i]
@@ -25,4 +25,3 @@ for i in xrange(len(TARGETS)):
     ret += json.dumps(data)
     ret += ','
     print ret
-#   "resource_icon_power": { "states": { "normal": { "images": ["art/ui/resource_icons3.png"], "origins": [0,84], "dimensions": [21,21], "load_priority": 100 } } },

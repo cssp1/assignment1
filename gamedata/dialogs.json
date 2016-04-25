@@ -7255,7 +7255,7 @@
 
             "advantage_label": {"kind": "TextField", "xy": [385,214], "dimensions": [0,32], "text_size": 13, "drop_shadow": 1, "ui_name": "Advantage"},
             "advantage": {"kind": "RichTextField", "xy": [285,234], "dimensions": [200,32], "text_size": 17, "drop_shadow": 1,
-                          "ui_name": "[color=#808080]?[/color]",
+                          "ui_name_unknown": "[color=#808080]?[/color]",
                           "ui_name_neutral": "[color=#ffff00]-[/color]",
                           "ui_name_good": "[color=#00ff00]<[/color]",
                           "ui_name_very_good": "[color=#00ff00]<<[/color]",
@@ -7265,8 +7265,29 @@
                           "ui_name_worst": "[color=#ff0000]>>>[/color]"
                          },
 
-            "str_sunken_left": {"kind":"StaticImage","xy":[160,198],"dimensions":[160,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
-            "str_sunken_right": {"kind":"StaticImage","xy":[450,198],"dimensions":[160,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "str_sunken_left": {"kind":"StaticImage","xy":[160,198],"dimensions":[160,125], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "str_sunken_right": {"kind":"StaticImage","xy":[450,198],"dimensions":[160,125], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+
+            "str_prog_left": { "kind": "ProgressBar", "xy": [185,213], "dimensions": [20,73], "outline_width": 1.5, "orientation": "vertical",
+                               "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
+                               "array": [4,1], "array_offset": [30,0] },
+            "str_prog_right": { "kind": "ProgressBar", "xy": [475,213], "dimensions": [20,73], "outline_width": 1.5, "orientation": "vertical",
+                               "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
+                               "array": [4,1], "array_offset": [30,0] },
+
+            "damage_vs_left": { "kind": "StaticImage", "xy": [185,292], "dimensions": [21,21], "asset": "damage_vs_rover", "state": "ineffective",
+                                "ui_tooltip": "Offense vs. %CATNAME: %d", "tooltip_delay": 0,
+                                "array": [4,1], "array_offset": [30,0] },
+            "damage_vs_right": { "kind": "StaticImage", "xy": [475,292], "dimensions": [21,21], "asset": "damage_vs_rover", "state": "ineffective",
+                                "ui_tooltip": "Defense vs. %CATNAME: %d", "tooltip_delay": 0,
+                                "array": [4,1], "array_offset": [30,0] },
+
+            "str_line_left": {"kind": "Line", "xy": [175,286], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
+            "str_line_right": {"kind": "Line", "xy": [465,286], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
+
+            "str_unknown_right": {"kind": "TextField", "xy": [450,198], "dimensions": [160,124], "text_size": 48,
+                                 "text_style": "bold", "drop_shadow": 1, "text_color": [0.5,0.5,0.5,1], "ui_name": "?"},
+
             "scout_time": {"kind": "TextField", "xy": [450,323], "dimensions": [160,32], "text_size": 13,
                            "ui_name_unscouted": "No scouting info", "ui_name_scouted": "Scouted %time ago",
                            "ui_name_pending": "Loading...",
