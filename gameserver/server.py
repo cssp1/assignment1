@@ -18515,6 +18515,10 @@ class GAMEAPI(resource.Resource):
         client_sig = arg[5]
         tag = arg[6]
 
+        if (not battle_time) or (not attacker) or (not defender):
+            retmsg.append(["ERROR", "SERVER_PROTOCOL"]) # cannot be canceled
+            return
+
         # the battle replay itself does not have sufficient information (attacker/defender alliance IDs) to determine
         # access permission. So instead, we use a secure signature of the args from the battle history.
         # this also allows sharing of replays, when the signature is included
