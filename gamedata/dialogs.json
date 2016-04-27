@@ -3111,7 +3111,7 @@
                     },
             "logo_frame": { "kind": "ActionButton", "xy": [102,3], "dimensions": [38,38], "bg_image": "alliance_icon_frame_small" },
             "name": { "kind": "TextField", "xy": [151,5], "dimensions": [250, 17], "text_size": 15, "text_hjustify": "left", "text_style": "bold",
-                      "clip_to": [151,5,199,21], "ui_name_error": "(This Alliance was disbanded)" },
+                      "clip_to": [151,5,199,21], "ui_name_error": "(Disbanded Alliance)" },
             "join_type": { "kind": "TextField", "xy": [151,24], "dimensions": [250, 17], "text_size": 13, "text_hjustify": "left" },
             "members": { "kind": "TextField", "xy": [357,0], "dimensions": [60, 30], "text_size": 12, "text_hjustify": "left",
                          "ui_name": "Members:\n%d1/%d2" },
