@@ -125,6 +125,8 @@ BattleReplayGUI.update = function(dialog) {
     var cur_time = cur_minutes.toFixed(0) + ':' + pad_with_zeros(Math.floor(cur_seconds%60.0).toFixed(0), 2); // +'.'+pad_with_zeros(((cur_seconds*100)%100).toFixed(0), 2);
     var s = dialog.data['widgets']['description']['ui_name'];
     dialog.widgets['description'].set_text_bbcode(s
+                                                  .replace('%cur_tick', pretty_print_number(cur_tick))
+                                                  .replace('%num_ticks', pretty_print_number(replay_player.num_ticks()-1))
                                                   .replace('%cur_time', cur_time)
                                                   .replace('%total_time', total_time)
                                                   .replace('%attacker', replay_player.header['attacker_name'] || '?')
