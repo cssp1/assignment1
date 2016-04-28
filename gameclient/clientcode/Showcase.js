@@ -665,7 +665,7 @@ Showcase.collect_active_sales_data = function(sku, path) {
         });
         return sales;
     } else if (('item' in sku) && ('ui_banner' in sku) && (eval_cond_or_literal(sku['ui_banner'], player, null)||'').toUpperCase().indexOf("SALE") != -1) {
-        if(!(read_predicate(sku['show_if']).is_satisfied(player, null))) { return []; }
+        if(('show_if' in sku) && !(read_predicate(sku['show_if']).is_satisfied(player, null))) { return []; }
         var sale = {'path': path + sku['item']};
         var item_ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(sku['item']));
         var sale_ui_name = null;
