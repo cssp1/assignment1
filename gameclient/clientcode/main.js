@@ -1457,7 +1457,11 @@ GameObject.prototype.apply_snapshot = function(snap) {
     if('y' in snap) { this.y = snap['y']; }
     if('hp' in snap) { this.hp = snap['hp']; }
     if('max_hp' in snap) { this.max_hp = snap['max_hp']; }
-    if('owner' in snap) { this.team = (snap['owner'] === session.user_id ? 'player' : 'enemy'); }
+
+    // XXX serialize creates a fake owner that is -1 for enemy, otherwise player
+    // this should be replaced by better team/ownership serialization
+    if('owner' in snap) { this.team = (snap['owner'] !== -1 ? 'player' : 'enemy'); }
+
     if('level' in snap) { this.level = snap['level']; }
     if('equipment' in snap) { this.equipment = snap['equipment']; }
     if('control_state' in snap) { this.control_state = snap['control_state']; }
