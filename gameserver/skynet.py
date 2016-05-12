@@ -7,8 +7,8 @@
 import sys, os, urllib, getopt, uuid, glob, copy, time, subprocess, datetime, math, re, gzip, hashlib
 
 import SpinJSON, Timezones, SpinConfig, SpinFacebook, FastGzipFile
-import pymongo # 3.0+ OK (I think!)
-
+import ANSIColor
+import pymongo
 import socket
 import SpinS3
 
@@ -1420,21 +1420,6 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
             if needs_control_pass:
                 print 'running control pass...'
                 control_adgroups(db, stgt_filter, tactical = 'use', explain = False)
-
-class ANSIColor:
-    BOLD = '\033[1m'
-    YELLOW = '\033[93m'
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    @classmethod
-    def bold(self, x): return self.BOLD+x+self.ENDC
-    @classmethod
-    def red(self, x): return self.RED+x+self.ENDC
-    @classmethod
-    def green(self, x): return self.GREEN+x+self.ENDC
-    @classmethod
-    def yellow(self, x): return self.YELLOW+x+self.ENDC
 
 ADIMAGE_FIELDS='id,name,account_id,created_time,creatives,hash,height,original_height,original_width,permalink_url,status,updated_time,url,url_128,width'
 def adimages_pull(db, ad_account_id):
