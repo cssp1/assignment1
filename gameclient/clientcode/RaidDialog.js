@@ -169,7 +169,7 @@ RaidDialog.update = function(dialog) {
                 dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_unscouted'];
             }
             RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null),
-                                       (raid_mode === 'scout'), null);
+                                       (raid_mode === 'scout'), (raid_mode === 'pickup' ? null : cap.total_raid_offense));
 
         }
 
@@ -250,7 +250,7 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
 
         var widget = dialog.widgets['damage_vs_'+side+x.toString()];
 
-        var q = strength[key] || 0;
+        var q = strength[catname] || 0;
         if(scout_only && key !== 'scout') { // deactivate non-scouting units
             q = 0;
             widget.show = false;
