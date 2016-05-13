@@ -8806,12 +8806,13 @@ class Player(AbstractPlayer):
                         gamesite.exception_log.event(server_time, 'player %d squad %d has map_loc %s but has in-base objects: %s' % \
                                                      (self.user_id, squad_id, repr(squad['map_loc']), repr(home_objects_by_squad[squad_id])))
                     must_recall = True
-                if (squad_id not in map_objects_by_squad):
+                if (squad_id not in map_objects_by_squad) and not squad.get('raid'): # XXX snap dead raids back to home?
                     if gamedata['server'].get('log_nosql',0) >= 1:
                         gamesite.exception_log.event(server_time, 'player %d squad %d has map_loc %s but no objects in NoSQL' % \
                                                      (self.user_id, squad_id, repr(squad['map_loc'])))
                     must_recall = True
-                else:
+
+                elif not squad.get('raid'): # XXX snap dead raids back to home?
                     # check if the squad is dead
                     all_dead = True
 
@@ -18112,7 +18113,7 @@ class GAMEAPI(resource.Resource):
                              'facebook_friends',
                              'attacker_name', 'defender_name',
                              'attacker_level', 'defender_level',
-                             'deployed_units',
+                             'deployed_units', 'raid_mode',
                              'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time',
                              'replay_version')
 

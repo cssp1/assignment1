@@ -249,7 +249,6 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
 
         dst = {'obj_id': nosql_id_generator.generate(), 'spec':spec['name']}
         if 'xy' in src: dst['xy'] = transform(xform, src['xy'])
-        if 'stack' in src: dst['stack'] = src['stack'] # for raids only
         if 'orders' in src:
             dst['orders'] = []
             for order in src['orders']:
@@ -285,6 +284,11 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
 
         dst['level'] = level
         ret.append(dst)
+
+        if 'stack' in src: # for raids only - duplicate the object stack-1 times
+            for i in xrange(1, src['stack']):
+                dst = copy.deepcopy(dst)
+                dst['obj_id'] = nosql_id_generator.generate()
 
     if len(powerplants) > 0:
         # level up powerplants to meet power req
@@ -1531,7 +1535,9 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                              nosql_client.get_fixed_objects_by_base(region_id, raid['base_id'])
                 squad_units = nosql_client.get_mobile_objects_by_base(region_id, squad['base_id'])
 
-                squad_update, raid_update, loot = Raid.resolve_raid(squad, raid, squad_units, raid_units)
+                squad_update, raid_update, loot, is_win, new_squad_units, new_raid_units = \
+                              Raid.resolve_raid(squad, raid, squad_units, raid_units, gamedata)
+
                 if verbose: print 'squad_update', squad_update, 'raid_update', raid_update
 
                 if squad_update or raid_update or (raid_update is None):
@@ -1545,8 +1551,11 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                     summary = Raid.make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
                                                        squad['base_landlord_id'], raid['base_landlord_id'],
                                                        attacker_pcinfo, defender_pcinfo,
-                                                       'victory', 'defeat',
-                                                       squad_units, raid_units, loot, raid_mode = squad['raid'])
+                                                       'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
+                                                       squad_units, raid_units,
+                                                       new_squad_units, new_raid_units,
+                                                       loot, raid_mode = squad['raid'])
+
                     if verbose: print SpinJSON.dumps(summary, pretty = True)
                     if not dry_run:
                         nosql_client.battle_record(summary, reason = 'resolve_raid_squads')
@@ -1582,6 +1591,22 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                     squad.update(squad_update)
                     if not dry_run:
                         nosql_client.update_map_feature(region_id, squad['base_id'], squad_update)
+
+                # XXX snap dead raids back to home?
+
+                # handle unit damage updates
+                # note: client should ping squads to get the army update
+                for new_units in (new_squad_units, new_raid_units):
+                    if new_units is None: continue # no update
+                    mobile_deletions = [unit for unit in new_units if Raid.army_unit_is_mobile(unit, gamedata) and unit.get('DELETED')]
+                    mobile_updates = [unit for unit in new_units if Raid.army_unit_is_mobile(unit, gamedata) and not unit.get('DELETED')]
+                    fixed_deletions = [unit for unit in new_units if not Raid.army_unit_is_mobile(unit, gamedata) and unit.get('DELETED')]
+                    fixed_updates = [unit for unit in new_units if not Raid.army_unit_is_mobile(unit, gamedata) and not unit.get('DELETED')]
+
+                    for unit in mobile_deletions: nosql_client.drop_mobile_object_by_id(region_id, unit['obj_id'], reason = 'resolve_raid_squads')
+                    for unit in fixed_deletions: nosql_client.drop_fixed_object_by_id(region_id, unit['obj_id'], reason = 'resolve_raid_squads')
+                    if fixed_updates: nosql_client.save_fixed_objects(region_id, fixed_updates, reason = 'resolve_raid_squads')
+                    if mobile_updates: nosql_client.save_mobile_objects(region_id, mobile_updates, reason = 'resolve_raid_squads')
 
             finally:
                 if squad_lock: lock_manager.release(region_id, squad['base_id'])
