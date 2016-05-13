@@ -46377,9 +46377,9 @@ function handle_server_message(data) {
         }; })(currency_url, after_promo_cb);
 
         var launch_offer_dialog = (function (_make_offer) { return function() {
-            invoke_child_message_dialog('Incoming Transmission',
-                                        'Commander, Facebook has created a special offer for you to obtain free '+Store.gamebucks_ui_name(),
-                                        {//'dialog':'message_dialog_big',
+            invoke_child_message_dialog(gamedata['dialogs']['message_dialog_payer_promo']['widgets']['title']['ui_name'],
+                                        gamedata['dialogs']['message_dialog_payer_promo']['widgets']['description']['ui_name'].replace('%GAMEBUCKS',Store.gamebucks_ui_name()),
+                                        {'dialog':'message_dialog_payer_promo',
                                          'close_button': 0,
                                          'ok_button_ui_name': 'View Offer',
                                          'on_ok': _make_offer});

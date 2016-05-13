@@ -78,6 +78,24 @@
         }
     },
 
+    "message_dialog_payer_promo": {
+        "dimensions": [451, 151],
+        "default_button": "ok_button",
+        "clip_children": 0,
+        "widgets": {
+            "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
+
+            "title":  { "kind": "TextField", "xy": [108,19], "dimensions": [300, 24], "text_style": "bold", "text_hjustify": "left", "ui_name": "Incoming Transmission" },
+            "close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "description": { "kind": "TextField", "xy": [108,43], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
+                             "text_vjustify": "top", "ui_name": "Facebook has created a special offer for you to obtain free %GAMEBUCKS!" },
+            "cancel_button": { "kind": "ActionButton", "xy": [166,110], "dimensions": [134,28], "show": 0, // off by default
+                               "bg_image": "menu_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Cancel" },
+            "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "View Offer" }
+        }
+    },
+
     "message_dialog_weak_zombie": {
         "bg_image": "dialog_487x337_bg",
         "dimensions": [487,337],
