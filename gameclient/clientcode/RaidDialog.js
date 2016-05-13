@@ -177,7 +177,7 @@ RaidDialog.update = function(dialog) {
 
         dialog.widgets['advantage'].show =
             dialog.widgets['advantage_label'].show = true;
-        var adv = (scout_data ? 'unknown' : 'unknown'); // "neutral","good","very_good","best","bad","very_bad","worst"
+        var adv = (raid_mode !== 'scout' && scout_data && scout_data['new_raid_defense'] ? RaidDialog.calc_advantage(cap.total_raid_offense, scout_data['new_raid_defense']) : 'unknown');
         dialog.widgets['advantage'].set_text_bbcode(dialog.data['widgets']['advantage']['ui_name_'+adv]);
 
     } else { // defenseless feature, no scouting necessary
@@ -207,6 +207,42 @@ RaidDialog.update = function(dialog) {
     }
 };
 
+/** @param {Object<string,number>} attacker_strength
+    @param {Object<string,number>} defender_strength
+    @return {string} "neutral","good","very_good","best","bad","very_bad","worst" */
+RaidDialog.calc_advantage = function(attacker_strength, defender_strength) {
+    var CATS = gamedata['strings']['damage_vs_categories'];
+
+    // very, very rough way to calculate advantage: look only at the
+    // single category with the absolute highest strength
+
+    var absolute_max = 0;
+    var absolute_max_i = -1;
+    for(var i = 0; i < CATS.length; i++) {
+        var key = CATS[i][0], catname = CATS[i][1];
+        var a = attacker_strength[catname] || 0;
+        var b = defender_strength[catname] || 0;
+        if(a > absolute_max || b > absolute_max) {
+            absolute_max = Math.max(a,b);
+            absolute_max_i = i;
+        }
+    }
+
+    if(absolute_max_i >= 0) {
+        var catname = CATS[absolute_max_i][1];
+        var a = attacker_strength[catname] || 0;
+        var b = defender_strength[catname] || 0;
+        if(a < 0.75 * b) {
+            return 'bad';
+        } else if(b < 0.75 * a) {
+            return 'good';
+        } else {
+            return 'neutral';
+        }
+    }
+
+    return 'neutral';
+};
 
 /** @param {!SPUI.Dialog} dialog
     @param {string} side
