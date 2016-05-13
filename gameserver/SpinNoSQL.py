@@ -1944,11 +1944,14 @@ class NoSQLClient (object):
             obj['_id'] = self.encode_object_id(obj['obj_id'])
             del obj['obj_id']
         try:
-            self.region_table(region, table_name).insert_many(objlist)
+            self.region_table(region, table_name).bulk_write([pymongo.operations.ReplaceOne({'_id':obj['_id']}, obj, upsert=True) for obj in objlist])
         finally:
             for obj in objlist:
                 obj['obj_id'] = self.decode_object_id(obj['_id'])
                 del obj['_id']
+
+    def save_fixed_objects(self, region, objlist, reason=''): return self.instrument('save_fixed_objects(%s)'%reason, self._save_objects, (region, 'fixed', objlist))
+    def save_mobile_objects(self, region, objlist, reason=''): return self.instrument('save_mobile_objects(%s)'%reason, self._save_objects, (region, 'mobile', objlist))
 
     def drop_fixed_objects_by_base(self, region, base_id, reason=''): return self.instrument('drop_fixed_objects_by_base(%s)'%reason, self._drop_objects, (region,'fixed',{'base_id':base_id}))
     def drop_mobile_objects_by_base(self, region, base_id, reason=''): return self.instrument('drop_mobile_objects_by_base(%s)'%reason, self._drop_objects, (region,'mobile',{'base_id':base_id}))
