@@ -692,10 +692,9 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 // is an unblocked path between them. Blocked cells get "region number" -1.
 
 /** @constructor @struct
-    @param {AStar.AStarMap} map */
-AStar.Connectivity = function(map) {
-    if(!(map instanceof AStar.AStarRectMap)) { throw Error('Connectivity only implemented for RectMap'); }
-
+    @param {AStar.AStarMap} map
+    @param {AStar.BlockChecker} checker */
+AStar.Connectivity = function(map, checker) {
     /** @type {!Array.<number>} */
     this.size = [map.size[0], map.size[1]];
 
@@ -705,13 +704,17 @@ AStar.Connectivity = function(map) {
     // use a flood-fill algorithm to assign region numbers
 
     var val = 0;
+
+    /** @type {!Array.<!AStar.AStarCell>} */
+    var neighbors = new Array(map.num_neighbors());
+
     for(var y = 0; y < this.size[1]; y++) {
         for(var x = 0; x < this.size[0]; x++) {
-            if(typeof(this.flood[y*this.size[1]+x]) != 'undefined') {
+            if(typeof(this.flood[y*this.size[0]+x]) != 'undefined') {
                 continue;
             }
-            if(map.is_blocked([x,y])) {
-                this.flood[y*this.size[1]+x] = -1;
+            if(map.is_blocked([x,y], checker)) {
+                this.flood[y*this.size[0]+x] = -1;
                 continue;
             }
             val += 1;
@@ -721,30 +724,39 @@ AStar.Connectivity = function(map) {
 
             while(q.length > 0) {
                 var p = q.pop();
-                if(typeof(this.flood[p[1]*this.size[1]+p[0]]) != 'undefined') {
+                if(typeof(this.flood[p[1]*this.size[0]+p[0]]) != 'undefined') {
                     continue;
                 }
-                if(map.is_blocked(p)) {
-                    this.flood[y*this.size[1]+x] = -1;
+                if(map.is_blocked(p, checker)) {
+                    this.flood[y*this.size[0]+x] = -1;
                     continue;
                 } else {
-                    // note: this only works for rectangular maps at the moment, but could be adapted to a hex map if necessary
+                    // find east-west extent of this region along this row
                     var w = p[0], e = p[0];
-                    while(!map.is_blocked([w,p[1]]) && typeof(this.flood[p[1]*this.size[1]+w]) == 'undefined' && w >= 0) {
+                    while(!map.is_blocked([w,p[1]], checker) && typeof(this.flood[p[1]*this.size[0]+w]) == 'undefined' && w >= 0) {
                         w -= 1;
                     }
                     w += 1;
-                    while(!map.is_blocked([e,p[1]]) && typeof(this.flood[p[1]*this.size[1]+e]) == 'undefined' && e < this.size[0]) {
+                    while(!map.is_blocked([e,p[1]], checker) && typeof(this.flood[p[1]*this.size[0]+e]) == 'undefined' && e < this.size[0]) {
                         e += 1;
                     }
                     e -= 1;
+
+                    // iterate along the region west-to-east
                     for(var x2 = w; x2 <= e; x2++) {
-                        this.flood[p[1]*this.size[1]+x2] = val;
-                        if(p[1] > 0 && !map.is_blocked([x2,p[1]-1]) && typeof(this.flood[(p[1]-1)*this.size[1]+x2]) == 'undefined') {
-                            q.push([x2,p[1]-1]);
-                        }
-                        if(p[1] < this.size[1]-1 && !map.is_blocked([x2,p[1]+1]) && typeof(this.flood[(p[1]+1)*this.size[1]+x2]) == 'undefined') {
-                            q.push([x2,p[1]+1]);
+                        this.flood[p[1]*this.size[0]+x2] = val;
+
+                        // queue points reachable one step north or south of here
+                        // (for hex maps, it's both nw/ne and sw/se)
+                        map.get_unblocked_neighbors(map.cell_if_unblocked([x2,p[1]], checker), checker, neighbors);
+
+                        for(var ni = 0; ni < neighbors.length; ni++) {
+                            var n = neighbors[ni];
+                            if(n &&
+                               (n.pos[1] == p[1]+1 || n.pos[1] == p[1]-1) &&
+                               typeof(this.flood[n.pos[1]*this.size[0]+n.pos[0]]) == 'undefined') {
+                                q.push([n.pos[0], n.pos[1]]);
+                            }
                         }
                     }
                 }
@@ -756,7 +768,7 @@ AStar.Connectivity = function(map) {
 /** @param {!Array.<number>} pos
     @return {number} */
 AStar.Connectivity.prototype.region_num = function(pos) {
-    return this.flood[pos[1]*this.size[1]+pos[0]];
+    return this.flood[pos[1]*this.size[0]+pos[0]];
 };
 
 /** @param {CanvasRenderingContext2D} ctx */
@@ -764,7 +776,7 @@ AStar.Connectivity.prototype.debug_draw = function(ctx) {
     ctx.save();
     for(var y = 0; y < this.size[1]; y++) {
         for(var x = 0; x < this.size[0]; x++) {
-            var val = this.flood[y*this.size[1]+x];
+            var val = this.flood[y*this.size[0]+x];
             if(val < 0) { continue; }
             var col = (val*0.20);
             var col_s = ((255*col) & 0xFF).toString();
@@ -1040,7 +1052,7 @@ AStar.CachedAStarContext.prototype.check_dirty = function() {
 };
 AStar.CachedAStarContext.prototype.ensure_connectivity = function() {
     if(!this.connectivity && this.options.use_connectivity) {
-        this.connectivity = new AStar.Connectivity(this.map);
+        this.connectivity = new AStar.Connectivity(this.map, null);
     }
 };
 
