@@ -29491,9 +29491,17 @@ player.squad_clear_client_data = function(squad_id) {
     delete player.squad_client_data[key];
 };
 
-player.squad_travel_time = function(squad_id, path) {
+/** @param {number} squad_id
+    @return {number} */
+player.squad_travel_time_per_hex = function(squad_id) {
     var squad_data = player.squads[squad_id.toString()];
-    return (path.length/(gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*(squad_data['travel_speed']||1)));
+    return (1.0/(gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*(squad_data['travel_speed']||1)));
+};
+/** @param {number} squad_id
+    @param {!Array<!Array<number>>} path
+    @return {number} */
+player.squad_travel_time = function(squad_id, path) {
+    return path.length * player.squad_travel_time_per_hex(squad_id);
 };
 
 /** Return a path that ends on this feature.
@@ -29563,10 +29571,13 @@ player.make_squad_path_checker = function(squad_id, dest, options) {
     };
 };
 /** NOT TO BE USED FOR RAIDS
+    @param {number=} at_time
     @param {{bump_self:(boolean|undefined)}=} options
     @return {AStar.BlockChecker|null} */
-player.make_squad_cell_checker = function(options) {
+player.make_squad_cell_checker = function(at_time, options) {
     if(!player.squad_bumping_enabled()) { return null; } // any blocker blocks
+    if(!at_time) { at_time = server_time; }
+
     return function(cell) {
         if(cell.block_count > 0) {
             for(var i = 0; i < cell.blockers.length; i++) {
@@ -29581,7 +29592,7 @@ player.make_squad_cell_checker = function(options) {
                         throw Error('last_waypoint '+JSON.stringify(last_waypoint)+' of feature '+JSON.stringify(feature)+' does not match cell.pos '+JSON.stringify(cell.pos));
                     }
 
-                    if(their_arrival_time > server_time + fudge_time) {
+                    if(their_arrival_time > at_time + fudge_time) {
                         continue; // not necessarily blocked! (there might be another feature here though)
                     }
                 }
@@ -29611,15 +29622,34 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
 
     // When squad_block_mode is 'after_move', allow travel through hexes that are reserved as the destination
     // of another squad before its arrival time. This requires a path-dependent blockage check, since the
-    // arrival time to check against depends on how long it takes us to get ther.
+    // arrival time to check against depends on how long it takes us to get there.
+
+    // earliest possible arrival time - used to check for dynamic blockage at destination that can't be avoided by any A* path
+    var earliest_arrival_at = function(d) {
+        return server_time + player.squad_travel_time_per_hex(squad_id) * hex_distance(squad_data['map_loc'], d);
+    };
+
+    // query speed benchmark
+    var slow_threshold = (player.is_developer() ? 0.1 : 999);
+    var start_time = (new Date()).getTime()/1000;
 
     // if dest is not blocked, try going directly there
-    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker(options))) {
+    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker(earliest_arrival_at(dest), options))) {
         var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest, options));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
+            var end_time = (new Date()).getTime()/1000;
+            if(end_time - start_time >= slow_threshold) {
+                console.log('squad_find_path_adjacent_to slow: returned DEST path after '+(1000*(end_time - start_time)).toFixed(2)+' ms');
+            }
             return path; // good path
         }
     }
+
+    var end_time = (new Date()).getTime()/1000;
+    if(end_time - start_time >= slow_threshold) {
+        console.log('squad_find_path_adjacent_to slow: gave up on DEST after '+(1000*(end_time - start_time)).toFixed(2)+' ms');
+    }
+    start_time = end_time;
 
     // try aiming for neighbor squares around "dest"
     var neighbors = session.region.get_neighbors(dest);
@@ -29628,7 +29658,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
 
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
-        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker(options))) {
+        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker(earliest_arrival_at(n), options))) {
             var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n, options));
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
@@ -29637,7 +29667,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
                 // note: need to check for blockage on this intermediate waypoint before changing the final destination to it,
                 // because it might be the destination of another moving squad, where we aren't allowed to land.
                 while(path.length >= 2 && hex_distance(path[path.length-2], dest) == 1 &&
-                      !session.region.occupancy.is_blocked(path[path.length-2], player.make_squad_cell_checker(options))) {
+                      !session.region.occupancy.is_blocked(path[path.length-2], player.make_squad_cell_checker(earliest_arrival_at(path[path.length-2]), options))) {
                     goog.array.removeAt(path, path.length-1);
                 }
                 var travel_time = player.squad_travel_time(squad_id, path);
@@ -29650,6 +29680,10 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
         }
     }
 
+    end_time = (new Date()).getTime()/1000;
+    if(end_time - start_time >= slow_threshold) {
+        console.log('squad_find_path_adjacent_to slow: returned NEIGHBOR path after '+(1000*(end_time - start_time)).toFixed(2)+' ms');
+    }
     return best_path;
 };
 
