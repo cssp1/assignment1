@@ -258,9 +258,14 @@ AStar.AStarMap.prototype.is_blocked = function(xy, checker) {
 AStar.AStarMap.prototype.num_neighbors = goog.abstractMethod;
 
 /** @param {AStar.AStarCell} node
- * @param {AStar.BlockChecker} checker
- * @param {!Array.<AStar.AStarCell>} ret */
+    @param {AStar.BlockChecker} checker
+    @param {!Array.<AStar.AStarCell>} ret */
 AStar.AStarMap.prototype.get_unblocked_neighbors = goog.abstractMethod;
+
+/** @param {!Array<number>} pos
+    @param {AStar.BlockChecker} checker
+    @param {!Array<Array<number>|null>} ret */
+AStar.AStarMap.prototype.get_unblocked_neighbor_locations = goog.abstractMethod;
 
 /** Iterate through all allocated cells, whether blocked or not. Used for integrity checking/debugging only.
  * @param {function(AStar.AStarCell)} func */
@@ -306,6 +311,18 @@ AStar.AStarRectMap.prototype.get_unblocked_neighbors = function(node, checker, r
     ret[1] = this.cell_if_unblocked([x+1,y], checker);
     ret[2] = this.cell_if_unblocked([x,y-1], checker);
     ret[3] = this.cell_if_unblocked([x,y+1], checker);
+};
+/** @override
+    @param {!Array<number>} pos
+    @param {AStar.BlockChecker} checker
+    @param {!Array<Array<number>|null>} ret */
+AStar.AStarRectMap.prototype.get_unblocked_neighbor_locations = function(pos, checker, ret) {
+    var x = pos[0];
+    var y = pos[1];
+    ret[0] = (this.is_blocked([x-1,y], checker) ? null : [x-1,y]);
+    ret[1] = (this.is_blocked([x+1,y], checker) ? null : [x+1,y]);
+    ret[2] = (this.is_blocked([x,y-1], checker) ? null : [x,y-1]);
+    ret[3] = (this.is_blocked([x,y+1], checker) ? null : [x,y+1]);
 };
 
 /** just for debugging - prints information about a blocker, which we assume to be a GameObject in astar_map
@@ -639,6 +656,22 @@ AStar.AStarHexMap.prototype.get_unblocked_neighbors = function(node, checker, re
     ret[5] = this.cell_if_unblocked([x+odd,y+1], checker); // lower-right
 };
 
+/** @override
+    @param {!Array<number>} pos
+    @param {AStar.BlockChecker} checker
+    @param {!Array<Array<number>|null>} ret */
+AStar.AStarHexMap.prototype.get_unblocked_neighbor_locations = function(pos, checker, ret) {
+    var x = pos[0], y = pos[1];
+    var odd = (y%2) > 0;
+
+    ret[0] = (this.is_blocked([x-1,y], checker) ? null : [x-1,y]); // left
+    ret[1] = (this.is_blocked([x+1,y], checker) ? null : [x+1,y]); // right
+    ret[2] = (this.is_blocked([x+odd-1,y-1], checker) ? null : [x+odd-1,y-1]); // upper-left
+    ret[3] = (this.is_blocked([x+odd,y-1], checker) ? null : [x+odd,y-1]); // upper-right
+    ret[4] = (this.is_blocked([x+odd-1,y+1], checker) ? null : [x+odd-1,y+1]); // lower-left
+    ret[5] = (this.is_blocked([x+odd,y+1], checker) ? null : [x+odd,y+1]); // lower-right
+};
+
 /** block/unblock individual hexes
     @param {!Array.<number>} xy
     @param {number} value +1 to block, -1 to unblock
@@ -708,7 +741,7 @@ AStar.Connectivity = function(map, checker) {
 
     var val = 0;
 
-    /** @type {!Array.<!AStar.AStarCell>} */
+    /** @type {!Array<Array<number>|null>} */
     var neighbors = new Array(map.num_neighbors());
 
     for(var y = 0; y < this.size[1]; y++) {
@@ -754,14 +787,14 @@ AStar.Connectivity = function(map, checker) {
 
                         // queue points reachable one step north or south of here
                         // (for hex maps, it's both nw/ne and sw/se)
-                        map.get_unblocked_neighbors(map.cell_if_unblocked([x2,p[1]], checker), checker, neighbors);
+                        map.get_unblocked_neighbor_locations([x2,p[1]], checker, neighbors);
 
                         for(var ni = 0; ni < neighbors.length; ni++) {
                             var n = neighbors[ni];
                             if(n &&
-                               (n.pos[1] == p[1]+1 || n.pos[1] == p[1]-1) &&
-                               typeof(this.flood[n.pos[1]*this.size[0]+n.pos[0]]) == 'undefined') {
-                                q.push([n.pos[0], n.pos[1]]);
+                               (n[1] == p[1]+1 || n[1] == p[1]-1) &&
+                               typeof(this.flood[n[1]*this.size[0]+n[0]]) == 'undefined') {
+                                q.push(n);
                             }
                         }
                     }
