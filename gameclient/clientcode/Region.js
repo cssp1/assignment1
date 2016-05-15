@@ -29,7 +29,9 @@ Region.Region = function(data) {
     this.connectivity_key = null;
 
     /** @type {?AStar.AStarContext} used for pathfinding and collision detection */
-    this.hstar_context = (data ? new AStar.AStarContext(this.occupancy, {heuristic_name:'manhattan'}) : null);
+    this.hstar_context = (data ? new AStar.AStarContext(this.occupancy, {heuristic_name:'manhattan',
+                                                                         iter_limit:gamedata['territory']['hstar_iter_limit']*Math.max(data['dimensions'][0], data['dimensions'][1])
+                                                                        }) : null);
 
     /** @type {?RegionMapIndex.RegionMapIndex} used for feature queries */
     this.map_index = (data ? new RegionMapIndex.RegionMapIndex(data['dimensions']) : null);
