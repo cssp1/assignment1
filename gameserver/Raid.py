@@ -306,7 +306,7 @@ def resolve_loc(gamedata, nosql_client, chat_mgr, lock_manager, region_id, loc, 
 
 # resolve action of a list of raid squads vs. a single raid target
 # *mutates raid_squads* on the way out
-def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, dry_run = False):
+def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, recall_squads = True, dry_run = False):
     # for proper resolution ordering, sort by arrival time, earliest first
     raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
 
@@ -392,20 +392,22 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                 if fixed_updates: nosql_client.save_fixed_objects(region_id, fixed_updates, reason = 'resolve_loc')
                 if mobile_updates: nosql_client.save_mobile_objects(region_id, mobile_updates, reason = 'resolve_loc')
 
-            # send the squad towards home
-            home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
-            if not home:
-                continue # XXX squad's home base not found on map
+            if recall_squads:
+                # send the squad towards home
+                home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
+                if not home:
+                    continue # XXX squad's home base not found on map
 
-            if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
-                # good backtrack path
-                path_update = backtrack(squad, time_now)
-            else:
-                continue # XXX no path found to home base
-            if not dry_run:
-                nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
-                                              old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
-                                              exclusive = -1, reason = 'resolve_loc')
+                if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
+                    # good backtrack path
+                    path_update = backtrack(squad, time_now)
+                else:
+                    continue # XXX no path found to home base
+                if not dry_run:
+                    nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
+                                                  old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
+                                                  exclusive = -1, reason = 'resolve_loc')
+
         finally:
             if squad_lock: lock_manager.release(region_id, squad['base_id'])
             if raid_lock: lock_manager.release(region_id, raid['base_id'])
