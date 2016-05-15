@@ -21,6 +21,13 @@ Region.Region = function(data) {
 
     /** @type {?AStar.AStarHexMap} used for pathfinding and collision detection */
     this.occupancy = (data ? new AStar.AStarHexMap(data['dimensions'], terrain_func) : null);
+
+    /** @type {AStar.Connectivity|null} for speeding up squad pathfinding */
+    this.connectivity = null;
+    /** @type {string|null} unique key for associating cached connectivity with a cell checker
+        (we also check that the map generation hasn't changed internally) */
+    this.connectivity_key = null;
+
     /** @type {?AStar.AStarContext} used for pathfinding and collision detection */
     this.hstar_context = (data ? new AStar.AStarContext(this.occupancy, {heuristic_name:'manhattan'}) : null);
 
@@ -33,6 +40,24 @@ Region.Region = function(data) {
     this.terrain = (data ? gamedata['region_terrain'][data['terrain']] : null);
     this.contest_rank = null;
 }
+
+/** Ensure this.connectivity is present and up to date, if connectivity usage is enabled by gamedata setting.
+    Otherwise return null.
+    @param {AStar.BlockChecker} cell_checker
+    @param {string} checker_key
+    @return {AStar.Connectivity|null} */
+Region.Region.prototype.ensure_connectivity = function(cell_checker, checker_key) {
+    if(!gamedata['territory']['hstar_use_connectivity']) { return null; }
+    var cache_key = this.occupancy.generation.toString()+':'+checker_key;
+    if(this.connectivity_key !== cache_key) {
+        if(player.is_developer()) {
+            console.log('updating connectivity to '+cache_key);
+        }
+        this.connectivity = new AStar.Connectivity(this.occupancy, cell_checker);
+        this.connectivity_key = cache_key;
+    }
+    return this.connectivity;
+};
 
 Region.Region.prototype.map_enabled = function() {
     return this.data && (!('enable_map' in this.data) || this.data['enable_map']);

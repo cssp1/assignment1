@@ -29573,12 +29573,14 @@ player.make_squad_path_checker = function(squad_id, dest, options) {
 /** NOT TO BE USED FOR RAIDS
     @param {number=} at_time
     @param {{bump_self:(boolean|undefined)}=} options
+    @param {Array<number>|undefined|null=} ignore_pos
     @return {AStar.BlockChecker|null} */
-player.make_squad_cell_checker = function(at_time, options) {
+player.make_squad_cell_checker = function(at_time, options, ignore_pos) {
     if(!player.squad_bumping_enabled()) { return null; } // any blocker blocks
     if(!at_time) { at_time = server_time; }
 
     return function(cell) {
+        if(ignore_pos && vec_equals(ignore_pos, cell.pos)) { return AStar.PASS; } // ignore blockage here
         if(cell.block_count > 0) {
             for(var i = 0; i < cell.blockers.length; i++) {
                 var feature = cell.blockers[i];
@@ -29629,12 +29631,23 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
         return server_time + player.squad_travel_time_per_hex(squad_id) * hex_distance(squad_data['map_loc'], d);
     };
 
+    // calculate map connectivity - ignore blockage at the squad's starting location and ignore ALL moving squads
+    // (this means connectivity will show regions as connected if they will later be separated by a moving squad
+    // reaching its destination. That's OK because the actual A* search will find the location blocked. We just want
+    // an early-out heuristic that will avoid fruitless A* searches).
+    var connectivity_key = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
+    var connectivity = session.region.ensure_connectivity(player.make_squad_cell_checker(-Infinity, // note: test against infinite past time to treat moving squads as transparent
+                                                                                         {bump_self:true}, // always assume bump_self, since we're ignoring ALL moving squads for connectivity purposes
+                                                                                         squad_data['map_loc']),
+                                                          connectivity_key);
+
     // query speed benchmark
     var slow_threshold = (player.is_developer() ? 0.1 : 999);
     var start_time = (new Date()).getTime()/1000;
 
     // if dest is not blocked, try going directly there
-    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker(earliest_arrival_at(dest), options))) {
+    if(!session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker(earliest_arrival_at(dest), options)) &&
+       (!connectivity || (connectivity.region_num(dest) === connectivity.region_num(squad_data['map_loc'])))) {
         var path = session.region.hstar_context.search(squad_data['map_loc'], dest, player.make_squad_path_checker(squad_id, dest, options));
         if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) == 0) {
             var end_time = (new Date()).getTime()/1000;
@@ -29658,7 +29671,8 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
 
     for(var i = 0; i < neighbors.length; i++) {
         var n = neighbors[i];
-        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker(earliest_arrival_at(n), options))) {
+        if(!session.region.occupancy.is_blocked(n, player.make_squad_cell_checker(earliest_arrival_at(n), options)) &&
+           (!connectivity || (connectivity.region_num(n) === connectivity.region_num(squad_data['map_loc'])))) {
             var path = session.region.hstar_context.search(squad_data['map_loc'], n, player.make_squad_path_checker(squad_id, n, options));
             // path must lead INTO n
             if(path && path.length >= 1 && hex_distance(path[path.length-1], n) == 0) {
