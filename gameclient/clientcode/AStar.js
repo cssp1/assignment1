@@ -698,8 +698,11 @@ AStar.Connectivity = function(map, checker) {
     /** @type {!Array.<number>} */
     this.size = [map.size[0], map.size[1]];
 
-    /** @type {!Array.<number>} */
-    this.flood = new Array(this.size[0]*this.size[1]);
+    if((typeof Int8Array !== 'undefined')) {
+        this.flood = /** @type {!Int8Array} */ (new Int8Array(this.size[0]*this.size[1]));
+    } else {
+        this.flood = /** @type {!Array<number>} */ (new Array(this.size[0]*this.size[1]));
+    }
 
     // use a flood-fill algorithm to assign region numbers
 
@@ -718,6 +721,9 @@ AStar.Connectivity = function(map, checker) {
                 continue;
             }
             val += 1;
+            if(val >= 128) {
+                throw Error('too many map colors, exceeded Int8 size');
+            }
 
             /** @type {!Array.<!Array.<number>>} */
             var q = [[x,y]];
@@ -776,7 +782,7 @@ AStar.Connectivity.prototype.debug_draw = function(ctx) {
     ctx.save();
     for(var y = 0; y < this.size[1]; y++) {
         for(var x = 0; x < this.size[0]; x++) {
-            var val = this.flood[y*this.size[0]+x];
+            var val = /** @type {number} */ (this.flood[y*this.size[0]+x]);
             if(val < 0) { continue; }
             var col = (val*0.20);
             var col_s = ((255*col) & 0xFF).toString();
