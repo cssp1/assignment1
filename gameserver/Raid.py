@@ -286,26 +286,12 @@ def backtrack(squad_feature, time_now):
 # below has dependencies on SpinNoSQL and ChatChannels stuff; above does not
 import SpinConfig
 
-# online function for resolving action at a map hex
+# online function to resolve action of a list of raid squads vs. a single raid target
 # intended to be usable both by server and maptool
 # intended to be self-contained with respect to locking and logging
 # this assumes that the nosql_client you provide has been set up with hooks to properly broadcast map updates
-def resolve_loc(gamedata, nosql_client, chat_mgr, lock_manager, region_id, loc, time_now, dry_run = False):
-    features = nosql_client.get_map_features_by_loc(region_id, loc)
-    # filter out not-arrived-yet moving features (use strict time comparison)
-    features = filter(lambda feature: ('base_map_path' not in feature) or \
-                      feature['base_map_path'][-1]['eta'] < time_now, features)
-    raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and feature.get('raid'), features)
-    if not raid_squads: return # no raids to process
-
-    targets = filter(lambda x: x['base_type'] == 'raid', features)
-    if not targets: return # no targets to process
-    raid = targets[0] # select first target
-
-    resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, dry_run = dry_run)
-
-# resolve action of a list of raid squads vs. a single raid target
 # *mutates raid_squads* on the way out
+
 def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, recall_squads = True, dry_run = False):
     # for proper resolution ordering, sort by arrival time, earliest first
     raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
@@ -314,6 +300,8 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
         owner_id, squad_id = map(int, squad['base_id'][1:].split('_'))
         assert squad['base_landlord_id'] == owner_id
         if not raid: break # target doesn't exist anymore
+        if raid['base_landlord_id'] == owner_id: break # target is actually owned by same player as squad - not eligible to raid it
+        assert raid['base_type'] == 'raid' # home base attacks handled in a separate path
 
         squad_lock = lock_manager.acquire(region_id, squad['base_id'])
         raid_lock = lock_manager.acquire(region_id, raid['base_id'])
@@ -333,7 +321,7 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                 # query player_cache for metadata on the attacker and
                 # defender. Not absolutely 100% guaranteed to be up to date with
                 # online server data, but close enough.
-                attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([owner_id, raid['base_landlord_id']], reason = 'Raid.resolve_loc')
+                attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([owner_id, raid['base_landlord_id']], reason = 'resolve_target')
 
                 summary = make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
                                               squad['base_landlord_id'], raid['base_landlord_id'],
@@ -343,7 +331,7 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                                               new_squad_units, new_raid_units,
                                               loot, raid_mode = squad['raid'])
                 if not dry_run:
-                    nosql_client.battle_record(summary, reason = 'Raid.resolve_loc')
+                    nosql_client.battle_record(summary, reason = 'resolve_target')
 
                     # broadcast map attack for GUI and battle history jewel purposes
                     if chat_mgr:
@@ -387,10 +375,10 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                 fixed_deletions = [unit for unit in new_units if not army_unit_is_mobile(unit, gamedata) and unit.get('DELETED')]
                 fixed_updates = [unit for unit in new_units if not army_unit_is_mobile(unit, gamedata) and not unit.get('DELETED')]
 
-                for unit in mobile_deletions: nosql_client.drop_mobile_object_by_id(region_id, unit['obj_id'], reason = 'resolve_loc')
-                for unit in fixed_deletions: nosql_client.drop_fixed_object_by_id(region_id, unit['obj_id'], reason = 'resolve_loc')
-                if fixed_updates: nosql_client.save_fixed_objects(region_id, fixed_updates, reason = 'resolve_loc')
-                if mobile_updates: nosql_client.save_mobile_objects(region_id, mobile_updates, reason = 'resolve_loc')
+                for unit in mobile_deletions: nosql_client.drop_mobile_object_by_id(region_id, unit['obj_id'], reason = 'resolve_target')
+                for unit in fixed_deletions: nosql_client.drop_fixed_object_by_id(region_id, unit['obj_id'], reason = 'resolve_target')
+                if fixed_updates: nosql_client.save_fixed_objects(region_id, fixed_updates, reason = 'resolve_target')
+                if mobile_updates: nosql_client.save_mobile_objects(region_id, mobile_updates, reason = 'resolve_target')
 
             if recall_squads:
                 # send the squad towards home
@@ -406,7 +394,7 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                 if not dry_run:
                     nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
                                                   old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
-                                                  exclusive = -1, reason = 'resolve_loc')
+                                                  exclusive = -1, reason = 'resolve_target')
 
         finally:
             if squad_lock: lock_manager.release(region_id, squad['base_id'])

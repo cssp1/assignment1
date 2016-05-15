@@ -27392,8 +27392,22 @@ class GAMEAPI(resource.Resource):
 
                 @admin_stats.measure_latency('do_squad_resolve')
                 def do_squad_resolve(region_id, loc):
+                    # query for squads and targets at this location
+                    features = gamesite.nosql_client.get_map_features_by_loc(region_id, loc)
+                    # filter out not-arrived-yet moving features (use strict time comparison)
+                    features = filter(lambda feature: ('base_map_path' not in feature) or \
+                                      feature['base_map_path'][-1]['eta'] < server_time, features)
+                    raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and feature.get('raid'), features)
+                    if not raid_squads: return # no raids to process
+
                     lock_manager = SpinNoSQLLockManager.LockManager(gamesite.nosql_client) # adaptor for Raid.py
-                    Raid.resolve_loc(gamedata, gamesite.nosql_client, gamesite.chat_mgr, lock_manager, region_id, loc, server_time)
+
+                    raid_targets = filter(lambda x: x['base_type'] == 'raid', features)
+                    for targ in raid_targets:
+                        Raid.resolve_target(gamedata, gamesite.nosql_client, gamesite.chat_mgr, lock_manager, region_id, targ, raid_squads, server_time)
+                    home_targets = filter(lambda x: x['base_type'] == 'home', features)
+                    for targ in home_targets:
+                        raise Exception('implement home-base attack path')
 
                 reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
 
