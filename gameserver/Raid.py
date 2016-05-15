@@ -150,7 +150,7 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
         target_spec = gamedata['units'][target['spec']]
         #target_level = target.get('level',1)
 
-        print shooter, 'shoots', target
+        #print shooter, 'shoots', target
 
         coeff = 1
         raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
@@ -464,30 +464,29 @@ def make_battle_summary(gamedata, nosql_client,
 
     # record remaining strength of defender
     # unless you lost a scout attempt
-    if (raid_mode != 'scout' or attacker_outcome == 'victory') and (defender_units_after is not None):
-        if len(defender_units_after) < 1:
-            ret['new_raid_offense'] = {}
-            ret['new_raid_defense'] = {}
-        else:
-            for obj in defender_units_after:
-                if obj['spec'] in gamedata['units']:
-                    spec = gamedata['units'][obj['spec']]
-                elif obj['spec'] in gamedata['buildings']:
-                    spec = gamedata['buildings'][obj['spec']]
-                else:
-                    continue
-                stack = obj.get('stack', 1)
-                level = obj.get('level', 1)
-                hp_ratio = obj.get('hp_ratio', 1)
-                for kind in ('raid_offense', 'raid_defense'):
-                    if kind in spec:
-                        val = get_leveled_quantity(spec[kind], level)
-                        for k, v in val.iteritems():
-                            v = get_leveled_quantity(v, level)
-                            v = stack * hp_ratio * v # ??
-                            if v > 0:
-                                if ('new_'+kind) not in ret: ret['new_'+kind] = {}
-                                ret['new_'+kind][k] = ret['new_'+kind].get(k,0) + v
+    if (raid_mode != 'scout' or attacker_outcome == 'victory') and (defender_units_after is not None) and (raid_mode != 'pickup'):
+        ret['new_raid_offense'] = {}
+        ret['new_raid_defense'] = {}
+
+        for obj in defender_units_after:
+            if obj['spec'] in gamedata['units']:
+                spec = gamedata['units'][obj['spec']]
+            elif obj['spec'] in gamedata['buildings']:
+                spec = gamedata['buildings'][obj['spec']]
+            else:
+                continue
+            stack = obj.get('stack', 1)
+            level = obj.get('level', 1)
+            hp_ratio = obj.get('hp_ratio', 1)
+            for kind in ('raid_offense', 'raid_defense'):
+                if kind in spec:
+                    val = get_leveled_quantity(spec[kind], level)
+                    for k, v in val.iteritems():
+                        v = get_leveled_quantity(v, level)
+                        v = stack * hp_ratio * v # ??
+                        if v > 0:
+                            if ('new_'+kind) not in ret: ret['new_'+kind] = {}
+                            ret['new_'+kind][k] = ret['new_'+kind].get(k,0) + v
 
     ret['loot'] = copy.copy(loot) # don't mutate caller's loot
 
