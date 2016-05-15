@@ -68,6 +68,7 @@ import SpinSignature
 import SpinNoSQLId
 import SpinNoSQL
 import SpinNoSQLLog
+import SpinNoSQLLockManager
 import SpinSQLBattles
 import Raid
 import Scores2
@@ -27391,7 +27392,8 @@ class GAMEAPI(resource.Resource):
 
                 @admin_stats.measure_latency('do_squad_resolve')
                 def do_squad_resolve(region_id, loc):
-                    Raid.resolve_loc(gamedata, gamesite.nosql_client, gamesite.chat_mgr, region_id, loc, server_time)
+                    lock_manager = SpinNoSQLLockManager.LockManager(gamesite.nosql_client) # adaptor for Raid.py
+                    Raid.resolve_loc(gamedata, gamesite.nosql_client, gamesite.chat_mgr, lock_manager, region_id, loc, server_time)
 
                 reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
 

@@ -285,13 +285,12 @@ def backtrack(squad_feature, time_now):
 
 # below has dependencies on SpinNoSQL and ChatChannels stuff; above does not
 import SpinConfig
-import SpinNoSQLLockManager
 
 # online function for resolving action at a map hex
 # intended to be usable both by server and maptool
 # intended to be self-contained with respect to locking and logging
 # this assumes that the nosql_client you provide has been set up with hooks to properly broadcast map updates
-def resolve_loc(gamedata, nosql_client, chat_mgr, region_id, loc, time_now, dry_run = False):
+def resolve_loc(gamedata, nosql_client, chat_mgr, lock_manager, region_id, loc, time_now, dry_run = False):
     features = nosql_client.get_map_features_by_loc(region_id, loc)
     # filter out not-arrived-yet moving features (use strict time comparison)
     features = filter(lambda feature: ('base_map_path' not in feature) or \
@@ -303,10 +302,14 @@ def resolve_loc(gamedata, nosql_client, chat_mgr, region_id, loc, time_now, dry_
     if not targets: return # no targets to process
     raid = targets[0] # select first target
 
+    resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, dry_run = dry_run)
+
+# resolve action of a list of raid squads vs. a single raid target
+# *mutates raid_squads* on the way out
+def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, raid_squads, time_now, dry_run = False):
     # for proper resolution ordering, sort by arrival time, earliest first
     raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
 
-    lock_manager = SpinNoSQLLockManager.LockManager(nosql_client, dry_run = dry_run)
     for squad in raid_squads:
         owner_id, squad_id = map(int, squad['base_id'][1:].split('_'))
         assert squad['base_landlord_id'] == owner_id
@@ -406,6 +409,8 @@ def resolve_loc(gamedata, nosql_client, chat_mgr, region_id, loc, time_now, dry_
         finally:
             if squad_lock: lock_manager.release(region_id, squad['base_id'])
             if raid_lock: lock_manager.release(region_id, raid['base_id'])
+
+    return raid # return updated target (possibly None)
 
 def get_denormalized_summary_props_from_pcache(gamedata, pcinfo):
     ret = {'cc': pcinfo.get(gamedata['townhall']+'_level',1),

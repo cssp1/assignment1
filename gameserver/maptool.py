@@ -7,6 +7,7 @@
 # tool for managing bases/quarries/hives on the Regional Map
 
 import SpinSyncChatClient
+import ChatChannels
 import SpinNoSQL
 import SpinUserDB
 import SpinConfig
@@ -1466,7 +1467,6 @@ def recall_squad(db, lock_manager, region_id, user_id, base_id, days_to_claim_un
     return True
 
 def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
-    # XXX this should be unified with Raid.py resolver
 
     region = Region(gamedata, region_id)
     pf = SquadPathfinder(region)
@@ -1525,92 +1525,11 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
         elif loc_key in raid_cache:
             raid = raid_cache[loc_key]
             print 'resolving raid at', pretty_feature(raid)
-            squad_lock = lock_manager.acquire(region_id, squad['base_id'])
-            raid_lock = lock_manager.acquire(region_id, raid['base_id'])
-            if not (squad_lock and raid_lock):
-                print 'could not get locks for both squad and raid, skipping'
-                continue
-            try:
-                raid_units = nosql_client.get_mobile_objects_by_base(region_id, raid['base_id']) + \
-                             nosql_client.get_fixed_objects_by_base(region_id, raid['base_id'])
-                squad_units = nosql_client.get_mobile_objects_by_base(region_id, squad['base_id'])
 
-                squad_update, raid_update, loot, is_win, new_squad_units, new_raid_units = \
-                              Raid.resolve_raid(squad, raid, squad_units, raid_units, gamedata)
-
-                if verbose: print 'squad_update', squad_update, 'raid_update', raid_update
-
-                if squad_update or raid_update or (raid_update is None):
-                    # metrics - keep in sync between Raid.py and maptool.py implementations!
-
-                    # query player_cache for metadata on the attacker and
-                    # defender. Not absolutely 100% guaranteed to be up to date with
-                    # online server data, but close enough.
-                    attacker_pcinfo, defender_pcinfo = nosql_client.player_cache_lookup_batch([owner_id, raid['base_landlord_id']], reason = 'resolve_raid_squads')
-
-                    summary = Raid.make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
-                                                       squad['base_landlord_id'], raid['base_landlord_id'],
-                                                       attacker_pcinfo, defender_pcinfo,
-                                                       'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
-                                                       squad_units, raid_units,
-                                                       new_squad_units, new_raid_units,
-                                                       loot, raid_mode = squad['raid'])
-
-                    if verbose: print SpinJSON.dumps(summary, pretty = True)
-                    if not dry_run:
-                        nosql_client.battle_record(summary, reason = 'resolve_raid_squads')
-                        # broadcast map attack for GUI and battle history jewel purposes
-
-                        if chat_client:
-                            chat_client.chat_send({'channel':'CONTROL', 'sender':
-                                                   {'secret':SpinConfig.config['proxy_api_secret'],
-                                                    'server':'maptool',
-                                                    'method':'broadcast_map_attack',
-                                                    'args': { 'msg': "REGION_MAP_ATTACK_COMPLETE",
-                                                              'region_id': region_id, 'feature': raid,
-                                                              'attacker_id': owner_id, 'defender_id': raid['base_landlord_id'],
-                                                              'summary': summary, 'pcache_info': [attacker_pcinfo, defender_pcinfo],
-                                                              # note: time is boxed here in "args" since it refers to the region map update time,
-                                                              # which could conceivably be on a different clock than the chat message time
-                                                              'map_time': time_now,
-                                                              'server': 'maptool' },
-                                                    },
-                                                   'text': ''}, log = False)
-
-                if raid_update is None:
-                    clear_base(db, lock_manager, region_id, raid['base_id'], dry_run = dry_run, already_locked = True)
-                    raid_lock = None
-                    del raid_cache[loc_key]
-                    raid = None
-                elif raid_update:
-                    raid.update(raid_update)
-                    if not dry_run:
-                        nosql_client.update_map_feature(region_id, raid['base_id'], raid_update)
-
-                if squad_update:
-                    squad.update(squad_update)
-                    if not dry_run:
-                        nosql_client.update_map_feature(region_id, squad['base_id'], squad_update)
-
-                # XXX snap dead raids back to home?
-
-                # handle unit damage updates
-                # note: client should ping squads to get the army update
-                for new_units in (new_squad_units, new_raid_units):
-                    if new_units is None: continue # no update
-                    mobile_deletions = [unit for unit in new_units if Raid.army_unit_is_mobile(unit, gamedata) and unit.get('DELETED')]
-                    mobile_updates = [unit for unit in new_units if Raid.army_unit_is_mobile(unit, gamedata) and not unit.get('DELETED')]
-                    fixed_deletions = [unit for unit in new_units if not Raid.army_unit_is_mobile(unit, gamedata) and unit.get('DELETED')]
-                    fixed_updates = [unit for unit in new_units if not Raid.army_unit_is_mobile(unit, gamedata) and not unit.get('DELETED')]
-
-                    for unit in mobile_deletions: nosql_client.drop_mobile_object_by_id(region_id, unit['obj_id'], reason = 'resolve_raid_squads')
-                    for unit in fixed_deletions: nosql_client.drop_fixed_object_by_id(region_id, unit['obj_id'], reason = 'resolve_raid_squads')
-                    if fixed_updates: nosql_client.save_fixed_objects(region_id, fixed_updates, reason = 'resolve_raid_squads')
-                    if mobile_updates: nosql_client.save_mobile_objects(region_id, mobile_updates, reason = 'resolve_raid_squads')
-
-            finally:
-                if squad_lock: lock_manager.release(region_id, squad['base_id'])
-                if raid_lock: lock_manager.release(region_id, raid['base_id'])
+            chat_mgr = ChatChannels.ChatChannelMgr(relay = chat_client) # adaptor for Raid.py
+            raid = Raid.resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, raid, [squad], time_now, dry_run = dry_run)
+            if raid is None: # target was cleared out
+                del raid_cache[loc_key]
 
         else:
              send_turnaround_message = True # unknown reason for recall
