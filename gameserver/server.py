@@ -9283,7 +9283,7 @@ class Player(AbstractPlayer):
                     pass # returning back to base is always allowed
                 else:
                     dest_features = gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)')
-                    if not any(x.get('base_type') in ('raid',) for x in dest_features):
+                    if not any(x.get('base_type') in ('raid','home') for x in dest_features):
                         return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_invalid_destination', coords[-1]]
                     range_limit = self.stattab.raid_range_pvp if any(x.get('base_type') == 'home' for x in dest_features) else \
                                   self.stattab.raid_range_pve
@@ -27391,7 +27391,7 @@ class GAMEAPI(resource.Resource):
                     return
 
                 @admin_stats.measure_latency('do_squad_resolve')
-                def do_squad_resolve(region_id, loc):
+                def do_squad_resolve(on_behalf_of_session, region_id, loc):
                     # query for squads and targets at this location
                     features = gamesite.nosql_client.get_map_features_by_loc(region_id, loc)
                     # filter out not-arrived-yet moving features (use strict time comparison)
@@ -27405,11 +27405,14 @@ class GAMEAPI(resource.Resource):
                     raid_targets = filter(lambda x: x['base_type'] == 'raid', features)
                     for targ in raid_targets:
                         Raid.resolve_target(gamedata, gamesite.nosql_client, gamesite.chat_mgr, lock_manager, region_id, targ, raid_squads, server_time)
+
                     home_targets = filter(lambda x: x['base_type'] == 'home', features)
                     for targ in home_targets:
-                        raise Exception('implement home-base attack path')
+                        d = gamesite.do_CONTROLAPI(on_behalf_of_session.user.user_id, {'user_id': targ['base_landlord_id'], 'method':'resolve_home_raid', 'squad_base_ids': SpinJSON.dumps([x['base_id'] for x in raid_squads])}, max_tries = 1)
+                        #d.addCallback(lambda x: gamesite.exception_log.event(server_time, 'RESPONSE %r' % x))
+                        d.addErrback(report_and_absorb_deferred_failure, on_behalf_of_session)
 
-                reactor.callLater(0, do_squad_resolve, session.player.home_region, loc)
+                reactor.callLater(0, do_squad_resolve, session, session.player.home_region, loc)
 
             elif spellname == 'SQUAD_EXIT_MAP':
                 if session.has_attacked:
@@ -28466,7 +28469,7 @@ class GameSite(server.Site):
             if server_time - last_activity > gamedata['server']['http_connection_timeout']:
                 client.close_connection_aggressively()
 
-    def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args):
+    def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
         host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
         port = SpinConfig.config['proxyserver']['external_http_port']
         base_url = 'http://%s:%d/CONTROLAPI?' % (host,port)
@@ -28498,7 +28501,8 @@ class GameSite(server.Site):
                                                 lambda response, _d=d: _d.callback(response),
                                                 error_callback = lambda err, _d=d, _method=caller_args['method'], _user_id=on_behalf_of_user_id: \
                                                 _d.errback(failure.Failure(Exception('AsyncHTTP_CONTROLAPI %r failure on behalf of player %d: %r' % \
-                                                                                     (_method, _user_id, err)))))
+                                                                                     (_method, _user_id, err)))),
+                                                max_tries = max_tries)
 
         # error handling note: it's not necessary to attach an errback here.
         # If caller attaches an errback, that will be used, otherwise
@@ -28867,6 +28871,10 @@ class AdminResource(resource.Resource):
         if io_stats:
             ret += '<hr><b>I/O System</b><p>'
             ret += io_stats
+
+        ret += '<hr><b>AsyncHTTP_CONTROLAPI</b><p>'
+        ret += gamesite.AsyncHTTP_CONTROLAPI.get_stats_html(server_time)
+
         ret += '</body></html>'
         ret = ret.encode('utf-8')
         request.setHeader('content-type', 'text/html; charset=UTF-8')

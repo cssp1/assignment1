@@ -1522,8 +1522,12 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 continue
             else:
                 print 'resolving raid at enemy home base', pretty_feature(home)
-                raise Exception('implement home-base attack path')
-                #home_cache[loc_key] = Raid.resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, home, [squad], time_now, recall_squads = False, dry_run = dry_run)
+                if not dry_run:
+                    try:
+                        do_CONTROLAPI({'user_id': home['base_landlord_id'], 'method': 'resolve_home_raid', 'squad_base_ids': SpinJSON.dumps([squad['base_id']])})
+                    except Exception as e:
+                        print 'resolve_home_raid error', e
+                        continue # stop here
 
         elif loc_key in raid_cache:
             raid = raid_cache[loc_key]
