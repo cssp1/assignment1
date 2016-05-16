@@ -724,6 +724,13 @@ AStar.AStarHexMap.prototype.unblock_hex_maybe = function(xy, blocker) {
 // "region numbers" for two cells are the same if and only if there
 // is an unblocked path between them. Blocked cells get "region number" -1.
 
+/** @const */
+AStar.CONNECTIVITY_UNKNOWN = 0; // MUST equal the default value of Int8Array()
+/** @const */
+AStar.CONNECTIVITY_BASE = 1; // first non-unknown value
+/** @const */
+AStar.CONNECTIVITY_BLOCKED = -1; // known blocked value (calling code assumes -1)
+
 /** @constructor @struct
     @param {AStar.AStarMap} map
     @param {AStar.BlockChecker} checker */
@@ -733,24 +740,26 @@ AStar.Connectivity = function(map, checker) {
 
     if((typeof Int8Array !== 'undefined')) {
         this.flood = /** @type {!Int8Array} */ (new Int8Array(this.size[0]*this.size[1]));
+        // already initialized to 0
     } else {
         this.flood = /** @type {!Array<number>} */ (new Array(this.size[0]*this.size[1]));
+        for(var i = 0; i < this.flood.length; i++) { this.flood[i] = AStar.CONNECTIVITY_UNKNOWN; }
     }
 
     // use a flood-fill algorithm to assign region numbers
 
-    var val = 0;
+    var val = AStar.CONNECTIVITY_BASE - 1;
 
     /** @type {!Array<Array<number>|null>} */
     var neighbors = new Array(map.num_neighbors());
 
     for(var y = 0; y < this.size[1]; y++) {
         for(var x = 0; x < this.size[0]; x++) {
-            if(typeof(this.flood[y*this.size[0]+x]) != 'undefined') {
-                continue;
+            if(this.flood[y*this.size[0]+x] != AStar.CONNECTIVITY_UNKNOWN) {
+                continue; // already flooded
             }
             if(map.is_blocked([x,y], checker)) {
-                this.flood[y*this.size[0]+x] = -1;
+                this.flood[y*this.size[0]+x] = AStar.CONNECTIVITY_BLOCKED;
                 continue;
             }
             val += 1;
@@ -763,20 +772,20 @@ AStar.Connectivity = function(map, checker) {
 
             while(q.length > 0) {
                 var p = q.pop();
-                if(typeof(this.flood[p[1]*this.size[0]+p[0]]) != 'undefined') {
-                    continue;
+                if(this.flood[p[1]*this.size[0]+p[0]] != AStar.CONNECTIVITY_UNKNOWN) {
+                    continue; // already flooded
                 }
                 if(map.is_blocked(p, checker)) {
-                    this.flood[y*this.size[0]+x] = -1;
+                    this.flood[y*this.size[0]+x] = AStar.CONNECTIVITY_BLOCKED;
                     continue;
                 } else {
                     // find east-west extent of this region along this row
                     var w = p[0], e = p[0];
-                    while(!map.is_blocked([w,p[1]], checker) && typeof(this.flood[p[1]*this.size[0]+w]) == 'undefined' && w >= 0) {
+                    while(!map.is_blocked([w,p[1]], checker) && this.flood[p[1]*this.size[0]+w] == AStar.CONNECTIVITY_UNKNOWN && w >= 0) {
                         w -= 1;
                     }
                     w += 1;
-                    while(!map.is_blocked([e,p[1]], checker) && typeof(this.flood[p[1]*this.size[0]+e]) == 'undefined' && e < this.size[0]) {
+                    while(!map.is_blocked([e,p[1]], checker) && this.flood[p[1]*this.size[0]+e] == AStar.CONNECTIVITY_UNKNOWN && e < this.size[0]) {
                         e += 1;
                     }
                     e -= 1;
@@ -793,7 +802,7 @@ AStar.Connectivity = function(map, checker) {
                             var n = neighbors[ni];
                             if(n &&
                                (n[1] == p[1]+1 || n[1] == p[1]-1) &&
-                               typeof(this.flood[n[1]*this.size[0]+n[0]]) == 'undefined') {
+                               this.flood[n[1]*this.size[0]+n[0]] == AStar.CONNECTIVITY_UNKNOWN) {
                                 q.push(n);
                             }
                         }
