@@ -121,7 +121,7 @@ class AsyncHTTPRequester(object):
         if max_tries is None:
             max_tries = self.default_max_tries
         else:
-            max_tries = max(max_tries, self.default_max_tries)
+            max_tries = max_tries # max(max_tries, self.default_max_tries)
 
         if headers: assert isinstance(headers, dict)
         request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
