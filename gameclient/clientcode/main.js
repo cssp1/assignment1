@@ -29956,7 +29956,7 @@ player.advance_squads = function() {
                 var need_resolve = false;
                 for(var i = 0; i < features.length; i++) {
                     var feature = features[i];
-                    if(feature['base_type'] == 'raid') {
+                    if(feature['base_type'] == 'raid' || feature['base_type'] == 'home') {
                         need_resolve = true;
                         break;
                     }

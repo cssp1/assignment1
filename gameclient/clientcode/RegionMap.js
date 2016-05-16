@@ -1000,7 +1000,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
         (feature['base_type'] === 'home' && can_attack_home))) {
         var raid_cb = (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
-            SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature); // XXXXXX needs work to handle home-base raids
+            SquadControlDialog.invoke_raid(_feature['base_map_loc'], _feature);
         }; })(this, feature);
         var wrapped_raid_cb = (will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
 

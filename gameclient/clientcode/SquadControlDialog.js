@@ -28,6 +28,11 @@ SquadControlDialog.invoke_deploy = function(coords) { return SquadControlDialog.
     @param {Object<string,?>|null} feature at destination */
 SquadControlDialog.invoke_call = function(coords, feature) { return SquadControlDialog.do_invoke('call', {'to_coords': coords, 'to_feature': feature || null}); };
 
+/** @param {!Array.<number>} coords
+    @param {!Object<string,?>} feature at destination */
+SquadControlDialog.invoke_raid = function(coords, feature) { return SquadControlDialog.do_invoke('call', {'to_coords': coords, 'to_feature': feature, 'is_raid': true}); };
+
+
 SquadControlDialog.invoke_manage = function() { return SquadControlDialog.do_invoke('manage', null); };
 SquadControlDialog.invoke_normal = function() { return SquadControlDialog.do_invoke('normal', null); };
 
@@ -89,7 +94,7 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
         dialog.widgets['army_dialog_buttons_army'].show = false;
     }
 
-    var title_mode = (dlg_mode == 'call' && dlg_mode_data['to_feature'] && dlg_mode_data['to_feature']['base_type'] === 'raid' ? 'call_raid' : dlg_mode);
+    var title_mode = (dlg_mode == 'call' && dlg_mode_data['is_raid'] ? 'call_raid' : dlg_mode);
     dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_'+title_mode];
 
     dialog.user_data['receiver_serial'] = SquadControlDialog.update_receivers_serial++;
@@ -146,7 +151,7 @@ SquadControlDialog.refresh = function(dialog) {
         if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
 
         // call to raid
-        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['to_feature'] && dialog.user_data['to_feature']['base_type'] == 'raid') {
+        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['is_raid']) {
             if(player.squad_is_deployed(id)) { return; } // can only raid from non-deployed squads
             var cap = caps[id.toString()] || null;
             // check for any available raid mode
@@ -341,7 +346,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                     if(_squad_control) {
                         var to_loc = _squad_control.user_data['to_coords'];
                         var to_feature = _squad_control.user_data['to_feature'];
-                        var is_raid = (to_feature && to_feature['base_type'] === 'raid');
+                        var is_raid = _squad_control.user_data['is_raid'];
                         var raid_distance = -1, raid_type = null;
                         if(is_raid) {
                             raid_distance = hex_distance(to_loc, player.home_base_loc);
