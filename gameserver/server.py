@@ -9289,6 +9289,15 @@ class Player(AbstractPlayer):
                                   self.stattab.raid_range_pve
                     if hex_distance(coords[-1], self.my_home.base_map_loc) > range_limit:
                         return False, [rollback_feature], ["CANNOT_DEPLOY_RAID_DIST_LIMIT", squad_id, 'raid_destination_too_far', coords[-1]]
+
+                    # check predicates
+                    for x in dest_features:
+                        if 'base_template' in x:
+                            template = gamedata['raids_server']['templates'].get(x['base_template'])
+                            if template and ('activation' in template) and (not self.is_cheater):
+                                if (not Predicates.read_predicate(template['activation']).is_satisfied(self, None)):
+                                    return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_destination_activation_false', coords[-1]]
+
             else:
                 # prevent re-directing raids anywhere other than back to home base
                 if (coords is None) or \
