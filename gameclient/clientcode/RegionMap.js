@@ -906,75 +906,111 @@ RegionMap.RegionMap.prototype.on_mousewheel = function(uv, offset, delta) {
 
 // return value is fed into "buttons" down below
 RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
-    if(feature['base_type'] === 'squad' && !player.squad_combat_enabled()) { return []; }
-    if(feature['base_type'] === 'home' && !player.map_home_combat_enabled()) { return []; }
-    if(feature['base_type'] === 'raid') { return []; }
+    var ret = [];
+
+    if(feature['base_type'] === 'squad' && !player.squad_combat_enabled()) { return ret; }
+    if(feature['base_type'] === 'home' && !player.map_home_combat_enabled()) { return ret; }
 
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
     var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
     var can_pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance && (info || is_ai_user_id_range(feature['base_landlord_id']));
     var squads_nearby = this.region.squads_nearby(feature['base_map_loc']);
 
-    var will_lose_protection = can_pre_attack &&
-        player.resource_state['protection_end_time'] > server_time &&
+    var will_lose_protection = player.resource_state['protection_end_time'] > server_time &&
         !is_ai_user_id_range(feature['base_landlord_id']) &&
         (feature['base_type'] != 'squad' || gamedata['territory']['squads_affect_protection']) &&
         (feature['base_type'] != 'quarry'|| gamedata['territory']['quarries_affect_protection']);
 
-    var verb = gamedata['strings']['regional_map'][(feature['base_landlord_id'] == session.user_id ? (feature['base_type'] == 'quarry' ? 'instant_visit_quarry' : 'instant_visit_base') : 'spy')];
+    // looking at an enemy home base that we can attack
+    var can_attack_home = (feature['base_type'] === 'home' && feature['base_landlord_id'] != session.user_id && !same_alliance &&
+                           info && (!this.region.pvp_level_gap_enabled() || player.in_attackable_level_range(info['player_level']||0)) &&
+                           !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()));
 
-    if(('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > this.time)) {
-        return [[verb, (function(_mapwidget, _feature) { return function() {
-            _mapwidget.set_popup(null);
-            var msg = gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD'];
-            invoke_squad_error(msg['ui_title'], msg['ui_name']);
-        }; })(this, feature), 'disabled_clickable', gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD']['ui_name'], SPUI.error_text_color]];
-    } else if(squads_nearby.length < 1 && hex_distance(player.home_base_loc, feature['base_map_loc']) !== 1) {
-        return [[verb, (function(_mapwidget, _feature) { return function() {
-            _mapwidget.set_popup(null);
-            var msg = gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS'];
-            invoke_squad_error(msg['ui_title'], msg['ui_name']);
-        }; })(this, feature), 'disabled_clickable',
-                 SPUI.break_lines(gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS']['ui_name'], SPUI.desktop_font, [300,0])[0],
-                 SPUI.error_text_color]];
-    } else {
-        // SPY (and if can_pre_attack is true, then ATTACK as well)
-        var make_cb = function(_mapwidget, _feature, _pre_attack) { return function() {
-            _mapwidget.set_popup(null);
-            do_visit_base(-1, {base_id:_feature['base_id'], pre_attack:_pre_attack, short_loading_timeout:true});
-        }; };
-        var spy_cb = make_cb(this, feature, 0);
-        var ret = [[verb, spy_cb]];
+    // SPY button
+    if(feature['base_type'] !== 'raid') {
 
+        var verb = gamedata['strings']['regional_map'][(feature['base_landlord_id'] == session.user_id ? (feature['base_type'] == 'quarry' ? 'instant_visit_quarry' : 'instant_visit_base') : 'spy')];
 
-        if(can_pre_attack) {
-            // do not show pre_attack option if player has no units deployable into this climate
-            var climate = new Climate(gamedata['climates'][(feature['base_climate'] && feature['base_climate'] in gamedata['climates'] ? feature['base_climate'] : gamedata['default_climate'])]);
-            var found_unit = false;
-            for(var id in player.my_army) {
-                var o = player.my_army[id];
-                if(goog.array.contains(squads_nearby, o['squad_id'])) {
-                    if(army_unit_hp(o)[0] > 0 && climate.can_deploy_unit_of_spec(gamedata['units'][o['spec']])) {
-                        found_unit = true; break;
+        if(('base_map_path' in feature) && feature['base_map_path'] && (feature['base_map_path'][feature['base_map_path'].length-1]['eta'] > this.time)) {
+            ret.push([verb, (function(_mapwidget, _feature) { return function() {
+                _mapwidget.set_popup(null);
+                var msg = gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD'];
+                invoke_squad_error(msg['ui_title'], msg['ui_name']);
+            }; })(this, feature), 'disabled_clickable', gamedata['errors']['CANNOT_SPY_ON_MOVING_SQUAD']['ui_name'], SPUI.error_text_color]);
+        } else if(squads_nearby.length < 1 && hex_distance(player.home_base_loc, feature['base_map_loc']) !== 1) {
+            ret.push([verb, (function(_mapwidget, _feature) { return function() {
+                _mapwidget.set_popup(null);
+                var msg = gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS'];
+                invoke_squad_error(msg['ui_title'], msg['ui_name']);
+            }; })(this, feature), 'disabled_clickable',
+                      SPUI.break_lines(gamedata['errors']['CANNOT_SPY_NO_NEARBY_SQUADS']['ui_name'], SPUI.desktop_font, [300,0])[0],
+                      SPUI.error_text_color]);
+        } else {
+            // SPY (and if can_pre_attack is true, then ATTACK as well)
+            var make_cb = function(_mapwidget, _feature, _pre_attack) { return function() {
+                _mapwidget.set_popup(null);
+                do_visit_base(-1, {base_id:_feature['base_id'], pre_attack:_pre_attack, short_loading_timeout:true});
+            }; };
+            var spy_cb = make_cb(this, feature, 0);
+            ret.push([verb, spy_cb]);
+
+            if(can_pre_attack) {
+                // do not show pre_attack option if player has no units deployable into this climate
+                var climate = new Climate(gamedata['climates'][(feature['base_climate'] && feature['base_climate'] in gamedata['climates'] ? feature['base_climate'] : gamedata['default_climate'])]);
+                var found_unit = false;
+                for(var id in player.my_army) {
+                    var o = player.my_army[id];
+                    if(goog.array.contains(squads_nearby, o['squad_id'])) {
+                        if(army_unit_hp(o)[0] > 0 && climate.can_deploy_unit_of_spec(gamedata['units'][o['spec']])) {
+                            found_unit = true; break;
+                        }
+                    }
+                }
+                if(found_unit) {
+                    // pre-attack button
+                    var attack_cb = make_cb(this, feature, 1); // pass pre_attack = 1 for auto-attack
+                    var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
+                    ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
+
+                    // pre-attack-and-resolve button
+                    if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
+                        var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
+                        var wrapped_resolve_cb = (will_lose_protection ? (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb) : resolve_cb);
+                        ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
                     }
                 }
             }
-            if(found_unit) {
-                // pre-attack button
-                var attack_cb = make_cb(this, feature, 1); // pass pre_attack = 1 for auto-attack
-                var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
-                ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
-
-                // pre-attack-and-resolve button
-                if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
-                    var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
-                    var wrapped_resolve_cb = (will_lose_protection ? (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb) : resolve_cb);
-                    ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
-                }
-            }
         }
-        return ret;
+    } // END is not raid site
+
+    // CALL SQUAD
+    if((feature['base_type'] === 'home' && player.map_home_combat_enabled()) ||
+       (feature['base_type'] === 'squad' && player.squad_combat_enabled()) ||
+       goog.array.contains(['empty','hive','quarry'], feature['base_type'])) {
+        ret.push([gamedata['strings']['regional_map']['call'],
+                  (function(_mapwidget, _feature) { return function() {
+                      _mapwidget.set_popup(null);
+                      SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
+                  }; })(this, feature), 'passive']);
     }
+
+    // LAUNCH RAID
+    if(player.raids_enabled() &&
+       (feature['base_type'] === 'raid' ||
+        (feature['base_type'] === 'home' && can_attack_home))) {
+        var raid_cb = (function(_mapwidget, _feature) { return function() {
+            _mapwidget.set_popup(null);
+            SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature); // XXXXXX needs work to handle home-base raids
+        }; })(this, feature);
+        var wrapped_raid_cb = (will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
+
+        if(feature['base_type'] === 'home' && ('protection_end_time' in feature) && (feature['protection_end_time'] === 1 || feature['protection_end_time'] >= this.time)) {
+            ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled']);
+        } else {
+            ret.push([gamedata['strings']['regional_map']['call_raid'], wrapped_raid_cb, 'normal']);
+        }
+    }
+    return ret;
 };
 
 RegionMap.RegionMap.prototype.make_bookmark_button = function(feature) {
@@ -1009,11 +1045,15 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
 
     var buttons = [];
 
-    if(lock_state != 0 && (lock_owner != session.user_id)) {
+    if(lock_state != 0 && (lock_owner != session.user_id) &&
+       !(player.raids_enabled() && lock_state == 1 && feature['base_type'] == 'home')) {
+        // locked, can't do anything
+
         //buttons.push([gamedata['strings']['regional_map']['under_attack'], function() {}, 'disabled']);
         if(feature['base_type'] !== 'squad') {
             buttons.push(mapwidget.make_bookmark_button(feature));
         }
+
     } else if(owned) {
 
         // OWN SQUAD
@@ -1147,16 +1187,8 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
 
         // OTHER HUMAN HOME BASE - NOSQL
         if(mapwidget.region.data['storage'] == 'nosql') {
-            // SPY
+            // SPY/CALL
             buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
-            if(player.map_home_combat_enabled()) {
-                // CALL SQUAD
-                buttons.push([gamedata['strings']['regional_map']['call'],
-                              (function(_mapwidget, _feature) { return function() {
-                                  _mapwidget.set_popup(null);
-                                  SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                              }; })(mapwidget, feature), 'passive']);
-            }
             buttons.push(mapwidget.make_bookmark_button(feature));
         } else {
             // OTHER HUMAN HOME BASE - LEGACY
@@ -1175,16 +1207,9 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
 
     } else if(feature['base_type'] == 'squad') {
         // OTHER PLAYER'S SQUAD
-        // SPY
+        // SPY/CALL
         buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
-        // CALL SQUAD
-        if(player.squad_combat_enabled()) {
-            buttons.push([gamedata['strings']['regional_map']['call'],
-                          (function(_mapwidget, _feature) { return function() {
-                              _mapwidget.set_popup(null);
-                              SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                          }; })(mapwidget, feature), 'passive']);
-        }
+
         // GET INFO
         buttons.push([gamedata['strings']['regional_map']['get_info'],
                       (function (_mapwidget, _feature) { return function() {
@@ -1203,18 +1228,18 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
     } else {
         if(mapwidget.region.data['storage'] == 'nosql' || player.travel_satisfied(feature['base_map_loc'])) {
             if(mapwidget.region.data['storage'] == 'nosql') {
-                if(feature['base_type'] !== 'empty') {
-                    // SPY
-                    buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
-                }
-                if(feature['base_type'] !== 'home' || player.map_home_combat_enabled()) {
+                if(feature['base_type'] === 'empty') {
                     // CALL SQUAD
-                    buttons.push([gamedata['strings']['regional_map'][(feature['base_type'] == 'raid' ? 'call_raid' : 'call')],
+                    buttons.push([gamedata['strings']['regional_map']['call'],
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
                                       SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                                  }; })(mapwidget, feature), (feature['base_type'] == 'raid' ? 'normal' : 'passive')]);
+                                  }; })(mapwidget, feature), 'passive']);
+                } else {
+                    // SPY/CALL
+                    buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
                 }
+
             } else {
                 buttons.push([gamedata['strings']['regional_map']['spy'],  (function(_mapwidget, _feature) { return function() {
                     _mapwidget.set_popup(null);
@@ -1576,14 +1601,19 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
 
     if(lock_state != 0) {
         if(lock_state == 2) {
-            if(!feature['base_type'] || feature['base_type'] == 'home') {
-                // actually under attack, but for home bases, never show them as under attack, only the mysterious "protection or home"
-                blink_list.push({'status':'home'});
+            // actually under attack
+            if(!player.raids_enabled() && (!feature['base_type'] || feature['base_type'] == 'home')) {
+                // for non-raidable home bases, never show them as under attack, only the mysterious "protection or home"
+                blink_list.push({'status':'home_or_protection'});
             } else {
                 blink_list.push({'status':'under_attack'});
             }
-        } else if(lock_state == 1) {
-            blink_list.push({'status':'home'});
+        } else if(lock_state == 1) { // actually at home
+            if(player.raids_enabled()) {
+                blink_list.push({'status':'home'});
+            } else {
+                blink_list.push({'status':'home_or_protection'});
+            }
         }
 
     } else if(feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && mapwidget.region.feature_is_moving(feature, mapwidget.time)) {
@@ -1614,7 +1644,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
             blink_list.push({'status':'owned'});
         }
     } else if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > mapwidget.time)) {
-        blink_list.push({'status':'protection'});
+        blink_list.push({'status':(player.raids_enabled() ? 'protection' : 'home_or_protection')});
     } else if(!player.is_cheater && goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates']) &&
               ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
               !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
@@ -1642,7 +1672,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
 
     // when bases are shows as home/protection/unattackable, blink last defense time
     if(feature['base_type'] == 'home' && !is_ai_user_id_range(feature['base_landlord_id'])) {
-        if(goog.array.contains(['home', 'protection', 'level_too_low', 'level_too_high'], blink_list[0]['status'])) {
+        if(goog.array.contains(['home', 'home_or_protection', 'protection', 'level_too_low', 'level_too_high'], blink_list[0]['status'])) {
             var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
             if(info && ('last_defense_time' in info) && (info['last_defense_time'] > 0)) {
                 blink_list.unshift({'status': 'home_last_defended', 'str': pretty_print_time_brief(mapwidget.time - info['last_defense_time'])});
@@ -2269,8 +2299,9 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             var show_bubble = false, show_padlock = false, token_icon = null, show_strength = false;
             var show_trophy = this.winnable_ladder_points(feature);
 
-            if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] == feature['base_landlord_id'] && (feature['base_landlord_id'] != session.user_id ||
-                                                                                                 feature['base_type'] == 'home')) {
+            if(feature['LOCK_STATE'] && feature['LOCK_OWNER'] == feature['base_landlord_id'] &&
+               !(player.raids_enabled() && feature['base_type'] == 'home') &&
+               (feature['base_landlord_id'] != session.user_id || feature['base_type'] == 'home')) {
                 show_bubble = true; // owner is here
             }
             if(feature['base_type'] == 'home' && ('protection_end_time' in feature)) {
