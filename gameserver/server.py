@@ -4991,7 +4991,7 @@ class Session(object):
 
         if not self.res_looter:
             gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
-            self.res_looter = ResLoot.ResLoot(gamedata, self, self.viewing_player, self.viewing_base)
+            self.res_looter = ResLoot.ResLoot(gamedata, self, RogueOwner, self.viewing_player, self.viewing_base)
 
         self.deployed_units = {}
         self.has_attacked = True
@@ -7829,6 +7829,7 @@ def spawn_units(owner, base, units, temporary = False,
 class AbstractPlayer(object):
     def __init__(self, user_id):
         self.user_id = user_id
+        self.home_region = None
         self.tech = {}
         self.stattab = self.AbstractStattab()
     def get_any_abtest_value(self, key, default_value): return default_value
@@ -18011,7 +18012,7 @@ class GAMEAPI(resource.Resource):
         change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
-        session.res_looter = ResLoot.ResLoot(gamedata, session, session.viewing_player, session.viewing_base)
+        session.res_looter = ResLoot.ResLoot(gamedata, session, session.player, session.viewing_player, session.viewing_base)
 
         # tell client about res looter state
         session.res_looter.send_update(change_retmsg)

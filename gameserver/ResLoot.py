@@ -11,23 +11,25 @@ import random, copy
 import Predicates
 
 # instantiate an appropriate looter for this (viewed) player and this base
-def ResLoot(gamedata, session, player, base):
-    if player.is_ai() and (base.base_type in ('home','hive')) and (base.base_resource_loot is not None):
-        return SpecificPvEResLoot(gamedata, session, player, base)
-    elif player.is_ai() or (base is not player.my_home):
-        return TablePvEResLoot(gamedata, session, player, base)
+def ResLoot(gamedata, session, attacker, defender, base):
+    if defender.is_ai() and (base.base_type in ('home','hive')) and (base.base_resource_loot is not None):
+        return SpecificPvEResLoot(gamedata, session, attacker, defender, base)
+    elif defender.is_ai() or (base is not defender.my_home):
+        return TablePvEResLoot(gamedata, session, attacker, defender, base)
     else: # PvP
         pvp_loot_method = gamedata.get('pvp_loot_method','hardcore')
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'pvp_loot_method' in gamedata['regions'][session.viewing_player.home_region]:
-            pvp_loot_method = gamedata['regions'][session.viewing_player.home_region]['pvp_loot_method']
-        pvp_loot_method = session.viewing_player.get_any_abtest_value('pvp_loot_method', pvp_loot_method)
-        if (not session.home_base) and pvp_loot_method == 'specific': # XXX remove home_base condition for AI attacks?
-            return SpecificPvPResLoot(gamedata, session, player, base)
+        if defender.home_region and defender.home_region in gamedata['regions'] and 'pvp_loot_method' in gamedata['regions'][defender.home_region]:
+            pvp_loot_method = gamedata['regions'][defender.home_region]['pvp_loot_method']
+        pvp_loot_method = defender.get_any_abtest_value('pvp_loot_method', pvp_loot_method)
+        if (base is not defender.my_home) and pvp_loot_method == 'specific': # XXX remove home_base condition for AI attacks?
+            return SpecificPvPResLoot(gamedata, session, attacker, defender, base)
         else:
-            return HardcorePvPResLoot(gamedata, session, player, base)
+            return HardcorePvPResLoot(gamedata, session, attacker, defender, base)
 
 class BaseResLoot(object):
-    def __init__(self, gamedata, session, player, base):
+    def __init__(self, gamedata, session, attacker, defender, base):
+        self.attacker = attacker
+        self.defender = defender
         self.base = base
         self.total_looted_uncapped = {} # total resource amounts looted, prior to capping to attacker's storage limit
 
@@ -45,7 +47,7 @@ class BaseResLoot(object):
         if obj.spec.worth_less_xp or (not (obj.is_storage() or obj.is_producer())): return None, None, None # not lootable
 
         # call into subclass to determine amounts and to subtract lost resources
-        looted, lost = self.do_loot_building(gamedata, session, obj, old_hp, new_hp, owning_player)
+        looted, lost = self.do_loot_building(gamedata, session, obj, old_hp, new_hp, owning_player, attacker)
 
         for res, amount in looted.iteritems():
             self.total_looted_uncapped[res] = self.total_looted_uncapped.get(res,0) + amount
@@ -53,7 +55,7 @@ class BaseResLoot(object):
         looted_uncapped = copy.copy(looted) # save a copy of the uncapped amounts before modification below
 
         # now add gained resources
-        if attacker is session.player:
+        if attacker and attacker.is_human():
             # check player's resource storage limit
             storage_limit_factor = attacker.get_any_abtest_value('loot_storage_limit', gamedata['loot_storage_limit'])
             excess = {}
@@ -75,7 +77,7 @@ class BaseResLoot(object):
 
             # award the resources to the player
             attacker.resources.gain_res(looted, reason = 'looted_from_ai' if ((not owning_player) or owning_player.is_ai()) else 'looted_from_human',
-                                        break_limit = True, # skip calculaton of snapshot since amounts are already capped
+                                        break_limit = True, # skip calculation of snapshot since amounts are already capped
                                         metadata={'opponent_user_id': owning_player.user_id if owning_player else -1,
                                                   'opponent_level': owning_player.resources.player_level if owning_player else -1,
                                                   'opponent_type': owning_player.ai_or_human() if owning_player else 'ai'})
@@ -149,11 +151,11 @@ class PerBuildingGradualLoot(object):
 
 # SG-style PvE looting: decrements a persistent base-wide specific total, deterministically
 class SpecificPvEResLoot(BaseResLoot):
-    def __init__(self, gamedata, session, player, base):
-        BaseResLoot.__init__(self, gamedata, session, player, base)
+    def __init__(self, gamedata, session, attacker, defender, base):
+        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base)
 
         self.modifier = 1.0
-        self.modifier *= session.player.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases_server']['loot_scale']
+        self.modifier *= attacker.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases_server']['loot_scale']
 
         # ALSO NOTE: gamedata['ai_bases_server']['loot_randomness'] IS NOT APPLIED!
         # Doing this would be complicated since we need to "freeze"
@@ -161,7 +163,7 @@ class SpecificPvEResLoot(BaseResLoot):
         # be stored in AIInstanceTable or in a cooldown or random
         # number seed on the player or something.
 
-        self.modifier *= session.player.stattab.get_player_stat('loot_factor_pve')
+        self.modifier *= attacker.stattab.get_player_stat('loot_factor_pve')
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             self.modifier *= self.base.base_richness
         if self.base.base_region and (self.base.base_region in gamedata['regions']):
@@ -246,7 +248,7 @@ class SpecificPvEResLoot(BaseResLoot):
         ret['starting_base_resource_loot'] = self.starting_base_resource_loot
         return ret
 
-    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player, attacker):
         # perform one-time setup, if necessary
         self.assign_loot_to_buildings(gamedata)
 
@@ -266,7 +268,7 @@ class SpecificPvEResLoot(BaseResLoot):
 
 # MF/TR-style PvE looting: based on a per-building "loot table" amount, with randomization
 class TablePvEResLoot(BaseResLoot):
-    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player, attacker):
         assert new_hp == 0
         looted = {}
         lost = {}
@@ -275,8 +277,8 @@ class TablePvEResLoot(BaseResLoot):
 
         # PvE-specific loot table modifiers
         loot_table_modifier = (1.0 + gamedata['ai_bases_server']['loot_randomness']*(2*random.random()-1))
-        loot_table_modifier *= session.player.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases_server']['loot_scale'])
-        loot_table_modifier *= session.player.stattab.get_player_stat('loot_factor_pve')
+        loot_table_modifier *= attacker.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases_server']['loot_scale'])
+        loot_table_modifier *= attacker.stattab.get_player_stat('loot_factor_pve')
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             loot_table_modifier *= self.base.base_richness
         if self.base.base_region and (self.base.base_region in gamedata['regions']):
@@ -295,7 +297,7 @@ class TablePvEResLoot(BaseResLoot):
             qty = max(obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res)),
                       obj.get_leveled_quantity(getattr(obj.spec, 'produces_'+res)))
             if qty > 0:
-                lost[res] = looted[res] = int(loot_table_modifier * loot_table[min(session.viewing_player.resources.player_level-1,len(loot_table)-1)]/float(nsame))
+                lost[res] = looted[res] = int(loot_table_modifier * loot_table[min(self.defender.resources.player_level-1,len(loot_table)-1)]/float(nsame))
 
         return looted, lost
 
@@ -306,44 +308,44 @@ class PvPResLoot(BaseResLoot):
         loot_attacker_gains_region_scale = 1
         loot_defender_loses_region_scale = 1
 
-        if session.player.home_region and session.player.home_region in gamedata['regions']:
-            loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.player.home_region].get('loot_attacker_gains_scale_if_attacker',1), session, session.player)
-            loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.player.home_region].get('loot_defender_loses_scale_if_attacker',1), session, session.player)
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions']:
-            loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_attacker_gains_scale_if_defender',1), session, session.viewing_player)
-            loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][session.viewing_player.home_region].get('loot_defender_loses_scale_if_defender',1), session, session.viewing_player)
+        if self.attacker.home_region and self.attacker.home_region in gamedata['regions']:
+            loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.attacker.home_region].get('loot_attacker_gains_scale_if_attacker',1), session, self.attacker)
+            loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.attacker.home_region].get('loot_defender_loses_scale_if_attacker',1), session, self.attacker)
+        if self.defender.home_region and self.defender.home_region in gamedata['regions']:
+            loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.defender.home_region].get('loot_attacker_gains_scale_if_defender',1), session, self.defender)
+            loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.defender.home_region].get('loot_defender_loses_scale_if_defender',1), session, self.defender)
 
         base_loot_attacker_gains_table = gamedata['loot_attacker_gains']
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][session.viewing_player.home_region]:
-            base_loot_attacker_gains_table = gamedata['regions'][session.viewing_player.home_region]['loot_attacker_gains']
-        base_loot_attacker_gains_table = session.viewing_player.get_any_abtest_value('loot_attacker_gains', base_loot_attacker_gains_table)
+        if self.defender.home_region and self.defender.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][self.defender.home_region]:
+            base_loot_attacker_gains_table = gamedata['regions'][self.defender.home_region]['loot_attacker_gains']
+        base_loot_attacker_gains_table = self.defender.get_any_abtest_value('loot_attacker_gains', base_loot_attacker_gains_table)
 
         if type(base_loot_attacker_gains_table) is dict:
-            # note: predicates evaluated on viewing_player, not player!
-            base_loot_attacker_gains = dict((res, Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, session.viewing_player)['ratio']) for res in gamedata['resources'])
+            # note: predicates evaluated on defender, not attacker!
+            base_loot_attacker_gains = dict((res, Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, self.defender)['ratio']) for res in gamedata['resources'])
         else: # one value for all kinds
             base_loot_attacker_gains = dict((res, base_loot_attacker_gains_table) for res in gamedata['resources'])
 
         base_loot_defender_loses_table = gamedata['loot_defender_loses']
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][session.viewing_player.home_region]:
-            base_loot_defender_loses_table = gamedata['regions'][session.viewing_player.home_region]['loot_defender_loses']
-        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
+        if self.defender.home_region and self.defender.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][self.defender.home_region]:
+            base_loot_defender_loses_table = gamedata['regions'][self.defender.home_region]['loot_defender_loses']
+        base_loot_defender_loses_table = self.defender.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
 
         if type(base_loot_defender_loses_table) is dict:
-            # note: predicates evaluated on viewing_player, not player!
-            base_loot_defender_loses = dict((res, Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, session.viewing_player)['ratio']) for res in gamedata['resources'])
+            # note: predicates evaluated on defender, not attacker!
+            base_loot_defender_loses = dict((res, Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, self.defender)['ratio']) for res in gamedata['resources'])
         else: # one value for all kinds
             base_loot_defender_loses = dict((res, base_loot_defender_loses_table) for res in gamedata['resources'])
 
         loot_attacker_gains = dict((res,
                                     base_loot_attacker_gains[res] * \
-                                    session.player.stattab.get_player_stat('loot_factor_pvp') * \
+                                    self.attacker.stattab.get_player_stat('loot_factor_pvp') * \
                                     resdata.get('loot_attacker_gains',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
         loot_defender_loses = dict((res,
                                     base_loot_defender_loses[res] * \
-                                    session.player.stattab.get_player_stat('loot_factor_pvp') * \
+                                    self.attacker.stattab.get_player_stat('loot_factor_pvp') * \
                                     resdata.get('loot_defender_loses',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
@@ -352,7 +354,7 @@ class PvPResLoot(BaseResLoot):
             loot_defender_loses[res] = min(max(loot_defender_loses[res],0),1)
             if loot_attacker_gains[res] > loot_defender_loses[res]:
                 raise Exception('%d vs %d: loot_attacker_gains[%s] %f > loot_defender_loses[%s] %f' % \
-                                (session.player.user_id, session.viewing_player.user_id,
+                                (self.attacker.user_id, self.defender.user_id,
                                  res, loot_attacker_gains[res], res, loot_defender_loses[res]))
                 loot_attacker_gains[res] = loot_defender_loses[res]
 
@@ -360,7 +362,7 @@ class PvPResLoot(BaseResLoot):
 
 # MF/TR-style PvP looting: fractional, randomized amounts taken from harvesters/storages
 class HardcorePvPResLoot(PvPResLoot):
-    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player, attacker):
         assert new_hp == 0
         looted = {}
         lost = {}
@@ -380,9 +382,9 @@ class HardcorePvPResLoot(PvPResLoot):
             # numbers, we are enabling the "loot_storage_distribution_bug" in titles that haven't been updated yet.
 
             loot_storage_distribution_bug = gamedata.get('loot_storage_distribution_bug', False)
-            if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_storage_distribution_bug' in gamedata['regions'][session.viewing_player.home_region]:
-                loot_storage_distribution_bug = gamedata['regions'][session.viewing_player.home_region]['loot_storage_distribution_bug']
-            loot_storage_distribution_bug = session.viewing_player.get_any_abtest_value('loot_storage_distribution_bug', loot_storage_distribution_bug)
+            if self.defender.home_region and self.defender.home_region in gamedata['regions'] and 'loot_storage_distribution_bug' in gamedata['regions'][self.defender.home_region]:
+                loot_storage_distribution_bug = gamedata['regions'][self.defender.home_region]['loot_storage_distribution_bug']
+            loot_storage_distribution_bug = self.defender.get_any_abtest_value('loot_storage_distribution_bug', loot_storage_distribution_bug)
 
             nbuild = 0
             weights = dict((res, 0) for res in gamedata['resources'])
@@ -431,12 +433,12 @@ class HardcorePvPResLoot(PvPResLoot):
 
 # SG-style PvP looting: more similar to the "specific" PvE loot code
 class SpecificPvPResLoot(PvPResLoot):
-    def __init__(self, gamedata, session, player, base):
-        BaseResLoot.__init__(self, gamedata, session, player, base)
+    def __init__(self, gamedata, session, attacker, defender, base):
+        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base)
 
         if base.base_resource_loot is None:
             # we're going to persist this between logins to remember the amount of resources still "unexposed" to looting
-            base.base_resource_loot = dict((res, getattr(player.resources, res)) for res in gamedata['resources'])
+            base.base_resource_loot = dict((res, getattr(self.defender.resources, res)) for res in gamedata['resources'])
 
         # precalculate the total loot available to the attacker
         self.starting_resource_loot = dict((res, 0) for res in gamedata['resources'])
@@ -450,24 +452,24 @@ class SpecificPvPResLoot(PvPResLoot):
 
         # get caps
         base_loot_attacker_gains_table = gamedata['loot_attacker_gains']
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][session.viewing_player.home_region]:
-            base_loot_attacker_gains_table = gamedata['regions'][session.viewing_player.home_region]['loot_attacker_gains']
+        if self.defender.home_region and self.defender.home_region in gamedata['regions'] and 'loot_attacker_gains' in gamedata['regions'][self.defender.home_region]:
+            base_loot_attacker_gains_table = gamedata['regions'][self.defender.home_region]['loot_attacker_gains']
         base_loot_defender_loses_table = gamedata['loot_defender_loses']
-        if session.viewing_player.home_region and session.viewing_player.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][session.viewing_player.home_region]:
-            base_loot_defender_loses_table = gamedata['regions'][session.viewing_player.home_region]['loot_defender_loses']
-        base_loot_defender_loses_table = session.viewing_player.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
+        if self.defender.home_region and self.defender.home_region in gamedata['regions'] and 'loot_defender_loses' in gamedata['regions'][self.defender.home_region]:
+            base_loot_defender_loses_table = gamedata['regions'][self.defender.home_region]['loot_defender_loses']
+        base_loot_defender_loses_table = self.defender.get_any_abtest_value('loot_defender_loses', base_loot_defender_loses_table)
 
         if type(base_loot_attacker_gains_table) is dict:
             for kind in attacker_caps:
                 for res in attacker_caps[kind]:
-                    cap = Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    cap = Predicates.eval_cond_or_literal(base_loot_attacker_gains_table[res][kind], session, self.defender).get('cap',-1) # note: evaluated on defender, not attacker!
                     if cap >= 0:
                         attacker_caps[kind][res] = cap
 
         if type(base_loot_defender_loses_table) is dict:
             for kind in defender_caps:
                 for res in defender_caps[kind]:
-                    cap = Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, session.viewing_player).get('cap',-1) # note: evaluated on viewing_player, not player!
+                    cap = Predicates.eval_cond_or_literal(base_loot_defender_loses_table[res][kind], session, self.defender).get('cap',-1) # note: evaluated on defender, not attacker!
                     if cap >= 0:
                         defender_caps[kind][res] = cap
 
@@ -573,7 +575,7 @@ class SpecificPvPResLoot(PvPResLoot):
         ret['starting_base_resource_loot'] = self.starting_resource_loot
         return ret
 
-    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player):
+    def do_loot_building(self, gamedata, session, obj, old_hp, new_hp, owning_player, attacker):
         looted = {}
         lost = {}
 
