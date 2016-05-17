@@ -436,10 +436,9 @@ def reload_gamedata():
         # XXX ugly hack - the file should be prepared separately for the client
         if 'ai_bases_client' in newdata: del newdata['ai_bases_client']
         newdata['ai_attacks'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_attacks_compiled.json"))
-        newdata['hives_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("hives_server.json"))
-        if 'hives_client' in newdata: del newdata['hives_client']
-        newdata['quarries_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("quarries_server.json"))
-        if 'quarries_client' in newdata: del newdata['quarries_client']
+        for KIND in ('hives','quarries','raids'): # hives_server quarries_server raids_server (for grepping)
+            newdata[KIND+'_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename(KIND+"_server.json"))
+            if KIND+'_client' in newdata: del newdata[KIND+'_client']
         newdata['offers'] = SpinConfig.load(SpinConfig.gamedata_component_filename("offers.json"))
         newdata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename("loot_tables.json"))
         newdata['promo_codes'] = SpinConfig.load(SpinConfig.gamedata_component_filename("promo_codes_compiled.json"))
