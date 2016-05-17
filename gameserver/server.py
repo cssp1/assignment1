@@ -282,6 +282,18 @@ def inventory_list_equal(a, b):
     return True
 
 # these functions work with the raw JSON structures stored in NoSQL for mobile objects
+def army_unit_hp(obj):
+    level = obj.get('level',1)
+    spec = GameObjectSpec.lookup(obj['spec'])
+    max_hp = obj['max_hp'] if 'max_hp' in obj else spec.get_leveled_quantity(spec.max_hp, level)
+    if 'hp' in obj:
+        cur_hp = obj['hp']
+    elif 'hp_ratio' in obj:
+        cur_hp = int(obj['hp_ratio'] * max_hp)
+    else:
+        cur_hp = max_hp
+    return [cur_hp, max_hp]
+
 def army_unit_is_dead(obj):
     return (obj.get('hp',1) <= 0 or obj.get('hp_ratio',1) <= 0)
 
@@ -3098,41 +3110,16 @@ class BaseTable:
 base_table = BaseTable()
 
 class DamageLog(object):
-    def __init__(self, base_id, observer):
+    def __init__(self, base_id, observer = None):
         self.state = {}
         self.base_id = base_id # for debug messages only
-        self.observer = observer
+        self.observer = observer or RogueOwner # default statless observer
     def record_multi(self, iter):
         for obj in iter:
             self.record(obj)
     def init_multi(self, iter):
         for obj in iter:
             self.init(obj)
-    def init(self, obj, consumable = False):
-        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
-        sowner_id = str(obj.owner.user_id)
-        if sowner_id not in self.state: self.state[sowner_id] = {}
-        self._init(self.state[sowner_id], obj, consumable = consumable)
-    def _init(self, state, obj, consumable = False):
-        if obj.obj_id in state:
-            if gamedata['server'].get('log_damage_log',1) >= 1:
-                gamesite.exception_log.event(server_time, 'DamageLog: _init() on already-registered object obs %d owner %d: %s' % (self.observer.user_id, obj.owner.user_id, obj.spec.name))
-        state[obj.obj_id] = {'spec':obj.spec.name, 'level':obj.level, 'orig_health': obj.hp/float(obj.max_hp)}
-        if consumable: state[obj.obj_id]['consumable'] = 1
-    def record(self, obj):
-        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
-        sowner_id = str(obj.owner.user_id)
-        if sowner_id not in self.state:
-            if gamedata['server'].get('log_damage_log',1) >= 1:
-                gamesite.exception_log.event(server_time, 'DamageLog: record() on object with unseen owner (have %s) obs %d at %s owner %d: %s' % (repr(self.state.keys()), self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name))
-            return
-        self._record(self.state[sowner_id], obj)
-    def _record(self, state, obj):
-        if obj.obj_id not in state:
-            if gamedata['server'].get('log_damage_log',1) >= 1:
-                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object obs %d at %s owner %d: spec %s obj_id %s squad %r' % (self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name, obj.obj_id, obj.squad_id if obj.is_mobile() else None))
-            return
-        state[obj.obj_id]['cur_health'] = obj.hp/float(obj.max_hp)
     def finalize(self):
         ret = {}
         for sowner_id in self.state:
@@ -3171,6 +3158,63 @@ class DamageLog(object):
             if v['count'] <= 1: del v['count']
 
         return ret
+
+class GameObjectDamageLog(DamageLog):
+    def init(self, obj, consumable = False):
+        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
+        sowner_id = str(obj.owner.user_id)
+        if sowner_id not in self.state: self.state[sowner_id] = {}
+        self._init(self.state[sowner_id], obj, consumable = consumable)
+    def _init(self, state, obj, consumable = False):
+        if obj.obj_id in state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: _init() on already-registered object obs %d owner %d: %s' % (self.observer.user_id, obj.owner.user_id, obj.spec.name))
+        state[obj.obj_id] = {'spec':obj.spec.name, 'level':obj.level, 'orig_health': obj.hp/float(obj.max_hp)}
+        if consumable: state[obj.obj_id]['consumable'] = 1
+    def record(self, obj):
+        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
+        sowner_id = str(obj.owner.user_id)
+        if sowner_id not in self.state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: record() on object with unseen owner (have %s) obs %d at %s owner %d: %s' % (repr(self.state.keys()), self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name))
+            return
+        self._record(self.state[sowner_id], obj)
+    def _record(self, state, obj):
+        if obj.obj_id not in state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object obs %d at %s owner %d: spec %s obj_id %s squad %r' % (self.observer.user_id, self.base_id, obj.owner.user_id, obj.spec.name, obj.obj_id, obj.squad_id if obj.is_mobile() else None))
+            return
+        state[obj.obj_id]['cur_health'] = obj.hp/float(obj.max_hp)
+
+class ArmyUnitDamageLog(DamageLog):
+    # similar to DamageLog, but operates on raw army units instead of GameObjects
+    def init(self, unit, consumable = False):
+        if (not (unit['spec'] in gamedata['buildings'] or unit['spec'] in gamedata['units'])): return # ignore scenery etc
+        sowner_id = str(unit['owner_id'])
+        if sowner_id not in self.state: self.state[sowner_id] = {}
+        self._init(self.state[sowner_id], unit, consumable = consumable)
+    def _init(self, state, unit, consumable = False):
+        if unit['obj_id'] in state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: _init() on already-registered object owner %d: %s' % (unit['owner_id'], unit['spec']))
+        cur_hp, max_hp = army_unit_hp(unit)
+        state[unit['obj_id']] = {'spec':unit['spec'], 'level':unit.get('level',1), 'orig_health': cur_hp/float(max_hp)}
+        if consumable: state[unit['obj_id']]['consumable'] = 1
+    def record(self, unit):
+        if (not (unit['spec'] in gamedata['buildings'] or unit['spec'] in gamedata['units'])): return # ignore scenery etc
+        sowner_id = str(unit['owner_id'])
+        if sowner_id not in self.state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: record() on object with unseen owner (have %s) at %s owner %d: %s' % (repr(self.state.keys()), self.base_id, unit['owner_id'], unit['spec']))
+            return
+        self._record(self.state[sowner_id], unit)
+    def _record(self, state, unit):
+        if unit['obj_id'] not in state:
+            if gamedata['server'].get('log_damage_log',1) >= 1:
+                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object at %s owner %d: spec %s obj_id %s squad %r' % (self.base_id, unit['owner_id'], unit['spec'], unit['obj_id'], obj.get('squad_id')))
+            return
+        cur_hp, max_hp = army_unit_hp(unit)
+        state[unit['obj_id']]['cur_health'] = cur_hp/float(max_hp)
 
 class AttackLog (object):
     @classmethod
@@ -4218,7 +4262,7 @@ class Session(object):
         self.attack_log = AttackLog(server_time, attacker_id, defender_id, base_id)
 
         if gamedata['server'].get('enable_damage_log',True) and self.player.tutorial_state == "COMPLETE":
-            self.damage_log = DamageLog(self.viewing_base.base_id, self.player)
+            self.damage_log = GameObjectDamageLog(self.viewing_base.base_id, observer = self.player)
 
         replay_token = None
         if self.attack_log.is_active():
@@ -4237,7 +4281,7 @@ class Session(object):
         for obj in sorted(obj_list, key = lambda obj: (obj.spec.kind, obj.spec.name)):
             if obj.is_mobile() or obj.spec.history_category in ('turrets','turret_emplacements'):
                 self.log_attack_unit(owner_id, obj, event_name, props = props)
-    def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None):
+    def _log_attack_unit_props(self, obj, props = None, fake_xy = None, killer_info = None):
         if props is None:
             props = {}
         if fake_xy:
@@ -4289,8 +4333,10 @@ class Session(object):
             if 'id' in killer_info: props['attacker_obj_id'] = killer_info['id']
             for EXTRA in ('spellname','mine','turret_head'): # extra metadata on the killer
                 if EXTRA in killer_info: props['attacker_'+EXTRA] = killer_info[EXTRA]
+        return props
 
-        self.attack_event(owner_id, event_name, props)
+    def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None):
+        self.attack_event(owner_id, event_name, self._log_attack_unit_props(obj, props = props, fake_xy = fake_xy, killer_info = killer_info))
 
     def attack_event(self, user_id, event_name, props):
         if self.attack_log is None:
@@ -16474,6 +16520,11 @@ class XSAPI(resource.Resource):
 # handler for game client API calls
 class GAMEAPI(resource.Resource):
     isLeaf = True
+
+    # awkward - for use by CustomerSupport.py
+    AttackLog_factory = AttackLog
+    ArmyUnitDamageLog_factory = ArmyUnitDamageLog
+
     def __init__(self):
         resource.Resource.__init__(self)
         self.quarry_query_cache = {}

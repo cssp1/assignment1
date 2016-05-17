@@ -14,7 +14,7 @@ def get_leveled_quantity(qty, level): # XXX duplicate
         return qty[level-1]
     return qty
 
-def is_scout_unit(unit, gamedata):
+def army_unit_is_scout(unit, gamedata):
     if unit['spec'] not in gamedata['units']: return False # might be a building
     spec = gamedata['units'][unit['spec']]
     if 'raid_offense' in spec:
@@ -213,8 +213,8 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
         squad_update['scouted'] = 1
 
         # filter out non-scout units
-        attacking_units = filter(lambda unit: is_scout_unit(unit, gamedata), attacking_units)
-        defending_units = filter(lambda unit: is_scout_unit(unit, gamedata), defending_units)
+        attacking_units = filter(lambda unit: army_unit_is_scout(unit, gamedata), attacking_units)
+        defending_units = filter(lambda unit: army_unit_is_scout(unit, gamedata), defending_units)
 
     if attacking_units: # there have to be attacking units for anything to happen
 
@@ -458,7 +458,7 @@ def make_battle_summary(gamedata, nosql_client,
 
     ret['deployed_units'] = {}
     for obj in attacker_units_before:
-        if raid_mode == 'scout' and is_scout_unit(obj, gamedata): continue
+        if raid_mode == 'scout' and (not army_unit_is_scout(obj, gamedata)): continue
         ret['deployed_units'][obj['spec']] = ret['deployed_units'].get(obj['spec'],0) + 1
 
     # record remaining strength of defender

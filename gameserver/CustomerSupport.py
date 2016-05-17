@@ -14,9 +14,10 @@
 import SpinJSON
 import SpinConfig
 import random
+#import copy
 from Region import Region
 import SpinNoSQLLockManager
-from Raid import recall_squad, RecallSquadException
+from Raid import recall_squad, RecallSquadException, army_unit_is_scout
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -754,9 +755,58 @@ class HandleResolveHomeRaid(Handler):
             session.player.my_home.base_last_attack_time = self.time_now
             session.player.my_home.base_times_attacked += 1
 
+            raid_mode = 'scout' if all(squad['raid'] == 'scout' for squad in raid_squads) else 'attack'
 
-            # XXXXXX rest of attack path here
-            # raise Exception('not implemented')
+            attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
+                                     key = lambda obj: obj['spec'])
+            defending_army = sorted([obj.persist_state(nosql = True) for obj in session.player.home_base_iter() if \
+                                     (obj.is_building() and obj.spec.history_category in ('turrets','turret_emplacements')) or \
+                                     (obj.is_mobile() and self.gamedata.get('enable_defending_units',True) and obj.squad_id == 0)
+                                     ],
+                                     key = lambda obj: obj['spec'])
+
+            if raid_mode == 'scout':
+                for army in attacking_army, defending_army:
+                    army = filter(lambda x: army_unit_is_scout(x, self.gamedata), army)
+
+            if not attacking_army:
+                return ReturnValue(result = 'HARMLESS_RACE_CONDITION') # no units to scout or attack with
+
+            # set up damage log
+            if self.gamedata['server'].get('enable_damage_log',True):
+                damage_log = self.gamesite.gameapi.ArmyUnitDamageLog_factory(session.player.my_home.base_id) # observer is actually attacker, but shouldn't matter here
+                damage_log.init_multi(defending_army)
+            else:
+                damage_log = None
+
+            # set up attack log (not enabled for now)
+            if 0:
+                attack_log = self.gamesite.gameapi.AttackLog_factory(self.time_now, raid_squads[0]['base_landlord_id'], self.user_id, session.player.my_home.base_id)
+            else:
+                attack_log = None
+
+            try:
+                if attack_log:
+                    pass
+                    ## if session.player.player_auras:
+                    ##     attack_log.event({'user_id':self.user_id, 'event_name': '3901_player_auras', 'code': 3901, 'player_auras':copy.copy(session.player.player_auras)})
+                    ##     # XXX attacker's auras? pass with squad feature?
+
+                    ## for obj in defending_units:
+                    ##     props = session._log_attack_unit_props(obj)
+                    ##     props.update({'user_id': self.user_id, 'event_name': '3900_unit_exists', 'code': 3900})
+                    ##     attack_log.event(props)
+
+                # XXXXXX rest of attack path here
+                # raise Exception('not implemented')
+
+            finally:
+                if attack_log:
+                    attack_log.close()
+
+            if damage_log:
+                damage_report = damage_log.finalize()
+                # summary['damage'] = damage_report
 
             # send the squads back home
             self.recall_squads(raid_squads)
