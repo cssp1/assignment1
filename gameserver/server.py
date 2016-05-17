@@ -7867,7 +7867,8 @@ class Player(AbstractPlayer):
 
     # "read/write semaphore" flags to prevent two users from writing changes to the same base at once
     class LockState:
-        # NOTE: keep constants in sync with dbserver.py: Lock
+        # NOTE: keep constants in sync with SpinNoSQL.py lock states
+        # <= 0 means "open" otherwise "taken"
         open = 0 # anyone can view
         logged_in = 1 # owner is viewing
         being_attacked = 2 # non-owner is attacking
@@ -23967,7 +23968,7 @@ class GAMEAPI(resource.Resource):
             # ping the map to update login status for the player's home base (sends broadcast of lock acquire)
             if not session.player_base_lock:
                 if gamesite.nosql_client.map_feature_lock_acquire(session.player.my_home.base_region, session.player.my_home.base_id, session.player.user_id,
-                                                                  reason = 'SERVER_HELLO') == Player.LockState.being_attacked:
+                                                                  desired_state = Player.LockState.logged_in, reason = 'SERVER_HELLO') == Player.LockState.logged_in:
                     session.player_base_lock = (session.player.my_home.base_region, session.player.my_home.base_id)
 
                     # XXXXXX only necessary during migration, shouldn't be necessary once all updates are sent in real-time

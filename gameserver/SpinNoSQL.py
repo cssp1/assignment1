@@ -158,7 +158,8 @@ class NoSQLClient (object):
             return True
         return False
 
-    # must match dbserver.py and server.py definitions of these lock states
+    # must match server.py definitions of these lock states
+    # <= 0 means "open" otherwise "taken"
     LOCK_OPEN = 0
     LOCK_LOGGED_IN = 1
     LOCK_BEING_ATTACKED = 2
@@ -1802,12 +1803,12 @@ class NoSQLClient (object):
         return self.region_table(region, 'map').find_one(qs) is not None
 
 
-    def map_feature_lock_acquire(self, region, base_id, owner_id, generation = -1, do_hook = True, reason=''):
-        state = self.instrument('map_feature_lock_acquire(%s)'%(reason), self._map_feature_lock_acquire, (region,base_id,owner_id,generation))
+    def map_feature_lock_acquire(self, region, base_id, owner_id, generation = -1, do_hook = True, desired_state = LOCK_BEING_ATTACKED, reason=''):
+        state = self.instrument('map_feature_lock_acquire(%s)'%(reason), self._map_feature_lock_acquire, (region,base_id,owner_id,generation,desired_state))
         if state > 0 and self.map_update_hook and do_hook:
             self.map_update_hook(region, base_id, {'LOCK_STATE':state, 'LOCK_OWNER':owner_id, 'preserve_locks':1}, owner_id)
         return state
-    def _map_feature_lock_acquire(self, region, base_id, owner_id, generation):
+    def _map_feature_lock_acquire(self, region, base_id, owner_id, generation, desired_state):
         LOCK_IS_OPEN = {'$or':[{'LOCK_STATE':{'$exists':False}},
                                {'LOCK_STATE':{'$lte':0}}]}
         LOCK_IS_STALE = {'LOCK_TIME':{'$lte':self.time - self.LOCK_TIMEOUT}} # lock timed out
@@ -1823,7 +1824,8 @@ class NoSQLClient (object):
                           {'$or':[{'$and':[LOCK_IS_OPEN,LOCK_GEN_IS_GOOD]},
                                   LOCK_IS_STALE]}]}
 
-        update = {'$set':{'LOCK_STATE':self.LOCK_BEING_ATTACKED,
+        assert desired_state in (self.LOCK_LOGGED_IN, self.LOCK_BEING_ATTACKED)
+        update = {'$set':{'LOCK_STATE':desired_state,
                           'LOCK_TIME':self.time,
                           'LOCK_OWNER':owner_id,
                           'last_mtime':self.time}}
@@ -1837,7 +1839,7 @@ class NoSQLClient (object):
                 return ret['LOCK_STATE']
         else:
             if self.region_table(region, 'map').update_one(qs, update).matched_count > 0:
-                return self.LOCK_BEING_ATTACKED
+                return desired_state
 
         return -self.LOCK_BEING_ATTACKED
 
