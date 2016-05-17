@@ -644,6 +644,23 @@ class HandleSquadDockUnits(Handler):
 
         return ReturnValue(result = 'ok')
 
+class HandleResolveHomeRaid(Handler):
+    need_user = False # ??
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.squad_base_ids = SpinJSON.loads(self.args['squad_base_ids'])
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        if session.home_base and session.has_attacked:
+            # currently defending against AI attack - punt
+            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK')
+
+        raise Exception('not implemented')
+
+        return ReturnValue(result = 'ok')
+    def exec_offline(self, user, player):
+        raise Exception('not implemented')
+
 class HandleChangeRegion(Handler):
     def __init__(self, *pargs, **pkwargs):
         Handler.__init__(self, *pargs, **pkwargs)
@@ -1194,6 +1211,7 @@ methods = {
     'give_item': HandleGiveItem,
     'send_message': HandleSendMessage,
     'squad_dock_units': HandleSquadDockUnits,
+    'resolve_home_raid': HandleResolveHomeRaid,
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
