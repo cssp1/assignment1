@@ -17,6 +17,7 @@ import random
 from Region import Region
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException
+import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -655,7 +656,7 @@ class HandleResolveHomeRaid(Handler):
         self.loc = SpinJSON.loads(self.args['loc'])
 
     def query_raid_squads(self):
-        raid_squads = self.gamesite.nosql_client.get_map_features_by_loc(self.region_id, self.loc)
+        raid_squads = list(self.gamesite.nosql_client.get_map_features_by_loc(self.region_id, self.loc))
         raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and \
                              feature.get('raid') and \
                              feature['base_landlord_id'] != self.user_id and \
@@ -684,6 +685,15 @@ class HandleResolveHomeRaid(Handler):
             return 'CANNOT_ATTACK_STRONGER_PLAYER'
 
         return None
+
+    def recall_squads(self, raid_squads):
+        # *ASSUMES SQUAD LOCKS ARE TAKEN*
+        for squad in raid_squads:
+            try:
+                recall_squad(self.gamesite.nosql_client, self.region_id, squad, self.time_now)
+            except RecallSquadException as e:
+                self.gamesite.exception_log.event(self.time_now, str(e))
+                continue
 
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
@@ -734,25 +744,24 @@ class HandleResolveHomeRaid(Handler):
                     i -= 1
                 i += 1
 
-            # XXX not checked: repeat_attack_cooldown, sandstorm, is_alt_account_unattackable
+            attacker_proxy = None # XXXXXX this is going to break - just temporary to see what ResLoot etc needs to know about the attacker
+            res_looter = ResLoot.ResLoot(self.gamedata, session, attacker_proxy, session.player, session.player.my_home)
 
-            # XXXXXX res_looter = ResLoot.ResLoot(self.gamedata, session, session.player, session.player.my_home)
+            # defender side of init_attack() - attacker side is done on launch
+            is_revenge_attack = False # XXX send this with the squad feature?
+            session.player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
 
-            raise Exception('not implemented')
+            session.player.my_home.base_last_attack_time = self.time_now
+            session.player.my_home.base_times_attacked += 1
+
+
+            # XXXXXX rest of attack path here
+            # raise Exception('not implemented')
 
             # send the squads back home
             self.recall_squads(raid_squads)
 
             return ReturnValue(result = 'ok')
-
-    def recall_squads(self, raid_squads):
-        # *ASSUMES SQUAD LOCKS ARE TAKEN*
-        for squad in raid_squads:
-            try:
-                recall_squad(self.gamesite.nosql_client, self.region_id, squad, self.time_now)
-            except RecallSquadException as e:
-                self.gamesite.exception_log.event(self.time_now, str(e))
-                continue
 
     def exec_offline(self, user, player):
         assert player.get('home_region') == self.region_id and player.get('base_map_loc') == self.loc
@@ -769,8 +778,6 @@ class HandleResolveHomeRaid(Handler):
             raid_squads = self.query_raid_squads()
             if not raid_squads: # no squads found
                 return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
-
-            # XXX not checked: repeat_attack_cooldown, sandstorm, is_alt_account_unattackable
 
             raise Exception('not implemented')
 

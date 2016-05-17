@@ -9284,7 +9284,7 @@ class Player(AbstractPlayer):
                 if(hex_distance(coords[-1], self.my_home.base_map_loc) == 0):
                     pass # returning back to base is always allowed
                 else:
-                    dest_features = gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)')
+                    dest_features = list(gamesite.nosql_client.get_map_features_by_loc(self.home_region, coords[-1], reason='squad_step(raid)'))
                     if not any(x.get('base_type') in ('raid','home') for x in dest_features):
                         return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_invalid_destination', coords[-1]]
                     range_limit = self.stattab.raid_range_pvp if any(x.get('base_type') == 'home' for x in dest_features) else \
@@ -9293,12 +9293,34 @@ class Player(AbstractPlayer):
                         return False, [rollback_feature], ["CANNOT_DEPLOY_RAID_DIST_LIMIT", squad_id, 'raid_destination_too_far', coords[-1]]
 
                     # check predicates
+                    # since the checks only happen at launch time, there's a chance of race conditions here
                     for x in dest_features:
                         if 'base_template' in x:
                             template = gamedata['raids_server']['templates'].get(x['base_template'])
                             if template and ('activation' in template) and (not self.is_cheater):
                                 if (not Predicates.read_predicate(template['activation']).is_satisfied(self, None)):
                                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_destination_activation_false', coords[-1]]
+                        if x.get('base_type') == 'home' and x['base_landlord_id'] != self.user_id:
+                            # perform PvP-specific attacker checks
+                            # (better to do defender checks at resolve time, to avoid player-unfriendly races)
+                            if self.is_alt_account_unattackable(x['base_landlord_id']) and gamedata['prevent_alt_attacks']:
+                                return False, [rollback_feature], ["CANNOT_ATTACK_ALT_ACCOUNT"]
+
+                            elif self.stattab.sandstorm_max:
+                                return False, [rollback_feature], ["CANNOT_ATTACK_SANDSTORM_MAX"]
+
+                            elif server_time < self.get_repeat_attack_cooldown_expire_time(x['base_landlord_id'], x['base_id']):
+                                return False, [rollback_feature], ["CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"]
+
+                            # init_attack() minus the defender-only parts
+                            is_revenge_attack = self.cooldown_active('revenge_defender:%d' % x['base_landlord_id'])
+                            self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
+
+                            # remove the protection timer of the player making the attack
+                            self.set_protection_end_time(session, -1,
+                                                         '3884_protection_removed' if self.has_damage_protection() else None,
+                                                         {'defender_id':x['base_landlord_id']})
+                            record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
 
             else:
                 # prevent re-directing raids anywhere other than back to home base
@@ -11502,6 +11524,33 @@ class Player(AbstractPlayer):
         return ret
 
     def alt_record_attack(self, other_id): pass
+
+    def init_attack_defender(self, attacker_id, attacker_is_human, is_home_attack, ladder_state, is_revenge_attack):
+        if attacker_is_human and is_home_attack:
+            self.record_protection_event('3885_i_got_attacked',
+                                         {'prev_end_time': self.resources.protection_end_time,
+                                          'attacker_id': attacker_id,
+                                          'ladder': bool(ladder_state)})
+            if is_revenge_attack:
+                record_player_metric(self, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
+
+    def init_attack_attacker(self, defender_id, defender_is_human, is_home_attack, ladder_state, is_revenge_attack):
+        if defender_is_human and is_home_attack:
+            self.alt_record_attack(defender_id)
+        self.attack_cooldown_start = server_time
+
+        if gamedata['server'].get('track_battle_streaks',0) > 0:
+            cd_list = ['battle_streak']
+            if ladder_state:
+                cd_list.append('battle_streak_ladder')
+            for cd in cd_list:
+                self.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
+
+        record_player_metric(self, dict_increment, 'attacks_launched', 1, time_series = False)
+        record_player_metric(self, dict_increment, 'attacks_launched_vs_'+('human' if defender_is_human else 'ai'), 1, time_series = False)
+
+        if defender_is_human and is_revenge_attack:
+            record_player_metric(self, dict_increment, 'revenge_attacks_launched_vs_'+('human' if defender_is_human else 'ai'), 1, time_series = False)
 
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
@@ -21162,6 +21211,7 @@ class GAMEAPI(resource.Resource):
             return
 
         self.init_attack(my_session, my_session.player, their_session.player, base, ladder_state)
+        # XXXXXX remove attacker protection
         gamesite.exception_log.event(server_time, 'HERE! %r' % deployable_squads)
         my_session.deferred_history_update = True
 
@@ -21312,26 +21362,20 @@ class GAMEAPI(resource.Resource):
     def init_attack(self, session, attacker, defender, base, ladder_state):
         # perform all necessary mutations at the start of an offensive attack
         # note: assumes all necessary locks are already taken
-        if defender.is_human() and base is defender.my_home:
-            defender.record_protection_event('3885_i_got_attacked',
-                                             {'prev_end_time': defender.resources.protection_end_time,
-                                              'attacker_id': attacker.user_id,
-                                              'ladder': bool(ladder_state)})
-            attacker.alt_record_attack(defender.user_id)
+        is_home_attack = (base.base_type == 'home')
+        is_revenge_attack = attacker.cooldown_active('revenge_defender:%d' % defender.user_id)
+        attacker_is_human = attacker.is_human()
+        defender_is_human = defender.is_human()
+
+        defender.init_attack_defender(attacker.user_id, attacker_is_human, is_home_attack, ladder_state, is_revenge_attack)
+        attacker.init_attack_attacker(defender.user_id, defender_is_human, is_home_attack, ladder_state, is_revenge_attack)
 
         base.base_last_attack_time = server_time
         base.base_times_attacked += 1
-        attacker.attack_cooldown_start = server_time
 
-        if gamedata['server'].get('track_battle_streaks',0) > 0:
-            cd_list = ['battle_streak']
-            if ladder_state:
-                cd_list.append('battle_streak_ladder')
-            for cd in cd_list:
-                attacker.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
-
-        if defender.is_human() and \
-           ((base is defender.my_home) or \
+        # deal with damage protection mutation
+        if defender_is_human and \
+           (is_home_attack or \
             (base.base_type == 'quarry' and gamedata['territory']['quarries_affect_protection']) or \
             (base.base_type == 'squad' and gamedata['territory']['squads_affect_protection'])):
             # remove the protection timer of the player making the attack
@@ -21340,12 +21384,6 @@ class GAMEAPI(resource.Resource):
                                              {'defender_id':defender.user_id})
             record_player_metric(attacker, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
 
-        record_player_metric(attacker, dict_increment, 'attacks_launched', 1, time_series = False)
-        record_player_metric(attacker, dict_increment, 'attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
-
-        if defender.is_human() and attacker.cooldown_active('revenge_defender:%d' % defender.user_id):
-            record_player_metric(attacker, dict_increment, 'revenge_attacks_launched_vs_'+defender.ai_or_human(), 1, time_series = False)
-            record_player_metric(defender, dict_increment, 'revenge_attacks_suffered', 1, time_series = False)
 
     # deploy units against a foreign (human or AI) player
     # returns true if successful
