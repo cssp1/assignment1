@@ -27417,7 +27417,11 @@ class GAMEAPI(resource.Resource):
 
                     home_targets = filter(lambda x: x['base_type'] == 'home', features)
                     for targ in home_targets:
-                        d = gamesite.do_CONTROLAPI(on_behalf_of_session.user.user_id, {'user_id': targ['base_landlord_id'], 'method':'resolve_home_raid', 'squad_base_ids': SpinJSON.dumps([x['base_id'] for x in raid_squads])}, max_tries = 1)
+                        d = gamesite.do_CONTROLAPI(on_behalf_of_session.user.user_id,
+                                                   {'user_id': targ['base_landlord_id'], 'method':'resolve_home_raid',
+                                                    'region_id': region_id, 'loc': SpinJSON.dumps(loc),
+                                                    'squad_base_ids': SpinJSON.dumps([x['base_id'] for x in raid_squads])},
+                                                   max_tries = 1)
                         #d.addCallback(lambda x: gamesite.exception_log.event(server_time, 'RESPONSE %r' % x))
                         d.addErrback(report_and_absorb_deferred_failure, on_behalf_of_session)
 

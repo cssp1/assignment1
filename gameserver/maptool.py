@@ -1524,7 +1524,9 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                 print 'resolving raid at enemy home base', pretty_feature(home)
                 if not dry_run:
                     try:
-                        do_CONTROLAPI({'user_id': home['base_landlord_id'], 'method': 'resolve_home_raid', 'squad_base_ids': SpinJSON.dumps([squad['base_id']])})
+                        do_CONTROLAPI({'user_id': home['base_landlord_id'], 'method': 'resolve_home_raid',
+                                       'region_id': region_id, 'loc': SpinJSON.dumps(squad['base_map_loc']),
+                                       'squad_base_ids': SpinJSON.dumps([squad['base_id']])})
                     except Exception as e:
                         print 'resolve_home_raid error', e
                         continue # stop here

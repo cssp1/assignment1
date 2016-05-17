@@ -382,25 +382,36 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
 
             if recall_squads:
                 # send the squad towards home
-                home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(owner_id))
-                if not home:
-                    continue # XXX squad's home base not found on map
-
-                if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
-                    # good backtrack path
-                    path_update = backtrack(squad, time_now)
-                else:
-                    continue # XXX no path found to home base
-                if not dry_run:
-                    nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
-                                                  old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
-                                                  exclusive = -1, reason = 'resolve_target')
+                try:
+                    recall_squad(nosql_client, region_id, squad, time_now, dry_run = dry_run)
+                except RecallSquadException:
+                    continue
 
         finally:
             if squad_lock: lock_manager.release(region_id, squad['base_id'])
             if raid_lock: lock_manager.release(region_id, raid['base_id'])
 
     return raid # return updated target (possibly None)
+
+class RecallSquadException(Exception): pass
+
+# send a squad back towards home
+# *ASSUMES LOCK IS HELD*
+def recall_squad(nosql_client, region_id, squad, time_now, dry_run = False):
+    home = nosql_client.get_map_feature_by_base_id(region_id, 'h'+str(squad['base_landlord_id']))
+    if not home:
+        raise RecallSquadException('in %s, cannot recall squad squad %s - home base not found' % (region_id, squad['base_id']))
+
+    if 'base_map_path' in squad and squad['base_map_path'][0]['xy'] == home['base_map_loc']:
+        # good backtrack path
+        path_update = backtrack(squad, time_now)
+    else:
+        raise RecallSquadException('in %s, cannot recall squad squad %s - path not back-trackable to home base' % (region_id, squad['base_id']))
+
+    if not dry_run:
+        nosql_client.move_map_feature(region_id, squad['base_id'], path_update,
+                                      old_loc = squad['base_map_loc'], old_path=squad.get('base_map_path',None),
+                                      exclusive = -1, reason = 'resolve_target')
 
 def get_denormalized_summary_props_from_pcache(gamedata, pcinfo):
     ret = {'cc': pcinfo.get(gamedata['townhall']+'_level',1),

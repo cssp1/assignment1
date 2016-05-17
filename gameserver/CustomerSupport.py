@@ -15,6 +15,8 @@ import SpinJSON
 import SpinConfig
 import random
 from Region import Region
+import SpinNoSQLLockManager
+from Raid import recall_squad, RecallSquadException
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -648,18 +650,134 @@ class HandleResolveHomeRaid(Handler):
     need_user = False # ??
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
+        self.region_id = self.args['region_id']
         self.squad_base_ids = SpinJSON.loads(self.args['squad_base_ids'])
+        self.loc = SpinJSON.loads(self.args['loc'])
+
+    def query_raid_squads(self):
+        raid_squads = self.gamesite.nosql_client.get_map_features_by_loc(self.region_id, self.loc)
+        raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and \
+                             feature.get('raid') and \
+                             feature['base_landlord_id'] != self.user_id and \
+                             feature['base_id'] in self.squad_base_ids, raid_squads)
+        return raid_squads
+
+    def get_pvp_balance_online(self, player, other_pcinfo, my_alliance, other_alliance):
+        his_level = other_pcinfo.get('player_level',1)
+        my_level_range = player.attackable_level_range()
+
+        if my_alliance >= 0 and self.gamedata['prevent_same_alliance_attacks'] and other_alliance == my_alliance:
+            return 'CANNOT_ATTACK_SAME_ALLIANCE'
+
+        if (self.region_id in self.gamedata['regions']) and (not self.gamedata['regions'][self.region_id].get('enable_pvp_level_gap', True)):
+            return None # region has no limits
+
+        if (self.gamedata['matchmaking']['revenge_time'] > 0) and player.cooldown_active('revenge_defender:%d' % other_pcinfo['user_id']):
+            return None # revenge - no limit
+
+        if (my_level_range[0]>=0) and (his_level < my_level_range[0]):
+            # we are much stronger
+            return 'CANNOT_ATTACK_WEAKER_PLAYER'
+
+        elif (my_level_range[1]>=0) and (his_level > my_level_range[1]):
+            # we are much weaker - prevent attack
+            return 'CANNOT_ATTACK_STRONGER_PLAYER'
+
+        return None
+
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
+        assert session.player.home_region == self.region_id and session.player.my_home.base_map_loc == self.loc
+        if session.player.has_damage_protection():
+            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_UNDER_PROTECTION')
+
         if session.home_base and session.has_attacked:
             # currently defending against AI attack - punt
             return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK')
 
-        raise Exception('not implemented')
+        affected = session.player.unit_repair_tick()
+        if affected:
+            for obj in affected: session.deferred_object_state_updates.add(affected)
+            session.send([["UNIT_REPAIR_UPDATE", session.player.unit_repair_queue]])
 
-        return ReturnValue(result = 'ok')
+        for obj in session.player.home_base_iter():
+            if obj.is_building():
+                # simulate passage of time for repairs, and also
+                # kickstart research and upgrading if it got stopped for some reason, and the building is at full health
+                obj.update_all()
+
+        with SpinNoSQLLockManager.LockManager(self.gamesite.nosql_client) as lock_manager:
+
+            for squad_base_id in self.squad_base_ids:
+                if not lock_manager.acquire(self.region_id, squad_base_id):
+                    # can't get a lock
+                    return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+
+            raid_squads = self.query_raid_squads()
+            if not raid_squads: # no squads found
+                return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+
+            temp = self.gamesite.sql_client.get_users_alliance([self.user_id,] + [squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
+            my_alliance, raid_alliances = temp[0], temp[1:]
+
+            raid_pcinfos = self.gamesite.nosql_client.player_cache_lookup_batch([squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
+
+            i = 0
+            for squad, raid_pcinfo, raid_alliance in zip(raid_squads[:], raid_pcinfos[:], raid_alliances[:]):
+                balance_error = self.get_pvp_balance_online(session.player, raid_pcinfo, my_alliance, raid_alliance)
+                if balance_error:
+                    del raid_squads[i]
+                    del raid_alliances[i]
+                    del raid_pcinfos[i]
+                    if not raid_squads:
+                        return ReturnValue(balance_error)
+                    i -= 1
+                i += 1
+
+            # XXX not checked: repeat_attack_cooldown, sandstorm, is_alt_account_unattackable
+
+            # XXXXXX res_looter = ResLoot.ResLoot(self.gamedata, session, session.player, session.player.my_home)
+
+            raise Exception('not implemented')
+
+            # send the squads back home
+            self.recall_squads(raid_squads)
+
+            return ReturnValue(result = 'ok')
+
+    def recall_squads(self, raid_squads):
+        # *ASSUMES SQUAD LOCKS ARE TAKEN*
+        for squad in raid_squads:
+            try:
+                recall_squad(self.gamesite.nosql_client, self.region_id, squad, self.time_now)
+            except RecallSquadException as e:
+                self.gamesite.exception_log.event(self.time_now, str(e))
+                continue
+
     def exec_offline(self, user, player):
-        raise Exception('not implemented')
+        assert player.get('home_region') == self.region_id and player.get('base_map_loc') == self.loc
+        if player['resources'].get('protection_end_time',-1) > self.time_now:
+            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_UNDER_PROTECTION')
+
+        with SpinNoSQLLockManager.LockManager(self.gamesite.nosql_client) as lock_manager:
+
+            for squad_base_id in self.squad_base_ids:
+                if not lock_manager.acquire(self.region_id, squad_base_id):
+                    # can't get a lock
+                    return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+
+            raid_squads = self.query_raid_squads()
+            if not raid_squads: # no squads found
+                return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+
+            # XXX not checked: repeat_attack_cooldown, sandstorm, is_alt_account_unattackable
+
+            raise Exception('not implemented')
+
+            # send the squads back home
+            self.recall_squads(raid_squads)
+
+            return ReturnValue(result = 'ok')
 
 class HandleChangeRegion(Handler):
     def __init__(self, *pargs, **pkwargs):
@@ -704,7 +822,7 @@ class HandleChangeRegion(Handler):
         props['protection_end_time'] = player['resources'].get('protection_end_time',-1)
         return props
 
-    def recall_squad(self, player, region_id, squad_id):
+    def recall_squad_instantly(self, player, region_id, squad_id):
         base_id = 's'+str(self.user_id)+'_'+str(squad_id)
         feature = self.gamesite.nosql_client.get_map_feature_by_base_id(region_id, base_id)
         if not feature: return
@@ -835,7 +953,7 @@ class HandleChangeRegion(Handler):
             for squad_sid, squad in player.get('squads',{}).iteritems():
                 squad_id = int(squad_sid)
                 if 'map_loc' in squad: # is deployed
-                    self.recall_squad(player, old_region, squad_id)
+                    self.recall_squad_instantly(player, old_region, squad_id)
                     for FIELD in ('map_loc', 'map_path'):
                         if FIELD in squad:
                             del squad[FIELD]

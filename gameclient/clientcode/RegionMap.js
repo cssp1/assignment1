@@ -912,7 +912,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
     if(feature['base_type'] === 'home' && !player.map_home_combat_enabled()) { return ret; }
 
     var info = PlayerCache.query_sync(feature['base_landlord_id']);
-    var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id;
+    var same_alliance = info && info['alliance_id'] && session.is_in_alliance() && info['alliance_id'] == session.alliance_id && gamedata['prevent_same_alliance_attacks'];
     var can_pre_attack = player.get_any_abtest_value('squad_pre_attack', gamedata['client']['squad_pre_attack']) && feature['base_type'] == 'squad' && feature['base_landlord_id'] != session.user_id && !same_alliance && (info || is_ai_user_id_range(feature['base_landlord_id']));
     var squads_nearby = this.region.squads_nearby(feature['base_map_loc']);
 

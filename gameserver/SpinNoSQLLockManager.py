@@ -58,3 +58,8 @@ class LockManager(object):
             self.release(lock[0], lock[1])
         for user_id in self.player_locks.keys():
             self.release_player(user_id)
+
+    # context pattern
+    def __enter__(self): return self
+    def __exit__(self, type, value, traceback):
+        self.release_all()
