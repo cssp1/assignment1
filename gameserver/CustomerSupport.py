@@ -17,7 +17,7 @@ import random
 #import copy
 from Region import Region
 import SpinNoSQLLockManager
-from Raid import recall_squad, RecallSquadException, army_unit_is_scout
+from Raid import recall_squad, RecallSquadException, army_unit_is_scout, army_unit_is_alive
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -765,8 +765,9 @@ class HandleResolveHomeRaid(Handler):
                                      ],
                                      key = lambda obj: obj['spec'])
 
-            if raid_mode == 'scout':
-                for army in attacking_army, defending_army:
+            for army in attacking_army, defending_army:
+                army = filter(lambda x: army_unit_is_alive(x, self.gamedata), army)
+                if raid_mode == 'scout':
                     army = filter(lambda x: army_unit_is_scout(x, self.gamedata), army)
 
             if not attacking_army:
@@ -776,6 +777,7 @@ class HandleResolveHomeRaid(Handler):
             if self.gamedata['server'].get('enable_damage_log',True):
                 damage_log = self.gamesite.gameapi.ArmyUnitDamageLog_factory(session.player.my_home.base_id) # observer is actually attacker, but shouldn't matter here
                 damage_log.init_multi(defending_army)
+                damage_log.init_multi(attacking_army)
             else:
                 damage_log = None
 
@@ -796,6 +798,12 @@ class HandleResolveHomeRaid(Handler):
                     ##     props = session._log_attack_unit_props(obj)
                     ##     props.update({'user_id': self.user_id, 'event_name': '3900_unit_exists', 'code': 3900})
                     ##     attack_log.event(props)
+
+                    ## for obj in attacking_units:
+                    ##     props = session._log_attack_unit_props(obj, props = {'method':'from_home', 'squad_id':obj.squad_id or 0})
+                    ##     props.update({'user_id': obj.owner.user_id, 'event_name': '3910_unit_deployed', 'code': 3910})
+                    ##     attack_log.event(props)
+
 
                 # XXXXXX rest of attack path here
                 # raise Exception('not implemented')
