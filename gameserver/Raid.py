@@ -26,6 +26,12 @@ def army_unit_is_scout(unit, gamedata):
 def army_unit_is_mobile(unit, gamedata):
     return unit['spec'] in gamedata['units']
 
+def army_unit_is_consumable(unit, gamedata):
+    if unit['spec'] in gamedata['units']:
+        spec = gamedata['units'][unit['spec']]
+        return spec.get('consumable',False)
+    return False
+
 # true if unit has a nonzero raid_offense stat other than scouting
 def army_unit_is_raid_shooter(unit, gamedata):
     if unit['spec'] in gamedata['units']:
@@ -227,15 +233,23 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
                 if new_squad_units is not None: new_squad_units = merge_unit_lists(new_squad_units, squad_units)
                 if new_raid_units is not None: new_raid_units = merge_unit_lists(new_raid_units, raid_units)
 
-            if new_squad_units is not None:
-                # recalculate max_cargo here, and clip cargo to it
-                max_cargo = calc_max_cargo(new_squad_units, gamedata)
-                cur_cargo = dict((res, max(cur_cargo.get(res,0), max_cargo.get(res,0))) for res in cur_cargo)
-                squad_update['max_cargo'] = max_cargo
-                squad_update['cargo'] = cur_cargo
-
         else:
             is_win = True
+
+        # handle disposable units here
+        if any(army_unit_is_consumable(unit, gamedata) for unit in attacking_units):
+            if new_squad_units is None:
+                new_squad_units = [copy.copy(x) for x in attacking_units]
+            for unit in new_squad_units:
+                if (raid_mode != 'scout' or army_unit_is_scout(unit, gamedata)) and army_unit_is_consumable(unit, gamedata):
+                    unit['DELETED'] = 1
+
+        # recalculate max_cargo here, and clip cargo to it
+        if new_squad_units is not None:
+            max_cargo = calc_max_cargo(new_squad_units, gamedata)
+            cur_cargo = dict((res, max(cur_cargo.get(res,0), max_cargo.get(res,0))) for res in cur_cargo)
+            squad_update['max_cargo'] = max_cargo
+            squad_update['cargo'] = cur_cargo
 
         # looting
         if is_win and raid_mode != 'scout':
