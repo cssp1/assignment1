@@ -10290,7 +10290,7 @@ class Player(AbstractPlayer):
         if self.cooldown_active('ladder_fatigue:%d' % other_player.user_id): return False
         if other_player.my_home.calc_base_damage() >= gamedata['matchmaking']['ladder_win_damage']: return False
         if self.is_same_alliance_sticky(other_player)[0]: return False
-        if self.is_alt_account_unladderable(other_player): return False
+        if self.is_alt_account_unladderable(other_player.user_id): return False
         if (self.home_region in gamedata['regions']) and \
            ('ladder_on_map_if_defender' in gamedata['regions'][self.home_region]) and \
            (not Predicates.read_predicate(gamedata['regions'][self.home_region]['ladder_on_map_if_defender']).is_satisfied(other_player, None)): return False
@@ -11501,7 +11501,7 @@ class Player(AbstractPlayer):
         if self.developer: ret['developer'] = self.developer # also insert "developer" flag here in case ETL scripts want to ignore these
         return ret
 
-    def alt_record_attack(self, other): pass
+    def alt_record_attack(self, other_id): pass
 
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
@@ -12191,13 +12191,13 @@ class LivePlayer(Player):
 
         return is_naughty, abuse_warning_msg
 
-    def get_alt_data(self, other):
-        if other.is_ai(): return False
-        key = str(other.user_id)
+    def get_alt_data(self, other_id):
+        if is_ai_user_id_range(other_id): return False
+        key = str(other_id)
         return self.known_alt_accounts.get(key, None)
 
-    def alt_record_attack(self, other):
-        alt_data = self.get_alt_data(other)
+    def alt_record_attack(self, other_id):
+        alt_data = self.get_alt_data(other_id)
         if not alt_data: return
         alt_data['attacks'] = alt_data.get('attacks',0) + 1
 
@@ -12228,25 +12228,25 @@ class LivePlayer(Player):
             if ip:
                 alt_data['last_ip'] = ip
 
-    def is_alt_account_unattackable(self, other):
+    def is_alt_account_unattackable(self, other_id):
         if (not spin_secure_mode): return False
         limit = gamedata['server']['alt_no_attack_after']
         if limit < 0: return False
-        alt_data = self.get_alt_data(other)
+        alt_data = self.get_alt_data(other_id)
         return alt_data and (alt_data.get('attacks',0) >= limit)
 
-    def is_alt_account_unprotectable(self, other):
+    def is_alt_account_unprotectable(self, other_id):
         if (not spin_secure_mode): return False
         limit = gamedata['server']['alt_no_protect_after']
         if limit < 0: return False
-        alt_data = self.get_alt_data(other)
+        alt_data = self.get_alt_data(other_id)
         return alt_data and (alt_data.get('attacks',0) >= limit)
 
-    def is_alt_account_unladderable(self, other):
+    def is_alt_account_unladderable(self, other_id):
         if (not spin_secure_mode): return False
         limit = gamedata['server'].get('alt_no_ladder_after',0)
         if limit < 0: return False
-        alt_data = self.get_alt_data(other)
+        alt_data = self.get_alt_data(other_id)
         return alt_data and (alt_data.get('attacks',0) >= limit)
 
     # accept URL parameters to override A/B test cohort assignment, and other developer-only variables
@@ -17829,7 +17829,7 @@ class GAMEAPI(resource.Resource):
 
         is_alt_account_unattackable = (session.viewing_player is not session.player) and \
                                       (session.viewing_base is session.viewing_player.my_home) and \
-                                      session.player.is_alt_account_unattackable(session.viewing_player)
+                                      session.player.is_alt_account_unattackable(session.viewing_player.user_id)
 
         # retrieve spyee's alliance info
         session.viewing_alliance_id_cache = -1
@@ -21227,7 +21227,7 @@ class GAMEAPI(resource.Resource):
             if player.stattab.sandstorm_max:
                 return (False, "CANNOT_ATTACK_SANDSTORM_MAX")
 
-            if player.is_alt_account_unattackable(other_player) and gamedata['prevent_alt_attacks']:
+            if player.is_alt_account_unattackable(other_player.user_id) and gamedata['prevent_alt_attacks']:
                 return (False, "CANNOT_ATTACK_ALT_ACCOUNT")
 
         return (True, None)
@@ -21273,7 +21273,7 @@ class GAMEAPI(resource.Resource):
 
         # always enable protection for non-secure testing. Otherwise perform checks.
         if (not spin_secure_mode) or \
-           ((not attacker.is_alt_account_unprotectable(defender)) and \
+           ((not attacker.is_alt_account_unprotectable(defender.user_id)) and \
             (not is_fatigued) and \
             (protect_same_ip or (not is_same_ip)) and \
             (protect_same_alliance or (not is_same_alliance)) and \
@@ -21303,7 +21303,7 @@ class GAMEAPI(resource.Resource):
                 if gamedata['server']['log_alt_accounts'] >= 1:
                     gamesite.exception_log.event(server_time, 'denying protection to same-alliance attack: %d vs. %d (%s) friends %d' % \
                                                  (attacker_user.user_id, defender_user.user_id, attacker_user.last_login_ip, int(attacker_user.is_friends_with(defender_user.social_id))))
-            elif attacker.is_alt_account_unprotectable(defender):
+            elif attacker.is_alt_account_unprotectable(defender.user_id):
                 if gamedata['server']['log_alt_accounts'] >= 1:
                     gamesite.exception_log.event(server_time, 'denying protection to known alt account: %d vs. %d' % (attacker_user.user_id, defender_user.user_id))
 
@@ -21317,7 +21317,7 @@ class GAMEAPI(resource.Resource):
                                              {'prev_end_time': defender.resources.protection_end_time,
                                               'attacker_id': attacker.user_id,
                                               'ladder': bool(ladder_state)})
-            attacker.alt_record_attack(defender)
+            attacker.alt_record_attack(defender.user_id)
 
         base.base_last_attack_time = server_time
         base.base_times_attacked += 1
