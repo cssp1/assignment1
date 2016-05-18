@@ -17,7 +17,9 @@ import random
 #import copy
 from Region import Region
 import SpinNoSQLLockManager
-from Raid import recall_squad, RecallSquadException, army_unit_is_scout, army_unit_is_alive, resolve_raid, make_battle_summary
+from Raid import recall_squad, RecallSquadException, \
+     army_unit_is_scout, army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
+     resolve_raid, make_battle_summary
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -748,11 +750,11 @@ class HandleResolveHomeRaid(Handler):
                     i -= 1
                 i += 1
 
-            attacker_proxy = None # XXXXXX this is going to break - just temporary to see what ResLoot etc needs to know about the attacker
-            res_looter = ResLoot.ResLoot(self.gamedata, session, attacker_proxy, session.player, session.player.my_home)
+            # XXX will need to pass attacker's stattab here
+            res_looter = ResLoot.ResLoot(self.gamedata, session, None, session.player, session.player.my_home)
 
             # defender side of init_attack() - attacker side is done on launch
-            is_revenge_attack = False # XXX send this with the squad feature?
+            is_revenge_attack = False # XXXXXX send this with the squad feature?
             session.player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
 
             session.player.my_home.base_last_attack_time = self.time_now
@@ -763,7 +765,7 @@ class HandleResolveHomeRaid(Handler):
             attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
                                      key = lambda obj: obj['spec'])
             defending_army = sorted([obj.persist_state(nosql = True) for obj in session.player.home_base_iter() if \
-                                     (obj.is_building() and obj.spec.history_category in ('turrets','turret_emplacements')) or \
+                                     obj.is_building() or \
                                      (obj.is_mobile() and self.gamedata.get('enable_defending_units',True) and obj.squad_id == 0)
                                      ],
                                      key = lambda obj: obj['spec'])
@@ -815,7 +817,107 @@ class HandleResolveHomeRaid(Handler):
 
                 #self.gamesite.exception_log.event(self.time_now, 'attacking_army %r\ndefending_army %r\nnew_attacking_army %r\nnew_defending_army %r' % (attacking_army, defending_army, new_attacking_army, new_defending_army))
 
-                actual_loot = {} # XXXXXX
+                # perform mutation on defender, including looting
+
+                actual_loot = {} # computed separately based on building damage using ResLooter code
+
+                if new_defending_army is not None:
+                    recalc_resources = False
+                    recalc_power = False
+
+                    for before, after in zip(defending_army, new_defending_army):
+                        # note: defending_army has already been filtered down to live units only
+
+                        if army_unit_is_mobile(after, self.gamedata) and (not army_unit_is_alive(after, self.gamedata)):
+                            # totally destroyed a mobile unit (similar to Player.destroy_object())
+                            obj = session.player.my_home.find_object_by_id(after['obj_id'])
+                            assert obj
+                            if session.has_object(after['obj_id']):
+                                retmsg.append(["OBJECT_REMOVED2", after['obj_id']])
+                                session.rem_object(after['obj_id'])
+
+                            session.player.unit_repair_cancel(obj)
+                            session.player.home_base_remove(obj)
+                            spec = army_unit_spec(after, self.gamedata)
+                            can_resurrect = spec.get('resurrectable') # XXX should check attacker's stattab
+                            if can_resurrect:
+                                # add back as zombie unit
+                                obj.hp = 0
+                                session.player.home_base_add(obj)
+                                if session.home_base and self.gamedata.get('enable_defending_units',True):
+                                    session.add_object(obj)
+                                    retmsg.append(["OBJECT_CREATED2", obj.serialize_state()])
+                                    if obj.auras:
+                                        retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
+                            else:
+                                session.player.send_army_update_destroyed(obj, retmsg)
+                        else:
+                            # partially damaged unit/building, or totally destroyed building (similar to Player.object_combat_updates())
+                            if after != before: # lazy
+                                old_hp = army_unit_hp(before, self.gamedata)
+                                new_hp = army_unit_hp(after, self.gamedata)
+
+                                if old_hp != new_hp:
+                                    obj = session.player.my_home.find_object_by_id(after['obj_id'])
+                                    assert obj
+                                    session.deferred_object_state_updates.add(obj)
+                                    new_hp = int(max(0, min(new_hp, obj.max_hp)))
+
+                                    if obj.is_mobile():
+                                        if session.player.unit_repair_cancel(obj):
+                                            recalc_resources = True
+                                    elif obj.is_building():
+                                        obj.halt_all() # returns true if havoc caused
+                                        if obj.affects_power():
+                                            recalc_power = True
+
+                                        if new_hp <= 0:
+                                            # XXXXXX missing: fragile items, on_destroy consequents
+
+                                            # looting!
+                                            # XXX will need to pass attacker's stattab here
+                                            looted, unused_looted_uncapped, lost = \
+                                                    res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, session.player, None)
+
+                                            looted_uncapped = looted # XXXXXX add loot to cargo here
+
+                                            if looted or looted_uncapped or lost:
+                                                for res in looted:
+                                                    if looted[res] > 0:
+                                                        actual_loot[res] = actual_loot.get(res,0) + looted[res]
+                                                        recalc_resources = True
+                                                for res in looted_uncapped:
+                                                    if looted_uncapped[res] > 0:
+                                                        actual_loot['looted_uncapped_'+res] = actual_loot.get('looted_uncapped_'+res,0) + looted_uncapped[res]
+                                                for res in lost:
+                                                    if lost[res] > 0:
+                                                        actual_loot[res+'_lost'] = actual_loot.get(res+'_lost',0) + lost[res]
+                                                        recalc_resources = True
+
+                                                # record econ flow
+                                                # human attacking human - log the frictional loss only, because the rest is a transfer
+                                                # EXCEPT for harvesters, which generate from "thin air" because the owner hadn't collected the resources yet
+                                                if obj.is_producer():
+                                                    econ_delta = looted
+                                                    econ_reason = 'human'
+                                                else:
+                                                    econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
+                                                    econ_reason = 'friction'
+                                                self.gamesite.admin_stats.econ_flow_res(session.player, 'loot', econ_reason, econ_delta)
+
+                                    obj.hp = new_hp # mutate!
+
+                    # record state changes to affected players
+                    if recalc_power and session.viewing_base is session.player.my_home:
+                        # note: this sends OBJECT_STATE_UPDATE for harvesters as well as BASE_POWER_UPDATE
+                        session.power_changed(session.viewing_base, None, retmsg)
+
+                    if recalc_resources:
+                        retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+                # XXXXXX perform mutation on attacking army
+                # XXXXXX add loot to cargo here
+
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,
                                               my_pcinfo, raid_pcinfos[0],
@@ -861,8 +963,8 @@ class HandleResolveHomeRaid(Handler):
                                                     'type': 'you_attacked_me',
                                                     'expire_time': self.time_now + self.gamedata['server']['message_expire_time']['i_attacked_you'],
                                                     'from_name': unicode(my_pcinfo.get('ui_name','Unknown')),
-                                                    'summary': summary, # XXXXXX increment_battle_statistics...
-                                                    'stats': stats # XXXXXX modify_scores...
+                                                    'summary': summary,
+                                                    'stats': stats
                                                     }])
 
                 # mail the victim a "you've been attacked" message and battle summary (offline case only)

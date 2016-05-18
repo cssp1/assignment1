@@ -308,7 +308,7 @@ class PvPResLoot(BaseResLoot):
         loot_attacker_gains_region_scale = 1
         loot_defender_loses_region_scale = 1
 
-        if self.attacker.home_region and self.attacker.home_region in gamedata['regions']:
+        if self.attacker and self.attacker.home_region and self.attacker.home_region in gamedata['regions']:
             loot_attacker_gains_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.attacker.home_region].get('loot_attacker_gains_scale_if_attacker',1), session, self.attacker)
             loot_defender_loses_region_scale *= Predicates.eval_cond_or_literal(gamedata['regions'][self.attacker.home_region].get('loot_defender_loses_scale_if_attacker',1), session, self.attacker)
         if self.defender.home_region and self.defender.home_region in gamedata['regions']:
@@ -339,13 +339,13 @@ class PvPResLoot(BaseResLoot):
 
         loot_attacker_gains = dict((res,
                                     base_loot_attacker_gains[res] * \
-                                    self.attacker.stattab.get_player_stat('loot_factor_pvp') * \
+                                    (self.attacker.stattab.get_player_stat('loot_factor_pvp') if self.attacker else 1) * \
                                     resdata.get('loot_attacker_gains',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
         loot_defender_loses = dict((res,
                                     base_loot_defender_loses[res] * \
-                                    self.attacker.stattab.get_player_stat('loot_factor_pvp') * \
+                                    (self.attacker.stattab.get_player_stat('loot_factor_pvp') if self.attacker else 1) * \
                                     resdata.get('loot_defender_loses',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
@@ -354,7 +354,7 @@ class PvPResLoot(BaseResLoot):
             loot_defender_loses[res] = min(max(loot_defender_loses[res],0),1)
             if loot_attacker_gains[res] > loot_defender_loses[res]:
                 raise Exception('%d vs %d: loot_attacker_gains[%s] %f > loot_defender_loses[%s] %f' % \
-                                (self.attacker.user_id, self.defender.user_id,
+                                (self.attacker.user_id if self.attacker else -1, self.defender.user_id,
                                  res, loot_attacker_gains[res], res, loot_defender_loses[res]))
                 loot_attacker_gains[res] = loot_defender_loses[res]
 

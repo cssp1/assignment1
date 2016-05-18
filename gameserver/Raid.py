@@ -543,10 +543,20 @@ def make_battle_summary(gamedata, nosql_client,
                 if role == 'defender':
                     ret['loot']['damage_inflicted'] = ret['loot'].get('damage_inflicted',0) + (before_hp - after_hp)
 
+                    # evaluate havoc
+                    if spec['kind'] == 'building' and before_hp >= max_hp and (not spec.get('worth_less_xp')):
+                        if b.get('build_start_time',-1) > 0 or \
+                           b.get('research_start_time',-1) > 0 or \
+                           b.get('upgrade_start_time',-1) > 0 or \
+                           b.get('enhance_start_time',-1) > 0 or \
+                           b.get('manuf_start_time',-1) > 0 or \
+                           ('crafting' in b and 'queue' in b['crafting'] and any(bus.get('start_time',-1) > 0 for bus in b['crafting']['queue'])):
+                           ret['loot']['havoc_caused'] = ret['loot'].get('havoc_caused',0) + 1
+
                 if spec['kind'] == 'mobile':
                     full_cost = dict((res, int((gamedata['unit_repair_resources'] if spec.get('resurrectable') else 1) * get_leveled_quantity(spec.get('build_cost_'+res,0), level))) for res in gamedata['resources'])
                     full_time = int((gamedata['unit_repair_time'] if spec.get('resurrectable') else 1) * get_leveled_quantity(spec.get('build_time',0), level))
-                else:
+                elif spec['kind'] == 'building':
                     full_cost = {} # buildings do not cost resources to repair
                     full_time = int(get_leveled_quantity(spec.get('repair_time',0), level))
 

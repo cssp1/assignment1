@@ -7203,6 +7203,11 @@ class Base(object):
             if obj.spec.name == specname:
                 return obj
         return None
+    def find_object_by_id(self, obj_id):
+        for obj in self.iter_objects():
+            if obj.obj_id == obj_id:
+                return obj
+        return None
 
     def get_power_state(self):
         power = [0,0]
@@ -27959,6 +27964,7 @@ class GameSite(server.Site):
         self.xsapi = xsapi
         self.player_table = player_table
         self.user_table = user_table
+        self.admin_stats = admin_stats
 
         self.last_ai_base_gc_time = 0
         self.last_player_flush_time = 0
