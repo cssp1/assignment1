@@ -831,12 +831,9 @@ class HandleResolveHomeRaid(Handler):
                 # broadcast map attack for GUI and battle history jewel purposes
                 self.gamesite.gameapi.broadcast_map_attack(self.region_id, base_props,
                                                            raid_squads[0]['base_landlord_id'], self.user_id,
-                                                           {'defender_outcome': summary['defender_outcome']},
+                                                           {'battle_type':'raid', 'raid_mode': raid_mode, 'defender_outcome': summary['defender_outcome']},
                                                            [my_pcinfo,] + raid_pcinfos,
                                                            msg = 'REGION_MAP_ATTACK_COMPLETE')
-
-                # XXXXXX rest of attack path
-                # raise Exception('not implemented')
 
                 # update victim's player cache entry
                 cache_props = {'lootable_buildings': session.player.get_lootable_buildings(),

@@ -446,6 +446,11 @@
         "msg_you": "you", "msg_you_pos": "your",
         "msg_make_possessive": "%s's",
 
+        "msg_home_was_raided_victory": "%defender_pos home base repelled an attack by %attacker!",
+        "msg_home_was_raided_defeat": "%defender_pos home base was raided by %attacker! - Check your Battle History",
+        "msg_home_was_scouted_victory": "%defender_pos home base repelled a scout attempt by %attacker!",
+        "msg_home_was_scouted_defeat": "%defender_pos home base was scouted by %attacker!",
+
         "msg_quarry_is_under_attack": "%defender_pos Quarry %basename is under attack by %attacker!",
         "msg_quarry_was_attacked_victory": "%defender_pos Quarry %basename repelled the attack by %attacker!",
         "msg_quarry_was_attacked_defeat": "%defender_pos Quarry %basename was taken by %attacker!",

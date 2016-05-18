@@ -46222,7 +46222,15 @@ function handle_server_message(data) {
                     } else if(msg == "REGION_MAP_ATTACK_BUMP") {
                         what_happened = 'was_bumped';
                     } else if(msg == "REGION_MAP_ATTACK_COMPLETE") {
-                        what_happened = 'was_attacked_' + summary['defender_outcome'];
+                        if(summary['battle_type'] === 'raid') {
+                            if(summary['raid_mode'] === 'scout') {
+                                what_happened = 'was_scouted_' + summary['defender_outcome'];
+                            } else {
+                                what_happened = 'was_raided_' + summary['defender_outcome'];
+                            }
+                        } else {
+                            what_happened = 'was_attacked_' + summary['defender_outcome'];
+                        }
                     } else {
                         what_happened = 'is_under_attack';
                     }
@@ -46250,7 +46258,7 @@ function handle_server_message(data) {
                         str = gamedata['strings']['regional_map'][str_key];
 
                         if(str) {
-                            var base_ui_name;
+                            var base_ui_name = '';
 
                             if(feature['base_type'] == 'squad') {
                                 var squad_id = parseInt(feature['base_id'].split('_')[1],10);
@@ -46267,8 +46275,8 @@ function handle_server_message(data) {
                             // capitalize first letter
                             str = str[0].toUpperCase() + str.substr(1);
 
-                            // show message if you aren't looking at the base
-                            if(session.viewing_base.base_id != feature['base_id']) {
+                            // show message if you aren't looking at the base, of if you got raided
+                            if(session.viewing_base.base_id != feature['base_id'] || summary['battle_type'] === 'raid') {
                                 user_log.msg(str, new SPUI.Color(1,1,0,1));
                             }
                         }

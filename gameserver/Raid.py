@@ -365,7 +365,8 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                                                         'args': { 'msg': "REGION_MAP_ATTACK_COMPLETE",
                                                                   'region_id': region_id, 'feature': raid,
                                                                   'attacker_id': owner_id, 'defender_id': raid['base_landlord_id'],
-                                                                  'summary': summary, 'pcache_info': [attacker_pcinfo, defender_pcinfo],
+                                                                  'summary': {'battle_type':'raid', 'raid_mode': squad['raid'], 'defender_outcome': summary['defender_outcome']}, # not full summary,
+                                                                  'pcache_info': [attacker_pcinfo, defender_pcinfo],
                                                                   # note: time is boxed here in "args" since it refers to the region map update time,
                                                                   # which could conceivably be on a different clock than the chat message time
                                                                   'map_time': time_now,
