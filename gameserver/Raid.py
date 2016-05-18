@@ -487,11 +487,12 @@ def make_battle_summary(gamedata, nosql_client,
 
     # record remaining strength of defender
     # unless you lost a scout attempt
-    if (raid_mode != 'scout' or attacker_outcome == 'victory') and (defender_units_after is not None) and (raid_mode != 'pickup'):
+    defender_units_now = defender_units_after if (defender_units_after is not None) else defender_units_before
+    if (raid_mode != 'scout' or attacker_outcome == 'victory') and (defender_units_now is not None) and (raid_mode != 'pickup'):
         ret['new_raid_offense'] = {}
         ret['new_raid_defense'] = {}
 
-        for obj in defender_units_after:
+        for obj in defender_units_now:
             if obj['spec'] in gamedata['units']:
                 spec = gamedata['units'][obj['spec']]
             elif obj['spec'] in gamedata['buildings']:

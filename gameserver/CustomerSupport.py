@@ -813,6 +813,8 @@ class HandleResolveHomeRaid(Handler):
 
                 is_conquest = is_win and (session.player.resources.player_level >= raid_pcinfos[0]['player_level'])
 
+                #self.gamesite.exception_log.event(self.time_now, 'attacking_army %r\ndefending_army %r\nnew_attacking_army %r\nnew_defending_army %r' % (attacking_army, defending_army, new_attacking_army, new_defending_army))
+
                 actual_loot = {} # XXXXXX
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,
