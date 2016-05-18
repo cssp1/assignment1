@@ -18185,7 +18185,7 @@ class GAMEAPI(resource.Resource):
                                                           time_range = [server_time - gamedata['server'].get('nosql_scout_reports_time_limit',8*3600), server_time],
                                                           limit = 1,
                                                           base_region = session.player.home_region,
-                                                          base_id = base_id, base_type = 'raid',
+                                                          base_id = base_id, base_types = ['raid','home'],
                                                           fields = ('time','new_raid_offense','new_raid_defense'),
                                                           reason = 'query_scout_reports')
             if summaries:

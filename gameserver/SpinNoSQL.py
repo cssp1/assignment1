@@ -742,7 +742,7 @@ class NoSQLClient (object):
             # if raid scout query is slow, enable this...
             if 0:
                 coll.create_index([('base_region',pymongo.ASCENDING),('base_id',pymongo.ASCENDING),('time',pymongo.ASCENDING)],
-                                  partialFilterExpression = {'base_type': 'raid'},
+                                  partialFilterExpression = {'base_type': {'$in':['raid','home']}},
                                   sparse = True, background = True)
 
             self.seen_battles = True
@@ -761,12 +761,12 @@ class NoSQLClient (object):
     BATTLES_HUMAN_ONLY = 2
     # XXXXXX time_range-based paging with limit means that some battles could be dropped (if several occur in the same second
     # and the limit gets hit part-way through). Might need GUID-based paging.
-    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, base_region = None, base_id = None, base_type = None, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
+    def battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, base_region = None, base_id = None, base_types = None, fields = None, oldest_first = False, limit = -1, streaming = False, reason=''):
         # player_id_A and player_id_B can be -1 for any player, or a valid ID to constrain to battles involving that player.
-        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_type, fields, oldest_first, limit, streaming, False))
-    def battles_get_count(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, base_region = None, base_id = None, base_type = None, reason=''):
-        return self.instrument('battles_get_count(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_type, None, False, -1, False, True))
-    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_type, fields, oldest_first, limit, streaming, count_only):
+        return self.instrument('battles_get(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_types, fields, oldest_first, limit, streaming, False))
+    def battles_get_count(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range = None, ai_or_human = BATTLES_ALL, passive_only = False, base_region = None, base_id = None, base_types = None, reason=''):
+        return self.instrument('battles_get_count(%s)'%reason, self._battles_get, (player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_types, None, False, -1, False, True))
+    def _battles_get(self, player_id_A, player_id_B, alliance_id_A, alliance_id_B, time_range, ai_or_human, passive_only, base_region, base_id, base_types, fields, oldest_first, limit, streaming, count_only):
         qs = {'$and': []}
         for player_id in (player_id_A, player_id_B):
             if player_id > 0:
@@ -795,7 +795,7 @@ class NoSQLClient (object):
 
         if base_region: qs['$and'].append({'base_region': base_region})
         if base_id: qs['$and'].append({'base_id': base_id})
-        if base_type: qs['$and'].append({'base_type': base_type})
+        if base_types is not None: qs['$and'].append({'base_type': {'$in': base_types}})
 
         if fields:
             q_fields = {'_id':1} # DO request _id so we can convert it to battle_id

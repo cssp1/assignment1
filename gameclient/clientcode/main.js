@@ -25857,7 +25857,19 @@ function battle_history_change_page(dialog, page) {
             }
 
             var myout = summary[myrole+'_outcome'];
-            var ui_outcome = gamedata['strings']['battle_end'][(ladder_state ? 'ladder' : (at_squad ? 'squad' : (at_quarry ? 'quarry' : (at_raid ? 'raid' : 'away'))))][myout]['log_outcome'][myrole];
+            var outcome_type;
+            if(ladder_state) {
+                outcome_type = 'ladder';
+            } else if(summary['raid_mode']) {
+                outcome_type = 'raid_'+summary['raid_mode'];
+            } else if(at_squad) {
+                outcome_type = 'squad';
+            } else if(at_quarry) {
+                outcome_type = 'quarry';
+            } else {
+                outcome_type = 'away';
+            }
+            var ui_outcome = gamedata['strings']['battle_end'][outcome_type][myout]['log_outcome'][myrole];
 
             // the "outcome" displayed here is the basic You Won/You Lost PLUS battle stars and PvP point delta
             if(dialog.widgets['row_outcome'+row].show) {
@@ -25884,7 +25896,7 @@ function battle_history_change_page(dialog, page) {
 
 
             dialog.widgets['row_loot'+row].show = true;
-            if(at_quarry || at_squad) {
+            if(at_quarry || at_squad || summary['raid_mode'] === 'scout') {
                 // show status instead of loot here
                 dialog.widgets['row_loot'+row].str = ui_outcome;
                 dialog.widgets['row_loot'+row].text_color = (myout === 'defeat' ? new SPUI.Color(1,0,0,1) : new SPUI.Color(0,0.8,0,1));
@@ -26044,6 +26056,9 @@ function update_battle_history_dialog(dialog) {
 
         if(gamedata['client']['battle_history_show_attackability'] && (dialog.user_data['chapter'] !== 'alliance')) {
             dialog.widgets['row_prot'+row].show = is_protected;
+            if(is_protected) {
+                dialog.widgets['row_prot'+row].str = dialog.data['widgets']['row_prot'][(player.raids_enabled() ? 'ui_name_prot' : 'ui_name')];
+            }
             dialog.widgets['row_cooldown'+row].show = (!is_protected && on_cooldown);
             if(dialog.widgets['row_cooldown'+row].show) {
                 dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(summary['attack_cooldown_expire'] - server_time));
@@ -26206,9 +26221,13 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
         }
         dialog.widgets[role+'_name'].str = name_str;
     }
-    dialog.widgets['time_since_battle'].str = dialog.data['widgets']['time_since_battle']['ui_name'].replace('%s', pretty_print_time_brief(server_time - summary['time']));
+    dialog.widgets['time_since_battle'].str = dialog.data['widgets']['time_since_battle'][(summary['raid_mode'] === 'scout' || summary['raid_mode'] === 'pickup') ? 'ui_name_encounter' : 'ui_name_battle'].replace('%s', pretty_print_time_brief(server_time - summary['time']));
     dialog.widgets['revenge_note'].str = summary['is_revenge'] ? dialog.data['widgets']['revenge_note']['ui_name_revenge'] : null;
-    dialog.widgets['battle_duration'].str = dialog.data['widgets']['battle_duration']['ui_name'].replace('%s', pretty_print_time(summary['duration']));
+    if('duration' in summary && summary['duration']) {
+        dialog.widgets['battle_duration'].str = dialog.data['widgets']['battle_duration']['ui_name'].replace('%s', pretty_print_time(summary['duration']));
+    } else {
+        dialog.widgets['battle_duration'].str = null;
+    }
 
     dialog.widgets['scroll_left'].state = 'disabled';
     dialog.widgets['scroll_right'].state = 'disabled';

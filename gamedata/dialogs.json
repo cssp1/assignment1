@@ -6389,7 +6389,7 @@
                          "ui_name_defender": "Defender", "ui_name_attacker": "Attacker", "ui_name_time": "%s %d ago",
                          "text_color":[0.8,0.8,0.8,1], "text_color_defender": [0,0.8,0,1], "text_color_attacker": [1,0,0,1],
                          "array": [1,5], "array_offset": [0,56] },
-            "row_prot": {"kind": "TextField", "xy":[175,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top","ui_name":"Protection or Home", "text_color": [1,0,0,1], "show": 0, "array": [1,5], "array_offset": [0,56] },
+            "row_prot": {"kind": "TextField", "xy":[175,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top","ui_name":"Protection or Home", "ui_name_prot": "Now Under Protection", "text_color": [1,0,0,1], "show": 0, "array": [1,5], "array_offset": [0,56] },
             "row_cooldown": {"kind": "TextField", "xy":[175,129], "dimensions": [157,60],"text_size": 13,"text_hjustify":"left","text_vjustify":"top","ui_name":"On cooldown: %s", "text_color": [1,0,0,1], "show": 0, "array": [1,5], "array_offset": [0,56] },
             "row_outcome": {"kind": "TextField", "xy":[301,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
                             "text_hjustify":"left","text_vjustify":"top", "ui_name_points": "%d Points",
@@ -6495,7 +6495,7 @@
             "attacker_type": { "kind": "TextField", "xy": [247,104], "dimensions": [105,19],"text_size": 13, "text_style": "normal",
                                "text_hjustify": "left", "ui_name": "Attacker", "text_color": [0.9,0,0,1] },
             "time_since_battle": { "kind": "TextField", "xy": [247,127], "dimensions": [105,19],"text_size": 13, "text_style": "thick",
-                                   "text_hjustify": "left", "ui_name": "Time Since Battle: %s" },
+                                   "text_hjustify": "left", "ui_name_battle": "Time Since Battle: %s", "ui_name_encounter": "Time Since Encounter: %s" },
             "revenge_note": { "kind": "TextField", "xy": [247,147], "dimensions": [105,19],"text_size": 13, "text_style": "thick",
                               "text_hjustify": "left", "ui_name_revenge": "Revenge! No level limits apply", "text_color": [1,0,0,1] },
 

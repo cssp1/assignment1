@@ -462,7 +462,6 @@ def make_battle_summary(gamedata, nosql_client,
            'base_region' : region_id,
            'base_map_loc' : base['base_map_loc'],
            'base_type' : base['base_type'],
-           'base_template' : base.get('base_template'),
            'base_ui_name' : base.get('base_ui_name','Unknown'),
            'base_id' : base['base_id'],
            'base_creation_time' : base.get('base_creation_time',-1),
@@ -475,11 +474,12 @@ def make_battle_summary(gamedata, nosql_client,
 
            'battle_type' : 'raid',
            'raid_mode': raid_mode,
-           'home_base' : True if base['base_id'][0] == 'h' else False,
+           'home_base' : 1 if base['base_id'][0] == 'h' else 0,
            'attacker_outcome': attacker_outcome,
            'defender_outcome': defender_outcome,
            }
-
+    if base.get('base_template'):
+        ret['base_template'] = base['base_template']
     ret['deployed_units'] = {}
     for obj in attacker_units_before:
         if raid_mode == 'scout' and (not army_unit_is_scout(obj, gamedata)): continue
