@@ -14,6 +14,9 @@ def get_leveled_quantity(qty, level): # XXX duplicate
         return qty[level-1]
     return qty
 
+# utility functions that operate on "army unit" instances
+# for the purposes of the Raids code, this can include buildings as well as mobile units.
+
 def army_unit_is_scout(unit, gamedata):
     if unit['spec'] not in gamedata['units']: return False # might be a building
     spec = gamedata['units'][unit['spec']]
@@ -32,15 +35,21 @@ def army_unit_is_consumable(unit, gamedata):
         return spec.get('consumable',False)
     return False
 
+def army_unit_spec(unit, gamedata):
+    if unit['spec'] in gamedata['units']:
+        return gamedata['units'][unit['spec']]
+    elif unit['spec'] in gamedata['buildings']:
+        return gamedata['buildings'][unit['spec']]
+    raise Exception('spec not found: '+unit['spec'])
+
 # true if unit has a nonzero raid_offense stat other than scouting
 def army_unit_is_raid_shooter(unit, gamedata):
-    if unit['spec'] in gamedata['units']:
-        spec = gamedata['units'][unit['spec']]
-        if 'raid_offense' in spec:
-            raid_offense = get_leveled_quantity(spec['raid_offense'], 1)
-            for key in raid_offense:
-                if key != 'scout':
-                    return True
+    spec = army_unit_spec(unit, gamedata)
+    if 'raid_offense' in spec:
+        raid_offense = get_leveled_quantity(spec['raid_offense'], 1)
+        for key in raid_offense:
+            if key != 'scout':
+                return True
     return False
 
 def army_unit_is_alive(unit, gamedata):
@@ -52,7 +61,8 @@ def army_unit_is_alive(unit, gamedata):
 def army_unit_hp(unit, gamedata):
     if 'DELETED' in unit: return 0
     if 'hp' in unit: return unit['hp']
-    max_hp = get_leveled_quantity(gamedata['units'][unit['spec']]['max_hp'], unit.get('level',1))
+    spec = army_unit_spec(unit, gamedata)
+    max_hp = get_leveled_quantity(spec['max_hp'], unit.get('level',1))
     if 'hp_ratio' in unit: return int(unit['hp_ratio']*max_hp)
     return max_hp
 
@@ -88,7 +98,7 @@ def merge_unit_lists(subset, master):
 def hurt_army_unit(unit, dmg, gamedata):
     # note: uses special DELETED convention
     level = unit.get('level',1)
-    spec = gamedata['units'][unit['spec']]
+    spec = army_unit_spec(unit, gamedata)
 
     old_hp = army_unit_hp(unit, gamedata)
     assert old_hp > 0
@@ -98,7 +108,7 @@ def hurt_army_unit(unit, dmg, gamedata):
     unit['hp_ratio'] = new_hp / (1.0*get_leveled_quantity(spec['max_hp'], level))
 
     if new_hp <= 0:
-        if get_leveled_quantity(spec.get('resurrectable',False), level):
+        if spec['kind'] == 'building' or get_leveled_quantity(spec.get('resurrectable',False), level):
             pass # resurrectable
         else:
             unit['DELETED'] = 1
@@ -190,7 +200,7 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
     # * assumes that you already have all the proper mutex locks on squad and raid!
     # returns (update_map_feature) mutations of squad, raid, loot
     assert squad_feature['base_type'] == 'squad' and squad_feature.get('raid')
-    assert raid_feature['base_type'] == 'raid'
+    assert raid_feature['base_type'] in ('raid','home')
 
     raid_mode = squad_feature['raid']
     assert raid_mode in ('pickup','attack','defend','scout')
@@ -536,7 +546,7 @@ def make_battle_summary(gamedata, nosql_client,
                     full_time = int((gamedata['unit_repair_time'] if spec.get('resurrectable') else 1) * get_leveled_quantity(spec.get('build_time',0), level))
                 else:
                     full_cost = {} # buildings do not cost resources to repair
-                    full_time = int(spec.get('repair_time',0))
+                    full_time = int(get_leveled_quantity(spec.get('repair_time',0), level))
 
                 # 'damage' accounting for ROI metrics
                 damage_key = b['spec']+(':L%d' % level)

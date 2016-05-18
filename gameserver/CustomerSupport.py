@@ -17,7 +17,7 @@ import random
 #import copy
 from Region import Region
 import SpinNoSQLLockManager
-from Raid import recall_squad, RecallSquadException, army_unit_is_scout, army_unit_is_alive
+from Raid import recall_squad, RecallSquadException, army_unit_is_scout, army_unit_is_alive, resolve_raid, make_battle_summary
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -662,6 +662,8 @@ class HandleResolveHomeRaid(Handler):
                              feature.get('raid') and \
                              feature['base_landlord_id'] != self.user_id and \
                              feature['base_id'] in self.squad_base_ids, raid_squads)
+        # XXX for now - we can fix this later
+        assert len(raid_squads) == 1
         return raid_squads
 
     def get_pvp_balance_online(self, player, other_pcinfo, my_alliance, other_alliance):
@@ -731,6 +733,7 @@ class HandleResolveHomeRaid(Handler):
             temp = self.gamesite.sql_client.get_users_alliance([self.user_id,] + [squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
             my_alliance, raid_alliances = temp[0], temp[1:]
 
+            my_pcinfo = self.gamesite.gameapi.get_player_cache_props(session.user, session.player, my_alliance)
             raid_pcinfos = self.gamesite.nosql_client.player_cache_lookup_batch([squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
 
             i = 0
@@ -804,17 +807,83 @@ class HandleResolveHomeRaid(Handler):
                     ##     props.update({'user_id': obj.owner.user_id, 'event_name': '3910_unit_deployed', 'code': 3910})
                     ##     attack_log.event(props)
 
+                base_props = session.player.my_home.get_cache_props()
+                squad_update, unused_base_update, unused_pve_loot, is_win, new_attacking_army, new_defending_army = \
+                              resolve_raid(raid_squads[0], base_props, attacking_army, defending_army, self.gamedata)
 
-                # XXXXXX rest of attack path here
+                is_conquest = is_win and (session.player.resources.player_level >= raid_pcinfos[0]['player_level'])
+
+                actual_loot = {} # XXXXXX
+                summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
+                                              raid_squads[0]['base_landlord_id'], self.user_id,
+                                              my_pcinfo, raid_pcinfos[0],
+                                              'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
+                                              attacking_army, defending_army,
+                                              new_attacking_army, new_defending_army,
+                                              actual_loot, raid_mode = raid_squads[0]['raid'])
+
+                # defender's battle statistics (attacker's is done via message)
+                session.player.increment_battle_statistics(session, raid_squads[0]['base_landlord_id'], summary)
+                self.gamesite.nosql_client.battle_record(summary, reason = 'resolve_home_raid')
+
+                # broadcast map attack for GUI and battle history jewel purposes
+                self.gamesite.gameapi.broadcast_map_attack(self.region_id, base_props,
+                                                           raid_squads[0]['base_landlord_id'], self.user_id,
+                                                           {'defender_outcome': summary['defender_outcome']},
+                                                           [my_pcinfo,] + raid_pcinfos,
+                                                           msg = 'REGION_MAP_ATTACK_COMPLETE')
+
+                # XXXXXX rest of attack path
                 # raise Exception('not implemented')
+
+                # update victim's player cache entry
+                cache_props = {'lootable_buildings': session.player.get_lootable_buildings(),
+                               'base_damage': session.player.my_home.calc_base_damage(),
+                               'base_repair_time': -1,
+                               'last_defense_time': self.time_now,
+                               'last_fb_notification_time': session.player.last_fb_notification_time
+                               }
+                self.gamesite.pcache_client.player_cache_update(self.user_id, cache_props, reason = 'resolve_home_raid')
+
+                # collect stat updates
+                stats = {}
+                stats['xp'] = summary['loot'].get('xp', 0)
+                stats['conquests'] = 1 if is_conquest else 0
+                stats['resources_looted'] = sum((summary['loot'].get(res,0) for res in self.gamedata['resources']),0)
+                stats['havoc_caused'] = summary['loot'].get('havoc_caused',0) if is_conquest else 0
+                stats['damage_inflicted'] = summary['loot'].get('damage_inflicted',0)
+
+                # collect trophy stats - note, trophies can come from AI attacks, but other stats cannot
+                for st in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
+                    stats[st] = summary['loot'].get(st, 0)
+
+                # mail the attacker the battle summary and stat updates
+                self.gamesite.msg_client.msg_send([{'from': self.user_id, 'to': [raid_squads[0]['base_landlord_id']],
+                                                    'type': 'you_attacked_me',
+                                                    'expire_time': self.time_now + self.gamedata['server']['message_expire_time']['i_attacked_you'],
+                                                    'from_name': unicode(my_pcinfo.get('ui_name','Unknown')),
+                                                    'summary': summary, # XXXXXX increment_battle_statistics...
+                                                    'stats': stats # XXXXXX modify_scores...
+                                                    }])
+
+                # mail the victim a "you've been attacked" message and battle summary (offline case only)
+                if 0:
+                    self.gamesite.msg_client.msg_send([{'from': raid_squads[0]['base_landlord_id'],
+                                                        'to': [self.user_id],
+                                                        'type': 'i_attacked_you',
+                                                        'expire_time': self.time_now + self.gamedata['server']['message_expire_time']['i_attacked_you'],
+                                                        'from_name': unicode(raid_pcinfos[0].get('ui_name','Unknown')),
+                                                        'summary': summary}])
+
 
             finally:
                 if attack_log:
                     attack_log.close()
 
             if damage_log:
-                damage_report = damage_log.finalize()
-                # summary['damage'] = damage_report
+                # XXX lift and replace Raid.make_battle_summary() version with this
+                # damage_report = summary['damage'] = damage_log.finalize()
+                pass
 
             # send the squads back home
             self.recall_squads(raid_squads)

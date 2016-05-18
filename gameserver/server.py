@@ -21984,6 +21984,17 @@ class GAMEAPI(resource.Resource):
 
                     to_ack.append(msg['msg_id'])
 
+                elif msg['type'] == 'you_attacked_me':
+                    summary = msg['summary']
+                    stats = msg['stats']
+
+                    session.player.increment_battle_statistics(session, summary['defender_id'], summary)
+                    if not is_login: # login path sends this unconditionally
+                        session.deferred_battle_history_update = True
+                    session.player.modify_scores(stats, reason = 'you_attacked_me mail(attacker)')
+
+                    to_ack.append(msg['msg_id'])
+
                 elif msg['type'] == 'mail':
                     if 'discard_if' in msg and (msg['discard_if'] in gamedata['predicate_library']):
                         if Predicates.read_predicate({'predicate':'LIBRARY', 'name':msg['discard_if']}).is_satisfied(session.player, None):
@@ -27940,6 +27951,7 @@ class GameSite(server.Site):
         # timeouts like the session or proxy timeout
         server.Site.__init__(self, root, timeout = gamedata['server']['http_connection_timeout'])
 
+        self.server_name = spin_server_name
         self.config = config
         self.gameapi = gameapi
         self.controlapi = controlapi
