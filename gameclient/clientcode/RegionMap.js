@@ -2530,7 +2530,8 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
 RegionMap.RegionMap.prototype.classify_feature = function(feature) {
     var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
     var owned = (feature['base_landlord_id'] === session.user_id);
-    var locked = (feature['LOCK_STATE'] && (feature['LOCK_STATE'] != 0)) ||
+    var locked = (feature['LOCK_STATE'] && (feature['LOCK_STATE'] != 0) &&
+                  !(player.raids_enabled() && feature['LOCK_STATE'] == 1 && feature['base_type'] == 'home')) ||
         (feature['repeat_attack_cooldown_expire'] && feature['repeat_attack_cooldown_expire'] > this.time);
 
     if(!owned && feature['base_type'] == 'home') {
