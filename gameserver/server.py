@@ -14083,10 +14083,29 @@ class CONTROLAPI(resource.Resource):
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
 
-            assert self.val
+            assert self.val and isinstance(self.val, CustomerSupport.ReturnValue)
+
+            if self.val.async:
+                assert isinstance(self.val.async, defer.Deferred) # sanity check
+
+                def offline_error(fail, self):
+                    gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r: %s' % \
+                                                 (self.user_id, self.method_name, self.handler.args, fail.getTraceback().strip())) # OK
+                    self.wrote_player = self.wrote_user = True # prevent writes from happening
+                    # turn exception into a regular result
+                    return CustomerSupport.ReturnValue(error = fail.getTraceback().strip()) # OK
+
+                self.val.async.addErrback(offline_error, self) # and pass though errors to...
+                self.val.async.addCallback(self.post_mutate, player_json, user_json) # return value of val.async will then replace self.val
+            else:
+                self.post_mutate(None, player_json, user_json)
+
+        def post_mutate(self, override_result, player_json, user_json): # handler finished, now perform final I/O
+            if override_result is not None: # swap in new result from async code
+                self.val = override_result
+
             if self.handler.read_only:
-                self.d.callback(self.val)
-                return
+                self.wrote_player = self.wrote_user = True # prevent writes from happening
             else:
                 if self.handler.need_player:
                     assert player_json
@@ -14101,7 +14120,8 @@ class CONTROLAPI(resource.Resource):
                     io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
                 else:
                     self.wrote_user = True
-                self.try_finish()
+
+            self.try_finish()
 
         def player_write_success(self):
             self.wrote_player = True
@@ -14111,6 +14131,7 @@ class CONTROLAPI(resource.Resource):
             self.try_finish()
         def try_finish(self):
             if (not self.wrote_player) or (not self.wrote_user): return # I/O not done yet
+            assert isinstance(self.val, CustomerSupport.ReturnValue) and (not self.val.async)
             self.d.callback(self.val)
 
     def handle(self, request, secret, method_name, args):
