@@ -9329,6 +9329,10 @@ class Player(AbstractPlayer):
             else:
                 return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'no_choice_matches', start_point]
 
+        # additional properties to add to the map feature, if the move succeeds
+        # used for raids to tag the raid with extra info for this target
+        add_props = {}
+
         if squad.get('raid'):
             if is_raid_launch:
                 # initial map entry. Make sure raid is going somewhere useful.
@@ -9375,6 +9379,10 @@ class Player(AbstractPlayer):
                                                          '3884_protection_removed' if self.has_damage_protection() else None,
                                                          {'defender_id':x['base_landlord_id']})
                             record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+                            # tag the feature with info the defender will need to know about us
+                            if is_revenge_attack:
+                                add_props['is_revenge_attack'] = 1
 
             else:
                 # prevent re-directing raids anywhere other than back to home base
@@ -9522,9 +9530,15 @@ class Player(AbstractPlayer):
 
                 attempt += 1
 
+            # success!
             new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
             squad['map_loc'] = new_entry['base_map_loc']
             squad['map_path'] = new_path
+
+            if add_props: # used for raids - add extra properties on success
+                # could be integrated with move_map_feature(), or in a combined atomic enter/move step
+                gamesite.nosql_client.update_map_feature(self.home_region, self.squad_base_id(squad_id), add_props,
+                                                         do_hook = False, reason = 'squad_step')
 
         finally:
             if lock_id:

@@ -754,7 +754,7 @@ class HandleResolveHomeRaid(Handler):
             res_looter = ResLoot.ResLoot(self.gamedata, session, None, session.player, session.player.my_home)
 
             # defender side of init_attack() - attacker side is done on launch
-            is_revenge_attack = False # XXXXXX send this with the squad feature?
+            is_revenge_attack = raid_squads[0].get('is_revenge_attack')
             session.player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
 
             session.player.my_home.base_last_attack_time = self.time_now
@@ -933,7 +933,6 @@ class HandleResolveHomeRaid(Handler):
                                 if cur_cargo[res] > max_cargo.get(res,0):
                                     # resources disappear if cargo-carrying units are destroyed
                                     wasted[res] = - (cur_cargo[res] - max_cargo.get(res,0)) # negative quantity
-                                    # XXXXXX needs an econ_flow here
                                     cur_cargo[res] = min(cur_cargo.get(res,0), max_cargo.get(res,0))
                             if res in actual_loot:
                                 if (res in max_cargo) and cur_cargo.get(res,0) < max_cargo[res]: # is there room for any loot?

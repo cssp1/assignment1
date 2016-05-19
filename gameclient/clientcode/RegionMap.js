@@ -923,8 +923,9 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
 
     // looking at an enemy home base that we can attack
     var can_attack_home = (feature['base_type'] === 'home' && feature['base_landlord_id'] != session.user_id && !same_alliance &&
-                           info && (!this.region.pvp_level_gap_enabled() || player.in_attackable_level_range(info['player_level']||0)) &&
-                           !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()));
+                           info &&
+                           (!this.region.pvp_level_gap_enabled() || player.in_attackable_level_range(info['player_level']||0) ||
+                            player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString())));
 
     // SPY button
     if(feature['base_type'] !== 'raid') {
