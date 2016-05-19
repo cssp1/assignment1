@@ -19,7 +19,7 @@ from Region import Region
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException, \
      army_unit_is_scout, army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
-     calc_max_cargo, resolve_raid, make_battle_summary
+     calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -904,7 +904,7 @@ class HandleResolveHomeRaid(Handler):
                                                 else:
                                                     econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
                                                     econ_reason = 'friction'
-                                                self.gamesite.admin_stats.econ_flow_res(session.player, 'loot', econ_reason, econ_delta)
+                                                self.gamesite.admin_stats.econ_flow_player(session.player, 'loot', econ_reason, econ_delta)
 
                                     obj.hp = new_hp # mutate!
 
@@ -926,10 +926,13 @@ class HandleResolveHomeRaid(Handler):
                     else:
                         cur_cargo = raid_squads[0].get('cargo', {})
                         max_cargo = calc_max_cargo(new_attacking_army if (new_attacking_army is not None) else attacking_army, self.gamedata)
+
+                        wasted = {}
                         for res in self.gamedata['resources']:
                             if res in cur_cargo:
                                 if cur_cargo[res] > max_cargo.get(res,0):
                                     # resources disappear if cargo-carrying units are destroyed
+                                    wasted[res] = - (cur_cargo[res] - max_cargo.get(res,0)) # negative quantity
                                     # XXXXXX needs an econ_flow here
                                     cur_cargo[res] = min(cur_cargo.get(res,0), max_cargo.get(res,0))
                             if res in actual_loot:
@@ -944,6 +947,10 @@ class HandleResolveHomeRaid(Handler):
                         squad_update['cargo'] = cur_cargo
                         squad_update['cargo_source'] = 'human'
 
+                        if wasted:
+                            self.gamesite.admin_stats.econ_flow(raid_squads[0]['base_landlord_id'],
+                                                                get_denormalized_summary_props_from_pcache(self.gamedata, raid_pcinfos[0]),
+                                                                'waste', 'raid', wasted)
                 # perform mutation on attacking army
                 # note: client should ping squads to get the army update
 

@@ -507,7 +507,11 @@ class AdminStats:
         self.quarry_cache_misses = 0
         self.quarry_cache_hits = 0
 
-    def econ_flow_res(self, player, category, reason, res, spec = None, level = None):
+    # convenience method when you have a live player instance
+    def econ_flow_player(self, player, *args, **kwargs):
+        self.econ_flow(player.user_id, player.get_denormalized_summary_props('brief'), *args, **kwargs)
+
+    def econ_flow(self, user_id, player_summary_props, category, reason, res, spec = None, level = None):
         # eventually need to separate third resource out
         total = sum(res.itervalues(),0)
         if total == 0: return # we assume that entries are either all positive or all negative
@@ -516,13 +520,13 @@ class AdminStats:
         self.econ[category][reason] = self.econ[category].get(reason,0) + total
 
         if gamedata['server'].get('log_econ_res', False) and gamesite.nosql_client:
-            props = {'user_id':player.user_id, 'res':res, 'cat':category, 'sub': reason}
+            props = {'user_id':user_id, 'res':res, 'cat':category, 'sub': reason}
             if spec is not None:
                 props['spec'] = spec
             if level is not None:
                 props['level'] = level
-            props.update(player.get_denormalized_summary_props('brief'))
-            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow_res')
+            props.update(player_summary_props)
+            gamesite.nosql_client.log_record('econ_res', server_time, props, log_ident = False, reason = 'econ_flow')
 
     def record_latency(self, name, elapsed):
         if name not in self.latency:
@@ -8780,7 +8784,7 @@ class Player(AbstractPlayer):
         if (sum(refund.itervalues(),0) > 0) and \
            (index != 0 or force_refund or gamedata['unit_repair_refund_on_cancel'] or self.squads_enabled()):
             refund = self.resources.gain_res(refund, reason='canceled_unit_repair')
-            admin_stats.econ_flow_res(self, 'consumption', 'unit_repair', refund)
+            admin_stats.econ_flow_player(self, 'consumption', 'unit_repair', refund)
             return True
         return False
 
@@ -9700,7 +9704,7 @@ class Player(AbstractPlayer):
     def squad_collect_cargo(self, cargo, cargo_source):
         gained = self.resources.gain_res(dict((res, cargo.get(res,0)) for res in gamedata['resources']), reason = cargo_source or '')
         if cargo_source:
-            admin_stats.econ_flow_res(self, 'loot', cargo_source, gained)
+            admin_stats.econ_flow_player(self, 'loot', cargo_source, gained)
 
     # get level-dependent quantity (based on PLAYER level)
     def get_leveled_quantity(self, qty, do_clamp = True):
@@ -11725,7 +11729,7 @@ class LivePlayer(Player):
             econ_type = 'repeatable'
         else:
             econ_type = 'one_time_ratio' if has_ratio_reward else 'one_time_fixed'
-        admin_stats.econ_flow_res(self, 'quests', econ_type, reward_res)
+        admin_stats.econ_flow_player(self, 'quests', econ_type, reward_res)
 
         reward_xp = 0
 
@@ -11955,7 +11959,7 @@ class LivePlayer(Player):
                 elif spec['resource'] in gamedata['resources']:
                     gained_res = self.resources.gain_res({spec['resource']:stack}, reason='item_fungible')
                     gained = sum(gained_res.itervalues(),0)
-                    admin_stats.econ_flow_res(self, 'item', 'fungible', gained_res)
+                    admin_stats.econ_flow_player(self, 'item', 'fungible', gained_res)
                     count += gained
                     stack -= gained
                 elif spec['resource'] == 'lottery_scans':
@@ -18872,7 +18876,7 @@ class GAMEAPI(resource.Resource):
                 raise Exception('Unhandled boost spell '+repr(spell))
 
             if success:
-                admin_stats.econ_flow_res(session.player, reason, 'boost', {spell['resource']:amount_added})
+                admin_stats.econ_flow_player(session.player, reason, 'boost', {spell['resource']:amount_added})
             else:
                 retmsg.append(["ERROR", "STORAGE_LIMIT", spell['resource']])
                 return False
@@ -18886,7 +18890,7 @@ class GAMEAPI(resource.Resource):
                     break
             if success:
                 session.player.resources.gain_res(spellarg, reason=reason)
-                admin_stats.econ_flow_res(session.player, reason, 'boost', spellarg)
+                admin_stats.econ_flow_player(session.player, reason, 'boost', spellarg)
             else:
                 return False
 
@@ -19585,7 +19589,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_done_time = -1
 
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
-        admin_stats.econ_flow_res(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
+        admin_stats.econ_flow_player(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
 
         power_factor = session.power_changed(session.viewing_base, object, retmsg)
 
@@ -19641,7 +19645,7 @@ class GAMEAPI(resource.Resource):
 
         negative_cost = dict((res,-cost[res]) for res in cost)
         session.player.resources.gain_res(negative_cost, reason='building_upgrade')
-        admin_stats.econ_flow_res(session.player, 'investment', 'buildings', negative_cost, spec = object.spec.name, level = object.level+1)
+        admin_stats.econ_flow_player(session.player, 'investment', 'buildings', negative_cost, spec = object.spec.name, level = object.level+1)
 
         # stop production
         if object.is_producer():
@@ -19817,7 +19821,7 @@ class GAMEAPI(resource.Resource):
         # start the research
         negative_cost = dict((res,-cost[res]) for res in cost)
         session.player.resources.gain_res(negative_cost, reason='tech_research')
-        admin_stats.econ_flow_res(session.player, 'investment', 'research', negative_cost, spec = tech_name, level = current+1)
+        admin_stats.econ_flow_player(session.player, 'investment', 'research', negative_cost, spec = tech_name, level = current+1)
 
         object.research_item = tech_name
         object.research_total_time = int(TechSpec.get_leveled_quantity(spec.research_time, current+1)/object.get_stat('research_speed', 1))
@@ -19850,7 +19854,7 @@ class GAMEAPI(resource.Resource):
         object.research_done_time = -1
 
         refund = session.player.resources.gain_res(refund, reason='canceled_research')
-        admin_stats.econ_flow_res(session.player, 'investment', 'research', refund, spec = tech_name, level = current+1)
+        admin_stats.econ_flow_player(session.player, 'investment', 'research', refund, spec = tech_name, level = current+1)
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
@@ -20053,7 +20057,7 @@ class GAMEAPI(resource.Resource):
             cost = dict((res,GameObjectSpec.get_leveled_quantity(amount, arg.recipe_level)) for res, amount in GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).iteritems())
             negative_cost = dict((res,-cost[res]) for res in cost)
             player.resources.gain_res(negative_cost, reason='crafting')
-            admin_stats.econ_flow_res(player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
+            admin_stats.econ_flow_player(player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
         else:
             cost = {}
 
@@ -20158,7 +20162,7 @@ class GAMEAPI(resource.Resource):
             cost = bus.craft_state.get('cost',{})
             refund = dict((res, int(gamedata['manufacture_cancel_refund']*cost.get(res,0))) for res in gamedata['resources'])
             refund = session.player.resources.gain_res(refund, reason='canceled_crafting')
-            admin_stats.econ_flow_res(session.player, recipe.get('econ_category','crafting') if recipe else 'crafting', 'crafting', refund)
+            admin_stats.econ_flow_player(session.player, recipe.get('econ_category','crafting') if recipe else 'crafting', 'crafting', refund)
 
             refund_ingredients = gamedata['crafting']['categories'][recipe['crafting_category']].get('refund_ingredients', False)
             if refund_ingredients:
@@ -20247,7 +20251,7 @@ class GAMEAPI(resource.Resource):
                             is_fungible = True
                         elif spec['resource'] in gamedata['resources']:
                             gained_res = session.player.resources.gain_res({spec['resource']: item.get('stack',1)}, reason='crafting')
-                            admin_stats.econ_flow_res(session.player, 'crafting', 'fungible', gained_res)
+                            admin_stats.econ_flow_player(session.player, 'crafting', 'fungible', gained_res)
                             # note: overflow is thrown away!
                             is_fungible = True
                     if is_fungible:
@@ -20436,7 +20440,7 @@ class GAMEAPI(resource.Resource):
             if (not session.player.is_cheater):
                 negative_cost = dict((res,-cost[res]) for res in cost)
                 session.player.resources.gain_res(negative_cost, reason='building_construction')
-                admin_stats.econ_flow_res(session.player, 'investment', 'buildings', negative_cost, spec = building_type, level = 1)
+                admin_stats.econ_flow_player(session.player, 'investment', 'buildings', negative_cost, spec = building_type, level = 1)
             build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, 1)
             if build_time > 0:
                 build_time = int(build_time / session.player.stattab.get_player_stat('foreman_speed'))
@@ -20609,7 +20613,7 @@ class GAMEAPI(resource.Resource):
         # queue it up
         negative_cost = dict((res,-cost[res]) for res in cost if res != 'time')
         session.player.resources.gain_res(negative_cost, reason='unit_production')
-        admin_stats.econ_flow_res(session.player, 'consumption', 'unit_manufacture', negative_cost)
+        admin_stats.econ_flow_player(session.player, 'consumption', 'unit_manufacture', negative_cost)
 
         # note: structure speed bonus has already been applied via unit stat
 
@@ -20656,7 +20660,7 @@ class GAMEAPI(resource.Resource):
 
         # return resources to the player
         refund = session.player.resources.gain_res(refund, reason='canceled_production')
-        admin_stats.econ_flow_res(session.player, 'consumption', 'unit_manufacture', refund)
+        admin_stats.econ_flow_player(session.player, 'consumption', 'unit_manufacture', refund)
 
         # save state
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
@@ -20873,7 +20877,7 @@ class GAMEAPI(resource.Resource):
 
         negative_cost = dict((res,-cost[res]) for res in cost if res != 'time')
         session.player.resources.gain_res(negative_cost, reason = 'unit_repair')
-        admin_stats.econ_flow_res(session.player, 'consumption', 'unit_repair', negative_cost)
+        admin_stats.econ_flow_player(session.player, 'consumption', 'unit_repair', negative_cost)
 
         if len(session.player.unit_repair_queue) > 0:
             prev_finish_time = session.player.unit_repair_queue[-1]['finish_time']
@@ -21910,7 +21914,7 @@ class GAMEAPI(resource.Resource):
                         gift = session.player.resources.gain_res(gift, reason='received_gift')
                         session.deferred_player_state_update = True
                         amount = sum(gift.itervalues(),0)
-                        admin_stats.econ_flow_res(session.player, 'gifts', 'gifts', gift)
+                        admin_stats.econ_flow_player(session.player, 'gifts', 'gifts', gift)
                         retmsg.append(["RECEIVED_GIFT2", msg['from'], msg.get('from_pcache',None), original_gift])
 
                     to_ack.append(msg['msg_id'])
@@ -21923,7 +21927,7 @@ class GAMEAPI(resource.Resource):
                     loot = msg['loot']
                     loot = session.player.resources.gain_res(loot, reason=msg['type'])
                     to_ack.append(msg['msg_id'])
-                    admin_stats.econ_flow_res(session.player, 'consumption', msg.get('reason', msg['type']), loot)
+                    admin_stats.econ_flow_player(session.player, 'consumption', msg.get('reason', msg['type']), loot)
                     retmsg.append(["SYSTEM_REFUND", loot, msg['ui_reason']])
 
                 elif msg['type'] == 'alliance_status_changed':
@@ -22491,10 +22495,10 @@ class GAMEAPI(resource.Resource):
                         flow_suffix = '_'+session.viewing_base.base_type if (session.viewing_base is not session.viewing_player.my_home) else ''
                         if ((not owning_player) or owning_player.is_ai()) and attacker.is_human():
                             # human attacking AI - all resources generated from thin air
-                            admin_stats.econ_flow_res(session.player, 'loot', 'ai'+flow_suffix, looted)
+                            admin_stats.econ_flow_player(session.player, 'loot', 'ai'+flow_suffix, looted)
                         elif (owning_player and owning_player.is_human()) and attacker.is_ai():
                             # AI attacking human - all resources destroyed
-                            admin_stats.econ_flow_res(session.player, 'loot', 'ai_attack'+flow_suffix, dict((res, -lost[res]) for res in lost))
+                            admin_stats.econ_flow_player(session.player, 'loot', 'ai_attack'+flow_suffix, dict((res, -lost[res]) for res in lost))
                         elif (owning_player and owning_player.is_human()) and attacker.is_human():
                             # human attacking human - log the frictional loss only, because the rest is a transfer
                             # EXCEPT for harvesters, which generate from "thin air" because the owner hadn't collected the resources yet
@@ -22504,7 +22508,7 @@ class GAMEAPI(resource.Resource):
                             else:
                                 econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in gamedata['resources'])
                                 econ_reason = 'friction'+flow_suffix
-                            admin_stats.econ_flow_res(session.player, 'loot', econ_reason, econ_delta)
+                            admin_stats.econ_flow_player(session.player, 'loot', econ_reason, econ_delta)
 
                     if newhp == 0:
                         # give XP for destroying and looting the building
@@ -22658,7 +22662,7 @@ class GAMEAPI(resource.Resource):
         session.player.unit_repair_cancel(obj)
         session.player.home_base_remove(obj)
         refund = session.player.resources.gain_res(refund, reason='recycled_unit')
-        admin_stats.econ_flow_res(session.player, 'consumption', 'unit_recycling', refund)
+        admin_stats.econ_flow_player(session.player, 'consumption', 'unit_recycling', refund)
 
         session.increment_player_metric('units_recycled', 1, bucket = True, time_series = False)
         session.increment_player_metric('unit:'+obj.spec.name+':recycled', 1, bucket = True, time_series = False)
@@ -22865,9 +22869,9 @@ class GAMEAPI(resource.Resource):
             session.increment_player_metric('harvested_'+resource+'_total', harvested+bonus, time_series = False, bucket = True)
             dict_setmax(session.player.history, 'harvested_'+resource+'_at_once', harvested+bonus)
 
-            admin_stats.econ_flow_res(session.player, 'harvesting', 'harvesters_'+base_type, {resource:harvested})
+            admin_stats.econ_flow_player(session.player, 'harvesting', 'harvesters_'+base_type, {resource:harvested})
             if bonus > 0:
-                admin_stats.econ_flow_res(session.player, 'harvesting', 'harvesters_'+base_type+'_bonus', {resource:bonus})
+                admin_stats.econ_flow_player(session.player, 'harvesting', 'harvesters_'+base_type+'_bonus', {resource:bonus})
 
             loot = {resource:harvested}
             if bonus > 0:
@@ -22905,7 +22909,7 @@ class GAMEAPI(resource.Resource):
         descr = 'home' if (object in session.player.home_base_iter()) else 'quarry'
         loot = session.player.resources.gain_res({resource:harvested}, reason='collect_deposit', snap = snap)
 
-        admin_stats.econ_flow_res(session.player, 'harvesting', 'outcrops_'+descr, loot)
+        admin_stats.econ_flow_player(session.player, 'harvesting', 'outcrops_'+descr, loot)
 
         if 'gamebucks' in object.metadata:
             loot['gamebucks'] = object.metadata['gamebucks']
@@ -24441,7 +24445,7 @@ class GAMEAPI(resource.Resource):
 
                     negative_cost = dict((res,-cost[res]) for res in cost)
                     session.player.resources.gain_res(negative_cost, reason='ladder_switch')
-                    admin_stats.econ_flow_res(session.player, 'consumption', 'ladder_switch', negative_cost)
+                    admin_stats.econ_flow_player(session.player, 'consumption', 'ladder_switch', negative_cost)
                     session.player.record_ladder_pvp_event('3304_ladder_skip', {'defender_id': session.viewing_player.user_id,
                                                                                 'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                                                 'cost': cost})
@@ -24893,7 +24897,7 @@ class GAMEAPI(resource.Resource):
                     success = True
                     negative_cost = {resname: -client_price}
                     session.player.resources.gain_res(negative_cost, reason='fungible_order')
-                    admin_stats.econ_flow_res(session.player, 'consumption', 'store_purchase', negative_cost) # may want more detail by specifying an econ_category on the item or store sku
+                    admin_stats.econ_flow_player(session.player, 'consumption', 'store_purchase', negative_cost) # may want more detail by specifying an econ_category on the item or store sku
 
                     if spellname != 'BUY_ITEM': # awkward overlap with 5120_buy_item logging
                         descr = Store.get_description(session, unit_id, spellname, spellarg, price_description)
@@ -26194,7 +26198,7 @@ class GAMEAPI(resource.Resource):
                     used_count = sum(gained_res.itervalues(),0)
                     if used_count > 0:
                         session.player.inventory_remove(item, used_count, '5130_item_activated', reason='fungible')
-                        admin_stats.econ_flow_res(session.player, 'item', 'fungible', gained_res)
+                        admin_stats.econ_flow_player(session.player, 'item', 'fungible', gained_res)
                         success = True
                     else:
                         retmsg.append(["ERROR", "STORAGE_LIMIT", spec['resource']])
@@ -27241,7 +27245,7 @@ class GAMEAPI(resource.Resource):
                             # take resources
                             negative_cost = dict((res,-cost[res]) for res in cost)
                             session.player.resources.gain_res(negative_cost, reason='alliance_modification')
-                            admin_stats.econ_flow_res(session.player, 'investment', 'alliance_modification', negative_cost)
+                            admin_stats.econ_flow_player(session.player, 'investment', 'alliance_modification', negative_cost)
                             retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                             new_info, new_membership = session.init_alliance(retmsg, reason='ALLIANCE_MODIFY')
                             assert new_info
@@ -27284,7 +27288,7 @@ class GAMEAPI(resource.Resource):
                                 # take resources
                                 negative_cost = dict((res,-cost[res]) for res in cost)
                                 session.player.resources.gain_res(negative_cost, reason='alliance_creation')
-                                admin_stats.econ_flow_res(session.player, 'investment', 'alliance_creation', negative_cost)
+                                admin_stats.econ_flow_player(session.player, 'investment', 'alliance_creation', negative_cost)
                                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                         else:
                             success = False
