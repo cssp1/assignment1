@@ -5170,22 +5170,13 @@ class Session(object):
     # call this after any action that may change the player's power production or consumption
     # it re-initializes harvesters with the correct harvesting rate
     def power_changed(self, base, changed_object, retmsg):
-        if not gamedata['enable_power']: return 1
-        if changed_object and (not (changed_object.is_building() and changed_object.affects_power())): return 1
+        power_factor, power_state, affected_obj_list = base.power_changed(changed_object)
+        for obj in affected_obj_list:
+            if self.has_object(obj.obj_id):
+                retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
 
-        power_state = base.get_power_state()
-        power_factor = compute_power_factor(power_state)
-
-        for obj in base.iter_objects():
-            if obj.is_building() and obj.is_producer():
-                obj.update_production(obj.owner, base.base_type, base.base_region, power_factor)
-                base.nosql_write_one(obj, 'power_changed')
-                if self.has_object(obj.obj_id):
-                    retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state(update_hp = False)])
-
-        if base is self.viewing_base:
+        if (base is self.viewing_base) and (power_state is not None):
             retmsg.append(["BASE_POWER_UPDATE", power_state])
-
         return power_factor
 
     def change_player_title(self, new_title_name, retmsg, force = False, chat_announce = True):
@@ -7246,6 +7237,23 @@ class Base(object):
                                     to_add = max(to_add, gamedata['crafting']['recipes'][entry.craft_state['recipe']].get('consumes_power',0))
                         power[1] += to_add
         return power
+
+    # returns tuple (new_power_factor, power_state (or None if N/A), affected_obj_list)
+    def power_changed(self, changed_object):
+        if not gamedata['enable_power']: return (1, None, [])
+        if changed_object and (not (changed_object.is_building() and changed_object.affects_power())): return (1, None, [])
+
+        power_state = self.get_power_state()
+        power_factor = compute_power_factor(power_state)
+        affected_obj_list = []
+
+        for obj in self.iter_objects():
+            if obj.is_building() and obj.is_producer():
+                obj.update_production(obj.owner, self.base_type, self.base_region, power_factor)
+                self.nosql_write_one(obj, 'power_changed')
+                affected_obj_list.append(obj)
+
+        return (power_factor, power_state, affected_obj_list)
 
     def get_base_radius(self):
         assert self.base_size >= 0 and self.base_size < len(gamedata['map']['base_perimeter'])
@@ -11168,7 +11176,7 @@ class Player(AbstractPlayer):
 
     # after a battle, increment history/time series counters
     # works for both attacking and defending
-    def increment_battle_statistics(self, session, opponent_id, summary):
+    def increment_battle_statistics(self, opponent_id, summary):
         if summary['attacker_id'] == self.user_id:
             myrole = 'attacker'
             oprole = 'defender'
@@ -11184,16 +11192,16 @@ class Player(AbstractPlayer):
 
         # update history counters/time series
         if myrole == 'attacker':
-            session.increment_player_metric('attacks_'+summary[myrole+'_outcome'], 1, time_series = False)
-            session.increment_player_metric('attacks_'+summary[myrole+'_outcome']+'_vs_'+opponent_type, 1, time_series = False)
+            record_player_metric(self, dict_increment, 'attacks_'+summary[myrole+'_outcome'], 1, time_series = False)
+            record_player_metric(self, dict_increment, 'attacks_'+summary[myrole+'_outcome']+'_vs_'+opponent_type, 1, time_series = False)
         elif myrole == 'defender':
             if (('base_id' not in summary) or (summary['base_id'] == home_base_id(self.user_id))): # no quarries
                 if opponent_type == 'human':
-                    session.increment_player_metric('attacks_suffered', 1) # note! only includes PvP, not PvE!
+                    record_player_metric(self, dict_increment, 'attacks_suffered', 1) # note! only includes PvP, not PvE!
                 elif opponent_type == 'ai':
-                    session.increment_player_metric('ai_attacks_suffered', 1)
+                    record_player_metric(self, dict_increment, 'ai_attacks_suffered', 1)
                     if str(summary.get('attack_type','')).startswith('daily'):
-                        session.increment_player_metric('daily_attacks_suffered', 1)
+                        record_player_metric(self, dict_increment, 'daily_attacks_suffered', 1)
 
         loot = summary.get('loot', {})
 
@@ -11206,37 +11214,37 @@ class Player(AbstractPlayer):
         for resc in gamedata['resources']:
             amount = loot.get(resc+loot_type,0)
             resc_total += amount
-            session.increment_player_metric(resc+loot_verb, amount, time_series = False)
-            session.increment_player_metric(resc+loot_verb+loot_prep+opponent_type, amount, time_series = False)
-        session.increment_player_metric('resources'+loot_verb, resc_total, time_series = False)
-        session.increment_player_metric('resources'+loot_verb+loot_prep+opponent_type, resc_total, time_series = False)
+            record_player_metric(self, dict_increment, resc+loot_verb, amount, time_series = False)
+            record_player_metric(self, dict_increment, resc+loot_verb+loot_prep+opponent_type, amount, time_series = False)
+        record_player_metric(self, dict_increment, 'resources'+loot_verb, resc_total, time_series = False)
+        record_player_metric(self, dict_increment, 'resources'+loot_verb+loot_prep+opponent_type, resc_total, time_series = False)
 
         # update unit/buildings kill/loss counters
         lost_verb = '_lost' if (myrole == 'attacker') else '_killed'
         killed_verb = '_killed' if (myrole == 'attacker') else '_lost'
 
-        session.increment_player_metric('units_killed', sum(loot.get('units'+killed_verb, {}).itervalues()), time_series = False)
-        session.increment_player_metric('units_lost', sum(loot.get('units'+lost_verb, {}).itervalues()), time_series = False)
+        record_player_metric(self, dict_increment, 'units_killed', sum(loot.get('units'+killed_verb, {}).itervalues()), time_series = False)
+        record_player_metric(self, dict_increment, 'units_lost', sum(loot.get('units'+lost_verb, {}).itervalues()), time_series = False)
 
         for spec_name, count in loot.get('units'+killed_verb, {}).iteritems():
-            session.increment_player_metric('unit:'+spec_name+':killed', count, time_series = False)
+            record_player_metric(self, dict_increment, 'unit:'+spec_name+':killed', count, time_series = False)
 
         for spec_name, count in loot.get('units'+lost_verb, {}).iteritems():
-            session.increment_player_metric('unit:'+spec_name+':lost', count, time_series = False)
+            record_player_metric(self, dict_increment, 'unit:'+spec_name+':lost', count, time_series = False)
 
         for spec_name, count in loot.get('buildings'+killed_verb, {}).iteritems():
-            session.increment_player_metric('building:'+spec_name+':killed', count, time_series = False)
+            record_player_metric(self, dict_increment, 'building:'+spec_name+':killed', count, time_series = False)
             if GameObjectSpec.exists(spec_name):
                 spec = GameObjectSpec.lookup(spec_name)
                 if spec.history_category:
-                    session.increment_player_metric(spec.history_category+'_killed', count, time_series = False)
+                    record_player_metric(self, dict_increment, spec.history_category+'_killed', count, time_series = False)
 
         for spec_name, count in loot.get('buildings'+lost_verb, {}).iteritems():
-            session.increment_player_metric('building:'+spec_name+':lost', count, time_series = False)
+            record_player_metric(self, dict_increment, 'building:'+spec_name+':lost', count, time_series = False)
             if GameObjectSpec.exists(spec_name):
                 spec = GameObjectSpec.lookup(spec_name)
                 if spec.history_category:
-                    session.increment_player_metric(spec.history_category+'_lost', count, time_series = False)
+                    record_player_metric(self, dict_increment, spec.history_category+'_lost', count, time_series = False)
 
 
     # for legacy reasons, the data sent for "You've been attacked" messages is slightly different
@@ -17482,7 +17490,7 @@ class GAMEAPI(resource.Resource):
             # finalize battle summary
             if summary:
                 summary['loot'] = copy.deepcopy(session.loot) # grab loot here since completion consequent may have modified it
-                session.player.increment_battle_statistics(session, summary['attacker_id'] if summary['battle_type'] == 'defense' else summary['defender_id'], summary)
+                session.player.increment_battle_statistics(summary['attacker_id'] if summary['battle_type'] == 'defense' else summary['defender_id'], summary)
 
                 # send log to MongoDB
                 if gamedata['server'].get('nosql_battle_record',True) and summary.get('attack_type',None) != 'tutorial' and summary['defender_id'] != LION_STONE_ID:
@@ -22044,7 +22052,7 @@ class GAMEAPI(resource.Resource):
                         # show battle history upon login when there are new entries NOT reflected in the "You've been Attacked" message
                         ret['was_attacked'] = False # disable this for now, let the client do it
 
-                    session.player.increment_battle_statistics(session, summary['attacker_id'], summary)
+                    session.player.increment_battle_statistics(summary['attacker_id'], summary)
                     if not is_login: # login path sends this unconditionally
                         session.deferred_battle_history_update = True
 
@@ -22054,7 +22062,7 @@ class GAMEAPI(resource.Resource):
                     summary = msg['summary']
                     stats = msg['stats']
 
-                    session.player.increment_battle_statistics(session, summary['defender_id'], summary)
+                    session.player.increment_battle_statistics(summary['defender_id'], summary)
                     if not is_login: # login path sends this unconditionally
                         session.deferred_battle_history_update = True
                     session.player.modify_scores(stats, reason = 'you_attacked_me mail(attacker)')

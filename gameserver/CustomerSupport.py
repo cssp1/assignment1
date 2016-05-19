@@ -651,7 +651,7 @@ class HandleSquadDockUnits(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleResolveHomeRaid(Handler):
-    need_user = False # ??
+
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.region_id = self.args['region_id']
@@ -702,20 +702,24 @@ class HandleResolveHomeRaid(Handler):
 
     # note: no logging, directly override exec()
     def exec_online(self, session, retmsg):
-        assert session.player.home_region == self.region_id and session.player.my_home.base_map_loc == self.loc
-        if session.player.has_damage_protection():
-            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_UNDER_PROTECTION')
-
         if session.home_base and session.has_attacked:
             # currently defending against AI attack - punt
             return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK')
+        return self.exec_all(session, retmsg, session.player, session.user)
 
-        affected = session.player.unit_repair_tick()
-        if affected:
+    def exec_all(self, session, retmsg, defender_player, defender_user):
+        # note: if defender is offline, session and retmsg can be None, and will be ignored
+
+        assert defender_player.home_region == self.region_id and defender_player.my_home.base_map_loc == self.loc
+        if defender_player.has_damage_protection():
+            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_UNDER_PROTECTION')
+
+        affected = defender_player.unit_repair_tick()
+        if affected and session:
             for obj in affected: session.deferred_object_state_updates.add(obj)
-            session.send([["UNIT_REPAIR_UPDATE", session.player.unit_repair_queue]])
+            session.send([["UNIT_REPAIR_UPDATE", defender_player.unit_repair_queue]])
 
-        for obj in session.player.home_base_iter():
+        for obj in defender_player.home_base_iter():
             if obj.is_building():
                 # simulate passage of time for repairs, and also
                 # kickstart research and upgrading if it got stopped for some reason, and the building is at full health
@@ -735,12 +739,12 @@ class HandleResolveHomeRaid(Handler):
             temp = self.gamesite.sql_client.get_users_alliance([self.user_id,] + [squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
             my_alliance, raid_alliances = temp[0], temp[1:]
 
-            my_pcinfo = self.gamesite.gameapi.get_player_cache_props(session.user, session.player, my_alliance)
+            my_pcinfo = self.gamesite.gameapi.get_player_cache_props(defender_user, defender_player, my_alliance)
             raid_pcinfos = self.gamesite.nosql_client.player_cache_lookup_batch([squad['base_landlord_id'] for squad in raid_squads], reason = 'resolve_home_raid')
 
             i = 0
             for squad, raid_pcinfo, raid_alliance in zip(raid_squads[:], raid_pcinfos[:], raid_alliances[:]):
-                balance_error = self.get_pvp_balance_online(session.player, raid_pcinfo, my_alliance, raid_alliance)
+                balance_error = self.get_pvp_balance_online(defender_player, raid_pcinfo, my_alliance, raid_alliance)
                 if balance_error:
                     del raid_squads[i]
                     del raid_alliances[i]
@@ -751,20 +755,21 @@ class HandleResolveHomeRaid(Handler):
                 i += 1
 
             # XXX will need to pass attacker's stattab here
-            res_looter = ResLoot.ResLoot(self.gamedata, session, None, session.player, session.player.my_home)
+            # note: OK to pass session = None
+            res_looter = ResLoot.ResLoot(self.gamedata, session, None, defender_player, defender_player.my_home)
 
             # defender side of init_attack() - attacker side is done on launch
             is_revenge_attack = raid_squads[0].get('is_revenge_attack')
-            session.player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
+            defender_player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
 
-            session.player.my_home.base_last_attack_time = self.time_now
-            session.player.my_home.base_times_attacked += 1
+            defender_player.my_home.base_last_attack_time = self.time_now
+            defender_player.my_home.base_times_attacked += 1
 
             raid_mode = 'scout' if all(squad['raid'] == 'scout' for squad in raid_squads) else 'attack'
 
             attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
                                      key = lambda obj: obj['spec'])
-            defending_army = sorted([obj.persist_state(nosql = True) for obj in session.player.home_base_iter() if \
+            defending_army = sorted([obj.persist_state(nosql = True) for obj in defender_player.home_base_iter() if \
                                      obj.is_building() or \
                                      (obj.is_mobile() and self.gamedata.get('enable_defending_units',True) and obj.squad_id == 0)
                                      ],
@@ -780,7 +785,7 @@ class HandleResolveHomeRaid(Handler):
 
             # set up damage log
             if self.gamedata['server'].get('enable_damage_log',True):
-                damage_log = self.gamesite.gameapi.ArmyUnitDamageLog_factory(session.player.my_home.base_id) # observer is actually attacker, but shouldn't matter here
+                damage_log = self.gamesite.gameapi.ArmyUnitDamageLog_factory(defender_player.my_home.base_id) # observer is actually attacker, but shouldn't matter here
                 damage_log.init_multi(defending_army)
                 damage_log.init_multi(attacking_army)
             else:
@@ -788,15 +793,15 @@ class HandleResolveHomeRaid(Handler):
 
             # set up attack log (not enabled for now)
             if 0:
-                attack_log = self.gamesite.gameapi.AttackLog_factory(self.time_now, raid_squads[0]['base_landlord_id'], self.user_id, session.player.my_home.base_id)
+                attack_log = self.gamesite.gameapi.AttackLog_factory(self.time_now, raid_squads[0]['base_landlord_id'], self.user_id, defender_player.my_home.base_id)
             else:
                 attack_log = None
 
             try:
                 if attack_log:
                     pass
-                    ## if session.player.player_auras:
-                    ##     attack_log.event({'user_id':self.user_id, 'event_name': '3901_player_auras', 'code': 3901, 'player_auras':copy.copy(session.player.player_auras)})
+                    ## if defender_player.player_auras:
+                    ##     attack_log.event({'user_id':self.user_id, 'event_name': '3901_player_auras', 'code': 3901, 'player_auras':copy.copy(defender_player.player_auras)})
                     ##     # XXX attacker's auras? pass with squad feature?
 
                     ## for obj in defending_units:
@@ -809,11 +814,11 @@ class HandleResolveHomeRaid(Handler):
                     ##     props.update({'user_id': obj.owner.user_id, 'event_name': '3910_unit_deployed', 'code': 3910})
                     ##     attack_log.event(props)
 
-                base_props = session.player.my_home.get_cache_props()
+                base_props = defender_player.my_home.get_cache_props()
                 squad_update, unused_base_update, unused_pve_loot, is_win, new_attacking_army, new_defending_army = \
                               resolve_raid(raid_squads[0], base_props, attacking_army, defending_army, self.gamedata)
 
-                is_conquest = is_win and (session.player.resources.player_level >= raid_pcinfos[0]['player_level'])
+                is_conquest = is_win and (defender_player.resources.player_level >= raid_pcinfos[0]['player_level'])
 
                 #self.gamesite.exception_log.event(self.time_now, 'attacking_army %r\ndefending_army %r\nnew_attacking_army %r\nnew_defending_army %r' % (attacking_army, defending_army, new_attacking_army, new_defending_army))
 
@@ -830,27 +835,28 @@ class HandleResolveHomeRaid(Handler):
 
                         if army_unit_is_mobile(after, self.gamedata) and (not army_unit_is_alive(after, self.gamedata)):
                             # totally destroyed a mobile unit (similar to Player.destroy_object())
-                            obj = session.player.my_home.find_object_by_id(after['obj_id'])
+                            obj = defender_player.my_home.find_object_by_id(after['obj_id'])
                             assert obj
-                            if session.has_object(after['obj_id']):
+                            if session and session.has_object(after['obj_id']):
                                 retmsg.append(["OBJECT_REMOVED2", after['obj_id']])
                                 session.rem_object(after['obj_id'])
 
-                            session.player.unit_repair_cancel(obj)
-                            session.player.home_base_remove(obj)
+                            defender_player.unit_repair_cancel(obj)
+                            defender_player.home_base_remove(obj)
                             spec = army_unit_spec(after, self.gamedata)
                             can_resurrect = spec.get('resurrectable') # XXX should check attacker's stattab
                             if can_resurrect:
                                 # add back as zombie unit
                                 obj.hp = 0
-                                session.player.home_base_add(obj)
-                                if session.home_base and self.gamedata.get('enable_defending_units',True):
+                                defender_player.home_base_add(obj)
+                                if session and session.home_base and self.gamedata.get('enable_defending_units',True):
                                     session.add_object(obj)
                                     retmsg.append(["OBJECT_CREATED2", obj.serialize_state()])
                                     if obj.auras:
                                         retmsg.append(["OBJECT_AURAS_UPDATE", obj.serialize_auras()])
                             else:
-                                session.player.send_army_update_destroyed(obj, retmsg)
+                                if session:
+                                    defender_player.send_army_update_destroyed(obj, retmsg)
                         else:
                             # partially damaged unit/building, or totally destroyed building (similar to Player.object_combat_updates())
                             if after != before: # lazy
@@ -858,13 +864,13 @@ class HandleResolveHomeRaid(Handler):
                                 new_hp = army_unit_hp(after, self.gamedata)
 
                                 if old_hp != new_hp:
-                                    obj = session.player.my_home.find_object_by_id(after['obj_id'])
+                                    obj = defender_player.my_home.find_object_by_id(after['obj_id'])
                                     assert obj
-                                    session.deferred_object_state_updates.add(obj)
+                                    if session: session.deferred_object_state_updates.add(obj)
                                     new_hp = int(max(0, min(new_hp, obj.max_hp)))
 
                                     if obj.is_mobile():
-                                        if session.player.unit_repair_cancel(obj):
+                                        if defender_player.unit_repair_cancel(obj):
                                             recalc_resources = True
                                     elif obj.is_building():
                                         obj.halt_all() # returns true if havoc caused
@@ -874,8 +880,9 @@ class HandleResolveHomeRaid(Handler):
                                         if new_hp <= 0:
                                             # looting!
                                             # XXX will need to pass attacker's stattab here
+                                            # note: OK to pass session = None
                                             looted, unused, lost = \
-                                                    res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, session.player, None)
+                                                    res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, defender_player, None)
 
                                             # note: the attacker isn't getting loot added directly here as in the RTS attack code
                                             # instead, we are going to grab it from actual_loot[res] later
@@ -902,24 +909,28 @@ class HandleResolveHomeRaid(Handler):
                                                 else:
                                                     econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
                                                     econ_reason = 'friction'
-                                                self.gamesite.admin_stats.econ_flow_player(session.player, 'loot', econ_reason, econ_delta)
+                                                self.gamesite.admin_stats.econ_flow_player(defender_player, 'loot', econ_reason, econ_delta)
 
                                             # XXX missing: on_destroy consequents
 
                                             for removed_item in obj.destroy_fragile_equipment_items():
-                                                session.player.inventory_log_event('5131_item_trashed', removed_item['spec'], -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
+                                                defender_player.inventory_log_event('5131_item_trashed', removed_item['spec'], -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
 
                                         # END building destroyed
 
                                     obj.hp = new_hp # mutate!
 
                     # record state changes to affected players
-                    if recalc_power and session.viewing_base is session.player.my_home:
-                        # note: this sends OBJECT_STATE_UPDATE for harvesters as well as BASE_POWER_UPDATE
-                        session.power_changed(session.viewing_base, None, retmsg)
+                    if recalc_power:
+                        if session:
+                            # note: this sends OBJECT_STATE_UPDATE for harvesters as well as BASE_POWER_UPDATE
+                            session.power_changed(session.viewing_base, None, retmsg)
+                        else:
+                            # offline version
+                            defender_player.my_home.power_changed(None)
 
-                    if recalc_resources:
-                        retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                    if session and recalc_resources:
+                        retmsg.append(["PLAYER_STATE_UPDATE", defender_player.resources.calc_snapshot().serialize()])
 
                 # add loot to cargo here
                 if actual_loot:
@@ -976,7 +987,7 @@ class HandleResolveHomeRaid(Handler):
                                               actual_loot, raid_mode = raid_squads[0]['raid'])
 
                 # defender's battle statistics (attacker's is done via message)
-                session.player.increment_battle_statistics(session, raid_squads[0]['base_landlord_id'], summary)
+                defender_player.increment_battle_statistics(raid_squads[0]['base_landlord_id'], summary)
                 self.gamesite.nosql_client.battle_record(summary, reason = 'resolve_home_raid')
 
                 # broadcast map attack for GUI and battle history jewel purposes
@@ -987,11 +998,11 @@ class HandleResolveHomeRaid(Handler):
                                                            msg = 'REGION_MAP_ATTACK_COMPLETE')
 
                 # update victim's player cache entry
-                cache_props = {'lootable_buildings': session.player.get_lootable_buildings(),
-                               'base_damage': session.player.my_home.calc_base_damage(),
+                cache_props = {'lootable_buildings': defender_player.get_lootable_buildings(),
+                               'base_damage': defender_player.my_home.calc_base_damage(),
                                'base_repair_time': -1,
                                'last_defense_time': self.time_now,
-                               'last_fb_notification_time': session.player.last_fb_notification_time
+                               'last_fb_notification_time': defender_player.last_fb_notification_time
                                }
                 self.gamesite.pcache_client.player_cache_update(self.user_id, cache_props, reason = 'resolve_home_raid')
 

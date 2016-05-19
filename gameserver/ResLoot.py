@@ -7,6 +7,11 @@
 # this is a library for use by the game server to perform looting of
 # resources when a building explodes
 
+# note: "session" is passed around in here only for the purpose of
+# evaluating predicates on the player. It will only be needed if
+# any active predicates has an is_satisfied2() method. Otherwise
+# session can be None and safely ignored.
+
 import random, copy
 import Predicates
 
