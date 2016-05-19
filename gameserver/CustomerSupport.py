@@ -658,6 +658,10 @@ class HandleResolveHomeRaid(Handler):
         self.squad_base_ids = SpinJSON.loads(self.args['squad_base_ids'])
         self.loc = SpinJSON.loads(self.args['loc'])
 
+        # remember some data needed for the offline FB notification
+        self.attacker_ui_name = 'Unknown'
+        self.raid_mode = None
+
     def query_raid_squads(self):
         raid_squads = list(self.gamesite.nosql_client.get_map_features_by_loc(self.region_id, self.loc))
         raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and \
@@ -754,6 +758,8 @@ class HandleResolveHomeRaid(Handler):
                     i -= 1
                 i += 1
 
+            self.attacker_ui_name = raid_pcinfos[0].get('ui_name','Unknown')
+
             # XXX will need to pass attacker's stattab here
             # note: OK to pass session = None
             res_looter = ResLoot.ResLoot(self.gamedata, session, None, defender_player, defender_player.my_home)
@@ -766,6 +772,7 @@ class HandleResolveHomeRaid(Handler):
             defender_player.my_home.base_times_attacked += 1
 
             raid_mode = 'scout' if all(squad['raid'] == 'scout' for squad in raid_squads) else 'attack'
+            self.raid_mode = raid_mode # for offline notification
 
             attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
                                      key = lambda obj: obj['spec'])
@@ -966,6 +973,19 @@ class HandleResolveHomeRaid(Handler):
                             self.gamesite.admin_stats.econ_flow(raid_squads[0]['base_landlord_id'],
                                                                 get_denormalized_summary_props_from_pcache(self.gamedata, raid_pcinfos[0]),
                                                                 'waste', 'raid', wasted)
+
+                if raid_mode != 'scout':
+                    base_damage = defender_player.my_home.calc_base_damage()
+                else:
+                    base_damage = None
+                summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
+                                              raid_squads[0]['base_landlord_id'], self.user_id,
+                                              my_pcinfo, raid_pcinfos[0],
+                                              'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
+                                              attacking_army, defending_army,
+                                              new_attacking_army, new_defending_army,
+                                              actual_loot, raid_mode = raid_squads[0]['raid'], base_damage = base_damage)
+
                 # perform mutation on attacking army
                 # note: client should ping squads to get the army update
 
@@ -977,14 +997,6 @@ class HandleResolveHomeRaid(Handler):
 
                     for unit in mobile_deletions: self.gamesite.nosql_client.drop_mobile_object_by_id(self.region_id, unit['obj_id'], reason = 'resolve_home_raid')
                     if mobile_updates: self.gamesite.nosql_client.save_mobile_objects(self.region_id, mobile_updates, reason = 'resolve_home_raid')
-
-                summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
-                                              raid_squads[0]['base_landlord_id'], self.user_id,
-                                              my_pcinfo, raid_pcinfos[0],
-                                              'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
-                                              attacking_army, defending_army,
-                                              new_attacking_army, new_defending_army,
-                                              actual_loot, raid_mode = raid_squads[0]['raid'])
 
                 # defender's battle statistics (attacker's is done via message)
                 defender_player.increment_battle_statistics(raid_squads[0]['base_landlord_id'], summary)
@@ -999,7 +1011,7 @@ class HandleResolveHomeRaid(Handler):
 
                 # update victim's player cache entry
                 cache_props = {'lootable_buildings': defender_player.get_lootable_buildings(),
-                               'base_damage': defender_player.my_home.calc_base_damage(),
+                               'base_damage': base_damage,
                                'base_repair_time': -1,
                                'last_defense_time': self.time_now,
                                'last_fb_notification_time': defender_player.last_fb_notification_time
@@ -1019,21 +1031,22 @@ class HandleResolveHomeRaid(Handler):
                     stats[st] = summary['loot'].get(st, 0)
 
                 # mail the attacker the battle summary and stat updates
-                self.gamesite.msg_client.msg_send([{'from': self.user_id, 'to': [raid_squads[0]['base_landlord_id']],
+                self.gamesite.msg_client.msg_send([{'from': self.user_id,
+                                                    'to': [raid_squads[0]['base_landlord_id']],
                                                     'type': 'you_attacked_me',
                                                     'expire_time': self.time_now + self.gamedata['server']['message_expire_time']['i_attacked_you'],
-                                                    'from_name': unicode(my_pcinfo.get('ui_name','Unknown')),
+                                                    'from_name': unicode(self.attacker_ui_name),
                                                     'summary': summary,
                                                     'stats': stats
                                                     }])
 
                 # mail the victim a "you've been attacked" message and battle summary (offline case only)
-                if 0:
+                if not session:
                     self.gamesite.msg_client.msg_send([{'from': raid_squads[0]['base_landlord_id'],
                                                         'to': [self.user_id],
                                                         'type': 'i_attacked_you',
                                                         'expire_time': self.time_now + self.gamedata['server']['message_expire_time']['i_attacked_you'],
-                                                        'from_name': unicode(raid_pcinfos[0].get('ui_name','Unknown')),
+                                                        'from_name': unicode(self.attacker_ui_name),
                                                         'summary': summary}])
 
 
@@ -1051,28 +1064,35 @@ class HandleResolveHomeRaid(Handler):
 
             return ReturnValue(result = 'ok')
 
-    def exec_offline(self, user, player):
-        assert player.get('home_region') == self.region_id and player.get('base_map_loc') == self.loc
-        if player['resources'].get('protection_end_time',-1) > self.time_now:
-            return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_UNDER_PROTECTION')
+    def exec_offline(self, json_user, json_player):
+        # hack - parse the JSON into actual User/Player instances
+        player = self.gamesite.player_table.unjsonize(json_player, None, self.user_id, False)
+        user = self.gamesite.user_table.unjsonize(json_user, self.user_id)
 
-        with SpinNoSQLLockManager.LockManager(self.gamesite.nosql_client) as lock_manager:
+        ret = self.exec_all(None, None, player, user)
 
-            for squad_base_id in self.squad_base_ids:
-                if not lock_manager.acquire(self.region_id, squad_base_id):
-                    # can't get a lock
-                    return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+        # now mutate the JSON versions
+        new_json_user = self.gamesite.user_table.jsonize(user)
+        new_json_player = self.gamesite.player_table.jsonize(player)
 
-            raid_squads = self.query_raid_squads()
-            if not raid_squads: # no squads found
-                return ReturnValue(result = 'HARMLESS_RACE_CONDITION')
+        # make this as atomic as possible
+        json_user.clear(); json_user.update(new_json_user)
+        json_player.clear(); json_player.update(new_json_player)
 
-            raise Exception('not implemented')
+        if self.raid_mode and self.raid_mode != 'scout':
+            # send "You got attacked" FB notification
+            config = self.gamedata['fb_notifications']['notifications']['you_got_attacked']
+            notif_text = config.get('ui_name_home_raid')
+            if notif_text:
+                notif_text = notif_text.replace('%ATTACKER', self.attacker_ui_name)
 
-            # send the squads back home
-            self.recall_squads(raid_squads)
+                # re-use the handler logic
+                # note: this mutates the JSON again
+                send_handler = HandleSendNotification(self.time_now, self.user_id, self.gamedata, self.gamesite,
+                                                      {'config': 'you_got_attacked', 'text': notif_text})
+                send_handler.exec_offline(json_user, json_player)
 
-            return ReturnValue(result = 'ok')
+        return ret
 
 class HandleChangeRegion(Handler):
     def __init__(self, *pargs, **pkwargs):

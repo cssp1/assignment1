@@ -26264,7 +26264,8 @@ function can_show_replay_for_battle_summary(summary) {
 // given a battle summary, determine if we can show deployment markers
 function can_show_deployment_markers_for_battle_summary(summary) {
     if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
-    return (summary['base_id'] === session.viewing_base.base_id &&
+    return (!summary['raid_mode'] &&
+            summary['base_id'] === session.viewing_base.base_id &&
             ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
              vec_equals(summary['base_ncells'] || gamedata['map']['default_ncells'],
                         (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&

@@ -1100,29 +1100,31 @@ class UserTable:
             return None
 
         with admin_stats.latency_measurer('user_table:parse'):
+            return self.unjsonize(jsonobj, user_id)
 
-            ret = User(user_id)
+    def unjsonize(self, jsonobj, user_id):
+        ret = User(user_id)
 
-            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-                    print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
+        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+            print 'warning: UserTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id'])
 
-            for name, coerce in self.WRITE_ONLY_FIELDS:
-                if jsonobj.has_key(name):
-                    del jsonobj[name]
+        for name, coerce in self.WRITE_ONLY_FIELDS:
+            if jsonobj.has_key(name):
+                del jsonobj[name]
 
-            # parse recognized fields
-            for name, coerce in self.FIELDS:
-                if jsonobj.has_key(name):
-                    val = jsonobj[name]
-                    if coerce:
-                        val = coerce(val)
-                    setattr(ret, name, val)
-                    del jsonobj[name]
+        # parse recognized fields
+        for name, coerce in self.FIELDS:
+            if jsonobj.has_key(name):
+                val = jsonobj[name]
+                if coerce:
+                    val = coerce(val)
+                setattr(ret, name, val)
+                del jsonobj[name]
 
-            # store unrecognized fields
-            for name, val in jsonobj.iteritems():
-                print 'unrecogized User data', name, ':', val
-                ret.foreign_data[name] = val
+        # store unrecognized fields
+        for name, val in jsonobj.iteritems():
+            print 'unrecogized User data', name, ':', val
+            ret.foreign_data[name] = val
 
         return ret
 
@@ -2835,42 +2837,45 @@ class PlayerTable:
             return None
 
         with admin_stats.latency_measurer('player_table:parse'):
+            return self.unjsonize(jsonobj, observer, user_id, live)
 
-            if live:
-                player = LivePlayer(user_id)
-            else:
-                player = ProxyPlayer(user_id)
+    def unjsonize(self, jsonobj, observer, user_id, live):
 
-            if observer is None: observer = player
+        if live:
+            player = LivePlayer(user_id)
+        else:
+            player = ProxyPlayer(user_id)
 
-            if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
-                gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
+        if observer is None: observer = player
 
-            for field in self.PLAYER_RW_FIELDS:
-                read_json_field(jsonobj, player, field, player = player, observer = observer)
-            for field in self.BASE_RW_FIELDS:
-                read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
+        if jsonobj.has_key('user_id') and jsonobj['user_id'] != user_id:
+            gamesite.exception_log.event(server_time, 'warning: PlayerTable lookup for id %d has data from id %d' % (user_id, jsonobj['user_id']))
 
-    #            if field[0] == 'my_base':
-    #                old_base = player.my_home.my_base
-    #                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
-    #                if new_base is not None:
-    #                    # verify that contents are identical
-    #                    if len(old_base) != len(new_base):
-    #                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
-    #                                                     (user_id, len(new_base), len(old_base)))
-    #                    #player.my_home.my_base = new_base
+        for field in self.PLAYER_RW_FIELDS:
+            read_json_field(jsonobj, player, field, player = player, observer = observer)
+        for field in self.BASE_RW_FIELDS:
+            read_json_field(jsonobj, player.my_home, field, player = player, observer = observer)
+
+#            if field[0] == 'my_base':
+#                old_base = player.my_home.my_base
+#                new_base = player.my_home.nosql_read(observer, player, 'PlayerTable:parse')
+#                if new_base is not None:
+#                    # verify that contents are identical
+#                    if len(old_base) != len(new_base):
+#                        gamesite.exception_log.event(server_time, 'PlayerTable: nosql_read for user %d returned %d objects but my_base had %d' % \
+#                                                     (user_id, len(new_base), len(old_base)))
+#                    #player.my_home.my_base = new_base
 
 
-            # save all unrecognized data as foreign_data
-            for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
-                if jsonobj.has_key(name): del jsonobj[name]
+        # save all unrecognized data as foreign_data
+        for name, coerce_write, coerce_read in self.PLAYER_WRONLY_FIELDS:
+            if jsonobj.has_key(name): del jsonobj[name]
 
-            for name, val in jsonobj.iteritems():
-                if name in self.PLAYER_DELETE_FIELDS: continue
-                if gamedata['server'].get('log_foreign_data', False):
-                    gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
-                player.foreign_data[name] = val
+        for name, val in jsonobj.iteritems():
+            if name in self.PLAYER_DELETE_FIELDS: continue
+            if gamedata['server'].get('log_foreign_data', False):
+                gamesite.exception_log.event(server_time, 'unrecognized playerdb data ' + name + ': ' + repr(val))
+            player.foreign_data[name] = val
 
         # init stattab AGAIN so that stuff that depends on home base contents (e.g. repair speed) gets updated properly
         player.recalc_stattab(observer)
@@ -11253,13 +11258,11 @@ class Player(AbstractPlayer):
     def battle_summary_to_recent_attack(cls, summary):
         ret = {'time':summary['time'],
                'attacker_user_id':summary['attacker_id'],
-               'attacker_facebook_id':summary['attacker_facebook_id'],
                'attacker_name':summary['attacker_name'],
                'attacker_level':summary['attacker_level'],
                'defender_outcome':summary['defender_outcome'],
                'base_id': summary['base_id'],
-               'base_ncells': summary['base_ncells'],
-               'base_damage': summary['base_damage'],
+               'base_damage': summary.get('base_damage',0),
                'deployed_units': summary.get('deployed_units',{}),
                'lost_units':sum(summary['loot'].get('units_killed', {}).itervalues()),
                'killed_units':sum(summary['loot'].get('units_lost', {}).itervalues()),
@@ -11270,14 +11273,21 @@ class Player(AbstractPlayer):
 
                # begin migration to unify player.recent_attacks to standard battle summary format
                'attacker_id': summary['attacker_id'],
-               'loot': summary['loot'],
+               'loot': summary.get('loot',{}),
                'defender_id': summary['defender_id'],
                }
         for res in gamedata['resources']:
             ret['lost_'+res] = summary['loot'].get(res+'_lost',0)
             ret['killed_units_'+res] = summary['loot'].get('units_lost_'+res,0)
-        if 'defender_protection_expired_at' in summary:
-            ret['defender_protection_expired_at'] = summary['defender_protection_expired_at']
+
+        for FIELD in ('defender_protection_expired_at',
+                      'base_ncells',
+                      'raid_mode',
+                      # obsolete legacy fields, but still might be wanted by client
+                      'attacker_facebook_id'):
+            if FIELD in summary:
+                ret[FIELD] = summary[FIELD]
+
         return ret
 
     def migrate_proxy(self):
