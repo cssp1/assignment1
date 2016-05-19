@@ -5354,10 +5354,7 @@ class SessionChangeOld(SessionChange): # non-map path
 
         if self.dest_player:
             if self.dest_user:
-                self.dest_player.frame_platform = self.dest_user.frame_platform # XXX awkward
-                self.dest_player.country = self.dest_user.country
-                self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
-                self.dest_player.developer = self.dest_user.developer
+                self.dest_player.sync_with_user(self.dest_user)
             self.dest_player.migrate_proxy()
         SessionChange.master_set.remove(self)
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
@@ -5592,10 +5589,7 @@ class SessionChangeNew(SessionChange): # new basedb path
             # get the base of the dest player
             if self.dest_player:
                 if self.dest_user:
-                    self.dest_player.frame_platform = self.dest_user.frame_platform # XXX awkward
-                    self.dest_player.country = self.dest_user.country
-                    self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
-                    self.dest_player.developer = self.dest_user.developer
+                    self.dest_player.sync_with_user(self.dest_user)
 
                 self.dest_player.migrate_proxy()
                 self.dest_base = self.dest_player.my_home
@@ -5617,10 +5611,7 @@ class SessionChangeNew(SessionChange): # new basedb path
             return
         if self.dest_player:
             if self.dest_user:
-                self.dest_player.frame_platform = self.dest_user.frame_platform # XXX awkward
-                self.dest_player.country = self.dest_user.country
-                self.dest_player.country_tier = SpinConfig.country_tier_map.get(self.dest_user.country, 4)
-                self.dest_player.developer = self.dest_user.developer
+                self.dest_player.sync_with_user(self.dest_user)
             self.dest_player.migrate_proxy()
             if self.dest_base_id[0] == 's' and self.dest_base: # set squad name
                 squad_data = self.dest_player.squads.get(str(self.dest_squad_id), None)
@@ -8160,6 +8151,16 @@ class Player(AbstractPlayer):
 
         # persist unrecognized data from JSON file
         self.foreign_data = {}
+
+    def sync_with_user(self, user):
+        # grab the fields that need to be copied over from the User
+        self.frame_platform = user.frame_platform
+        self.facebook_id = user.facebook_id
+        self.birthday = user.birthday
+        self.country = user.country
+        self.price_region = SpinConfig.price_region_map.get(self.country, 'unknown')
+        self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
+        self.developer = user.developer
 
     # call this function right after tutorial_state becomes "COMPLETE" to set up post-tutorial state
     def set_post_tutorial_state(self):
@@ -11666,6 +11667,16 @@ class LivePlayer(Player):
 
         # developer access - ignore resource limits and time delays
         self.is_cheater = False
+
+    def sync_with_user(self, user):
+        super(LivePlayer,self).sync_with_user(user)
+        # sync additional LivePlayer fields here
+        self.browser_name = user.browser_name
+        self.browser_os = user.browser_os
+        self.browser_version = user.browser_version
+        self.browser_hardware = user.browser_hardware
+        self.browser_caps = user.browser_caps
+        self.user_facebook_likes = user.facebook_likes
 
     def unit_repair_send(self, retmsg):
         retmsg.append(["UNIT_REPAIR_UPDATE", self.unit_repair_queue])
@@ -23674,24 +23685,10 @@ class GAMEAPI(resource.Resource):
         if player.player_preferences is None:
             player.player_preferences = user.preferences
 
-        # note: these fields are redundant with User, but are necessary to copy on to the Player so that Predicates etc. have access to them
-        player.facebook_id = user.facebook_id
-        player.country = user.country
-        player.frame_platform = user.frame_platform
-        player.user_facebook_likes = user.facebook_likes
-        player.birthday = user.birthday
-        player.developer = user.developer
-        player.browser_name = user.browser_name
-        player.browser_os = user.browser_os
-        player.browser_version = user.browser_version
-        player.browser_hardware = user.browser_hardware
-        player.browser_caps = user.browser_caps
-
         if client_permissions: player.facebook_permissions = client_permissions.split(',')
 
-        # looked up every time by country
-        player.price_region = SpinConfig.price_region_map.get(user.country, 'unknown')
-        player.country_tier = SpinConfig.country_tier_map.get(user.country, 4)
+        # note: some fields are redundant with User, but are necessary to copy on to the Player so that Predicates etc. have access to them
+        player.sync_with_user(user)
 
         player.bust_expired_locks()
 
