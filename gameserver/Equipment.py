@@ -17,6 +17,15 @@ class Equipment (object):
                 for x in Equipment.slot_type_iter(equipment[slot_type]):
                     yield x
 
+    # same as equip_iter() but yields (addr,item) tuples like ((slot_type, slot_num), {"spec": "foo", ...})
+    @staticmethod
+    def equip_enumerate(equipment):
+        if equipment:
+            assert type(equipment) is dict
+            for slot_type in equipment:
+                for slot_num, x in enumerate(Equipment.slot_type_iter(equipment[slot_type])):
+                    yield ((slot_type, slot_num), x)
+
     # iterate through slots of one slot type
     @staticmethod
     def slot_type_iter(equipment_slot_type):

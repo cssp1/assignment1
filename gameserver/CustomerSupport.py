@@ -872,8 +872,6 @@ class HandleResolveHomeRaid(Handler):
                                             recalc_power = True
 
                                         if new_hp <= 0:
-                                            # XXXXXX missing: fragile items, on_destroy consequents
-
                                             # looting!
                                             # XXX will need to pass attacker's stattab here
                                             looted, unused, lost = \
@@ -905,6 +903,13 @@ class HandleResolveHomeRaid(Handler):
                                                     econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
                                                     econ_reason = 'friction'
                                                 self.gamesite.admin_stats.econ_flow_player(session.player, 'loot', econ_reason, econ_delta)
+
+                                            # XXX missing: on_destroy consequents
+
+                                            for removed_item in obj.destroy_fragile_equipment_items():
+                                                session.player.inventory_log_event('5131_item_trashed', removed_item['spec'], -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
+
+                                        # END building destroyed
 
                                     obj.hp = new_hp # mutate!
 

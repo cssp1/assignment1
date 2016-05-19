@@ -6962,6 +6962,17 @@ class Building(GameObject):
 
     def is_invisible(self, session): return self.spec.invisible
 
+    # returns list of items destroyed
+    def destroy_fragile_equipment_items(self):
+        if not self.equipment: return []
+        to_destroy = []
+        for addr, item in Equipment.equip_enumerate(self.equipment):
+            if item['spec'] in gamedata['items']:
+                spec = gamedata['items'][item['spec']]
+                if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
+                    to_destroy.append((addr, item))
+        return [Equipment.equip_remove(self.equipment, addr, item['spec']) for addr, item in to_destroy]
+
 class ResourceStateSnapshot:
     def __init__(self, inventory, res_max, res_cur, gamebucks, facebook_credits, player_level, xp, protection_end_time):
         self.inventory = inventory
@@ -22562,31 +22573,16 @@ class GAMEAPI(resource.Resource):
                                     session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y]}, reason='on_destroy(%s)' % obj.spec.name)
 
                         # check for fragile equipment
-                        items_destroyed = None
-                        if obj.equipment:
-                            items_destroyed = []
-                            for slot_type in obj.equipment:
-                                for slot_num in xrange(len(obj.equipment[slot_type])):
-                                    if obj.equipment[slot_type][slot_num]:
-                                        if type(obj.equipment[slot_type][slot_num]) is dict:
-                                            specname = obj.equipment[slot_type][slot_num]['spec']
-                                        else:
-                                            specname = obj.equipment[slot_type][slot_num]
+                        items_destroyed = obj.destroy_fragile_equipment_items()
 
-                                        if specname in gamedata['items']:
-                                            spec = gamedata['items'][specname]
-                                            if spec.get('fragility',0) > 0 and random.random() < spec['fragility']:
-                                                items_destroyed.append((slot_type, slot_num, specname))
-
-                            for slot_type, slot_num, specname in items_destroyed:
-                                removed_item = Equipment.equip_remove(obj.equipment, (slot_type, slot_num), specname)
-                                # record expenditure of the item (e.g. landmines)
-                                if owning_player:
-                                    session.attack_item_expended(owning_player.user_id, specname, removed_item.get('stack',1))
-                                    owning_player.inventory_log_event('5131_item_trashed', specname, -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
+                        # record expenditure of the items (e.g. landmines)
+                        for removed_item in items_destroyed:
+                            if owning_player:
+                                session.attack_item_expended(owning_player.user_id, removed_item['spec'], removed_item.get('stack',1))
+                                owning_player.inventory_log_event('5131_item_trashed', removed_item['spec'], -removed_item.get('stack',1), removed_item.get('expire_time',-1), level=removed_item.get('level',1), reason='destroyed')
 
                         if items_destroyed:
-                            event_props['items_destroyed'] = [x[2] for x in items_destroyed]
+                            event_props['items_destroyed'] = [x['spec'] for x in items_destroyed]
 
                         session.log_attack_unit(owning_user.user_id if owning_user else 0, obj, '3920_building_destroyed', props = event_props, killer_info = killer_info)
 
