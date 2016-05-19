@@ -26051,15 +26051,16 @@ function update_battle_history_dialog(dialog) {
 
         var info = PlayerCache.query_sync(user_id) || {};
         var prot_end_time = (info && ('protection_end_time' in info) ? info['protection_end_time'] : -1);
-        var is_protected = (prot_end_time == 1 || prot_end_time > server_time || (info && info['LOCK_STATE']));
+        var is_protected = (prot_end_time == 1 || prot_end_time > server_time);
+        var is_logged_in = (info && info['LOCK_STATE'] == 1);
         var on_cooldown = ('attack_cooldown_expire' in summary && summary['attack_cooldown_expire'] > server_time);
 
         if(gamedata['client']['battle_history_show_attackability'] && (dialog.user_data['chapter'] !== 'alliance')) {
-            dialog.widgets['row_prot'+row].show = is_protected;
-            if(is_protected) {
+            dialog.widgets['row_prot'+row].show = (is_protected || (!player.raids_enabled() && is_logged_in));
+            if(dialog.widgets['row_prot'+row].show) {
                 dialog.widgets['row_prot'+row].str = dialog.data['widgets']['row_prot'][(player.raids_enabled() ? 'ui_name_prot' : 'ui_name')];
             }
-            dialog.widgets['row_cooldown'+row].show = (!is_protected && on_cooldown);
+            dialog.widgets['row_cooldown'+row].show = (!is_protected && !is_logged_in && on_cooldown);
             if(dialog.widgets['row_cooldown'+row].show) {
                 dialog.widgets['row_cooldown'+row].str = dialog.data['widgets']['row_cooldown']['ui_name'].replace('%s', pretty_print_time_brief(summary['attack_cooldown_expire'] - server_time));
             }
