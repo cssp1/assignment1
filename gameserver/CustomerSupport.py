@@ -19,7 +19,7 @@ from Region import Region
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException, \
      army_unit_is_scout, army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
-     resolve_raid, make_battle_summary
+     calc_max_cargo, resolve_raid, make_battle_summary
 import ResLoot
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
@@ -712,7 +712,7 @@ class HandleResolveHomeRaid(Handler):
 
         affected = session.player.unit_repair_tick()
         if affected:
-            for obj in affected: session.deferred_object_state_updates.add(affected)
+            for obj in affected: session.deferred_object_state_updates.add(obj)
             session.send([["UNIT_REPAIR_UPDATE", session.player.unit_repair_queue]])
 
         for obj in session.player.home_base_iter():
@@ -876,19 +876,20 @@ class HandleResolveHomeRaid(Handler):
 
                                             # looting!
                                             # XXX will need to pass attacker's stattab here
-                                            looted, unused_looted_uncapped, lost = \
+                                            looted, unused, lost = \
                                                     res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, session.player, None)
 
-                                            looted_uncapped = looted # XXXXXX add loot to cargo here
+                                            # note: the attacker isn't getting loot added directly here as in the RTS attack code
+                                            # instead, we are going to grab it from actual_loot[res] later
 
-                                            if looted or looted_uncapped or lost:
+                                            if looted or lost:
                                                 for res in looted:
                                                     if looted[res] > 0:
+                                                        # note: the plain loot value is going to get decremented later if limited by raider's cargo capacity
                                                         actual_loot[res] = actual_loot.get(res,0) + looted[res]
+                                                        actual_loot['looted_uncapped_'+res] = actual_loot.get('looted_uncapped_'+res,0) + looted[res]
                                                         recalc_resources = True
-                                                for res in looted_uncapped:
-                                                    if looted_uncapped[res] > 0:
-                                                        actual_loot['looted_uncapped_'+res] = actual_loot.get('looted_uncapped_'+res,0) + looted_uncapped[res]
+
                                                 for res in lost:
                                                     if lost[res] > 0:
                                                         actual_loot[res+'_lost'] = actual_loot.get(res+'_lost',0) + lost[res]
@@ -915,8 +916,45 @@ class HandleResolveHomeRaid(Handler):
                     if recalc_resources:
                         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-                # XXXXXX perform mutation on attacking army
-                # XXXXXX add loot to cargo here
+                # add loot to cargo here
+                if actual_loot:
+                    if (not is_win) or raid_mode == 'scout':
+                        # drop all loot
+                        for res in self.gamedata['resources']:
+                            if res in actual_loot:
+                                del actual_loot[res]
+                    else:
+                        cur_cargo = raid_squads[0].get('cargo', {})
+                        max_cargo = calc_max_cargo(new_attacking_army if (new_attacking_army is not None) else attacking_army, self.gamedata)
+                        for res in self.gamedata['resources']:
+                            if res in cur_cargo:
+                                if cur_cargo[res] > max_cargo.get(res,0):
+                                    # resources disappear if cargo-carrying units are destroyed
+                                    # XXXXXX needs an econ_flow here
+                                    cur_cargo[res] = min(cur_cargo.get(res,0), max_cargo.get(res,0))
+                            if res in actual_loot:
+                                if (res in max_cargo) and cur_cargo.get(res,0) < max_cargo[res]: # is there room for any loot?
+                                    amount = min(actual_loot[res], max_cargo[res] - cur_cargo.get(res,0))
+                                    actual_loot[res] = amount
+                                    cur_cargo[res] = cur_cargo.get(res,0) + amount
+                                else:
+                                    del actual_loot[res]
+
+                        squad_update['max_cargo'] = max_cargo
+                        squad_update['cargo'] = cur_cargo
+                        squad_update['cargo_source'] = 'human'
+
+                # perform mutation on attacking army
+                # note: client should ping squads to get the army update
+
+                self.gamesite.nosql_client.update_map_feature(self.region_id, raid_squads[0]['base_id'], squad_update)
+                if new_attacking_army is not None:
+
+                    mobile_deletions = [unit for unit in new_attacking_army if army_unit_is_mobile(unit, self.gamedata) and unit.get('DELETED')]
+                    mobile_updates = [unit for unit in new_attacking_army if army_unit_is_mobile(unit, self.gamedata) and not unit.get('DELETED')]
+
+                    for unit in mobile_deletions: self.gamesite.nosql_client.drop_mobile_object_by_id(self.region_id, unit['obj_id'], reason = 'resolve_home_raid')
+                    if mobile_updates: self.gamesite.nosql_client.save_mobile_objects(self.region_id, mobile_updates, reason = 'resolve_home_raid')
 
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,
