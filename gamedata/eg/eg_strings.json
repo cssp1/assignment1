@@ -405,6 +405,8 @@
         "deploy": "Deploy Battalion",
         "call": "Call Battalion",
         "call_raid": "Launch Raid",
+        "under_protection": "Under protection",
+        "next_raid_in": "Next raid attempt in %s",
         "move": "Move",
         "halt": "Halt",
         "guard": "Guard",

@@ -104,6 +104,7 @@
     "CANNOT_ATTACK_YOUR_SQUAD_RACE" : { "ui_title": "Your battalion is under attack!", "ui_name": "Just before you deployed, one of your battalions came under attack." },
     "CANNOT_ATTACK_PLAYER_UNDER_PROTECTION": { "ui_name": "Cannot attack this base because the player is under protection" },
     "CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN": { "ui_name": "Cannot attack this base because the repeated attack cooldown has not expired yet" },
+    "CANNOT_ATTACK_RAID_PVP_ATTEMPT_LIMIT": { "ui_name": "Cannot attack this base because you ran out of PvP raid attempts" },
     "CANNOT_ATTACK_WEAKER_PLAYER": { "ui_name": "Cannot attack this base because the opponent is significantly weaker than you" },
     "CANNOT_ATTACK_STRONGER_PLAYER": { "ui_name": "Cannot attack this base because the opponent is significantly stronger than you" },
     "CANNOT_ATTACK_YOU_ARE_ISOLATED": { "ui_name": "Cannot attack this base because you are isolated from PvP against innocent players" },
