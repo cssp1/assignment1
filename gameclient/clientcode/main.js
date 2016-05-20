@@ -46278,7 +46278,7 @@ function handle_server_message(data) {
                             str = str[0].toUpperCase() + str.substr(1);
 
                             // show message if you aren't looking at the base, of if you got raided
-                            if(session.viewing_base.base_id != feature['base_id'] || summary['battle_type'] === 'raid') {
+                            if(session.viewing_base.base_id != feature['base_id'] || (summary && summary['battle_type'] === 'raid')) {
                                 user_log.msg(str, new SPUI.Color(1,1,0,1));
                             }
                         }
