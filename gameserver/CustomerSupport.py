@@ -758,11 +758,13 @@ class HandleResolveHomeRaid(Handler):
                     i -= 1
                 i += 1
 
+            raid_stattabs = [squad.get('player_stattab',{}) for squad in raid_squads]
+            attacker_loot_factor_pvp = raid_stattabs[0].get('player',{}).get('loot_factor_pvp',{'val':1})['val']
+
             self.attacker_ui_name = raid_pcinfos[0].get('ui_name','Unknown')
 
-            # XXX will need to pass attacker's stattab here
             # note: OK to pass session = None
-            res_looter = ResLoot.ResLoot(self.gamedata, session, None, defender_player, defender_player.my_home)
+            res_looter = ResLoot.ResLoot(self.gamedata, session, None, defender_player, defender_player.my_home, attacker_loot_factor_pvp)
 
             # defender side of init_attack() - attacker side is done on launch
             is_revenge_attack = raid_squads[0].get('is_revenge_attack')
@@ -809,7 +811,7 @@ class HandleResolveHomeRaid(Handler):
                     pass
                     ## if defender_player.player_auras:
                     ##     attack_log.event({'user_id':self.user_id, 'event_name': '3901_player_auras', 'code': 3901, 'player_auras':copy.copy(defender_player.player_auras)})
-                    ##     # XXX attacker's auras? pass with squad feature?
+                    ##     # XXX log attacker's auras here
 
                     ## for obj in defending_units:
                     ##     props = session._log_attack_unit_props(obj)
@@ -851,7 +853,8 @@ class HandleResolveHomeRaid(Handler):
                             defender_player.unit_repair_cancel(obj)
                             defender_player.home_base_remove(obj)
                             spec = army_unit_spec(after, self.gamedata)
-                            can_resurrect = spec.get('resurrectable') # XXX should check attacker's stattab
+                            can_resurrect = spec.get('resurrectable') or \
+                                            raid_stattabs[0].get('units',{}).get(after['spec'],{}).get('resurrection',{'val':1})['val'] >= 2 # RESURRECT_AND_REPAIR_WITH_TECH
                             if can_resurrect:
                                 # add back as zombie unit
                                 obj.hp = 0
@@ -886,7 +889,6 @@ class HandleResolveHomeRaid(Handler):
 
                                         if new_hp <= 0:
                                             # looting!
-                                            # XXX will need to pass attacker's stattab here
                                             # note: OK to pass session = None
                                             looted, unused, lost = \
                                                     res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, defender_player, None)

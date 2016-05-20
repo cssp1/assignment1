@@ -16,24 +16,26 @@ import random, copy
 import Predicates
 
 # instantiate an appropriate looter for this (viewed) player and this base
-def ResLoot(gamedata, session, attacker, defender, base):
+# attacker_loot_factor usually comes from attacker's stattab (loot_factor_pve/pvp)
+def ResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor):
     if defender.is_ai() and (base.base_type in ('home','hive')) and (base.base_resource_loot is not None):
-        return SpecificPvEResLoot(gamedata, session, attacker, defender, base)
+        return SpecificPvEResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
     elif defender.is_ai() or (base is not defender.my_home):
-        return TablePvEResLoot(gamedata, session, attacker, defender, base)
+        return TablePvEResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
     else: # PvP
         pvp_loot_method = gamedata.get('pvp_loot_method','hardcore')
         if defender.home_region and defender.home_region in gamedata['regions'] and 'pvp_loot_method' in gamedata['regions'][defender.home_region]:
             pvp_loot_method = gamedata['regions'][defender.home_region]['pvp_loot_method']
         pvp_loot_method = defender.get_any_abtest_value('pvp_loot_method', pvp_loot_method)
         if (base is not defender.my_home) and pvp_loot_method == 'specific': # XXX remove home_base condition for AI attacks?
-            return SpecificPvPResLoot(gamedata, session, attacker, defender, base)
+            return SpecificPvPResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
         else:
-            return HardcorePvPResLoot(gamedata, session, attacker, defender, base)
+            return HardcorePvPResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
 
 class BaseResLoot(object):
-    def __init__(self, gamedata, session, attacker, defender, base):
+    def __init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor):
         self.attacker = attacker
+        self.attacker_loot_factor = attacker_loot_factor # usually from stattab
         self.defender = defender
         self.base = base
         self.total_looted_uncapped = {} # total resource amounts looted, prior to capping to attacker's storage limit
@@ -156,8 +158,8 @@ class PerBuildingGradualLoot(object):
 
 # SG-style PvE looting: decrements a persistent base-wide specific total, deterministically
 class SpecificPvEResLoot(BaseResLoot):
-    def __init__(self, gamedata, session, attacker, defender, base):
-        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base)
+    def __init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor):
+        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor)
 
         self.modifier = 1.0
         self.modifier *= attacker.get_any_abtest_value('ai_loot_scale', 1) # note: do NOT apply gamedata['ai_bases_server']['loot_scale']
@@ -168,7 +170,7 @@ class SpecificPvEResLoot(BaseResLoot):
         # be stored in AIInstanceTable or in a cooldown or random
         # number seed on the player or something.
 
-        self.modifier *= attacker.stattab.get_player_stat('loot_factor_pve')
+        self.modifier *= attacker_loot_factor
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             self.modifier *= self.base.base_richness
         if self.base.base_region and (self.base.base_region in gamedata['regions']):
@@ -283,7 +285,7 @@ class TablePvEResLoot(BaseResLoot):
         # PvE-specific loot table modifiers
         loot_table_modifier = (1.0 + gamedata['ai_bases_server']['loot_randomness']*(2*random.random()-1))
         loot_table_modifier *= attacker.get_any_abtest_value('ai_loot_scale', gamedata['ai_bases_server']['loot_scale'])
-        loot_table_modifier *= attacker.stattab.get_player_stat('loot_factor_pve')
+        loot_table_modifier *= self.attacker_loot_factor
         if self.base.base_type != 'quarry' and self.base.base_richness > 0:
             loot_table_modifier *= self.base.base_richness
         if self.base.base_region and (self.base.base_region in gamedata['regions']):
@@ -344,13 +346,13 @@ class PvPResLoot(BaseResLoot):
 
         loot_attacker_gains = dict((res,
                                     base_loot_attacker_gains[res] * \
-                                    (self.attacker.stattab.get_player_stat('loot_factor_pvp') if self.attacker else 1) * \
+                                    self.attacker_loot_factor * \
                                     resdata.get('loot_attacker_gains',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
         loot_defender_loses = dict((res,
                                     base_loot_defender_loses[res] * \
-                                    (self.attacker.stattab.get_player_stat('loot_factor_pvp') if self.attacker else 1) * \
+                                    self.attacker_loot_factor * \
                                     resdata.get('loot_defender_loses',1),
                                     ) for res, resdata in gamedata['resources'].iteritems())
 
@@ -438,8 +440,8 @@ class HardcorePvPResLoot(PvPResLoot):
 
 # SG-style PvP looting: more similar to the "specific" PvE loot code
 class SpecificPvPResLoot(PvPResLoot):
-    def __init__(self, gamedata, session, attacker, defender, base):
-        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base)
+    def __init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor):
+        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor)
 
         if base.base_resource_loot is None:
             # we're going to persist this between logins to remember the amount of resources still "unexposed" to looting

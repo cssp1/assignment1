@@ -5045,7 +5045,7 @@ class Session(object):
 
         if not self.res_looter:
             gamesite.exception_log.event(server_time, 'deploy_ai_attack with no res_looter %s' % (self.dump_exception_state(),))
-            self.res_looter = ResLoot.ResLoot(gamedata, self, RogueOwner, self.viewing_player, self.viewing_base)
+            self.res_looter = ResLoot.ResLoot(gamedata, self, RogueOwner, self.viewing_player, self.viewing_base, 1)
 
         self.deployed_units = {}
         self.has_attacked = True
@@ -9297,6 +9297,15 @@ class Player(AbstractPlayer):
         if raid_mode:
             feature['raid'] = raid_mode
             feature['max_cargo'] = max_cargo
+
+            # add player data that defenders will need to know to resolve battles/looting
+            feature['player_stattab'] = self.stattab.serialize_for_squad()
+            # modestly censored version of player auras
+            feature_player_auras = [aura for aura in self.player_auras if gamedata['auras'][aura['spec']].get('show_in_battle_log',True)]
+            if feature_player_auras:
+                feature['player_auras'] = feature_player_auras
+            feature['player_tech'] = self.tech
+
             exclusive = -1 # no collision checks
             exclude_filter = None
         elif self.squad_block_mode() == 'never':
@@ -10903,6 +10912,17 @@ class Player(AbstractPlayer):
             if d:
                 return ModChain.get_stat(d.get(stat, None), default_value)
             return default_value
+
+        # subset of properties needed to resolve attacks remotely
+        def serialize_for_squad(self):
+            return {'quarry_control_limit': self.quarry_control_limit,
+                    'player': dict((key, self.serialize_modchain_for_squad(val)) for key, val in self.player_stats.iteritems() \
+                                   if key.startswith('loot_factor_')),
+                    'units': dict((specname, dict((key, self.serialize_modchain_for_squad(val)) for key, val in unit_stats.iteritems())) \
+                                  for specname, unit_stats in self.units.iteritems()),
+                    }
+        # drop everything except the final value
+        def serialize_modchain_for_squad(self, chain): return {'val': chain['val']}
 
         def serialize(self):
             return {
@@ -18244,7 +18264,8 @@ class GAMEAPI(resource.Resource):
         change_retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
         change_retmsg.append(["DONATED_UNITS_UPDATE", session.player.donated_units])
 
-        session.res_looter = ResLoot.ResLoot(gamedata, session, session.player, session.viewing_player, session.viewing_base)
+        session.res_looter = ResLoot.ResLoot(gamedata, session, session.player, session.viewing_player, session.viewing_base,
+                                             session.player.stattab.get_player_stat('loot_factor_pve' if session.viewing_player.is_ai() else 'loot_factor_pvp'))
 
         # tell client about res looter state
         session.res_looter.send_update(change_retmsg)
