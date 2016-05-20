@@ -23,6 +23,9 @@
     "hstar_iter_limit": 20, // A* search iteration limit, relative to largest map dimension (actual limit is this * MAX(width,height))
     "hstar_use_connectivity": 1, // pre-compute map connectivity for squad pathfinding (slows common case but improves worst case of pathfinding into enclosed spaces)
 
+    "raid_pvp_attempts_max": 10, // max number of PvP raid attempts you can store up
+    "raid_pvp_attempt_cooldown": 3600, // time to regain one PvP raid attempt
+
     "quarry_requirement": { "predicate": "LIBRARY", "name": "quarry_requirement" },
     "quarry_play_requirement": { "predicate": "LIBRARY", "name": "quarry_play_requirement" },
     "change_region_requirement": { "predicate": "LIBRARY", "name": "change_region_requirement" },

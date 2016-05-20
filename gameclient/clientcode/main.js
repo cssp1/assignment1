@@ -6354,6 +6354,26 @@ player.quarry_guards_enabled = function() { return player.get_territory_setting(
 /** @return {boolean} */
 player.raids_enabled = function() { return player.get_territory_setting('enable_raids'); };
 
+/** @return {number} */
+player.raid_pvp_attempts_left = function() {
+    var cd = player.cooldown_find('raid_pvp_attempt');
+    var cd_time = player.get_territory_setting('raid_pvp_attempt_cooldown');
+    var attempts_max = player.get_territory_setting('raid_pvp_attempts_max');
+    var consumed = (cd ? ('stack' in cd ? cd['stack'] : 1) : 0);
+    if(cd) {
+        // passage of time
+        consumed -= Math.max(0, Math.floor((server_time - cd['start']) / cd_time));
+    }
+    return Math.max(0, attempts_max - consumed);
+};
+/** @return {number} seconds until next attempt is added, -1 if full */
+player.raid_pvp_attempt_next_in = function() {
+    var cd = player.cooldown_find('raid_pvp_attempt');
+    if(!cd) { return -1; }
+    var cd_time = player.get_territory_setting('raid_pvp_attempt_cooldown');
+    return cd_time - ((server_time - cd['start']) % cd_time);
+};
+
 /** @return {string} */
 player.squad_block_mode = function() {
     var mode = player.get_territory_setting('squad_block_mode');
@@ -20997,6 +21017,21 @@ function toggle_region_map() {
 
 function update_region_map(dialog) {
     update_map_dialog_header_buttons(dialog.widgets['header_buttons']);
+
+    if(player.raids_enabled()) {
+        var left = player.raid_pvp_attempts_left();
+        var togo = player.raid_pvp_attempt_next_in();
+        var ui_text;
+        if(togo > 0) {
+            ui_text = dialog.data['widgets']['raid_pvp_attempts']['ui_name_next'].replace('%d', left).replace('%s', pretty_print_time(togo));
+        } else {
+            ui_text = dialog.data['widgets']['raid_pvp_attempts']['ui_name_full'].replace('%d', left);
+        }
+        dialog.widgets['raid_pvp_attempts'].set_text_bbcode(ui_text);
+
+    } else {
+        dialog.widgets['raid_pvp_attempts'].show = false;
+    }
 
     dialog.widgets['map'].time = server_time;
 

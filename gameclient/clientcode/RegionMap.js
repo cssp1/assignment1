@@ -1005,8 +1005,10 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
         }; })(this, feature);
         var wrapped_raid_cb = (will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
 
-        if(feature['base_type'] === 'home' && ('protection_end_time' in feature) && (feature['protection_end_time'] === 1 || feature['protection_end_time'] >= this.time)) {
-            ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled']);
+        if(feature['base_type'] === 'home' && player.raid_pvp_attempts_left() < 1) {
+            ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled', gamedata['strings']['regional_map']['next_raid_in'].replace('%s', pretty_print_time(player.raid_pvp_attempt_next_in())), SPUI.error_text_color]);
+        } else if(feature['base_type'] === 'home' && ('protection_end_time' in feature) && (feature['protection_end_time'] === 1 || feature['protection_end_time'] >= this.time)) {
+            ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled', gamedata['strings']['regional_map']['under_protection'], SPUI.error_text_color]);
         } else {
             ret.push([gamedata['strings']['regional_map']['call_raid'], wrapped_raid_cb, 'normal']);
         }

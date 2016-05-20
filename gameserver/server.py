@@ -8701,6 +8701,35 @@ class Player(AbstractPlayer):
     def num_deployed_raids(self):
         return len([d for d in self.squads.itervalues() if ('map_loc' in d) and d.get('raid')])
 
+    # raid_pvp_attempt cooldown:
+    # "start" is the last time a stack was added / attempt was consumed
+    # "end" is the time when all stacks will be gone / attempts restored
+    def raid_pvp_attempts_left(self):
+        cd = self.cooldown_find('raid_pvp_attempt')
+        cd_time = self.get_territory_setting('raid_pvp_attempt_cooldown')
+        if cd:
+            # update stack count
+            while server_time - cd['start'] > cd_time:
+                cd['stack'] = cd.get('stack',1) - 1
+                cd['start'] += cd_time
+                assert cd['start'] < server_time
+            if cd['stack'] <= 0:
+                del self.cooldowns['raid_pvp_attempt']
+                cd = None
+        attempts_max = self.get_territory_setting('raid_pvp_attempts_max')
+        if not cd:
+            return attempts_max
+        else:
+            return max(0, attempts_max - cd.get('stack',1))
+
+    def raid_pvp_attempt_consume(self):
+        cd = self.cooldown_find('raid_pvp_attempt')
+        if cd:
+            cd['stack'] = cd.get('stack',1) + 1
+            cd['end'] += gamedata['territory']['raid_pvp_attempt_cooldown']
+        else:
+            self.cooldown_trigger('raid_pvp_attempt', gamedata['territory']['raid_pvp_attempt_cooldown'], add_stack = 1)
+
     def which_squad_is_under_repair(self):
         squad_under_repair = None
         for item in self.unit_repair_queue:
@@ -9398,6 +9427,9 @@ class Player(AbstractPlayer):
                             elif server_time < self.get_repeat_attack_cooldown_expire_time(x['base_landlord_id'], x['base_id']):
                                 return False, [rollback_feature], ["CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"]
 
+                            elif self.raid_pvp_attempts_left() < 1:
+                                return False, [rollback_feature], ["CANNOT_ATTACK_RAID_PVP_ATTEMPT_LIMIT"]
+
                             # init_attack() minus the defender-only parts
                             is_revenge_attack = self.cooldown_active('revenge_defender:%d' % x['base_landlord_id'])
                             if is_revenge_attack:
@@ -9406,6 +9438,7 @@ class Player(AbstractPlayer):
 
                             if not on_success:
                                 def on_attack_launch():
+                                    self.raid_pvp_attempt_consume()
                                     self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
 
                                     # remove the protection timer of the player making the attack
@@ -9414,8 +9447,9 @@ class Player(AbstractPlayer):
                                                                  {'defender_id':x['base_landlord_id']})
                                     # create revenge allowance
                                     if gamedata['matchmaking']['revenge_time'] > 0:
-                                        # note: update not sent to client at this time
                                         self.cooldown_trigger('revenge_attacker:%d' % x['base_landlord_id'], gamedata['matchmaking']['revenge_time'])
+
+                                    session.send([["COOLDOWNS_UPDATE", self.cooldowns]])
 
                                     record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
 

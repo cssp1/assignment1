@@ -8296,6 +8296,12 @@
             "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "!TX desktop map/attack button" },
 
+            "raid_pvp_attempts": { "kind": "RichTextField", "xy": [137,18], "dimensions": [300, 41], "text_size": 13,
+                                   "text_hjustify": "left",
+                                   "ui_name_full": "PvP Raid Attempts Left: %d",
+                                   "ui_name_next": "PvP Raid Attempts Left: %d [color=#ffff39](next in %s)[/color]",
+                                   "layout": { "hjustify": "center", "vjustify": "top" } },
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1,
                               "layout": { "hjustify": "right", "vjustify": "top" } },
 
