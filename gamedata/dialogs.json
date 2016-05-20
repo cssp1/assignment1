@@ -7251,19 +7251,19 @@
             "portrait_left": {"kind": "FriendPortrait", "xy":[62,100], "dimensions": [50,50], "push_bg_image": 1 },
             "portrait_outline_left": { "kind": "SolidRect", "xy":[62,100], "dimensions":[50,50],
                                        "color": [0,0,0,0], "outline_color": [0.4,0.4,0.4,1], "outline_width": 1 },
-            "level_left": {"kind": "TextField", "xy": [28,158], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
+            "level_left": {"kind": "TextField", "xy": [28,152], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
 
             "portrait_right": {"kind": "FriendPortrait", "xy":[654,100], "dimensions": [50,50], "push_bg_image": 1 },
             "portrait_outline_right": { "kind": "SolidRect", "xy":[654,100], "dimensions":[50,50],
                                         "color": [0,0,0,0], "outline_color": [0.4,0.4,0.4,1], "outline_width": 1 },
-            "level_right": {"kind": "TextField", "xy": [621,158], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
+            "level_right": {"kind": "TextField", "xy": [621,152], "dimensions": [120,36], "text_size": 13, "text_style": "bold", "ui_name": "L%level"},
 
 
-            "coords_left": {"kind": "TextField", "xy": [157,158], "dimensions": [159,36], "text_size": 13,
+            "coords_left": {"kind": "TextField", "xy": [157,152], "dimensions": [159,36], "text_size": 13,
                             "text_hjustify": "right", "ui_name": "123,456"},
-            "coords_right": {"kind": "TextField", "xy": [449,158], "dimensions": [159,36], "text_size": 13,
+            "coords_right": {"kind": "TextField", "xy": [449,152], "dimensions": [159,36], "text_size": 13,
                              "text_hjustify": "right", "ui_name": "123,456"},
-            "site_size": {"kind": "TextField", "xy": [451,158], "dimensions": [159,36], "text_size": 13, "text_style": "bold",
+            "site_size": {"kind": "TextField", "xy": [451,152], "dimensions": [159,36], "text_size": 13, "text_style": "bold",
                           "text_hjustify": "left", "ui_name": "Size: %qsize"},
 
             "vs": {"kind": "TextField", "xy": [385,50], "dimensions": [0,36], "text_size": 19, "ui_name": "vs", "drop_shadow": 1},
@@ -7283,25 +7283,34 @@
                           "ui_name_worst": "[color=#ff0000]>>>[/color]"
                          },
 
-            "str_sunken_left": {"kind":"StaticImage","xy":[160,198],"dimensions":[160,125], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
-            "str_sunken_right": {"kind":"StaticImage","xy":[450,198],"dimensions":[160,125], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "str_label_left": {"kind": "TextField", "xy": [160,182], "dimensions": [160,18], "text_size": 13, "ui_name": "Your Offense",
+                               "text_color": [0.5,0.5,0.5] },
+            "str_label_right": {"kind": "TextField", "xy": [450,182], "dimensions": [160,18], "text_size": 13, "ui_name": "Enemy Defense",
+                                "text_color": [0.5,0.5,0.5] },
 
-            "str_prog_left": { "kind": "ProgressBar", "xy": [185,213], "dimensions": [20,73], "outline_width": 1.5, "orientation": "vertical",
-                               "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
-                               "array": [4,1], "array_offset": [30,0] },
-            "str_prog_right": { "kind": "ProgressBar", "xy": [475,213], "dimensions": [20,73], "outline_width": 1.5, "orientation": "vertical",
-                               "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
-                               "array": [4,1], "array_offset": [30,0] },
+            "str_sunken_left": {"kind":"StaticImage","xy":[160,201],"dimensions":[160,122], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
+            "str_sunken_right": {"kind":"StaticImage","xy":[450,201],"dimensions":[160,122], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},
 
-            "damage_vs_left": { "kind": "StaticImage", "xy": [185,292], "dimensions": [21,21], "asset": "damage_vs_rover", "state": "ineffective",
+            "str_prog_left": { "kind": "ProgressBar", "xy": [182,214], "dimensions": [20,73], "orientation": "vertical",
+                               "outline_width": 1.5, "outline_fit": 1,
+                               "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
+                               "array": [5,1], "array_offset": [24,0] },
+            "str_prog_right": { "kind": "ProgressBar", "xy": [472,214], "dimensions": [20,73], "orientation": "vertical",
+                                "outline_width": 1.5, "outline_fit": 1,
+                                "full_color": [0.006,0.24,0.08,0.5], "empty_color": [0,0,0,0], "outline_color": [0.012,0.48,0.16,1],
+                                "array": [5,1], "array_offset": [24,0] },
+
+            "damage_vs_left": { "kind": "StaticImage", "xy": [182,214], "dimensions": [21,100], "asset": "damage_vs_rover", "state": "ineffective",
                                 "ui_tooltip": "Offense vs. %CATNAME: %d", "tooltip_delay": 0,
-                                "array": [4,1], "array_offset": [30,0] },
-            "damage_vs_right": { "kind": "StaticImage", "xy": [475,292], "dimensions": [21,21], "asset": "damage_vs_rover", "state": "ineffective",
-                                "ui_tooltip": "Defense vs. %CATNAME: %d", "tooltip_delay": 0,
-                                "array": [4,1], "array_offset": [30,0] },
+                                "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
+                                "array": [5,1], "array_offset": [24,0] },
+            "damage_vs_right": { "kind": "StaticImage", "xy": [472,214], "dimensions": [21,100], "asset": "damage_vs_rover", "state": "ineffective",
+                                "ui_tooltip": "%CATNAME: %d", "tooltip_delay": 0,
+                                "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
+                                "array": [5,1], "array_offset": [24,0] },
 
-            "str_line_left": {"kind": "Line", "xy": [175,286], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
-            "str_line_right": {"kind": "Line", "xy": [465,286], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
+            "str_line_left": {"kind": "Line", "xy": [175,287], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
+            "str_line_right": {"kind": "Line", "xy": [465,287], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
 
             "str_unknown_right": {"kind": "TextField", "xy": [450,198], "dimensions": [160,124], "text_size": 48,
                                  "text_style": "bold", "drop_shadow": 1, "text_color": [0.5,0.5,0.5,1], "ui_name": "?"},

@@ -2848,6 +2848,10 @@ SPUI.Line.prototype.do_draw = function(offset) {
   */
 SPUI.ProgressBar = function(data) {
     goog.base(this, data);
+
+    // if true, only outline the filled portion. Otherwise outline the filled+empty area
+    this.outline_fit = ('outline_fit' in data ? data['outline_fit'] : false);
+
     this.outline_width = data['outline_width'] || 2;
     var col = data['outline_color'] || [0.02,0.02,0.02,0.5];
     // outline of the bar
@@ -2896,12 +2900,28 @@ SPUI.ProgressBar.prototype.do_draw = function(offset) {
         SPUI.ctx.clip();
     }
     if(this.alpha < 1) { SPUI.ctx.globalAlpha = this.alpha; }
-    SPUI.ctx.fillStyle = this.empty_color.str();
-    SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], this.wh[0], this.wh[1]);
+    if(this.empty_color.a > 0) {
+        SPUI.ctx.fillStyle = this.empty_color.str();
+        SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], this.wh[0], this.wh[1]);
+    }
     this.progress = Math.min(Math.max(this.progress, 0), 1);
 
     var end = Math.floor(this.progress*this.wh[(this.orientation === 'vertical' ? 1 : 0)]);
+
+    // [x,y,w,h] of filled area. null if absent.
+    var bar;
+
     if(this.progress > 0) {
+        if(this.orientation === 'vertical') {
+            bar = [offset[0]+this.xy[0], offset[1]+this.xy[1]+this.wh[1]-end, this.wh[0], end];
+        } else {
+            bar = [offset[0]+this.xy[0], offset[1]+this.xy[1], end, this.wh[1]];
+        }
+    } else {
+        bar = null;
+    }
+
+    if(bar) {
         var col;
         if(this.low_color) {
             col = SPUI.Color.mix(this.low_color, this.full_color, this.progress);
@@ -2909,16 +2929,16 @@ SPUI.ProgressBar.prototype.do_draw = function(offset) {
             col = this.full_color;
         }
         SPUI.ctx.fillStyle = (this.full_mouseover_color && this.mouse_enter_time > 0) ? this.full_mouseover_color.str() : col.str();
-        if(this.orientation === 'vertical') {
-            SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1]+this.wh[1]-end, this.wh[0], end);
-        } else {
-            SPUI.ctx.fillRect(offset[0]+this.xy[0], offset[1]+this.xy[1], end, this.wh[1]);
-        }
+        SPUI.ctx.fillRect(bar[0], bar[1], bar[2], bar[3]);
     }
-    if(this.outline_width > 0) {
+    if(this.outline_width > 0 && (!this.outline_fit || bar)) {
         SPUI.ctx.lineWidth = this.outline_width;
         SPUI.ctx.strokeStyle = this.outline_color.str();
-        SPUI.ctx.strokeRect(offset[0]+this.xy[0], offset[1]+this.xy[1], this.wh[0], this.wh[1]);
+        if(this.outline_fit) { // filled area only
+            SPUI.ctx.strokeRect(bar[0], bar[1], bar[2], bar[3]);
+        } else { // entire outline
+            SPUI.ctx.strokeRect(offset[0]+this.xy[0], offset[1]+this.xy[1], this.wh[0], this.wh[1]);
+        }
     }
     if(this.ticks) {
         SPUI.ctx.strokeStyle = this.tick_color.str();

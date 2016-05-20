@@ -251,9 +251,10 @@ RaidDialog.calc_advantage = function(attacker_strength, defender_strength) {
     @param {boolean} scout_only
 */
 RaidDialog.update_strength = function(dialog, side, strength, scout_only, opponent_strength) {
-    dialog.widgets['str_sunken_'+side].show =
+    dialog.widgets['str_label_'+side].show =
+        dialog.widgets['str_sunken_'+side].show =
         dialog.widgets['str_line_'+side].show = (strength !== null);
-    for(var x = 0; x < dialog.data['widgets']['str_prog_left']['array'][0]; x++) {
+    for(var x = 0; x < dialog.data['widgets']['str_prog_'+side]['array'][0]; x++) {
         dialog.widgets['str_prog_'+side+x.toString()].show =
             dialog.widgets['damage_vs_'+side+x.toString()].show = false;
     }
@@ -277,12 +278,18 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
         }
     }
 
-    // all normal categories, minus buildings, plus scout
+    // all normal categories, plus scout
     var CATS = gamedata['strings']['damage_vs_categories'].concat([["scout","scout"]]);
     var x = 0;
     for(var i = 0; i < CATS.length; i++) {
         var key = CATS[i][0], catname = CATS[i][1];
-        if(key === 'building') { continue; } // skip buildings
+
+        /*
+        if(key === 'building' && side === 'right') {
+            // skip buildings for the defender
+            continue;
+        }
+        */
 
         var widget = dialog.widgets['damage_vs_'+side+x.toString()];
 
@@ -312,7 +319,7 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
         }
         widget.tooltip.str = widget.data['ui_tooltip'].replace('%CATNAME', ui_name).replace('%d', pretty_print_number(q));
         x += 1;
-        if(x >= dialog.data['widgets']['str_prog_left']['array'][0]) { break; }
+        if(x >= dialog.data['widgets']['str_prog_'+side]['array'][0]) { break; }
     }
 };
 
