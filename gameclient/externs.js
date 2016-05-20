@@ -157,13 +157,13 @@ var XPayStationWidget = {
 // (only needed for the Browserified version.
 // Unfortunately, this prevents Closure from shortening the API names.)
 var pako = {
-    /** @param {string|Array} input
-        @param {{to:(string|undefined)}} options
-        @return {string|Array} */
+    /** @param {string|Uint8Array|Array<number>} input
+        @param {{to:(string|undefined)}=} options
+        @return {string|Uint8Array|Array<number>} */
     "gzip": function(input, options) {},
-    /** @param {string|Array} input
-        @param {{to:(string|undefined)}} options
-        @return {string|Array} */
+    /** @param {string|Uint8Array|Array<number>} input
+        @param {{to:(string|undefined)}=} options
+        @return {string|Uint8Array|Array<number>} */
     "ungzip": function(input, options) {}
 };
 

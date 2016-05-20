@@ -1718,9 +1718,8 @@ class GameProxy(proxy.ReverseProxyResource):
         else:
             load_game_code = ''
             # load third-party CommonJS libraries using their browserified variant
-            # and reference the module under its mangled name to prevent errors in base.js
-            load_game_code += '<script type="text/javascript" src="pako/dist/pako.min.js"></script>' + \
-                              '<script type="text/javascript">module$pako$index = pako;</script>'
+            load_game_code += '<script type="text/javascript" src="pako/dist/pako.min.js"></script>'
+            # ^ defines "pako" as a global symbol, which will be picked up within SPGzip.js
             load_game_code += '<script type="text/javascript" src="google/closure/goog/base.js"></script>'
             load_game_code += '<script type="text/javascript" src="generated-deps.js"></script>'
             load_game_code += '<script type="text/javascript">goog.require("SPINPUNCHGAME");</script>'

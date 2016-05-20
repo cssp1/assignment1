@@ -15,18 +15,13 @@ goog.provide('SPGzip');
 // The hack works as follows:
 // - Plaintext code: we load the Browserified version of the library manually (see proxyserver)
 // and then fake out base.js to pretend that it's been loaded under the mangled module name.
-// - Compiled code: we goog.require() the mangled module name
+// - Compiled code: we require() the true module name
 // so that Closure finds the source files and links up the type info.
 
-goog.require('module$pako$index');
-
-// Note: for plaintext code, "module$pako$index" will already be defined by the pre-loaded Browserified code.
+// Note: for plaintext code, "pako" will already be defined by the pre-loaded Browserified code.
 // For compiled code, we need to assign it ourselves.
 
-SPGzip.pako = null;
-if(!SPGzip.pako) { // necessary to avoid Closure compiler error
-    SPGzip.pako = goog.module.get('module$pako$index');
-}
+SPGzip.pako = (typeof(pako) === 'undefined' ? require('../pako') : pako);
 
 /** @param {!Array<number>|Uint8Array} input
     @return {!Array<number>|Uint8Array} */

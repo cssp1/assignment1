@@ -89,6 +89,7 @@ CLOSURE_LIB_FILES:= --js='google/third_party/closure/goog/mochikit/async/*.js' \
  --js='!google/closure/goog/labs/storage/**' \
  --js='!google/closure/goog/module/testdata/**' \
  --js='!google/closure/goog/positioning/**' \
+ --js='!google/closure/goog/promise/testsuiteadapter.js' \
  --js='!google/closure/goog/storage/**' \
  --js='!google/closure/goog/testing/**' \
  --js='!google/closure/goog/tweak/**' \
