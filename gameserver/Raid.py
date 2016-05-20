@@ -458,7 +458,7 @@ def make_battle_summary(gamedata, nosql_client,
                         # object state lists
                         attacker_units_before, defender_units_before,
                         attacker_units_after, defender_units_after,
-                        loot, raid_mode = None, base_damage = None):
+                        loot, raid_mode = None, base_damage = None, is_revenge = False):
     ret = {'time' : time_now,
            'base_region' : region_id,
            'base_map_loc' : base['base_map_loc'],
@@ -481,6 +481,8 @@ def make_battle_summary(gamedata, nosql_client,
            }
     if base_damage is not None:
         ret['base_damage'] = base_damage
+    if is_revenge:
+        ret['is_revenge'] = is_revenge
     if base.get('base_template'):
         ret['base_template'] = base['base_template']
     ret['deployed_units'] = {}

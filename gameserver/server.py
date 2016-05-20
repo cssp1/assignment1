@@ -9358,6 +9358,9 @@ class Player(AbstractPlayer):
         # used for raids to tag the raid with extra info for this target
         add_props = {}
 
+        # additional function to call if move succeeds, used for raids
+        on_success = None
+
         if squad.get('raid'):
             if is_raid_launch:
                 # initial map entry. Make sure raid is going somewhere useful.
@@ -9397,17 +9400,27 @@ class Player(AbstractPlayer):
 
                             # init_attack() minus the defender-only parts
                             is_revenge_attack = self.cooldown_active('revenge_defender:%d' % x['base_landlord_id'])
-                            self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
-
-                            # remove the protection timer of the player making the attack
-                            self.set_protection_end_time(session, -1,
-                                                         '3884_protection_removed' if self.has_damage_protection() else None,
-                                                         {'defender_id':x['base_landlord_id']})
-                            record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
-
-                            # tag the feature with info the defender will need to know about us
                             if is_revenge_attack:
+                                # tag the feature with info the defender will need to know about us
                                 add_props['is_revenge_attack'] = 1
+
+                            if not on_success:
+                                def on_attack_launch():
+                                    self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
+
+                                    # remove the protection timer of the player making the attack
+                                    self.set_protection_end_time(session, -1,
+                                                                 '3884_protection_removed' if self.has_damage_protection() else None,
+                                                                 {'defender_id':x['base_landlord_id']})
+                                    # create revenge allowance
+                                    if gamedata['matchmaking']['revenge_time'] > 0:
+                                        # note: update not sent to client at this time
+                                        self.cooldown_trigger('revenge_attacker:%d' % x['base_landlord_id'], gamedata['matchmaking']['revenge_time'])
+
+                                    record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+                                on_success = on_attack_launch
+
 
             else:
                 # prevent re-directing raids anywhere other than back to home base
@@ -9564,6 +9577,8 @@ class Player(AbstractPlayer):
                 # could be integrated with move_map_feature(), or in a combined atomic enter/move step
                 gamesite.nosql_client.update_map_feature(self.home_region, self.squad_base_id(squad_id), add_props,
                                                          do_hook = False, reason = 'squad_step')
+            if on_success:
+                on_success()
 
         finally:
             if lock_id:

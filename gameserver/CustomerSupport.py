@@ -984,7 +984,8 @@ class HandleResolveHomeRaid(Handler):
                                               'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
                                               attacking_army, defending_army,
                                               new_attacking_army, new_defending_army,
-                                              actual_loot, raid_mode = raid_squads[0]['raid'], base_damage = base_damage)
+                                              actual_loot, raid_mode = raid_squads[0]['raid'], base_damage = base_damage,
+                                              is_revenge = is_revenge_attack)
 
                 # perform mutation on attacking army
                 # note: client should ping squads to get the army update
@@ -1001,6 +1002,11 @@ class HandleResolveHomeRaid(Handler):
                 # defender's battle statistics (attacker's is done via message)
                 defender_player.increment_battle_statistics(raid_squads[0]['base_landlord_id'], summary)
                 self.gamesite.nosql_client.battle_record(summary, reason = 'resolve_home_raid')
+
+                # create revenge allowance
+                if self.gamedata['matchmaking']['revenge_time'] > 0:
+                    defender_player.cooldown_trigger('revenge_defender:%d' % raid_squads[0]['base_landlord_id'], self.gamedata['matchmaking']['revenge_time'])
+                    if session: retmsg.append(["COOLDOWNS_UPDATE", defender_player.cooldowns])
 
                 # broadcast map attack for GUI and battle history jewel purposes
                 self.gamesite.gameapi.broadcast_map_attack(self.region_id, base_props,
