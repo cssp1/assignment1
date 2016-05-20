@@ -20668,7 +20668,7 @@ function invoke_generic_context_menu(xy, buttons, dialog_name, special_buttons) 
         for(i = 0; i < buttons.length; i++) {
             var but = buttons[i];
             var wname = (prefix ? prefix+'_' : '')+'button'+i.toString();
-            if(!wname in dialog.widgets) { throw Error('bad wname '+wname); }
+            if(!(wname in dialog.widgets)) { throw Error('bad wname '+wname); }
             var widget = dialog.widgets[wname];
             if(!but.ui_name) { throw Error('blank ui_name for button on '+dialog_name); }
             widget.str = but.ui_name;
