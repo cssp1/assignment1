@@ -23886,7 +23886,7 @@ class GAMEAPI(resource.Resource):
         player.migrate(session, user.user_id, user.account_creation_time, is_returning_user)
         player.prune_player_auras(is_session_change = True, is_login = True)
 
-        player.my_home.base_resource_loot = None # reset base_resource_loot state
+        player.my_home.base_resource_loot = None # reset base_resource_loot state on login
 
         # check the data proxyserver attached to the session to see if there are other players logging in from the same IP
         # note: must be done AFTER migrate() since the format of known_alt_accounts has changed

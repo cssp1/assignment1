@@ -763,9 +763,6 @@ class HandleResolveHomeRaid(Handler):
 
             self.attacker_ui_name = raid_pcinfos[0].get('ui_name','Unknown')
 
-            # note: OK to pass session = None
-            res_looter = ResLoot.ResLoot(self.gamedata, session, None, defender_player, defender_player.my_home, attacker_loot_factor_pvp)
-
             # defender side of init_attack() - attacker side is done on launch
             is_revenge_attack = raid_squads[0].get('is_revenge_attack')
             defender_player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
@@ -827,16 +824,14 @@ class HandleResolveHomeRaid(Handler):
                 squad_update, unused_base_update, unused_pve_loot, is_win, new_attacking_army, new_defending_army = \
                               resolve_raid(raid_squads[0], base_props, attacking_army, defending_army, self.gamedata)
 
-                is_conquest = is_win and (defender_player.resources.player_level >= raid_pcinfos[0]['player_level'])
+                is_conquest = is_win and raid_mode != 'scout' and (defender_player.resources.player_level >= raid_pcinfos[0]['player_level'])
 
                 #self.gamesite.exception_log.event(self.time_now, 'attacking_army %r\ndefending_army %r\nnew_attacking_army %r\nnew_defending_army %r' % (attacking_army, defending_army, new_attacking_army, new_defending_army))
 
-                # perform mutation on defender, including looting
-
-                actual_loot = {} # computed separately based on building damage using ResLooter code
+                # perform mutation on defender, not including looting
+                recalc_resources = False
 
                 if new_defending_army is not None:
-                    recalc_resources = False
                     recalc_power = False
 
                     for before, after in zip(defending_army, new_defending_army):
@@ -888,38 +883,6 @@ class HandleResolveHomeRaid(Handler):
                                             recalc_power = True
 
                                         if new_hp <= 0:
-                                            # looting!
-                                            # note: OK to pass session = None
-                                            looted, unused, lost = \
-                                                    res_looter.loot_building(self.gamedata, session, obj, obj.hp, new_hp, defender_player, None)
-
-                                            # note: the attacker isn't getting loot added directly here as in the RTS attack code
-                                            # instead, we are going to grab it from actual_loot[res] later
-
-                                            if looted or lost:
-                                                for res in looted:
-                                                    if looted[res] > 0:
-                                                        # note: the plain loot value is going to get decremented later if limited by raider's cargo capacity
-                                                        actual_loot[res] = actual_loot.get(res,0) + looted[res]
-                                                        actual_loot['looted_uncapped_'+res] = actual_loot.get('looted_uncapped_'+res,0) + looted[res]
-                                                        recalc_resources = True
-
-                                                for res in lost:
-                                                    if lost[res] > 0:
-                                                        actual_loot[res+'_lost'] = actual_loot.get(res+'_lost',0) + lost[res]
-                                                        recalc_resources = True
-
-                                                # record econ flow
-                                                # human attacking human - log the frictional loss only, because the rest is a transfer
-                                                # EXCEPT for harvesters, which generate from "thin air" because the owner hadn't collected the resources yet
-                                                if obj.is_producer():
-                                                    econ_delta = looted
-                                                    econ_reason = 'human'
-                                                else:
-                                                    econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
-                                                    econ_reason = 'friction'
-                                                self.gamesite.admin_stats.econ_flow_player(defender_player, 'loot', econ_reason, econ_delta)
-
                                             # XXX missing: on_destroy consequents
 
                                             for removed_item in obj.destroy_fragile_equipment_items():
@@ -938,43 +901,69 @@ class HandleResolveHomeRaid(Handler):
                             # offline version
                             defender_player.my_home.power_changed(None)
 
-                    if session and recalc_resources:
-                        retmsg.append(["PLAYER_STATE_UPDATE", defender_player.resources.calc_snapshot().serialize()])
 
-                # add loot to cargo here
-                if actual_loot:
-                    if (not is_win) or raid_mode == 'scout':
-                        # drop all loot
-                        for res in self.gamedata['resources']:
-                            if res in actual_loot:
-                                del actual_loot[res]
-                    else:
-                        cur_cargo = raid_squads[0].get('cargo', {})
-                        max_cargo = calc_max_cargo(new_attacking_army if (new_attacking_army is not None) else attacking_army, self.gamedata)
+                # LOOTING
+                actual_loot = {}
 
-                        wasted = {}
-                        for res in self.gamedata['resources']:
-                            if res in cur_cargo:
-                                if cur_cargo[res] > max_cargo.get(res,0):
-                                    # resources disappear if cargo-carrying units are destroyed
-                                    wasted[res] = - (cur_cargo[res] - max_cargo.get(res,0)) # negative quantity
-                                    cur_cargo[res] = min(cur_cargo.get(res,0), max_cargo.get(res,0))
-                            if res in actual_loot:
-                                if (res in max_cargo) and cur_cargo.get(res,0) < max_cargo[res]: # is there room for any loot?
-                                    amount = min(actual_loot[res], max_cargo[res] - cur_cargo.get(res,0))
-                                    actual_loot[res] = amount
-                                    cur_cargo[res] = cur_cargo.get(res,0) + amount
-                                else:
-                                    del actual_loot[res]
+                if is_win and raid_mode != 'scout':
+                    cur_cargo = raid_squads[0].get('cargo', {})
+                    max_cargo = calc_max_cargo(new_attacking_army if (new_attacking_army is not None) else attacking_army, self.gamedata)
+                    cargo_space = dict((res, max(0, max_cargo.get(res,0) - cur_cargo.get(res,0))) for res in self.gamedata['resources'])
 
-                        squad_update['max_cargo'] = max_cargo
-                        squad_update['cargo'] = cur_cargo
-                        squad_update['cargo_source'] = 'human'
+                    if any(cargo_space[res] > 0 for res in self.gamedata['resources']):
+                        if session:
+                            # reset base_resource_loot state for online attack
+                            defender_player.my_home.base_resource_loot = None
 
-                        if wasted:
-                            self.gamesite.admin_stats.econ_flow(raid_squads[0]['base_landlord_id'],
-                                                                get_denormalized_summary_props_from_pcache(self.gamedata, raid_pcinfos[0]),
-                                                                'waste', 'raid', wasted)
+                        # note: OK to pass session = None
+                        res_looter = ResLoot.AllOrNothingPvPResLoot(self.gamedata, session, None, defender_player, defender_player.my_home,
+                                                                    attacker_loot_factor_pvp, cargo_space)
+
+                        looted, lost = res_looter.do_loot_base(self.gamedata, session, defender_player)
+
+                        if looted or lost:
+                            for res in looted:
+                                if looted[res] > 0:
+                                    actual_loot[res] = actual_loot.get(res,0) + looted[res]
+                                    recalc_resources = True
+
+                            for res in lost:
+                                if lost[res] > 0:
+                                    actual_loot[res+'_lost'] = actual_loot.get(res+'_lost',0) + lost[res]
+                                    recalc_resources = True
+
+                            # record econ flow
+                            # human attacking human - log the frictional loss only, because the rest is a transfer
+                            econ_delta = dict((res,looted.get(res,0)-lost.get(res,0)) for res in self.gamedata['resources'])
+                            self.gamesite.admin_stats.econ_flow_player(defender_player, 'loot', 'friction', econ_delta)
+
+                            wasted = {}
+                            for res in self.gamedata['resources']:
+                                if res in cur_cargo:
+                                    if cur_cargo[res] > max_cargo.get(res,0):
+                                        # resources disappear if cargo-carrying units are destroyed
+                                        wasted[res] = - (cur_cargo[res] - max_cargo.get(res,0)) # negative quantity
+                                        cur_cargo[res] = min(cur_cargo.get(res,0), max_cargo.get(res,0))
+                                if res in actual_loot:
+                                    if (res in max_cargo) and cur_cargo.get(res,0) < max_cargo[res]: # is there room for any loot?
+                                        amount = min(actual_loot[res], max_cargo[res] - cur_cargo.get(res,0))
+                                        assert actual_loot[res] == amount # should be enured by ResLoot code
+                                        cur_cargo[res] = cur_cargo.get(res,0) + amount
+                                    else:
+                                        del actual_loot[res]
+
+                            if wasted:
+                                self.gamesite.admin_stats.econ_flow(raid_squads[0]['base_landlord_id'],
+                                                                    get_denormalized_summary_props_from_pcache(self.gamedata, raid_pcinfos[0]),
+                                                                    'waste', 'raid', wasted)
+
+                            squad_update['max_cargo'] = max_cargo
+                            squad_update['cargo'] = cur_cargo
+                            squad_update['cargo_source'] = 'human'
+
+
+                if session and recalc_resources:
+                    retmsg.append(["PLAYER_STATE_UPDATE", defender_player.resources.calc_snapshot().serialize()])
 
                 if raid_mode != 'scout':
                     base_damage = defender_player.my_home.calc_base_damage()

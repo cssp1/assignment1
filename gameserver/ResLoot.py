@@ -618,3 +618,48 @@ class SpecificPvPResLoot(PvPResLoot):
                     obj.contents -= lost[res]
 
         return looted, lost
+
+
+# Used for Raid PvP looting
+# Gives out all the loot for a battle at once
+class AllOrNothingPvPResLoot(PvPResLoot):
+    def __init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor, cargo_space):
+        BaseResLoot.__init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor)
+
+        loot_attacker_gains, loot_defender_loses = self.compute_gain_loss_coeffs(gamedata, session, 'storage')
+        for res in gamedata['resources']:
+            assert 0 < loot_attacker_gains[res] <= loot_defender_loses[res] <= 1
+
+        if base.base_resource_loot is None:
+            # we're going to persist this until the defender logs in next, to remember the amount of resources still "unexposed" to looting
+            base.base_resource_loot = dict((res, getattr(defender.resources, res)) for res in gamedata['resources'])
+
+        # on win, how much the attacker will gain, limited by cargo space
+        self.looted = dict((res,
+                            min(cargo_space.get(res,0),
+                                int(loot_attacker_gains[res] * base.base_resource_loot.get(res,0) + 0.5))) \
+                           for res in gamedata['resources'])
+
+        # on win, how much the defender will lose, scaled off attacker's loot
+        self.lost = dict((res,
+                          min(base.base_resource_loot.get(res,0),
+                              int(((1.0*loot_defender_loses[res])/loot_attacker_gains[res]) * self.looted[res] + 0.5))) \
+                         for res in gamedata['resources'])
+
+        self.exposed = dict((res,
+                             min(base.base_resource_loot.get(res,0),
+                                 int((1.0/loot_defender_loses[res]) * self.lost[res] + 0.5))) \
+                            for res in gamedata['resources'])
+
+    # all looting for a battle happens in this one function
+    def do_loot_base(self, gamedata, session, owning_player):
+
+        # loot is taken directly from the owner's stored resources
+        owning_player.resources.gain_res(dict((res,-self.lost[res]) for res in gamedata['resources']), reason='looted_by_attacker')
+
+        # persist the fraction "seen" by the looting code, and only subject the remainder to future looting
+        # (only relevant if the defender is off-line. Otherwise base_resource_loot is reset on attack.)
+        for res in gamedata['resources']:
+            self.base.base_resource_loot[res] = max(0, self.base.base_resource_loot[res] - self.exposed[res])
+
+        return self.looted, self.lost
