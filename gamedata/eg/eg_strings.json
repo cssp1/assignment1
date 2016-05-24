@@ -714,8 +714,8 @@
     /// refund message used when Facebook returns a "declined" status (asynchronous rejection of the transaction - sometimes happens with debit cards when your bank account has insufficient funds)
     "gamebucks_refund_mail_decline": { "ui_from": "Narrator",
                                        "duration": -1,
-                                       "ui_subject": "Refund complete",
-                                       "ui_body": "Your purchase of %QUANTITY %GAMEBUCKS_NAME from %DAY at %TIME GMT was declined by Facebook, and has been refunded.\n\nYou will not be charged for this purchase.\n\nPayment ID: %PAYMENT_ID"},
+                                       "ui_subject": "Payment issue",
+                                       "ui_body": "Your attempt to purchase %QUANTITY %GAMEBUCKS_NAME on %DAY at %TIME GMT was declined by your payment method, and has been refunded.\n\nYou will not be charged for this purchase.\n\nThis may be the result of an insufficient bank balance or other problem with your online payment method. For more information, submit a request to [u][color=#ffff00][url=https://www.facebook.com/help/contact/830921593618796]Facebook Support[/url][/color][/u].\nYour Payment ID: %PAYMENT_ID"},
 
     "gift_order_refund_mail": { "ui_from": "Narrator",
                                 "duration": -1,
