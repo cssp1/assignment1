@@ -357,8 +357,16 @@ class AuraActivePredicate(Predicate):
         self.min_stack = data.get('min_stack',1)
         self.match_data = data.get('match_data', None)
     def is_satisfied(self, player, qdata):
+        return self.is_satisfied2(None, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         player.prune_player_auras()
-        for aura in player.player_auras:
+        aura_list = player.player_auras
+        if override_time is not None:
+            # also check against recently-expired auras (e.g. for sales)
+            aura_list = aura_list + player.get_player_auras_recently_expired(override_time)
+        for aura in aura_list:
+            if override_time is not None and aura.get('start_time',-1) > override_time: continue
+
             if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
                 if self.match_data is not None:
                     is_matched = True
@@ -374,7 +382,9 @@ class AuraInactivePredicate(Predicate):
         Predicate.__init__(self, data)
         self.act_pred = AuraActivePredicate(data)
     def is_satisfied(self, player, qdata):
-        return not self.act_pred.is_satisfied(player, qdata)
+        return self.is_satisfied2(None, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return not self.act_pred.is_satisfied2(session, player, qdata, override_time = override_time)
 
 class CooldownActivePredicate(Predicate):
     def __init__(self, data):
@@ -515,7 +525,7 @@ class GamedataVarPredicate(Predicate):
         self.method = method or '=='
 
     def is_satisfied2(self, session, player, qdata, override_time = None):
-        test_value = eval_cond_or_literal(player.get_gamedata_var(self.name), session, player)
+        test_value = eval_cond_or_literal(player.get_gamedata_var(self.name), session, player, qdata, override_time = override_time)
         if self.method == '==':
             return test_value == self.value
         elif self.method == 'in':

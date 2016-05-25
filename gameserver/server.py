@@ -2629,6 +2629,9 @@ class PlayerTable:
               # because A/B tests might alter tech specs, and tech might alter auras, and auras alter my_base reconstitution
               ('abtests', None, None),
               ('tech', None, lambda player, observer, tech: player.load_tech_and_init_stattab(observer, tech)),
+
+              # important! this must come BEFORE player_auras because load_auras_and_init_stattab() may mutate it!
+              ('player_auras_recently_expired', None, None),
               ('player_auras', None, lambda player, observer, auras: player.load_auras_and_init_stattab(observer, auras)),
 
               ('home_region', None, None),
@@ -8063,6 +8066,9 @@ class Player(AbstractPlayer):
         # list of {"spec": "aura_name", "strength": 1234, "start_time": 1234567, "end_time": 1234568 }
         self.player_auras = []
 
+        # auras that expired recently - used for AuraActive predicates with override_time
+        self.player_auras_recently_expired = []
+
         self.stattab = None # this should be initialized in load_auras/load_tech by the parsing code
 
         self.travel_state = {'dest_loc':None, 'start_time':-1, 'end_time':-1, 'attacks_made': 0}
@@ -8334,8 +8340,26 @@ class Player(AbstractPlayer):
                 metric_event_coded(self.user_id, '5142_dp_cancel_aura_ended', {'aura_name': aura['spec'], 'start_time': aura.get('start_time',-1)}) # XXX hack
                 continue
 
-        for aura in to_remove: self.player_auras.remove(aura)
+        for aura in to_remove:
+            self.player_auras.remove(aura)
+            if 'end_time' in aura and \
+               aura['spec'] in gamedata['auras'] and \
+               gamedata['auras'][aura['spec']].get('track_recently_expired',False):
+                self.player_auras_recently_expired.append(aura)
+
+        to_remove_expired = []
+        for aura in self.player_auras_recently_expired:
+            if (server_time - aura.get('end_time',-1)) >= gamedata['server'].get('player_auras_track_recently_expired_for',86400): # keep for one day
+                to_remove_expired.append(aura)
+        for aura in to_remove_expired:
+            self.player_auras_recently_expired.remove(aura)
+
         return bool(to_remove)
+
+    def get_player_auras_recently_expired(self, ref_time):
+        return filter(lambda aura: aura.get('start_time',-1) <= ref_time and \
+                                   aura.get('end_time',-1) > ref_time,
+                      self.player_auras_recently_expired)
 
     def do_remove_aura(self, aura_name, remove_stack = -1, data = None):
         for aura in self.player_auras:
@@ -26916,6 +26940,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                 else:
                     session.player.player_auras = []
+                    session.player.player_auras_recently_expired = []
                     session.player.recalc_stattab(session.player)
                     session.player.stattab.send_update(session, retmsg)
             elif spellname == "CHEAT_GIVE_GAMEBUCKS":
