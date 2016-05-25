@@ -27,7 +27,7 @@ def ResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor):
         if defender.home_region and defender.home_region in gamedata['regions'] and 'pvp_loot_method' in gamedata['regions'][defender.home_region]:
             pvp_loot_method = gamedata['regions'][defender.home_region]['pvp_loot_method']
         pvp_loot_method = defender.get_any_abtest_value('pvp_loot_method', pvp_loot_method)
-        if (base is not defender.my_home) and pvp_loot_method == 'specific': # XXX remove home_base condition for AI attacks?
+        if pvp_loot_method == 'specific' and ((not attacker) or (base is not attacker.my_home)): # XXX remove home_base condition for AI attacks?
             return SpecificPvPResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
         else:
             return HardcorePvPResLoot(gamedata, session, attacker, defender, base, attacker_loot_factor)
