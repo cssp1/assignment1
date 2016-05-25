@@ -37636,6 +37636,12 @@ function update_buy_gamebucks_sku23(dialog) {
     var spell = dialog.user_data['spell'];
     var spellarg = dialog.user_data['spellarg'];
 
+    if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
+        // spell disappeared (e.g. due to sale running out)
+        dialog.show = false;
+        return;
+    }
+
     dialog.widgets['loading_spinner'].show = dialog.widgets['hider'].show = pending;
     var hi = (dialog.mouse_enter_time > 0) && (!dialog.widgets['hider'].show) && !pending;
     dialog.xy = [dialog.user_data['base_xy'][0],
@@ -37849,12 +37855,16 @@ function update_buy_gamebucks_sku23(dialog) {
     //dialog.widgets['price_display'].state = ((display_currency == 'Facebook Credits' && payment_currency == 'fbcredits') || player.get_any_abtest_value('always_show_fbcredits_logo', gamedata['store']['always_show_fbcredits_logo']) ? 'fbcredits' : 'neutral');
     //}
 
-    dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false);
-    // manually add " Credits" suffix to Facebook Credits amounts in the list
-    if(display_currency == 'Facebook Credits' && payment_currency == 'fbcredits') {
-        dialog.widgets['price_display'].str += ' Credits';
-    } else if(display_currency == 'Kongregate Kreds' && payment_currency == 'kgcredits') {
-        dialog.widgets['price_display'].str += ' Kreds';
+    if(payment_price >= 0) {
+        dialog.widgets['price_display'].str = Store.display_real_currency_amount(display_currency, payment_price, payment_currency, false);
+        // manually add " Credits" suffix to Facebook Credits amounts in the list
+        if(display_currency == 'Facebook Credits' && payment_currency == 'fbcredits') {
+            dialog.widgets['price_display'].str += ' Credits';
+        } else if(display_currency == 'Kongregate Kreds' && payment_currency == 'kgcredits') {
+            dialog.widgets['price_display'].str += ' Kreds';
+        }
+    } else {
+        dialog.widgets['price_display'].str = null;
     }
 
     if(payment_price >= 0 && !pending) {
