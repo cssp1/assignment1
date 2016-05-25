@@ -731,6 +731,8 @@ AStar.CONNECTIVITY_BASE = 1; // first non-unknown value
 /** @const */
 AStar.CONNECTIVITY_BLOCKED = -1; // known blocked value (calling code assumes -1)
 
+AStar.connectivity_wordsize_warned = false;
+
 /** @constructor @struct
     @param {AStar.AStarMap} map
     @param {AStar.BlockChecker} checker */
@@ -738,15 +740,13 @@ AStar.Connectivity = function(map, checker) {
     /** @type {!Array.<number>} */
     this.size = [map.size[0], map.size[1]];
 
-    if((typeof Int8Array !== 'undefined')) {
-        this.flood = /** @type {!Int8Array} */ (new Int8Array(this.size[0]*this.size[1]));
-        // already initialized to 0
-    } else {
-        this.flood = /** @type {!Array<number>} */ (new Array(this.size[0]*this.size[1]));
-        for(var i = 0; i < this.flood.length; i++) { this.flood[i] = AStar.CONNECTIVITY_UNKNOWN; }
-    }
-
     // use a flood-fill algorithm to assign region numbers
+
+    /** @type {Int8Array|Int16Array|Array<number>|null} */
+    this.flood = null;
+    this.flood_max = 0; // max legal value supported by flood
+
+    this.flood = this.init_flood();
 
     var val = AStar.CONNECTIVITY_BASE - 1;
 
@@ -763,8 +763,13 @@ AStar.Connectivity = function(map, checker) {
                 continue;
             }
             val += 1;
-            if(val >= 128) {
-                throw Error('too many map colors, exceeded Int8 size');
+            if(val > this.flood_max) {
+                // overflow - re-initialize flood with a bigger data type
+                if(!AStar.connectivity_wordsize_warned) {
+                    AStar.connectivity_wordsize_warned = true;
+                    console.log('too many map colors, increasing word size');
+                }
+                this.init_flood(this.flood, val);
             }
 
             /** @type {!Array.<!Array.<number>>} */
@@ -811,6 +816,39 @@ AStar.Connectivity = function(map, checker) {
             }
         }
     }
+};
+
+/** Set up the flood-fill array. Optionally copy from an existing array with given maximum value
+    @param {Int8Array|Int16Array|Array<number>=} copy_from
+    @param {number=} copy_from_max
+    @return {!Int8Array|!Int16Array|!Array<number>} */
+AStar.Connectivity.prototype.init_flood = function(copy_from, copy_from_max) {
+    var initialized;
+    if((!copy_from_max || copy_from_max <= 127) && (typeof Int8Array !== 'undefined')) {
+        this.flood = /** @type {!Int8Array} */ (new Int8Array(this.size[0]*this.size[1]));
+        initialized = true; // already initialized to 0
+        this.flood_max = 127;
+    } else if((!copy_from_max || copy_from_max <= 32767) && (typeof Int16Array !== 'undefined')) {
+        this.flood = /** @type {!Int16Array} */ (new Int16Array(this.size[0]*this.size[1]));
+        initialized = true; // already initialized to 0
+        this.flood_max = 32767;
+    } else {
+        this.flood = /** @type {!Array<number>} */ (new Array(this.size[0]*this.size[1]));
+        initialized = false;
+        this.flood_max = 1<<30;
+    }
+
+    if(copy_from) {
+        for(var i = 0; i < this.size[0]*this.size[1]; i++) {
+            this.flood[i] = copy_from[i];
+        }
+    } else if(!initialized) {
+        for(var i = 0; i < this.size[0]*this.size[1]; i++) {
+            this.flood[i] = AStar.CONNECTIVITY_UNKNOWN;
+        }
+    }
+
+    return this.flood;
 };
 
 /** @param {!Array.<number>} pos
