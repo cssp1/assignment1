@@ -2079,7 +2079,8 @@ class User:
                                                                payment_data['server_time_according_to_client'],
                                                                usd_equivalent = usd_equivalent,
                                                                gift_order = payment_data.get('gift_order',None),
-                                                               payment_id = payment_id)
+                                                               payment_id = payment_id,
+                                                               override_time = payment_data.get('time',server_time))
 
                         descr = Store.get_description(session, payment_data['unit_id'], payment_data['spellname'], payment_data['spellarg'], price_description)
 
@@ -4552,7 +4553,7 @@ class Session(object):
             if expire_by > 0: expire_time = min(expire_by, expire_time) if (expire_time > 0) else expire_by
         return expire_time
 
-    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, duration_ref_time = None):
+    def get_loot_items(self, player, loot_table, item_duration, item_expire_at, duration_ref_time = None, override_time = None):
         assert player is self.player
 
         absolute_time = player.get_absolute_time()
@@ -4561,7 +4562,7 @@ class Session(object):
 
         loot = LootTable.get_loot(gamedata['loot_tables'], loot_table,
                                   rand_func = player.random_source.random,
-                                  cond_resolver = lambda pred: Predicates.read_predicate(pred).is_satisfied(player,None))
+                                  cond_resolver = lambda pred: Predicates.read_predicate(pred).is_satisfied2(self, player, None, override_time = override_time))
         if item_expire_at > 0:
             expire_time = item_expire_at
         elif item_duration > 0:
@@ -14510,9 +14511,9 @@ class Store(object):
     # this must match Store.get_price in the game client code, or else there will be trouble!!!
     # return -1 if the order is invalid (e.g. because upgrade/research requirements are not met)
     @classmethod
-    def get_price(cls, session, sale_currency, unit_id, spell, spellarg, price_description, error_reason):
+    def get_price(cls, session, sale_currency, unit_id, spell, spellarg, price_description, error_reason, override_time = None):
 
-        p, p_currency = Store.get_base_price(session, unit_id, spell, spellarg, price_description, error_reason, sale_currency)
+        p, p_currency = Store.get_base_price(session, unit_id, spell, spellarg, price_description, error_reason, sale_currency, override_time = override_time)
 
         if p <= 0:
             return p
@@ -14618,13 +14619,13 @@ class Store(object):
 
     # get_base_price returns the "base" FB credits price before A/B test price caps are applied
     @classmethod
-    def get_base_price(cls, session, unit_id, spell, spellarg, price_description, error_reason, sale_currency):
+    def get_base_price(cls, session, unit_id, spell, spellarg, price_description, error_reason, sale_currency, override_time = None):
         assert spell.has_key('paid')
         p_currency = 'fbcredits'
 
         for PRED in ('requires',): # XXXXXX this never checked show_if - should it?
             if PRED in spell:
-                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                if session and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None, override_time = override_time)):
                     error_reason.append('spell "%s" predicate is not satisfied' % PRED)
                     return -1, p_currency
 
@@ -15464,7 +15465,8 @@ class Store(object):
     def execute_order(cls, gameapi, session, retmsg, currency, amount_willing_to_pay,
                       unit_id, spellname, spellarg,
                       server_time_according_to_client,
-                      usd_equivalent = None, gift_order = None, payment_id = None):
+                      usd_equivalent = None, gift_order = None, payment_id = None,
+                      override_time = None):
 
         # verify that the order is possible and that amount_willing_to_pay is correct
         spell = gamedata['spells'][spellname]
@@ -15488,7 +15490,7 @@ class Store(object):
             store_price = amount_willing_to_pay
 
         else:
-            store_price = Store.get_price(session, currency, unit_id, spell, spellarg, price_description, error_reason)
+            store_price = Store.get_price(session, currency, unit_id, spell, spellarg, price_description, error_reason, override_time = override_time)
 
         if gift_order and (not (spellname.startswith("BUY_GAMEBUCKS_") or spellname == "FB_GAMEBUCKS_PAYMENT")):
             raise Exception('gift_order for a non-gamebucks SKU user %d' % session.user.user_id)
@@ -15904,7 +15906,7 @@ class Store(object):
             if want_loot: # item bundle
                 assert not gift_order # XXX no code path yet for gifted bundles
                 loot_table = gamedata['loot_tables'][spell['loot_table']]
-                items += session.get_loot_items(session.player, loot_table['loot'], -1, -1)
+                items += session.get_loot_items(session.player, loot_table['loot'], -1, -1, override_time = override_time)
                 if items:
                     loggable_items = copy.deepcopy(items) # because inventory operations might mutate it
                     if session.player.get_any_abtest_value('modal_looting', gamedata['modal_looting']) and \
