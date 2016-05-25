@@ -18,7 +18,7 @@ class Predicate(object):
     # this is a new function we want to migrate some session-dependent .is_satisfied() calls to
     # it will default to the old is_satisfied() if there is no override in the subclass
     # XXX add a context= parameter to this, like Consequent.execute()
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         return self.is_satisfied(player, qdata)
 
 class AlwaysTruePredicate(Predicate):
@@ -52,9 +52,9 @@ class AndPredicate(ComboPredicate):
             if not sub.is_satisfied(player, qdata):
                 return False
         return True
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         for sub in self.subpredicates:
-            if not sub.is_satisfied2(session, player, qdata):
+            if not sub.is_satisfied2(session, player, qdata, override_time = override_time):
                 return False
         return True
 class OrPredicate(ComboPredicate):
@@ -63,16 +63,16 @@ class OrPredicate(ComboPredicate):
             if sub.is_satisfied(player, qdata):
                 return True
         return False
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         for sub in self.subpredicates:
-            if sub.is_satisfied2(session, player, qdata):
+            if sub.is_satisfied2(session, player, qdata, override_time = override_time):
                 return True
         return False
 class NotPredicate(ComboPredicate):
     def is_satisfied(self, player, qdata):
         return not self.subpredicates[0].is_satisfied(player, qdata)
-    def is_satisfied2(self, session, player, qdata):
-        return not self.subpredicates[0].is_satisfied2(session, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return not self.subpredicates[0].is_satisfied2(session, player, qdata, override_time = override_time)
 
 class AllBuildingsUndamagedPredicate(Predicate):
     def is_shooter(self, spec):
@@ -175,7 +175,7 @@ class TimeInGamePredicate(Predicate):
         else:
             self.within_last = None
 
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         if player.creation_time < 0: return False
         if ('sessions' not in player.history): return False
 
@@ -330,12 +330,12 @@ class QuestCompletedPredicate(Predicate):
         Predicate.__init__(self, data)
         self.quest_name = data['quest_name']
         self.must_claim = bool(data.get('must_claim', False))
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         target_quest = player.get_abtest_quest(self.quest_name)
         # new skip_quest_claim behavior - don't require quest to have been claimed
         # (if this becomes a performance problem, may need to cache the player's satisfied quests)
         if (not self.must_claim) and (not target_quest.force_claim):
-            if target_quest.activation and (not target_quest.activation.is_satisfied2(session, player, qdata)): return False
+            if target_quest.activation and (not target_quest.activation.is_satisfied2(session, player, qdata, override_time = override_time)): return False
             return target_quest.goal.is_satisfied2(session, player, qdata)
         else:
             return (self.quest_name in player.completed_quests)
@@ -514,7 +514,7 @@ class GamedataVarPredicate(Predicate):
         self.value = value
         self.method = method or '=='
 
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         test_value = eval_cond_or_literal(player.get_gamedata_var(self.name), session, player)
         if self.method == '==':
             return test_value == self.value
@@ -580,7 +580,7 @@ class AIInstanceGenerationPredicate(Predicate):
         Predicate.__init__(self, data)
         self.value = data['value']
         self.method = data['method']
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         assert session.viewing_player.is_ai()
         test_value = session.viewing_player.ai_generation
         if self.method == '>=':
@@ -622,8 +622,8 @@ class LibraryPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.name = data['name']
-    def is_satisfied2(self, session, player, qdata):
-        return read_predicate(player.get_abtest_predicate(self.name)).is_satisfied2(session, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return read_predicate(player.get_abtest_predicate(self.name)).is_satisfied2(session, player, qdata, override_time = override_time)
     def is_satisfied(self, player, qdata): # XXXXXX remove when safe
         return read_predicate(player.get_abtest_predicate(self.name)).is_satisfied(player, qdata)
 
@@ -662,7 +662,15 @@ class EventTimePredicate(Predicate):
         self.ignore_activation = data.get('ignore_activation', False)
         self.t_offset = data.get('time_offset', 0)
     def is_satisfied(self, player, qdata):
-        et = player.get_event_time(self.kind, self.name, self.method, ignore_activation = self.ignore_activation, t_offset = self.t_offset)
+        return self.is_satisfied2(None, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if override_time is not None:
+            # offset that will adjust absolute time back to override_time
+            ref_offset = override_time - player.get_absolute_time()
+        else:
+            ref_offset = 0
+        et = player.get_event_time(self.kind, self.name, self.method, ignore_activation = self.ignore_activation,
+                                   t_offset = self.t_offset + ref_offset)
         if et is None: return False
         if self.range:
             return (et >= self.range[0] and et < self.range[1])
@@ -677,8 +685,14 @@ class AbsoluteTimePredicate(Predicate):
         self.shift = data.get('shift', 0)
         self.repeat_interval = data.get('repeat_interval', None)
     def is_satisfied(self, player, qdata):
-        et = player.get_absolute_time()
-        if et is None: return False
+        return self.is_satisfied2(None, player, qdata)
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if override_time is not None:
+            et = override_time
+        else:
+            et = player.get_absolute_time()
+            if et is None: return False
+
         et = et + self.shift
         if self.mod > 0:
             et = et % self.mod
@@ -708,7 +722,7 @@ class TimeOfDayPredicate(Predicate):
         return True
 
 class HasAttackedPredicate(Predicate):
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.has_attacked
 
 class BaseSizePredicate(Predicate):
@@ -869,7 +883,7 @@ class ArmySizePredicate(Predicate):
 
 # FOR GUI PURPOSES ONLY! NOT GUARANTEED ACCURATE!
 class IsInAlliancePredicate(Predicate):
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         assert player is session.player
         return session.alliance_id_cache >= 0
 
@@ -885,7 +899,7 @@ class ViewingBaseDamagePredicate(Predicate):
         self.value = data['value']
         self.method = data.get('method', '>=')
         self.assert_owner = data.get('assert_owner', None)
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         if self.assert_owner == 'self_home':
             assert session.viewing_base is player.my_home
         base_damage = session.viewing_base.calc_base_damage()
@@ -898,7 +912,7 @@ class ViewingBaseObjectDestroyedPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
         self.spec = data['spec']
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         for obj in session.viewing_base.iter_objects():
             if obj.spec.name == self.spec and obj.is_destroyed():
                 return True
@@ -916,7 +930,7 @@ class PlayerPreferencePredicate(Predicate):
 class HomeBasePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
-    def is_satisfied2(self, session, player, qdata):
+    def is_satisfied2(self, session, player, qdata, override_time = None):
         return bool(session.home_base)
 
 # instantiate a Predicate object from JSON
@@ -1047,13 +1061,13 @@ def read_predicate(data):
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
-def eval_cond(chain, session, player, qdata = None):
+def eval_cond(chain, session, player, qdata = None, override_time = None):
     for pred, val in chain:
-        if read_predicate(pred).is_satisfied2(session, player, qdata):
+        if read_predicate(pred).is_satisfied2(session, player, qdata, override_time = override_time):
             return val
     return None
 
-def eval_cond_or_literal(chain, session, player, qdata = None):
+def eval_cond_or_literal(chain, session, player, qdata = None, override_time = None):
     if type(chain) is not list:
         return chain
-    return eval_cond(chain, session, player, qdata)
+    return eval_cond(chain, session, player, qdata, override_time = override_time)
