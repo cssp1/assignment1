@@ -130,35 +130,26 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
     iter = 0
     winner = 1 # defender wins by default if there is a stalemate
 
-    first_shooter = randgen.choice([0,1])
-    randomness = 0.4
-    random_streak = -1
-    random_streak_side = -1
-
     while True:
 
-        # pick side to shoot
-        if random_streak > 0:
-            i = random_streak_side
-            random_streak -= 1
+        # check for win condition
+        done = False
+        for i in (0,1):
+            if len(sides[i]) < 1:
+                winner = 1-i
+                done = True
+                break
+        if done: break
+
+        # uniformly choose next shooter from all live units
+        shooter_i = randgen.randint(0, len(sides[0]) + len(sides[1]) - 1)
+        if shooter_i < len(sides[0]):
+            defense = sides[1]
+            shooter = sides[0][shooter_i]
         else:
-            i = first_shooter ^ (iter % 2) # alternate sides
-
-            # to add randomness to battles, sometimes allow one side to shoot consecutively
-            # a few times (just randomizing the shooter on each iteration doesn't disturb outcomes enough)
-            if randomness > 0 and randgen.random() > randomness:
-                random_streak = 5
-                random_streak_side = i
-
-        offense = sides[i]
-        defense = sides[1-i]
-
-        if len(defense) < 1:
-            winner = i; break
-        elif len(offense) < 1:
-            winner = 1-i; break
-
-        shooter = randgen.choice(offense)
+            defense = sides[0]
+            shooter = sides[1][shooter_i - len(sides[0])]
+        # then choose target uniformly from all live units on the other side
         target = randgen.choice(defense)
 
         shooter_spec = gamedata['units'][shooter['spec']]

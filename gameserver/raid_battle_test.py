@@ -4,7 +4,8 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import sys, getopt, random, copy, math
+import sys, getopt, random, copy
+from math import pow, log, sqrt
 import ANSIColor
 
 verbose = 0
@@ -18,30 +19,31 @@ BASE_COST = 10
 BASE_HP = 10
 BASE_SPACE = 1
 
-TIER_POWER_INC = 2.2
-TIER_HP_INC = 2.2
+TIER_POWER_INC = 2.4
+TIER_HP_INC = 2.8
 TIER_COST_INC = 1.5
 
-ARMY_SIZE = 24
+ARMY_SIZE = 6
 
 UNIT_CATS = ['roc', 'pap', 'sci']
 UNITS = {}
 for tier in (1,2,3):
     for cat in UNIT_CATS:
         specname = 'tier%d_%s' % (tier, cat)
-        UNITS[specname] = {'hp': int(BASE_HP*math.pow(TIER_HP_INC,tier-1)),
-                           'cost': int(BASE_COST*math.pow(TIER_COST_INC,tier-1)),
+        UNITS[specname] = {'hp': int(BASE_HP*pow(TIER_HP_INC,tier-1)),
+                           'cost': int(BASE_COST*pow(TIER_COST_INC,tier-1)),
                            'space': BASE_SPACE,
                            'defense': {cat: 1},
-                           'offense': {'roc': int(math.pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'roc' else (BASE_POWER_BETTER if cat == 'pap' else BASE_POWER_WORSE))),
-                                       'pap': int(math.pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'pap' else (BASE_POWER_BETTER if cat == 'sci' else BASE_POWER_WORSE))),
-                                       'sci': int(math.pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'sci' else (BASE_POWER_BETTER if cat == 'roc' else BASE_POWER_WORSE)))
+                           'offense': {'roc': int(pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'roc' else (BASE_POWER_BETTER if cat == 'pap' else BASE_POWER_WORSE))),
+                                       'pap': int(pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'pap' else (BASE_POWER_BETTER if cat == 'sci' else BASE_POWER_WORSE))),
+                                       'sci': int(pow(TIER_POWER_INC,tier-1) * (BASE_POWER_EQUAL if cat == 'sci' else (BASE_POWER_BETTER if cat == 'roc' else BASE_POWER_WORSE)))
                                        }
                            }
 
 def make_army(tier, portion, fullness = 1):
     army = []
-    qty = dict((cat, int(ARMY_SIZE//BASE_SPACE * portion[cat] * fullness)) for cat in UNIT_CATS)
+    qty = dict((cat, int(ARMY_SIZE//BASE_SPACE * portion[cat] * fullness + 0.5)) for cat in UNIT_CATS)
+    print qty
     for cat in UNIT_CATS:
         for i in range(qty[cat]):
             specname = 'tier%d_%s' % (tier, cat)
@@ -71,37 +73,22 @@ def fight(a, b, randgen = None):
     iter = 0
     winner = None
 
-    # pick side to shoot first (gives ~30% advantage!)
-    first_shooter = randgen.choice([0,1])
-
-    randomness = 0.4 # 0.9
-    random_streak = -1
-    random_streak_side = -1
-
     while True:
 
-        # pick side to shoot
-        if random_streak > 0:
-            i = random_streak_side
-            random_streak -= 1
+        for i in (0,1):
+            if len(sides[i]) < 1:
+                winner = 1-i; break
+        if winner is not None: break
+
+        # uniformly choose next shooter from all live units
+        shooter_i = randgen.randint(0, len(sides[0]) + len(sides[1]) - 1)
+        if shooter_i < len(sides[0]):
+            defense = sides[1]
+            shooter = sides[0][shooter_i]
         else:
-            i = first_shooter ^ (iter % 2) # alternate sides
-
-            # to add randomness to battles, sometimes allow one side to shoot consecutively
-            # a few times (just randomizing the shooter on each iteration doesn't disturb outcomes enough)
-            if randomness > 0 and randgen.random() > randomness:
-                random_streak = 5
-                random_streak_side = i
-
-        offense = sides[i]
-        defense = sides[1-i]
-
-        if len(defense) < 1:
-            winner = i; break
-        elif len(offense) < 1:
-            winner = 1-i; break
-
-        shooter = randgen.choice(offense)
+            defense = sides[0]
+            shooter = sides[1][shooter_i - len(sides[0])]
+        # then choose target uniformly from all live units on the other side
         target = randgen.choice(defense)
 
         shooter_spec = UNITS[shooter['spec']]
@@ -150,7 +137,7 @@ def fight(a, b, randgen = None):
 def analyze(army_a, army_b):
     randgen = random.Random()
 
-    SAMPLES = 100
+    SAMPLES = 1000
     wins = 0
     damage_samples = []
     n_attacks_samples = []
@@ -188,7 +175,7 @@ def analyze(army_a, army_b):
         log_win_odds = -float('inf')
     else:
         win_odds = wins / float(SAMPLES - wins)
-        log_win_odds = math.log(win_odds)
+        log_win_odds = log(win_odds)
 
     win_variance = (wins/float(SAMPLES)) * ((SAMPLES-wins)/float(SAMPLES))
 
@@ -212,7 +199,7 @@ def test_efficiency(reason, bounds, a, b, eff_baseline):
     # relative efficiency compared to baseline
     reff = efficiency/eff_baseline
 
-    ui_result = '%-32s: %5.2f vs baseline (goal %.1f-%.1f), %.1f attacks, wins %d/%d SD %.2f' % (reason, reff, bounds[0], bounds[1], avg_n_attacks, wins[0], wins[1], math.sqrt(win_variance))
+    ui_result = '%-42s: %5.2f vs baseline (goal %.2f-%.2f), %.1f attacks, wins %d/%d SD %.2f' % (reason, reff, bounds[0], bounds[1], avg_n_attacks, wins[0], wins[1], sqrt(win_variance))
     if bounds[0] <= reff <= bounds[1]: # good
         ui_result = ANSIColor.green(ui_result)
     else:
@@ -249,12 +236,26 @@ if __name__ == '__main__':
     print 'eff_baseline', eff_baseline
 
     # all else being equal, against the same opponent:
+    TARGET_EFF_INC = [1.55,1.75] # target efficiency gain per level above (must be >= economy growth)
+    TARGET_EFF_DEC = [0.25,0.5] # target efficiency loss per level below
+    BETTER_ARMY_INC = [1.5,2.0] # target efficiency gain by having a perfectly better-matched army
 
-    test_efficiency('Slightly better-matched army, same tier', [1.3,2.0], tier1_roc, tier1_sci, eff_baseline)
-    test_efficiency('Perfectly better-matched army, same tier', [4.0,8.0], tier1_roc_only, tier1_sci_only, eff_baseline)
-    test_efficiency('Better-matched army, lower tier', [0.5,0.8], tier1_roc, tier2_sci, eff_baseline)
-    test_efficiency('Next-lower-tier army', [0.25,0.5], tier1_balanced, tier2_balanced, eff_baseline)
-    test_efficiency('Next-higher-tier army', [1.5,2.0], tier2_balanced, tier1_balanced, eff_baseline)
-    test_efficiency('Two-higher-tier army', [2.0,4.0], tier3_balanced, tier1_balanced, eff_baseline)
-    test_efficiency('Bigger army, same tier', [1.3,2.0], tier1_bigger, tier1_balanced, eff_baseline)
-    test_efficiency('Bigger army, lower tier', [0.25,0.5], tier1_bigger, tier2_balanced, eff_baseline)
+    test_efficiency('Same army, same tier', [0.9,1.1], tier1_balanced, tier1_balanced, eff_baseline)
+    test_efficiency('Slightly better-matched army, same tier', [pow(BETTER_ARMY_INC[0],0.5), pow(BETTER_ARMY_INC[1],0.5)],
+                    tier1_roc, tier1_sci, eff_baseline)
+    test_efficiency('Perfectly better-matched army, same tier', BETTER_ARMY_INC,
+                    tier1_roc_only, tier1_sci_only, eff_baseline)
+    test_efficiency('Better-matched army, lower tier', [BETTER_ARMY_INC[0]*TARGET_EFF_DEC[0],
+                                                        BETTER_ARMY_INC[1]/TARGET_EFF_DEC[1]],
+                    tier1_roc, tier2_sci, eff_baseline)
+    test_efficiency('Next-lower-tier army', TARGET_EFF_DEC,
+                    tier1_balanced, tier2_balanced, eff_baseline)
+    test_efficiency('Next-higher-tier army', TARGET_EFF_INC,
+                    tier2_balanced, tier1_balanced, eff_baseline)
+    # should be power(,2), but it's hard to work it out, and lower is actually better here
+    test_efficiency('Two-higher-tier army', [pow(TARGET_EFF_INC[0],1.25), pow(TARGET_EFF_INC[1],1.25)],
+                    tier3_balanced, tier1_balanced, eff_baseline)
+    test_efficiency('Bigger army, same tier', [1.25,2.0],
+                    tier1_bigger, tier1_balanced, eff_baseline)
+    test_efficiency('Bigger army, lower tier', [0.25,0.75],
+                    tier1_bigger, tier2_balanced, eff_baseline)
