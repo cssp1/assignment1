@@ -16,12 +16,12 @@ BASE_POWER_EQUAL = 5
 BASE_POWER_BETTER = 10
 BASE_POWER_WORSE = 2
 BASE_COST = 10
-BASE_HP = 10
+BASE_HP = 30
 BASE_SPACE = 1
 
-TIER_POWER_INC = 2.4
-TIER_HP_INC = 2.8
-TIER_COST_INC = 1.5
+TIER_POWER_INC = 1.8
+TIER_HP_INC = 1.8
+TIER_COST_INC = 1.5 # = econ growth
 
 ARMY_SIZE = 6
 
@@ -192,12 +192,11 @@ def analyze(army_a, army_b):
         print 'wins', wins, '/', SAMPLES, 'ln(odds)', log_win_odds, 'median damage', median_damage, 'avg #attacks', avg_n_attacks
     return (wins,SAMPLES), log_win_odds, median_damage, avg_n_attacks, win_variance
 
-def test_efficiency(reason, bounds, a, b, eff_baseline):
+def test_efficiency(reason, bounds, a, b, dpv_baseline):
     wins, log_win_odds, median_damage, avg_n_attacks, win_variance = analyze(a,b)
-    efficiency = 1.0/median_damage
 
-    # relative efficiency compared to baseline
-    reff = efficiency/eff_baseline
+    # relative DPV compared to baseline
+    reff = median_damage/dpv_baseline
 
     ui_result = '%-42s: %5.2f vs baseline (goal %.2f-%.2f), %.1f attacks, wins %d/%d SD %.2f' % (reason, reff, bounds[0], bounds[1], avg_n_attacks, wins[0], wins[1], sqrt(win_variance))
     if bounds[0] <= reff <= bounds[1]: # good
@@ -230,32 +229,41 @@ if __name__ == '__main__':
 
     tier3_balanced = make_army(3, {'roc':0.34, 'pap':0.34, 'sci':0.34})
 
-    # DPV = Damage Per Victory, Efficiency = 1/DPV
+    # DPV = Damage Per Victory
 
-    eff_baseline = 1.0/(analyze(tier1_balanced, tier1_balanced)[2])
-    print 'eff_baseline', eff_baseline
+    dpv_baseline = analyze(tier1_balanced, tier1_balanced)[2]
+    print 'dpv_baseline', dpv_baseline
 
     # all else being equal, against the same opponent:
-    TARGET_EFF_INC = [1.55,1.75] # target efficiency gain per level above (must be >= economy growth)
-    TARGET_EFF_DEC = [0.25,0.5] # target efficiency loss per level below
-    BETTER_ARMY_INC = [1.5,2.0] # target efficiency gain by having a perfectly better-matched army
+    TARGET_DPV_INC = [2.3,2.9] # goal DPV increase per level below target (must be >= economy growth^2)
+    TARGET_DPV_DEC = [1.0/2.3,0.8] # goal DPV decrease per level above target (must be >= 1/DPV_INC)
+    BETTER_ARMY_DEC = [0.5,0.75] # target DPV decrease by having a perfectly better-matched army
 
-    test_efficiency('Same army, same tier', [0.9,1.1], tier1_balanced, tier1_balanced, eff_baseline)
-    test_efficiency('Slightly better-matched army, same tier', [pow(BETTER_ARMY_INC[0],0.5), pow(BETTER_ARMY_INC[1],0.5)],
-                    tier1_roc, tier1_sci, eff_baseline)
-    test_efficiency('Perfectly better-matched army, same tier', BETTER_ARMY_INC,
-                    tier1_roc_only, tier1_sci_only, eff_baseline)
-    test_efficiency('Better-matched army, lower tier', [BETTER_ARMY_INC[0]*TARGET_EFF_DEC[0],
-                                                        BETTER_ARMY_INC[1]/TARGET_EFF_DEC[1]],
-                    tier1_roc, tier2_sci, eff_baseline)
-    test_efficiency('Next-lower-tier army', TARGET_EFF_DEC,
-                    tier1_balanced, tier2_balanced, eff_baseline)
-    test_efficiency('Next-higher-tier army', TARGET_EFF_INC,
-                    tier2_balanced, tier1_balanced, eff_baseline)
-    # should be power(,2), but it's hard to work it out, and lower is actually better here
-    test_efficiency('Two-higher-tier army', [pow(TARGET_EFF_INC[0],1.25), pow(TARGET_EFF_INC[1],1.25)],
-                    tier3_balanced, tier1_balanced, eff_baseline)
-    test_efficiency('Bigger army, same tier', [1.25,2.0],
-                    tier1_bigger, tier1_balanced, eff_baseline)
-    test_efficiency('Bigger army, lower tier', [0.25,0.75],
-                    tier1_bigger, tier2_balanced, eff_baseline)
+
+    test_efficiency('vs. tier N+2', [pow(TARGET_DPV_INC[0],2), pow(TARGET_DPV_INC[1],2)],
+                    tier1_balanced, tier3_balanced, dpv_baseline)
+    test_efficiency('vs. tier N+1', TARGET_DPV_INC,
+                    tier1_balanced, tier2_balanced, dpv_baseline)
+
+    test_efficiency('Same army, same tier', [0.9,1.1], tier1_balanced, tier1_balanced, dpv_baseline)
+
+    test_efficiency('vs. tier N-1', TARGET_DPV_DEC,
+                    tier2_balanced, tier1_balanced, dpv_baseline)
+
+    test_efficiency('vs. tier N-2', [pow(TARGET_DPV_DEC[0],2), pow(TARGET_DPV_DEC[1],2)],
+                    tier3_balanced, tier1_balanced, dpv_baseline)
+
+
+    test_efficiency('Slightly better-matched army, same tier', [pow(BETTER_ARMY_DEC[0],0.5), pow(BETTER_ARMY_DEC[1],0.5)],
+                    tier1_roc, tier1_sci, dpv_baseline)
+    test_efficiency('Perfectly better-matched army, same tier', BETTER_ARMY_DEC,
+                    tier1_roc_only, tier1_sci_only, dpv_baseline)
+    test_efficiency('Better-matched army, lower tier', [BETTER_ARMY_DEC[0]*TARGET_DPV_INC[0],
+                                                        BETTER_ARMY_DEC[1]*TARGET_DPV_INC[1]],
+                    tier1_roc, tier2_sci, dpv_baseline)
+
+
+    test_efficiency('Bigger army, same tier', [0.5, 0.8],
+                    tier1_bigger, tier1_balanced, dpv_baseline)
+#    test_efficiency('Bigger army, lower tier', [0.5*TARGET_DPV_INC[0], 0.8*TARGET_DPV_INC[1]],
+#                    tier1_bigger, tier2_balanced, dpv_baseline)
