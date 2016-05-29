@@ -22180,6 +22180,10 @@ class GAMEAPI(resource.Resource):
                     summary = msg['summary']
                     stats = msg['stats']
 
+                    # increment XP here
+                    if stats.get('xp'):
+                        self.give_xp(session, retmsg, stats['xp'], 'you_attacked_me_mail', None)
+
                     session.player.increment_battle_statistics(summary['defender_id'], summary)
                     if not is_login: # login path sends this unconditionally
                         session.deferred_battle_history_update = True

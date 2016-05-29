@@ -850,6 +850,8 @@ class HandleResolveHomeRaid(Handler):
                 # perform mutation on defender, not including looting
                 recalc_resources = False
 
+                actual_loot = {}
+
                 if new_defending_army is not None:
                     recalc_power = False
 
@@ -902,6 +904,14 @@ class HandleResolveHomeRaid(Handler):
                                             recalc_power = True
 
                                         if new_hp <= 0:
+                                            # give XP for destroying the building
+                                            if obj.spec.worth_less_xp:
+                                                actual_loot['xp'] = actual_loot.get('xp',0) + self.gamedata['player_xp']['destroy_building_min_xp']
+                                            else:
+                                                actual_loot['xp'] = actual_loot.get('xp',0) + int(obj.level * self.gamedata['player_xp']['destroy_building'])
+                                                # keep track of total levels of destroyed buildings for awarding victory bonus XP
+                                                actual_loot['destroyed_building_levels'] = actual_loot.get('destroyed_building_levels',0) + obj.level
+
                                             # XXX missing: on_destroy consequents
 
                                             for removed_item in obj.destroy_fragile_equipment_items():
@@ -922,7 +932,6 @@ class HandleResolveHomeRaid(Handler):
 
 
                 # LOOTING
-                actual_loot = {}
 
                 if is_win and raid_mode != 'scout':
                     cur_cargo = raid_squads[0].get('cargo', {})
@@ -980,6 +989,11 @@ class HandleResolveHomeRaid(Handler):
                             squad_update['cargo'] = cur_cargo
                             squad_update['cargo_source'] = 'human'
 
+                            # XP for looting
+                            if sum(lost.itervalues(),0) > 0:
+                                coeff = self.gamedata['player_xp']['pvp_loot_xp']
+                                if is_win: coeff *= self.gamedata['player_xp']['loot_victory_bonus']
+                                actual_loot['xp'] = actual_loot.get('xp',0) + int(coeff * self.gamedata['player_xp']['loot'] * sum(lost.itervalues(),0))
 
                 if session and recalc_resources:
                     retmsg.append(["PLAYER_STATE_UPDATE", defender_player.resources.calc_snapshot().serialize()])
@@ -993,6 +1007,10 @@ class HandleResolveHomeRaid(Handler):
                     is_ladder_win = is_win and defender_player.my_home.ladder_victory_satisfied(None, base_damage)
                     actual_loot['trophies_pvp'] = ladder_state['points']['victory' if is_ladder_win else 'defeat'][str(raid_squads[0]['base_landlord_id'])]
                     actual_loot['viewing_trophies_pvp'] = ladder_state['points']['defeat' if is_ladder_win else 'victory'][str(self.user_id)]
+
+                # bonus XP for destroyed building levels
+                if is_win and actual_loot.get('destroyed_building_levels',0) > 0:
+                    actual_loot['xp'] = actual_loot.get('xp',0) + int(actual_loot['destroyed_building_levels'] * self.gamedata['player_xp']['destroy_building_victory_bonus'])
 
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,

@@ -509,6 +509,8 @@ def make_battle_summary(gamedata, nosql_client,
                             ret['new_'+kind][k] = ret['new_'+kind].get(k,0) + v
 
     ret['loot'] = copy.copy(loot) # don't mutate caller's loot
+    if 'xp' not in ret['loot']:
+        ret['loot']['xp'] = 0
 
     # add damage stats to loot
     for role, user_id, before, after in (('attacker', attacker_id, attacker_units_before, attacker_units_after),
@@ -516,7 +518,6 @@ def make_battle_summary(gamedata, nosql_client,
         if after is None: continue # no delta
         assert len(before) == len(after)
 
-        ret['loot']['xp'] = 0 # no XP
         if 'damage' not in ret: ret['damage'] = {}
         my_damage = ret['damage'][str(user_id)] = {}
 
