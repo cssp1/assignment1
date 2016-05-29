@@ -9385,7 +9385,7 @@ class Player(AbstractPlayer):
         max_steps = map_dimensions[0]+map_dimensions[1]
         return coords[:max_steps]
 
-    def squad_step(self, session, squad_id, coords, is_raid_launch, path_choices = None):
+    def squad_step(self, session, squad_id, coords, raid_mode, path_choices = None):
         # path_choices is an optional dictionary of possible paths {"x,y": path...}
         # when the client is not sure exactly where a moving squad will halt before embarking on the new path.
         assert (gamesite.nosql_client and self.home_region)
@@ -9425,7 +9425,7 @@ class Player(AbstractPlayer):
         on_success = None
 
         if squad.get('raid'):
-            if is_raid_launch:
+            if raid_mode:
                 # initial map entry. Make sure raid is going somewhere useful.
                 if not coords: # None or empty list
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_no_destination', None]
@@ -9469,6 +9469,17 @@ class Player(AbstractPlayer):
                             if is_revenge_attack:
                                 # tag the feature with info the defender will need to know about us
                                 add_props['is_revenge_attack'] = 1
+
+                            # add ladderable flag
+                            if raid_mode != 'scout' and \
+                               (not (gamedata['anti_bullying']['enable_ladder_fatigue'] and \
+                                     self.cooldown_active('ladder_fatigue:%d' % x['base_landlord_id']))) and \
+                               Predicates.read_predicate(gamedata['regions'][self.home_region].get('ladder_on_map_if',
+                                                                                                   {'predicate':'ALWAYS_FALSE'})).is_satisfied(self, None) and \
+                               not self.is_alt_account_unladderable(x['base_landlord_id']):
+                                add_props['ladderable'] = 1
+                                add_props['ladder_points'] = self.ladder_points()
+                                add_props['sticky_alliances'] = self.get_sticky_alliances()
 
                             if not on_success:
                                 def on_attack_launch():
@@ -10345,11 +10356,11 @@ class Player(AbstractPlayer):
         if data.get('LOCK_STATE',0) != 0: return False
         return True
 
-    def create_ladder_state_points_scaled_by_trophy_delta(self, other_id, other_player, tbl):
-        delta = other_player.ladder_points() - self.ladder_points()
-        ret = {'points': {'victory': {str(self.user_id): min(max(int(tbl['attacker_victory']['base'] + delta * tbl['attacker_victory']['delta']), tbl['attacker_victory']['min']), tbl['attacker_victory']['max']),
+    @classmethod
+    def create_ladder_state_points_scaled_by_trophy_delta(cls, my_id, other_id, delta, tbl):
+        ret = {'points': {'victory': {str(my_id): min(max(int(tbl['attacker_victory']['base'] + delta * tbl['attacker_victory']['delta']), tbl['attacker_victory']['min']), tbl['attacker_victory']['max']),
                                       str(other_id):     min(max(int(tbl['defender_victory']['base'] - delta * tbl['defender_victory']['delta']), tbl['defender_victory']['min']), tbl['defender_victory']['max'])},
-                          'defeat': {str(self.user_id):  max(min(int(tbl['attacker_defeat']['base'] + delta * tbl['attacker_defeat']['delta']), tbl['attacker_defeat']['min']), tbl['attacker_defeat']['max']),
+                          'defeat': {str(my_id):  max(min(int(tbl['attacker_defeat']['base'] + delta * tbl['attacker_defeat']['delta']), tbl['attacker_defeat']['min']), tbl['attacker_defeat']['max']),
                                      str(other_id):      max(min(int(tbl['defender_defeat']['base'] - delta * tbl['defender_defeat']['delta']), tbl['defender_defeat']['min']), tbl['defender_defeat']['max']),
                                      }}}
         for FIELD in ('protection_based_on','victory_condition'):
@@ -10379,8 +10390,9 @@ class Player(AbstractPlayer):
 
     def create_ladder_state(self, other_id, other_player, scale_points = 1, on_map = False):
         if other_player and (not other_player.is_ai()) and (gamedata['matchmaking']['ladder_point_incr_by_trophies'] or on_map):
+            delta = other_player.ladder_points() - self.ladder_points()
             tbl = gamedata['matchmaking']['ladder_point_on_map_table' if on_map else 'ladder_point_incr_by_trophies_table']
-            ret = self.create_ladder_state_points_scaled_by_trophy_delta(other_id, other_player, tbl)
+            ret = self.create_ladder_state_points_scaled_by_trophy_delta(self.user_id, other_id, delta, tbl)
             if on_map and self.home_region and (self.home_region in gamedata['regions']):
                 scale_points *= gamedata['regions'][self.home_region].get('ladder_point_scale',1)
         else:
@@ -22173,6 +22185,19 @@ class GAMEAPI(resource.Resource):
                         session.deferred_battle_history_update = True
                     session.player.modify_scores(stats, reason = 'you_attacked_me mail(attacker)')
 
+                    # send trophy update to attacker
+                    retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)]])
+
+                    # add battle fatigue on attacker against this victim
+                    fatigue_cdname = ('ladder_fatigue' if summary['loot'].get('trophies_pvp') else 'battle_fatigue')
+                    if gamedata['anti_bullying']['enable_'+fatigue_cdname]:
+                        # for MAP ladder battles, only apply fatigue on victory
+                        if fatigue_cdname != 'ladder_fatigue' or summary['attacker_outcome'] == 'victory':
+                            duration = Predicates.eval_cond(gamedata['anti_bullying'][fatigue_cdname+'_duration'], session, session.player)
+                            if duration > 0:
+                                session.player.cooldown_trigger(fatigue_cdname+':%d' % summary['defender_id'], duration, add_stack = 1)
+                                session.deferred_player_cooldowns_update = True
+
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'mail':
@@ -27608,7 +27633,7 @@ class GAMEAPI(resource.Resource):
                     # (this is the only chance to step towards something other than home base)
                     step_success = True
                     try:
-                        step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, True)
+                        step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, raid_mode)
                         map_features += step_map_features
                     finally:
                         if not step_success:

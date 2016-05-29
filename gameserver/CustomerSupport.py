@@ -21,6 +21,7 @@ from Raid import recall_squad, RecallSquadException, \
      army_unit_is_scout, army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
      calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
+from Predicates import read_predicate
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -758,6 +759,27 @@ class HandleResolveHomeRaid(Handler):
                     i -= 1
                 i += 1
 
+            raid_mode = 'scout' if all(squad['raid'] == 'scout' for squad in raid_squads) else 'attack'
+            self.raid_mode = raid_mode # remember for offline notification
+
+            # set up ladder state
+
+            attacker_sticky_alliances = set(filter(lambda a: a >= 0, raid_alliances + sum((x.get('sticky_alliances',[]) for x in raid_squads), [])))
+            defender_sticky_alliances = set(defender_player.get_sticky_alliances())
+
+            if raid_mode != 'scout' and \
+               all(squad.get('ladderable',True) for squad in raid_squads) and \
+               all(('ladder_points' in squad) for squad in raid_squads) and \
+               not bool(attacker_sticky_alliances.intersection(defender_sticky_alliances)) and \
+               read_predicate(self.gamedata['regions'][self.region_id].get('ladder_on_map_if_defender',{'predicate':'ALWAYS_TRUE'})).is_satisfied(defender_player, None) and \
+               defender_player.my_home.calc_base_damage() < self.gamedata['matchmaking']['ladder_win_damage']:
+                # note: this is a classmethod, not associated with this particular player
+                delta = defender_player.ladder_points() - raid_squads[0]['ladder_points']
+                ladder_state = defender_player.create_ladder_state_points_scaled_by_trophy_delta(raid_squads[0]['base_landlord_id'], self.user_id, delta,
+                                                                                                 self.gamedata['matchmaking']['ladder_point_on_map_table'])
+            else:
+                ladder_state = None
+
             raid_stattabs = [squad.get('player_stattab',{}) for squad in raid_squads]
             attacker_loot_factor_pvp = raid_stattabs[0].get('player',{}).get('loot_factor_pvp',{'val':1})['val']
 
@@ -765,13 +787,10 @@ class HandleResolveHomeRaid(Handler):
 
             # defender side of init_attack() - attacker side is done on launch
             is_revenge_attack = raid_squads[0].get('is_revenge_attack')
-            defender_player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, None, is_revenge_attack)
+            defender_player.init_attack_defender(raid_squads[0]['base_landlord_id'], True, True, ladder_state, is_revenge_attack)
 
             defender_player.my_home.base_last_attack_time = self.time_now
             defender_player.my_home.base_times_attacked += 1
-
-            raid_mode = 'scout' if all(squad['raid'] == 'scout' for squad in raid_squads) else 'attack'
-            self.raid_mode = raid_mode # for offline notification
 
             attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
                                      key = lambda obj: obj['spec'])
@@ -969,6 +988,12 @@ class HandleResolveHomeRaid(Handler):
                     base_damage = defender_player.my_home.calc_base_damage()
                 else:
                     base_damage = None
+
+                if ladder_state:
+                    is_ladder_win = is_win and defender_player.my_home.ladder_victory_satisfied(None, base_damage)
+                    actual_loot['trophies_pvp'] = ladder_state['points']['victory' if is_ladder_win else 'defeat'][str(raid_squads[0]['base_landlord_id'])]
+                    actual_loot['viewing_trophies_pvp'] = ladder_state['points']['defeat' if is_ladder_win else 'victory'][str(self.user_id)]
+
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,
                                               my_pcinfo, raid_pcinfos[0],
@@ -997,14 +1022,13 @@ class HandleResolveHomeRaid(Handler):
                 # create revenge allowance
                 if self.gamedata['matchmaking']['revenge_time'] > 0:
                     defender_player.cooldown_trigger('revenge_defender:%d' % raid_squads[0]['base_landlord_id'], self.gamedata['matchmaking']['revenge_time'])
-                    if session: retmsg.append(["COOLDOWNS_UPDATE", defender_player.cooldowns])
 
-                # broadcast map attack for GUI and battle history jewel purposes
-                self.gamesite.gameapi.broadcast_map_attack(self.region_id, base_props,
-                                                           raid_squads[0]['base_landlord_id'], self.user_id,
-                                                           {'battle_type':'raid', 'raid_mode': raid_mode, 'defender_outcome': summary['defender_outcome']},
-                                                           [my_pcinfo,] + raid_pcinfos,
-                                                           msg = 'REGION_MAP_ATTACK_COMPLETE')
+                # remove battle fatigue on victim against this attacker
+                fatigue_cdname = ('ladder_fatigue' if ladder_state else 'battle_fatigue')
+                if (not ladder_state) or (defender_player.is_ladder_player() and (not is_revenge_attack)):
+                    defender_player.cooldown_reset(fatigue_cdname+':%d' % raid_squads[0]['base_landlord_id'])
+
+                if session: session.deferred_player_cooldowns_update = True
 
                 # update victim's player cache entry
                 cache_props = {'lootable_buildings': defender_player.get_lootable_buildings(),
@@ -1023,9 +1047,12 @@ class HandleResolveHomeRaid(Handler):
                 stats['havoc_caused'] = summary['loot'].get('havoc_caused',0) if is_conquest else 0
                 stats['damage_inflicted'] = summary['loot'].get('damage_inflicted',0)
 
-                # collect trophy stats - note, trophies can come from AI attacks, but other stats cannot
-                for st in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
-                    stats[st] = summary['loot'].get(st, 0)
+                # update defender's trophy stats immediately
+                if actual_loot.get('viewing_trophies_pvp',0):
+                    defender_player.modify_scores({'trophies_pvp': actual_loot['viewing_trophies_pvp']}, reason = 'resolve_home_raid')
+                # update attacker's trophy stats on next login (XXX should be immediate?)
+                if actual_loot.get('trophies_pvp',0):
+                    stats['trophies_pvp'] = actual_loot['trophies_pvp']
 
                 # mail the attacker the battle summary and stat updates
                 self.gamesite.msg_client.msg_send([{'from': self.user_id,
@@ -1046,6 +1073,15 @@ class HandleResolveHomeRaid(Handler):
                                                         'from_name': unicode(self.attacker_ui_name),
                                                         'summary': summary}])
 
+
+                # broadcast map attack for GUI and battle history jewel purposes
+                # regenerate my_pcinfo since it depends on trophies etc
+                my_pcinfo = self.gamesite.gameapi.get_player_cache_props(defender_user, defender_player, my_alliance)
+                self.gamesite.gameapi.broadcast_map_attack(self.region_id, base_props,
+                                                           raid_squads[0]['base_landlord_id'], self.user_id,
+                                                           {'battle_type':'raid', 'raid_mode': raid_mode, 'defender_outcome': summary['defender_outcome']},
+                                                           [my_pcinfo,] + raid_pcinfos,
+                                                           msg = 'REGION_MAP_ATTACK_COMPLETE')
 
             finally:
                 if attack_log:
