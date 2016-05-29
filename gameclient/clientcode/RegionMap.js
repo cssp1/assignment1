@@ -1695,38 +1695,43 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     dialog.widgets['attackability'].text_color = SPUI.make_colorv(dialog.data['widgets']['attackability']['text_color_'+blink_list[index]['status']]);
 };
 
-RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) {
-    if(!this.region.data['ladder_on_map_if'] || !read_predicate(this.region.data['ladder_on_map_if']).is_satisfied(player, null)) { return 0; }
-    if(is_ai_user_id_range(feature['base_landlord_id'] || 0)) { return 0; }
-    if(feature['base_landlord_id'] == session.user_id) { return 0; }
-    if(feature['base_type'] != 'home') { return 0; }
-    if(('LOCK_STATE' in feature) && feature['LOCK_STATE'] != 0) { return 0; }
-    if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > this.time)) { return 0; }
+/** @param {!Object<string,?>} feature
+    @return {number} */
+RegionMap.RegionMap.prototype.winnable_ladder_points = function(feature) { return this.winnable_ladder_points_detailed(feature)[0]; };
+
+/** @param {!Object<string,?>} feature
+    @return {!Array} [amount, reason code] */
+RegionMap.RegionMap.prototype.winnable_ladder_points_detailed = function(feature) {
+    if(!this.region.data['ladder_on_map_if'] || !read_predicate(this.region.data['ladder_on_map_if']).is_satisfied(player, null)) { return [0, 'ladder_on_map_if false']; }
+    if(is_ai_user_id_range(feature['base_landlord_id'] || 0)) { return [0, 'feature base_landlord_id is AI']; }
+    if(feature['base_landlord_id'] == session.user_id) { return [0, 'feature is owned by us']; }
+    if(feature['base_type'] != 'home') { return [0, 'feature is not a home base']; }
+    if(('LOCK_STATE' in feature) && feature['LOCK_STATE'] != 0 && !(player.raids_enabled() && feature['LOCK_STATE'] == 1)) { return [0, 'feature is locked']; }
+    if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > this.time)) { return [0, 'feature is protected']; }
     var info = ('base_landlord_id' in feature ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
-    if(!info) { return 0; }
-    var player_info = PlayerCache.query_sync_fetch(session.user_id);
-    if(!player_info) { return 0; }
+    if(!info) { return [0, 'no PlayerCache for base_landlord_id']; }
+    var player_info = PlayerCache.query_sync_fetch(session.user_id); // for own trophy count
+    if(!player_info) { return [0, 'no PlayerCache for self']; }
     if(!player.in_attackable_level_range(info['player_level']||0) &&
        !player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString()) &&
-       this.region.pvp_level_gap_enabled()) { return 0; }
-    if(player.cooldown_active('ladder_fatigue:'+feature['base_landlord_id'].toString())) { return 0; }
+       this.region.pvp_level_gap_enabled()) { return [0, 'level range restriction']; }
+    if(player.cooldown_active('ladder_fatigue:'+feature['base_landlord_id'].toString())) { return [0, 'ladder_fatigue cooldown']; }
     var win_points = 0;
-//  if!(('trophies_pvp' in info)) { return 0; } ???
-    if(!player.cooldown_active('ladder_fatigue:'+feature['base_landlord_id'].toString()) &&
-       ('base_damage' in info) && info['base_damage'] < gamedata['matchmaking']['ladder_win_damage'] &&
-       (!('base_repair_time' in info) || info['base_repair_time'] < this.time) &&
-       (!session.is_in_alliance() || (('alliance_id' in info) && info['alliance_id'] != session.alliance_id)) &&
-       (!('alliance_id' in info) || !player.cooldown_active('alliance_sticky:'+info['alliance_id'].toString()))
-      ) {
-        var attacker_count = player_info['trophies_pvp'] || 0;
-        var defender_count = info['trophies_pvp'] || 0;
-        var tbl = gamedata['matchmaking']['ladder_point_on_map_table'];
-        var delta = defender_count - attacker_count;
-        win_points = Math.min(Math.max(Math.floor(tbl['attacker_victory']['base'] + delta * tbl['attacker_victory']['delta']), tbl['attacker_victory']['min']), tbl['attacker_victory']['max']);
-        var scale_points = this.region.data['ladder_point_scale'] || 1;
-        win_points = Math.max(Math.floor(scale_points * win_points), 1);
-    }
-    return win_points;
+//  if!(('trophies_pvp' in info)) { return [0, 'no self trophy count']; } ???
+    if(!('base_damage' in info) || info['base_damage'] >= gamedata['matchmaking']['ladder_win_damage']) { return [0, 'no base_damage, or damaged above ladder win threshold']; }
+    if(('base_repair_time' in info) && info['base_repair_time'] >= this.time) { return [0, 'player under repair']; }
+    if(session.is_in_alliance() && ('alliance_id' in info) && info['alliance_id'] == session.alliance_id) { return [0, 'same alliance now']; }
+    if(('alliance_id' in info) && player.cooldown_active('alliance_sticky:'+info['alliance_id'].toString())) { return [0, 'same alliance sticky']; }
+
+    var attacker_count = player_info['trophies_pvp'] || 0;
+    var defender_count = info['trophies_pvp'] || 0;
+    var tbl = gamedata['matchmaking']['ladder_point_on_map_table'];
+    var delta = defender_count - attacker_count;
+    win_points = Math.min(Math.max(Math.floor(tbl['attacker_victory']['base'] + delta * tbl['attacker_victory']['delta']), tbl['attacker_victory']['min']), tbl['attacker_victory']['max']);
+    var scale_points = this.region.data['ladder_point_scale'] || 1;
+    win_points = Math.max(Math.floor(scale_points * win_points), 1);
+
+    return [win_points, null];
 };
 
 /** @param {!Array.<!Object>} feature_list - list of map features
