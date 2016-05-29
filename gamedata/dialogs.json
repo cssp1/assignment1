@@ -7305,15 +7305,15 @@
                                 "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
                                 "array": [5,1], "array_offset": [24,0] },
             "damage_vs_right": { "kind": "StaticImage", "xy": [472,214], "dimensions": [21,100], "asset": "damage_vs_rover", "state": "ineffective",
-                                "ui_tooltip": "%CATNAME: %d", "tooltip_delay": 0,
-                                "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
-                                "array": [5,1], "array_offset": [24,0] },
+                                 "ui_tooltip": "%CATNAME: %d", "tooltip_delay": 0,
+                                 "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
+                                 "array": [5,1], "array_offset": [24,0] },
 
             "str_line_left": {"kind": "Line", "xy": [175,287], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
             "str_line_right": {"kind": "Line", "xy": [465,287], "dimensions": [130,0], "color":  [0.33,0.33,0.33,1], "stroke_width": 1 },
 
             "str_unknown_right": {"kind": "TextField", "xy": [450,198], "dimensions": [160,124], "text_size": 48,
-                                 "text_style": "bold", "drop_shadow": 1, "text_color": [0.5,0.5,0.5,1], "ui_name": "?"},
+                                  "text_style": "bold", "drop_shadow": 1, "text_color": [0.5,0.5,0.5,1], "ui_name": "?"},
 
             "scout_time": {"kind": "TextField", "xy": [450,323], "dimensions": [160,32], "text_size": 13,
                            "ui_name_unscouted": "No scouting info", "ui_name_scouted": "Scouted %time ago",

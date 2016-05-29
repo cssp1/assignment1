@@ -1065,12 +1065,12 @@
                                                  "ui_description": "You failed to overcome the enemy defenses." }
                                    },
                     "raid_scout": { "victory":  { "ui_title": "Victory!",
-                                                   "log_outcome": { "attacker": "Scout\nSuccess", "defender": "Scouts\nKilled" },
-                                                   "ui_description": "Your scouts succeeded in gathering info." },
-                                     "defeat": { "ui_title": "Withdraw",
-                                                 "log_outcome": { "attacker": "Scout\nFailed", "defender": "You Were\nScouted" },
-                                                 "ui_description": "Your scouts failed to overcome the enemy's anti-scout defenses." }
-                                   },
+                                                  "log_outcome": { "attacker": "Scout\nSuccess", "defender": "Scouts\nKilled" },
+                                                  "ui_description": "Your scouts succeeded in gathering info." },
+                                    "defeat": { "ui_title": "Withdraw",
+                                                "log_outcome": { "attacker": "Scout\nFailed", "defender": "You Were\nScouted" },
+                                                "ui_description": "Your scouts failed to overcome the enemy's anti-scout defenses." }
+                                  },
                     "raid_pickup": { "victory":  { "ui_title": "Gathered!",
                                                    "log_outcome": { "attacker": "Pickup\nSuccess", "defender": "Pickup\nKilled" },
                                                    "ui_description": "Your units returned with cargo." },
