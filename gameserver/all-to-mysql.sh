@@ -57,7 +57,7 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./battle_risk_reward_to_sql.py -q --prune --parallel 16
 
   # send SpinReminder notification
-  if [[ "${GAME_ID}" == "tr" || "${GAME_ID}" == "dv" ]]; then
+  if [[ "${GAME_ID}" == "tr" ]]; then
       ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
                          --recipients "`./SpinConfig.py --getvar server_status_recipients`"
   fi
@@ -106,10 +106,10 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./acquisitions_to_sql.py -q # requires upcache and analytics-views
 
   # send SpinReminder notification
-  # TR/DV: Mon/Tue/Wed/Thu/Fri, others: Mon/Thu
+  # TR: Mon/Tue/Wed/Thu/Fri, others: Mon/Thu
   # DAY_OF_WEEK is (1..7); 1 is Monday
 
-  if [[ (("${GAME_ID}" == "tr" || "${GAME_ID}" == "dv") && ($RUN_START_DAY_OF_WEEK -le 5)) || \
+  if [[ (("${GAME_ID}" == "tr") && ($RUN_START_DAY_OF_WEEK -le 5)) || \
         ($RUN_START_DAY_OF_WEEK -eq 1) || ($RUN_START_DAY_OF_WEEK -eq 4) ]]; then
       ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "daily SQL analytics update is finished. Input data was complete starting from ${RUN_START_UI_TIME}." \
                          --recipients "`./SpinConfig.py --getvar analytics_recipients`"
