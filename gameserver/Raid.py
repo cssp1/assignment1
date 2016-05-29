@@ -52,6 +52,10 @@ def army_unit_is_raid_shooter(unit, gamedata):
                 return True
     return False
 
+def army_unit_is_visible_to_enemy(unit, gamedata):
+    spec = army_unit_spec(unit, gamedata)
+    return not spec.get('invisible', False) # note: ignore invis_on_hold
+
 def army_unit_is_alive(unit, gamedata):
     if 'DELETED' in unit: return True # special case for these lists
     if 'hp' in unit and unit['hp'] <= 0: return False
@@ -149,8 +153,13 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
         else:
             defense = sides[0]
             shooter = sides[1][shooter_i - len(sides[0])]
-        # then choose target uniformly from all live units on the other side
-        target = randgen.choice(defense)
+
+        # then choose target uniformly from all live, visible units on the other side
+        visible_defense = filter(lambda unit: army_unit_is_visible_to_enemy(unit, gamedata), defense)
+        if not visible_defense:
+            # stalemate - defender wins
+            break
+        target = randgen.choice(visible_defense)
 
         shooter_spec = gamedata['units'][shooter['spec']]
         shooter_level = shooter.get('level',1)
