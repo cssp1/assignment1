@@ -15642,14 +15642,14 @@ class Store(object):
             if hist_type == 'upgrade':
                 hist_type = 'building_upgrade'
             session.increment_player_metric('speedups_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount, time_series = False)
             session.increment_player_metric(hist_type+'_speedups_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount, time_series = False)
 
             session.increment_player_metric('building:'+object.spec.name+':speedups_purchased', 1, time_series = False)
-            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_speedups', record_amount)
+            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_speedups', record_amount, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':'+hist_type+'_speedups_purchased', 1, time_series = False)
-            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount)
+            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount, time_series = False)
 
         elif spellname == "SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY":
             squad_id = spellarg
@@ -15713,7 +15713,7 @@ class Store(object):
             session.player.prune_player_auras()
             session.deferred_player_auras_update = True
             session.increment_player_metric('player_aura_speedups_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_player_aura_speedups', record_amount, time_series = False)
 
         elif spellname == "UNIT_REPAIR_SPEEDUP_FOR_MONEY":
 
@@ -15727,9 +15727,9 @@ class Store(object):
                 item['finish_time'] = server_time - 1
             gameapi.do_unit_repair_tick(session, retmsg, must_reply = True)
             session.increment_player_metric('speedups_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_speedups', record_amount, time_series = False)
             session.increment_player_metric('unit_repair_speedups_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_unit_repair_speedups', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_unit_repair_speedups', record_amount, time_series = False)
             retmsg.append(["SQUADS_UPDATE", session.player.squads]) # to unblock GUI
 
         elif spellname == "REPAIR_ALL_FOR_MONEY":
@@ -15800,7 +15800,7 @@ class Store(object):
                                                                                    'base_id': spellarg,
                                                                                    record_price_type: amount_willing_to_pay})
             session.increment_player_metric('base_repairs_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_base_repairs', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_base_repairs', record_amount, time_series = False)
 
         elif spellname == "UPGRADE_FOR_MONEY":
             object = session.get_object(unit_id)
@@ -15810,9 +15810,9 @@ class Store(object):
                                                                                         record_price_type: amount_willing_to_pay
                                                                                         })
             session.increment_player_metric('building_upgrades_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_building_upgrades', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_building_upgrades', record_amount, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':upgrades_purchased', 1, time_series = False)
-            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_upgrades', record_amount)
+            session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_upgrades', record_amount, time_series = False)
 
         elif spellname == "CRAFT_FOR_MONEY":
             object = session.get_object(unit_id)
@@ -15837,7 +15837,7 @@ class Store(object):
                                                                                        'currency':currency,
                                                                                        record_price_type: amount_willing_to_pay})
             session.increment_player_metric('barrier_upgrades_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_barrier_upgrades', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_barrier_upgrades', record_amount, time_series = False)
 
         elif spellname.startswith("GROW_BASE_PERIMETER"):
             # accept any spellname of the form GROW_BASE_PERIMETERx_... where "x" is the new level to grow to
@@ -15850,13 +15850,13 @@ class Store(object):
                                                                                             'currency': currency,
                                                                                             record_price_type: amount_willing_to_pay})
             session.increment_player_metric('base_growth_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_base_growth', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_base_growth', record_amount, time_series = False)
 
         elif spellname.startswith("CHANGE_REGION"):
             if not gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_change_region'):
                 raise Exception('player %d %s(%s) purchase failure' % (session.player.user_id, spellname, repr(spellarg)))
             session.increment_player_metric('base_relocations_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_base_relocations', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_base_relocations', record_amount, time_series = False)
             session.player.send_history_update(retmsg)
 
         elif spellname == "RESEARCH_FOR_MONEY":
@@ -15878,13 +15878,13 @@ class Store(object):
                                                                     record_price_type: amount_willing_to_pay,
                                                                     })
             session.increment_player_metric('techs_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_techs', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_techs', record_amount, time_series = False)
             session.increment_player_metric('tech:'+techname+':purchased', 1, time_series = False)
             session.increment_player_metric('tech:'+techname+':'+record_spend_type+'_spent', record_amount)
 
             if session.player.tech[techname] == 1:
                 session.increment_player_metric('tech_unlocks_purchased', 1, time_series = False)
-                session.increment_player_metric(record_spend_type+'_spent_on_tech_unlocks', record_amount)
+                session.increment_player_metric(record_spend_type+'_spent_on_tech_unlocks', record_amount, time_series = False)
 
             session.activity_classifier.researched_tech()
 
@@ -15899,7 +15899,7 @@ class Store(object):
                                                                              record_price_type: amount_willing_to_pay,
                                                                              })
             session.increment_player_metric('resource_boosts_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_resource_boosts', record_amount, time_series = False)
 
         elif spellname.startswith("BUY_GAMEBUCKS_") or spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "XSOLLA_PAYMENT", "FB_GAMEBUCKS_PAYMENT"):
             spell = gamedata['spells'][spellname]
@@ -15921,7 +15921,7 @@ class Store(object):
             session.setmax_player_metric('largest_purchase_gamebucks', bucks)
 
             session.increment_player_metric('gamebucks_purchased', bucks)
-            session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_gamebucks', record_amount, time_series = False)
 
             if spellname in ("FB_PROMO_GAMEBUCKS", "FB_TRIALPAY_GAMEBUCKS", "FB_GAMEBUCKS_PAYMENT"):
                 session.increment_player_metric('promo_gamebucks_earned', bucks)
@@ -16031,8 +16031,8 @@ class Store(object):
                     session.player.resources.gain_gamebucks(-gift_amount, reason='gift_order')
                     total_gift_amount += gift_amount
                     entry['success'] = True
-                    session.increment_player_metric('gift_orders_sent', 1)
-                    session.increment_player_metric('gamebucks_spent_on_gift_orders', gift_amount)
+                    session.increment_player_metric('gift_orders_sent', 1, time_series = False)
+                    session.increment_player_metric('gamebucks_spent_on_gift_orders', gift_amount, time_series = False)
 
                     # send notifications
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
@@ -16105,7 +16105,7 @@ class Store(object):
         elif spellname.startswith("BUY_PROTECTION"):
             assert gameapi.execute_spell(session, retmsg, spellname, None, reason = 'purchased_protection')
             session.increment_player_metric('protections_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_protection', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_protection', record_amount, time_series = False)
 
         elif spellname.startswith("FREE_RANDOM_") or spellname.startswith("BUY_RANDOM_"):
             # returns item list here for logging
@@ -16114,7 +16114,7 @@ class Store(object):
             price_description.append(SpinJSON.dumps({'items':items}))
             if (not spellname.startswith("FREE_RANDOM_")):
                 session.increment_player_metric('random_items_purchased', 1, time_series = False)
-                session.increment_player_metric(record_spend_type+'_spent_on_random_items', record_amount)
+                session.increment_player_metric(record_spend_type+'_spent_on_random_items', record_amount, time_series = False)
             else:
                 session.increment_player_metric('free_random_items', 1, time_series = False)
             session.player.send_history_update(retmsg)
@@ -16124,7 +16124,7 @@ class Store(object):
             if 'item' in spellarg['skudata']:
                 session.increment_player_metric('item:'+spellarg['skudata']['item']+':purchased', int(spellarg['skudata'].get('stack',1)), time_series = False)
             session.increment_player_metric('items_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_items', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_items', record_amount, time_series = False)
 
         elif spellname == "CHANGE_ALIAS":
             if not gameapi.execute_spell(session, retmsg, spellname, spellarg, reason = 'purchased_alias_change'):
@@ -16141,8 +16141,8 @@ class Store(object):
             assert scanner
             scanner.contents += 1
             session.increment_player_metric('lottery_tickets_purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_lottery_tickets', record_amount)
-            session.increment_player_metric(record_spend_type+'_spent_on_lottery', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_lottery_tickets', record_amount, time_series = False)
+            session.increment_player_metric(record_spend_type+'_spent_on_lottery', record_amount, time_series = False)
             retmsg.append(["OBJECT_STATE_UPDATE2", scanner.serialize_state()])
 
         elif spellname == "LOTTERY_SCAN":
@@ -16158,7 +16158,7 @@ class Store(object):
 
             session.increment_player_metric('flash_offers_purchased', 1, time_series = False)
             session.increment_player_metric('flash_offer:'+spellname+':purchased', 1, time_series = False)
-            session.increment_player_metric(record_spend_type+'_spent_on_flash_offers', record_amount)
+            session.increment_player_metric(record_spend_type+'_spent_on_flash_offers', record_amount, time_series = False)
 
         else:
             raise Exception('Unknown paid spell ' + spellname)
