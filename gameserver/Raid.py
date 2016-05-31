@@ -39,6 +39,50 @@ def army_unit_pair_dps_key(shooter_unit, target_unit, gamedata):
            (shooter_unit['owner_id'], shooter_unit['spec'], shooter_unit.get('level',1), army_unit_equipment_key(shooter_unit, gamedata),
             target_unit['owner_id'], target_unit['spec'], target_unit.get('level',1), army_unit_equipment_key(target_unit, gamedata))
 
+def army_unit_pair_dph(shooter, target, gamedata):
+    if not army_unit_is_visible_to_enemy(target, gamedata):
+        return 0 # invisible
+
+    shooter_spec = army_unit_spec(shooter, gamedata)
+    shooter_level = shooter.get('level',1)
+    target_spec = army_unit_spec(target, gamedata)
+    target_level = target.get('level',1)
+
+    # XXX should this iterate on defense_types instead?
+    shooter_keys = [shooter_spec['manufacture_category'] if army_unit_is_mobile(shooter, gamedata) else 'building',]
+    target_keys = [target_spec['manufacture_category'] if army_unit_is_mobile(target, gamedata) else 'building',]
+
+    # XXX or some type of building stat override for turret heads (apply to summary as well!)
+    raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
+    damage = 1
+    for k in target_keys:
+        assert k in raid_offense
+        damage *= get_leveled_quantity(raid_offense[k], shooter_level)
+
+    damage_coeff_pre_armor = 1
+    damage_coeff_post_armor = 1
+
+    #damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage', 1)
+    #damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken', 1)
+
+    # note: use manufacture_category as key instead of iterating on defense_types
+    for k in target_keys:
+        pass # damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage_vs:%s' % k, 1)
+    for k in shooter_keys:
+        pass # damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken_from:%s' % k, 1)
+
+    damage *= damage_coeff_pre_armor
+
+    armor = max(get_leveled_quantity(target_spec.get('armor',0), target_level), 0) # target.owner.stattab.get_unit_stat(target['spec'], 'armor', 0)
+    if armor > 0: damage = max(1, damage - armor)
+
+    damage *= damage_coeff_post_armor
+
+    damage = max(1, int(damage + 0.5))
+
+    damage *= shooter.get('stack',1) # XXX not a good way to handle stacks
+    return damage
+
 # utility functions that operate on "army unit" instances
 # for the purposes of the Raids code, this can include buildings as well as mobile units.
 
@@ -171,20 +215,7 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
             for defender in other_side:
                 dph_key = army_unit_pair_dps_key(attacker, defender, gamedata)
                 if dph_key not in dph_cache:
-                    if not army_unit_is_visible_to_enemy(defender, gamedata):
-                        coeff = 0 # invisible
-                    else:
-                        coeff = 1
-                        shooter_spec = army_unit_spec(attacker, gamedata)
-                        shooter_level = attacker.get('level',1)
-                        target_spec = army_unit_spec(defender, gamedata)
-
-                        raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
-                        assert target_spec['manufacture_category'] in raid_offense
-                        coeff *= get_leveled_quantity(raid_offense[target_spec['manufacture_category']], shooter_level)
-                        coeff *= attacker.get('stack',1)
-                        coeff = int(coeff)
-                    dph_cache[dph_key] = coeff
+                    dph_cache[dph_key] = army_unit_pair_dph(attacker, defender, gamedata)
                 dph_matrix[i][a].append(dph_cache[dph_key])
 
     if 0:
