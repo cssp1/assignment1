@@ -8,11 +8,36 @@
 # used by both maptool (for offline resolution) and server (for online resolution)
 
 import copy, random
+import Equipment
 
 def get_leveled_quantity(qty, level): # XXX duplicate
     if type(qty) == list:
         return qty[level-1]
     return qty
+
+# the following is cribbed from AutoResolve.py - but instead of working with live Player/GameObjects, they work with JSON structures
+
+def item_affects_dps(item, gamedata):
+    spec = gamedata['items'].get(item['spec'])
+    if spec:
+        if 'equip' in spec and 'effects' in spec['equip']:
+            for effect in spec['equip']['effects']:
+                if effect['code'] == 'modstat' and effect['stat'] in ('weapon','weapon_level'):
+                    return True
+    return False
+
+def army_unit_equipment_key(unit, gamedata):
+    if 'equipment' in unit:
+        return '|'.join(sorted('%s_L%d' % (item['spec'], item.get('level',1)) \
+                               for item in Equipment.equip_iter(unit['equipment']) \
+                               if item_affects_dps(item, gamedata)))
+    return ''
+
+# unique identifier for the DPS relationship between a shooter and target
+def army_unit_pair_dps_key(shooter_unit, target_unit, gamedata):
+    return '%d:%s:L%d:%s vs %d:%s:L%d:%s' % \
+           (shooter_unit['owner_id'], shooter_unit['spec'], shooter_unit.get('level',1), army_unit_equipment_key(shooter_unit, gamedata),
+            target_unit['owner_id'], target_unit['spec'], target_unit.get('level',1), army_unit_equipment_key(target_unit, gamedata))
 
 # utility functions that operate on "army unit" instances
 # for the purposes of the Raids code, this can include buildings as well as mobile units.
@@ -109,7 +134,10 @@ def hurt_army_unit(unit, dmg, gamedata):
 
     new_hp = max(0, old_hp - dmg)
     if 'hp' in unit: del unit['hp']
-    unit['hp_ratio'] = new_hp / (1.0*get_leveled_quantity(spec['max_hp'], level))
+    if new_hp <= 0:
+        unit['hp_ratio'] = 0
+    else:
+        unit['hp_ratio'] = (new_hp + 0.9) / (1.0*get_leveled_quantity(spec['max_hp'], level))
 
     if new_hp <= 0:
         if spec['kind'] == 'building' or get_leveled_quantity(spec.get('resurrectable',False), level):
@@ -128,9 +156,44 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
     live_defending_units = filter(lambda unit: army_unit_is_alive(unit, gamedata) and army_unit_is_raid_shooter(unit, gamedata),
                                   new_defending_units)
 
+    sides = [live_attacking_units, live_defending_units]
+
+    # pre-compute damage per hit between every pair of possible shooters/targets
+    dph_cache = {}
+    dph_matrix = [[], # for each attacking unit, list of dph against each defending unit
+                  []] # for each defending unit, list of dph against each attacking unit
+    # so the indexing is dph_matrix[0][index_into_live_attacking_units][index_into_live_defending_units]
+    #                 or dph_matrix[1][index_into_live_defending_units][index_into_live_attacking_units]
+    for i, side in enumerate(sides):
+        other_side = sides[1-i]
+        for a, attacker in enumerate(side):
+            dph_matrix[i].append([])
+            for defender in other_side:
+                dph_key = army_unit_pair_dps_key(attacker, defender, gamedata)
+                if dph_key not in dph_cache:
+                    if not army_unit_is_visible_to_enemy(defender, gamedata):
+                        coeff = 0 # invisible
+                    else:
+                        coeff = 1
+                        shooter_spec = army_unit_spec(attacker, gamedata)
+                        shooter_level = attacker.get('level',1)
+                        target_spec = army_unit_spec(defender, gamedata)
+
+                        raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
+                        assert target_spec['manufacture_category'] in raid_offense
+                        coeff *= get_leveled_quantity(raid_offense[target_spec['manufacture_category']], shooter_level)
+                        coeff *= attacker.get('stack',1)
+                        coeff = int(coeff)
+                    dph_cache[dph_key] = coeff
+                dph_matrix[i][a].append(dph_cache[dph_key])
+
+    if 0:
+        print dph_cache
+        print 'dph attacker', dph_matrix[0]
+        print 'dph defender', dph_matrix[1]
+
     randgen = random.Random()
 
-    sides = [live_attacking_units, live_defending_units]
     iter = 0
     winner = 1 # defender wins by default if there is a stalemate
 
@@ -145,41 +208,38 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
                 break
         if done: break
 
-        # uniformly choose next shooter from all live units
-        shooter_i = randgen.randint(0, len(sides[0]) + len(sides[1]) - 1)
-        if shooter_i < len(sides[0]):
-            defense = sides[1]
-            shooter = sides[0][shooter_i]
-        else:
-            defense = sides[0]
-            shooter = sides[1][shooter_i - len(sides[0])]
-
-        # then choose target uniformly from all live, visible units on the other side
-        visible_defense = filter(lambda unit: army_unit_is_visible_to_enemy(unit, gamedata), defense)
-        if not visible_defense:
+        # choose next shooter/target pair with uniform random probability
+        # from all *nonzero* entries of dph_matrix
+        # (if dph_matrix is all zero, we have a stalemate)
+        # later, we could add some kind of weighing to simulate targeting
+        pairs = []
+        for s in (0,1):
+            for i, row in enumerate(dph_matrix[s]):
+                for j, entry in enumerate(row):
+                    if entry > 0:
+                        pairs.append((s, i, j)) # (side, index of shooter, index of target)
+        if len(pairs) < 1:
             # stalemate - defender wins
             break
-        target = randgen.choice(visible_defense)
 
-        shooter_spec = gamedata['units'][shooter['spec']]
-        shooter_level = shooter.get('level',1)
-        target_spec = gamedata['units'][target['spec']]
-        #target_level = target.get('level',1)
+        s, i, j = randgen.choice(pairs)
+        shooter = sides[s][i]
+        target = sides[1-s][j]
 
-        #print shooter, 'shoots', target
+        damage_done = dph_cache[army_unit_pair_dps_key(shooter, target, gamedata)]
+        assert damage_done > 0
 
-        coeff = 1
-        raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
-        assert target_spec['manufacture_category'] in raid_offense
-        coeff *= get_leveled_quantity(raid_offense[target_spec['manufacture_category']], shooter_level)
-        coeff = int(coeff)
-        assert coeff > 0
+        #print shooter, 'shoots', target, 'for', damage_done
 
-        hurt_army_unit(target, coeff, gamedata)
+        hurt_army_unit(target, damage_done, gamedata)
 
         if not army_unit_is_alive(target, gamedata):
             # remove from list of live targets
-            defense.remove(target)
+            del sides[1-s][j]
+            # remove from dph_matrix
+            del dph_matrix[1-s][j] # entry with target as attacker
+            for row in dph_matrix[s]: # entries with target as defender
+                del row[j]
 
         iter += 1
         if iter >= 9999:
