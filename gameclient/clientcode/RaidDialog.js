@@ -282,6 +282,8 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
     var CATS = gamedata['strings']['damage_vs_categories'].concat([["scout","scout"]]);
     var x = 0;
     for(var i = 0; i < CATS.length; i++) {
+        // note: key is a defense_type, and is the actual stat used for calculations
+        // catname is a corresponding manufacture_category or object_kind, FOR UI ONLY
         var key = CATS[i][0], catname = CATS[i][1];
 
         /*
@@ -293,7 +295,7 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
 
         var widget = dialog.widgets['damage_vs_'+side+x.toString()];
 
-        var q = strength[catname] || 0;
+        var q = strength[key] || 0;
         if(scout_only && key !== 'scout') { // deactivate non-scouting units
             q = 0;
             widget.show = false;

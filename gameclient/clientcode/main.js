@@ -29430,6 +29430,8 @@ var SquadCapabilities = function() {
     this.total_raid_offense = {};
     /** @type {!Object<string,number>} */
     this.total_raid_defense = {};
+    /** @type {!Object<string,number>} */
+    this.total_raid_hp = {};
 };
 
 /** Check if a map feature is always defenseless, i.e. subject to raid pickup
@@ -29494,6 +29496,12 @@ player.get_mobile_squad_capabilities = function() {
 
         entry.icon_asset = get_leveled_quantity(spec['art_asset'], obj_level);
 
+        if('raid_offense' in spec || 'raid_defense' in spec) {
+            goog.array.forEach(spec['defense_types'], function(key) {
+                entry.total_raid_hp[key] = (entry.total_raid_hp[key] || 0) + cur_max_hp[0];
+            });
+        }
+
         // check offense/defense stats, including scouting
         goog.array.forEach([['raid_offense', entry.total_raid_offense],
                             ['raid_defense', entry.total_raid_defense]],
@@ -29518,12 +29526,14 @@ player.get_mobile_squad_capabilities = function() {
                                }
                            });
         // check cargo space
-        for(var res in gamedata['resources']) {
-            if('cargo_'+res in spec) {
-                var val = get_leveled_quantity(spec['cargo_'+res], obj_level);
-                if(val) {
-                    entry.max_cargo[res] = (entry.max_cargo[res] || 0) + val;
-                    entry.can_raid_pickup = true;
+        if(cur_max_hp[0] > 0) {
+            for(var res in gamedata['resources']) {
+                if('cargo_'+res in spec) {
+                    var val = get_leveled_quantity(spec['cargo_'+res], obj_level);
+                    if(val) {
+                        entry.max_cargo[res] = (entry.max_cargo[res] || 0) + val;
+                        entry.can_raid_pickup = true;
+                    }
                 }
             }
         }

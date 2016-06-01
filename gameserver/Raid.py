@@ -49,15 +49,14 @@ def army_unit_pair_dph(shooter, target, gamedata):
     target_level = target.get('level',1)
 
     # XXX should this iterate on defense_types instead?
-    shooter_keys = [shooter_spec['manufacture_category'] if army_unit_is_mobile(shooter, gamedata) else 'building',]
-    target_keys = [target_spec['manufacture_category'] if army_unit_is_mobile(target, gamedata) else 'building',]
+    shooter_keys = shooter_spec['defense_types']
+    target_keys = target_spec['defense_types']
 
     # XXX or some type of building stat override for turret heads (apply to summary as well!)
     raid_offense = get_leveled_quantity(shooter_spec['raid_offense'], shooter_level)
     damage = 1
     for k in target_keys:
-        assert k in raid_offense
-        damage *= get_leveled_quantity(raid_offense[k], shooter_level)
+        damage *= get_leveled_quantity(raid_offense.get(k,1), shooter_level)
 
     damage_coeff_pre_armor = 1
     damage_coeff_post_armor = 1
@@ -65,7 +64,6 @@ def army_unit_pair_dph(shooter, target, gamedata):
     #damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage', 1)
     #damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken', 1)
 
-    # note: use manufacture_category as key instead of iterating on defense_types
     for k in target_keys:
         pass # damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage_vs:%s' % k, 1)
     for k in shooter_keys:
@@ -576,10 +574,15 @@ def make_battle_summary(gamedata, nosql_client,
         ret['is_revenge'] = is_revenge
     if base.get('base_template'):
         ret['base_template'] = base['base_template']
-    ret['deployed_units'] = {}
-    for obj in attacker_units_before:
-        if raid_mode == 'scout' and (not army_unit_is_scout(obj, gamedata)): continue
-        ret['deployed_units'][obj['spec']] = ret['deployed_units'].get(obj['spec'],0) + 1
+
+    for dic_name, unit_list in (('deployed_units', attacker_units_before),
+                                ('defending_units', defender_units_before)):
+        live_unit_list = filter(lambda unit: (raid_mode != 'scout' or army_unit_is_scout(obj, gamedata)) and \
+                                army_unit_is_alive(unit, gamedata), unit_list)
+        if live_unit_list:
+            ret[dic_name] = {}
+            for unit in live_unit_list:
+                ret[dic_name][unit['spec']] = ret[dic_name].get(unit['spec'],0) + unit.get('stack',1)
 
     # record remaining strength of defender
     # unless you lost a scout attempt
@@ -587,6 +590,7 @@ def make_battle_summary(gamedata, nosql_client,
     if (raid_mode != 'scout' or attacker_outcome == 'victory') and (defender_units_now is not None) and (raid_mode != 'pickup'):
         ret['new_raid_offense'] = {}
         ret['new_raid_defense'] = {}
+        ret['new_raid_hp'] = {}
 
         for obj in defender_units_now:
             if obj['spec'] in gamedata['units']:
@@ -597,7 +601,15 @@ def make_battle_summary(gamedata, nosql_client,
                 continue
             stack = obj.get('stack', 1)
             level = obj.get('level', 1)
-            hp_ratio = obj.get('hp_ratio', 1)
+            hp = army_unit_hp(obj, gamedata)
+            hp_ratio = hp / get_leveled_quantity(spec['max_hp'], level)
+
+            if 'raid_offense' in spec or 'raid_defense' in spec:
+                for key in spec['defense_types']:
+                    total_hp = hp * stack
+                    if total_hp > 0:
+                        ret['new_raid_hp'][key] = ret['new_raid_hp'].get(key,0) + total_hp
+
             for kind in ('raid_offense', 'raid_defense'):
                 if kind in spec:
                     val = get_leveled_quantity(spec[kind], level)
@@ -605,7 +617,6 @@ def make_battle_summary(gamedata, nosql_client,
                         v = get_leveled_quantity(v, level)
                         v = stack * hp_ratio * v # ??
                         if v > 0:
-                            if ('new_'+kind) not in ret: ret['new_'+kind] = {}
                             ret['new_'+kind][k] = ret['new_'+kind].get(k,0) + v
 
     ret['loot'] = copy.copy(loot) # don't mutate caller's loot
