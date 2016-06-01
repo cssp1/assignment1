@@ -14,6 +14,8 @@
     "deployments_per_travel": 1, // number of times you can attack/reinforce per travel "trip"
 
     "unit_travel_speed_factor": 0.25, // coefficient that relates unit maxvel to map travel_speed (in hexes per second)
+    "raid_travel_speed_factor": 0.0625, // coefficient that relates unit maxvel to raid travel_speed (in hexes per second)
+
     "enable_quarry_guards": 1, // enable squads guarding quarries
     "enable_squad_combat": 1, // squads can fight squads
     "enable_map_home_combat": 1, // squads can fight home bases

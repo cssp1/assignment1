@@ -128,15 +128,6 @@ RaidDialog.update = function(dialog) {
         dialog.widgets['site_size'].str = null;
     }
 
-    // too slow?
-    var raid_path = player.raid_find_path_to(player.home_base_loc, feature);
-    if(raid_path) {
-        var travel_time = player.squad_travel_time(squad_id, raid_path);
-        dialog.widgets['travel_time'].str = dialog.data['widgets']['travel_time']['ui_name'].replace('%time', pretty_print_time(travel_time));
-    } else {
-        dialog.widgets['travel_time'].str = dialog.data['widgets']['travel_time']['ui_name_blocked'];
-    }
-
     var raid_mode = null;
     if(cap.can_pickup_feature(feature)) {
         raid_mode = 'pickup';
@@ -147,6 +138,15 @@ RaidDialog.update = function(dialog) {
         raid_mode = 'attack';
     } else {
         raid_mode = 'unable';
+    }
+
+    // too slow?
+    var raid_path = player.raid_find_path_to(player.home_base_loc, feature);
+    if(raid_path) {
+        var travel_time = player.squad_travel_time(squad_id, raid_path, raid_mode);
+        dialog.widgets['travel_time'].str = dialog.data['widgets']['travel_time']['ui_name'].replace('%time', pretty_print_time(travel_time));
+    } else {
+        dialog.widgets['travel_time'].str = dialog.data['widgets']['travel_time']['ui_name_blocked'];
     }
 
     var scout_data = null;

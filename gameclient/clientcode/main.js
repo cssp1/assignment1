@@ -29573,17 +29573,47 @@ player.squad_clear_client_data = function(squad_id) {
     delete player.squad_client_data[key];
 };
 
+// squad travel time conventions:
+// "travel_speed" of the squad is the maxvel of the slowest unit within it.
+// this is MULTIPLIED by territory's travel_speed_factor and any stattab bonus to get the final speed.
+
 /** @param {number} squad_id
     @return {number} */
-player.squad_travel_time_per_hex = function(squad_id) {
+player.squad_travel_speed = function(squad_id) {
+    // undeployed squads will not have a travel_speed property
     var squad_data = player.squads[squad_id.toString()];
-    return (1.0/(gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*(squad_data['travel_speed']||1)));
+    if('travel_speed' in squad_data) {
+        return squad_data['travel_speed'];
+    }
+    var travel_speed = -1;
+    goog.object.forEach(player.my_army, function(obj, obj_id) {
+        var obj_squad_id = obj['squad_id'] || 0;
+        if(obj_squad_id === squad_id) {
+            var speed = get_leveled_quantity(gamedata['units'][obj['spec']]['maxvel']||0, obj['level']||1);
+            if(travel_speed < 0) {
+                travel_speed = speed;
+            } else {
+                travel_speed = Math.min(travel_speed, speed);
+            }
+        }
+    });
+    return travel_speed;
+};
+
+/** @param {number} squad_id
+    @param {string|null=} raid_mode - overrides what the squad currently is
+    @return {number} */
+player.squad_travel_time_per_hex = function(squad_id, raid_mode) {
+    var squad_data = player.squads[squad_id.toString()];
+    var travel_speed = player.squad_travel_speed(squad_id);
+    return (1.0/(gamedata['territory'][(squad_data['raid'] || raid_mode) ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*travel_speed));
 };
 /** @param {number} squad_id
     @param {!Array<!Array<number>>} path
+    @param {string|null=} raid_mode - overrides what the squad currently is
     @return {number} */
-player.squad_travel_time = function(squad_id, path) {
-    return path.length * player.squad_travel_time_per_hex(squad_id);
+player.squad_travel_time = function(squad_id, path, raid_mode) {
+    return path.length * player.squad_travel_time_per_hex(squad_id, raid_mode);
 };
 
 /** Return a path that ends on this feature.
@@ -29904,8 +29934,9 @@ player.squad_move = function(squad_id, path) {
         next_eta += gamedata['client']['predict_squad_movement_estimated_latency'] || 0; // even more optional latency prediction
         var map_path = [{'xy': squad_data['map_loc'], 'eta': next_eta}];
 
+        var travel_speed = player.squad_travel_speed(squad_id);
         for(var i = 0; i < path.length; i++) {
-            next_eta += 1.0 / (gamedata['territory']['unit_travel_speed_factor']*get_player_stat(player.stattab, 'travel_speed')*(squad_data['travel_speed']||1.0));
+            next_eta += 1.0 / (gamedata['territory'][(squad_data['raid'] ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor')]*get_player_stat(player.stattab, 'travel_speed')*travel_speed);
             map_path.push({'xy': path[i], 'eta': next_eta});
         }
 

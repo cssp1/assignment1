@@ -1567,7 +1567,7 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
             next_eta = time.time()
             new_path = [{'xy': squad['base_map_loc'], 'eta': next_eta}]
             for i, xy in enumerate(astar_solution):
-                next_eta += float(1.0/(gamedata['territory']['unit_travel_speed_factor']*squad.get('travel_speed',1.0)))
+                next_eta += float(1.0/(gamedata['territory']['raid_travel_speed_factor']*squad.get('travel_speed',1.0)))
                 new_path.append({'xy': xy, 'eta': next_eta})
 
         if not lock_manager.acquire(region_id, squad['base_id']): # yes, there's a race condition here
