@@ -12615,6 +12615,22 @@ function update_desktop_dialogs() {
             dialog.widgets['attack_time_amount'].str = s;
         }
 
+        // warn about important enemy auras
+        var ui_enemy_aura_msgs = [];
+        goog.array.forEach(enemy.player_auras, function(aura) {
+            var spec = gamedata['auras'][aura['spec']];
+            if(!spec) { return; }
+            var msg = eval_cond_or_literal(spec['ui_enemy_warning'] || null, player, null);
+            if(msg) {
+                ui_enemy_aura_msgs.push(msg);
+            }
+        });
+        if(ui_enemy_aura_msgs.length > 0) {
+            dialog.widgets['enemy_aura_message'].show = true;
+            dialog.widgets['enemy_aura_message'].str = ui_enemy_aura_msgs.join('\n');
+        } else {
+            dialog.widgets['enemy_aura_message'].show = false;
+        }
     } // end NOT session.home_base
 
     if(session.home_base) {

@@ -1833,6 +1833,18 @@ ViewingBaseDamagePredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function ViewingBaseTypePredicate(data) {
+    goog.base(this, data);
+    this.base_type = data['base_type'];
+}
+goog.inherits(ViewingBaseTypePredicate, Predicate);
+ViewingBaseTypePredicate.prototype.is_satisfied = function(player, qdata) {
+    var world = session.get_real_world();
+    return world.base.base_type === this.base_type;
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function ViewingBaseObjectDestroyedPredicate(data) {
     goog.base(this, data);
     this.spec = data['spec'];
@@ -1988,6 +2000,8 @@ function read_predicate(data) {
         return new ArmySizePredicate(data);
     } else if(kind === 'VIEWING_BASE_DAMAGE') {
         return new ViewingBaseDamagePredicate(data);
+    } else if(kind === 'VIEWING_BASE_TYPE') {
+        return new ViewingBaseTypePredicate(data);
     } else if(kind === 'VIEWING_BASE_OBJECT_DESTROYED') {
         return new ViewingBaseObjectDestroyedPredicate(data);
     } else if(kind === 'QUERY_STRING') {

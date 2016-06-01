@@ -955,6 +955,9 @@
                                      "ui_name": "This base was last defended %s ago",
                                      "text_color": [1,1,1,1], "text_size": 15, "text_hjustify": "center" },
 
+            // used to warn player about important enemy auras
+            "enemy_aura_message": { "show": 0, "kind": "TextField", "xy": [0,130], "dimensions": [762,21], "drop_shadow": 1,
+                                    "text_color": [1,1,0,1], "text_size": 15, "text_hjustify": "center" },
 
             "protection_time_bar": { "kind": "StaticImage", "xy": [321,64], "dimensions": [142,32], "asset": "resource_bar_142px",
                                      "ui_tooltip": "Opponent is temporarily protected from attack", "tooltip_delay": 0,
