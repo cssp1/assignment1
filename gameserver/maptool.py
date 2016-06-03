@@ -290,6 +290,7 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
             for i in xrange(1, src['stack']):
                 dst = copy.deepcopy(dst)
                 dst['obj_id'] = nosql_id_generator.generate()
+                ret.append(dst)
 
     if len(powerplants) > 0:
         # level up powerplants to meet power req
