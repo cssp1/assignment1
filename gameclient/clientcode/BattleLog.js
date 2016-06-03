@@ -539,6 +539,21 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                 }
             }
             line.push(new SPText.ABlock(tx, pr.normal));
+        } else if(met['event_name'] == '3972_raid_scout_result') {
+            if('new_raid_hp' in met) {
+                var hp = met['new_raid_hp'];
+                var ui_str_list = [];
+                var CATS = gamedata['strings']['damage_vs_categories'];
+                for(var c = 0; c < CATS.length; c++) {
+                    var key = CATS[c][0], catname = CATS[c][1];
+                    var ui_catname = gamedata['strings']['manufacture_categories'][catname];
+                    if(hp[key] > 0 && ui_catname) {
+                        ui_str_list.push(ui_catname['plural']+' '+pretty_print_number(hp[key])+' HP');
+                    }
+                }
+                var ui_str = (ui_str_list.length > 0 ? ui_str_list.join('\n') : 'None');
+                line.push(new SPText.ABlock(poss[met['user_id']]+' raid strength remaining: '+ui_str, pr.normal));
+            }
         } else {
             line.push(new SPText.ABlock(met['event_name'], pr.normal));
         }

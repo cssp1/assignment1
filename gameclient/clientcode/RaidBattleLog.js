@@ -72,5 +72,16 @@ RaidBattleLog.from_summary = function(sum) {
 
     ret.push({'event_name': '3830_battle_end', 'battle_outcome': sum['attacker_outcome']});
 
+    var scout_data = ['new_raid_hp', 'new_raid_offense', 'new_raid_defense'];
+    if(goog.array.some(scout_data, function(key) { return key in sum; })) {
+        var event = {'user_id': sum['defender_id'], 'event_name': '3972_raid_scout_result'};
+        goog.array.forEach(scout_data, function(key) {
+            if(key in sum) {
+                event[key] = sum[key];
+            }
+        });
+        ret.push(event);
+    }
+
     return ret;
 };
