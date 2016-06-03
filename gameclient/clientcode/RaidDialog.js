@@ -205,8 +205,11 @@ RaidDialog.update = function(dialog) {
                                // enemy strength to normalize against
                                (raid_mode !== 'pickup' && raid_mode !== 'scout' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null));
 
-    RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
-    RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
+    var available_loot = (raid_mode === 'scout' ? null : (feature && 'base_resource_loot' in feature ? feature['base_resource_loot'] : null));
+    var usable_max_cargo = (raid_mode === 'scout' ? null : cap.max_cargo);
+
+    RaidDialog.update_cargo(dialog, squad_id, usable_max_cargo, available_loot);
+    RaidDialog.update_loot(dialog, available_loot, usable_max_cargo);
 
     dialog.widgets['description'].set_text_bbcode(dialog.data['widgets']['description']['ui_name_'+raid_mode]);
 
@@ -347,8 +350,10 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_mode, oppone
 
 /** @param {!SPUI.Dialog} dialog
     @param {number} squad_id
-    @param {Object<string,number>|null} cargo_cap */
-RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
+    @param {Object<string,number>|null} cargo_cap
+    @param {Object<string,number>|null} normalize_to
+*/
+RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap, normalize_to) {
     var row = 0;
     dialog.widgets['cargo_label'].show = cargo_cap && (goog.object.getCount(cargo_cap) > 0);
     if(dialog.widgets['cargo_label'].show) {
@@ -356,6 +361,11 @@ RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
         var max_amount = 1;
         for(var res in cargo_cap) {
             max_amount = Math.max(max_amount, cargo_cap[res]);
+        }
+        if(normalize_to) {
+            for(var res in normalize_to) {
+                max_amount = Math.max(max_amount, normalize_to[res]);
+            }
         }
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
@@ -366,7 +376,9 @@ RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
                 dialog.widgets['cargo_amount'+row.toString()].show = true;
             dialog.widgets['cargo_icon'+row.toString()].asset = resdata['icon_small'];
             dialog.widgets['cargo_prog'+row.toString()].progress = amount/max_amount;
+            dialog.widgets['cargo_prog'+row.toString()].outline_color = SPUI.make_colorv(resdata['bar_full_color']);
             dialog.widgets['cargo_prog'+row.toString()].full_color = SPUI.make_colorv(resdata['bar_full_color']);
+            dialog.widgets['cargo_prog'+row.toString()].full_color.a = 0.25;
             dialog.widgets['cargo_amount'+row.toString()].str = pretty_print_number(amount);
             row += 1;
             if(row >= dialog.data['widgets']['cargo_bar']['array'][1]) { break; }
@@ -384,19 +396,26 @@ RaidDialog.update_cargo = function(dialog, squad_id, cargo_cap) {
 };
 
 /** @param {!SPUI.Dialog} dialog
-    @param {Object<string,?>|null} feature */
-RaidDialog.update_loot = function(dialog, feature) {
+    @param {Object<string,number>|null} loot
+    @param {Object<string,number>|null} normalize_to
+*/
+RaidDialog.update_loot = function(dialog, loot, normalize_to) {
     var row = 0;
-    dialog.widgets['loot_label'].show = (feature && 'base_resource_loot' in feature);
-    if(feature && 'base_resource_loot' in feature) {
+    dialog.widgets['loot_label'].show = !!loot;
+    if(loot) {
         // normalize to highest amount of any remaining resource
         var max_amount = 1;
-        for(var res in feature['base_resource_loot']) {
-            max_amount = Math.max(max_amount, feature['base_resource_loot'][res]);
+        for(var res in loot) {
+            max_amount = Math.max(max_amount, loot[res]);
+        }
+        if(normalize_to) {
+            for(var res in normalize_to) {
+                max_amount = Math.max(max_amount, normalize_to[res]);
+            }
         }
         for(var res in gamedata['resources']) {
             var resdata = gamedata['resources'][res];
-            var amount = feature['base_resource_loot'][res] || 0;
+            var amount = loot[res] || 0;
             dialog.widgets['loot_bar'+row.toString()].show =
                 dialog.widgets['loot_prog'+row.toString()].show =
                 dialog.widgets['loot_icon'+row.toString()].show =
