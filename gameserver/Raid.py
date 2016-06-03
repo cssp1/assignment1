@@ -123,6 +123,10 @@ def army_unit_is_visible_to_enemy(unit, gamedata):
     spec = army_unit_spec(unit, gamedata)
     return not spec.get('invisible', False) # note: ignore invis_on_hold
 
+def army_unit_is_worth_less_xp(unit, gamedata):
+    spec = army_unit_spec(unit, gamedata)
+    return spec.get('worth_less_xp', False)
+
 def army_unit_is_alive(unit, gamedata):
     if 'DELETED' in unit: return True # special case for these lists
     if 'hp' in unit and unit['hp'] <= 0: return False
@@ -578,7 +582,8 @@ def make_battle_summary(gamedata, nosql_client,
     for dic_name, unit_list in (('deployed_units', attacker_units_before),
                                 ('defending_units', defender_units_before)):
         live_unit_list = filter(lambda unit: (raid_mode != 'scout' or army_unit_is_scout(obj, gamedata)) and \
-                                army_unit_is_alive(unit, gamedata), unit_list)
+                                army_unit_is_alive(unit, gamedata) and \
+                                not army_unit_is_worth_less_xp(unit, gamedata), unit_list)
         if live_unit_list:
             ret[dic_name] = {}
             for unit in live_unit_list:
@@ -591,6 +596,7 @@ def make_battle_summary(gamedata, nosql_client,
         ret['new_raid_offense'] = {}
         ret['new_raid_defense'] = {}
         ret['new_raid_hp'] = {}
+        ret['new_raid_space'] = {}
 
         for obj in defender_units_now:
             if obj['spec'] in gamedata['units']:
@@ -609,6 +615,11 @@ def make_battle_summary(gamedata, nosql_client,
                     total_hp = hp * stack
                     if total_hp > 0:
                         ret['new_raid_hp'][key] = ret['new_raid_hp'].get(key,0) + total_hp
+                    if 'consumes_space' in spec:
+                        total_space = stack * get_leveled_quantity(spec['consumes_space'], level)
+                        total_space *= hp_ratio # ??
+                        if total_space > 0:
+                            ret['new_raid_space'][key] = ret['new_raid_space'].get(key,0) + total_space
 
             for kind in ('raid_offense', 'raid_defense'):
                 if kind in spec:

@@ -29448,6 +29448,8 @@ var SquadCapabilities = function() {
     this.total_raid_defense = {};
     /** @type {!Object<string,number>} */
     this.total_raid_hp = {};
+    /** @type {!Object<string,number>} */
+    this.total_raid_space = {};
 };
 
 /** Check if a map feature is always defenseless, i.e. subject to raid pickup
@@ -29515,6 +29517,10 @@ player.get_mobile_squad_capabilities = function() {
         if('raid_offense' in spec || 'raid_defense' in spec) {
             goog.array.forEach(spec['defense_types'], function(key) {
                 entry.total_raid_hp[key] = (entry.total_raid_hp[key] || 0) + cur_max_hp[0];
+                if('consumes_space' in spec) {
+                    var spc = hp_ratio * get_leveled_quantity(spec['consumes_space'], obj_level);
+                    entry.total_raid_space[key] = (entry.total_raid_space[key] || 0) + spc;
+                }
             });
         }
 

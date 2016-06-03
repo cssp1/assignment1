@@ -168,8 +168,8 @@ RaidDialog.update = function(dialog) {
             } else {
                 dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_unscouted'];
             }
-            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null),
-                                       (raid_mode === 'scout'), (raid_mode === 'pickup' ? null : cap.total_raid_offense));
+            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null),
+                                       (raid_mode === 'scout'), (raid_mode === 'pickup' ? null : cap.total_raid_hp));
 
         }
 
@@ -189,8 +189,8 @@ RaidDialog.update = function(dialog) {
         dialog.widgets['str_unknown_right'].show = false;
     }
 
-    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_offense), (raid_mode === 'scout'),
-                               (scout_data && scout_data['new_raid_defense'] ? scout_data['new_raid_defense'] : null));
+    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_hp), (raid_mode === 'scout'),
+                               (scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null));
 
     RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
     RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
@@ -220,16 +220,19 @@ RaidDialog.calc_advantage = function(attacker_strength, defender_strength) {
     var absolute_max_i = -1;
     for(var i = 0; i < CATS.length; i++) {
         var key = CATS[i][0], catname = CATS[i][1];
-        var a = attacker_strength[catname] || 0;
-        var b = defender_strength[catname] || 0;
+        var a = attacker_strength[key] || 0;
+        var b = defender_strength[key] || 0;
         if(a > absolute_max || b > absolute_max) {
             absolute_max = Math.max(a,b);
             absolute_max_i = i;
         }
     }
 
+    //console.log('attacker '+JSON.stringify(attacker_strength)+'\ndefender '+JSON.stringify(defender_strength));
+
     if(absolute_max_i >= 0) {
-        var catname = CATS[absolute_max_i][1];
+        var catname = CATS[absolute_max_i][0];
+        //console.log('critical stat '+catname);
         var a = attacker_strength[catname] || 0;
         var b = defender_strength[catname] || 0;
         if(a < 0.75 * b) {

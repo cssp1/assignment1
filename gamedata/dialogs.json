@@ -7304,11 +7304,11 @@
                                 "array": [5,1], "array_offset": [24,0] },
 
             "damage_vs_left": { "kind": "StaticImage", "xy": [182,214], "dimensions": [21,100], "asset": "damage_vs_rover", "state": "ineffective",
-                                "ui_tooltip": "Offense vs. %CATNAME: %d", "tooltip_delay": 0,
+                                "ui_tooltip": "%CATNAME: %d Total HP", "tooltip_delay": 0,
                                 "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
                                 "array": [5,1], "array_offset": [24,0] },
             "damage_vs_right": { "kind": "StaticImage", "xy": [472,214], "dimensions": [21,100], "asset": "damage_vs_rover", "state": "ineffective",
-                                 "ui_tooltip": "%CATNAME: %d", "tooltip_delay": 0,
+                                 "ui_tooltip": "%CATNAME: %d Total HP", "tooltip_delay": 0,
                                  "bg_image_offset": [0,79], // deliberately oversized for tooltip hover area
                                  "array": [5,1], "array_offset": [24,0] },
 
