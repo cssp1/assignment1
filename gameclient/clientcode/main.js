@@ -26,6 +26,7 @@ goog.require('PlayerCache');
 goog.require('AllianceCache');
 goog.require('Backdrop');
 goog.require('BattleLog');
+goog.require('RaidBattleLog');
 goog.require('BattleReplay');
 goog.require('BattleReplayGUI');
 goog.require('ChatFilter');
@@ -26286,7 +26287,9 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
 
     battle_log_change_page(dialog, 0);
 
-    if(summary['battle_type'] !== 'raid') {
+    if(summary['battle_type'] === 'raid') {
+        receive_battle_log_result(dialog, {'log': RaidBattleLog.from_summary(summary)});
+    } else {
         dialog.widgets['loading_rect'].show =
             dialog.widgets['loading_text'].show = true;
         get_battle_log(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'] || null, signature,

@@ -17,8 +17,6 @@ goog.require('SPUI'); // for SPUI.Color
 goog.require('SPText');
 goog.require('ItemDisplay');
 
-var BattleLog = {};
-
 BattleLog.DIRTABLE = [[0,22.5,"North"],
                       [22.5,67.5,"Northeast"],
                       [67.5,112.5,"East"],
@@ -129,7 +127,7 @@ BattleLog.compress_group = function(group) {
     var units = {};
     for(var i = 0; i < group.length; i++) {
         var met = group[i];
-        var key = met['unit_type']+'|'+met['level'].toString();
+        var key = met['unit_type']+'|'+('level' in met ? met['level'].toString() : '?');
         if(met['turret_head']) {
             var props = {'turret_head': met['turret_head']};
             key += '|'+JSON.stringify(props);
@@ -175,8 +173,11 @@ BattleLog.compress = function(metlist) {
            met['user_id'] == group[0]['user_id'] &&
            met['attacker_obj_id'] == group[0]['attacker_obj_id'] &&
            met['attacker_type'] == group[0]['attacker_type'] &&
-           met['unit_type'] && met['level'] &&
-           met['event_name'] != '3920_building_destroyed') {
+           met['unit_type'] &&
+           !(met['event_name'] == '3920_building_destroyed' && ('level' in met) && ('attacker_type' in met))) {
+
+            // building_destroyed events are only compressed if there is almost no data on them (for raids)
+
             var can_compress = true;
 
             if((met['event_name'] == '3910_unit_deployed') &&
@@ -194,7 +195,7 @@ BattleLog.compress = function(metlist) {
         // ineligible, output group
         ret = ret.concat(BattleLog.compress_group(group));
         group = [];
-        if(met['unit_type'] && met['level']) {
+        if(met['unit_type']) {
             group.push(met);
         } else {
             ret.push(met);
@@ -285,6 +286,11 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
     var ret = [];
     var start = -1; // battle start time
 
+    var ui_battle_kind = (summary['battle_type'] === 'raid' ?
+                          (summary['raid_mode'] === 'scout' ?
+                           'Scout attempt' : 'Raid')
+                          : 'Battle');
+
     // show unit casualties
     if('loot' in summary) {
         var casualties_shown = false;
@@ -332,8 +338,8 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
             start = met['time'];
             // note: GUI displays the timestamp as a "Battle ID" to reduce player confusion, but it's just the UNIX
             // timestamp of the battle start, NOT an actual unique ID.
-            line.push(new SPText.ABlock('Battle starts at '+(new Date(1000*summary['time'])).toUTCString()+' (Battle ID '+summary['time'].toString()+')', props.neutral.normal));
-        } else {
+            line.push(new SPText.ABlock(ui_battle_kind+' starts at '+(new Date(1000*summary['time'])).toUTCString()+' (Battle ID '+summary['time'].toString()+')', props.neutral.normal));
+        } else if('time' in met) {
             line.push(new SPText.ABlock((met['time']-start).toString()+'s: ', pr.normal));
         }
 
@@ -503,7 +509,7 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         } else if(met['event_name'] == '3829_battle_auto_resolved') {
             line.push(new SPText.ABlock(names[met['user_id']]+' auto-resolved the battle, with the following outcome:', pr.hi));
         } else if(met['event_name'] == '3830_battle_end' || met['event_name'] == '3860_ai_attack_end') {
-            var tx = 'Battle ended: ';
+            var tx = ui_battle_kind + ' ended: ';
             var outcome = met['battle_outcome'];
             if(met['event_name'] == '3860_ai_attack_end') {
                 // invert sense of battle_outcome for AI attack

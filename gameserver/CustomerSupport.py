@@ -781,6 +781,8 @@ class HandleResolveHomeRaid(Handler):
                 ladder_state = None
 
             raid_stattabs = [squad.get('player_stattab',{}) for squad in raid_squads]
+            raid_auras = [squad.get('player_auras',[]) for squad in raid_squads]
+            raid_techs = [squad.get('player_tech',{}) for squad in raid_squads]
             attacker_loot_factor_pvp = raid_stattabs[0].get('player',{}).get('loot_factor_pvp',{'val':1})['val']
 
             self.attacker_ui_name = raid_pcinfos[0].get('ui_name','Unknown')
@@ -1014,7 +1016,9 @@ class HandleResolveHomeRaid(Handler):
 
                 summary = make_battle_summary(self.gamedata, self.gamesite.nosql_client, self.time_now, self.region_id, raid_squads[0], base_props,
                                               raid_squads[0]['base_landlord_id'], self.user_id,
-                                              my_pcinfo, raid_pcinfos[0],
+                                              raid_pcinfos[0], my_pcinfo,
+                                              raid_auras[0], defender_player.player_auras_censored(),
+                                              raid_techs[0], defender_player.tech,
                                               'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
                                               attacking_army, defending_army,
                                               new_attacking_army, new_defending_army,

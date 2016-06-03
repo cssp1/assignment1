@@ -5082,7 +5082,11 @@ class Session(object):
 
         replay_token = self.open_attack_log(self.attack_finish_time, self.incoming_attack_id if (self.incoming_attack_id > 0) else -1, self.user.user_id)
         self.attack_event(self.user.user_id, '3850_ai_attack_start', {})
-        if self.player.player_auras: self.attack_event(self.user.user_id, '3901_player_auras', {'player_auras':copy.copy(self.player.player_auras)})
+        if self.player.player_auras:
+            censored_player_auras = self.player.player_auras_censored()
+            if censored_player_auras:
+                self.attack_event(self.user.user_id, '3901_player_auras', {'player_auras':copy.deepcopy(censored_player_auras)})
+
         self.log_attack_units(self.user.user_id, [obj for obj in self.player.home_base_iter() if self.has_object(obj.obj_id)], '3900_unit_exists')
         if self.damage_log: self.damage_log.init_multi(obj for obj in self.player.home_base_iter() if self.has_object(obj.obj_id))
 
@@ -8319,6 +8323,10 @@ class Player(AbstractPlayer):
         while len(self.ladder_match_history) > max_exclude:
             self.ladder_match_history.remove(self.ladder_match_history[0])
 
+    # modestly censored version of player auras for use in battle logs
+    def player_auras_censored(self):
+        return [aura for aura in self.player_auras if gamedata['auras'].get(aura['spec'],{}).get('show_in_battle_log',True)]
+
     def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False):
         to_remove = []
         for aura in self.player_auras:
@@ -9325,8 +9333,7 @@ class Player(AbstractPlayer):
 
             # add player data that defenders will need to know to resolve battles/looting
             feature['player_stattab'] = self.stattab.serialize_for_squad()
-            # modestly censored version of player auras
-            feature_player_auras = [aura for aura in self.player_auras if gamedata['auras'][aura['spec']].get('show_in_battle_log',True)]
+            feature_player_auras = self.player_auras_censored()
             if feature_player_auras:
                 feature['player_auras'] = feature_player_auras
             feature['player_tech'] = self.tech
@@ -16910,7 +16917,6 @@ class GAMEAPI(resource.Resource):
                         'base_times_attacked': session.viewing_base.base_times_attacked,
                         'base_ncells': session.viewing_base.ncells(),
                         'base_map_loc': copy.deepcopy(session.viewing_base.base_map_loc),
-                        'ladder_state': copy.deepcopy(session.ladder_state),
                         'defender_id': session.viewing_user.user_id,
                         'defender_name': defender_name,
                         'defender_facebook_id': session.viewing_user.facebook_id,
@@ -16921,6 +16927,7 @@ class GAMEAPI(resource.Resource):
                         'base_damage': base_damage,
                         'attacker_outcome': outcome,
                         'defender_outcome': defender_outcome }
+            if session.ladder_state: summary['ladder_state'] = copy.deepcopy(session.ladder_state)
             summary.update(session.res_looter.battle_summary_props())
             if facebook_friends: summary['facebook_friends'] = True
             if session.viewing_user.social_id: summary['defender_social_id'] = session.viewing_user.social_id
@@ -18378,7 +18385,7 @@ class GAMEAPI(resource.Resource):
                                                           limit = 1,
                                                           base_region = session.player.home_region,
                                                           base_id = base_id, base_types = ['raid','home'],
-                                                          fields = ('time','new_raid_offense','new_raid_defense','new_raid_hp','new_raid_space'),
+                                                          fields = ('time','new_raid_offense','new_raid_defense','new_raid_hp','new_raid_space','base_damage'), # note: also update BATTLE_HISTORY_FIELDS if necessary
                                                           reason = 'query_scout_reports')
             if summaries:
                 summary = summaries[0]
@@ -18416,7 +18423,9 @@ class GAMEAPI(resource.Resource):
                              'facebook_friends',
                              'attacker_name', 'defender_name',
                              'attacker_level', 'defender_level',
-                             'deployed_units', 'raid_mode',
+                             # note: also update query_scout_reports() if necessary
+                             'deployed_units', 'defending_units', 'raid_mode', 'new_raid_offense', 'new_raid_defense', 'new_raid_hp', 'new_raid_space',
+                             'attacker_auras', 'defender_auras', 'attacker_tech', 'defender_tech',
                              'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time',
                              'replay_version')
 
@@ -21783,10 +21792,14 @@ class GAMEAPI(resource.Resource):
                                                                                         'battle_streak_ladder': session.player.cooldown_active('battle_streak_ladder'),
                                                                                         'ladder_state': session.ladder_state})
 
-                if session.viewing_player.player_auras: session.attack_event(session.viewing_user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.viewing_player.player_auras)})
+                censored_viewing_player_auras = session.viewing_player.player_auras_censored()
+                if censored_viewing_player_auras:
+                    session.attack_event(session.viewing_user.user_id, '3901_player_auras', {'player_auras':copy.deepcopy(censored_viewing_player_auras)})
                 session.log_attack_units(session.viewing_user.user_id, session.iter_objects(), '3900_unit_exists')
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
-                if session.player.player_auras: session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.copy(session.player.player_auras)})
+                censored_player_auras = session.player.player_auras_censored()
+                if censored_player_auras:
+                    session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.deepcopy(censored_player_auras)})
 
             retmsg.append(["PLAYER_ATTACK_WAVE_DEPLOYED", real_attack_finish_time, replay_token])
 

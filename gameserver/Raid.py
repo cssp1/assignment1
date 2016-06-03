@@ -29,7 +29,7 @@ def item_affects_dps(item, gamedata):
 def army_unit_equipment_key(unit, gamedata):
     if 'equipment' in unit:
         return '|'.join(sorted('%s_L%d' % (item['spec'], item.get('level',1)) \
-                               for item in Equipment.equip_iter(unit['equipment']) \
+                               for item in Equipment.Equipment.equip_iter(unit['equipment']) \
                                if item_affects_dps(item, gamedata)))
     return ''
 
@@ -109,13 +109,15 @@ def army_unit_spec(unit, gamedata):
         return gamedata['buildings'][unit['spec']]
     raise Exception('spec not found: '+unit['spec'])
 
-# true if unit has a nonzero raid_offense stat other than scouting
+# true if unit has a nonzero raid_offense stat
 def army_unit_is_raid_shooter(unit, gamedata):
     spec = army_unit_spec(unit, gamedata)
+    level = unit.get('level',1)
     if 'raid_offense' in spec:
-        raid_offense = get_leveled_quantity(spec['raid_offense'], 1)
+        raid_offense = get_leveled_quantity(spec['raid_offense'], level)
         for key in raid_offense:
-            if key != 'scout':
+            val = get_leveled_quantity(raid_offense[key], level)
+            if val > 0:
                 return True
     return False
 
@@ -443,6 +445,8 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
                 summary = make_battle_summary(gamedata, nosql_client, time_now, region_id, squad, raid,
                                               squad['base_landlord_id'], raid['base_landlord_id'],
                                               attacker_pcinfo, defender_pcinfo,
+                                              squad.get('player_auras',[]), [], # assume no defender auras
+                                              squad.get('player_tech',{}), {}, # assume no defender tech
                                               'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
                                               squad_units, raid_units,
                                               new_squad_units, new_raid_units,
@@ -547,6 +551,8 @@ def make_battle_summary(gamedata, nosql_client,
                         time_now, region_id, squad, base,
                         attacker_id, defender_id,
                         attacker_pcinfo, defender_pcinfo,
+                        attacker_player_auras, defender_player_auras,
+                        attacker_tech, defender_tech,
                         attacker_outcome, defender_outcome,
                         # object state lists
                         attacker_units_before, defender_units_before,
@@ -579,9 +585,15 @@ def make_battle_summary(gamedata, nosql_client,
     if base.get('base_template'):
         ret['base_template'] = base['base_template']
 
+    if attacker_player_auras: ret['attacker_auras'] = attacker_player_auras
+    if defender_player_auras: ret['defender_auras'] = defender_player_auras
+    if attacker_tech: ret['attacker_tech'] = attacker_tech
+    if defender_tech: ret['defender_tech'] = defender_tech
+
     for dic_name, unit_list in (('deployed_units', attacker_units_before),
                                 ('defending_units', defender_units_before)):
         live_unit_list = filter(lambda unit: (raid_mode != 'scout' or army_unit_is_scout(obj, gamedata)) and \
+                                army_unit_is_raid_shooter(unit, gamedata) and \
                                 army_unit_is_alive(unit, gamedata) and \
                                 not army_unit_is_worth_less_xp(unit, gamedata), unit_list)
         if live_unit_list:
@@ -693,15 +705,17 @@ def make_battle_summary(gamedata, nosql_client,
                     my_damage[damage_key]['time'] = my_damage[damage_key].get('time',0) + part_time
 
                 # units_lost_* accounting for destroyed units (not buildings)
-                if after_hp <= 0 and spec['kind'] == 'mobile':
+                if after_hp <= 0 and spec['kind'] in ('mobile', 'building'):
                     adj = 'lost' if role == 'attacker' else 'killed'
-                    if 'units_'+adj not in ret['loot']:
-                        ret['loot']['units_'+adj] = {}
-                    ret['loot']['units_'+adj][b['spec']] = ret['loot']['units_'+adj].get(b['spec'],0) + 1
+                    key = {'mobile': 'units', 'building': 'buildings'}[spec['kind']] + '_' + adj
+                    if key not in ret['loot']:
+                        ret['loot'][key] = {}
+                    ret['loot'][key][b['spec']] = ret['loot'][key].get(b['spec'],0) + 1
 
-                    for res in full_cost:
-                        if full_cost[res] > 0:
-                            ret['loot']['units_'+adj+'_'+res] = ret['loot'].get('units_'+adj+'_'+res,0) + full_cost[res]
+                    if full_cost:
+                        for res in full_cost:
+                            if full_cost[res] > 0:
+                                ret['loot'][key+'_'+res] = ret['loot'].get(key+'_'+res,0) + full_cost[res]
 
     for role, user_id, pcinfo in (('attacker', attacker_id, attacker_pcinfo), ('defender', defender_id, defender_pcinfo)):
         is_ai = 0 if user_id > 1100 else 1 # XXX really need to fix this sometime
