@@ -53,8 +53,13 @@ RaidDialog.invoke = function(squad_id, feature_id) {
 /** @param {!SPUI.Dialog} dialog
     @param {Object<string,?>|null} result */
 RaidDialog.receive_scout_reports = function(dialog, result) {
+    var feature = session.region.find_feature_by_id(dialog.user_data['feature_id']);
+
     dialog.user_data['scout_data_pending'] = false;
-    if(result && (('new_raid_offense' in result) || ('new_raid_defense' in result))) {
+    // note: ignore scout reports from a previous "generation" of this feature at a different location
+    if(result &&
+       vec_equals(result['base_map_loc'], feature['base_map_loc']) &&
+       (('new_raid_offense' in result) || ('new_raid_defense' in result) || ('new_raid_hp' in result))) {
         dialog.user_data['scout_data'] = result;
     }
 };

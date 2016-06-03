@@ -18385,7 +18385,7 @@ class GAMEAPI(resource.Resource):
                                                           limit = 1,
                                                           base_region = session.player.home_region,
                                                           base_id = base_id, base_types = ['raid','home'],
-                                                          fields = ('time','new_raid_offense','new_raid_defense','new_raid_hp','new_raid_space','base_damage'), # note: also update BATTLE_HISTORY_FIELDS if necessary
+                                                          fields = ('time','new_raid_offense','new_raid_defense','new_raid_hp','new_raid_space','base_damage','base_map_loc'), # note: also update BATTLE_HISTORY_FIELDS if necessary
                                                           reason = 'query_scout_reports')
             if summaries:
                 summary = summaries[0]
