@@ -146,18 +146,10 @@ SquadControlDialog.refresh = function(dialog) {
     var squad_ids = goog.array.map(goog.object.getKeys(player.squads), function(x) { return parseInt(x,10); }).sort();
 
     var caps = player.get_mobile_squad_capabilities();
+    dialog.user_data['caps'] = caps;
 
     goog.array.forEach(squad_ids, function (id) {
         if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
-
-        // call to raid
-        if(dialog.user_data['dlg_mode'] == 'call' && dialog.user_data['is_raid']) {
-            if(player.squad_is_deployed(id)) { return; } // can only raid from non-deployed squads
-            var cap = caps[id.toString()] || null;
-            // check for any available raid mode
-            if(!cap || !cap.can_raid_feature(dialog.user_data['to_feature'])) { return; }
-        }
-
         make_squad_tile_args.push({squad_id: id, template: 'squad_tile'});
     });
 
@@ -561,6 +553,19 @@ SquadControlDialog.update_squad_tile = function(dialog) {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
         can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
+
+        // restrictions on call to raid
+        if(dialog.parent.user_data['is_raid']) {
+            if(squad_is_deployed) {
+                can_do_action = false;
+            } else {
+                var caps = dialog.parent.user_data['caps'];
+                var cap = (caps ? caps[dialog.user_data['squad_id'].toString()] || null : null);
+                // check for any available raid mode
+                if(!cap || !cap.can_raid_feature(dialog.parent.user_data['to_feature'])) { can_do_action = false; }
+            }
+        }
+
         dialog.widgets['coverup'].show = hover || !can_do_action;
     }
 
