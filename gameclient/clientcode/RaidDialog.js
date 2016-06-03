@@ -173,8 +173,12 @@ RaidDialog.update = function(dialog) {
             } else {
                 dialog.widgets['scout_time'].str = dialog.data['widgets']['scout_time']['ui_name_unscouted'];
             }
-            RaidDialog.update_strength(dialog, 'right', (raid_mode !== 'pickup' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null),
-                                       (raid_mode === 'scout'), (raid_mode === 'pickup' ? null : cap.total_raid_hp));
+            RaidDialog.update_strength(dialog, 'right',
+                                       // their strength
+                                       (raid_mode !== 'pickup' && raid_mode !== 'scout' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null),
+                                       (raid_mode === 'scout'),
+                                       // my strength to normalize against
+                                       (raid_mode === 'pickup' ? null : (raid_mode === 'scout' ? cap.scout_raid_hp : cap.total_raid_hp)));
 
         }
 
@@ -194,8 +198,12 @@ RaidDialog.update = function(dialog) {
         dialog.widgets['str_unknown_right'].show = false;
     }
 
-    RaidDialog.update_strength(dialog, 'left', (raid_mode === 'pickup' ? null : cap.total_raid_hp), (raid_mode === 'scout'),
-                               (scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null));
+    RaidDialog.update_strength(dialog, 'left',
+                               // my strength
+                               (raid_mode === 'pickup' ? null : (raid_mode === 'scout' ? cap.scout_raid_hp : cap.total_raid_hp)),
+                               (raid_mode === 'scout'),
+                               // enemy strength to normalize against
+                               (raid_mode !== 'pickup' && raid_mode !== 'scout' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null));
 
     RaidDialog.update_cargo(dialog, squad_id, (raid_mode === 'scout' ? null : cap.max_cargo));
     RaidDialog.update_loot(dialog, (raid_mode === 'scout' ? null : feature));
@@ -255,16 +263,22 @@ RaidDialog.calc_advantage = function(attacker_strength, defender_strength) {
 /** @param {!SPUI.Dialog} dialog
     @param {string} side
     @param {Object<string,number>|null} strength
+    @param {boolean} scout_mode
     @param {Object<string,number>|null} opponent_strength - for normalizing against
-    @param {boolean} scout_only
 */
-RaidDialog.update_strength = function(dialog, side, strength, scout_only, opponent_strength) {
+RaidDialog.update_strength = function(dialog, side, strength, scout_mode, opponent_strength) {
+    var scout_only = false;
+
     dialog.widgets['str_label_'+side].show =
         dialog.widgets['str_sunken_'+side].show =
         dialog.widgets['str_line_'+side].show = (strength !== null);
     for(var x = 0; x < dialog.data['widgets']['str_prog_'+side]['array'][0]; x++) {
         dialog.widgets['str_prog_'+side+x.toString()].show =
             dialog.widgets['damage_vs_'+side+x.toString()].show = false;
+    }
+
+    if(dialog.widgets['str_label_'+side].show) {
+        dialog.widgets['str_label_'+side].str = dialog.data['widgets']['str_label_'+side][scout_mode ? 'ui_name_scout' : 'ui_name'];
     }
 
     if(strength === null) { return; }
@@ -286,20 +300,18 @@ RaidDialog.update_strength = function(dialog, side, strength, scout_only, oppone
         }
     }
 
-    // all normal categories, plus scout
-    var CATS = gamedata['strings']['damage_vs_categories'].concat([["scout","scout"]]);
+    // all normal categories
+    var CATS = gamedata['strings']['damage_vs_categories']; // .concat([["scout","scout"]]);
     var x = 0;
     for(var i = 0; i < CATS.length; i++) {
         // note: key is a defense_type, and is the actual stat used for calculations
         // catname is a corresponding manufacture_category or object_kind, FOR UI ONLY
         var key = CATS[i][0], catname = CATS[i][1];
 
-        /*
-        if(key === 'building' && side === 'right') {
-            // skip buildings for the defender
+        if(key === 'building' && side === 'left') {
+            // skip buildings for the attacker
             continue;
         }
-        */
 
         var widget = dialog.widgets['damage_vs_'+side+x.toString()];
 

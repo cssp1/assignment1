@@ -87,10 +87,9 @@ def army_unit_pair_dph(shooter, target, gamedata):
 def army_unit_is_scout(unit, gamedata):
     if unit['spec'] not in gamedata['units']: return False # might be a building
     spec = gamedata['units'][unit['spec']]
-    if 'raid_offense' in spec:
-        val = get_leveled_quantity(spec['raid_offense'], unit.get('level',1))
-        if val and 'scout' in val:
-            return True
+    if ('defense_types' in spec and 'scout' in spec['defense_types']):
+        assert army_unit_is_raid_shooter(unit, gamedata) # check assumption that scout is subset of shooter
+        return True
     return False
 
 def army_unit_is_mobile(unit, gamedata):
@@ -163,7 +162,7 @@ def merge_unit_lists(subset, master):
     ret = []
     i = s = 0
     for i, unit in enumerate(master):
-        if subset[s]['obj_id'] == unit['obj_id']:
+        if len(subset) >= s+1 and subset[s]['obj_id'] == unit['obj_id']:
             # use the subset version
             ret.append(subset[s])
             s += 1
@@ -315,8 +314,8 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
     new_squad_units = None
     new_raid_units = None
 
-    attacking_units = squad_units[:]
-    defending_units = raid_units[:]
+    attacking_units = filter(lambda unit: army_unit_is_alive(unit, gamedata), squad_units)
+    defending_units = filter(lambda unit: army_unit_is_alive(unit, gamedata), raid_units)
 
     # scouting
     if raid_mode == 'scout':
@@ -333,10 +332,9 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
             is_win, new_squad_units, new_raid_units = \
                     resolve_raid_battle(attacking_units, defending_units, gamedata)
 
-            if raid_mode == 'scout':
-                # add back the non-scout units at their correct positions in the unit lists
-                if new_squad_units is not None: new_squad_units = merge_unit_lists(new_squad_units, squad_units)
-                if new_raid_units is not None: new_raid_units = merge_unit_lists(new_raid_units, raid_units)
+            # add back the pass-through units at their correct positions in the unit lists
+            if new_squad_units is not None: new_squad_units = merge_unit_lists(new_squad_units, squad_units)
+            if new_raid_units is not None: new_raid_units = merge_unit_lists(new_raid_units, raid_units)
 
         else:
             is_win = True
@@ -592,7 +590,7 @@ def make_battle_summary(gamedata, nosql_client,
 
     for dic_name, unit_list in (('deployed_units', attacker_units_before),
                                 ('defending_units', defender_units_before)):
-        live_unit_list = filter(lambda unit: (raid_mode != 'scout' or army_unit_is_scout(obj, gamedata)) and \
+        live_unit_list = filter(lambda unit: (raid_mode != 'scout' or army_unit_is_scout(unit, gamedata)) and \
                                 army_unit_is_raid_shooter(unit, gamedata) and \
                                 army_unit_is_alive(unit, gamedata) and \
                                 not army_unit_is_worth_less_xp(unit, gamedata), unit_list)

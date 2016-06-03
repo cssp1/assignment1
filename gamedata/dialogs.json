@@ -7286,9 +7286,11 @@
                           "ui_name_worst": "[color=#ff0000]>>>[/color]"
                          },
 
-            "str_label_left": {"kind": "TextField", "xy": [160,182], "dimensions": [160,18], "text_size": 13, "ui_name": "Your Offense",
+            "str_label_left": {"kind": "TextField", "xy": [160,182], "dimensions": [160,18], "text_size": 13,
+                               "ui_name": "Your Offense", "ui_name_scout": "Your Scouts",
                                "text_color": [0.5,0.5,0.5] },
-            "str_label_right": {"kind": "TextField", "xy": [450,182], "dimensions": [160,18], "text_size": 13, "ui_name": "Enemy Defense",
+            "str_label_right": {"kind": "TextField", "xy": [450,182], "dimensions": [160,18], "text_size": 13,
+                                "ui_name": "Enemy Defense", "ui_name_scout": "Enemy Scouts",
                                 "text_color": [0.5,0.5,0.5] },
 
             "str_sunken_left": {"kind":"StaticImage","xy":[160,201],"dimensions":[160,122], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1},

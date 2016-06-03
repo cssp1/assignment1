@@ -18,7 +18,7 @@ import random
 from Region import Region
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException, \
-     army_unit_is_scout, army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
+     army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
      calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
 from Predicates import read_predicate
@@ -794,18 +794,15 @@ class HandleResolveHomeRaid(Handler):
             defender_player.my_home.base_last_attack_time = self.time_now
             defender_player.my_home.base_times_attacked += 1
 
-            attacking_army = sorted(sum([self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id']) for squad in raid_squads], []),
+            attacking_army = sorted(sum([filter(lambda x: army_unit_is_alive(x, self.gamedata),
+                                                self.gamesite.nosql_client.get_mobile_objects_by_base(self.region_id, squad['base_id'])) for squad in raid_squads], []),
                                      key = lambda obj: obj['spec'])
             defending_army = sorted([obj.persist_state(nosql = True) for obj in defender_player.home_base_iter() if \
                                      obj.is_building() or \
-                                     (obj.is_mobile() and self.gamedata.get('enable_defending_units',True) and obj.squad_id == 0)
+                                     (obj.is_mobile() and self.gamedata.get('enable_defending_units',True) and obj.squad_id == 0) and \
+                                     (not obj.is_destroyed())
                                      ],
                                      key = lambda obj: obj['spec'])
-
-            for army in attacking_army, defending_army:
-                army = filter(lambda x: army_unit_is_alive(x, self.gamedata), army)
-                if raid_mode == 'scout':
-                    army = filter(lambda x: army_unit_is_scout(x, self.gamedata), army)
 
             if not attacking_army:
                 return ReturnValue(result = 'HARMLESS_RACE_CONDITION') # no units to scout or attack with
@@ -1000,7 +997,7 @@ class HandleResolveHomeRaid(Handler):
                 if session and recalc_resources:
                     retmsg.append(["PLAYER_STATE_UPDATE", defender_player.resources.calc_snapshot().serialize()])
 
-                if raid_mode != 'scout':
+                if raid_mode != 'scout' or is_win:
                     base_damage = defender_player.my_home.calc_base_damage()
                 else:
                     base_damage = None
@@ -1022,7 +1019,7 @@ class HandleResolveHomeRaid(Handler):
                                               'victory' if is_win else 'defeat', 'defeat' if is_win else 'victory',
                                               attacking_army, defending_army,
                                               new_attacking_army, new_defending_army,
-                                              actual_loot, raid_mode = raid_squads[0]['raid'], base_damage = base_damage,
+                                              actual_loot, raid_mode = raid_mode, base_damage = base_damage,
                                               is_revenge = is_revenge_attack)
 
                 # perform mutation on attacking army

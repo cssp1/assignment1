@@ -29453,6 +29453,15 @@ var SquadCapabilities = function() {
     this.total_raid_hp = {};
     /** @type {!Object<string,number>} */
     this.total_raid_space = {};
+
+    /** @type {!Object<string,number>} */
+    this.scout_raid_offense = {};
+    /** @type {!Object<string,number>} */
+    this.scout_raid_defense = {};
+    /** @type {!Object<string,number>} */
+    this.scout_raid_hp = {};
+    /** @type {!Object<string,number>} */
+    this.scout_raid_space = {};
 };
 
 /** Check if a map feature is always defenseless, i.e. subject to raid pickup
@@ -29515,23 +29524,35 @@ player.get_mobile_squad_capabilities = function() {
         var cur_max_hp = army_unit_hp(obj);
         var hp_ratio = cur_max_hp[0] / cur_max_hp[1];
 
+        // check scout ability
+        var is_scout = ('defense_types' in spec && goog.array.contains(spec['defense_types'], 'scout'));
+        if(is_scout) {
+            entry.can_raid_scout = true;
+        }
+
         entry.icon_asset = get_leveled_quantity(spec['art_asset'], obj_level);
 
         if('raid_offense' in spec || 'raid_defense' in spec) {
             goog.array.forEach(spec['defense_types'], function(key) {
                 entry.total_raid_hp[key] = (entry.total_raid_hp[key] || 0) + cur_max_hp[0];
+                if(is_scout) {
+                    entry.scout_raid_hp[key] = (entry.scout_raid_hp[key] || 0) + cur_max_hp[0];
+                }
                 if('consumes_space' in spec) {
                     var spc = hp_ratio * get_leveled_quantity(spec['consumes_space'], obj_level);
                     entry.total_raid_space[key] = (entry.total_raid_space[key] || 0) + spc;
+                    if(is_scout) {
+                        entry.scout_raid_space[key] = (entry.scout_raid_space[key] || 0) + spc;
+                    }
                 }
             });
         }
 
-        // check offense/defense stats, including scouting
-        goog.array.forEach([['raid_offense', entry.total_raid_offense],
-                            ['raid_defense', entry.total_raid_defense]],
+        // check offense/defense stats
+        goog.array.forEach([['raid_offense', entry.total_raid_offense, entry.scout_raid_offense],
+                            ['raid_defense', entry.total_raid_defense, entry.scout_raid_defense]],
                            function(x) {
-                               var spec_key = x[0], total = x[1];
+                               var spec_key = x[0], total = x[1], scout = x[2];
                                if(spec_key in spec) {
                                    var val_dict = get_leveled_quantity(spec[spec_key], obj_level);
                                    for(var k in val_dict) {
@@ -29539,9 +29560,10 @@ player.get_mobile_squad_capabilities = function() {
                                        val *= hp_ratio; // ??
                                        if(val > 0) {
                                            total[k] = (total[k] || 0) + val;
-                                           if(k === 'scout') {
-                                               entry.can_raid_scout = true;
-                                           } else if(spec_key === 'raid_offense') {
+                                           if(is_scout) {
+                                               scout[k] = (scout[k] || 0) + val;
+                                           }
+                                           if(spec_key === 'raid_offense') {
                                                entry.can_raid_offense = true;
                                            } else if(spec_key === 'raid_defense') {
                                                entry.can_raid_defense = true;
