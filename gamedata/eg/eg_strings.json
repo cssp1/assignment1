@@ -49,6 +49,7 @@
                             "in_reserve": "Awaiting Assignment",
                             "ready": "Ready to Deploy",
                             "deployed": "Deployed at (%s)",
+                            "raid_guard": "Guarding %s",
                             "traveling": "Traveling to (%s) (%time)",
                             "returning_to_home_base": "Returning (%time)",
                             "quarry": "Guarding Quarry %s",
