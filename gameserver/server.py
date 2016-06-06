@@ -9536,7 +9536,7 @@ class Player(AbstractPlayer):
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'waypoint', waypoint]
 
                 # construct new path
-                next_eta += 0 if self.travel_override else float(1.0/(gamedata['territory']['raid_travel_speed_factor' if raid_mode else 'unit_travel_speed_factor']*self.stattab.get_player_stat('travel_speed')*squad.get('travel_speed',1.0)))
+                next_eta += 0 if self.travel_override else float(1.0/(gamedata['territory']['raid_travel_speed_factor' if (raid_mode or squad.get('raid')) else 'unit_travel_speed_factor']*self.stattab.get_player_stat('travel_speed')*squad.get('travel_speed',1.0)))
                 new_path.append({'xy': waypoint, 'eta': next_eta})
 
         else:
