@@ -2219,6 +2219,9 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 if(moving) {
                     SPUI.ctx.save();
 
+                    // but raid squads as transparent
+                    if(feature['base_type'] === 'squad' && feature['raid']) { SPUI.ctx.globalAlpha = 0.66; }
+
                     var last_next_progress = this.region.feature_interpolate_pos(feature, this.time);
                     // note: cell_to_field is nonlinear, so we have to do the interpolation after converting to field coordinates
                     var last_xy = this.cell_to_field(last_next_progress[0]);
@@ -2477,7 +2480,10 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             }
 
             // XXX temporary hack for raids
-            if(feature['base_type'] == 'raid' || (feature['base_type'] == 'squad' && feature['raid'])) {
+            if(feature['base_type'] == 'squad' && feature['raid'] && !owned) {
+                // other player's raid - only visible to developers
+                label = '(DEV-R) '+label;
+            } else if(feature['base_type'] == 'raid' || (feature['base_type'] == 'squad' && feature['raid'])) {
                 label = '(R) '+label;
             }
 

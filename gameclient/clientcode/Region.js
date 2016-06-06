@@ -10,6 +10,8 @@ goog.provide('Region');
     References a lot of stuff from main.js :(
 */
 
+goog.require('MapFeature');
+
 /** @constructor @struct */
 Region.Region = function(data) {
     this.data = data;
@@ -215,10 +217,13 @@ Region.Region.prototype.for_each_feature = function(cb, cb_this) {
     goog.array.forEach(this.features, cb, cb_this);
 };
 
-Region.Region.prototype.feature_shown = function(feature) {
+/** @param {!MapFeature.MapFeature} feature
+    @param {boolean=} eta_only - flag if we only want to show the ETA (for raids)
+    @return {boolean} */
+Region.Region.prototype.feature_shown = function(feature, eta_only) {
     if(!('base_map_loc' in feature)) { return false; }
     // hide raid squads not owned by you
-    if(!player.is_developer() && feature['base_type'] == 'squad' && feature['raid'] && feature['base_landlord_id'] != session.user_id) { return false; }
+    if(!eta_only && !player.is_developer() && feature['base_type'] == 'squad' && feature['raid'] && feature['base_landlord_id'] != session.user_id) { return false; }
 
     if(feature['base_type'] == 'hive' && ('base_template' in feature) && (feature['base_template'] in gamedata['hives_client']['templates']) &&
        ('show_if' in gamedata['hives_client']['templates'][feature['base_template']]) &&
@@ -233,14 +238,15 @@ Region.Region.prototype.feature_blocks_map = function(feature) {
     return (feature['base_type'] !== 'squad' || (!feature['raid'] && player.squad_block_mode() !== 'never'));
 };
 
-/** Check a feature's location for incoming raids (by other players).
+/** Check a feature's location for incoming raids (by other players who don't own the feature).
     Return the seconds-to-go for the earliest arrival, or -1 if none.
     @return {number} */
 Region.Region.prototype.feature_incoming_raid_togo = function(feature) {
-    var flist = this.find_features_at_coords(feature['base_map_loc']);
+    var flist = this.find_features_at_coords(feature['base_map_loc'], {eta_only: true});
     var min_togo = -1;
     goog.array.forEach(flist, function(f) {
         if(f !== feature && f['base_type'] === 'squad' && f['raid'] && f['base_landlord_id'] !== session.user_id &&
+           f['base_landlord_id'] !== feature['base_landlord_id'] &&
            this.feature_is_moving(f)) {
             var eta = f['base_map_path'][f['base_map_path'].length-1]['eta'];
             if(eta > server_time) {
@@ -356,21 +362,11 @@ Region.Region.prototype.feature_exists_at = function(base_id, base_ui_name, loc)
 }
 
 /** @param {Array.<number>} cell
-  * @param {{include_moving_squads:(boolean|undefined)}=} options */
+  * @param {{include_moving_squads:(boolean|undefined), eta_only:(boolean|undefined)}=} options */
 Region.Region.prototype.find_features_at_coords = function(cell, options) {
     var feature_list = [];
     if(cell) {
-        /*
-        for(var i = 0; i < this.features.length; i++) {
-            var f = this.features[i];
-            if(!this.feature_shown(f)) { continue; }
-            if(!f['base_map_loc']) { continue; }
-            if(f['base_map_loc'][0] == cell[0] && f['base_map_loc'][1] == cell[1]) {
-                feature_list.push(f);
-            }
-        }
-        */
-        feature_list = goog.array.filter(this.map_index.get_by_loc(cell), this.feature_shown, this);
+        feature_list = goog.array.filter(this.map_index.get_by_loc(cell), function(f) { return this.feature_shown(f, options && options.eta_only); }, this);
     }
 
     // special case for player's own moving squads
