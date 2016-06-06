@@ -6354,6 +6354,8 @@ player.map_home_combat_enabled = function() { return player.get_territory_settin
 player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
 /** @return {boolean} */
 player.raids_enabled = function() { return player.get_territory_setting('enable_raids'); };
+/** @return {boolean} includes both defensive and offensive raids */
+player.alliance_raids_enabled = function() { return player.get_territory_setting('enable_alliance_raids'); };
 
 /** @return {number} */
 player.raid_pvp_attempts_left = function() {
@@ -29481,19 +29483,28 @@ SquadCapabilities.feature_is_defenseless = function(feature) {
     @return {boolean} */
 SquadCapabilities.prototype.can_pickup_feature = function(feature) {
     // "pickup" is allowed when the original template lists no defending units or buildings
-    return this.can_raid_pickup && SquadCapabilities.feature_is_defenseless(feature);
+    return !!(this.can_raid_pickup && SquadCapabilities.feature_is_defenseless(feature) &&
+              (session.region.feature_stance(feature) & Region.Stance.HOSTILE));
 };
 /** @param {!Object<string,?>} feature
     @return {boolean} */
 SquadCapabilities.prototype.can_attack_feature = function(feature) {
-    return this.can_raid_offense && !SquadCapabilities.feature_is_defenseless(feature);
+    return !!(this.can_raid_offense && !SquadCapabilities.feature_is_defenseless(feature) &&
+              (session.region.feature_stance(feature) & Region.Stance.HOSTILE));
+};
+/** @param {!Object<string,?>} feature
+    @return {boolean} */
+SquadCapabilities.prototype.can_guard_feature = function(feature) {
+    return player.alliance_raids_enabled() &&
+        !!(this.can_raid_defense && (session.region.feature_stance(feature) & Region.Stance.ALLIANCEMATE));
 };
 /** @param {!Object<string,?>} feature
     @return {boolean} */
 SquadCapabilities.prototype.can_scout_feature = function(feature) {
-    return this.can_raid_scout && !SquadCapabilities.feature_is_defenseless(feature);
+    return !!(this.can_raid_scout && !SquadCapabilities.feature_is_defenseless(feature) &&
+              (session.region.feature_stance(feature) & Region.Stance.HOSTILE));
 };
-    /** @param {!Object<string,?>} feature
+/** @param {!Object<string,?>} feature
     @return {boolean} */
 SquadCapabilities.prototype.can_defend_feature = function(feature) { return false; } // not implemented
 /** @param {!Object<string,?>} feature
@@ -29502,6 +29513,7 @@ SquadCapabilities.prototype.can_raid_feature = function(feature) {
     return (this.can_attack_feature(feature) ||
             this.can_scout_feature(feature) ||
             this.can_defend_feature(feature) ||
+            this.can_guard_feature(feature) ||
             this.can_pickup_feature(feature));
 };
 
@@ -30098,19 +30110,24 @@ player.advance_squads = function() {
             } else if(!session.region.dirty) {
                 var features = session.region.find_features_at_coords(squad_data['map_loc']);
                 var need_resolve = false;
-                for(var i = 0; i < features.length; i++) {
-                    var feature = features[i];
-                    if(feature['base_type'] == 'raid' || feature['base_type'] == 'home') {
+                var need_recall = true;
+                goog.array.forEach(features, function(feature) {
+                    if(feature['base_id'] === player.squad_base_id(squad_data['id'])) { return; } // self
+                    var stance = session.region.feature_stance(feature);
+                    if(player.alliance_raids_enabled() &&
+                       feature['base_type'] == 'home' && (stance & (Region.Stance.ALLIANCEMATE | Region.Stance.UNKNOWN))) {
+                        need_recall = false; // leave it there to guard
+                    } else if((feature['base_type'] == 'raid' || feature['base_type'] == 'home') &&
+                              (stance & Region.Stance.HOSTILE)) {
                         need_resolve = true;
-                        break;
+                        need_recall = false;
                     }
-                }
-                if(need_resolve) {
-                    if(!squad_data['pending']) {
-                        squad_data['pending'] = true;
-                        send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RESOLVE", squad_data['map_loc']]);
-                    }
-                } else if(!squad_data['pending']) {
+                });
+
+                if(need_resolve && !squad_data['pending']) {
+                    squad_data['pending'] = true;
+                    send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "SQUAD_RESOLVE", squad_data['map_loc']]);
+                } else if(need_recall && !squad_data['pending']) {
                     console.log('Auto-recalling idle raid squad '+squad_data['id'].toString());
                     // use underscore variant to avoid GUI error spam
                     if(player._squad_recall_move(squad_data['id'])) {

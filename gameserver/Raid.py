@@ -290,6 +290,7 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
 
     return (winner is 0), new_attacking_units, new_defending_units
 
+# XXXXXXRAIDGUARDS
 def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata):
     # * assumes that you already have all the proper mutex locks on squad and raid!
     # returns (update_map_feature) mutations of squad, raid, loot

@@ -8720,6 +8720,7 @@ class Player(AbstractPlayer):
     def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
     def raids_enabled(self): return self.get_territory_setting('enable_raids')
+    def alliance_raids_enabled(self): return self.get_territory_setting('enable_alliance_raids')
     def squad_bumping_enabled(self): return self.get_territory_setting('enable_squad_bumping')
 
     def unit_speedups_enabled(self):
@@ -9457,55 +9458,65 @@ class Player(AbstractPlayer):
                                 if (not Predicates.read_predicate(template['activation']).is_satisfied(self, None)):
                                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'raid_destination_activation_false', coords[-1]]
                         if x.get('base_type') == 'home' and x['base_landlord_id'] != self.user_id:
-                            # perform PvP-specific attacker checks
-                            # (better to do defender checks at resolve time, to avoid player-unfriendly races)
-                            if self.is_alt_account_unattackable(x['base_landlord_id']) and gamedata['prevent_alt_attacks']:
-                                return False, [rollback_feature], ["CANNOT_ATTACK_ALT_ACCOUNT"]
+                            # is it a friendly guard action?
+                            if self.alliance_raids_enabled() and self.is_same_alliance(x['base_landlord_id']):
+                                # guard action
+                                if raid_mode != 'guard' and gamedata['prevent_same_alliance_attacks']:
+                                    return False, [rollback_feature], ["CANNOT_ATTACK_SAME_ALLIANCE"]
+                            else:
+                                # hostile action
+                                if raid_mode not in ('attack','scout'):
+                                    return False, [rollback_feature], ["HARMLESS_RACE_CONDITION"]
 
-                            elif self.stattab.sandstorm_max:
-                                return False, [rollback_feature], ["CANNOT_ATTACK_SANDSTORM_MAX"]
+                                # perform PvP-specific attacker checks
+                                # (better to do defender checks at resolve time, to avoid player-unfriendly races)
+                                if self.is_alt_account_unattackable(x['base_landlord_id']) and gamedata['prevent_alt_attacks']:
+                                    return False, [rollback_feature], ["CANNOT_ATTACK_ALT_ACCOUNT"]
 
-                            elif server_time < self.get_repeat_attack_cooldown_expire_time(x['base_landlord_id'], x['base_id']):
-                                return False, [rollback_feature], ["CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"]
+                                elif self.stattab.sandstorm_max:
+                                    return False, [rollback_feature], ["CANNOT_ATTACK_SANDSTORM_MAX"]
 
-                            elif self.raid_pvp_attempts_left() < 1:
-                                return False, [rollback_feature], ["CANNOT_ATTACK_RAID_PVP_ATTEMPT_LIMIT"]
+                                elif server_time < self.get_repeat_attack_cooldown_expire_time(x['base_landlord_id'], x['base_id']):
+                                    return False, [rollback_feature], ["CANNOT_ATTACK_REPEAT_ATTACK_COOLDOWN"]
 
-                            # init_attack() minus the defender-only parts
-                            is_revenge_attack = self.cooldown_active('revenge_defender:%d' % x['base_landlord_id'])
-                            if is_revenge_attack:
-                                # tag the feature with info the defender will need to know about us
-                                add_props['is_revenge_attack'] = 1
+                                elif self.raid_pvp_attempts_left() < 1:
+                                    return False, [rollback_feature], ["CANNOT_ATTACK_RAID_PVP_ATTEMPT_LIMIT"]
 
-                            # add ladderable flag
-                            if raid_mode != 'scout' and \
-                               (not (gamedata['anti_bullying']['enable_ladder_fatigue'] and \
-                                     self.cooldown_active('ladder_fatigue:%d' % x['base_landlord_id']))) and \
-                               Predicates.read_predicate(gamedata['regions'][self.home_region].get('ladder_on_map_if',
-                                                                                                   {'predicate':'ALWAYS_FALSE'})).is_satisfied(self, None) and \
-                               not self.is_alt_account_unladderable(x['base_landlord_id']):
-                                add_props['ladderable'] = 1
-                                add_props['ladder_points'] = self.ladder_points()
-                                add_props['sticky_alliances'] = self.get_sticky_alliances()
+                                # init_attack() minus the defender-only parts
+                                is_revenge_attack = self.cooldown_active('revenge_defender:%d' % x['base_landlord_id'])
+                                if is_revenge_attack:
+                                    # tag the feature with info the defender will need to know about us
+                                    add_props['is_revenge_attack'] = 1
 
-                            if not on_success:
-                                def on_attack_launch():
-                                    self.raid_pvp_attempt_consume()
-                                    self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
+                                # add ladderable flag
+                                if raid_mode == 'attack' and \
+                                   (not (gamedata['anti_bullying']['enable_ladder_fatigue'] and \
+                                         self.cooldown_active('ladder_fatigue:%d' % x['base_landlord_id']))) and \
+                                   Predicates.read_predicate(gamedata['regions'][self.home_region].get('ladder_on_map_if',
+                                                                                                       {'predicate':'ALWAYS_FALSE'})).is_satisfied(self, None) and \
+                                   not self.is_alt_account_unladderable(x['base_landlord_id']):
+                                    add_props['ladderable'] = 1
+                                    add_props['ladder_points'] = self.ladder_points()
+                                    add_props['sticky_alliances'] = self.get_sticky_alliances()
 
-                                    # remove the protection timer of the player making the attack
-                                    self.set_protection_end_time(session, -1,
-                                                                 '3884_protection_removed' if self.has_damage_protection() else None,
-                                                                 {'defender_id':x['base_landlord_id']})
-                                    # create revenge allowance
-                                    if gamedata['matchmaking']['revenge_time'] > 0:
-                                        self.cooldown_trigger('revenge_attacker:%d' % x['base_landlord_id'], gamedata['matchmaking']['revenge_time'])
+                                if not on_success:
+                                    def on_attack_launch():
+                                        self.raid_pvp_attempt_consume()
+                                        self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
 
-                                    session.send([["COOLDOWNS_UPDATE", self.cooldowns]])
+                                        # remove the protection timer of the player making the attack
+                                        self.set_protection_end_time(session, -1,
+                                                                     '3884_protection_removed' if self.has_damage_protection() else None,
+                                                                     {'defender_id':x['base_landlord_id']})
+                                        # create revenge allowance
+                                        if gamedata['matchmaking']['revenge_time'] > 0:
+                                            self.cooldown_trigger('revenge_attacker:%d' % x['base_landlord_id'], gamedata['matchmaking']['revenge_time'])
 
-                                    record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+                                        session.send([["COOLDOWNS_UPDATE", self.cooldowns]])
 
-                                on_success = on_attack_launch
+                                        record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+                                    on_success = on_attack_launch
 
 
             else:
@@ -27640,7 +27651,8 @@ class GAMEAPI(resource.Resource):
                 raid_info = spellargs[2] # None for regular squads, {'path':[[x,y],...], 'mode':...} for raids
                 is_raid = bool(raid_info)
                 if is_raid:
-                    assert raid_info['mode'] in ('pickup','attack','defend','scout')
+                    assert raid_info['mode'] in ('pickup','attack','defend','scout','guard')
+                    if not session.player.alliance_raids_enabled(): assert raid_info['mode'] != 'guard'
                     raid_mode = raid_info['mode']
                     raid_path = raid_info['path']
                 else:

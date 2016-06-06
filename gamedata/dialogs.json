@@ -6992,7 +6992,7 @@
 
             "title": { "kind": "TextField", "xy": [18,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name_normal": "!TX Army", "ui_name_manage": "Battalions",
-                       "ui_name_deploy": "Deploy Battalion", "ui_name_call": "Call Battalion", "ui_name_call_raid": "Launch Raid" },
+                       "ui_name_deploy": "Deploy Battalion", "ui_name_call": "Call Battalion", "ui_name_call_raid": "Launch Battalion" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "sunken": {"kind": "StaticImage", "xy":[29,64], "dimensions":[677,350], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
@@ -7041,7 +7041,8 @@
                     "color_deployed": [0,0.05,0.025,1], "outline_color_deployed": [0.4,0.8,0.4,1],
                     "color_returning_to_home_base": [0,0.05,0.025,1], "outline_color_returning_to_home_base": [0.4,0.8,0.4,1],
                     "color_traveling" :[0,0.05,0.025,1], "outline_color_traveling": [0.4,0.8,0.4,1],
-                    "color_quarry": [0,0.025,0.05,1], "outline_color_quarry": [0.4,0.8,0.8,1]
+                    "color_quarry": [0,0.025,0.05,1], "outline_color_quarry": [0.4,0.8,0.8,1],
+                    "color_raid_guard": [0,0.025,0.05,1], "outline_color_raid_guard": [0.4,0.8,0.8,1]
                   },
             "name": { "kind": "TextField", "xy": [0,1], "dimensions": [164,17], "clip_to": [0,1,164,25],
                       "text_size": 15, "text_hjustify": "center", "text_style": "bold",
@@ -7237,8 +7238,14 @@
             "squad_decoration": { "kind": "SolidRect", "xy": [180,95], "dimensions": [220,110], "color": [0,0.33,0,0.1],
                                   "outline_width": 1, "outline_color": [0,0.33,0,1],
                                   "path": [[60,0], [120,18], [120,54], [60,72], [0,54], [0,18], [60,0]] },
-            "site_decoration": { "kind": "SolidRect", "xy": [466,95], "dimensions": [220,110], "color": [0.33,0,0,0.1],
-                                 "outline_width": 1, "outline_color": [0.33,0,0,1],
+            "site_decoration": { "kind": "SolidRect", "xy": [466,95], "dimensions": [220,110],
+                                 "outline_width": 1,
+                                 "outline_color_hostile": [0.33,0,0,1],
+                                 "outline_color_friendly": [0,0.33,0,1],
+                                 "outline_color_unknown": [0.2,0.2,0.2,1],
+                                 "color_hostile": [0.33,0,0,0.1],
+                                 "color_friendly": [0,0.33,0,0.1],
+                                 "color_unknown": [0,0,0,0],
                                  "path": [[60,0], [120,18], [120,54], [60,72], [0,54], [0,18], [60,0]] },
 
             "squad_unit_icon": { "kind": "StaticImage", "xy": [185,92], "dimensions": [112,100], "bg_image_offset": [0,-8], "bg_image_justify": "center",
@@ -7363,6 +7370,7 @@
                              "ui_name_attack": "[b]If you win[/b]: Enemy defenses are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n[b]If you lose[/b]: Your units are destroyed. Enemy defenses may suffer some damage.",
                              "ui_name_defend": "[b]If you win[/b]: Enemy units are destroyed. Your units may suffer some damage. Battalion returns with as much loot as fits in Cargo.\n[b]If you lose[/b]: Your units are destroyed. Enemy units may suffer some damage.",
                              "ui_name_scout": "[b]If you win[/b]: Enemy defense strength is revealed. Your scounting units may suffer some damage.\n\n[b]If you lose[/b]: Your scounting units are destroyed.",
+                             "ui_name_guard": "Your units will help defend against attacks at this location.",
                              "ui_name_unable": "Battalion unable to act on this target."
                            },
 
@@ -7372,6 +7380,9 @@
             "pickup_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
                                "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                "state": "normal", "ui_name": "Retrieve Loot" },
+            "guard_button": { "kind": "ActionButton", "xy": [604,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
+                               "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                               "state": "normal", "ui_name": "Send Guards" },
             "scout_button": { "kind": "ActionButton", "xy": [438,443], "dimensions": [148,30], "text_size": 13, "text_style": "bold",
                               "bg_image": "action_button_resizable", "bg_image_resizable": 1, "state": "normal", "ui_name": "Scout" },
             "cancel_button": { "kind": "ActionButton", "xy": [272,443], "dimensions": [148,30],

@@ -664,6 +664,7 @@ class HandleResolveHomeRaid(Handler):
         self.raid_mode = None
 
     def query_raid_squads(self):
+        # XXXXXXRAIDGUARDS
         raid_squads = list(self.gamesite.nosql_client.get_map_features_by_loc(self.region_id, self.loc))
         raid_squads = filter(lambda feature: feature['base_type'] == 'squad' and \
                              feature.get('raid') and \

@@ -927,6 +927,10 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                            (!this.region.pvp_level_gap_enabled() || player.in_attackable_level_range(info['player_level']||0) ||
                             player.cooldown_active('revenge_defender:'+feature['base_landlord_id'].toString())));
 
+    // looking at an enemy home base that we can raid-guard
+    var can_guard_home = (feature['base_type'] === 'home' && feature['base_landlord_id'] != session.user_id && same_alliance &&
+                          player.alliance_raids_enabled());
+
     // SPY button
     if(feature['base_type'] !== 'raid') {
 
@@ -998,16 +1002,18 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
     // LAUNCH RAID
     if(player.raids_enabled() &&
        (feature['base_type'] === 'raid' ||
-        (feature['base_type'] === 'home' && can_attack_home))) {
+        (feature['base_type'] === 'home' && (can_attack_home || can_guard_home)))) {
         var raid_cb = (function(_mapwidget, _feature) { return function() {
             _mapwidget.set_popup(null);
             SquadControlDialog.invoke_raid(_feature['base_map_loc'], _feature);
         }; })(this, feature);
-        var wrapped_raid_cb = (will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
+        var wrapped_raid_cb = (can_attack_home && will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
 
-        if(feature['base_type'] === 'home' && player.raid_pvp_attempts_left() < 1) {
+        if(feature['base_type'] === 'home' && can_guard_home) {
+            ret.push([gamedata['strings']['regional_map']['guard'], wrapped_raid_cb, 'normal']);
+        } else if(feature['base_type'] === 'home' && can_attack_home && player.raid_pvp_attempts_left() < 1) {
             ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled', gamedata['strings']['regional_map']['next_raid_in'].replace('%s', pretty_print_time(player.raid_pvp_attempt_next_in())), SPUI.error_text_color]);
-        } else if(feature['base_type'] === 'home' && ('protection_end_time' in feature) && (feature['protection_end_time'] === 1 || feature['protection_end_time'] >= this.time)) {
+        } else if(feature['base_type'] === 'home' && can_attack_home && ('protection_end_time' in feature) && (feature['protection_end_time'] === 1 || feature['protection_end_time'] >= this.time)) {
             ret.push([gamedata['strings']['regional_map']['call_raid'], null, 'disabled', gamedata['strings']['regional_map']['under_protection'], SPUI.error_text_color]);
         } else {
             ret.push([gamedata['strings']['regional_map']['call_raid'], wrapped_raid_cb, 'normal']);

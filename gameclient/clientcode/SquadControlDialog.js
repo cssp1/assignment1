@@ -503,6 +503,12 @@ SquadControlDialog.update_squad_tile = function(dialog) {
             if(feat && feat['base_type'] == 'quarry') {
                 my_status = 'quarry';
                 my_status_s = feat['base_ui_name'];
+            } else if(feat && feat['base_type'] == 'home' &&
+                      (session.region.feature_stance(feat) & Region.Stance.ALLIANCEMATE) &&
+                      player.alliance_raids_enabled()) {
+                var info = PlayerCache.query_sync_fetch(feat['base_landlord_id']);
+                my_status = 'raid_guard';
+                my_status_s = PlayerCache._get_ui_name(info) || gamedata['strings']['regional_map']['unknown_name'];
             } else {
                 my_status = 'deployed';
                 my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();

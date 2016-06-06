@@ -45,6 +45,7 @@ RaidDialog.invoke = function(squad_id, feature_id) {
     dialog.widgets['attack_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'attack'); };
     dialog.widgets['scout_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'scout'); };
     dialog.widgets['pickup_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'pickup'); };
+    dialog.widgets['guard_button'].onclick = function(w) { RaidDialog.launch(w.parent, 'guard'); };
 
     dialog.ondraw = RaidDialog.update;
     return dialog;
@@ -65,7 +66,7 @@ RaidDialog.receive_scout_reports = function(dialog, result) {
 };
 
 /** @param {!SPUI.Dialog} dialog
-    @param {string} raid_mode ("attack", "defend", "scout", "pickup") */
+    @param {string} raid_mode */
 RaidDialog.launch = function(dialog, raid_mode) {
     var squad_id = dialog.user_data['squad_id'];
     var squad = player.squads[squad_id.toString()];
@@ -108,6 +109,9 @@ RaidDialog.update = function(dialog) {
         close_dialog(dialog); return;
     }
 
+    var stance = session.region.feature_stance(feature);
+
+
     dialog.widgets['name_left'].str = player.ui_name;
     dialog.widgets['squad_name'].str = squad['ui_name'] || dialog.data['widgets']['squad_name']['ui_name']; // "Unnamed"
     dialog.widgets['squad_unit_icon'].asset = cap.icon_asset;
@@ -118,6 +122,12 @@ RaidDialog.update = function(dialog) {
     dialog.widgets['site_icon'].state = (feature['base_type'] == 'quarry' ?
                                          'quarry_'+feature['base_icon'] :
                                          'base');
+    var color_mode = (stance & Region.Stance.HOSTILE ? 'color_hostile' :
+         (stance & Region.Stance.ALLIANCEMATE ? 'color_friendly' :
+          'color_unknown'));
+    dialog.widgets['site_decoration'].outline_color = SPUI.make_colorv(dialog.data['widgets']['site_decoration']['outline_'+color_mode]);
+    dialog.widgets['site_decoration'].color = SPUI.make_colorv(dialog.data['widgets']['site_decoration'][color_mode]);
+
     var enemy_info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
     dialog.widgets['name_right'].str = (enemy_info ? PlayerCache._get_ui_name(enemy_info) : null) || dialog.data['widgets']['name_right']['ui_name'];
     dialog.widgets['portrait_left'].set_user(session.user_id, true);
@@ -141,6 +151,8 @@ RaidDialog.update = function(dialog) {
         raid_mode = 'scout';
     } else if(cap.can_attack_feature(feature)) {
         raid_mode = 'attack';
+    } else if(cap.can_guard_feature(feature)) {
+        raid_mode = 'guard';
     } else {
         raid_mode = 'unable';
     }
@@ -156,7 +168,7 @@ RaidDialog.update = function(dialog) {
 
     var scout_data = null;
 
-    if(!SquadCapabilities.feature_is_defenseless(feature)) {
+    if((stance & Region.Stance.HOSTILE) && !SquadCapabilities.feature_is_defenseless(feature)) {
         dialog.widgets['scout_time'].show = true;
         dialog.widgets['scout_spinner'].show = !!dialog.user_data['scout_data_pending'];
 
@@ -186,10 +198,10 @@ RaidDialog.update = function(dialog) {
 
         dialog.widgets['advantage'].show =
             dialog.widgets['advantage_label'].show = true;
-        var adv = (raid_mode !== 'scout' && scout_data && scout_data['new_raid_defense'] ? RaidDialog.calc_advantage(cap.total_raid_offense, scout_data['new_raid_defense']) : 'unknown');
+        var adv = (raid_mode !== 'scout' && raid_mode !== 'guard' && scout_data && scout_data['new_raid_defense'] ? RaidDialog.calc_advantage(cap.total_raid_offense, scout_data['new_raid_defense']) : 'unknown');
         dialog.widgets['advantage'].set_text_bbcode(dialog.data['widgets']['advantage']['ui_name_'+adv]);
 
-    } else { // defenseless feature, no scouting necessary
+    } else { // defenseless or non-hostile feature, no scouting necessary
         dialog.widgets['advantage'].show =
             dialog.widgets['advantage_label'].show =
             dialog.widgets['scout_spinner'].show =
@@ -205,8 +217,8 @@ RaidDialog.update = function(dialog) {
                                // enemy strength to normalize against
                                (raid_mode !== 'pickup' && raid_mode !== 'scout' && scout_data && scout_data['new_raid_hp'] ? scout_data['new_raid_hp'] : null));
 
-    var available_loot = (raid_mode === 'scout' ? null : (feature && 'base_resource_loot' in feature ? feature['base_resource_loot'] : null));
-    var usable_max_cargo = (raid_mode === 'scout' ? null : cap.max_cargo);
+    var available_loot = ((raid_mode === 'scout' || raid_mode == 'guard') ? null : (feature && 'base_resource_loot' in feature ? feature['base_resource_loot'] : null));
+    var usable_max_cargo = ((raid_mode === 'scout' || raid_mode == 'guard') ? null : cap.max_cargo);
 
     RaidDialog.update_cargo(dialog, squad_id, usable_max_cargo, available_loot);
     RaidDialog.update_loot(dialog, available_loot, usable_max_cargo);
@@ -215,6 +227,7 @@ RaidDialog.update = function(dialog) {
 
     dialog.widgets['scout_button'].show = cap.can_scout_feature(feature);
     dialog.widgets['pickup_button'].show = cap.can_pickup_feature(feature);
+    dialog.widgets['guard_button'].show = cap.can_guard_feature(feature);
     dialog.widgets['attack_button'].show = !dialog.widgets['pickup_button'].show && cap.can_attack_feature(feature);
     if(raid_mode != 'unable') {
         dialog.default_button = dialog.widgets[raid_mode+'_button'];
