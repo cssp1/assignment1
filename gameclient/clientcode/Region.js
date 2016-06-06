@@ -254,6 +254,38 @@ Region.Region.prototype.feature_incoming_raid_togo = function(feature) {
     return min_togo;
 };
 
+/** Diplomatic stances. Note: bitfield, in case we ever need
+    non-mutually-exclusive values. Use bitwise & to test.
+    @enum {number} */
+Region.Stance = {
+    SELF: 0,
+    ALLIANCEMATE: 1,
+    UNKNOWN: 2,
+    HOSTILE: 4
+};
+
+/** @param {!Object} feature
+    @return {Region.Stance} */
+Region.Region.prototype.feature_stance = function(feature) {
+    if(feature['base_landlord_id'] === session.user_id) {
+        return Region.Stance.SELF;
+    } else if(is_ai_user_id_range(feature['base_landlord_id'])) {
+        return Region.Stance.HOSTILE;
+    } else if(!session.is_in_alliance()) {
+        return Region.Stance.HOSTILE;
+    } else { // in alliance - need to check owner's alliance
+        var info = PlayerCache.query_sync_fetch(feature['base_landlord_id']);
+        if(!info) {
+            return Region.Stance.UNKNOWN;
+        } else {
+            if(info['alliance_id'] === session.alliance_id) {
+                return Region.Stance.ALLIANCEMATE;
+            } else {
+                return Region.Stance.HOSTILE;
+            }
+        }
+    }
+};
 
 /** note: just checking for presence of base_map_path is not correct, because sometimes squads
     get to where they're going, and the base_map_path on the server side disappears, but that
