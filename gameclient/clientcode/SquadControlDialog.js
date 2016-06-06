@@ -564,6 +564,11 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                 // check for any available raid mode
                 if(!cap || !cap.can_raid_feature(dialog.parent.user_data['to_feature'])) { can_do_action = false; }
             }
+        // restrictions on call to non-raid
+        } else if(player.squad_is_raid(dialog.user_data['squad_id'])) {
+            if(squad_is_deployed) {
+                can_do_action = false;
+            }
         }
 
         dialog.widgets['coverup'].show = hover || !can_do_action;
