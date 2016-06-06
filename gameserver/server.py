@@ -19934,6 +19934,7 @@ class GAMEAPI(resource.Resource):
         metric_event_coded(session.user.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'instant'})
 
         if session.viewing_base is session.player.my_home:
+            session.deferred_history_update = True
             max_level = max([p.level for p in session.player.home_base_iter() if p.spec.name == object.spec.name])
             session.setmax_player_metric('building:'+object.spec.name+':max_level', max_level, bucket = bool(object.spec.worth_less_xp))
 
