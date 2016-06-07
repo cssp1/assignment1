@@ -1482,7 +1482,7 @@ class HandleSendNotification(Handler):
         # enable sending notification even if one was already sent since last logout
         self.multi_per_logout = bool(int(self.args.get('multi_per_logout','0')))
 
-        self.text = self.args['text']
+        self.text = self.args['text'] # should be Unicode
 
         # optional override of the "ref" referer parameter. Only used if no "config" is selected.
         self.ref_override = self.args.get('ref',None)

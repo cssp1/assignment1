@@ -14128,7 +14128,11 @@ class CONTROLAPI(resource.Resource):
         if ('secret' in request.args and 'method' in request.args):
             secret = str(request.args['secret'][0])
             method = str(request.args['method'][0])
-            args = dict([(k, str(v[0])) for k, v in request.args.iteritems() if k not in ('secret','method')])
+
+            # Twisted gives us request.args in the form of raw bytes
+            # I think in most cases we want to immediately convert to Unicode strings here.
+            # Though maybe a future bulk-data-transfer call would want to preserve raw bytes?
+            args = dict([(k, unicode(urllib.unquote(v[0]).decode('utf-8'))) for k, v in request.args.iteritems() if k not in ('secret','method')])
 
             with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
                 ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
