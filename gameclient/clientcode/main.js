@@ -46193,6 +46193,9 @@ function handle_server_message(data) {
         if(replay_token && !session.is_recording()) {
             session.start_recording(replay_token, client_time + (finish_time - server_time) + 5); // approximate battle end client_time, plus some fudge
         }
+    } else if(msg == "NOTIFICATION") {
+        var text = data[1]; // SPHTTP.unwrap_string(data[1]);
+        user_log.msg(text, new SPUI.Color(1,1,0,1));
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];
         var sender_info = data[2];

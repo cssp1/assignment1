@@ -1491,8 +1491,14 @@ class HandleSendNotification(Handler):
 
         self.simulate = bool(int(self.args.get('simulate','0'))) # for testing, act as if we actually transmitted the notification
 
+        # if true, and player is logged in, send via an in-game text notification instead of using the social network
+        self.send_ingame = bool(int(self.args.get('send_ingame','0')))
+
     # no logging
     def exec_online(self, session, retmsg):
+        if self.send_ingame:
+            session.send([["NOTIFICATION", self.text]], flush_now = True)
+            return ReturnValue(result = 'ok')
 
         if not session.user.facebook_id:
             return ReturnValue(result = 'no social network to send notification')
