@@ -3590,7 +3590,6 @@ GameObject.prototype.ai_threatlist_update = function(world) {
     if(this.is_mobile() && world.tick_astar_queries_left === 0) {
         return;
     }
-    world.tick_astar_queries_left -= 1;
 
     // remember previous target, to try to re-target it if possible
     var prev_target_id = null;
@@ -3601,9 +3600,15 @@ GameObject.prototype.ai_threatlist_update = function(world) {
     this.ai_threatlist_dirty = false;
     this.ai_threatlist = [];
 
+    if(this.is_destroyed()) {
+        return;
+    }
+
     var auto_spell = this.get_auto_spell();
     if(!auto_spell) { return; }
     var auto_spell_level = this.get_auto_spell_level();
+
+    world.tick_astar_queries_left -= 1;
 
     var aggro_radius;
     if(this.is_mobile()) {
@@ -4240,6 +4245,11 @@ GameObject.prototype.next_ai_order = function(world) {
 
 /** @param {!World.World} world */
 GameObject.prototype.run_ai = function(world) {
+    if(this.is_destroyed()) {
+        this.ai_stop();
+        return;
+    }
+
     var auto_spell = this.get_auto_spell();
     var auto_spell_level = this.get_auto_spell_level();
     var auto_spell_range, auto_spell_eff_range, auto_spell_min_range;
