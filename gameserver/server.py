@@ -9500,7 +9500,7 @@ class Player(AbstractPlayer):
                                     add_props['sticky_alliances'] = self.get_sticky_alliances()
 
                                 if not on_success:
-                                    def on_attack_launch():
+                                    def on_attack_launch(new_path):
                                         self.raid_pvp_attempt_consume()
                                         self.init_attack_attacker(x['base_landlord_id'], True, True, None, is_revenge_attack)
 
@@ -9515,6 +9515,19 @@ class Player(AbstractPlayer):
                                         session.send([["COOLDOWNS_UPDATE", self.cooldowns]])
 
                                         record_player_metric(self, dict_setmax, 'last_pvp_aggression_time', server_time, time_series = False)
+
+                                        # send real-time notification to the victim
+                                        if raid_mode != 'scout':
+                                            config = gamedata['fb_notifications']['notifications'].get('incoming_raid',{})
+                                            notif_text = config.get('ui_name_home')
+                                            if notif_text and new_path:
+                                                notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(self))
+                                                secs_to_arrival = new_path[-1]['eta'] - server_time
+                                                mins_to_arrival = max(1, (secs_to_arrival + 30) // 60) # round to nearest whole minute
+                                                notif_text = notif_text.replace('%TIME', '%dmin' % mins_to_arrival)
+                                                notif_args = {'method': 'send_notification', 'user_id': x['base_landlord_id'],
+                                                              'text': notif_text, 'config': 'incoming_raid', 'send_ingame': 1}
+                                                gamesite.do_CONTROLAPI(self.user_id, notif_args)
 
                                     on_success = on_attack_launch
 
@@ -9675,7 +9688,7 @@ class Player(AbstractPlayer):
                 gamesite.nosql_client.update_map_feature(self.home_region, self.squad_base_id(squad_id), add_props,
                                                          do_hook = False, reason = 'squad_step')
             if on_success:
-                on_success()
+                on_success(new_path)
 
         finally:
             if lock_id:

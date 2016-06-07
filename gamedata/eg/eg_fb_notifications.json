@@ -23,6 +23,14 @@
             "ui_name_quarry": "%ATTACKER attacked your quarry! Fight back now?"
         },
 
+        "incoming_raid": {
+            "ref": "incoming_raid", "priority": 99,
+            "enable_newbie": 1,
+            "enable_elder": 1,
+            "min_interval": 0, // note: for this notification only, its own min_interval overrides the global one
+            "ui_name_home": "%ATTACKER launched a raid at you! %TIME to arrival!"
+        },
+
         "raid_complete": {
             "ref": "raid_complete", "priority": 50,
             "enable_newbie": 1,
