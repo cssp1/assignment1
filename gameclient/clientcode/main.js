@@ -2308,12 +2308,16 @@ GameObject.prototype.cast_client_spell = function(world, spell_name, spell, targ
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
+                    var strength = this.get_leveled_quantity(imp_aura['strength'] || 1);
+                    if(imp_aura['strength_mod_by_weapon_damage']) {
+                        strength *= this.combat_stats.weapon_damage;
+                    }
                     var effect = new CombatEngine.AreaAuraEffect(world.combat_engine.cur_tick, client_time, this.id, this.team, impact_pos,
                                                     ('targets_ground' in spell ? spell['targets_ground'] : 1),
                                                     ('targets_air' in spell ? spell['targets_air'] : 1),
                                                     radius, radius_rect,
                                                     this.get_leveled_quantity(spell['splash_falloff'] || 'linear'),
-                                                    this.get_leveled_quantity(imp_aura['strength'] || 1),
+                                                    strength,
                                                     this.get_leveled_quantity(imp_aura['spec']),
                                                     relative_time_to_tick(this.get_leveled_quantity(imp_aura['duration'] || 1)),
                                                     this.get_leveled_quantity(imp_aura['range'] || 0),
@@ -3030,12 +3034,16 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
+                var strength = get_leveled_quantity(imp_aura['strength'] || 1, my_level);
+                if(my_stats && imp_aura['strength_mod_by_weapon_damage']) {
+                    strength *= my_stats.weapon_damage;
+                }
                 effects.push(new CombatEngine.AreaAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
                                                 get_leveled_quantity(spell['splash_falloff'] || 'linear', my_level),
-                                                get_leveled_quantity(imp_aura['strength'] || 1, my_level),
+                                                strength,
                                                 get_leveled_quantity(imp_aura['spec'], my_level),
                                                 relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
                                                 get_leveled_quantity(imp_aura['range'] || 0, my_level),
@@ -3062,8 +3070,12 @@ function do_fire_projectile_time(world, my_source, my_id, my_spec_name, my_level
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
+                    var strength = get_leveled_quantity(imp_aura['strength'] || 1, my_level);
+                    if(my_stats && imp_aura['strength_mod_by_weapon_damage']) {
+                        strength *= my_stats.weapon_damage;
+                    }
                     effects.push(new CombatEngine.TargetedAuraEffect(absolute_time_to_tick(hit_time+postfire_delay), hit_time+postfire_delay, my_id, my_team, target.id,
-                                                        get_leveled_quantity(imp_aura['strength'] || 1, my_level),
+                                                        strength,
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
                                                         get_leveled_quantity(imp_aura['range'] || 0, my_level),
@@ -3445,12 +3457,16 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
         if(spell['impact_auras']) {
             for (var i = 0; i < spell['impact_auras'].length; i++) {
                 var imp_aura = spell['impact_auras'][i];
+                var strength = get_leveled_quantity(imp_aura['strength'] || 1, my_level);
+                if(my_stats && imp_aura['strength_mod_by_weapon_damage']) {
+                    strength *= my_stats.weapon_damage;
+                }
                 effects.push(new CombatEngine.AreaAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target_pos,
                                                 ('splash_to_ground' in spell ? spell['splash_to_ground'] : false) || !(target_height > 0),
                                                 ('splash_to_air' in spell ? spell['splash_to_air'] : false) || (target_height > 0),
                                                 radius, false,
                                                 get_leveled_quantity(spell['splash_falloff'] || 'linear', my_level),
-                                                get_leveled_quantity(imp_aura['strength'] || 1, my_level),
+                                                strength,
                                                 get_leveled_quantity(imp_aura['spec'], my_level),
                                                 relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
                                                 get_leveled_quantity(imp_aura['range'] || 0, my_level),
@@ -3477,8 +3493,12 @@ function do_fire_projectile_ticks(world, my_source, my_id, my_spec_name, my_leve
             if(spell['impact_auras']) {
                 for (var i = 0; i < spell['impact_auras'].length; i++) {
                     var imp_aura = spell['impact_auras'][i];
+                    var strength = get_leveled_quantity(imp_aura['strength'] || 1, my_level);
+                    if(my_stats && imp_aura['strength_mod_by_weapon_damage']) {
+                        strength *= my_stats.weapon_damage;
+                    }
                     effects.push(new CombatEngine.TargetedAuraEffect(GameTypes.TickCount.add(hit_tick, postfire_delay_ticks), -1, my_id, my_team, target.id,
-                                                        get_leveled_quantity(imp_aura['strength'] || 1, my_level),
+                                                        strength,
                                                         get_leveled_quantity(imp_aura['spec'], my_level),
                                                         relative_time_to_tick(get_leveled_quantity(imp_aura['duration'] || 1, my_level)),
                                                         get_leveled_quantity(imp_aura['range'] || 0, my_level),
