@@ -11990,136 +11990,49 @@ function update_aura_bar(dialog) {
     // position relative to player
     dialog.xy = vec_add([desktop_dialogs['player_portrait_dialog'].xy[0], 0], [9,64]);
 
-    // fill in aura icons
-    var first_aura = 0;
+    // get list of auras to show - filter out expired/hidden auras
+    var display_aura_list = goog.array.filter(player.player_auras, function(aura) {
+        if(aura['end_time'] && aura['end_time'] > 0 && aura['end_time'] < server_time) { return false; }
+        var spec =  gamedata['auras'][aura['spec']];
+        if(('show' in spec) && (!spec['show'])) { return false; }
+        if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return false; }
+        return true;
+    });
 
-    // DUMMY AURA FOR DAMAGE PROTECTION
-    if(player.resource_state["protection_end_time"] > server_time) {
-        dialog.widgets['aura_slot'+first_aura].show = false;
-        dialog.widgets['aura_icon'+first_aura].show = true;
-        dialog.widgets['aura_icon'+first_aura].asset = gamedata['auras']['damage_protection']['icon'];
-        dialog.widgets['aura_stack'+first_aura].show = false;
-        dialog.widgets['aura_frame'+first_aura].show = true;
-        dialog.widgets['aura_frame'+first_aura].state = (dialog.user_data['aura_context'] && dialog.user_data['aura_context'].user_data['slot'] == first_aura ? 'active' : 'buff');
-        var aura = {"spec":"damage_protection", "end_time": player.resource_state["protection_end_time"]};
-        dialog.widgets['aura_frame'+first_aura].onenter = (function (_i, _aura) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i) { return; }
-            invoke_aura_context(dialog, w.xy, _i, _aura, false);
-        }; })(first_aura, aura);
-        dialog.widgets['aura_frame'+first_aura].onclick = (function (_i, _aura) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i) {
-                invoke_aura_context(dialog, w.xy, _i, _aura, true);
-            }
-        }; })(first_aura, aura);
-        dialog.widgets['aura_frame'+first_aura].onleave_cb = (function (_i) { return function(w) {
-            var dialog = w.parent;
-            var c = dialog.user_data['aura_context'];
-            var out_of_bounds = true;
-            if(c) {
-                var abs_xy = c.get_absolute_xy();
-                if((mouse_state.last_raw_x >= abs_xy[0]) && (mouse_state.last_raw_x < (abs_xy[0]+c.wh[0])) &&
-                   (mouse_state.last_raw_y >= abs_xy[1])) { // note: no check on Y max
-                        out_of_bounds = false;
-                }
-            }
+    // prepend some "dummy" auras that display information in the same
+    // format as an aura, but aren't actually stored in player.player_auras
 
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i &&
-               (out_of_bounds || !dialog.user_data['aura_context'].user_data['show_dropdown'])) {
-                invoke_aura_context(dialog, w.xy, -1, null, false);
-            }
-        }; })(first_aura);
-
-        dialog.widgets['aura_timer'+first_aura].show = true;
-        dialog.widgets['aura_timer'+first_aura].str = pretty_print_time_brief(player.resource_state["protection_end_time"] - server_time);
-
-        if(dialog.user_data['protection_time_glow']) {
-            dialog.widgets['aura_glow'+first_aura].show = true;
-            dialog.widgets['aura_glow'+first_aura].alpha = dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5);
-        } else {
-            dialog.widgets['aura_glow'+first_aura].show = false;
-        }
-
-        first_aura += 1;
+    // dummy aura for damage protection
+    if(player.resource_state['protection_end_time'] > server_time) {
+        display_aura_list.unshift({'spec':'damage_protection', 'end_time': player.resource_state['protection_end_time'],
+                                   'ui_glow': (dialog.user_data['protection_time_glow'] ?
+                                               dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5) : 0)});
     }
 
-    // DUMMY AURA FOR DONATED UNITS
+    // dummy aura for donated units
     if(player.unit_donation_enabled() && player.has_donated_units()) {
-        dialog.widgets['aura_slot'+first_aura].show = true;
-        dialog.widgets['aura_icon'+first_aura].show = true;
-        dialog.widgets['aura_icon'+first_aura].asset = player.donated_units_icon();
-
-        dialog.widgets['aura_stack'+first_aura].show = false;
-        dialog.widgets['aura_frame'+first_aura].show = true;
-        dialog.widgets['aura_frame'+first_aura].state = (dialog.user_data['aura_context'] && dialog.user_data['aura_context'].user_data['slot'] == first_aura ? 'active' : 'buff');
-
-        var aura = {"spec":"donated_units",
-                    "extra_ui_description": player.donated_units_description(', ') + '\n' + gamedata['auras']['donated_units']['ui_space'].replace('%cur',player.donated_units_space().toFixed(0)).replace('%max',player.donated_units_max_space().toFixed(0))
-                   };
-
-        dialog.widgets['aura_frame'+first_aura].onenter = (function (_i, _aura) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i) { return; }
-            invoke_aura_context(dialog, w.xy, _i, _aura, false);
-        }; })(first_aura, aura);
-        dialog.widgets['aura_frame'+first_aura].onclick = (function (_i, _aura) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i) {
-                invoke_aura_context(dialog, w.xy, _i, _aura, true);
-            }
-        }; })(first_aura, aura);
-        dialog.widgets['aura_frame'+first_aura].onleave_cb = (function (_i) { return function(w) {
-            var dialog = w.parent;
-            if(dialog.user_data['aura_context'] &&
-               dialog.user_data['aura_context'].user_data['slot'] == _i &&
-               (1 || !dialog.user_data['aura_context'].user_data['show_dropdown'])) {
-                invoke_aura_context(dialog, w.xy, -1, null, false);
-            }
-        }; })(first_aura);
-
-        dialog.widgets['aura_timer'+first_aura].show = false;
-
-        first_aura += 1;
+        display_aura_list.unshift({'spec':'donated_units',
+                                   'icon': player.donated_units_icon(), // override with alliance-specific icon
+                                   'ui_description_extra': player.donated_units_description(', ') + '\n' + gamedata['auras']['donated_units']['ui_space'].replace('%cur',player.donated_units_space().toFixed(0)).replace('%max',player.donated_units_max_space().toFixed(0))
+                                  });
     }
 
-    var aura_index = 0;
     var dialog_width = 0;
 
-    for(var i = first_aura; i < dialog.data['widgets']['aura_icon']['array'][0]; i++) {
-        // skip expired/hidden auras
-        while((aura_index < player.player_auras.length) &&
-              ((player.player_auras[aura_index]['end_time'] &&
-                player.player_auras[aura_index]['end_time'] > 0 &&
-                player.player_auras[aura_index]['end_time'] < server_time) ||
-               (('show' in gamedata['auras'][player.player_auras[aura_index]['spec']]) &&
-                !gamedata['auras'][player.player_auras[aura_index]['spec']]['show']) ||
-               (('show_if' in gamedata['auras'][player.player_auras[aura_index]['spec']]) &&
-                !read_predicate(gamedata['auras'][player.player_auras[aura_index]['spec']]['show_if']).is_satisfied(player, null)))) {
-                  aura_index += 1;
-        }
+    for(var i = 0; i < dialog.data['widgets']['aura_icon']['array'][0]; i++) {
 
-        if(aura_index < player.player_auras.length) {
-            var aura = player.player_auras[aura_index];
+        if(i < display_aura_list.length) {
+            var aura = display_aura_list[i];
             var aura_spec = gamedata['auras'][aura['spec']];
+
             // show aura
-            dialog.widgets['aura_glow'+i].show = false;
             dialog.widgets['aura_slot'+i].show = false;
             dialog.widgets['aura_icon'+i].show = true;
-            if(aura_spec['icon']) {
-                if(aura_spec['icon'] == 'gamebucks_inventory_icon') {
-                    dialog.widgets['aura_icon'+i].asset = player.get_any_abtest_value('gamebucks_inventory_icon', gamedata['store']['gamebucks_inventory_icon']);
-                } else {
-                    dialog.widgets['aura_icon'+i].asset = aura_spec['icon'];
-                }
-            } else {
-                dialog.widgets['aura_icon'+i].asset = 'inventory_unknown';
+            var icon = aura['icon'] || aura_spec['icon'] || 'inventory_unknown';
+            if(icon == 'gamebucks_inventory_icon') {
+                icon = player.get_any_abtest_value('gamebucks_inventory_icon', gamedata['store']['gamebucks_inventory_icon']);
             }
+            dialog.widgets['aura_icon'+i].asset = icon;
 
             dialog.widgets['aura_stack'+i].str = ('stack' in aura ? (('stack_prefix' in aura_spec) ? aura_spec['stack_prefix'] : '') + pretty_print_number(aura['stack']) : null);
             dialog.widgets['aura_stack'+i].show = ('stack' in aura) && (aura['stack'] != 1) && (!('show_stack' in aura_spec) || aura_spec['show_stack']);
@@ -12177,7 +12090,13 @@ function update_aura_bar(dialog) {
                 dialog.widgets['aura_timer'+i].show = false;
             }
 
-            aura_index += 1;
+            if(aura['ui_glow'] > 0) {
+                dialog.widgets['aura_glow'+i].show = true;
+                dialog.widgets['aura_glow'+i].alpha = aura['ui_glow'];
+            } else {
+                dialog.widgets['aura_glow'+i].show = false;
+            }
+
             dialog_width = Math.max(dialog_width, dialog.widgets['aura_icon'+i].xy[0] + dialog.widgets['aura_icon'+i].wh[0]);
         } else {
             dialog.widgets['aura_glow'+i].show =
@@ -24646,8 +24565,8 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     while(descr.indexOf('%stack') != -1) {
         descr = descr.replace('%stack', pretty_print_number(('stack' in aura ? aura['stack'] : 1)));
     }
-    if('extra_ui_description' in aura) {
-        descr += aura['extra_ui_description'];
+    if('ui_description_extra' in aura) {
+        descr += aura['ui_description_extra'];
     }
     while(descr.indexOf('%level') >= 0) {
         descr = descr.replace('%level', pretty_print_number(level));
