@@ -12017,6 +12017,39 @@ function update_aura_bar(dialog) {
                                   });
     }
 
+    // dummy aura for incoming raids
+    if(player.home_base_loc && session.region && !session.region.dirty &&
+       session.region.feature_incoming_raid_togo({'base_map_loc': player.home_base_loc}) > 0) {
+        var features = session.region.find_features_at_coords(player.home_base_loc, {eta_only: true});
+        goog.array.forEach(features, function(feature) {
+            if(feature['base_landlord_id'] !== session.user_id &&
+               feature['base_type'] === 'squad' &&
+               feature['raid']) {
+                var stance = session.region.feature_stance(feature);
+                var aura_name = null;
+
+                if(feature['raid'] === 'guard' && player.alliance_raids_enabled() && (stance & (Region.Stance.ALLIANCEMATE))) {
+                    // incoming guards
+                    aura_name = 'incoming_raid_guards';
+                } else if(feature['raid'] !== 'scout' && (stance & Region.Stance.HOSTILE)) {
+                    aura_name = 'incoming_raid';
+                }
+                if(aura_name) {
+                    var attacker_info = PlayerCache.query_sync(feature['base_landlord_id']);
+                    var attacker_ui_name = PlayerCache._get_ui_name(attacker_info || {});
+                    var attacker_home_feature = session.region.find_feature_by_id('h'+feature['base_landlord_id'].toString());
+                    var attacker_home_base_loc = (attacker_home_feature ? attacker_home_feature['base_map_loc'] : null);
+                    display_aura_list.unshift({'spec': aura_name,
+                                               'end_time': ('base_map_path' in feature ? Math.max(feature['base_map_path'][feature['base_map_path'].length-1]['eta'], server_time) : server_time),
+                                               'ui_description_extra': gamedata['auras'][aura_name]['ui_description_extra'].replace('%PERSON', attacker_ui_name),
+                                               'onclick_consequent_state': (attacker_home_base_loc ?
+                                                                            {'map_loc': attacker_home_base_loc} : null)
+                                              });
+                }
+            }
+        });
+    }
+
     var dialog_width = 0;
 
     for(var i = 0; i < dialog.data['widgets']['aura_icon']['array'][0]; i++) {
@@ -12052,9 +12085,9 @@ function update_aura_bar(dialog) {
             }; })(i, aura);
 
             if(aura_spec['on_click']) {
-                dialog.widgets['aura_frame'+i].onclick = (function (_cons) { return function(w) {
-                    read_consequent(_cons).execute();
-                }; })(aura_spec['on_click']);
+                dialog.widgets['aura_frame'+i].onclick = (function (_cons, _state) { return function(w) {
+                    read_consequent(_cons).execute(_state);
+                }; })(aura_spec['on_click'], aura['onclick_consequent_state'] || null);
             } else {
                 dialog.widgets['aura_frame'+i].onclick = (function (_i, _aura) { return function(w) {
                     var dialog = w.parent;

@@ -508,10 +508,26 @@ InvokeCraftingConsequent.prototype.execute = function(state) {
 function InvokeMapConsequent(data) {
     goog.base(this, data);
     this.chapter = data['chapter'] || null;
+    this.map_loc = data['map_loc'] || null;
 }
 goog.inherits(InvokeMapConsequent, Consequent);
 InvokeMapConsequent.prototype.execute = function(state) {
     change_selection_ui(null);
+
+    // special case when coordinates are provided
+    // this skips any "region map might be disabled" logic
+    // in invoke_map_dialog()
+    if(this.chapter === 'quarries') {
+        var map_loc = this.map_loc;
+        if(typeof(map_loc) === 'string' && map_loc[0] == '$') {
+            map_loc = (state ? state[map_loc.slice(1)] : null);
+        }
+        if(map_loc) {
+            invoke_region_map(map_loc);
+            return;
+        }
+    }
+
     invoke_map_dialog(this.chapter);
 };
 

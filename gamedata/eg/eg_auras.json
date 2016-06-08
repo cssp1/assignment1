@@ -48,6 +48,29 @@
         "ui_space": "(Space used: %cur/%max)"
     },
 
+    // dummy aura for incoming raids/guards
+    // for UI only, has no actual effect
+    "incoming_raid": {
+        "name": "incoming_raid",
+        "icon": "sandstorm_max_icon",
+        "harm": 1, "cancelable": 0,
+        "ui_name": "Incoming Raid", "name_color": [1,0,0],
+        "ui_description": "An enemy raid is coming! Prepare base defenders!",
+        "ui_description_extra": "\nAttacker: %PERSON",
+        "ui_expires": "Arrives in %s",
+        "on_click": {"consequent": "INVOKE_MAP_DIALOG", "chapter": "quarries", "map_loc": "$map_loc"}
+    },
+    "incoming_raid_guards": {
+        "name": "incoming_raid_guards",
+        "icon": "alicon_circstar",
+        "help": 1, "cancelable": 0,
+        "ui_name": "Incoming Guards", "name_color": [0,1,1],
+        "ui_description": "Friendly reinforcement battalion is on the way.",
+        "ui_description_extra": "\nOwner: %PERSON",
+        "ui_expires": "Arrives in %s",
+        "on_click": {"consequent": "INVOKE_MAP_DIALOG", "chapter": "quarries", "map_loc": "$map_loc"}
+    },
+
     "combat_time_warped_faster": {
         "name": "combat_time_warped_faster",
         "icon": "inventory_clock_fastforward_blue",
