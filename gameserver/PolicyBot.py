@@ -55,7 +55,7 @@ class Policy(object):
     REPEAT_OFFENDER_COOLDOWN_DURATION = 30*86400
 
     # duration of banishment from prohibited regions
-    REGION_BANISH_DURATION=30*86400
+    REGION_BANISH_DURATION = 90*86400
 
     def __init__(self, db_client, dry_run = True, test = False, msg_fd = None, verbose = 0):
         self.db_client = db_client
