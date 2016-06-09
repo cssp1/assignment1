@@ -1848,7 +1848,8 @@ if __name__ == '__main__':
             # MASTER PER-REGION MAINTENANCE JOB
             with SpinSingletonProcess.SingletonProcess('maptool-region-maint-%s-%s' % (SpinConfig.config['game_id'], region_id)):
                 assert base_type == 'ALL'
-                raids_enabled = gamedata['regions'][region_id].get('spawn_raids', True) and len(gamedata['raids_client']['templates']) > 0
+                raids_enabled = (gamedata['regions'][region_id].get('enable_raids')) or \
+                                (gamedata['territory'].get('enable_raids'))
 
                 print "====== %s ======" % region_id
 
@@ -1873,7 +1874,8 @@ if __name__ == '__main__':
                 weed_orphan_objects(db, lock_manager, region_id, dry_run=dry_run)
 
                 # 55. resolve raid squad issues
-                if raids_enabled:
+                # note: this is going to be done by a separate cron job that only calls "squad resolve"
+                if False and raids_enabled:
                     print "%s: resolving raid squads..." % region_id
                     resolve_raid_squads(db, lock_manager, region_id, dry_run=dry_run)
 
