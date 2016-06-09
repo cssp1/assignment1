@@ -353,7 +353,8 @@ class AntiAltPolicy(Policy):
         pro_alt_regions = filter(lambda x: not is_anti_alt_region(x) and x.get('continent_id',None) == cur_continent_id, gamedata['regions'].itervalues())
 
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
-        is_majority_anti_alt_game = len(anti_alt_regions) > len(pro_alt_regions)
+        is_majority_anti_alt_game = (len(anti_alt_regions) > len(pro_alt_regions)) or \
+                                    (SpinConfig.game() == 'bfm') # special-purpose hack for BFM during migration
 
         # check repeat offender status via cooldown
         togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
@@ -368,6 +369,9 @@ class AntiAltPolicy(Policy):
                                        x.get('auto_join',1) and x.get('enable_map',1) and \
                                        not x.get('developer_only',0) and \
                                        x['id'] not in other_alt_region_names, gamedata['regions'].itervalues())
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'continent %r first-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
             if len(candidate_regions) >= 1:
                 new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
@@ -378,6 +382,9 @@ class AntiAltPolicy(Policy):
                                        x.get('open_join',1) and x.get('enable_map',1) and \
                                        not x.get('developer_only',0),
                                        pro_alt_regions)
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'continent %r second-pass candidate_regions %r' % (cur_continent_id, [x['id'] for x in candidate_regions])
+
             assert len(candidate_regions) >= 1
             new_region = candidate_regions[random.randint(0, len(candidate_regions)-1)]
 
