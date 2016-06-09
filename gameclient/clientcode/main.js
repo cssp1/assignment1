@@ -6383,9 +6383,13 @@ player.map_home_combat_enabled = function() { return player.get_territory_settin
 /** @return {boolean} */
 player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };
 /** @return {boolean} */
-player.raids_enabled = function() { return player.get_territory_setting('enable_raids'); };
-/** @return {boolean} includes both defensive and offensive raids */
-player.alliance_raids_enabled = function() { return player.get_territory_setting('enable_alliance_raids'); };
+player.raids_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_raids'), player, null); };
+
+/** alliance raids flag - includes both defensive and offensive raids.
+    valid only when raids_enabled() is true.
+    @return {boolean}
+ */
+player.alliance_raids_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_alliance_raids')); };
 
 /** @return {number} */
 player.raid_pvp_attempts_left = function() {

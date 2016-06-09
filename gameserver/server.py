@@ -8719,8 +8719,11 @@ class Player(AbstractPlayer):
     def squad_speedups_enabled(self): return self.get_territory_setting('enable_squad_speedups')
     def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
-    def raids_enabled(self): return self.get_territory_setting('enable_raids')
-    def alliance_raids_enabled(self): return self.get_territory_setting('enable_alliance_raids')
+    def raids_enabled(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('enable_raids'), None, self)
+
+    # alliance raids flag - includes both defensive and offensive raids.
+    # valid only when raids_enabled() is true.
+    def alliance_raids_enabled(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('enable_alliance_raids'), None, self)
     def squad_bumping_enabled(self): return self.get_territory_setting('enable_squad_bumping')
 
     def unit_speedups_enabled(self):
