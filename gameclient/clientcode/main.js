@@ -26125,7 +26125,9 @@ function update_battle_history_dialog(dialog) {
         } else {
 
             // only say "Revenge" if we can actually do a revenge attack
-            var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) && !is_protected && !on_cooldown);
+            var can_revenge = (player.cooldown_active('revenge_defender:'+user_id.toString()) &&
+                               !is_protected && !is_logged_in && !on_cooldown &&
+                               !(session.is_in_alliance() && session.alliance_id === info['alliance_id']));
             if(can_revenge) {
                 dialog.widgets['row_revenge_button'+row].show = true;
                 dialog.widgets['row_revenge_button'+row].bg_image = dialog.data['widgets']['row_revenge_button']['bg_image'+(can_revenge?'':'_spy')];
