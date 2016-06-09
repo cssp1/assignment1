@@ -1511,6 +1511,7 @@
 
             // similarly for ranges, the internal value is a multiplier, but the GUI displays the product with the weapon's base range
             "weapon_range": { "ui_name": "Max Range", "ui_tooltip": "Maximum distance main weapon can shoot", "display": "integer" },
+            "weapon_range_pbaoe": { "ui_name": "Trigger Dist", "ui_tooltip": "Maximum distance at which the weapon will trigger", "display": "integer" },
             "effective_weapon_range": { "ui_name": "Effective Range", "ui_tooltip": "Distance at which main weapon accuracy starts to degrade", "display": "integer" },
 
             "accuracy": { "ui_name": "Accuracy", "ui_tooltip": "Chance to hit a target within effective weapon range. Degrades at longer distances.", "display": "pct" },

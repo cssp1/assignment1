@@ -40833,7 +40833,7 @@ function get_weapon_spell_features2(spec, spell) {
     if('effective_range' in spell) {
         ret.push('effective_weapon_range');
     }
-    if(!is_melee_spell(spell) && ('range' in spell) && (spell['code'] != 'pbaoe')) {
+    if(!is_melee_spell(spell) && ('range' in spell)) {
         ret.push('weapon_range');
     }
     if('min_range' in spell) {
