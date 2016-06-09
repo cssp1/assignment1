@@ -352,13 +352,18 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
                         } else {
                             if(resolve_squad_deployment_problem(is_raid, raid_distance, raid_type)) { return; }
 
-                            // find a place to deploy the squad
+                            // find a place to deploy the squad, favoring the side with the smallest distance to target
                             var deploy_at = null;
                             if(!is_raid) {
                                 var neighbors = session.region.get_neighbors(player.home_base_loc);
+                                var min_dist = -1;
                                 goog.array.forEach(neighbors, function(xy) {
                                     if(!session.region.occupancy.is_blocked(xy, player.make_squad_cell_checker())) {
-                                        deploy_at = xy;
+                                        var dist = hex_distance(xy, to_loc);
+                                        if(!deploy_at || dist < min_dist) {
+                                            min_dist = dist;
+                                            deploy_at = xy;
+                                        }
                                     }
                                 });
                             } else {
