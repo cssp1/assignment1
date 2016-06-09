@@ -4,6 +4,14 @@
 
 . /etc/spinpunch
 
+# check for various files in the environment that we'll need to run all steps
+for VITAL_FILE in "${HOME}/.aws/credentials" "${HOME}/.aws/config" "${HOME}/.ssh/dropbox-access-token"; do
+    if [ ! -r "${VITAL_FILE}" ]; then
+        echo "Credential file missing: ${VITAL_FILE}"
+        exit 1
+    fi
+done
+
 if [ $# -ne 5 ]; then
     echo "Usage: tournament-winners.sh END_TIME SEASON# WEEK# STAT TIME_SCOPE"
     exit 1
