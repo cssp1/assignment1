@@ -194,8 +194,21 @@ def get_existing_map_by_loc(db, region_id, loc):
     return dict([(x['base_id'], x) for x in nosql_client.get_map_features_by_loc(region_id, loc)])
 
 def get_population(db, region_id, base_type):
-    base_types = [base_type,] if base_type != 'ALL' else ['home','quarry','hive','squad']
-    print '%-16s ' % region_id + ' '.join(['%s: %-4d' % (btype, nosql_client.count_map_features_by_type(region_id, btype)) for btype in base_types])
+    base_types = [base_type,] if base_type != 'ALL' else ['home','quarry','hive','raid','squad']
+    pops_by_type = dict((btype, nosql_client.count_map_features_by_type(region_id, btype)) for btype in base_types)
+
+    # split squads into raid and non-raid
+    if 'enable_raids' in gamedata['regions'][region_id] and 'squad' in base_types:
+        squad_list = list(nosql_client.get_map_features_by_type(region_id, 'squad'))
+        def squad_type(feature):
+            return 'squad (raid)' if feature.get('raid') else 'squad (nonraid)'
+        pops_by_type['squad (raid)'] = len(filter(lambda feature: feature.get('raid'), squad_list))
+        pops_by_type['squad (nonraid)'] = len(squad_list) - pops_by_type['squad (raid)']
+        del pops_by_type['squad']
+        base_types.remove('squad')
+        base_types += ['squad (raid)', 'squad (nonraid)']
+
+    print '%-16s ' % region_id + ' '.join(['%s: %-4d' % (btype, pops_by_type[btype]) for btype in base_types])
 
 def print_all(db, lock_manager, region_id, base_type, dry_run = True):
     map_cache = get_existing_map_by_type(db, region_id, base_type)
