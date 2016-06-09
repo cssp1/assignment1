@@ -6389,7 +6389,7 @@ player.raids_enabled = function() { return eval_cond_or_literal(player.get_terri
     valid only when raids_enabled() is true.
     @return {boolean}
  */
-player.alliance_raids_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_alliance_raids')); };
+player.alliance_raids_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_alliance_raids'), player, null); };
 
 /** @return {number} */
 player.raid_pvp_attempts_left = function() {
