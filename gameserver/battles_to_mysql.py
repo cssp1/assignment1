@@ -30,6 +30,7 @@ def battles_schema(sql_util): return {
                ('framerate', 'FLOAT4'),
                ('active_player_ping', 'FLOAT4'),
                ('battle_type', 'VARCHAR(8)'), # 'attack' or 'defense'
+               ('raid_mode', 'VARCHAR(8)'), # 'attack', 'scout', 'guard', etc
                ('active_player_id', 'INT4'),
                ('active_player_apm', 'FLOAT4'),
                #('active_player_townhall_level', 'INT4'), # obsolete - now included in summary dimensions
