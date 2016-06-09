@@ -30068,11 +30068,14 @@ player.advance_squads = function() {
         } else if(orders && 'move' in orders) {
             var dest = orders['move'];
             if(player.squad_is_deployed(squad_data['id']) && !player.squad_is_moving(squad_data['id'])) {
-                if(hex_distance(squad_data['map_loc'], dest) <= 1) {
+                // when a squad has movement queued towards an unblocked hex on the map, move it into the hex itself,
+                // not just and adjacent hex.
+                var desired_distance = (session.region.occupancy.is_blocked(dest, player.make_squad_cell_checker()) ? 1 : 0);
+                if(hex_distance(squad_data['map_loc'], dest) <= desired_distance) {
                     // already there
                 } else {
                     var path = player.squad_find_path_adjacent_to(squad_data['id'], dest);
-                    if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) <= 1) {
+                    if(path && path.length >= 1 && hex_distance(path[path.length-1], dest) <= desired_distance) {
                         player.squad_move(squad_data['id'], path);
                     } else {
                         var s = gamedata['errors']['INVALID_MAP_LOCATION'];
