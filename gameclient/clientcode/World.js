@@ -890,10 +890,10 @@ World.World.prototype.damage_attribution_key = function(obj) {
         return obj.spec['name'] + ':L' + (obj.level || 1).toString();
     } else if(obj.is_building()) {
         if(obj.is_emplacement()) {
-            var item = obj.turret_head_item();
-            if(item) {
+            var item_specname = obj.turret_head_item();
+            if(item_specname) {
                 // turret_head_whatever_L2 -> turret_head_whatever:L2
-                return item['spec'].replace('_L', ':L');
+                return item_specname.replace('_L', ':L');
             }
         } else if(obj.is_turret()) {
             return obj.spec['name'] + ':L' + (obj.level || 1).toString();
