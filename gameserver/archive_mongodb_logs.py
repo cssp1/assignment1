@@ -63,6 +63,7 @@ TABLES = {
 
     # let's try keeping these in MongoDB indefinitely - or not. TR DB size grows about 2GB/week without bound.
     'battles': { 's3_name': 'battles', 'table_name': 'battles', 'compression': 'zip', 'retain_for': 30*86400 },
+    'damage_attribution': { 's3_name': 'damage_attribution', 'table_name': 'log_damage_attribution', 'compression': 'zip', 'retain_for': 2*86400 },
 
     # exceptions
     'exceptions': { 's3_name': 'exceptions', 'table_name': 'log_exceptions', 'compression': 'zip', 'retain_for': 30*86400 },

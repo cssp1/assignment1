@@ -340,6 +340,11 @@ def UnitDonationLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4150_units_donated'
                                   ])
+def DamageAttributionLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['3871_damage_attribution'
+                                  ])
+
 def FishingLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['5150_fish_start',

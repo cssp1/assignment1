@@ -7071,6 +7071,7 @@ enemy.is_legacy_pvp_player = function() {
     }
     return true;
 };
+enemy.get_any_abtest_value = function(key, default_value) { return default_value; };
 
 player.get_townhall = function() {
     return session.for_each_real_object(function(obj) {
@@ -46974,6 +46975,11 @@ function flush_dirty_objects(options) {
             obj.state_dirty = 0;
         }
     });
+
+    if(args.length > 0 && session.has_attacked && player.tutorial_state == "COMPLETE" &&
+      !options.urgent_only && !options.buildings_only && !options.skip_check) {
+        session.get_real_world().report_damage_attribution();
+    }
 
     if(args.length > 0) {
         send_to_server.func(["OBJECT_COMBAT_UPDATES", args]);

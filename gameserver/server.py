@@ -24826,6 +24826,21 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                     session.send_adnetwork_events(retmsg)
 
+        elif arg[0] == "REPORT_DAMAGE_ATTRIBUTION":
+            # see client's DamageAttribution.js
+            owner_id = arg[1]
+            props = arg[2] # {'damage_done': {...}, 'damage_taken': {...}}
+            assert ('damage_done' in props) or ('damage_taken' in props)
+            if owner_id == session.user.user_id:
+                props['sum'] = session.player.get_denormalized_summary_props('brief')
+            elif owner_id == session.viewing_user.user_id and (not session.viewing_player.is_ai()):
+                props['sum'] = session.viewing_player.get_denormalized_summary_props('brief')
+            elif owner_id == -1:
+                pass # it's the AI - record, but without summary props
+            else:
+                return # unknown user
+            metric_event_coded(owner_id, '3871_damage_attribution', props)
+
         elif arg[0] == "REPORT_METRIC":
             key = arg[1]
             val = arg[2]
@@ -28275,6 +28290,7 @@ class GameSite(server.Site):
                                              SpinLog.AlliancesLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_alliances')), # alliance events to MongoDB log_alliances
                                              SpinLog.AllianceMembersLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_alliance_members')), # alliance member events to MongoDB log_alliance_members
                                              SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
+                                             SpinLog.DamageAttributionLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_damage_attribution')), # damage attribution events to MongoDB log_damage_attribution
                                              SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                              SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_quests')), # quests events to MongoDB log_quests
                                              SpinLog.LotteryLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_lottery')), # lottery events to MongoDB log_lottery

@@ -12,6 +12,7 @@ goog.require('AStar');
 goog.require('Base');
 goog.require('Citizens');
 goog.require('CombatEngine');
+goog.require('DamageAttribution');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('WallManager');
@@ -110,6 +111,8 @@ World.World = function(base, objects, enable_citizens) {
     /** @type {!SPFX.FXWorld} special effects world, with physics properties */
     this.fxworld = new SPFX.FXWorld((('gravity' in base.base_climate_data) ? base.base_climate_data['gravity'] : 1),
                                     (('ground_plane' in base.base_climate_data) ? base.base_climate_data['ground_plane'] : 0));
+
+    this.damage_attrib = new DamageAttribution.DamageAttribution();
 
     /** @type {Citizens.Context|null} army units walking around the base */
     this.citizens = null;
@@ -848,8 +851,63 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
                                           'client_time': client_time
                                         });
     }
+
+    this.attribute_damage(source || null, target, original_target_hp, target.hp);
 };
 
+/** @private
+    @param {GameObject|null} shooter
+    @param {!GameObject} target
+    @param {number} old_hp
+    @param {number} new_hp */
+World.World.prototype.attribute_damage = function(shooter, target, old_hp, new_hp) {
+    if(!gamedata['client']['report_damage_attribution']) { return; }
+
+    var dmg = {'hp': old_hp - new_hp};
+    if(target.is_mobile()) {
+        // add resources and time
+        var cost = target.cost_to_repair(target.team === 'player' ? player : enemy);
+        for(var k in cost) { dmg[k] = cost[k]; }
+    }
+    // XXX mines, missiles not included here
+    if(shooter && shooter.spec) { // note: missiles might have a mock GameObject here
+        var shooter_key = this.damage_attribution_key(shooter);
+        if(shooter_key) {
+            this.damage_attrib.add(shooter_key, dmg, null);
+        }
+    }
+    var target_key = this.damage_attribution_key(target);
+    if(target_key) {
+        this.damage_attrib.add(target_key, null, dmg);
+    }
+};
+
+/** @private
+    @param {!GameObject} obj
+    @return {string|null} */
+World.World.prototype.damage_attribution_key = function(obj) {
+    if(obj.is_mobile()) {
+        return obj.spec['name'] + ':L' + (obj.level || 1).toString();
+    } else if(obj.is_building()) {
+        if(obj.is_emplacement()) {
+            var item = obj.turret_head_item();
+            if(item) {
+                // turret_head_whatever_L2 -> turret_head_whatever:L2
+                return item['spec'].replace('_L', ':L');
+            }
+        } else if(obj.is_turret()) {
+            return obj.spec['name'] + ':L' + (obj.level || 1).toString();
+        }
+    }
+    return null;
+};
+
+World.World.prototype.report_damage_attribution = function() {
+    if(gamedata['client']['report_damage_attribution'] && !this.damage_attrib.empty()) {
+        send_to_server.func(["REPORT_DAMAGE_ATTRIBUTION", session.user_id, this.damage_attrib.serialize()]);
+        this.damage_attrib = new DamageAttribution.DamageAttribution();
+    }
+};
 
 /** @param {!Array<number>} xy
     @return {boolean} whether combat units can be deployed (by the player) at this location */
