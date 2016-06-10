@@ -221,6 +221,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     'appcenter_search': 'facebook_free',
     'appcenter_search_typeahead': 'facebook_free',
     'appcenter_toplist': 'facebook_free',
+    'desktop_app': 'facebook_free', # seems to have replaced "appcenter"
 
     'bgl_featured': 'facebook_free', # this is a new source for special features that Facebook runs for us manually
 
