@@ -125,6 +125,7 @@ elif [[ "$FREQ" == "hourly" ]]; then
   run_it ./credits_to_mysql.py -q
   run_it ./client_trouble_to_sql.py -q --prune --optimize
   run_it ./econ_res_to_sql.py -q --prune
+  run_it ./damage_attribution_to_sql.py -q --prune
   run_it ./gamebucks_to_mysql.py -q --unit-cost --prune
   run_it ./fb_notifications_to_sql.py -q --prune
   run_it ./policy_bot_to_sql.py -q --prune
