@@ -48,10 +48,24 @@ DamageAttribution.DamageAttribution.prototype._add = function(key, accum, dmg) {
 /** @return {boolean} */
 DamageAttribution.DamageAttribution.prototype.empty = function() { return this.is_empty; };
 
+/** @private
+    @param {!Object<string,?>} d
+    @return {!Object<string,?>} */
+DamageAttribution.DamageAttribution.prototype.serialize_dict = function(d) {
+    var ret = {};
+    for(var parent in d) {
+        ret[parent] = {}
+        for(var child in d[parent]) {
+            ret[parent][child] = serialize_number(d[parent][child], 2);
+        }
+    }
+    return ret;
+};
+
 /** @return {!Object<string,?>} */
 DamageAttribution.DamageAttribution.prototype.serialize = function() {
     return {
-        'damage_done': this.damage_done,
-        'damage_taken': this.damage_taken
+        'damage_done': this.serialize_dict(this.damage_done),
+        'damage_taken': this.serialize_dict(this.damage_taken)
     };
 };
