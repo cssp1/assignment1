@@ -8250,8 +8250,9 @@ var COST_MODE = {
     @param {number} max_hp
     @param {!Object} player
     @param {number=} cost_mode
-    @param {GameObject|null=} builder */
-function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, builder) {
+    @param {GameObject|null=} builder
+    @param {boolean=} allow_fractions */
+function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, builder, allow_fractions) {
     if(!cost_mode) { cost_mode = COST_MODE.REPAIR; }
     var cost_ratio, time_ratio, spd;
     if(cost_mode === COST_MODE.MANUFACTURE_CANCEL) { // note: legacy only - now queue entries store their own cost
@@ -8278,11 +8279,13 @@ function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, b
 
     var health_ratio = 1.0 - 1.0*cur_hp/max_hp;
     var cost_time = get_leveled_quantity(spec['build_time'], level);
-    var rep_time = Math.max(1, Math.floor(time_ratio * health_ratio * cost_time / spd));
+    var raw_rep_time = time_ratio * health_ratio * cost_time / spd;
+    var rep_time = (allow_fractions ? Math.max(0, raw_rep_time) : Math.max(1, Math.floor(raw_rep_time)));
     var ret = {'time':rep_time};
 
     for(var res in gamedata['resources']) {
-        ret[res] = Math.max(0, Math.floor(cost_ratio * health_ratio * get_leveled_quantity(spec['build_cost_'+res] || 0, level)));
+        var raw_amount = cost_ratio * health_ratio * get_leveled_quantity(spec['build_cost_'+res] || 0, level);
+        ret[res] = Math.max(0, (allow_fractions ? raw_amount : Math.floor(raw_amount)));
     }
 
     return ret;

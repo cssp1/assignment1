@@ -866,7 +866,13 @@ World.World.prototype.attribute_damage = function(shooter, target, old_hp, new_h
     var dmg = {'hp': old_hp - new_hp};
     if(target.is_mobile()) {
         // add resources and time
-        var cost = target.cost_to_repair(target.team === 'player' ? player : enemy);
+        // note: cost_to_repair gives the full cost of bringing the object from cur_hp to max_hp
+        // assume the function is linear and just pass a cur_hp value that's damage_done below max
+        var cost = mobile_cost_to_repair(target.spec, target.level,
+                                         target.max_hp - (old_hp-new_hp), // damage_done below max
+                                         target.max_hp,
+                                         target.team === 'player' ? player : enemy,
+                                         COST_MODE.REPAIR, null, true);
         for(var k in cost) { dmg[k] = cost[k]; }
     }
     // XXX mines, missiles not included here
