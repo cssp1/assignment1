@@ -123,7 +123,7 @@ if __name__ == '__main__':
 
         if do_prune:
             # drop old data
-            KEEP_DAYS = 60
+            KEEP_DAYS = 30
             old_limit = time_now - KEEP_DAYS * 86400
 
             if verbose: print 'pruning', login_flow_table
