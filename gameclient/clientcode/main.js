@@ -5145,7 +5145,7 @@ Building.prototype.activity_speedup_kind = function() {
 
 
 Building.prototype.is_busy = function() {
-    return this.is_repairing() || this.is_upgrading() || this.is_under_construction() || this.is_researching() || this.is_manufacturing() || this.is_crafting();
+    return this.is_repairing() || this.is_upgrading() || this.is_under_construction() || this.is_researching() || this.is_manufacturing() || (this.is_crafting() && this.crafting_time_left_all() > 0);
 };
 
 Building.prototype.research_time_left = function() {
@@ -5167,7 +5167,7 @@ Building.prototype.crafting_time_left_all = function() {
             ret -= Math.max(0, server_time - bus['start_time']);
         }
     });
-    return ret;
+    return Math.max(0, ret);
 };
 
 // return time left on currently in-progress recipe

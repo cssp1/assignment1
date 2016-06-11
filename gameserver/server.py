@@ -6872,7 +6872,17 @@ class Building(GameObject):
         return (len(self.manuf_queue) > 0)
 
     def is_crafting(self):
+        # note: this can be true if there are uncollected products, but no activity taking place
         return bool(self.crafting)
+
+    def crafting_time_left_all(self):
+        if not self.crafting: return 0
+        ret = 0
+        for bus in self.crafting.queue:
+            ret += bus.total_time - bus.done_time
+            if bus.start_time > 0:
+                ret -= max(0, server_time - bus.start_time)
+        return max(0, ret)
 
     def activity_finish_time(self):
         if self.is_repairing():
@@ -6934,7 +6944,7 @@ class Building(GameObject):
             return None
 
     def is_busy(self):
-        return self.is_repairing() or self.is_upgrading() or self.is_under_construction() or self.is_researching() or self.is_manufacturing() or self.is_crafting()
+        return self.is_repairing() or self.is_upgrading() or self.is_under_construction() or self.is_researching() or self.is_manufacturing() or (self.is_crafting() and self.crafting_time_left_all() > 0)
 
     def is_using_foreman(self):
         if self.is_under_construction() or self.is_upgrading(): return True
