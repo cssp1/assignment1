@@ -841,7 +841,8 @@ class HandleResolveHomeRaid(Handler):
 
                 base_props = defender_player.my_home.get_cache_props()
                 squad_update, unused_base_update, unused_pve_loot, is_win, new_attacking_army, new_defending_army = \
-                              resolve_raid(raid_squads[0], base_props, attacking_army, defending_army, self.gamedata)
+                              resolve_raid(raid_squads[0], base_props, attacking_army, defending_army, self.gamedata,
+                                           raid_power_factor = defender_player.my_home.get_power_factor())
 
                 is_conquest = is_win and raid_mode != 'scout' and (defender_player.resources.player_level >= raid_pcinfos[0]['player_level'])
 

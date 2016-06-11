@@ -39,7 +39,8 @@ def army_unit_pair_dps_key(shooter_unit, target_unit, gamedata):
            (shooter_unit['owner_id'], shooter_unit['spec'], shooter_unit.get('level',1), army_unit_equipment_key(shooter_unit, gamedata),
             target_unit['owner_id'], target_unit['spec'], target_unit.get('level',1), army_unit_equipment_key(target_unit, gamedata))
 
-def army_unit_pair_dph(shooter, target, gamedata):
+def army_unit_pair_dph(shooter, target, gamedata,
+                       shooter_power_factor = 1):
     if not army_unit_is_visible_to_enemy(target, gamedata):
         return 0 # invisible
 
@@ -57,6 +58,10 @@ def army_unit_pair_dph(shooter, target, gamedata):
     damage = 1
     for k in target_keys:
         damage *= get_leveled_quantity(raid_offense.get(k,1), shooter_level)
+
+    if shooter_spec['kind'] == 'building' and shooter_power_factor < 1 and gamedata.get('enable_power'):
+        min_fac = gamedata['minimum_combat_power_factor']
+        damage *= min_fac + (1-min_fac) * shooter_power_factor
 
     damage_coeff_pre_armor = 1
     damage_coeff_post_armor = 1
@@ -192,7 +197,8 @@ def hurt_army_unit(unit, dmg, gamedata):
         else:
             unit['DELETED'] = 1
 
-def resolve_raid_battle(attacking_units, defending_units, gamedata):
+def resolve_raid_battle(attacking_units, defending_units, gamedata,
+                        defending_power_factor = 1):
     # do not mutate attacking_units or defending_units. Return new unit lists instead.
     new_attacking_units = [copy.copy(x) for x in attacking_units]
     new_defending_units = [copy.copy(x) for x in defending_units]
@@ -218,7 +224,8 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
             for defender in other_side:
                 dph_key = army_unit_pair_dps_key(attacker, defender, gamedata)
                 if dph_key not in dph_cache:
-                    dph_cache[dph_key] = army_unit_pair_dph(attacker, defender, gamedata)
+                    dph_cache[dph_key] = army_unit_pair_dph(attacker, defender, gamedata,
+                                                            shooter_power_factor = defending_power_factor if i == 1 else 1)
                 dph_matrix[i][a].append(dph_cache[dph_key])
 
     if 0:
@@ -291,7 +298,8 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata):
     return (winner is 0), new_attacking_units, new_defending_units
 
 # XXXXXXRAIDGUARDS
-def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata):
+def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata,
+                 raid_power_factor = 1):
     # * assumes that you already have all the proper mutex locks on squad and raid!
     # returns (update_map_feature) mutations of squad, raid, loot
     assert squad_feature['base_type'] == 'squad' and squad_feature.get('raid')
@@ -331,7 +339,8 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata)
 
         if defending_units:
             is_win, new_squad_units, new_raid_units = \
-                    resolve_raid_battle(attacking_units, defending_units, gamedata)
+                    resolve_raid_battle(attacking_units, defending_units, gamedata,
+                                        defending_power_factor = raid_power_factor)
 
             # add back the pass-through units at their correct positions in the unit lists
             if new_squad_units is not None: new_squad_units = merge_unit_lists(new_squad_units, squad_units)

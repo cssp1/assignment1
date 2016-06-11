@@ -7261,6 +7261,8 @@ class Base(object):
                         power[1] += to_add
         return power
 
+    def get_power_factor(self): return compute_power_factor(self.get_power_state())
+
     # returns tuple (new_power_factor, power_state (or None if N/A), affected_obj_list)
     def power_changed(self, changed_object):
         if not gamedata['enable_power']: return (1, None, [])
