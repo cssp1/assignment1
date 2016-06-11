@@ -39,5 +39,6 @@
 "enable_replay_playback": {"predicate": "OR", "subpredicates": [
     {"predicate": "QUERY_STRING", "key": "enable_recording", "value": "1"},
     {"predicate": "ANY_ABTEST", "key": "enable_replay_playback", "value": 1}
-]}
+]},
 
+"report_damage_attribution": 1 // enable damage attribution data collection
