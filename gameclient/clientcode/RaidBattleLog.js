@@ -65,7 +65,9 @@ RaidBattleLog.from_summary = function(sum) {
                 } else {
                     return;
                 }
-                ret.push({'event_name': event_name, 'unit_type': specname, 'user_id': owner_id});
+                for(var i = 0; i < qty; i++) {
+                    ret.push({'event_name': event_name, 'unit_type': specname, 'user_id': owner_id});
+                }
             });
         }
                         });
