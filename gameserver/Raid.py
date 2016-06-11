@@ -39,7 +39,23 @@ def army_unit_pair_dps_key(shooter_unit, target_unit, gamedata):
            (shooter_unit['owner_id'], shooter_unit['spec'], shooter_unit.get('level',1), army_unit_equipment_key(shooter_unit, gamedata),
             target_unit['owner_id'], target_unit['spec'], target_unit.get('level',1), army_unit_equipment_key(target_unit, gamedata))
 
+def read_stattab(obj_id, spec, stattab, key, default_value):
+    if not stattab: return default_value
+    if spec['kind'] == 'building' and \
+       'buildings' in stattab and \
+       obj_id in stattab['buildings']:
+        table = stattab['buildings'][obj_id]
+    elif spec['kind'] == 'mobile' and \
+         'units' in stattab and \
+         spec['name'] in stattab['units']:
+        table = stattab['units'][spec['name']]
+    if key in table:
+        return table[key]['val']
+    return default_value
+
 def army_unit_pair_dph(shooter, target, gamedata,
+                       shooter_stattab = None,
+                       target_stattab = None,
                        shooter_power_factor = 1):
     if not army_unit_is_visible_to_enemy(target, gamedata):
         return 0 # invisible
@@ -49,7 +65,6 @@ def army_unit_pair_dph(shooter, target, gamedata,
     target_spec = army_unit_spec(target, gamedata)
     target_level = target.get('level',1)
 
-    # XXX should this iterate on defense_types instead?
     shooter_keys = shooter_spec['defense_types']
     target_keys = target_spec['defense_types']
 
@@ -66,17 +81,18 @@ def army_unit_pair_dph(shooter, target, gamedata,
     damage_coeff_pre_armor = 1
     damage_coeff_post_armor = 1
 
-    #damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage', 1)
-    #damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken', 1)
+    damage_coeff_pre_armor *= read_stattab(shooter['obj_id'], shooter_spec, shooter_stattab, 'weapon_damage', 1)
+    damage_coeff_post_armor *= read_stattab(target['obj_id'], target_spec, target_stattab, 'damage_taken', 1)
 
     for k in target_keys:
-        pass # damage_coeff_pre_armor *= shooter.owner.stattab.get_unit_stat(shooter.spec.name, 'weapon_damage_vs:%s' % k, 1)
+        damage_coeff_pre_armor *= read_stattab(shooter['obj_id'], shooter_spec, shooter_stattab, 'weapon_damage_vs:%s' % k, 1)
     for k in shooter_keys:
-        pass # damage_coeff_post_armor *= target.owner.stattab.get_unit_stat(target.spec.name, 'damage_taken_from:%s' % k, 1)
+        damage_coeff_post_armor *= read_stattab(target['obj_id'], target_spec, target_stattab, 'damage_taken_from:%s' % k, 1)
 
     damage *= damage_coeff_pre_armor
 
-    armor = max(get_leveled_quantity(target_spec.get('armor',0), target_level), 0) # target.owner.stattab.get_unit_stat(target['spec'], 'armor', 0)
+    armor = max(get_leveled_quantity(target_spec.get('armor',0), target_level), 0)
+    armor = max(armor, read_stattab(target['obj_id'], target_spec, target_stattab, 'armor', 0))
     if armor > 0: damage = max(1, damage - armor)
 
     damage *= damage_coeff_post_armor
@@ -198,6 +214,8 @@ def hurt_army_unit(unit, dmg, gamedata):
             unit['DELETED'] = 1
 
 def resolve_raid_battle(attacking_units, defending_units, gamedata,
+                        attacking_stattab = None,
+                        defending_stattab = None,
                         defending_power_factor = 1):
     # do not mutate attacking_units or defending_units. Return new unit lists instead.
     new_attacking_units = [copy.copy(x) for x in attacking_units]
@@ -225,6 +243,8 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata,
                 dph_key = army_unit_pair_dps_key(attacker, defender, gamedata)
                 if dph_key not in dph_cache:
                     dph_cache[dph_key] = army_unit_pair_dph(attacker, defender, gamedata,
+                                                            shooter_stattab = defending_stattab if i == 1 else attacking_stattab,
+                                                            target_stattab = attacking_stattab if i == 1 else defending_stattab,
                                                             shooter_power_factor = defending_power_factor if i == 1 else 1)
                 dph_matrix[i][a].append(dph_cache[dph_key])
 
@@ -299,6 +319,8 @@ def resolve_raid_battle(attacking_units, defending_units, gamedata,
 
 # XXXXXXRAIDGUARDS
 def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata,
+                 squad_stattab = None,
+                 raid_stattab = None,
                  raid_power_factor = 1):
     # * assumes that you already have all the proper mutex locks on squad and raid!
     # returns (update_map_feature) mutations of squad, raid, loot
@@ -340,6 +362,8 @@ def resolve_raid(squad_feature, raid_feature, squad_units, raid_units, gamedata,
         if defending_units:
             is_win, new_squad_units, new_raid_units = \
                     resolve_raid_battle(attacking_units, defending_units, gamedata,
+                                        attacking_stattab = squad_stattab,
+                                        defending_stattab = raid_stattab,
                                         defending_power_factor = raid_power_factor)
 
             # add back the pass-through units at their correct positions in the unit lists
@@ -440,7 +464,8 @@ def resolve_target(gamedata, nosql_client, chat_mgr, lock_manager, region_id, ra
             squad_units = nosql_client.get_mobile_objects_by_base(region_id, squad['base_id'])
 
             squad_update, raid_update, loot, is_win, new_squad_units, new_raid_units = \
-                          resolve_raid(squad, raid, squad_units, raid_units, gamedata)
+                          resolve_raid(squad, raid, squad_units, raid_units, gamedata,
+                                       squad_stattab = squad.get('player_stattab', None))
 
             if squad_update or raid_update or (raid_update is None):
                 # metrics - keep in sync between Raid.py and maptool.py implementations!
