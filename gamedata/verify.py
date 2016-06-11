@@ -1294,7 +1294,12 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
             if matches:
                 level = int(matches.group('level'))
                 if level != expect_level:
-                    error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, effect['strength'])
+                    # special case for high-level TR/DV turret heads that don't have custom assets yet
+                    if gamedata['game_id'] in ('tr','dv') and level < expect_level and expect_level >= 17 and \
+                       'turret_head_' in matches.group('root'):
+                        pass
+                    else:
+                        error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, effect['strength'])
     return error
 
 def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_slots = -1, is_toplevel = True):
