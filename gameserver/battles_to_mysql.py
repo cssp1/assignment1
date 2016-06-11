@@ -29,7 +29,7 @@ def battles_schema(sql_util): return {
                ('duration', 'INT4'),
                ('framerate', 'FLOAT4'),
                ('active_player_ping', 'FLOAT4'),
-               ('battle_type', 'VARCHAR(8)'), # 'attack' or 'defense'
+               ('battle_type', 'VARCHAR(8)'), # 'attack', 'defense', or 'raid'
                ('raid_mode', 'VARCHAR(8)'), # 'attack', 'scout', 'guard', etc
                ('active_player_id', 'INT4'),
                ('active_player_apm', 'FLOAT4'),
@@ -269,7 +269,7 @@ if __name__ == '__main__':
 
             # add redundant active_player/active_opponent fields
             if 'battle_type' in row:
-                if row['battle_type'] == 'attack':
+                if row['battle_type'] in ('attack', 'raid'):
                     human_role = 'attacker'
                     row['active_opponent_id'] = row['defender_id']
                 elif row['battle_type'] == 'defense':
