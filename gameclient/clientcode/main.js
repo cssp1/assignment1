@@ -21392,28 +21392,29 @@ function region_map_finder_update(dialog, kind, state) {
     var tooltip_str;
     var onclick;
     if(show) {
+        var ui_res = '';
+        if(kind_res) {
+            if(kind_res in gamedata['resources']) {
+                ui_res = gamedata['resources'][kind_res]['ui_name'];
+            } else if(kind_res in gamedata['items']) {
+                ui_res = gamedata['items'][kind_res]['ui_name'];
+            }
+        }
+
+        if(kind_root == 'quarry') {
+            button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
+            tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+            player.record_feature_use('quarry_finder_seen');
+        } else {
+            button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind].replace('%s', ui_res);
+            tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_'+kind].replace('%s', ui_res);
+            player.record_feature_use(kind+'_finder_seen');
+        }
+
         if(state['found'] !== null && state['found'].length > 0) {
             // valid base
             button_state = (kind == 'attacker' ? 'attack' : 'normal');
 
-            var ui_res = '';
-            if(kind_res) {
-                if(kind_res in gamedata['resources']) {
-                    ui_res = gamedata['resources'][kind_res]['ui_name'];
-                } else if(kind_res in gamedata['items']) {
-                    ui_res = gamedata['items'][kind_res]['ui_name'];
-                }
-            }
-
-            if(kind_root == 'quarry') {
-                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
-                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
-                player.record_feature_use('quarry_finder_seen');
-            } else {
-                button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind].replace('%s', ui_res);
-                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_'+kind].replace('%s', ui_res);
-                player.record_feature_use(kind+'_finder_seen');
-            }
             onclick = (function (_kind, _state) { return function(w) {
                 player.record_feature_use(_kind.indexOf('quarry_') == 0 ? 'quarry_finder_used' : (_kind+'_finder_used'));
                 var dialog = w.parent;
