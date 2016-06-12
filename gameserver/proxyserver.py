@@ -119,6 +119,29 @@ control_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_ti
                                                   max_tries = config.get('max_tries',1),
                                                   retry_delay = config.get('retry_delay',10))
 
+# track # of calls to each FB API endpoint for usage monitoring
+class APIUsageMonitor(object):
+    def __init__(self):
+        self.usage = {}
+        self.dump_interval = 300 # dump every 5 minutes
+        self.last_dump_time = -1
+    def record(self, key):
+        self.usage[key] = self.usage.get(key,0) + 1
+    def need_dump(self):
+        return bool(self.usage) and (proxy_time - self.last_dump_time) >= self.dump_interval
+    def dump(self):
+        # return string and reset usage counters
+        usage, self.usage, self.last_dump_time = self.usage, {}, proxy_time
+        ret = ' '.join('%s: %d' % (key, qty) for key, qty in sorted(usage.items()))
+        return ret
+
+fb_api_usage = APIUsageMonitor()
+
+# wrapper for all FB API calls
+def fb_queue_request(endpoint, *args, **kwargs):
+    fb_api_usage.record(endpoint)
+    return fb_async_http.queue_request(*args, **kwargs)
+
 # clean session-/auth-flow-specific parameters out of a uri query string
 def clean_qs(uri, add_props = None):
     parts = urlparse.urlparse(uri)
@@ -1084,7 +1107,7 @@ class GameProxy(proxy.ReverseProxyResource):
                                  })
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
             exception_log.event(proxy_time, 'fetching OAuth token: ' + url)
-        fb_async_http.queue_request(proxy_time, url, sc.on_response, error_callback = sc.on_error)
+        fb_queue_request('oauth/access_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
     class OAuthGetter:
@@ -1123,7 +1146,7 @@ class GameProxy(proxy.ReverseProxyResource):
                                 })
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
             exception_log.event(proxy_time, 'verifying OAuth token: ' + url)
-        fb_async_http.queue_request(proxy_time, url, sc.on_response, error_callback = sc.on_error)
+        fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
     class OAuthVerifier:
@@ -1184,9 +1207,10 @@ class GameProxy(proxy.ReverseProxyResource):
             self.d = d
             self.attempt = 0
         def go(self):
-            fb_async_http.queue_request(proxy_time,
-                                        SpinFacebook.versioned_graph_endpoint('user/permissions', str(self.visitor.facebook_id)+'/permissions')+'?'+urllib.urlencode({'access_token':SpinConfig.config['facebook_app_access_token']}),
-                                        self.on_response, error_callback = self.on_error)
+            fb_queue_request('user/permissions',
+                             proxy_time,
+                             SpinFacebook.versioned_graph_endpoint('user/permissions', str(self.visitor.facebook_id)+'/permissions')+'?'+urllib.urlencode({'access_token':SpinConfig.config['facebook_app_access_token']}),
+                             self.on_response, error_callback = self.on_error)
             if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 3:
                 exception_log.event(proxy_time, 'proxyserver: index_visit_check_scope(attempt %d) facebook ID %s' % (self.attempt, self.visitor.facebook_id))
 
@@ -2187,12 +2211,12 @@ class GameProxy(proxy.ReverseProxyResource):
                         def on_error(self, reason):
                             self.d.callback('')
                     pinger = FBRTAPI_payment_pinger(payment_id, pay, d)
-                    fb_async_http.queue_request(proxy_time,
-                                                SpinFacebook.versioned_graph_endpoint('payment', payment_id) + \
-                                                '?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token'],
-                                                                      'fields':SpinFacebook.PAYMENT_FIELDS
-                                                                      }),
-                                                pinger.on_response, error_callback = pinger.on_error, max_tries = 4)
+                    fb_queue_request('payment', proxy_time,
+                                     SpinFacebook.versioned_graph_endpoint('payment', payment_id) + \
+                                     '?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token'],
+                                                           'fields':SpinFacebook.PAYMENT_FIELDS
+                                                           }),
+                                     pinger.on_response, error_callback = pinger.on_error, max_tries = 4)
                     # fire-and-forget - let the pinger go asynchronously
                     return ''
 
@@ -2608,6 +2632,10 @@ class FBPortraitProxy(PortraitProxy):
                                                        max_tries = config.get('max_tries',1),
                                                        retry_delay = config.get('retry_delay',3))
 
+    def render(self, request):
+        fb_api_usage.record('portrait')
+        return PortraitProxy.render(self, request)
+
     def parse_request(self, request):
         # sanity-check the URL we are about to proxy
         parts = urlparse.urlparse(request.uri)
@@ -2971,11 +2999,12 @@ def do_main():
 
         try:
             collect_garbage()
-            # reload config file (e.g. to pick up whitelist changes)
-            # but DO NOT mess with server list
-            # SpinConfig.reload()
 
             db_client.server_status_update('proxyserver', admin_stats.get_server_status_json(), reason='bgfunc')
+
+            if SpinConfig.config.get('enable_facebook', 0) and \
+               fb_api_usage.need_dump():
+                facebook_log.event(proxy_time, 'API Usage: %s' % fb_api_usage.dump())
 
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
