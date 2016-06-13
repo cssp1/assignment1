@@ -49,6 +49,8 @@ def read_stattab(obj_id, spec, stattab, key, default_value):
          'units' in stattab and \
          spec['name'] in stattab['units']:
         table = stattab['units'][spec['name']]
+    else:
+        return default_value
     if key in table:
         return table[key]['val']
     return default_value
