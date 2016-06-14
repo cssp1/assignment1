@@ -1160,6 +1160,12 @@ def check_item(itemname, spec):
                                        expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
                 if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
+                if effect['stat'] == 'on_destroy' and 'strength' in effect:
+                    for cons in effect['strength']:
+                        if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                            if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
+                                error |= 1; print '%s\'s ui_description does not mention that its security team is persistent' % (itemname,)
+
             if 'consequent' in effect:
                 error |= check_consequent(effect['consequent'], reason = 'item %s: effects' % itemname)
 
