@@ -69,6 +69,19 @@ class CraftingBusiness(SingleBusiness):
         self.craft_state = state['craft']
     def describe_state(self): return 'craft,'+self.craft_state['recipe'] # repr(self.craft_state)
 
+class EnhanceBusiness(SingleBusiness):
+    def __init__(self, enhance_state = None, *args, **kwargs):
+        SingleBusiness.__init__(self, *args, **kwargs)
+        self.enhance_state = enhance_state
+    def persist_state(self):
+        ret = SingleBusiness.persist_state(self)
+        ret['enhance'] = self.enhance_state
+        return ret
+    def unpersist_state(self, state):
+        SingleBusiness.unpersist_state(self, state)
+        self.enhance_state = state['enhance']
+    def describe_state(self): return 'enhance,%s,L%d' % (self.enhance_state['spec'], self.enhance_state['level'])
+
 class QueuedBusiness(AbstractBusiness):
     def __init__(self, klass):
         self.klass = klass

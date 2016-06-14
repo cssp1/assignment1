@@ -1946,7 +1946,7 @@ GameObject.prototype.run_control_facing = function(world) {
     if('turn_rate' in this.spec) {
 
         if(this.is_building() && this.control_state === control_states.CONTROL_STOP &&
-           !this.combat_stats.stunned && !(this.is_upgrading() || this.is_repairing() || this.disarmed)) {
+           !this.combat_stats.stunned && !(this.is_upgrading() || this.is_enhancing() || this.is_repairing() || this.disarmed)) {
             // idle turrets - rotate them around slowly
             var incr = gamedata['client']['turret_scan_speed']*Math.PI/180;
             incr *= this.combat_power_factor(world.base); // turn more slowly if depowered
@@ -2619,7 +2619,7 @@ GameObject.prototype.run_control_shooting = function(world) {
 
         if((this.control_cooldown <= 0) &&
            (!this.combat_stats.disarmed) &&
-           !(this.is_building() && (this.is_upgrading() || this.is_repairing() || this.disarmed)) &&
+           !(this.is_building() && (this.is_upgrading() || this.is_enhancing() || this.is_repairing() || this.disarmed)) &&
            (!this.is_under_construction()) &&
            (!this.is_destroyed())) {
 
@@ -2695,7 +2695,7 @@ GameObject.prototype.run_control_shooting = function(world) {
        (this.is_inert() ||
         (!this.is_destroyed() &&
          this.control_state === control_states.CONTROL_STOP &&
-         !(this.is_building() && (this.is_under_construction() || this.is_upgrading() || this.is_repairing() || this.disarmed))))) {
+         !(this.is_building() && (this.is_under_construction() || this.is_upgrading() || this.is_enhancing() || this.is_repairing() || this.disarmed))))) {
         this.serialization_dirty = true;
         this.cast_client_spell(world, continuous_spell, gamedata['spells'][continuous_spell], null, null);
     }
@@ -4766,6 +4766,9 @@ function Building() {
     /** @type {Object|null} */
     this.crafting = null;
 
+    /** @type {Object|null} */
+    this.enhancing = null;
+
     /** @type {Object|string|null} */
     this.config = null;
 
@@ -4908,6 +4911,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     this.disarmed = data.shift();
     this.crafting = data.shift();
     this.config = data.shift();
+    this.enhancing = data.shift();
 
     session.clear_building_idle_state_caches(); // for ALL buildings
 
@@ -5059,6 +5063,9 @@ Building.prototype.is_under_construction = function() {
 Building.prototype.is_upgrading = function() {
     return (this.upgrade_total_time > 0);
 };
+Building.prototype.is_enhancing = function() {
+    return !!this.enhancing;
+}
 Building.prototype.is_researching = function() {
     return !!(this.research_item);
 };
@@ -5084,7 +5091,7 @@ Building.prototype.manuf_total_time = function() {
 };
 
 Building.prototype.is_using_foreman = function() {
-    if(this.is_under_construction() || this.is_upgrading()) { return true; }
+    if(this.is_under_construction() || this.is_upgrading() || this.is_enhancing()) { return true; }
     if(this.is_crafting()) {
         var craft_queue = this.get_crafting_queue();
         for(var i = 0; i < craft_queue.length; i++) {
@@ -5108,6 +5115,10 @@ Building.prototype.time_until_finish = function() {
     } else if(this.is_upgrading()) {
         if(this.upgrade_start_time <= 0) { throw Error('invalid state: upgrade halted'); }
         return this.upgrade_total_time - (server_time - this.upgrade_start_time) - this.upgrade_done_time;
+    } else if(this.is_enhancing()) {
+        var bus = this.enhancing;
+        if(bus['start_time'] <= 0) { throw Error('invalid state: enhancing halted'); }
+        return bus['start_time'] + bus['total_time'] - bus['done_time'] - server_time;
     } else if(this.is_under_construction()) {
         if(this.build_start_time <= 0) { throw Error('invalid state: construct halted'); }
         return this.build_total_time - (server_time - this.build_start_time) - this.build_done_time;
@@ -5132,6 +5143,8 @@ Building.prototype.activity_speedup_kind = function() {
         return 'building_repair';
     } else if(this.is_upgrading() || this.is_under_construction()) {
         return 'building_upgrade';
+    } else if(this.is_enhancing()) {
+        return 'building_enhance';
     } else if(this.is_researching()) {
         return 'tech_research';
     } else if(this.is_manufacturing()) {
@@ -5145,7 +5158,7 @@ Building.prototype.activity_speedup_kind = function() {
 
 
 Building.prototype.is_busy = function() {
-    return this.is_repairing() || this.is_upgrading() || this.is_under_construction() || this.is_researching() || this.is_manufacturing() || (this.is_crafting() && this.crafting_time_left_all() > 0);
+    return this.is_repairing() || this.is_upgrading() || this.is_enhancing() || this.is_under_construction() || this.is_researching() || this.is_manufacturing() || (this.is_crafting() && this.crafting_time_left_all() > 0);
 };
 
 Building.prototype.research_time_left = function() {
@@ -5249,6 +5262,19 @@ Building.prototype.upgrade_time_left = function() {
 };
 Building.prototype.upgrade_progress = function() {
     return (this.upgrade_done_time + (this.upgrade_start_time > 0 ? (server_time - this.upgrade_start_time) : 0))/this.upgrade_total_time;
+};
+
+Building.prototype.enhance_time_left = function() {
+    var bus = this.enhancing;
+    var ret = bus['total_time'] - bus['done_time'];
+    if(bus['start_time'] > 0) {
+        ret -= (server_time - bus['start_time']);
+    }
+    return ret;
+};
+Building.prototype.enhance_progress = function() {
+    var bus = this.enhancing;
+    return (bus['done_time'] + (bus['start_time'] > 0 ? (server_time - bus['start_time']) : 0))/bus['total_time'];
 };
 
 Building.prototype.manuf_time_left = function() {
@@ -6473,7 +6499,7 @@ player.all_minefields_armed = function() {
 
 player.alliance_building_is_busy = function() {
     var alliance_building = find_object_by_type(gamedata['alliance_building']);
-    if(!alliance_building || alliance_building.is_under_construction() || alliance_building.is_upgrading() || alliance_building.is_damaged()) {
+    if(!alliance_building || alliance_building.is_under_construction() || alliance_building.is_upgrading() || alliance_building.is_enhancing() || alliance_building.is_damaged()) {
         return true;
     }
     return false;
@@ -6481,7 +6507,7 @@ player.alliance_building_is_busy = function() {
 player.region_map_building_is_busy = function() {
     var region_map_building = find_object_by_type(gamedata['region_map_building']);
     if(!region_map_building ||
-       ((region_map_building.is_under_construction() || region_map_building.is_upgrading()) && !player.get_any_abtest_value('region_map_available_during_transmitter_upgrade', gamedata['territory']['region_map_available_during_transmitter_upgrade'])) ||
+       ((region_map_building.is_under_construction() || region_map_building.is_upgrading() || region_map_building.is_enhancing()) && !player.get_any_abtest_value('region_map_available_during_transmitter_upgrade', gamedata['territory']['region_map_available_during_transmitter_upgrade'])) ||
        (region_map_building.is_damaged() && !player.get_any_abtest_value('region_map_available_during_transmitter_repair', gamedata['territory']['region_map_available_during_transmitter_repair']))) {
         return true;
     }
@@ -6492,7 +6518,7 @@ player.warehouse_is_busy = function() {
         if(!session.home_base) { return session.home_warehouse_busy; }
         var warehouse = find_object_by_type(gamedata['inventory_building']);
         if(!warehouse ||
-           ((warehouse.is_under_construction() || warehouse.is_upgrading()) && !player.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata['inventory_available_during_warehouse_upgrade'])) ||
+           ((warehouse.is_under_construction() || warehouse.is_upgrading() || warehouse.is_enhancing()) && !player.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata['inventory_available_during_warehouse_upgrade'])) ||
            (warehouse.is_damaged() && !player.get_any_abtest_value('inventory_available_during_warehouse_repair', gamedata['inventory_available_during_warehouse_repair']))) {
             return true;
         }
@@ -6503,7 +6529,7 @@ player.squad_bay_is_busy = function() {
     if(player.squads_enabled()) {
         var bay = find_object_by_type(gamedata['squad_building']);
         if(!bay ||
-           ((bay.is_under_construction() || bay.is_upgrading()) && !player.get_any_abtest_value('squads_available_during_squad_bay_upgrade', gamedata['squads_available_during_squad_bay_upgrade'])) ||
+           ((bay.is_under_construction() || bay.is_upgrading() || bay.is_enhancing()) && !player.get_any_abtest_value('squads_available_during_squad_bay_upgrade', gamedata['squads_available_during_squad_bay_upgrade'])) ||
            (bay.is_damaged() && !player.get_any_abtest_value('squads_available_during_squad_bay_repair', gamedata['squads_available_during_squad_bay_repair']))) {
             return true;
         }
@@ -6516,7 +6542,7 @@ player.squad_bay_is_busy = function() {
 player.lottery_is_busy = function(scanner) {
     if(player.get_any_abtest_value('enable_lottery', gamedata['enable_lottery'])) {
         if(!scanner ||
-           ((scanner.is_under_construction() || scanner.is_upgrading()) && !player.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata['lottery_available_during_scanner_upgrade'])) ||
+           ((scanner.is_under_construction() || scanner.is_upgrading() || scanner.is_enhancing()) && !player.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata['lottery_available_during_scanner_upgrade'])) ||
            (scanner.is_damaged() && !player.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata['lottery_available_during_scanner_repair']))) {
             return true;
         }
@@ -15840,6 +15866,8 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
                 }
             } else if(obj.is_upgrading() && obj.upgrade_start_time <= 0) {
                 interrupts.push(dialog.data['widgets']['halt_message']['ui_name_upgrade'].replace('%s',obj.spec['ui_name']));
+            } else if(obj.is_enhancing()) { // reuse upgrade text
+                interrupts.push(dialog.data['widgets']['halt_message']['ui_name_upgrade'].replace('%s',obj.spec['ui_name']));
             }
         }
     });
@@ -18805,6 +18833,9 @@ function do_invoke_speedup_dialog(kind) {
         description_finish = gamedata['strings']['speedup']['finish_building'].replace('%s', selection.unit.spec['ui_name']);
     } else if(selection.unit.is_upgrading()) {
         description_finish = gamedata['strings']['speedup']['finish_upgrading'].replace('%s', selection.unit.spec['ui_name']);
+    } else if(selection.unit.is_enhancing()) {
+        // reuse the finish_upgrading text (?)
+        description_finish = gamedata['strings']['speedup']['finish_upgrading'].replace('%s', selection.unit.spec['ui_name']);
     } else if(selection.unit.is_researching()) {
         var techname = selection.unit.research_item;
         if(techname in player.tech) {
@@ -20287,16 +20318,16 @@ function invoke_building_context_menu(mouse_xy) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
-        } else if((session.home_base || quarry_buildable) && obj.is_upgrading()) {
-            // if upgrading, then just show speedup and cancel
+        } else if((session.home_base || quarry_buildable) && (obj.is_upgrading() || obj.is_enhancing())) {
+            // if upgrading or enhancing, then just show speedup and cancel
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
-                                                onclick: (function (_id) { return function() {
+                                                onclick: (function (_obj) { return function() {
                                                     change_selection_ui(null);
-                                                    invoke_confirm_cancel_message('upgrade', (function (__id) { return function() { send_to_server.func(["CAST_SPELL", __id, "CANCEL_UPGRADE"]); }; })(_id));
-                                                }; })(selection.unit.id), asset: 'menu_button_resizable'}));
+                                                    invoke_confirm_cancel_message('upgrade', (function (__obj) { return function() { send_to_server.func(["CAST_SPELL", __obj.id, (__obj.is_enhancing() ? "CANCEL_ENHANCE" : "CANCEL_UPGRADE")]); }; })(_obj));
+                                                }; })(selection.unit), asset: 'menu_button_resizable'}));
         } else {
             // not damaged and not upgrading
 
@@ -20507,7 +20538,7 @@ function invoke_building_context_menu(mouse_xy) {
          (!(session.viewing_base.base_climate in gamedata['climates']) || !gamedata['climates'][session.viewing_base.base_climate]['exclude_ground_units']))
        )) {
         // "Move" is always the last button
-        if(obj.is_building() && (obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading())) {
+        if(obj.is_building() && (obj.is_repairing() || obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing())) {
             // moves are not allowed while repairing, constructing, or upgrading
         } else {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MOVE_BUILDING']['ui_name'],
@@ -22979,7 +23010,7 @@ function update_loot_dialog(dialog) {
             } else {
                 busy_reason = 'repair';
             }
-        } else if(warehouse && warehouse.is_upgrading()) {
+        } else if(warehouse && (warehouse.is_upgrading() || warehouse.is_enhancing())) {
             busy_reason = 'upgrade_speedup';
         } else {
             throw Error("cannot determine warehouse busy reason");
@@ -24755,7 +24786,7 @@ function resolve_building_problem(specname, allow_upgrading) {
         var helper = get_requirements_help(read_predicate({'predicate': 'BUILDING_LEVEL', 'building_type': specname, 'trigger_level':1}), null);
         if(helper) { helper(); }
         return true;
-    } else if(building.is_damaged() || (!allow_upgrading && (building.is_upgrading() || building.is_under_construction()))) {
+    } else if(building.is_damaged() || (!allow_upgrading && (building.is_upgrading() || building.is_under_construction() || building.is_enhancing()))) {
         change_selection_unit(building);
         if(building.is_damaged() && !building.is_repairing()) {
             invoke_repair_dialog();
@@ -31387,7 +31418,7 @@ function update_manufacture_dialog(dialog) {
                     } else if(builder.is_damaged()) {
                         // prompt player to initiate repair
                         invoke_child_repair_dialog();
-                    } else if(builder.is_upgrading()) {
+                    } else if(builder.is_upgrading() || builder.is_enhancing()) {
                         // prompt player to speedup upgrade
                         invoke_child_speedup_dialog('production');
                     } else if(builder.level < get_leveled_quantity(gamedata['units'][spec_name]['requires_factory_level']||0, unlock_level)) {
@@ -42726,7 +42757,7 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
         var cat_spec = gamedata['crafting']['categories'][recipe_spec['crafting_category']];
         var queueable = !('queueable' in cat_spec && !cat_spec['queueable']);
         if((!queueable && builder.is_crafting()) ||
-           (builder.is_repairing() || builder.is_upgrading() || builder.is_under_construction())) {
+           (builder.is_repairing() || builder.is_upgrading() || builder.is_under_construction() || builder.is_enhancing())) {
             return [false, gamedata['errors']['WORKSHOP_IS_BUSY']['ui_name'], ['speedup', builder]];
         } else if(builder.is_damaged()) {
             return [false, gamedata['errors']['WORKSHOP_IS_BUSY']['ui_name'], ['repair', builder]];
@@ -42926,7 +42957,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         var allow_free_speedup = true;
         var always_free_speedup = false;
 
-        if(!unit.is_repairing() && !unit.is_upgrading() && !unit.is_under_construction()) {
+        if(!unit.is_repairing() && !unit.is_upgrading() && !unit.is_under_construction() && !unit.is_enhancing()) {
             if(unit.is_manufacturing()) {
                 if(!player.unit_speedups_enabled()) {
                     return [-1, p_currency];
@@ -47681,7 +47712,7 @@ function create_mouse_tooltip() {
                     }
                 }
             } else if(obj.is_producer() && !obj.is_under_construction()) {
-                if(obj.is_upgrading()) {
+                if(obj.is_upgrading() || obj.is_enhancing()) {
                     str.push(gamedata['strings']['cursors']['upgrading']);
                 } else if(obj.team === 'player') {
                     var contents = obj.interpolate_contents();
@@ -49510,7 +49541,7 @@ function do_draw() {
 Building.prototype.get_idle_state = function() {
     if(this.spec['worth_less_xp']) { return null; } // exclude barriers
     if(this.is_destroyed()) { return null; }
-    if(this.is_damaged() || this.is_upgrading() || this.is_under_construction()) { return null; }
+    if(this.is_damaged() || this.is_upgrading() || this.is_under_construction() || this.is_enhancing()) { return null; }
 
     if(this.idle_state_cache === null || (this.idle_state_cache_valid_until > 0 && client_time > this.idle_state_cache_valid_until)) {
         // note: assumes get_idle_state_advanced/legacy() never return null
@@ -50067,7 +50098,7 @@ function draw_building_or_inert(world, obj, powerfac) {
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
     }
 
-    if(obj.is_building() && (obj.is_under_construction() || obj.is_upgrading() ||
+    if(obj.is_building() && (obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() ||
                              obj.is_researching() || obj.is_manufacturing() || obj.is_crafting())) {
         var progress = 0;
         if(obj.is_under_construction()) {
@@ -50079,6 +50110,12 @@ function draw_building_or_inert(world, obj, powerfac) {
             progress = obj.upgrade_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
                 status_text.push(gamedata['strings']['cursors']['upgrading']+': ' + pretty_print_time(obj.upgrade_time_left()));
+            }
+        } else if(obj.is_enhancing()) {
+            progress = obj.enhance_progress();
+            if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
+                // reuse researching text for enhancing
+                status_text.push(gamedata['strings']['cursors']['researching'].replace('%tech',gamedata['enhancements'][obj.enhancing['enhance']['spec']]['ui_name']).replace('%d', obj.enhancing['enhance']['level'].toString())+': ' + pretty_print_time(obj.enhance_time_left()));
             }
         } else if(obj.is_researching()) {
             var tech = (session.home_base ? player.tech : enemy.tech);
@@ -50142,7 +50179,7 @@ function draw_building_or_inert(world, obj, powerfac) {
 
     // pause animation for idle factories and research labs
     if(obj.is_building() &&
-       (obj.is_upgrading() ||
+       (obj.is_upgrading() || obj.is_enhancing() ||
         (obj.is_factory() && !obj.is_manufacturing()) ||
         (obj.is_researcher() && !obj.is_researching()) ||
         (obj.is_producer() && producer_halted) ||
@@ -50210,7 +50247,7 @@ function draw_building_or_inert(world, obj, powerfac) {
         var facing = 0;
         if(obj.is_inert() && obj.metadata && 'facing' in obj.metadata) {
             facing = obj.metadata['facing'];
-        } else if('turn_rate' in obj.spec && !(obj.is_building() && (obj.is_upgrading() || obj.is_repairing() || obj.disarmed))) {
+        } else if('turn_rate' in obj.spec && !(obj.is_building() && (obj.is_upgrading() || obj.is_enhancing() || obj.is_repairing() || obj.disarmed))) {
             facing = (world ? obj.interpolate_facing(world) : obj.cur_facing);
         }
         if(icon) {
@@ -51307,6 +51344,8 @@ function draw_health_bar(xy, obj) {
             progress = obj.build_progress();
         } else if(obj.is_upgrading()) {
             progress = obj.upgrade_progress();
+        } else if(obj.is_enhancing()) {
+            progress = obj.enhance_progress();
         } else if(obj.is_researching()) {
             progress = obj.research_progress();
         } else if(obj.is_crafting()) {
