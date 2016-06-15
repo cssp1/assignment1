@@ -44,7 +44,7 @@ def get_tokens(template):
         return _get_tokens(template['completion'])
     return 0
 
-def make_client_raid_template(template):
+def make_client_raid_template(template_name, template):
     out = {'ui_name': template['ui_name'],
            'icon': template['icon']}
     ui_loot_rarity = template.get('ui_loot_rarity',-1)
@@ -71,7 +71,7 @@ def make_client_raid_template(template):
         out['ui_tokens2'] = token_item
     return out
 
-def make_server_raid_template(template):
+def make_server_raid_template(template_name, template):
     out = copy.copy(template)
     for FIELD in ('units','scenery','buildings'):
         if FIELD in out:
@@ -110,9 +110,9 @@ if __name__ == '__main__':
     for id in ids:
         template = raids['templates'][id]
         if mode is MODE_CLIENT:
-            out['templates'][id] = make_client_raid_template(template)
+            out['templates'][id] = make_client_raid_template(id, template)
         elif mode is MODE_SERVER:
-            out['templates'][id] = make_server_raid_template(template)
+            out['templates'][id] = make_server_raid_template(id, template)
 
     SpinJSON.dump(out, out_fd.fd, pretty = True, newline = True)
     out_fd.complete()
