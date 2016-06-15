@@ -20814,7 +20814,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "FACTORY_DAMAGED"])
             return
 
-        if object.is_busy():
+        if object.is_upgrading() or object.is_enhancing():
             retmsg.append(["ERROR", "FACTORY_IS_UPGRADING"])
             return
 
