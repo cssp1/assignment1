@@ -653,8 +653,6 @@ if __name__ == '__main__':
 
                     qs, qs_args = bdict[tag_list[i]]
                     d = req.runQuery("SELECT pg_sleep(1); "+qs, qs_args) # insert artificial delay to test what happens when we kill the server manually
-                    if d is None:
-                        return
 
                     def my_error(f):
                         print 'CLIENT error', f.value

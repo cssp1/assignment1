@@ -40,9 +40,9 @@ class SQLBattlesClient(object):
         query = self.sql_client.runQuery('SELECT summary from '+self.util.sym(tbl)+' WHERE '+(' AND '.join(where_conditions))+\
                                          ' ORDER BY time DESC'+\
                                          ((' LIMIT %d' % limit) if limit > 0 else ''))
-        if query:
-            # extract raw list of summary columns
-            query.addCallback(lambda result, self=self: [self.decode_summary(row['summary']) for row in result])
+
+        # extract raw list of summary columns
+        query.addCallback(lambda result, self=self: [self.decode_summary(row['summary']) for row in result])
         return query
 
     def decode_summary(self, raw_summary):

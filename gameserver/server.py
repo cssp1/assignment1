@@ -18589,26 +18589,23 @@ class GAMEAPI(resource.Resource):
                                                                                       'human': SpinSQLBattles.SQLBattlesClient.BATTLES_HUMAN_ONLY}[ai_or_human],
                                                                        time_range = cold_time_range,
                                                                        reason = 'query_battle_history(cold)')
-                if cold_d is None: # can happen if db is down
-                    # return hot query only
-                    result_d = defer.succeed((hot_summaries, hot_is_final, 'partial'))
-                else:
-                    # reformat results from raw summary list to (summaries, is_final, is_error)
-                    cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, None))
 
-                    # merge hot and cold summaries, in descending time order
-                    def merge_hot_and_cold(cold_result, hot_summaries, hot_is_final):
-                        cold_summaries, cold_is_final, cold_is_error = cold_result
-                        #gamesite.exception_log.event(server_time, 'COLD %r final %r' % ([x['time'] for x in cold_summaries], cold_is_final))
-                        #gamesite.exception_log.event(server_time, 'FINAL %r final %r' % ([x['time'] for x in (hot_summaries+cold_summaries)], cold_is_final and hot_is_final))
-                        return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, None)
-                    cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
+                # reformat results from raw summary list to (summaries, is_final, is_error)
+                cold_d.addCallback(lambda cold_summaries, cold_limit=cold_limit: (cold_summaries, len(cold_summaries) < cold_limit, None))
 
-                    # if cold query fails, just return the hot results as if the cold query never happened
-                    cold_d.addErrback(report_and_reraise_deferred_failure, session)
-                    cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, 'partial'))
+                # merge hot and cold summaries, in descending time order
+                def merge_hot_and_cold(cold_result, hot_summaries, hot_is_final):
+                    cold_summaries, cold_is_final, cold_is_error = cold_result
+                    #gamesite.exception_log.event(server_time, 'COLD %r final %r' % ([x['time'] for x in cold_summaries], cold_is_final))
+                    #gamesite.exception_log.event(server_time, 'FINAL %r final %r' % ([x['time'] for x in (hot_summaries+cold_summaries)], cold_is_final and hot_is_final))
+                    return (hot_summaries + cold_summaries, cold_is_final and hot_is_final, None)
+                cold_d.addCallback(merge_hot_and_cold, hot_summaries, hot_is_final)
 
-                    result_d = cold_d
+                # if cold query fails, just return the hot results as if the cold query never happened
+                cold_d.addErrback(report_and_reraise_deferred_failure, session)
+                cold_d.addErrback(lambda _, hot_summaries=hot_summaries, hot_is_final=hot_is_final: (hot_summaries, hot_is_final, 'partial'))
+
+                result_d = cold_d
 
             else:
                 # return hot query only
@@ -26233,9 +26230,6 @@ class GAMEAPI(resource.Resource):
 
                     qs, qs_args = bdict[tag_list[i]]
                     d = gamesite.sql_scores2_client.sql_client.runQuery(qs, qs_args) # "SELECT pg_sleep(2); "+qs for latency testing
-                    if d is None:
-                        on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, Exception('Scores2 SQL server is down'))
-                        return # not async
 
                     d.addCallbacks(functools.partial(next_query, master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i+1),
                                    functools.partial(on_error, master_d, session, retmsg, retmsg_tag, result, user_ids))

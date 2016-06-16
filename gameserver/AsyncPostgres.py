@@ -5,7 +5,8 @@
 # found in the LICENSE file.
 
 from txpostgres import txpostgres, reconnection
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
+from twisted.python import failure
 import psycopg2.extras
 import sys
 
@@ -14,14 +15,14 @@ class LoggingDetector(reconnection.DeadConnectionDetector):
         reconnection.DeadConnectionDetector.__init__(self)
         self.parent = parent
     def startReconnecting(self, f):
-        self.parent.log_exception_func('AsyncPostgresDetector: database connection is down (error: %r)' % f.value)
+        self.parent.log_exception_func('AsyncPostgresDetector %s: database connection is down (error: %r)' % (self.parent.identity, f.value))
         self.parent.okay = False
         return reconnection.DeadConnectionDetector.startReconnecting(self, f)
     def reconnect(self):
-        self.parent.log_exception_func('AsyncPostgresDetector: reconnecting...')
+        self.parent.log_exception_func('AsyncPostgresDetector %s: reconnecting...' % (self.parent.identity))
         return reconnection.DeadConnectionDetector.reconnect(self)
     def connectionRecovered(self):
-        self.parent.log_exception_func('AsyncPostgresDetector: reconnected.')
+        self.parent.log_exception_func('AsyncPostgresDetector %s: reconnected.' % (self.parent.identity))
         self.parent.okay = True
         return reconnection.DeadConnectionDetector.connectionRecovered(self)
     def deathChecker(self, f):
@@ -37,6 +38,7 @@ class DictConnection(txpostgres.Connection):
 class AsyncPostgres(object):
     def __init__(self, dbconfig, log_exception_func = None, verbosity = 0):
         self.dbconfig = dbconfig
+        self.identity = dbconfig['host'] # for debugging only
         self.verbosity = verbosity
         if log_exception_func is None:
             log_exception_func = lambda x: sys.stderr.write(x+'\n')
@@ -49,17 +51,18 @@ class AsyncPostgres(object):
         d.addCallback(self.connected)
     def connected(self, con):
         if self.verbosity >= 1:
-            self.log_exception_func('AsyncPostgres: connected')
+            self.log_exception_func('AsyncPostgres %s: connected' % self.identity)
         self.okay = True
     def connectionError(self, f):
         if self.verbosity >= 0:
-            self.log_exception_func('AsyncPostgres: connection error %r' % f.value)
+            self.log_exception_func('AsyncPostgres %s: connection error %r' % (self.identity, f.value))
         self.okay = False
     def runQuery(self, *args, **kwargs):
         if not self.okay:
+            msg = 'AsyncPostgres %s: aborting query because connection is not okay' % (self.identity)
             if self.verbosity >= 1:
-                self.log_exception_func('AsyncPostgres: aborting query because connection is not okay')
-            return None
+                self.log_exception_func(msg)
+            return defer.fail(failure.Failure(Exception(msg)))
         return self.con.runQuery(*args, **kwargs)
 
     # same API as the synchronous SQL/NoSQL drivers
@@ -82,9 +85,6 @@ if __name__ == '__main__':
 
     def my_query(req):
         d = req.runQuery('select 1 as first, 2 as second;')
-        if not d:
-            print 'CLIENT abort'
-            return
 
         def my_result(res):
             print 'CLIENT result', [row.items() for row in res] # res
