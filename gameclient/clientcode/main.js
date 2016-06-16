@@ -1713,7 +1713,7 @@ GameObject.prototype.modify_stats_by_modstats_table = function(table) {
         this.combat_stats.weapon_range *= table['weapon_range']['val'];
         this.combat_stats.effective_weapon_range *= table['weapon_range']['val']; // also change effective_range
     }
-    //if('effective_weapon_range' in table) { this.combat_stats.effective_weapon_range *= table['effective_weapon_range']['val']; }
+    if('effective_weapon_range' in table) { this.combat_stats.effective_weapon_range *= table['effective_weapon_range']['val']; }
 
     // special case test
     if(('weapon_range_pvp' in table) && !session.home_base && !session.viewing_ai) {
