@@ -539,6 +539,7 @@ class BHVisitor(Visitor):
         self.frame_platform = self.demographics['frame_platform'] = 'bh'
         self.battlehouse_id = None
         self.battlehouse_auth_token = None
+        self.csrf_state = None
 
     def set_battlehouse_id(self, bh_id):
         self.battlehouse_id = str(bh_id)
