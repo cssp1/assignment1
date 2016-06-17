@@ -1042,15 +1042,17 @@ class GameProxy(proxy.ReverseProxyResource):
 
         redirect_url = SpinConfig.config['battlehouse_api_path']+'/api/v3/oauth/authorize'
 
-        # note: FB's handling of the response_type arg is weird, it wants code%20token for the combined one
         redirect_url += '?'+urllib.urlencode({'client_id': SpinConfig.config['battlehouse_oauth_app_id'],
-                                              'redirect_uri': visitor.game_container,
+                                              'redirect_uri': visitor.canvas_url(),
                                               'state': visitor.csrf_state,
                                               'response_type': 'code',
                                               'scope': scope })
 
-        # redirect (with frame break) to redirect_url
-        ret = '<html><body onload="top.location.href = \'%s\';"></body></html>' % str(redirect_url)
+        # redirect (without frame break) to redirect_url
+        ret = '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
+        # clickable link -> popup works temporarily
+        #ret = '<html><body><a href="#" onclick="var opener = window.open(\'%s\', \'Battlehouse Login\', \'scrollbars=yes, width=500, height=500, top=150, left=150\');">Click here to log in</a></body></html>' % str(redirect_url)
+
         metric_event_coded(visitor, '0030_request_permission', metric_props)
         return ret
 
@@ -1064,7 +1066,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         url += '/access_token?' + \
                urllib.urlencode({'client_id':SpinConfig.config['battlehouse_oauth_app_id'],
-                                 'redirect_uri':visitor.game_container,
+                                 'redirect_uri':visitor.canvas_url(),
                                  'client_secret':SpinConfig.config['battlehouse_oauth_app_secret'],
                                  'code':request.args['code'][-1],
                                  'grant_type':'authorization_code'
@@ -1081,28 +1083,27 @@ class GameProxy(proxy.ReverseProxyResource):
         def on_response(self, response):
             self.d.callback(self.parent.index_visit_fetch_bh_oauth_token_response(self.request, self.visitor, response))
         def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_fetch_bh_oauth_token_response(self.request, self.visitor, ''))
+            self.d.callback(self.parent.index_visit_fetch_bh_oauth_token_response(self.request, self.visitor, reason))
 
     def index_visit_fetch_bh_oauth_token_response(self, request, visitor, response):
         # note: "response" is JSON for errors, otherwise a string
-        if response and (response[0] != '{') and ('access_token' in response):
-            data = urlparse.parse_qs(response)
-            return self.index_visit_use_bh_oauth_token(request, visitor, data['auth_token'])
+        if response and (response[0] == '{') and ('"access_token"' in response):
+            data = SpinJSON.loads(response)
+            return self.index_visit_use_bh_oauth_token(request, visitor, str(data['access_token']))
 
         # fail back to auth re-request
         raw_log.event(proxy_time, 'failed to fetch oauth token: '+repr(request)+' args '+repr(request.args)+' response '+repr(response))
         return self.index_visit_bh(request, visitor)
 
     def index_visit_use_bh_oauth_token(self, request, visitor, token):
-        visitor.battlehouse_auth_token = str(data['auth_token'])
+        visitor.battlehouse_auth_token = token
         # note! we don't have battlehouse_id yet!
         d = defer.Deferred()
         d.addCallback(SpinHTTP.complete_deferred_request, request)
         vc = self.BHVerifyCheck(self, request, visitor, d)
-        bh_async_http.queue_request(proxy_time,
-                                    SpinConfig.config['battlehouse_api_path']+'/api/v3/users/me?' + \
-                                    urllib.urlencode({'auth_token':visitor.battlehouse_auth_token}),
-                                    vc.on_response, error_callback = vc.on_error)
+        url = SpinConfig.config['battlehouse_api_path']+'/api/v3/users/me?' + \
+              urllib.urlencode({'access_token':visitor.battlehouse_auth_token})
+        bh_async_http.queue_request(proxy_time, url, vc.on_response, error_callback = vc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
     class BHVerifyCheck:
@@ -1118,10 +1119,10 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_bh_verify_response(self, request, visitor, response):
         r = SpinJSON.loads(response)
-        if not r.get('user_id',None):
+        if not r.get('id',None):
             return self.index_visit_go_away(request, visitor)
 
-        visitor.set_battlehouse_id(r['user_id'])
+        visitor.set_battlehouse_id(r['id'])
         # geolocate country
         visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
