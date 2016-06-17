@@ -66,14 +66,32 @@ SPUI.Font = function(size, leading, style) {
     this.style = style;
 };
 
+/** For Google Web Fonts, we need to inject a CSS fragment into the <head> block to specify the font location */
+SPUI.Font.google_css_injected = false;
+
 /** return HTML5 representation of this font in string form
     @return {string} */
 SPUI.Font.prototype.str = function() {
-    var ret = "sans-serif";
-    ret = this.size.toString() + "px " + ret;
-    if(this.style != "normal") {
-        ret = this.style + " " + ret;
+    var font_family = 'sans-serif';
+
+    var google_font = gamedata['client']['google_font'] || null;
+    if(google_font) {
+        if(!SPUI.Font.google_css_injected) {
+            SPUI.Font.google_css_injected = true;
+            var link = document.createElement('link');
+            link.href = 'https://fonts.googleapis.com/css?family=' + encodeURIComponent(google_font);
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+        }
+        font_family = '\''+google_font+'\',' + font_family;
     }
+
+    var ret = '';
+    if(this.style != 'normal') {
+        ret += this.style + ' ';
+    }
+    ret += this.size.toString()+'px ';
+    ret += font_family;
     return ret;
 };
 
