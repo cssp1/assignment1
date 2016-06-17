@@ -487,7 +487,7 @@ if __name__ == '__main__':
             print fmt % ('Alias (Call Sign):', player['alias'])
 
         if user.get('frame_platform', None):
-            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate','ag':'Armor Games'}[user['frame_platform']])
+            print fmt % ('Frame Platform:', {'fb':'Facebook','kg':'Kongregate','ag':'Armor Games','bh':'Battlehouse'}[user['frame_platform']])
 
         if user.get('ag_id', None):
             print fmt % ('Armor Games ID:', '"'+str(user['ag_id'])+'"')
@@ -498,6 +498,11 @@ if __name__ == '__main__':
             print fmt % ('Kongregate ID:', '"'+str(user['kg_id'])+'"')
         if user.get('kg_username', None):
             print fmt % ('Kongregate Name:', '"'+str(user['kg_username'])+'"')
+
+        if user.get('bh_id', None):
+            print fmt % ('Battlehouse ID:', '"'+str(user['bh_id'])+'"')
+        if user.get('bh_username', None):
+            print fmt % ('Battlehouse Name:', '"'+str(user['bh_username'])+'"')
 
         if user.get('facebook_id', None):
             print fmt % ('Facebook ID:', '"'+str(user['facebook_id'])+'"')

@@ -53,6 +53,12 @@ var spin_armorgames_user;
 var spin_kongregate_enabled;
 var spin_kongregate_user;
 /** @type {boolean} */
+var spin_battlehouse_enabled;
+/** @type {string} */
+var spin_battlehouse_user;
+/** @type {string} */
+var spin_battlehouse_api_path;
+/** @type {boolean} */
 var spin_facebook_enabled;
 /** @type {string} */
 var spin_facebook_user;

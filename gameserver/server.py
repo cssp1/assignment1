@@ -994,6 +994,7 @@ class UserTable:
                          ('fb_oauth_token', str),
                          ('kg_auth_token', str),
                          ('ag_auth_token', str),
+                         ('bh_auth_token', str),
                          ]
 
     FIELDS = [('country', None),
@@ -1033,6 +1034,10 @@ class UserTable:
               ('ag_username', None),
               ('ag_avatar_url', str),
               ('ag_friend_ids', None),
+              ('bh_id', str),
+              ('bh_hit_time', int),
+              ('bh_profile', None),
+              ('bh_username', None),
               ('acquisition_data', None),
               ('acquisition_campaign', None),
               ('acquisition_secondary', None),
@@ -1260,6 +1265,13 @@ class User:
         self.ag_avatar_url = None
         self.ag_friend_ids = None
 
+        # Battlehouse profile data
+        self.bh_auth_token = None # auth token from proxyserver login
+        self.bh_id = None # set on login
+        self.bh_profile = None
+        self.bh_hit_time = -1
+        self.bh_username = None
+
         self.acquisition_data = []
         self.acquisition_campaign = ''
         self.acquisition_type = None
@@ -1317,6 +1329,7 @@ class User:
         if player.alias: return player.get_titled_alias()
         if self.ag_username: return self.ag_username
         if self.kg_username: return self.kg_username
+        if self.bh_username: return self.bh_username
         if self.facebook_first_name:
             if self.facebook_name and len(self.facebook_name.split(' ')) >= 2:
                 # first name + last initial
@@ -1335,6 +1348,7 @@ class User:
     def get_real_name(self):
         if self.ag_username: return self.ag_username
         if self.kg_username: return self.kg_username
+        if self.bh_username: return self.bh_username
         if self.facebook_first_name: return self.facebook_first_name
         if self.facebook_name: return self.facebook_name.split(' ')[0]
         return 'Unknown(user)'
@@ -1360,6 +1374,8 @@ class User:
             return self.facebook_profile.get('email', None)
         if self.ag_profile:
             return self.ag_profile.get('email', None)
+        if self.bh_profile:
+            return self.bh_profile.get('email', None)
         return None
 
     def chat_can_interact(self):
@@ -1682,6 +1698,45 @@ class User:
             # go back N years and 6 months
             self.birthday = int(server_time - (data['user_vars']['age']*365+180)*86400)
         self.kg_hit_time = server_time
+
+        if retmsg is None:
+            if self.active_session:
+                retmsg = self.active_session.outgoing_messages
+        if retmsg is not None:
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+    def retrieve_bh_info(self, session, retmsg):
+        if (None not in (self.bh_username,)) and \
+           ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
+            # use cached data
+            return
+
+        # note: auth token not required
+
+        if SpinConfig.config.get('enable_battlehouse',0):
+            self.retrieve_bh_info_start(session)
+        else:
+            # note: must match proxyserver.py test credentials
+            test_response = SpinJSON.dumps({"id":"rh4py9er3b8sf89kyu34braxhe","create_at":1466128021292,"update_at":1466128388312,"delete_at":0,"username":"example1","auth_data":"","auth_service":"","email":"asdf@example.com","nickname":"Example","first_name":"Ex","last_name":"Ample","roles":"system_admin","last_activity_at":1466189487290,"last_ping_at":1466189833741,"allow_marketing":True,"notify_props":{"channel":"true","desktop":"all","desktop_sound":"true","email":"true","first_name":"false","mention_keys":"example1,@example1","push":"mention"},"last_password_update":1466128021292,"locale":"en"})
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_bh_info_complete(_session, None, test_response)) # delay to expose timing bugs
+
+    def retrieve_bh_info_start(self, session):
+        assert self.bh_auth_token
+        gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
+                                                     SpinConfig.config['battlehouse_api_path']+'/api/v3/users/%s/get' % self.bh_id,
+                                                     lambda result, _session=session: self.retrieve_bh_info_complete(_session, None, result),
+                                                     headers = {'Authorization': 'Bearer '+self.bh_auth_token})
+
+    def retrieve_bh_info_complete(self, session, retmsg, result):
+        data = SpinJSON.loads(result)
+        assert data['id'] == self.bh_id
+
+        self.bh_profile = data # store entire profile
+
+        self.bh_username = data['nickname']
+        if 'birthday' in data: pass # no birthday data
+        self.bh_hit_time = server_time
 
         if retmsg is None:
             if self.active_session:
@@ -18735,6 +18790,7 @@ class GAMEAPI(resource.Resource):
         if user.facebook_id: ret['facebook_id'] = user.facebook_id
         if user.ag_id: ret['ag_id'] = user.ag_id
         if user.kg_id: ret['kg_id'] = user.kg_id
+        if user.bh_id: ret['bh_id'] = user.bh_id
         if user.social_id: ret['social_id'] = user.social_id
         if user.ag_avatar_url: ret['ag_avatar_url'] = user.ag_avatar_url
         if user.kg_avatar_url: ret['kg_avatar_url'] = user.kg_avatar_url
@@ -18749,7 +18805,7 @@ class GAMEAPI(resource.Resource):
             fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
-                      'facebook_id', 'kg_id', 'ag_id',
+                      'facebook_id', 'kg_id', 'ag_id', 'bh_id',
                       'facebook_name', 'facebook_first_name', 'last_fb_notification_time', 'enable_fb_notifications', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
 
@@ -23741,7 +23797,7 @@ class GAMEAPI(resource.Resource):
             return False
 
         frame_platform = client_social_id[0:2]
-        assert frame_platform in ('fb','kg','ag')
+        assert frame_platform in ('fb','kg','ag','bh')
 
         # check gamedata against server version
         client_gamedata_date = client_gamedata_build_info.get('date','nodate') if client_gamedata_build_info else 'none'
@@ -23884,6 +23940,12 @@ class GAMEAPI(resource.Resource):
             user.ag_id = social_id[2:]
             if not user.ag_username:
                 user.ag_username = '(waiting for Armor Games)'
+
+        elif frame_platform == 'bh':
+            user.bh_auth_token = auth_token
+            user.bh_id = social_id[2:]
+            if not user.bh_username:
+                user.bh_username = '(waiting for Battlehouse)'
 
         user.browser_name = str(user_demographics[0]) if user_demographics[0] != 'unknown' else None
         try:
@@ -24123,6 +24185,8 @@ class GAMEAPI(resource.Resource):
             user.retrieve_kg_info(session, retmsg)
         elif session.user.frame_platform == 'ag':
             user.retrieve_ag_info(session, retmsg)
+        elif session.user.frame_platform == 'bh':
+            user.retrieve_bh_info(session, retmsg)
 
         # record acquisition or reacquisition
         acq_event_props = {'anon_id': metrics_anon_id,
@@ -24620,6 +24684,7 @@ class GAMEAPI(resource.Resource):
         if session.user.ag_avatar_url: cache_props['ag_avatar_url'] = session.user.ag_avatar_url
         if session.user.kg_id: cache_props['kg_id'] = session.user.kg_id
         if session.user.kg_avatar_url: cache_props['kg_avatar_url'] = session.user.kg_avatar_url
+        if session.user.bh_id: cache_props['bh_id'] = session.user.bh_id
 
         cache_props[gamedata['townhall']+'_level'] = session.player.get_townhall_level()
 
@@ -28217,6 +28282,8 @@ class GameSite(server.Site):
         self.kongregate_log.event(server_time, exc)
     def log_armorgames_exception(self, exc):
         self.armorgames_log.event(server_time, exc)
+    def log_battlehouse_exception(self, exc):
+        self.battlehouse_log.event(server_time, exc)
     def log_xsolla_exception(self, exc):
         self.xsolla_log.event(server_time, exc)
 
@@ -28292,6 +28359,14 @@ class GameSite(server.Site):
                                                                  self.log_armorgames_exception,
                                                                  max_tries = data['max_tries'],
                                                                  retry_delay = data['retry_delay'])
+        data = gamedata['server'].get('AsyncHTTP_Battlehouse', gamedata['server']['AsyncHTTP_Facebook'])
+        self.AsyncHTTP_Battlehouse = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
+                                                                  data['total_request_limit'],
+                                                                  data['request_timeout'],
+                                                                  spin_log_verbosity,
+                                                                  self.log_battlehouse_exception,
+                                                                  max_tries = data['max_tries'],
+                                                                  retry_delay = data['retry_delay'])
         data = gamedata['server'].get('AsyncHTTP_Xsolla', gamedata['server']['AsyncHTTP_Facebook'])
         self.AsyncHTTP_Xsolla = AsyncHTTP.AsyncHTTPRequester(data['concurrent_request_limit'],
                                                              data['total_request_limit'],
@@ -28380,6 +28455,7 @@ class GameSite(server.Site):
         self.facebook_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-facebook.txt')
         self.armorgames_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-armorgames.txt')
         self.kongregate_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-kongregate.txt')
+        self.battlehouse_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-battlehouse.txt')
         self.xsolla_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-xsolla.txt')
         self.trace_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-traces.txt')
 
@@ -29272,6 +29348,9 @@ class AdminResource(resource.Resource):
         if SpinConfig.config.get('enable_armorgames',0):
             ret += '<hr><b>AsyncHTTP_ArmorGames</b><p>'
             ret += gamesite.AsyncHTTP_ArmorGames.get_stats_html(server_time)
+        if SpinConfig.config.get('enable_battlehouse',0):
+            ret += '<hr><b>AsyncHTTP_Battlehouse</b><p>'
+            ret += gamesite.AsyncHTTP_Battlehouse.get_stats_html(server_time)
 
         if SpinConfig.config['enable_kissmetrics'] or SpinConfig.config.get('enable_adotomi', False) or SpinConfig.config.get('enable_dauup', False):
             ret += '<hr><b>AsyncHTTP_metrics</b><p>'

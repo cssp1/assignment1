@@ -97,6 +97,8 @@ BEGIN
            RETURN 'Kongregate';
         ELSEIF frame_platform = 'ag' THEN
            RETURN 'Armor Games';
+        ELSEIF frame_platform = 'bh' THEN
+           RETURN 'Battlehouse';
         ELSEIF frame_platform = 'fb' THEN
            -- if camp maps to facebook_free or game_viral, return those
            -- if camp maps to MISSING, then ignore (!) this user (this is what ANALYTICS2 does - maybe we should report it as 'FB MISSING' instead?)

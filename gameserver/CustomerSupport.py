@@ -204,6 +204,8 @@ class HandleClearAlias(Handler):
             new_ui_name = user['kg_username']
         elif user.get('ag_username'):
             new_ui_name = user['ag_username']
+        elif user.get('bh_username'):
+            new_ui_name = user['bh_username']
         elif user.get('facebook_first_name'):
             new_ui_name = user['facebook_first_name']
         elif user.get('facebook_name'):

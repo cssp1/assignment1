@@ -89,7 +89,7 @@ def update_user(user_id, db_client):
 
         props = {}
 
-        for FIELD in ('social_id', 'facebook_id', 'kg_id', 'ag_id', 'ag_avatar_url', 'kg_avatar_url'):
+        for FIELD in ('social_id', 'facebook_id', 'bh_id', 'kg_id', 'ag_id', 'ag_avatar_url', 'kg_avatar_url'):
             if user.get(FIELD):
                 props[FIELD] = user[FIELD]
 
@@ -99,6 +99,8 @@ def update_user(user_id, db_client):
             props['ui_name'] = user['ag_username']
         elif user.get('kg_username',None):
             props['ui_name'] = user['kg_username']
+        elif user.get('bh_username',None):
+            props['ui_name'] = user['bh_username']
         elif user.get('facebook_first_name', None):
             props['ui_name'] = user['facebook_first_name']
         elif user.get('facebook_name', None):

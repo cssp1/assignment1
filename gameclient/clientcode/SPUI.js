@@ -2525,6 +2525,17 @@ SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
         }
     }
 };
+SPUI.get_battlehouse_portrait_url = function(bh_id) {
+    if(SPUI.force_anon_portraits || anon_mode || (bh_id && bh_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
+        return SPUI.get_anonymous_portrait_url(bh_id === spin_battlehouse_user);
+    } else {
+        if(gamedata['client']['proxy_portraits']) {
+            return GameArt.art_url('bh_portrait/?bh_id='+encodeURIComponent(bh_id)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
+        } else {
+            return spin_battlehouse_api_path+'/api/v3/users/'+bh_id+'/image';
+        }
+    }
+};
 
 SPUI.FriendPortrait.prototype.update_display = function() {
     if(this.displayed_user_id == this.user_id) { return; } // already set
@@ -2559,7 +2570,8 @@ SPUI.FriendPortrait.prototype.update_display = function() {
             var url = null;
             var urls = {'fb': (info['facebook_id'] ? SPUI.get_facebook_portrait_url(info['facebook_id']) : null),
                         'ag': (info['ag_avatar_url'] ? SPUI.get_armorgames_portrait_url(info['ag_id'] || null, info['ag_avatar_url']) : null),
-                        'kg': (info['kg_avatar_url'] ? SPUI.get_kongregate_portrait_url(info['kg_id'] || null, info['kg_avatar_url']) : null) };
+                        'kg': (info['kg_avatar_url'] ? SPUI.get_kongregate_portrait_url(info['kg_id'] || null, info['kg_avatar_url']) : null),
+                        'bh': (info['bh_id'] ? SPUI.get_battlehouse_portrait_url(info['bh_id']) : null) };
 
             // first try current frame platform
             if(urls[spin_frame_platform]) {

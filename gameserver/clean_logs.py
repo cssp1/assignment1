@@ -70,6 +70,7 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
          filename.endswith('-purchase_ui.json') or \
          filename.endswith('-traces.txt') or \
          filename.endswith('-armorgames.txt') or \
+         filename.endswith('-battlehouse.txt') or \
          filename.endswith('-facebook.txt') or \
          filename.endswith('-controlapi.txt') or \
          filename.endswith('-kongregate.txt') or \

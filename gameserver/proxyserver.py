@@ -69,6 +69,7 @@ exception_log = None
 facebook_log = None
 kongregate_log = None
 armorgames_log = None
+battlehouse_log = None
 fbrtapi_raw_log = None
 fbrtapi_json_log = None
 xsapi_raw_log = None
@@ -108,6 +109,14 @@ if SpinConfig.config.get('enable_armorgames', 0):
     config = SpinConfig.config['proxyserver'].get('AsyncHTTP_ArmorGames', {})
     ag_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
                                                  lambda x: armorgames_log.event(proxy_time, x) if armorgames_log else sys.stderr.write(x+'\n'),
+                                                 max_tries = config.get('max_tries',1),
+                                                 retry_delay = config.get('retry_delay',3))
+
+bh_async_http = None
+if SpinConfig.config.get('enable_battlehouse', 0):
+    config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Battlehouse', {})
+    bh_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                 lambda x: battlehouse_log.event(proxy_time, x) if battlehouse_log else sys.stderr.write(x+'\n'),
                                                  max_tries = config.get('max_tries',1),
                                                  retry_delay = config.get('retry_delay',3))
 
@@ -184,7 +193,7 @@ class GameServer:
 static_includes = None
 def reload_static_includes():
     global static_includes
-    STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'kg_guest.html', 'fb_guest.html',
+    STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'index_body_bh.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
                             'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'facebookexternalhit.html',
                             'XsollaSDK.js']
@@ -408,7 +417,7 @@ class Visitor(object):
         return props
 
     def __repr__(self):
-        print_dict = dict((k,v) for k,v in self.__dict__.iteritems() if k not in ('raw_signed_request', 'oauth_token', 'kongregate_auth_token', 'armorgames_auth_token'))
+        print_dict = dict((k,v) for k,v in self.__dict__.iteritems() if k not in ('raw_signed_request', 'oauth_token', 'kongregate_auth_token', 'armorgames_auth_token', 'battlehouse_auth_token'))
         return self.anon_id + ' (active %ds ago): ' % (proxy_time-self.last_active_time) + repr(print_dict)
 
 class FBVisitor(Visitor):
@@ -523,6 +532,33 @@ class AGVisitor(Visitor):
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
         return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
+
+class BHVisitor(Visitor):
+    def __init__(self, *args, **kwargs):
+        Visitor.__init__(self, *args, **kwargs)
+        self.frame_platform = self.demographics['frame_platform'] = 'bh'
+        self.battlehouse_id = None
+        self.battlehouse_auth_token = None
+
+    def set_battlehouse_id(self, bh_id):
+        self.battlehouse_id = str(bh_id)
+        self.demographics['social_id'] = self.social_id = 'bh'+self.battlehouse_id
+
+    def auth_token(self): return self.battlehouse_auth_token
+    def immune_to_country_restrictions(self): return False
+    def must_go_away(self):
+        return ('go_away_whitelist' in SpinConfig.config) and (self.battlehouse_id not in SpinConfig.config['go_away_whitelist'])
+
+    def set_game_container(self, request):
+        self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.battlehouse.com/') # punt :(
+
+    # XXXXXXBH this might break the OAuth redirect to have extra parameters in the query string?
+    def canvas_url(self):
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/BHROOT' + q_clean_qs(self.first_hit_uri, {})
+
+    def canvas_url_no_auth(self):
+        # send the browser the URL to redirect to after authorizing
+        return self.server_protocol + self.server_host + ':' + self.server_port + '/BHROOT' + q_clean_qs(self.first_hit_uri, {})
 
 visitor_table = {}
 
@@ -749,12 +785,20 @@ class GameProxy(proxy.ReverseProxyResource):
             #exception_log.event(proxy_time, 'proxyserver: NEW cookie '+anon_id)
 
         if anon_id not in visitor_table:
-            visitor_table[anon_id] = visitor = {'fb': FBVisitor, 'kg': KGVisitor, 'ag': AGVisitor}[frame_platform](request, anon_id)
+            visitor_table[anon_id] = visitor = {'fb': FBVisitor,
+                                                'kg': KGVisitor,
+                                                'ag': AGVisitor,
+                                                'bh': BHVisitor,
+                                                }[frame_platform](request, anon_id)
         else:
             visitor = visitor_table[anon_id]
 
         visitor.update_on_hit(request)
-        return {'fb': self.index_visit_fb, 'kg': self.index_visit_kg, 'ag': self.index_visit_ag}[frame_platform](request, visitor)
+        return {'fb': self.index_visit_fb,
+                'kg': self.index_visit_kg,
+                'ag': self.index_visit_ag,
+                'bh': self.index_visit_bh,
+                }[frame_platform](request, visitor)
 
     def index_visit_kg(self, request, visitor):
         # example hit:
@@ -954,6 +998,141 @@ class GameProxy(proxy.ReverseProxyResource):
             return self.index_visit_go_away(request, visitor)
         return self.index_visit_authorized(request, visitor)
 
+    def index_visit_bh(self, request, visitor):
+        # example hit:
+        # http://myserver.example.com:8005/BHROOT?code=0000abcd&state=something
+
+        if self.the_pool_is_closed():
+            return self.index_visit_go_away(request, visitor)
+
+        if not (('code' in request.args) and ('state' in request.args)):
+            # initial hit
+
+            if not SpinConfig.config.get('enable_battlehouse',0) \
+               and (not SpinConfig.config.get('secure_mode',0)): # do not allow in secure mode
+                # use fake sandbox credentials
+                # note: match server.py retrieve_bh_info() test credentials
+                visitor.set_battlehouse_id('rh4py9er3b8sf89kyu34braxhe')
+                visitor.battlehouse_auth_token = '0123456789'
+                return self.index_visit_authorized(request, visitor)
+            else:
+                return self.index_visit_do_bh_auth(request, visitor)
+
+        # we have a purported code and CSRF state
+        if visitor.csrf_state and SpinConfig.config['proxyserver'].get('csrf_protection',True) and \
+           (request.args['state'][-1] != visitor.csrf_state):
+            exception_log.event(proxy_time, 'got auth code with bad CSRF state: '+repr(request)+' args '+repr(request.args)+' wanted '+visitor.csrf_state)
+            request.setResponseCode(http.BAD_REQUEST)
+            return str('invalid csrf_state')
+
+        return self.index_visit_do_bh_auth_2(request, visitor, request.args['code'][-1])
+
+    def index_visit_do_bh_auth(self, request, visitor):
+        scope = 'user'
+
+        # create anti-CSRF state that OAuth should pass back to us
+        # but use same one for repeated attempts in one session, in case of reload bugs
+        if not visitor.csrf_state:
+            visitor.csrf_state = hashlib.sha256(SpinConfig.config['battlehouse_app_secret']+'666'+str(visitor.anon_id)+str(proxy_time)).hexdigest()
+
+        metric_props = visitor.add_demographics({'method': 'bh_oauth', 'scope': scope})
+        if visitor.first_hit_uri:
+            metric_props['query_string'] = clean_qs(visitor.first_hit_uri)
+
+        redirect_url = SpinConfig.config['battlehouse_api_path']+'/api/v3/oauth/authorize'
+
+        # note: FB's handling of the response_type arg is weird, it wants code%20token for the combined one
+        redirect_url += '?'+urllib.urlencode({'client_id': SpinConfig.config['battlehouse_oauth_app_id'],
+                                              'redirect_uri': visitor.game_container,
+                                              'state': visitor.csrf_state,
+                                              'response_type': 'code',
+                                              'scope': scope })
+
+        # redirect (with frame break) to redirect_url
+        ret = '<html><body onload="top.location.href = \'%s\';"></body></html>' % str(redirect_url)
+        metric_event_coded(visitor, '0030_request_permission', metric_props)
+        return ret
+
+    def index_visit_do_bh_auth_2(self, request, visitor, code):
+        # asynchronously call OAuth API to retrieve an oauth_token using the "code" from the auth redirect
+        d = defer.Deferred()
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
+        sc = self.BHOAuthGetter(self, request, visitor, d)
+
+        url = SpinConfig.config['battlehouse_api_path']+'/api/v3/oauth'
+
+        url += '/access_token?' + \
+               urllib.urlencode({'client_id':SpinConfig.config['battlehouse_oauth_app_id'],
+                                 'redirect_uri':visitor.game_container,
+                                 'client_secret':SpinConfig.config['battlehouse_oauth_app_secret'],
+                                 'code':request.args['code'][-1],
+                                 'grant_type':'authorization_code'
+                                 })
+        bh_async_http.queue_request(proxy_time,url, sc.on_response, error_callback = sc.on_error, method = 'POST')
+        return twisted.web.server.NOT_DONE_YET
+
+    class BHOAuthGetter:
+        def __init__(self, parent, request, visitor, d):
+            self.parent = parent
+            self.request = request
+            self.visitor = visitor
+            self.d = d
+        def on_response(self, response):
+            self.d.callback(self.parent.index_visit_fetch_bh_oauth_token_response(self.request, self.visitor, response))
+        def on_error(self, reason):
+            self.d.callback(self.parent.index_visit_fetch_bh_oauth_token_response(self.request, self.visitor, ''))
+
+    def index_visit_fetch_bh_oauth_token_response(self, request, visitor, response):
+        # note: "response" is JSON for errors, otherwise a string
+        if response and (response[0] != '{') and ('access_token' in response):
+            data = urlparse.parse_qs(response)
+            return self.index_visit_use_bh_oauth_token(request, visitor, data['auth_token'])
+
+        # fail back to auth re-request
+        raw_log.event(proxy_time, 'failed to fetch oauth token: '+repr(request)+' args '+repr(request.args)+' response '+repr(response))
+        return self.index_visit_bh(request, visitor)
+
+    def index_visit_use_bh_oauth_token(self, request, visitor, token):
+        visitor.battlehouse_auth_token = str(data['auth_token'])
+        # note! we don't have battlehouse_id yet!
+        d = defer.Deferred()
+        d.addCallback(SpinHTTP.complete_deferred_request, request)
+        vc = self.BHVerifyCheck(self, request, visitor, d)
+        bh_async_http.queue_request(proxy_time,
+                                    SpinConfig.config['battlehouse_api_path']+'/api/v3/users/me?' + \
+                                    urllib.urlencode({'auth_token':visitor.battlehouse_auth_token}),
+                                    vc.on_response, error_callback = vc.on_error)
+        return twisted.web.server.NOT_DONE_YET
+
+    class BHVerifyCheck:
+        def __init__(self, parent, request, visitor, d):
+            self.parent = parent
+            self.request = request
+            self.visitor = visitor
+            self.d = d
+        def on_response(self, response):
+            self.d.callback(self.parent.index_visit_bh_verify_response(self.request, self.visitor, response))
+        def on_error(self, reason):
+            self.d.callback(self.parent.index_visit_bh_verify_response(self.request, self.visitor, None))
+
+    def index_visit_bh_verify_response(self, request, visitor, response):
+        r = SpinJSON.loads(response)
+        if not r.get('user_id',None):
+            return self.index_visit_go_away(request, visitor)
+
+        visitor.set_battlehouse_id(r['user_id'])
+        # geolocate country
+        visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
+
+        metric_event_coded(visitor, '0020_page_view',
+                           visitor.add_demographics({#'Viewed URL': request.uri,
+                                                     'query_string': clean_qs(request.uri),
+                                                     'referer': SpinHTTP.get_twisted_header(request, 'referer') or 'unknown',
+                                                     'battlehouse_user_id': visitor.battlehouse_id
+                                                     }))
+        return self.index_visit_authorized(request, visitor)
+
+
     def index_visit_fb(self, request, visitor):
 
         # check for signed_request (either sent as POST arg or GET query string)
@@ -1095,7 +1274,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # asynchronously call Facebook API to retrieve an oauth_token using the "code" from the auth redirect
         d = defer.Deferred()
         d.addCallback(SpinHTTP.complete_deferred_request, request)
-        sc = self.OAuthGetter(self, request, visitor, d)
+        sc = self.FBOAuthGetter(self, request, visitor, d)
 
         url = SpinFacebook.versioned_graph_endpoint('oauth', 'oauth')
 
@@ -1110,18 +1289,18 @@ class GameProxy(proxy.ReverseProxyResource):
         fb_queue_request('oauth/access_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
         return twisted.web.server.NOT_DONE_YET
 
-    class OAuthGetter:
+    class FBOAuthGetter:
         def __init__(self, parent, request, visitor, d):
             self.parent = parent
             self.request = request
             self.visitor = visitor
             self.d = d
         def on_response(self, response):
-            self.d.callback(self.parent.index_visit_fetch_oauth_token_response(self.request, self.visitor, response))
+            self.d.callback(self.parent.index_visit_fetch_fb_oauth_token_response(self.request, self.visitor, response))
         def on_error(self, reason):
-            self.d.callback(self.parent.index_visit_fetch_oauth_token_response(self.request, self.visitor, ''))
+            self.d.callback(self.parent.index_visit_fetch_fb_oauth_token_response(self.request, self.visitor, ''))
 
-    def index_visit_fetch_oauth_token_response(self, request, visitor, response):
+    def index_visit_fetch_fb_oauth_token_response(self, request, visitor, response):
         # note: "response" is JSON for errors, otherwise a string
         if response and (response[0] != '{') and ('access_token' in response):
             data = urlparse.parse_qs(response)
@@ -1456,6 +1635,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if (not SpinConfig.config.get('enable_facebook',0)) and \
            (not SpinConfig.config.get('enable_kongregate',0)) and \
            (not SpinConfig.config.get('enable_armorgames',0)) and \
+           (not SpinConfig.config.get('enable_battlehouse',0)) and \
            (not SpinGoogleAuth.twisted_request_is_local(request)) and (SpinConfig.config['proxyserver'].get('require_google_auth',1)):
             auth_info = SpinGoogleAuth.twisted_do_auth(request, 'GAME', proxy_time)
             if not auth_info['ok']:
@@ -1838,10 +2018,13 @@ class GameProxy(proxy.ReverseProxyResource):
             '$FACEBOOK_ENABLED$': 'true' if SpinConfig.config.get('enable_facebook',0) else 'false',
             '$KONGREGATE_ENABLED$': 'true' if SpinConfig.config.get('enable_kongregate',0) else 'false',
             '$ARMORGAMES_ENABLED$': 'true' if SpinConfig.config.get('enable_armorgames',0) else 'false',
+            '$BATTLEHOUSE_ENABLED$': 'true' if SpinConfig.config.get('enable_battlehouse',0) else 'false',
             '$FRAME_PLATFORM$': visitor.frame_platform,
             '$SOCIAL_ID$': visitor.social_id,
             '$FACEBOOK_ID$': "'"+visitor.facebook_id+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$ARMORGAMES_ID$': "'"+visitor.armorgames_id+"'" if isinstance(visitor, AGVisitor) else 'null',
+            '$BATTLEHOUSE_ID$': "'"+visitor.battlehouse_id+"'" if isinstance(visitor, BHVisitor) else 'null',
+            '$BATTLEHOUSE_API_PATH$': ("'"+SpinConfig.config['battlehouse_api_path']+"'") if SpinConfig.config.get('battlehouse_api_path') else 'null',
             '$KONGREGATE_ID$': "'"+visitor.kongregate_id+"'" if isinstance(visitor, KGVisitor) else 'null',
             '$SIGNED_REQUEST$': "'"+visitor.raw_signed_request+"'" if isinstance(visitor, FBVisitor) else 'null',
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login
@@ -2280,6 +2463,8 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'kg')
             elif self.path == '/AGROOT':
                 ret = self.render_ROOT(request, frame_platform = 'ag')
+            elif self.path == '/BHROOT':
+                ret = self.render_ROOT(request, frame_platform = 'bh')
             elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
@@ -2345,7 +2530,9 @@ class AdminStats(object):
         for name, async in (('control_async_http', control_async_http),
                             ('fb_async_http', fb_async_http),
                             ('ag_async_http', ag_async_http),
-                            ('kg_async_http', kg_async_http)):
+                            ('kg_async_http', kg_async_http),
+                            ('bh_async_http', bh_async_http),
+                            ):
             if async:
                 ret += '<hr><b>%s</b><p>' % name
                 ret += async.get_stats_html(proxy_time, expose_info = (not SpinConfig.config.get('secure_mode',0)))
@@ -2709,6 +2896,31 @@ class AGPortraitProxy(PortraitProxy):
             return None
         return avatar_url
 
+class BHPortraitProxy(PortraitProxy):
+    def __init__(self):
+        # keep our own private requester to avoid disturbing the main API calls, and to operate when the platform is disabled
+        config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Battlehouse', {})
+        self.async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_timeout',30), 0,
+                                                       lambda x: battlehouse_log.event(proxy_time, x) if battlehouse_log else sys.stderr.write(x+'\n'),
+                                                       max_tries = config.get('max_tries',1),
+                                                       retry_delay = config.get('retry_delay',3))
+
+    def parse_request(self, request):
+        # sanity-check the URL we are about to proxy
+        parts = urlparse.urlparse(request.uri)
+        path_fields = parts.path.split('/')
+        if len(path_fields) != 3: return None
+        if path_fields[1] != 'bh_portrait': return None
+        if path_fields[0] != '' or path_fields[2] != '': return None
+        if parts.params or parts.fragment: return None
+        qs = urlparse.parse_qs(parts.query)
+        if ('bh_id' not in qs): return None
+        for key, val in qs.iteritems():
+            if key not in ('spin_origin', 'bh_id', 'v'):
+                return None
+        # XXXXXXBH this doesn't work yet, it needs some authorization for either the app or the user
+        return SpinConfig.config['battlehouse_api_path']+'/api/v3/users/'+qs['bh_id'][-1]+'/image'
+
 class XDChannelResource(static.Data):
     # returns the "channel" file necessary for Facebook cross-domain JavaScript calls
     isLeaf = True
@@ -2767,6 +2979,7 @@ class ProxyRoot(TwistedNoResource):
             'fb_portrait': FBPortraitProxy(),
             'kg_portrait': KGPortraitProxy(),
             'ag_portrait': AGPortraitProxy(),
+            'bh_portrait': BHPortraitProxy(),
             'channel': channel_resource, 'channel.php': channel_resource,
             'crossdomain.xml': flash_xd_resource,
             'compiled-client.js': CachedJSFile('../gameclient/compiled-client.js'),
@@ -2785,7 +2998,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
@@ -2985,6 +3198,8 @@ def do_main():
     kongregate_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-kongregate.txt')
     global armorgames_log
     armorgames_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-armorgames.txt')
+    global battlehouse_log
+    battlehouse_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-battlehouse.txt')
     global fbrtapi_raw_log, fbrtapi_json_log
     fbrtapi_raw_log = SpinLog.DailyRawLog(proxy_log_dir+'/', '-fbrtapi.txt')
     fbrtapi_json_log = SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fbrtapi')
