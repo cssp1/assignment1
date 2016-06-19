@@ -766,6 +766,8 @@ GameArt.Sprite = function(name, data) {
     } else if(this.style === 'corners') {
         n_images = 1;
         this.corner_width = data['corner_width'];
+    } else if(this.style === 'tiling') {
+        n_images = 1;
     } else if(this.style === 'null') {
         n_images = 0;
     } else {
@@ -921,7 +923,7 @@ GameArt.Sprite.prototype.select_image = function(facing, time) {
         }
 
         index = frame;
-    } else if(this.style === 'plain' || this.style === 'corners') {
+    } else if(this.style === 'plain' || this.style === 'corners' || this.style === 'tiling') {
         index = 0;
     }
 
@@ -988,6 +990,18 @@ GameArt.Sprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
             img.drawSubImage([0,2*w+start],[w,w-start],[xy[0],xy[1]+dest_wh[1]-w+start],[w,w-start]); // lower left
             img.drawSubImage([w,2*w+start],[w,w-start],[xy[0]+w,xy[1]+dest_wh[1]-w+start],[dest_wh[0]-2*w,w-start]); // lower center
             img.drawSubImage([2*w,2*w+start],[w,w-start],[xy[0]+dest_wh[0]-w,xy[1]+dest_wh[1]-w+start],[w,w-start]); // lower right
+        } else if(this.style === 'tiling') {
+            var nx = Math.floor((dest_wh[0] - 1) / img.wh[0]) + 1;
+            var ny = Math.floor((dest_wh[1] - 1) / img.wh[1]) + 1;
+            for(var ix = 0; ix < nx; ix++) {
+                for(var iy = 0; iy < ny; iy++) {
+                    var tile_w = Math.min(img.wh[0], dest_wh[0] - ix * img.wh[0]);
+                    var tile_h = Math.min(img.wh[1], dest_wh[1] - iy * img.wh[1]);
+                    img.drawSubImage([0,0], [tile_w, tile_h],
+                                     [xy[0] + img.wh[0]*ix, xy[1] + img.wh[1]*iy],
+                                     [tile_w, tile_h]);
+                }
+            }
 
         } else {
             // note: ignores dest_wh and uses the image's native wh
@@ -1033,7 +1047,7 @@ GameArt.CompoundSprite.prototype.get_subasset = function(data) {
     return GameArt.assets[params.name].states[params.state];
 };
 GameArt.CompoundSprite.prototype.get_subasset_params = function(data) {
-    var name, state, transform, scale, alpha, offset, centered, clip_to;
+    var name, state, transform, scale, alpha, offset, centered, clip_to, clip_to_dest_inset;
     if(typeof(data) === 'string') {
         name = data;
         state = 'normal';
@@ -1043,6 +1057,7 @@ GameArt.CompoundSprite.prototype.get_subasset_params = function(data) {
         offset = [0,0];
         centered = false;
         clip_to = null;
+        clip_to_dest_inset = null;
     } else {
         name = data['name'];
         state = data['state'] || 'normal';
@@ -1052,8 +1067,9 @@ GameArt.CompoundSprite.prototype.get_subasset_params = function(data) {
         offset = ('offset' in data) ? data['offset'] : [0,0];
         centered = data['centered'] || false;
         clip_to = data['clip_to'] || null;
+        clip_to_dest_inset = ('clip_to_dest_inset' in data ? data['clip_to_dest_inset'] : null);
     }
-    return {name:name, state:state, scale:scale, transform:transform, alpha:alpha, offset:offset, centered:centered, clip_to:clip_to};
+    return {name:name, state:state, scale:scale, transform:transform, alpha:alpha, offset:offset, centered:centered, clip_to:clip_to, clip_to_dest_inset:clip_to_dest_inset};
 }
 
 GameArt.CompoundSprite.prototype.prep_for_draw = function(xy, facing, time, dest_wh) {
@@ -1083,13 +1099,20 @@ GameArt.CompoundSprite.prototype.do_draw = function(xy, facing, time, dest_wh) {
         var childxy = xy.slice(0);
         var params = this.get_subasset_params(this.subassets[i]);
         var sprite = GameArt.assets[params.name].states[params.state];
-        var has_state = (params.clip_to || (params.scale != 1) || (params.alpha != 1) || (!!params.transform));
+        var has_state = (params.clip_to || (params.clip_to_dest_inset !== null) || (params.scale != 1) || (params.alpha != 1) || (!!params.transform));
 
         if(has_state) { GameArt.ctx.save(); }
 
         if(params.clip_to) {
             GameArt.ctx.beginPath();
             GameArt.ctx.rect(xy[0]+params.clip_to[0], childxy[1]+params.clip_to[1], params.clip_to[2], params.clip_to[3]);
+            GameArt.ctx.clip();
+        }
+
+        if(params.clip_to_dest_inset !== null) {
+            var ins = params.clip_to_dest_inset;
+            GameArt.ctx.beginPath();
+            GameArt.ctx.rect(xy[0]+ins, xy[1]+ins, dest_wh[0] - 2*ins, dest_wh[1] - 2*ins);
             GameArt.ctx.clip();
         }
 
