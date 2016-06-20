@@ -132,16 +132,21 @@ control_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_ti
 class APIUsageMonitor(object):
     def __init__(self):
         self.usage = {}
+        self.unique_sets = {}
         self.dump_interval = 300 # dump every 5 minutes
         self.last_dump_time = -1
-    def record(self, key):
+    def record(self, key, unique_key = None):
         self.usage[key] = self.usage.get(key,0) + 1
+        if unique_key is not None:
+            if key not in self.unique_sets:
+                self.unique_sets[key] = set()
+            self.unique_sets[key].add(unique_key)
     def need_dump(self):
         return bool(self.usage) and (proxy_time - self.last_dump_time) >= self.dump_interval
     def dump(self):
         # return string and reset usage counters
-        usage, self.usage, self.last_dump_time = self.usage, {}, proxy_time
-        ret = ' '.join('%s: %d' % (key, qty) for key, qty in sorted(usage.items()))
+        usage, self.usage, unique_sets, self.unique_sets, self.last_dump_time = self.usage, {}, self.unique_sets, {}, proxy_time
+        ret = ' '.join('%s: %d' % (key, qty) + (' (%d unique)' % len(unique_sets[key]) if key in unique_sets else '') for key, qty in sorted(usage.items()))
         return ret
 
 fb_api_usage = APIUsageMonitor()
@@ -2829,7 +2834,7 @@ class FBPortraitProxy(PortraitProxy):
                                                        retry_delay = config.get('retry_delay',3))
 
     def render(self, request):
-        fb_api_usage.record('portrait')
+        fb_api_usage.record('portrait', unique_key = self.parse_request(request))
         return PortraitProxy.render(self, request)
 
     def parse_request(self, request):
