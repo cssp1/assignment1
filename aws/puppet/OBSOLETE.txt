@@ -1,0 +1,4 @@
+This directory was an experimental conversion of the setup-common
+scripts to Puppet.
+
+battlehouse-infra has updated/tweaked versions of these.
