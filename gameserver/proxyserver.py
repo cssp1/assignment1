@@ -2527,14 +2527,21 @@ class AdminStats(object):
                         )
             ret += '</table>'
         return ret
+
     def render_html(self):
+        asyncs = [('control_async_http', control_async_http),
+                  ('fb_async_http', fb_async_http),
+                  ('ag_async_http', ag_async_http),
+                  ('kg_async_http', kg_async_http),
+                  ('bh_async_http', bh_async_http),
+                  ]
+
+        for resname, res in proxysite.proxy_root.static_resources.iteritems():
+            if isinstance(res, PortraitProxy):
+                asyncs.append((resname+'.async_http', res.async_http))
+
         ret = ''
-        for name, async in (('control_async_http', control_async_http),
-                            ('fb_async_http', fb_async_http),
-                            ('ag_async_http', ag_async_http),
-                            ('kg_async_http', kg_async_http),
-                            ('bh_async_http', bh_async_http),
-                            ):
+        for name, async in asyncs:
             if async:
                 ret += '<hr><b>%s</b><p>' % name
                 ret += async.get_stats_html(proxy_time, expose_info = (not SpinConfig.config.get('secure_mode',0)))
