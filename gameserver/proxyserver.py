@@ -2820,8 +2820,10 @@ class PortraitProxy(twisted.web.resource.Resource):
                            ):
                 if HEADER in headers:
                     self.request.setHeader(HEADER, headers[HEADER][-1])
+            self.request.setResponseCode(int(status))
             self.d.callback(body)
         def on_error(self, ui_reason = None, body = None, headers = None, status = None):
+            self.request.setResponseCode(int(status))
             self.d.callback(ui_reason)
 
 class FBPortraitProxy(PortraitProxy):
