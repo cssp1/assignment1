@@ -276,7 +276,11 @@ class AsyncHTTPRequester(object):
 
                 if request.callback_type == self.CALLBACK_FULL:
                     request.error_callback(ui_reason = ui_reason, body = body, headers = getter.response_headers,
-                                           status = getattr(getter, 'status', '999')) # status may not be present on a failed request
+                                           # first, note that getter.status is sometimes (always?) a string rather than a number
+                                           # second, sometimes the getter fails before the request even gets to the server,
+                                           # in which case it won't have a status attribute. Not sure on the best error code for
+                                           # this but let's go with 502 Bad Gateway for now.
+                                           status = getattr(getter, 'status', '502'))
                 else:
                     request.error_callback(ui_reason)
             except:
