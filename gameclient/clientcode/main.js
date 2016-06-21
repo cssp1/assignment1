@@ -39372,6 +39372,10 @@ function update_new_store_sku(d) {
         var expire_time = -1;
         if('expire_time' in skudata) {
             expire_time = skudata['expire_time'];
+        } else if('activation' in skudata && read_predicate(skudata['activation']).ui_expire_time(player) > 0) {
+            expire_time = read_predicate(skudata['activation']).ui_expire_time(player);
+        } else if('show_if' in skudata && read_predicate(skudata['show_if']).ui_expire_time(player) > 0) {
+            expire_time = read_predicate(skudata['show_if']).ui_expire_time(player);
         } else {
             // look to parents for inherited expiration time
             var cat = null;
@@ -39391,6 +39395,8 @@ function update_new_store_sku(d) {
                         etime = cat['expire_time'];
                     } else if('activation' in cat) {
                         etime = read_predicate(cat['activation']).ui_expire_time(player);
+                    } else if('show_if' in cat) {
+                        etime = read_predicate(cat['show_if']).ui_expire_time(player);
                     }
                     if(etime > 0) {
                         expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
