@@ -266,14 +266,6 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
         }
     }
 
-    var bbcode_click_handlers = {
-        'sku': { 'onclick': function (path) { return (function (_path) { return function() {
-            invoke_store('exact_path', _path);
-            // play sound effect
-            GameArt.play_canned_sound('action_button_134px');
-        }; })(path); } }
-    };
-
     // find width of capital M of the font that will be used for the bbcode
     SPUI.ctx.save();
     SPUI.ctx.font = dialog.widgets['plus_text'].font.str();
@@ -318,7 +310,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
         var plus_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
             dialog.data['widgets']['plus_text']['ui_name_more'] +'[/sku][/u][/color]';
-        Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['plus_text'], plus_str, null, bbcode_click_handlers, plus_and_more);
+        Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['plus_text'], plus_str, null, system_chat_bbcode_click_handlers, plus_and_more);
 
         var show_active_sales = true;
 
@@ -342,7 +334,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
                     dialog.widgets['sale_label'].show = dialog.widgets['sale_text'].show = true;
                     var sale_and_more = ' ... [color=#'+link_color+'][u][sku='+hack['plus_store_category']+'/]'+
                         dialog.data['widgets']['sale_text']['ui_name_more'] +'[/sku][/u][/color]';
-                    Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['sale_text'], sale_str, null, bbcode_click_handlers, sale_and_more);
+                    Showcase.append_bbcode_text_with_line_breaking(dialog.widgets['sale_text'], sale_str, null, system_chat_bbcode_click_handlers, sale_and_more);
                 }
             }
         }
@@ -556,7 +548,7 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             } else {
                 text = text.replace('%PLUS_STORE_CATEGORY', token_item_name);
             }
-            dialog.widgets['progression_text'].append_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handlers));
+            dialog.widgets['progression_text'].append_text(SPText.cstring_to_ablocks_bbcode(text, null, system_chat_bbcode_click_handlers));
         }
     }
 

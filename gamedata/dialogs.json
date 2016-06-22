@@ -2989,7 +2989,7 @@
     },
 
     "mail_dialog": {
-        "bg_image": "",
+        "clip_children": 0,
         "dimensions": [736,446],
         "widgets": {
             "glow": { "show": 0, "sound": "success_playful_22", "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,506],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",

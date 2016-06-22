@@ -15105,7 +15105,12 @@ var system_chat_bbcode_click_handlers = {
                                     (function (_cheeve) { return function(dialog) { PlayerInfoDialog.invoke_achievements_tab(dialog, _cheeve['category'], _cheeve['name']); }; })(cheeve)
                                    );
         }
-    }; } }
+    }; } },
+    'sku': { 'onclick': function (path) { return (function (_path) { return function() {
+        invoke_store('exact_path', _path);
+        // play sound effect
+        GameArt.play_canned_sound('action_button_resizable');
+    }; })(path); } }
 };
 
 
