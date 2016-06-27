@@ -267,19 +267,23 @@ def get_http_origin(visitor, is_ssl):
 # inject original host/port/ssl info into custom HTTP headers so that
 # the server behind the proxy knows where the request originally came from
 
-def add_proxy_headers(request):
+def make_proxy_headers(request):
     # note: don't use proxy_secret here, since we don't double-proxy anything - no spin-orig headers should be set yet
     orig_protocol, orig_host, orig_port = parse_host_port(SpinHTTP.get_twisted_header(request, 'host') or 'unknown', SpinHTTP.twisted_request_is_ssl(request))
     orig_uri = request.uri
     orig_ip = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
     orig_referer = SpinHTTP.get_twisted_header(request, 'referer') or 'unknown'
-    SpinHTTP.set_twisted_header(request,'spin-orig-signature', SpinSignature.sign_proxy_headers(orig_protocol, orig_host, orig_port, orig_uri, orig_ip, orig_referer, SpinConfig.config['proxy_api_secret']))
-    SpinHTTP.set_twisted_header(request,'spin-orig-protocol',orig_protocol)
-    SpinHTTP.set_twisted_header(request,'spin-orig-host',orig_host)
-    SpinHTTP.set_twisted_header(request,'spin-orig-port',orig_port)
-    SpinHTTP.set_twisted_header(request,'spin-orig-uri',orig_uri)
-    SpinHTTP.set_twisted_header(request,'spin-orig-ip',orig_ip)
-    SpinHTTP.set_twisted_header(request,'spin-orig-referer',orig_referer)
+    return {'spin-orig-signature': SpinSignature.sign_proxy_headers(orig_protocol, orig_host, orig_port, orig_uri, orig_ip, orig_referer, SpinConfig.config['proxy_api_secret']),
+            'spin-orig-protocol':orig_protocol,
+            'spin-orig-host':orig_host,
+            'spin-orig-port':orig_port,
+            'spin-orig-uri':orig_uri,
+            'spin-orig-ip':orig_ip,
+            'spin-orig-referer':orig_referer}
+
+def add_proxy_headers(request):
+    for k, v in make_proxy_headers(request).iteritems():
+        SpinHTTP.set_twisted_header(request, k, v)
 
 def dump_request(request):
     print 'REQUEST', request
@@ -587,9 +591,28 @@ class ProxySession(object):
         self.gameserver_fwd = (gameserver_host, gameserver_port) # where to forward proxied GAMEAPI/CREDITAPI/etc requests
         self.gameserver_ctrl= controlapi_url(gameserver_host, gameserver_port) # endpoint for CONTROLAPI requests
 
-
     def __repr__(self):
         return self.session_id[:4] + '... user %5d %15s (active %ds ago on %s)' % (self.user_id, repr(self.ip), proxy_time-self.last_active_time, self.gameserver_name)
+
+    # emulate in-memory session table with MongoDB backend query result
+    @classmethod
+    def emulate(cls, info):
+        if not info: return None
+        srvinfo = info['server_info']
+        ret = cls(info['session_id'], info['_id'], info['social_id'],
+                  info['ip'], srvinfo['server_name'], srvinfo['hostname'], srvinfo['game_http_port'])
+        ret.last_active_time = info['last_active_time']
+        return ret
+
+def get_any_game_server():
+    # pick any open server (e.g. for customer support requests on offline players) and return (hostname, port)
+    qs = {'type':SpinConfig.game(), 'state':'ok',
+          'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
+          'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
+    result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
+    if result:
+        return (result['hostname'], result['game_http_port'])
+    return None
 
 # keep track of outstanding async session termination requests, so that we can cancel overlapped ones
 # this is for user convenience (making sure the last login attempt wins, if several arrive in a row)
@@ -1658,16 +1681,6 @@ class GameProxy(proxy.ReverseProxyResource):
         if SpinConfig.config.get('the_pool_is_closed',False): return True
         return False # dynamic routing does not use this path
 
-    def get_any_game_server(self):
-        # pick any open server (e.g. for customer support requests on offline players) and return (hostname, port)
-        qs = {'type':SpinConfig.game(), 'state':'ok',
-              'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
-              'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
-        result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
-        if result:
-            return (result['hostname'], result['game_http_port'])
-        return None
-
     def assign_game_server(self, request, visitor):
         # note: visitor may be None for METRICSAPI requests
 
@@ -1734,20 +1747,12 @@ class GameProxy(proxy.ReverseProxyResource):
         control_async_http.queue_request(proxy_time, url, handler, error_callback = handler)
         if verbose(): print 'forcefully terminating for', reason, 'user', user_id, 'server', server_name, 'session', session_id, 'wait_count', wait_count
 
-    # XXX emulate in-memory session table with MongoDB backend
-    def session_emulate(self, info):
-        if not info: return None
-        srvinfo = info['server_info']
-        ret = ProxySession(info['session_id'], info['_id'], info['social_id'],
-                           info['ip'], srvinfo['server_name'], srvinfo['hostname'], srvinfo['game_http_port'])
-        ret.last_active_time = info['last_active_time']
-        return ret
     def session_insert_dynamic(self, session, server):
         old_info = db_client.session_insert(session.session_id, session.user_id, session.social_id, session.ip,
                                             {'server_name':server.name, 'hostname':server.host, 'game_http_port':server.port,
                                              'game_ssl_port':server.ssl_port, 'game_ws_port':server.ws_port, 'game_wss_port':server.wss_port},
                                             session.last_active_time)
-        return self.session_emulate(old_info)
+        return ProxySession.emulate(old_info)
 
     def index_visit_game(self, request, visitor):
         # this could be delayed to after the async portion, if we update the session after the async completes
@@ -1975,11 +1980,11 @@ class GameProxy(proxy.ReverseProxyResource):
                     raw_log.event(proxy_time, 'long possible alt list for %r: %r from %s' % (session.user_id, possible_alts, log_request(request)))
                 for alt_user_id in possible_alts:
                     fwd = None
-                    alt_session = self.session_emulate(db_client.session_get_by_user_id(alt_user_id, reason='record_alt_login'))
+                    alt_session = ProxySession.emulate(db_client.session_get_by_user_id(alt_user_id, reason='record_alt_login'))
                     if alt_session:
                         fwd = session.gameserver_fwd
                     else:
-                        fwd = self.get_any_game_server()
+                        fwd = get_any_game_server()
 
                     if fwd:
                         # send fire-and-forget requests
@@ -2083,7 +2088,7 @@ class GameProxy(proxy.ReverseProxyResource):
             session_id = request.args['session'][0]
             if verbose() >= 2: print 'GAMEAPI proxy call for session', session_id
 
-            session = self.session_emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
+            session = ProxySession.emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
             if not session:
                 if verbose(): print 'GAMEAPI proxy error: session not recognized', session_id
                 request.setHeader('Connection', 'close')
@@ -2168,7 +2173,7 @@ class GameProxy(proxy.ReverseProxyResource):
             # otherwise, pick any open server
             if (not fwd) and ('user_id' in request.args):
                 user_id = int(request.args['user_id'][-1])
-                session = self.session_emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
+                session = ProxySession.emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
                 if session:
                     fwd = session.gameserver_fwd
             elif (not fwd) and (('facebook_id' in request.args) or ('social_id' in request.args)):
@@ -2176,12 +2181,12 @@ class GameProxy(proxy.ReverseProxyResource):
                     social_id = 'fb'+request.args['facebook_id'][-1]
                 else:
                     social_id = request.args['social_id'][-1]
-                session = self.session_emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
+                session = ProxySession.emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
                 if session:
                     fwd = session.gameserver_fwd
 
             if not fwd:
-                fwd = self.get_any_game_server()
+                fwd = get_any_game_server()
 
             if not fwd:
                 SpinHTTP.set_service_unavailable(request)
@@ -2198,7 +2203,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
             if request_data['event'] in ('item_order_request', 'item_order_placed'):
                 kongregate_id = str(request_data['buyer_id'])
-                session = self.session_emulate(db_client.session_get_by_social_id('kg'+kongregate_id, reason=self.path))
+                session = ProxySession.emulate(db_client.session_get_by_social_id('kg'+kongregate_id, reason=self.path))
             else:
                 raise Exception('KGAPI call with invalid "event": '+log_request(request))
 
@@ -2238,7 +2243,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     return ''
                 elif request_data['notification_type'] == 'payment':
                     # proxy to gameserver, if player is logged in
-                    session = self.session_emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
+                    session = ProxySession.emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
                     if session:
                         return self.render_via_proxy(session.gameserver_fwd, request)
 
@@ -2264,7 +2269,7 @@ class GameProxy(proxy.ReverseProxyResource):
             if method == 'payments_get_item_price':
                 # NEW FB Payments flow (with dynamic pricing)
                 facebook_id = str(request_data['user_id'])
-                session = self.session_emulate(db_client.session_get_by_social_id('fb'+facebook_id, reason=self.path))
+                session = ProxySession.emulate(db_client.session_get_by_social_id('fb'+facebook_id, reason=self.path))
             else:
                 # OLD FB Credits flow
                 order_details = None
@@ -2276,13 +2281,13 @@ class GameProxy(proxy.ReverseProxyResource):
 
                 if 'session_id' in order_info:
                     session_id = str(order_info['session_id'])
-                    session = self.session_emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
+                    session = ProxySession.emulate(db_client.session_get_by_session_id(session_id, reason=self.path))
                     if verbose(): print 'CREDITAPI proxy call for session', session_id
                 elif order_details and 'buyer' in order_details:
                     # in-app currency promo orders do not come with a session_id since they are generated
                     # by Facebook. Search the session table for it instead.
                     buyer = str(order_details['buyer'])
-                    session = self.session_emulate(db_client.session_get_by_social_id('fb'+buyer, reason=self.path))
+                    session = ProxySession.emulate(db_client.session_get_by_social_id('fb'+buyer, reason=self.path))
 
             if not session: raise Exception('cannot find session for CREDITAPI call: '+repr(order_details))
             return self.render_via_proxy(session.gameserver_fwd, request)
@@ -2291,7 +2296,7 @@ class GameProxy(proxy.ReverseProxyResource):
             assert str(request.args['app_id'][0]) == SpinConfig.config['facebook_app_id']
             order_info = request.args['order_info'][0]
             user_id = int(order_info)
-            session = self.session_emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
+            session = ProxySession.emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
             if session:
                 # synchronous path
                 return self.render_via_proxy(session.gameserver_fwd, request)
@@ -2331,7 +2336,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
         elif self.path == '/OGPAPI':
             # pick any open server
-            fwd = self.get_any_game_server()
+            fwd = get_any_game_server()
 
             if not fwd:
                 SpinHTTP.set_service_unavailable(request)
@@ -2422,7 +2427,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 # mark account as "deauthorized"
 
                 # pick any open server
-                fwd = self.get_any_game_server()
+                fwd = get_any_game_server()
                 if fwd:
                     url = controlapi_url(fwd[0], fwd[1]) + '?' + \
                           urllib.urlencode(dict(secret = str(SpinConfig.config['proxy_api_secret']),
