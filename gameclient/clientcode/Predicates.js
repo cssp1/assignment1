@@ -769,6 +769,7 @@ AuraInactivePredicate.prototype.do_ui_help = function(player) {
     }
     return null;
 };
+AuraInactivePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
@@ -1714,6 +1715,7 @@ HasAliasPredicate.prototype.do_ui_describe = function(player) {
 HasAliasPredicate.prototype.do_ui_help = function(player) {
     return {'noun': 'alias', 'verb': 'set' };
 };
+HasAliasPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */

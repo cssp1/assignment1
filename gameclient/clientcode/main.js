@@ -39191,6 +39191,7 @@ function update_new_store_sku(d) {
     var set_completed = false;
     var info_str = null, info_col = 'ok', info_small = false, info_high = false;
     var helper = null, child_catdata = null;
+    var expire_time = -1;
 
     // initialize cooldown to hidden
     d.widgets['cooldown_label'].show = d.widgets['cooldown_time'].show = false;
@@ -39208,6 +39209,47 @@ function update_new_store_sku(d) {
         }
     }
     d.widgets['jewel'].user_data['count'] = count;
+
+    // compute expiration time for all SKUs except for hierarchical categories
+    if(!('name' in skudata)) {
+        if('expire_time' in skudata) {
+            expire_time = skudata['expire_time'];
+        } else if('activation' in skudata && read_predicate(skudata['activation']).ui_expire_time(player) > 0) {
+            expire_time = read_predicate(skudata['activation']).ui_expire_time(player);
+        } else if('show_if' in skudata && read_predicate(skudata['show_if']).ui_expire_time(player) > 0) {
+            expire_time = read_predicate(skudata['show_if']).ui_expire_time(player);
+        } else {
+            // look to parents for inherited expiration time
+            var cat = null;
+            var catlist = gamedata['store']['catalog'];
+            var catpath = d.user_data['catpath'];
+            for(var i = 0; i < catpath.length; i++) {
+                cat = goog.array.find(catlist, function (entry) {
+                    return (entry['name'] && entry['name'] === catpath[i] &&
+                            (!('activation' in entry) || read_predicate(entry['activation']).is_satisfied(player,null)) &&
+                            (!('start_time' in entry) || entry['start_time'] < player.get_absolute_time()) &&
+                            (!('expire_time' in entry) || entry['expire_time'] >= player.get_absolute_time()));
+                });
+                if(cat) {
+                    // figure out parent's expiration time
+                    var etime = -1;
+                    if('expire_time' in cat) {
+                        etime = cat['expire_time'];
+                    } else if('activation' in cat) {
+                        etime = read_predicate(cat['activation']).ui_expire_time(player);
+                    } else if('show_if' in cat) {
+                        etime = read_predicate(cat['show_if']).ui_expire_time(player);
+                    }
+                    if(etime > 0) {
+                        expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
+                    }
+                } else {
+                    break;
+                }
+                catlist = cat['skus'] || [];
+            }
+        }
+    }
 
     if('spell' in skudata) {
         var spell = gamedata['spells'][skudata['spell']];
@@ -39293,6 +39335,7 @@ function update_new_store_sku(d) {
         }
 
         if(('cooldown_name' in spell) && (!info_str || info_high)) {
+            expire_time = -1; // override computed expiration time with the cooldown display
             var cd_name = spell['cooldown_name'];
             var togo = player.cooldown_togo(cd_name);
 
@@ -39374,45 +39417,6 @@ function update_new_store_sku(d) {
             }
         }
 
-        var expire_time = -1;
-        if('expire_time' in skudata) {
-            expire_time = skudata['expire_time'];
-        } else if('activation' in skudata && read_predicate(skudata['activation']).ui_expire_time(player) > 0) {
-            expire_time = read_predicate(skudata['activation']).ui_expire_time(player);
-        } else if('show_if' in skudata && read_predicate(skudata['show_if']).ui_expire_time(player) > 0) {
-            expire_time = read_predicate(skudata['show_if']).ui_expire_time(player);
-        } else {
-            // look to parents for inherited expiration time
-            var cat = null;
-            var catlist = gamedata['store']['catalog'];
-            var catpath = d.user_data['catpath'];
-            for(var i = 0; i < catpath.length; i++) {
-                cat = goog.array.find(catlist, function (entry) {
-                    return (entry['name'] && entry['name'] === catpath[i] &&
-                            (!('activation' in entry) || read_predicate(entry['activation']).is_satisfied(player,null)) &&
-                            (!('start_time' in entry) || entry['start_time'] < player.get_absolute_time()) &&
-                            (!('expire_time' in entry) || entry['expire_time'] >= player.get_absolute_time()));
-                });
-                if(cat) {
-                    // figure out parent's expiration time
-                    var etime = -1;
-                    if('expire_time' in cat) {
-                        etime = cat['expire_time'];
-                    } else if('activation' in cat) {
-                        etime = read_predicate(cat['activation']).ui_expire_time(player);
-                    } else if('show_if' in cat) {
-                        etime = read_predicate(cat['show_if']).ui_expire_time(player);
-                    }
-                    if(etime > 0) {
-                        expire_time = (expire_time > 0 ? Math.min(expire_time, etime) : etime);
-                    }
-                } else {
-                    break;
-                }
-                catlist = cat['skus'] || [];
-            }
-        }
-
         // show loot table contents and expiration time
         if('loot_table' in skudata) {
             var item_result = session.get_loot_items(player, gamedata['loot_tables_client'][skudata['loot_table']]['loot']);
@@ -39434,14 +39438,6 @@ function update_new_store_sku(d) {
             update_buy_gamebucks_or_store_sku_attachments(d, collapsed_item_list, true);
         }
 
-        if(expire_time > 0) {
-            if(info_str) { info_high = true; }
-            d.widgets['cooldown_label'].show = d.widgets['cooldown_time'].show = true;
-            d.widgets['cooldown_label'].str = d.data['widgets']['cooldown_label'][('ui_availability' in skudata ? 'ui_name_availability_ends' : 'ui_name_expires')];
-            d.widgets['cooldown_time'].str = pretty_print_time(expire_time - player.get_absolute_time());
-            var col = d.data['widgets']['cooldown_time']['text_color_expires'];
-            d.widgets['cooldown_time'].text_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
-        }
     } else if('name' in skudata) {
         // hierarchical category
         child_catdata = skudata;
@@ -39481,6 +39477,16 @@ function update_new_store_sku(d) {
 
     } else {
         throw Error('unhandled skudata '+JSON.stringify(skudata));
+    }
+
+    if(expire_time > 0 && !('ui_availability' in skudata)) {
+        if(info_str) { info_high = true; }
+        d.widgets['cooldown_label'].show = d.widgets['cooldown_time'].show = true;
+        // note: the ui_availability case here is probably unused - it causes GUI overlap with the timer
+        d.widgets['cooldown_label'].str = d.data['widgets']['cooldown_label'][('ui_availability' in skudata ? 'ui_name_availability_ends' : 'ui_name_expires')];
+        d.widgets['cooldown_time'].str = pretty_print_time(expire_time - player.get_absolute_time());
+        var col = d.data['widgets']['cooldown_time']['text_color_expires'];
+        d.widgets['cooldown_time'].text_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
     }
 
     d.widgets['info'].show = !!info_str;
