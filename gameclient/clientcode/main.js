@@ -8116,6 +8116,9 @@ function Mobile() {
     } else {
         this.draw_offset = null;
     }
+
+    /** @type {boolean} for replays only - recorded result of is_invisible() during battle */
+    this.replay_invisible = false;
 }
 
 goog.inherits(Mobile, GameObject);
@@ -8136,6 +8139,7 @@ Mobile.prototype.serialize = function() {
     //ret['path_valid'] = this.path_valid; // only needed for pathing
     //ret['path'] = deepcopy_array(this.path); // only needed for pathing
     //ret['stuck_loc'] = (this.stuck_loc ? deepcopy_array(this.stuck_loc) : null); // only needed for pathing
+    ret['is_invisible'] = (this.is_invisible() ? 1 : 0);
     return ret;
 };
 /** @override */
@@ -8154,6 +8158,7 @@ Mobile.prototype.apply_snapshot = function(snap) {
     //if('path_valid' in snap) { this.path_valid = snap['path_valid']; } // XXX only needed for facing I think
     //if('path' in snap) { this.path = snap['path']; } // XXX only needed for facing I think
     //if('stuck_loc' in snap) { this.stuck_loc = snap['stuck_loc']; }
+    if('is_invisible' in snap) { this.replay_invisible = !!snap['is_invisible']; }
 };
 
 /** @override */
@@ -8182,6 +8187,10 @@ Mobile.prototype.is_under_repair = function() { return this.under_repair_finish 
 
 // return true if the object should be invisible to opponents
 Mobile.prototype.is_invisible = function() {
+
+    // override dynamic value with recorded value, since orders and AI state are not recorded
+    if(session.is_replay()) { return this.replay_invisible; }
+
     // mobile units only go invisible when:
     // 1) invis_on_hold: 1 in unit spec
     // 2) unit is in hold position mode
@@ -8438,6 +8447,7 @@ Mobile.prototype.apply_orders = function(world) {
         }
         // note: if 'aggressive' not in ord, then do NOT change current state
         this.path_valid = false;
+        this.serialization_dirty = true;
     }
 };
 
