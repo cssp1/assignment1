@@ -3284,7 +3284,13 @@ SPUI.ScrollingTextField.prototype.set_text = function(text, user_data) {
     @param {Object|null=} user_data */
 SPUI.ScrollingTextField.prototype.append_text_with_linebreaking_bbcode = function(text, props, click_handlers, user_data) {
     // break lines, protecting BBCode
-    var broken_s = SPUI.break_lines(text, this.font, this.wh, {bbcode:true})[0];
+
+    // note: an unfortunate hack here - SPUI.break_lines()'s width estimate can mis-match SPText when BBCodes involve font changes.
+    // SPUI.break_lines() sometimes under-estimates the width, causing the already-"broken" text here to get broken again inside
+    // of update_text() when it undergoes true SPText breaking. This means we'll end up with little "hanging" bits that add unwanted
+    // carriage returns. Hack around this by under-estimating our true width so that SPUI.break_lines() will tend to break a little earlier.
+
+    var broken_s = SPUI.break_lines(text, this.font, vec_mul([0.95,1], this.wh), {bbcode:true})[0];
     goog.array.forEach(broken_s.split('\n'), function(line) {
         this.append_text(SPText.cstring_to_ablocks_bbcode(line, props, click_handlers), user_data);
     }, this);
