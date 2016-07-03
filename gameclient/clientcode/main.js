@@ -1128,7 +1128,7 @@ Aura.prototype.apply = function(world, obj) {
 /** @param {!World.World} world
     @param {!GameObject} obj */
 Aura.prototype.update_effect = function(world, obj) {
-    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (obj.team != 'enemy' || !obj.is_invisible())) {
+    if(('visual_effect' in this.spec) && !obj.spec['worth_less_xp'] && (!obj.is_invisible() || (obj.team === 'player' && !session.is_replay()))) {
         // do not show FX on barriers or invisible objects
         var vfx_props = {'radius': 0.8*obj.hit_radius() };
         this.visual_effect = world.fxworld.add_visual_effect_at_time(obj.interpolate_pos(world), (obj.is_mobile() ? obj.altitude : 0), [0,1,0], client_time, this.spec['visual_effect'], true, vfx_props);
@@ -7821,7 +7821,7 @@ function find_object_at_screen_pixel(world, xy, ji, include_unselectable) {
             }
         }
 
-        if(temp.is_invisible() && temp.team !== 'player') { return; }
+        if(temp.is_invisible() && (temp.team !== 'player' || session.is_replay())) { return; }
 
         if(!temp.is_mobile()) {
             // in combat, skip destroyed buildings (but in peacetime keep them, because you want the context menu to repair)
@@ -47672,7 +47672,7 @@ function create_mouse_tooltip() {
         var str = [];
 
         if(obj.is_mobile() || obj.is_building()) {
-            if(obj.is_invisible() && obj.team !== 'player') {
+            if(obj.is_invisible() && (obj.team !== 'player' || session.is_replay())) {
                 mouse_tooltip.onleave();
                 return;
             }
@@ -50722,7 +50722,7 @@ function draw_unit(world, unit) {
         }
 
         if(unit.spec['cloaked']) {
-            if(unit.team !== 'player' && unit.is_invisible()) {
+            if(unit.is_invisible() && (unit.team !== 'player' || session.is_replay())) {
                 return false; // hidden unit!
             }
             if(unit.team === 'player') {
