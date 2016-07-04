@@ -200,7 +200,7 @@ class S3 (object):
         auth_string = 'AWS '+self.key+':'+signature
         headers = {'Date': date,
                    'Content-Type': content_type,
-                   'Content-Length': length,
+                   'Content-Length': unicode(length),
                    'Authorization': auth_string}
         if md5sum: headers['Content-MD5'] = md5sum_b64
         if acl: headers['x-amz-acl'] = acl
