@@ -123,7 +123,12 @@ class AsyncHTTPRequester(object):
         else:
             max_tries = max_tries # max(max_tries, self.default_max_tries)
 
-        if headers: assert isinstance(headers, dict)
+        if headers:
+            assert isinstance(headers, dict)
+            # these should NOT be multi-valued
+            for k, v in headers.iteritems():
+                assert not isinstance(v, list)
+                assert (isinstance(v, bytes) or isinstance(v, basestring)) # XXX basestring should be deprecated in favor of unicode
         request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
