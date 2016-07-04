@@ -1473,7 +1473,7 @@ class NoSQLClient (object):
     def ctrl_queue_poll(self, reason=''):
         return self.instrument('ctrl_queue_poll(%s)'%reason, self._ctrl_queue_poll, ())
     def _ctrl_queue_poll(self):
-        return map(self.decode_ctrl_queue, self.ctrl_queue_table().find({'lock_time': {'$lt': 0}}))
+        return map(self.decode_ctrl_queue, self.ctrl_queue_table().find({'lock_time': {'$lt': 0}}).sort([('_id',pymongo.ASCENDING),]))
 
     ###### PLAYER MESSAGE TABLE ######
 
