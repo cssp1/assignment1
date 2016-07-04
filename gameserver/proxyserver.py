@@ -20,6 +20,7 @@ if sys.platform == 'linux2':
 
 from twisted.internet import reactor, task, defer, protocol, utils
 from twisted.web import proxy, resource, static, http, twcgi
+from twisted.web.test.requesthelper import DummyRequest
 import twisted.web.error
 import twisted.web.server
 from twisted.python import log, failure
@@ -601,9 +602,11 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
 
     if not fwd:
         if is_reliable and attempt_count < 1:
-            # retry, with null request XXX use NoSQL queue
-            reactor.callLater(5, controlapi_launch, None, args, headers, postdata, url_qs, ui_log_info, attempt_count + 1)
-            exception_log.event(proxy_time, 'cannot find server for CONTROLAPI proxy call, will retry: '+ui_log_info)
+            # queue for retry
+            exception_log.event(proxy_time, 'cannot find server for reliable CONTROLAPI proxy call, queueing: '+ui_log_info)
+            db_client.ctrl_queue_add(int(args['user_id'][-1]), {'args': args, 'headers': headers,
+                                                                'postdata': postdata, 'url_qs': url_qs,
+                                                                'ui_log_info': ui_log_info})
             if request:
                 SpinHTTP.set_accepted(request)
             return defer.succeed(SpinHTTP.accepted_response_body)
@@ -614,22 +617,26 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
             return defer.succeed(SpinHTTP.service_unavailable_response_body)
 
     def on_finish(d, is_reliable, args, in_headers, postdata, url_qs, ui_log_info, attempt_count, success, request, body = '', headers = {}, status = '500', ui_reason = None):
+        update_time()
         code = int(status)
 
         if code == 503 and is_reliable and attempt_count < 1: # 503 Service Unavailable
-            # retry, with null request XXX use NoSQL queue
-            exception_log.event(proxy_time, 'CONTROLAPI proxy call returned 503 Service Unavailable, will retry: '+ui_log_info)
-            reactor.callLater(5, controlapi_launch, None, args, in_headers, postdata, url_qs, ui_log_info, attempt_count + 1)
+            # queue for retry
+            exception_log.event(proxy_time, 'reliable CONTROLAPI proxy call returned 503 Service Unavailable, queueing: '+ui_log_info)
+            db_client.ctrl_queue_add(int(args['user_id'][-1]), {'args': args, 'headers': in_headers,
+                                                                'postdata': postdata, 'url_qs': url_qs,
+                                                                'ui_log_info': ui_log_info})
             code = None # override by set_accepted()
             body = SpinHTTP.accepted_response_body
             if request:
                 SpinHTTP.set_accepted(request)
 
         if request:
-            for k, v in headers.iteritems():
-                # translate from multi-valued headers to single-valued headers, keeping only the last one
-                assert isinstance(v, list)
-                request.setHeader(k,v[-1])
+            if headers:
+                for k, v in headers.iteritems():
+                    # translate from multi-valued headers to single-valued headers, keeping only the last one
+                    assert isinstance(v, list)
+                    request.setHeader(k,v[-1])
             if code is None:
                 # when over-riding the returned body, we also need to nuke Content-Length since it refers to the old body
                 if request.responseHeaders.hasHeader(b'content-length'):
@@ -713,6 +720,41 @@ def controlapi_pick_server(args):
         fwd = get_any_game_server()
 
     return fwd
+
+def controlapi_queue_poll():
+    for entry in db_client.ctrl_queue_poll():
+        if db_client.ctrl_queue_reserve(entry['id']):
+            if verbose():
+                exception_log.event(proxy_time, 'proxyserver: processing reliable CONTROLAPI request %s ...' % entry['args']['ui_log_info'])
+
+
+            dummy_request = DummyRequest('') # mock request so we can grab the response code
+
+            # need to do some manual UTF-8 encoding for Unicode pulled out of MongoDB
+            args = entry['args']
+            d = controlapi_launch(dummy_request,
+                                  dict((k.encode('utf-8'), [vi.encode('utf-8') for vi in v]) for k,v in args['args'].iteritems()),
+                                  dict((k.encode('utf-8'), v.encode('utf-8')) for k,v in args['headers'].iteritems()),
+                                  args['postdata'].encode('utf-8'),
+                                  args['url_qs'], args['ui_log_info'], 1)
+
+            def unlock_and_pass_error(err, entry):
+                if verbose():
+                    exception_log.event(proxy_time, 'proxyserver: failure on reliable CONTROLAPI request %s ...' % \
+                                        entry['args']['ui_log_info'])
+                db_client.ctrl_queue_complete(entry['id'], False)
+                return err
+            def unlock_check(ret, dummy_request, entry):
+                if verbose():
+                    exception_log.event(proxy_time, 'proxyserver: %r on reliable CONTROLAPI request %s ...' % \
+                                        (dummy_request.responseCode, entry['args']['ui_log_info']))
+                is_final = (dummy_request.responseCode != 503) # if 503 Service Unavailable, try again, otherwise we're done
+                db_client.ctrl_queue_complete(entry['id'], is_final)
+                return ret
+
+            d.addErrback(unlock_and_pass_error, entry)
+            d.addCallback(unlock_check, dummy_request, entry)
+
 
 # Currently active GAMEAPI sessions
 
@@ -1336,7 +1378,8 @@ class GameProxy(proxy.ReverseProxyResource):
                    (proxy_time >= int(signed_request['expires'])) and \
                    SpinConfig.config.get('enable_facebook',0):
                     # request was expired - send user back to auth
-                    raw_log.event(proxy_time, ('browser presented an expired Facebook signed request (expires at %d, current time %d): ' % (int(signed_request['expires']), proxy_time))+log_request(request))
+                    if verbose():
+                        raw_log.event(proxy_time, ('browser presented an expired Facebook signed request (expires at %d, current time %d): ' % (int(signed_request['expires']), proxy_time))+log_request(request))
                     signed_request = None
                     # don't reset?
                     #visitor.oauth_token = None
@@ -3312,6 +3355,8 @@ def do_main():
             if SpinConfig.config.get('enable_facebook', 0) and \
                fb_api_usage.need_dump():
                 facebook_log.event(proxy_time, 'API Usage: %s' % fb_api_usage.dump())
+
+            controlapi_queue_poll()
 
         except:
             exception_log.event(proxy_time, 'proxyserver bgfunc Exception: ' + traceback.format_exc())
