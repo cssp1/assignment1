@@ -1528,7 +1528,7 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
                     try:
                         config = gamedata['fb_notifications']['notifications']['raid_complete']
                         notification_text = config['ui_name'].replace('%SQUADNAME', squad.get('base_ui_name', ''))
-                        do_CONTROLAPI({'user_id': owner_id, 'method': 'send_notification',
+                        do_CONTROLAPI({'user_id': owner_id, 'method': 'send_notification', 'reliable': 1,
                                        'config': 'raid_complete', 'text': notification_text})
                     except Exception as e:
                         print 'raid_complete notification error', e

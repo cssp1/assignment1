@@ -9624,7 +9624,7 @@ class Player(AbstractPlayer):
                                                 secs_to_arrival = new_path[-1]['eta'] - server_time
                                                 mins_to_arrival = max(1, (secs_to_arrival + 30) // 60) # round to nearest whole minute
                                                 notif_text = notif_text.replace('%TIME', '%dmin' % mins_to_arrival)
-                                                notif_args = {'method': 'send_notification', 'user_id': x['base_landlord_id'],
+                                                notif_args = {'method': 'send_notification', 'reliable': 1, 'user_id': x['base_landlord_id'],
                                                               'text': notif_text, 'config': 'incoming_raid', 'send_ingame': 1}
                                                 gamesite.do_CONTROLAPI(self.user_id, notif_args)
 
@@ -16179,7 +16179,7 @@ class Store(object):
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
+                        gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
 
                 retmsg.append(["YOU_SENT_GIFT_ORDER", gift_order])
 
@@ -17286,7 +17286,7 @@ class GAMEAPI(resource.Resource):
                         if not session.viewing_base.base_ui_name:
                             pass # gamesite.exception_log.event(server_time, 'BASE_UI_NAME not available for %s' % session.viewing_base.base_id)
                         notif_text = notif_text.replace('%BASE_UI_NAME', session.viewing_base.base_ui_name or '')
-                    notif_args = {'method': 'send_notification', 'user_id': session.viewing_user.user_id,
+                    notif_args = {'method': 'send_notification', 'reliable': 1, 'user_id': session.viewing_user.user_id,
                                   'text': notif_text, 'config': 'you_got_attacked'}
 
                     # send the notification AFTER the victim's lock is dropped! otherwise it'll just hit an offline-locked error
@@ -22385,7 +22385,7 @@ class GAMEAPI(resource.Resource):
                         config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
                         if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
+                            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
 
                     gift_order_refund = msg.get('gift_order_refund', None)
                     if gift_order_refund:
@@ -26124,7 +26124,7 @@ class GAMEAPI(resource.Resource):
                 config = gamedata['fb_notifications']['notifications'].get(config_name,None)
                 if config:
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
-                    gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
+                    gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
 
             retmsg.append(["ALLIANCE_PROMOTE_RESULT", alliance_id, promotee_id, success, tag])
 
