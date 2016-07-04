@@ -22,6 +22,7 @@ class AsyncHTTPRequester(object):
     CALLBACK_BODY_ONLY = 'body_only'
 
     # callback receives keyword arguments {body:"asdf", headers:{"Content-Type":["image/jpeg"]}, status:200}
+    # ** note that headers is multi-valued here ** (inconsistent with queue_request!)
     # and failure also gets ui_reason: "Some Exception Happened"
     CALLBACK_FULL = 'full'
 
@@ -128,7 +129,8 @@ class AsyncHTTPRequester(object):
             # these should NOT be multi-valued
             for k, v in headers.iteritems():
                 assert not isinstance(v, list)
-                assert (isinstance(v, bytes) or isinstance(v, basestring)) # XXX basestring should be deprecated in favor of unicode
+                if not (isinstance(v, bytes) or isinstance(v, basestring)): # XXX basestring should be deprecated in favor of unicode
+                    raise Exception('unexpected header %r type %r' % (k, type(v)))
         request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
