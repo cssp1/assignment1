@@ -572,10 +572,149 @@ class BHVisitor(Visitor):
 
 visitor_table = {}
 
-# Currently active GAMEAPI sessions
-
 def controlapi_url(gameserver_host, gameserver_port):
     return 'http://%s:%d/CONTROLAPI' % (gameserver_host, gameserver_port)
+
+def controlapi_handle(request):
+    if 'secret' not in request.args or request.args['secret'][-1] != SpinConfig.config['proxy_api_secret'] or 'method' not in request.args:
+        raise Exception('unauthorized')
+
+    if 'broadcast' in request.args:
+        return controlapi_handle_broadcast(request.args)
+
+    elif 'server' in request.args and request.args['server'][-1] == 'proxyserver': # it's for us
+        return controlapi_handle_proxyserver(request.args)
+
+    # prepare everything we need to forward the request to a game server, and possibly to retry it later
+    headers = request.getAllHeaders()
+    headers.update(make_proxy_headers(request))
+    postdata = request.content.read()
+    url_qs = ('?' + ('&'.join([k+'='+urllib.quote_plus(v) for k in request.args for v in request.args[k]])) if request.args else '')
+    ui_log_info = log_request(request)
+
+    return controlapi_launch(request, request.args, headers, postdata, url_qs, ui_log_info, 0)
+
+def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, attempt_count):
+    is_reliable = 'user_id' in args and 'reliable' in args and args['reliable'][-1] not in ('0', 'false')
+
+    fwd = controlapi_pick_server(args)
+
+    if not fwd:
+        if is_reliable and attempt_count < 1:
+            # retry, with null request XXX use NoSQL queue
+            reactor.callLater(5, controlapi_launch, None, args, headers, postdata, url_qs, ui_log_info, attempt_count + 1)
+            exception_log.event(proxy_time, 'cannot find server for CONTROLAPI proxy call, will retry: '+ui_log_info)
+            if request:
+                SpinHTTP.set_accepted(request)
+            return defer.succeed(SpinHTTP.accepted_response_body)
+        else:
+            exception_log.event(proxy_time, 'cannot find server for CONTROLAPI proxy call: '+ui_log_info)
+            if request:
+                SpinHTTP.set_service_unavailable(request)
+            return defer.succeed(SpinHTTP.service_unavailable_response_body)
+
+    def on_finish(d, is_reliable, args, in_headers, postdata, url_qs, ui_log_info, attempt_count, success, request, body = '', headers = {}, status = '500', ui_reason = None):
+        code = int(status)
+
+        if code == 503 and is_reliable and attempt_count < 1: # 503 Service Unavailable
+            # retry, with null request XXX use NoSQL queue
+            exception_log.event(proxy_time, 'CONTROLAPI proxy call returned 503 Service Unavailable, will retry: '+ui_log_info)
+            reactor.callLater(5, controlapi_launch, None, args, in_headers, postdata, url_qs, ui_log_info, attempt_count + 1)
+            code = None # override by set_accepted()
+            body = SpinHTTP.accepted_response_body
+            if request:
+                SpinHTTP.set_accepted(request)
+
+        if request:
+            for k, v in headers.iteritems():
+                # translate from multi-valued headers to single-valued headers, keeping only the last one
+                assert isinstance(v, list)
+                request.setHeader(k,v[-1])
+            if code is None:
+                # when over-riding the returned body, we also need to nuke Content-Length since it refers to the old body
+                if request.responseHeaders.hasHeader(b'content-length'):
+                    request.responseHeaders.removeHeader(b'content-length')
+            else:
+                request.setResponseCode(code)
+
+        d.callback(body)
+
+    d = defer.Deferred()
+    control_async_http.queue_request(proxy_time,
+                                     controlapi_url(fwd[0], fwd[1]) + url_qs,
+                                     functools.partial(on_finish, d, is_reliable, args, headers, postdata, url_qs, ui_log_info, attempt_count, True, request),
+                                     error_callback = functools.partial(on_finish, d, is_reliable, args, headers, postdata, url_qs, ui_log_info, attempt_count, False, request),
+                                     headers = headers,
+                                     postdata = postdata,
+                                     callback_type = control_async_http.CALLBACK_FULL)
+    return d
+
+def controlapi_handle_proxyserver(args):
+    method = args['method'][-1]
+    if method == 'reconfig':
+        return defer.succeed(SpinJSON.dumps(reconfig(), newline=True))
+    elif method == 'test_payment_dispute':
+        test_response = SpinJSON.loads('''{"id":"example_payment","user":{"name":"Frank","id":"example3"},"actions":[{"type":"charge","status":"completed","currency":"USD","amount":"50.00","time_created":"2014-02-09T16:34:55+0000","time_updated":"2014-02-09T16:34:55+0000"}],"refundable_amount":{"currency":"USD","amount":"50.00"},"items":[{"type":"IN_APP_PURCHASE","product":"http:\/\/trprod.spinpunch.com\/OGPAPI?spellname=BUY_GAMEBUCKS_5000_FBP_P100M_USD&type=tr_sku","quantity":1}],"country":"US","request_id":"tr_1102945_8f64174bf243e51fedfeb2f468dcccb6_1541","created_time":"2014-02-09T16:34:55+0000","payout_foreign_exchange_rate":1,"disputes":[{"user_comment":"I bougth 50 dollars and press the x in the corner so I took me back to the game so I triedgain it did give me my 50 dollars worth in  gold I had a hundred in card so I tried again to get my other 50 dollars in gold and it declined my card that means that one of the payments went tru but I didn\'t got my gold!! pls help me","time_created":"2014-02-10T23:12:49+0000","user_email":"asdf\u0040example.com"}]}''')
+        send_payment_dispute_notification(test_response, 1112, dry_run = True)
+        return defer.succeed('ok\n')
+    else:
+        raise Exception('unhandled method '+method)
+
+def controlapi_handle_broadcast(args):
+    qs = {'type':SpinConfig.game(), 'state':'ok'}
+    fwdlist = [(x['hostname'], x['game_http_port'], x['server_name']) for x in db_client.server_status_query(qs, fields = {'_id':1, 'hostname':1, 'game_http_port':1})]
+
+    dlist = []
+    namelist = []
+    for fwd in fwdlist:
+        url = controlapi_url(fwd[0], fwd[1]) + '?' + urllib.urlencode(dict((k, v[0]) for k, v in args.iteritems() if k not in ('broadcast','server')))
+        exception_log.event(proxy_time, url)
+        d = defer.Deferred()
+        control_async_http.queue_request(proxy_time, url, d.callback, error_callback = d.callback)
+        dlist.append(d)
+        namelist.append(fwd[2])
+
+    d = defer.DeferredList(dlist, consumeErrors=1)
+    def format_responses(rlist, namelist):
+        response = [{'server_name':namelist[i], 'result':res[1]} if res[0] else {'server_name':namelist[i], 'error':res[1]} \
+                    for i, res in enumerate(rlist)]
+        return SpinJSON.dumps(response, newline=True)
+    d.addCallback(format_responses, namelist)
+    return d
+
+def controlapi_pick_server(args):
+    fwd = None
+
+    if 'server' in args:
+        server_name = args['server'][-1]
+        row = db_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'game_http_port':1})
+        if row:
+            fwd = (row['hostname'], row['game_http_port'], server_name)
+        else:
+            raise Exception('server %s not found' % server_name)
+
+    # if method acts on a user, and that user is logged in, route it to the server handling that user
+    # otherwise, pick any open server
+    if (not fwd) and ('user_id' in args):
+        user_id = int(args['user_id'][-1])
+        session = ProxySession.emulate(db_client.session_get_by_user_id(user_id, reason='controlapi_pick_server'))
+        if session:
+            fwd = session.gameserver_fwd
+    elif (not fwd) and (('facebook_id' in args) or ('social_id' in args)):
+        if 'facebook_id' in args:
+            social_id = 'fb'+args['facebook_id'][-1]
+        else:
+            social_id = args['social_id'][-1]
+        session = ProxySession.emulate(db_client.session_get_by_social_id(social_id, reason='controlapi_pick_server'))
+        if session:
+            fwd = session.gameserver_fwd
+
+    if not fwd:
+        fwd = get_any_game_server()
+
+    return fwd
+
+# Currently active GAMEAPI sessions
 
 class ProxySession(object):
     # note: make local copies of some server fields at creation, so
@@ -2122,77 +2261,9 @@ class GameProxy(proxy.ReverseProxyResource):
             return self.render_via_proxy(session.gameserver_fwd, request)
 
         elif self.path == '/CONTROLAPI':
-            if 'secret' not in request.args or request.args['secret'][-1] != SpinConfig.config['proxy_api_secret'] or 'method' not in request.args:
-                raise Exception('unauthorized')
-
-            method = request.args['method'][-1]
-
-            if 'broadcast' in request.args:
-                qs = {'type':SpinConfig.game(), 'state':'ok'}
-                fwdlist = [(x['hostname'], x['game_http_port'], x['server_name']) for x in db_client.server_status_query(qs, fields = {'_id':1, 'hostname':1, 'game_http_port':1})]
-
-                dlist = []
-                namelist = []
-                for fwd in fwdlist:
-                    url = 'http://%s:%d/CONTROLAPI?' % (fwd[0], fwd[1]) + urllib.urlencode(dict((k, v[0]) for k, v in request.args.iteritems() if k not in ('broadcast','server')))
-                    exception_log.event(proxy_time, url)
-                    d = defer.Deferred()
-                    control_async_http.queue_request(proxy_time, url, d.callback, error_callback = d.callback)
-                    dlist.append(d)
-                    namelist.append(fwd[2])
-
-                d = defer.DeferredList(dlist, consumeErrors=1)
-                def gather_responses(self, request, namelist, rlist):
-                    response = [{'server_name':namelist[i], 'result':rlist[i][1]} if rlist[i][0] else {'server_name':namelist[i], 'error':rlist[i][1]} \
-                                for i in xrange(len(rlist))]
-                    SpinHTTP.complete_deferred_request(SpinJSON.dumps(response, newline=True), request)
-                d.addCallback(functools.partial(gather_responses, self, request, namelist))
-                return twisted.web.server.NOT_DONE_YET
-
-            fwd = None
-
-            if 'server' in request.args:
-                server_name = request.args['server'][-1]
-                if server_name == 'proxyserver': # it's for us!
-                    if method == 'reconfig':
-                        return SpinJSON.dumps(reconfig(), newline=True)
-                    elif method == 'test_payment_dispute':
-                        test_response = SpinJSON.loads('''{"id":"example_payment","user":{"name":"Frank","id":"example3"},"actions":[{"type":"charge","status":"completed","currency":"USD","amount":"50.00","time_created":"2014-02-09T16:34:55+0000","time_updated":"2014-02-09T16:34:55+0000"}],"refundable_amount":{"currency":"USD","amount":"50.00"},"items":[{"type":"IN_APP_PURCHASE","product":"http:\/\/trprod.spinpunch.com\/OGPAPI?spellname=BUY_GAMEBUCKS_5000_FBP_P100M_USD&type=tr_sku","quantity":1}],"country":"US","request_id":"tr_1102945_8f64174bf243e51fedfeb2f468dcccb6_1541","created_time":"2014-02-09T16:34:55+0000","payout_foreign_exchange_rate":1,"disputes":[{"user_comment":"I bougth 50 dollars and press the x in the corner so I took me back to the game so I triedgain it did give me my 50 dollars worth in  gold I had a hundred in card so I tried again to get my other 50 dollars in gold and it declined my card that means that one of the payments went tru but I didn\'t got my gold!! pls help me","time_created":"2014-02-10T23:12:49+0000","user_email":"asdf\u0040example.com"}]}''')
-                        send_payment_dispute_notification(test_response, 1112, dry_run = True)
-                        return 'ok\n'
-                    else:
-                        raise Exception('unhandled method '+method)
-                else:
-                    row = db_client.server_status_query_one({'_id':server_name}, {'hostname':1, 'game_http_port':1})
-                    if row:
-                        fwd = (row['hostname'], row['game_http_port'], server_name)
-                    else:
-                        raise Exception('server %s not found' % server_name)
-
-            # if method acts on a user, and that user is logged in, route it to the server handling that user
-            # otherwise, pick any open server
-            if (not fwd) and ('user_id' in request.args):
-                user_id = int(request.args['user_id'][-1])
-                session = ProxySession.emulate(db_client.session_get_by_user_id(user_id, reason=self.path))
-                if session:
-                    fwd = session.gameserver_fwd
-            elif (not fwd) and (('facebook_id' in request.args) or ('social_id' in request.args)):
-                if 'facebook_id' in request.args:
-                    social_id = 'fb'+request.args['facebook_id'][-1]
-                else:
-                    social_id = request.args['social_id'][-1]
-                session = ProxySession.emulate(db_client.session_get_by_social_id(social_id, reason=self.path))
-                if session:
-                    fwd = session.gameserver_fwd
-
-            if not fwd:
-                fwd = get_any_game_server()
-
-            if not fwd:
-                SpinHTTP.set_service_unavailable(request)
-                exception_log.event(proxy_time, 'cannot find server for CONTROLAPI call: '+log_request(request))
-                return SpinHTTP.service_unavailable_response_body
-            return self.render_via_proxy(fwd, request)
+            d = controlapi_handle(request)
+            d.addCallback(SpinHTTP.complete_deferred_request, request)
+            return twisted.web.server.NOT_DONE_YET
 
         elif self.path == '/KGAPI':
             #exception_log.event(proxy_time, 'KGAPI call: '+repr(request.args))
