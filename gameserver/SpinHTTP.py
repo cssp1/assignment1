@@ -64,6 +64,14 @@ def set_service_unavailable(request):
 
 service_unavailable_response_body = '503 Service Unavailable, please try again later\n'
 
+def set_accepted(request):
+    request.setResponseCode(202) # 202 Accepted
+    # The request has been accepted for processing, but the processing has not been completed. The request might or might not be eventually acted upon, and may be disallowed when processing occurs.
+    # request.setHeader('Connection', 'close')
+
+accepted_response_body = '{"result": "ok", "status": 202}\n'
+
+
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
 
