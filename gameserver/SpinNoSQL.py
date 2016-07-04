@@ -199,6 +199,7 @@ class NoSQLClient (object):
         self.seen_player_aliases = False
         self.seen_facebook_ids = False
         self.seen_messages = False
+        self.seen_ctrl_queue = False
         self.seen_regions = {}
         self.seen_alliances = False
         self.seen_turf = False
@@ -355,6 +356,12 @@ class NoSQLClient (object):
                                             {'$unset':{'LOCK_GENERATION':1}}).matched_count
         if n > 0:
             print '  Deleted', n, 'old player lock generation counters'
+
+        print 'Busting stale ctrl_queue locks...'
+        n = self.ctrl_queue_table().update_many({'lock_time': {'$gt': 0, '$lt': time_now - self.LOCK_TIMEOUT}},
+                                                {'$set': {'lock_time': -1}}).matched_count
+        if n > 0:
+            print '  Busted', n, 'stale ctrl_queue locks'
 
         print 'Checking for expired player messages...'
         prune_msg_qs = {'$or': [{'expire_time': {'$gt': 0, '$lt': time_now}}]}
@@ -1428,6 +1435,45 @@ class NoSQLClient (object):
                     self.log_exception('player_lock_acquire(%d want %d) by %s failed, unknown reason' % (player_id, want_state, self.ident))
 
                 return (state_response, cur_state_racy.get('LOCK_GENERATION',-1) if cur_state_racy else -1)
+
+    ###### PLAYER CONTROLAPI QUEUE TABLE ######
+    # synchronous calls to CONTROLAPI that modify players may fail due to (intentionally allowed) race conditions,
+    # e.g. if the player is in the middle of logging out or under attack when the call comes in.
+    # Most users of CONTROLAPI don't mind an occasional failure, but sometimes we really do want to ensure 100%
+    # reliable execution of a particular call. To accomplish this, we maintain a queue of pending incomplete calls
+    # that will be periodically polled for and executed by an external process (proxyserver?).
+
+    def ctrl_queue_table(self):
+        coll = self._table('ctrl_queue')
+        if not self.seen_ctrl_queue:
+            # rely on the default _id index only
+            self.seen_ctrl_queue = True
+        return coll
+    def decode_ctrl_queue(self, row):
+        row['id'] = self.decode_object_id(row['_id']); del row['_id']
+        return row
+
+    def ctrl_queue_add(self, user_id, args, reason=''):
+        return self.instrument('ctrl_queue_add(%s)'%reason, self._ctrl_queue_add, (user_id, args))
+    def _ctrl_queue_add(self, user_id, args):
+        self.ctrl_queue_table().insert_one({'user_id': user_id, 'args': args, 'create_time': self.time, 'lock_time':-1})
+    def ctrl_queue_reserve(self, entry_id, reason=''):
+        return self.instrument('ctrl_queue_reserve(%s)'%reason, self._ctrl_queue_reserve, (entry_id,))
+    def _ctrl_queue_reserve(self, entry_id):
+        success = self.ctrl_queue_table().update_one({'_id': self.encode_object_id(entry_id),
+                                                      'lock_time': {'$lt': 0}}, {'$set': {'lock_time': self.time}}).matched_count > 0
+        return success
+    def ctrl_queue_complete(self, entry_id, success, reason=''):
+        return self.instrument('ctrl_queue_complete(%s)'%reason, self._ctrl_queue_complete, (entry_id, success))
+    def _ctrl_queue_complete(self, entry_id, success):
+        if success:
+            self.ctrl_queue_table().delete_one({'_id': self.encode_object_id(entry_id)})
+        else:
+            self.ctrl_queue_table().update_one({'_id': self.encode_object_id(entry_id)}, {'$set': {'lock_time': -1}})
+    def ctrl_queue_poll(self, reason=''):
+        return self.instrument('ctrl_queue_poll(%s)'%reason, self._ctrl_queue_poll, ())
+    def _ctrl_queue_poll(self):
+        return map(self.decode_ctrl_queue, self.ctrl_queue_table().find({'lock_time': {'$lt': 0}}))
 
     ###### PLAYER MESSAGE TABLE ######
 
@@ -2718,6 +2764,19 @@ if __name__ == '__main__':
         assert client.player_cache_lookup_batch([1112,1113,9999], fields = ['ui_name']) == [{'user_id': 1112, u'ui_name': u'Dr. Gonzo 1112'}, {'user_id': 1113, u'ui_name': u'Dr. Gonzo 1113'}, {}]
         assert client.player_cache_lookup_batch([1112,1113,9999]) == [{u'last_mtime': client.time, 'user_id': 1112, u'ui_name': u'Dr. Gonzo 1112', u'facebook_id': u'example1'}, {u'last_mtime': client.time, 'user_id': 1113, u'ui_name': u'Dr. Gonzo 1113', u'facebook_id': u'example2'}, {}]
         assert sorted(client.get_users_modified_since(1234)) == sorted([1112,1113,1117])
+
+        # TEST CONTROL QUEUE
+        client.ctrl_queue_table().drop(); client.seen_ctrl_queue = False
+        client.ctrl_queue_add(1112, {'foo': 'bar'})
+        ctrl_list = client.ctrl_queue_poll()
+        assert len(ctrl_list) == 1
+        assert client.ctrl_queue_reserve(ctrl_list[0]['id'])
+        assert not client.ctrl_queue_reserve(ctrl_list[0]['id'])
+        client.ctrl_queue_complete(ctrl_list[0]['id'], False) # failure
+        assert len(client.ctrl_queue_poll()) == 1
+        assert client.ctrl_queue_reserve(ctrl_list[0]['id'])
+        client.ctrl_queue_complete(ctrl_list[0]['id'], True) # success
+        assert len(client.ctrl_queue_poll()) == 0
 
         # TEST MESSAGES
         client.message_table().drop(); client.seen_messages = False
