@@ -11886,6 +11886,61 @@ class Player(AbstractPlayer):
         if defender_is_human and is_revenge_attack:
             record_player_metric(self, dict_increment, 'revenge_attacks_launched_vs_'+('human' if defender_is_human else 'ai'), 1, time_series = False)
 
+    def mailbox_append(self, msg, safe_not_to_copy = False):
+        if 'attachments' in msg:
+            dict_increment(self.history, 'mail_attachments_received', len(msg['attachments']))
+        if not (safe_not_to_copy):
+            # nasty things happen when callers pass in references to gamedata (e.g. item tables get mutated)
+            # so be safe by copying everything
+            msg = copy.deepcopy(msg)
+        if 'time' not in msg: msg['time'] = server_time # ensure a (send) "time" field is prevent
+        msg['received_time'] = server_time
+        self.mailbox.append(msg)
+
+    # ugly API, needs rework
+    def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, extra_props = None,
+                         replace_s = '', replace_level = '', replace_time = '', replace_day = '', replacements = None):
+
+        if to_user_id is None: to_user_id = self.user_id
+
+        # "data" should be an entry in gamedata['strings']
+        if duration is None:
+            if 'expire_at' in data:
+                duration = data['expire_at'] - server_time
+            elif 'duration' in data:
+                duration = data['duration']
+            else:
+                duration = 2*365*24*60*60
+
+        ret = {'type':'mail',
+               'msg_id': generate_mail_id(),
+               'to': [to_user_id]}
+
+        for src_key, dst_key in (('ui_from','from_name'), ('ui_subject','subject'), ('ui_body','body')):
+            ret[dst_key] = data[src_key].replace('%s',replace_s).replace('%level',replace_level).replace('%time',replace_time).replace('%day',replace_day)
+            if replacements:
+                for k, v in replacements.iteritems():
+                    ret[dst_key] = ret[dst_key].replace(k, v)
+
+        if duration < 0:
+            ret['expire_time'] = -1
+        else:
+            ret['expire_time'] = server_time + duration
+
+        if attachments is not None:
+            ret['attachments'] = attachments
+        elif 'attachments' in data:
+            ret['attachments'] = data['attachments']
+
+        for PRED in ('show_if', 'discard_if'):
+            if PRED in data:
+                ret[PRED] = data[PRED]
+
+        if extra_props:
+            for k, v in extra_props.iteritems():
+                ret[k] = v
+        return ret
+
 # these are proxy "stubs" that represent players OTHER than the one playing the game
 # (e.g., other players whose bases you visit or attack)
 
@@ -12312,17 +12367,6 @@ class LivePlayer(Player):
 
     def send_mailbox_update(self, retmsg):
         retmsg.append(["MAIL_UPDATE", None, self.mailbox])
-
-    def mailbox_append(self, msg, safe_not_to_copy = False):
-        if 'attachments' in msg:
-            dict_increment(self.history, 'mail_attachments_received', len(msg['attachments']))
-        if not (safe_not_to_copy):
-            # nasty things happen when callers pass in references to gamedata (e.g. item tables get mutated)
-            # so be safe by copying everything
-            msg = copy.deepcopy(msg)
-        if 'time' not in msg: msg['time'] = server_time # ensure a (send) "time" field is prevent
-        msg['received_time'] = server_time
-        self.mailbox.append(msg)
 
     # return unique player history key for a daily tip or message
     @staticmethod
@@ -13264,50 +13308,6 @@ class LivePlayer(Player):
                                                   attachments = items,
                                                   ))
         self.send_mailbox_update(retmsg)
-
-    # ugly API, needs rework
-    def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, extra_props = None,
-                         replace_s = '', replace_level = '', replace_time = '', replace_day = '', replacements = None):
-
-        if to_user_id is None: to_user_id = self.user_id
-
-        # "data" should be an entry in gamedata['strings']
-        if duration is None:
-            if 'expire_at' in data:
-                duration = data['expire_at'] - server_time
-            elif 'duration' in data:
-                duration = data['duration']
-            else:
-                duration = 2*365*24*60*60
-
-        ret = {'type':'mail',
-               'msg_id': generate_mail_id(),
-               'to': [to_user_id]}
-
-        for src_key, dst_key in (('ui_from','from_name'), ('ui_subject','subject'), ('ui_body','body')):
-            ret[dst_key] = data[src_key].replace('%s',replace_s).replace('%level',replace_level).replace('%time',replace_time).replace('%day',replace_day)
-            if replacements:
-                for k, v in replacements.iteritems():
-                    ret[dst_key] = ret[dst_key].replace(k, v)
-
-        if duration < 0:
-            ret['expire_time'] = -1
-        else:
-            ret['expire_time'] = server_time + duration
-
-        if attachments is not None:
-            ret['attachments'] = attachments
-        elif 'attachments' in data:
-            ret['attachments'] = data['attachments']
-
-        for PRED in ('show_if', 'discard_if'):
-            if PRED in data:
-                ret[PRED] = data[PRED]
-
-        if extra_props:
-            for k, v in extra_props.iteritems():
-                ret[k] = v
-        return ret
 
     def update_map_placement(self, session, retmsg):
         # assign location on world map
