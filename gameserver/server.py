@@ -10723,6 +10723,18 @@ class Player(AbstractPlayer):
         else:
             self.remove_aura(session, retmsg, 'trophy_pvp_decay', force = True)
 
+    def apply_alliance_leave_point_loss(self, alliance_ui_name):
+        fraction = Predicates.eval_cond_or_literal(gamedata['matchmaking'].get('alliance_leave_point_loss',0), None, self)
+        if fraction <= 0: return 0
+        cur_points = self.ladder_points()
+        loss = int(fraction * cur_points)
+        if loss <= 0: return 0
+        self.modify_scores({'trophies_pvp':-loss}, reason = 'alliance_leave_point_loss')
+        self.mailbox_append(self.make_system_mail(gamedata['strings']['alliance_leave_point_loss_mail'],
+                                                  replacements = {'%LOSS': '%d' % loss,
+                                                                  '%ALLIANCE_NAME': alliance_ui_name}))
+        return loss
+
     def unit_donation_enabled(self):
         return self.get_any_abtest_value('enable_unit_donation', gamedata['enable_unit_donation'])
 
@@ -26065,6 +26077,8 @@ class GAMEAPI(resource.Resource):
                                          'end_time': server_time + cd_time})
                     gamesite.msg_client.msg_send(messages)
 
+                    gamesite.do_CONTROLAPI(session.user.user_id, {'method':'apply_alliance_leave_point_loss','reliable':1,'user_id':kickee,'alliance_ui_name':info['ui_name']})
+
                     metric_event_coded(session.user.user_id, '4602_alliance_num_members_updated', {'alliance_id': alliance_id, 'num_members_cache': info['num_members']})
 
             retmsg.append(["ALLIANCE_KICK_RESULT", alliance_id, kickee, success, tag])
@@ -26208,7 +26222,9 @@ class GAMEAPI(resource.Resource):
                     if old_channel and gamedata['server']['chat_alliance_membership']:
                         session.do_chat_send(old_channel, 'I left the alliance!', bypass_gag = True, props = {'type':'left_alliance'})
 
-
+                    if session.player.apply_alliance_leave_point_loss(info['ui_name']):
+                        session.deferred_mailbox_update = True
+                        retmsg.append(["PLAYER_CACHE_UPDATE", [self.get_player_cache_props(session.user, session.player, -1)]])
 
                     if status == -1: # alliance was disbanded
                         session.increment_player_metric('alliances_disbanded', 1, time_series = False)

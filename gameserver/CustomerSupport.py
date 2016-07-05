@@ -1641,6 +1641,24 @@ class HandleSendNotification(Handler):
             ret['developer'] = 1
         return ret
 
+class HandleApplyAllianceLeavePointLoss(Handler):
+    def __init__(self, *pargs, **pkwargs):
+        Handler.__init__(self, *pargs, **pkwargs)
+        self.alliance_ui_name = self.args.get('alliance_ui_name','Unknown')
+    # note: no logging
+    def exec_offline(self, json_user, json_player):
+        return self._exec_offline_as_online(json_user, json_player)
+    def exec_online(self, session, retmsg):
+        return self.exec_all(session, retmsg, session.user, session.player)
+    def exec_all(self, session, retmsg, user, player):
+        if player.apply_alliance_leave_point_loss(self.alliance_ui_name):
+            # notify live session
+            if session:
+                session.deferred_mailbox_update = True
+            if retmsg is not None:
+                retmsg.append(["PLAYER_CACHE_UPDATE", [self.gamesite.gameapi.get_player_cache_props(user, player, None)]])
+        return ReturnValue(result = 'ok')
+
 class HandlePlayerBatch(Handler):
     read_only = True
     need_user = False
@@ -1728,6 +1746,7 @@ methods = {
     'offer_payer_promo': HandleOfferPayerPromo,
     'invoke_facebook_auth': HandleInvokeFacebookAuth,
     'send_notification': HandleSendNotification,
+    'apply_alliance_leave_point_loss': HandleApplyAllianceLeavePointLoss,
     'player_batch': HandlePlayerBatch,
     # not implemented yet: join_abtest, clear_abtest
 }
