@@ -106,6 +106,26 @@ class Handler(object):
     # optional execution method that can be called if want_raw is true
     def exec_offline_raw(self, user_raw, player_raw): raise Exception('not implemented')
 
+    # exec_offline() can call this to re-use exec_online() for an offline player by parsing the JSON into live objects
+    # assumes the existence of a method with the signature "exec_all(self, session, retmsg, user, player)"
+    # where session and retmsg will be None in the offline case
+    def _exec_offline_as_online(self, json_user, json_player):
+        # parse the JSON into actual User/Player instances
+        player = self.gamesite.player_table.unjsonize(json_player, None, self.user_id, False)
+        user = self.gamesite.user_table.unjsonize(json_user, self.user_id)
+
+        ret = self.exec_all(None, None, user, player)
+
+        # now mutate the JSON versions
+        new_json_user = self.gamesite.user_table.jsonize(user)
+        new_json_player = self.gamesite.player_table.jsonize(player)
+
+        # make the update as atomic as possible
+        json_user.clear(); json_user.update(new_json_user)
+        json_player.clear(); json_player.update(new_json_player)
+
+        return ret
+
 class HandleGetRaw(Handler):
     read_only = True
     def __init__(self, *args, **kwargs):
@@ -713,9 +733,9 @@ class HandleResolveHomeRaid(Handler):
         if session.home_base and session.has_attacked:
             # currently defending against AI attack - punt
             return ReturnValue(result = 'CANNOT_ATTACK_PLAYER_WHILE_ALREADY_UNDER_ATTACK')
-        return self.exec_all(session, retmsg, session.player, session.user)
+        return self.exec_all(session, retmsg, session.user, session.player)
 
-    def exec_all(self, session, retmsg, defender_player, defender_user):
+    def exec_all(self, session, retmsg, defender_user, defender_player):
         # note: if defender is offline, session and retmsg can be None, and will be ignored
 
         assert defender_player.home_region == self.region_id and defender_player.my_home.base_map_loc == self.loc
@@ -1123,19 +1143,7 @@ class HandleResolveHomeRaid(Handler):
             return ReturnValue(result = 'ok')
 
     def exec_offline(self, json_user, json_player):
-        # hack - parse the JSON into actual User/Player instances
-        player = self.gamesite.player_table.unjsonize(json_player, None, self.user_id, False)
-        user = self.gamesite.user_table.unjsonize(json_user, self.user_id)
-
-        ret = self.exec_all(None, None, player, user)
-
-        # now mutate the JSON versions
-        new_json_user = self.gamesite.user_table.jsonize(user)
-        new_json_player = self.gamesite.player_table.jsonize(player)
-
-        # make this as atomic as possible
-        json_user.clear(); json_user.update(new_json_user)
-        json_player.clear(); json_player.update(new_json_player)
+        ret = self._exec_offline_as_online(json_user, json_player)
 
         if self.raid_mode and self.raid_mode != 'scout':
             # send "You got attacked" FB notification
