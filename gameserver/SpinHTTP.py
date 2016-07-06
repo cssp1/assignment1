@@ -155,7 +155,8 @@ def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = Tru
 def complete_deferred_request(body, request, http_status = None):
     if body == NOT_DONE_YET:
         return body
-    assert type(body) in (str, unicode)
+    if type(body) not in (str, unicode, bytes):
+        raise Exception('unexpected body type %r: %r' % (type(body), body))
     if hasattr(request, '_disconnected') and request._disconnected: return
     if http_status:
         request.setResponseCode(http_status)
