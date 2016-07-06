@@ -2493,13 +2493,13 @@ SPUI.get_anonymous_portrait_url = function(is_myself) {
 
 SPUI.get_facebook_portrait_url = function(facebook_id) {
     facebook_id = facebook_id.toString(); // just make sure we don't get any numeric IDs
-    if(SPUI.force_anon_portraits || anon_mode || facebook_id.indexOf('example') == 0) { // anonymous mode or testing sandbox
+    if(SPUI.force_anon_portraits || anon_mode || facebook_id.indexOf('example') == 0 || !spin_facebook_oauth_token) { // not connected to FB, anonymous mode, or testing sandbox
         return SPUI.get_anonymous_portrait_url(facebook_id === spin_facebook_user);
     } else {
         if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('fb_portrait/'+facebook_id+'/picture?v='+gamedata['client']['portrait_proxy_cache_rev'], false); // "v" version is to rev the cache
+            return GameArt.art_url('fb_portrait/'+facebook_id+'/picture?v='+gamedata['client']['portrait_proxy_cache_rev']+'&access_token='+encodeURIComponent(spin_facebook_oauth_token), false); // "v" version is to rev the cache
         } else {
-            return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture');
+            return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture?access_token='+encodeURIComponent(spin_facebook_oauth_token));
         }
     }
 };

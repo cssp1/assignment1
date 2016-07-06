@@ -2969,9 +2969,14 @@ class FBPortraitProxy(PortraitProxy):
         if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
         for key, val in qs.iteritems():
-            if key not in ('v', 'spin_origin'):
+            if key not in ('v', 'spin_origin', 'access_token'):
                 return None
-        return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)+'?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token']})
+        if 0:
+            tok = SpinConfig.config['facebook_app_access_token']
+        else:
+            if 'access_token' not in qs: return None
+            tok = qs['access_token'][-1]
+        return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fbid)+'?'+urllib.urlencode({'access_token': tok})
 
 class KGPortraitProxy(PortraitProxy):
     def __init__(self):
