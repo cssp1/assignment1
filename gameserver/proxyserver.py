@@ -2958,7 +2958,17 @@ class FBPortraitProxy(PortraitProxy):
 
     def render(self, request):
         fb_api_usage.record('portrait', unique_key = self.parse_request(request))
-        return PortraitProxy.render(self, request)
+        ret = PortraitProxy.render(self, request)
+        if 'access_token' in request.args:
+            # limit caching to the access token expiration time, otherwise CDN re-requests will fail
+            expire_time = proxy_time + 3600 # XXX should be derived from the access token
+            request.setHeader('Cache-Control', 'max-age='+str(expire_time - proxy_time))
+            if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
+                request.setHeader('Expires', format_http_time(expire_time))
+            else: # remove any Expires header
+                if request.responseHeaders.hasHeader(b'Expires'):
+                    request.responseHeaders.removeHeader(b'Expires')
+        return ret
 
     def parse_request(self, request):
         # sanity-check the URL we are about to proxy
