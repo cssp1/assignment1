@@ -646,7 +646,7 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
             else:
                 request.setResponseCode(code)
 
-        d.callback(body)
+        d.callback(body or '')
 
     d = defer.Deferred()
     control_async_http.queue_request(proxy_time,
