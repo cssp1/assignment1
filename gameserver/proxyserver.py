@@ -603,7 +603,8 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
     if not fwd:
         if is_reliable and attempt_count < 1:
             # queue for retry
-            exception_log.event(proxy_time, 'cannot find server for reliable CONTROLAPI proxy call, queueing: '+ui_log_info)
+            if verbose():
+                exception_log.event(proxy_time, 'cannot find server for reliable CONTROLAPI proxy call, queueing: '+ui_log_info)
             db_client.ctrl_queue_add(int(args['user_id'][-1]), {'args': args, 'headers': headers,
                                                                 'postdata': postdata, 'url_qs': url_qs,
                                                                 'ui_log_info': ui_log_info})
@@ -622,7 +623,8 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
 
         if code == 503 and is_reliable and attempt_count < 1: # 503 Service Unavailable
             # queue for retry
-            exception_log.event(proxy_time, 'reliable CONTROLAPI proxy call returned 503 Service Unavailable, queueing: '+ui_log_info)
+            if verbose():
+                exception_log.event(proxy_time, 'reliable CONTROLAPI proxy call returned 503 Service Unavailable, queueing: '+ui_log_info)
             db_client.ctrl_queue_add(int(args['user_id'][-1]), {'args': args, 'headers': in_headers,
                                                                 'postdata': postdata, 'url_qs': url_qs,
                                                                 'ui_log_info': ui_log_info})
