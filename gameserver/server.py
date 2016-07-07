@@ -14780,9 +14780,10 @@ class Store(object):
 
         for skudata in cat['skus']:
             if sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm):
-                if pr < 0 or skudata['price'] < pr:
+                skudata_price = Predicates.eval_cond_or_literal(skudata['price'], None, player)
+                if pr < 0 or skudata_price < pr:
                     ret = skudata
-                    pr = skudata['price']
+                    pr = skudata_price
 
         # also look in extra_store_specials
         if catpath[0] == 'specials':
@@ -14793,9 +14794,10 @@ class Store(object):
                         extras = data['extra_store_specials'];
                         for skudata in extras:
                             if sku_match(skudata, player, specname, tablename, level, stack, melt_time, melt_dur, tm):
-                                if pr < 0 or skudata['price'] < pr:
+                                skudata_price = Predicates.eval_cond_or_literal(skudata['price'], None, player)
+                                if pr < 0 or skudata_price < pr:
                                     ret = skudata
-                                    pr = skudata['price']
+                                    pr = skudata_price
 
         return ret
 
@@ -14851,7 +14853,7 @@ class Store(object):
                     return -1, p_currency
 
             p_currency = skudata.get('price_currency', p_currency)
-            return skudata['price'], p_currency
+            return Predicates.eval_cond_or_literal(skudata['price'], session, session.player), p_currency
 
         elif formula == 'fb_inapp_currency_fbcredits':
             # charge at least as much as the gamebucks are worth in credits
@@ -19453,7 +19455,7 @@ class GAMEAPI(resource.Resource):
                 items = [item,]
 
             # for metrics only
-            price = skudata['price']
+            price = Predicates.eval_cond_or_literal(skudata['price'], session, session.player)
             price_currency = skudata.get('price_currency','fbcredits')
             if price_currency == 'fbcredits':
                 price = session.player.get_any_abtest_value('gamebucks_per_fbcredit', gamedata['store']['gamebucks_per_fbcredit']) * price

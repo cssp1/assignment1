@@ -3057,6 +3057,11 @@ def check_store_sku(sku_name, sku):
         if 'loot_table' in sku and sku['loot_table'] not in gamedata['loot_tables']:
             error |= 1; print 'store sku %s refers to invalid loot table "%s"' % (sku_name, sku['spell'], sku['loot_table'])
 
+        if 'price' in sku and type(sku['price']) is list:
+            if 'item' not in sku or 'spell' in sku:
+                error |= 1; print 'store sku %s has cond-chain price but this is only supported for "item" SKUs not "spell" skus' % sku_name
+            error |= check_cond_chain(sku['price'], reason = 'sku %s: price' % sku_name)
+
         if 'on_purchase' in sku: error |= check_consequent(sku['on_purchase'], reason='sku:'+sku_name+':on_purchase')
         if ('price_currency' in sku):
             if sku['price_currency'].startswith('item:'):

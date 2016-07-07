@@ -42962,7 +42962,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             }
         }
         if('price_currency' in skudata) { p_currency = skudata['price_currency']; }
-        return [skudata['price'], p_currency];
+        return [eval_cond_or_literal(skudata['price'], player, null), p_currency];
 
     } else if(formula === 'gamebucks_topup') {
         var bucks_per_credit = player.get_any_abtest_value('gamebucks_per_fbcredit_topup', gamedata['store']['gamebucks_per_fbcredit_topup']);
