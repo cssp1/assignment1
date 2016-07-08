@@ -200,6 +200,7 @@ class NoSQLClient (object):
         self.seen_facebook_ids = False
         self.seen_messages = False
         self.seen_ctrl_queue = False
+        self.seen_player_portraits = False
         self.seen_regions = {}
         self.seen_alliances = False
         self.seen_turf = False
@@ -1474,6 +1475,53 @@ class NoSQLClient (object):
         return self.instrument('ctrl_queue_poll(%s)'%reason, self._ctrl_queue_poll, ())
     def _ctrl_queue_poll(self):
         return map(self.decode_ctrl_queue, self.ctrl_queue_table().find({'lock_time': {'$lt': 0}}).sort([('_id',pymongo.ASCENDING),]))
+
+
+    ###### PLAYER PORTRAIT TABLE ######
+    # maintains a library of profile pictures, one for each player
+    # necessary because Facebook doesn't always let third parties retrieve pictures
+
+    def player_portraits_table(self):
+        coll = self._table('player_portraits')
+        if not self.seen_player_portraits:
+            # rely on the default _id index only
+            self.seen_player_portraits = True
+        return coll
+    def decode_player_portrait(self, row):
+        if '_id' in row: # decode _id to user_id
+            row['user_id'] = row['_id']; del row['_id']
+        if 'data' in row: # decode binary data
+            row['data'] = bytes(row['data'])
+        return row
+
+    def player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified, reason=''):
+        return self.instrument('player_portrait_add(%s)'%reason, self._player_portrait_add, (user_id, data, retrieved, content_type, expires, last_modified))
+    def _player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified):
+        assert isinstance(data, bytes)
+        assert len(data) < 64*1024 # 64KB max
+        binary_data = bson.Binary(data)
+        if content_type is not None:
+            content_type = unicode(content_type)
+            assert len(content_type) < 64
+        # time fields should be UNIX timestamps
+        assert type(retrieved) in (int,long)
+        if expires is not None: assert type(expires) in (int, long)
+        if last_modified is not None: assert type(last_modified) in (int, long)
+        self.player_portraits_table().update_one({'_id': user_id}, {'$set': {
+                                                  'data': binary_data, # encode binary data
+                                                  'retrieved': long(retrieved),
+                                                  'content_type': content_type,
+                                                  'expires': long(expires),
+                                                  'last_modified': long(last_modified)}}, upsert = True)
+
+    def player_portrait_get(self, user_id, fields = None, reason=''):
+        return self.instrument('player_portrait_get(%s)'%reason, self._player_portrait_get, (user_id, fields))
+    def _player_portrait_get(self, user_id, fields):
+        if fields: fields = dict((f,1) for f in fields) # convert array to dict
+        row = self.player_portraits_table().find_one({'_id': user_id}, fields)
+        if row is not None:
+            row = self.decode_player_portrait(row)
+        return row
 
     ###### PLAYER MESSAGE TABLE ######
 

@@ -70,6 +70,7 @@ import SpinNoSQL
 import SpinNoSQLLog
 import SpinNoSQLLockManager
 import SpinSQLBattles
+import PlayerPortraits
 import Raid
 import Scores2
 import CustomerSupport
@@ -1706,6 +1707,11 @@ class User:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
+        # update portrait
+        portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {'kg_avatar_url':self.kg_avatar_url}, 'kg', 'kg'+str(self.kg_id), None)
+        if session:
+            session.portrait_update_launched(portrait_d)
+
     def retrieve_bh_info(self, session, retmsg):
         if (None not in (self.bh_username,)) and \
            ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
@@ -1727,6 +1733,9 @@ class User:
                                                      SpinConfig.config['battlehouse_api_path']+'/api/v3/users/%s/get' % self.bh_id,
                                                      lambda result, _session=session: self.retrieve_bh_info_complete(_session, None, result),
                                                      headers = {'Authorization': 'Bearer '+self.bh_auth_token})
+        # update portrait
+        portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
+        session.portrait_update_launched(portrait_d)
 
     def retrieve_bh_info_complete(self, session, retmsg, result):
         data = SpinJSON.loads(result)
@@ -1805,6 +1814,11 @@ class User:
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+        # update portrait
+        portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {'ag_avatar_url':self.ag_avatar_url}, 'ag', 'ag'+str(self.ag_id), None)
+        if session:
+            session.portrait_update_launched(portrait_d)
 
     def retrieve_ag_friends_start(self, session, offset = 0, previous_results = None):
         limit = 1
@@ -2514,6 +2528,10 @@ class User:
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, profile_url, functools.partial(self.retrieve_facebook_info_receive, session, 'profile'))
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, friends_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'friends', []))
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, likes_url, functools.partial(self.retrieve_facebook_info_receive_paged, session, 'likes', []))
+
+            # update portrait
+            portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'fb', 'fb'+str(self.facebook_id), self.fb_oauth_token)
+            session.portrait_update_launched(portrait_d)
 
     def retrieve_facebook_info_receive_paged(self, session, dest, buffer, raw_result):
         result = SpinJSON.loads(raw_result)
@@ -5269,6 +5287,11 @@ class Session(object):
                                                               'old_name': old_name})
             gamesite.gameapi.send_player_cache_update(self, 'change_title')
         return True
+
+    # call with a Deferred that will fire when the player portrait is updated
+    def portrait_update_launched(self, portrait_d):
+        portrait_d.addCallbacks(lambda _, self=self: self.send([["PLAYER_PORTRAIT_UPDATE"]], flush_now = True),
+                                lambda _, self=self: report_and_absorb_deferred_failure(_, self))
 
 class SessionChange(object):
     # This holds the state of an ongoing asynchronous session change request
@@ -28417,6 +28440,7 @@ class GameSite(server.Site):
         self.msg_client = None # XXX temp - easy way to switch message_table API between dbserver and mongodb
         self.sql_client = None # XXX temp - easy way to switch alliances/scores API between SQL and mongodb
         self.social_id_table = None
+        self.player_portraits = None
 
         # connect to MongoDB
         self.nosql_init(is_startup = True)
@@ -28652,6 +28676,11 @@ class GameSite(server.Site):
         self.pcache_client = self.db_client
         self.mongo_scores2_client = Scores2.MongoScores2(self.nosql_client)
 
+        self.player_portraits = PlayerPortraits.PlayerPortraits(self.nosql_client,
+                                                                {'fb': self.AsyncHTTP_Facebook,
+                                                                 'kg': self.AsyncHTTP_Kongregate,
+                                                                 'ag': self.AsyncHTTP_ArmorGames,
+                                                                 'bh': self.AsyncHTTP_Battlehouse})
     def nosql_shutdown(self):
         if self.nosql_client:
             self.social_id_table = None
