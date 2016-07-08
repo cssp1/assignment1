@@ -10,11 +10,9 @@ import cgi, cgitb
 import sys, os, time, datetime, functools
 import urlparse
 import pymongo # 3.0+ OK
+import SpinHTTP
 import SpinConfig
 import SpinGoogleAuth
-
-def format_http_time(stamp):
-    return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(stamp))
 
 def gen_csrf_state(tbl, remote_host):
     state = ''.join([('%02x' % ord(c)) for c in os.urandom(16)])
@@ -94,7 +92,7 @@ if __name__ == "__main__":
             # good auth, redirect to resource
             final_url = result['final_url']
             cookie_name = SpinGoogleAuth.spin_token_cookie_name()
-            cookie_expires = format_http_time(auth['expires_at'])
+            cookie_expires = SpinHTTP.format_http_time(auth['expires_at'])
             print 'Set-Cookie: %s=%s;domain=.%s;path=/;expires=%s;' % (cookie_name, spin_token, MY_DOMAIN, cookie_expires)
             print
             print '<html><body onload="location.href = \'%s\';">Authenticated! Loading %s...</body></html>' % (final_url, final_url)

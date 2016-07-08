@@ -86,9 +86,6 @@ def update_time():
 update_time()
 proxy_launch_time = proxy_time
 
-def format_http_time(stamp):
-    return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(stamp))
-
 const_one_year = 60*60*24*365
 
 fb_async_http = None
@@ -308,7 +305,7 @@ def log_request(request):
     return ret
 
 def set_cookie(request, cookie_name, value, duration):
-    request.addCookie(cookie_name, value, expires = format_http_time(proxy_time+duration))
+    request.addCookie(cookie_name, value, expires = SpinHTTP.format_http_time(proxy_time+duration))
     # necessary for IE7+ to accept iframed cookies
     request.setHeader('P3P', 'CP="CAO DSP CURa ADMa DEVa TAIa PSAa PSDa IVAi IVDi CONi OUR UNRi OTRi BUS IND PHY ONL UNI COM NAV INT DEM CNT STA PRE GOV LOC"')
 
@@ -2820,7 +2817,7 @@ class CachedJSFile(resource.Resource):
         max_age = SpinConfig.config['proxyserver'].get('js_files_max_cache_age', 90*24*60*60)
         request.setHeader('Cache-Control', 'max-age='+str(max_age))
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
-            request.setHeader('Expires', format_http_time(proxy_time + max_age))
+            request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time + max_age))
         # IE<10 requires text/plain for CORS requests to work
         content_type = 'text/plain' if SpinConfig.config['proxyserver'].get('xhr_js_files', False) else 'text/javascript'
         request.setHeader('Content-Type', content_type)
@@ -2859,7 +2856,7 @@ class ArtFile(static.File):
         max_age = SpinConfig.config['proxyserver'].get('art_assets_max_cache_age', 90*24*60*60)
         request.setHeader('Cache-Control', 'max-age='+str(max_age))
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
-            request.setHeader('Expires', format_http_time(proxy_time + max_age))
+            request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time + max_age))
 
         # necessary for art files fetched by XMLHttpRequest to work when they're on the CDN
         # note! this means that CDN requests MUST have a unique ?origin=whatever in the URL!
@@ -2884,7 +2881,7 @@ class PortraitProxy(twisted.web.resource.Resource):
         max_age = SpinConfig.config['proxyserver'].get('portraits_max_cache_age', 24*60*60)
         request.setHeader('Cache-Control', 'max-age='+str(max_age))
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
-            request.setHeader('Expires', format_http_time(proxy_time + max_age))
+            request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time + max_age))
 
         # note! this means that requests MUST have a unique ?spin_origin=whatever in the URL!
         assert 'spin_origin' in request.args
@@ -2964,7 +2961,7 @@ class FBPortraitProxy(PortraitProxy):
             expire_time = proxy_time + 3600 # XXX should be derived from the access token
             request.setHeader('Cache-Control', 'max-age='+str(expire_time - proxy_time))
             if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
-                request.setHeader('Expires', format_http_time(expire_time))
+                request.setHeader('Expires', SpinHTTP.format_http_time(expire_time))
             else: # remove any Expires header
                 if request.responseHeaders.hasHeader(b'Expires'):
                     request.responseHeaders.removeHeader(b'Expires')
@@ -3084,7 +3081,7 @@ class XDChannelResource(static.Data):
         SpinHTTP.set_access_control_headers(request)
         request.setHeader('pragma', 'public')
         request.setHeader('Cache-Control', 'max-age='+str(const_one_year))
-        request.setHeader('Expires', format_http_time(proxy_time+const_one_year))
+        request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time+const_one_year))
         return static.Data.render(self, request)
 
 class FlashXDResource(static.Data):
@@ -3102,7 +3099,7 @@ class FlashXDResource(static.Data):
         SpinHTTP.set_access_control_headers(request)
         request.setHeader('pragma', 'public')
         request.setHeader('Cache-Control', 'max-age='+str(const_one_year))
-        request.setHeader('Expires', format_http_time(proxy_time+const_one_year))
+        request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time+const_one_year))
         return static.Data.render(self, request)
 
 # wrapper for twcgi.CGIScript that adds a SPIN_IS_SSL environment variable

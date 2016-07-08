@@ -6,6 +6,18 @@
 
 # HTTP utilities
 
+import time
+
+# create RFC2822 timestamp
+def format_http_time(stamp):
+    return time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(stamp))
+
+from email.utils import mktime_tz, parsedate_tz
+
+# parse RFC2822 timestamp, inverse of format_http_time()
+def parse_http_time(http_time):
+    return long(mktime_tz(parsedate_tz(http_time)))
+
 import base64, re
 
 # wrap/unwrap Unicode text strings for safe transmission across the AJAX connection
