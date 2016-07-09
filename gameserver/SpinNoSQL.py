@@ -1511,8 +1511,9 @@ class NoSQLClient (object):
                                                   'data': binary_data, # encode binary data
                                                   'retrieved': long(retrieved),
                                                   'content_type': content_type,
-                                                  'expires': long(expires),
-                                                  'last_modified': long(last_modified)}}, upsert = True)
+                                                  'expires': long(expires) if expires is not None else None,
+                                                  'last_modified': long(last_modified) if last_modified is not None else None,
+                                                  }}, upsert = True)
 
     def player_portrait_get(self, user_id, fields = None, reason=''):
         return self.instrument('player_portrait_get(%s)'%reason, self._player_portrait_get, (user_id, fields))
