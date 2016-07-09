@@ -2481,9 +2481,12 @@ SPUI.FriendPortrait_active_list = [];
 /** Invalidate (force refresh of) all FriendPortraits for this user_id
     @param {number} user_id */
 SPUI.FriendPortrait.invalidate_user_id = function(user_id) {
+    var url = SPUI.get_portrait_endpoint_url(user_id);
+    PortraitCache.invalidate_url(url);
     goog.array.forEach(SPUI.FriendPortrait_active_list, function(port) {
         if(port.user_id === user_id) {
             port.displayed_user_id = null;
+            //port.raw_image = PortraitCache.get_raw_image(url);
         }
     });
 };
@@ -2557,6 +2560,24 @@ SPUI.get_battlehouse_portrait_url = function(bh_id) {
     }
 };
 
+/** @param {number} user_id
+    @return {string} */
+SPUI.get_portrait_endpoint_url = function(user_id) {
+    if(SPUI.force_anon_portraits || anon_mode) {
+        return SPUI.get_anonymous_portrait_url(user_id === session.user_id);
+    }
+
+    var base_url = 'portrait/?user_id='+user_id.toString();
+    if(gamedata['client']['portrait_endpoint_per_session']) {
+        // optionally fetch with current frame platform token - but puts session into the CDN cache key :(
+        base_url += '&frame_platform='+spin_frame_platform;
+        if(spin_frame_platform === 'fb' && spin_facebook_oauth_token) { // include auth token
+            base_url += '&access_token='+encodeURIComponent(spin_facebook_oauth_token);
+        }
+    }
+    return GameArt.art_url(base_url);
+};
+
 SPUI.FriendPortrait.prototype.update_display = function() {
     if(this.displayed_user_id == this.user_id) { return; } // already set
     this.bg_image = this.raw_image = null;
@@ -2568,25 +2589,31 @@ SPUI.FriendPortrait.prototype.update_display = function() {
             return;
         }
 
+        if(is_ai_user_id_range(this.user_id)) {
+            // for AIs, we pull the asset from gamedata
+            var key = this.user_id.toString();
+            if(!(key in gamedata['ai_bases_client']['bases'])) {
+                console.log('lookup of undefined ai portrait: '+key);
+                this.bg_image = 'unknown_person_portrait';
+            } else {
+                var ai_base_data = gamedata['ai_bases_client']['bases'][key];
+                var portrait_key = (this.use_map_portrait && 'map_portrait' in ai_base_data) ? 'map_portrait' : 'portrait';
+                this.bg_image = ai_base_data[portrait_key];
+            }
+            this.displayed_user_id = this.user_id; // mark as up-to-date
+            return;
+        }
+
+        if(gamedata['client']['portrait_endpoint']) {
+            var url = SPUI.get_portrait_endpoint_url(this.user_id);
+            this.raw_image = PortraitCache.get_raw_image(url);
+            this.displayed_user_id = this.user_id; // mark as up-to-date
+            return;
+        }
+
         var info = PlayerCache.query_sync_fetch(this.user_id);
         if(info) {
-
-            // for AIs, we pull the asset from gamedata
-            if(PlayerCache.get_is_ai(info)) {
-                var key = this.user_id.toString();
-                if(!(key in gamedata['ai_bases_client']['bases'])) {
-                    console.log('lookup of undefined ai portrait: '+key);
-                    this.bg_image = 'unknown_person_portrait';
-                } else {
-                    var ai_base_data = gamedata['ai_bases_client']['bases'][key];
-                    var portrait_key = (this.use_map_portrait && 'map_portrait' in ai_base_data) ? 'map_portrait' : 'portrait';
-                    this.bg_image = ai_base_data[portrait_key];
-                }
-                this.displayed_user_id = this.user_id; // mark as up-to-date
-                return;
-            }
-
-            // now try social network portrait URLs
+            // try social network portrait URLs
             var url = null;
             var urls = {'fb': (info['facebook_id'] ? SPUI.get_facebook_portrait_url(info['facebook_id']) : null),
                         'ag': (info['ag_avatar_url'] ? SPUI.get_armorgames_portrait_url(info['ag_id'] || null, info['ag_avatar_url']) : null),

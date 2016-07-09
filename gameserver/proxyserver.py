@@ -3023,7 +3023,7 @@ class FBPortraitProxy(PortraitProxy):
         if parts.params or parts.fragment: return None
         qs = urlparse.parse_qs(parts.query)
         for key, val in qs.iteritems():
-            if key not in ('v', 'spin_origin', 'access_token'):
+            if key not in ('v', 'gen', 'spin_origin', 'access_token'):
                 return None
         if 0:
             tok = SpinConfig.config['facebook_app_access_token']
@@ -3052,7 +3052,7 @@ class KGPortraitProxy(PortraitProxy):
         qs = urlparse.parse_qs(parts.query)
         if ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
-            if key not in ('spin_origin', 'avatar_url', 'v'):
+            if key not in ('spin_origin', 'avatar_url', 'v', 'gen'):
                 return None
         avatar_url = qs['avatar_url'][-1]
         avatar_parts = urlparse.urlparse(avatar_url)
@@ -3080,7 +3080,7 @@ class AGPortraitProxy(PortraitProxy):
         qs = urlparse.parse_qs(parts.query)
         if ('avatar_url' not in qs): return None
         for key, val in qs.iteritems():
-            if key not in ('spin_origin', 'avatar_url', 'v'):
+            if key not in ('spin_origin', 'avatar_url', 'v', 'gen'):
                 return None
         avatar_url = qs['avatar_url'][-1]
         if '%2F' in avatar_url: # handle browsers that (improperly?) leave avatar_url URL-encoded
@@ -3110,7 +3110,7 @@ class BHPortraitProxy(PortraitProxy):
         qs = urlparse.parse_qs(parts.query)
         if ('bh_id' not in qs): return None
         for key, val in qs.iteritems():
-            if key not in ('spin_origin', 'bh_id', 'v'):
+            if key not in ('spin_origin', 'bh_id', 'v', 'gen'):
                 return None
         # XXXXXXBH this doesn't work yet, it needs some authorization for either the app or the user
         return SpinConfig.config['battlehouse_api_path']+'/api/v3/users/'+qs['bh_id'][-1]+'/image'

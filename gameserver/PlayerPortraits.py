@@ -28,6 +28,10 @@ class PlayerPortraits(object):
         if frame_platform == 'fb':
             if not social_id.startswith('fb'): return None
             fb_id = social_id[2:]
+            if fb_id.startswith('example1'): # for sandbox testing
+                return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait.jpg'
+            elif fb_id.startswith('example2'):
+                return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait2.jpg'
             tok = access_token or SpinConfig.config.get('facebook_app_access_token','')
             return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fb_id) + '?' + urllib.urlencode({'access_token': tok})
         elif frame_platform == 'kg':
@@ -87,7 +91,7 @@ class PlayerPortraits(object):
         row = self.db_client.player_portrait_get(user_id)
         if row and ((not row.get('expires')) or row['expires'] >= time_now):
             # hit
-            return defer.succeed((row['content_type'], row['data']))
+            return defer.succeed((True, row['content_type'], row['data']))
 
         # miss - can we retrieve the portrait, as a third party?
         if pcache_info is None:

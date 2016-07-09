@@ -44783,7 +44783,8 @@ function handle_server_message(data) {
         player.title = data[1];
         //player.unlocked_titles = data[2];
     } else if(msg == "PLAYER_PORTRAIT_UPDATE") {
-        // XXX needs to invalidate displayed portrait URL
+        // invalidate displayed portrait URL of ourself
+        SPUI.FriendPortrait.invalidate_user_id(session.user_id);
     } else if(msg == "PLAYER_CACHE_UPDATE") {
         PlayerCache.update_batch(data[1]);
     } else if(msg == "FACEBOOK_CURRENCY_UPDATE") {
