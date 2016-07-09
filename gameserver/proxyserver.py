@@ -53,6 +53,7 @@ import SpinSignature
 import SpinGoogleAuth
 import SpinGeoIP
 import SpinBrotli
+import PlayerPortraits
 
 proxy_daemonize = ('-n' not in sys.argv)
 verbose_in_argv = ('-v' in sys.argv)
@@ -125,6 +126,8 @@ control_async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, config.get('request_ti
                                                   lambda x: exception_log.event(proxy_time, x),
                                                   max_tries = config.get('max_tries',1),
                                                   retry_delay = config.get('retry_delay',10))
+
+player_portraits = None
 
 # track # of calls to each FB API endpoint for usage monitoring
 class APIUsageMonitor(object):
@@ -2870,6 +2873,48 @@ class ArtFile(static.File):
         self.set_cdn_headers(request)
         return static.File.render(self, request)
 
+# NEW user_id-based portrait retrieval endpoint that will replace PortraitProxy
+class PortraitEndpoint(twisted.web.resource.Resource):
+    # boilerplate to short-circuit path lookups
+    def getChildWithDefault(self, path, request): return self
+
+    def set_cdn_headers(self, request):
+        # note! this means that requests MUST have a unique ?spin_origin=whatever in the URL!
+        assert 'spin_origin' in request.args
+        SpinHTTP.set_access_control_headers_for_cdn(request, -1)
+
+    # sometimes the client or the CDN strip off the ?spin_origin query parameter
+    # to avoid errors, "invent" a plausible origin that will probably match the request
+    def ensure_spin_origin(self, request):
+        if ('spin_origin' not in request.args):
+            if request.requestHeaders.hasHeader('origin'):
+                origin = SpinHTTP.get_twisted_header(request, 'origin')
+            else:
+                origin = SpinHTTP.get_twisted_header(request, 'host')
+            if origin:
+                listen_host = SpinConfig.config['proxyserver'].get('external_listen_host','')
+                # XXX this may cause problems if we ever have proxyserver listen on different origins
+                if listen_host and origin not in (listen_host, 'http://'+listen_host, 'https://'+listen_host):
+                    raise Exception('origin mismatch: %s vs %s' % (origin, listen_host))
+                request.args['spin_origin'] = [origin]
+
+    def render_OPTIONS(self, request):
+        self.ensure_spin_origin(request)
+        self.set_cdn_headers(request)
+        return ''
+
+    def render(self, request):
+        update_time()
+        self.ensure_spin_origin(request)
+        self.set_cdn_headers(request)
+        # enable keep-alive
+        if SpinConfig.config['proxyserver'].get('use_http_keep_alive', True) and \
+           (SpinHTTP.get_twisted_header(request, 'connection').lower() == 'keep-alive'):
+            request.setHeader(b'Connection', b'keep-alive')
+            request.setHeader(b'Keep-Alive', b'timeout=%d' % 30) # 30sec
+        return player_portraits.endpoint(proxy_time, request)
+
+
 # We have to proxy Facebook and Kongregate portraits, to attach a specific Access-Control-Allow-Origin
 # so that drawing them will not taint the HTML Canvas.
 class PortraitProxy(twisted.web.resource.Resource):
@@ -3129,6 +3174,7 @@ class ProxyRoot(TwistedNoResource):
             'kg_portrait': KGPortraitProxy(),
             'ag_portrait': AGPortraitProxy(),
             'bh_portrait': BHPortraitProxy(),
+            'portrait': PortraitEndpoint(),
             'channel': channel_resource, 'channel.php': channel_resource,
             'crossdomain.xml': flash_xd_resource,
             'compiled-client.js': CachedJSFile('../gameclient/compiled-client.js'),
@@ -3301,6 +3347,15 @@ def do_main():
                                       )
     global social_id_table
     social_id_table = SocialIDCache.SocialIDCache(db_client)
+
+    global player_portraits
+    player_portraits = PlayerPortraits.PlayerPortraits(db_client,
+                                                       # for testing, use alternate requester in sandbox mode
+                                                       {'fb': fb_async_http if (SpinConfig.config.get('secure_mode',0) or fb_async_http) else control_async_http,
+                                                        'kg': kg_async_http,
+                                                        'ag': ag_async_http,
+                                                        'bh': bh_async_http},
+                                                       log_exception_func)
 
     backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()
