@@ -95,7 +95,7 @@ class PlayerPortraits(object):
 
         # miss - can we retrieve the portrait, as a third party?
         if pcache_info is None:
-            pcache_info = self.db_client.player_cache_lookup_batch([user_id], fields = ('social_id','kg_avatar_url','ag_avatar_url'))[0]
+            pcache_info = self.db_client.player_cache_lookup_batch([user_id], fields = ('social_id','facebook_id','kg_avatar_url','ag_avatar_url'))[0]
 
         if pcache_info is not None:
             if 'social_id' in pcache_info:
