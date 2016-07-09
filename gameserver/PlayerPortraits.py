@@ -98,9 +98,17 @@ class PlayerPortraits(object):
             pcache_info = self.db_client.player_cache_lookup_batch([user_id], fields = ('social_id','kg_avatar_url','ag_avatar_url'))[0]
 
         if pcache_info is not None:
-            target_platform = pcache_info['social_id'][0:2] if 'social_id' in pcache_info else None
+            if 'social_id' in pcache_info:
+                target_platform = pcache_info['social_id'][0:2]
+                social_id = pcache_info['social_id']
+            elif 'facebook_id' in pcache_info: # legacy entries
+                target_platform = 'fb'
+                social_id = 'fb'+str(pcache_info['facebook_id'])
+            else:
+                target_platform = None
+
             if target_platform:
-                ret = self.update(time_now, user_id, pcache_info, target_platform, pcache_info['social_id'],
+                ret = self.update(time_now, user_id, pcache_info, target_platform, social_id,
                                   access_token if (frame_platform is not None and frame_platform == target_platform) else None,
                                   allow_fail = True)
                 if ret:
