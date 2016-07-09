@@ -21,3 +21,7 @@ PortraitCache.get_raw_image = function(url) {
     }
     return PortraitCache.images[url];
 };
+
+PortraitCache.clear = function() {
+    PortraitCache.images = {};
+};

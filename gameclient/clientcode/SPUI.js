@@ -2470,8 +2470,28 @@ SPUI.FriendPortrait = function(data) {
     // filled in asynchronously
     // if displayed_user_id == this.user_id, then we are ready to draw
     this.displayed_user_id = null;
+
+    SPUI.FriendPortrait_active_list.push(this);
 };
 goog.inherits(SPUI.FriendPortrait, SPUI.ActionButton);
+
+/** @type {!Array<!SPUI.FriendPortrait>} list of active widgets, for invalidation purposes */
+SPUI.FriendPortrait_active_list = [];
+
+/** Invalidate (force refresh of) all FriendPortraits for this user_id
+    @param {number} user_id */
+SPUI.FriendPortrait.invalidate_user_id = function(user_id) {
+    goog.array.forEach(SPUI.FriendPortrait_active_list, function(port) {
+        if(port.user_id === user_id) {
+            port.displayed_user_id = null;
+        }
+    });
+};
+
+SPUI.FriendPortrait.prototype.destroy = function() {
+    goog.base(this, 'destroy');
+    goog.array.remove(SPUI.FriendPortrait_active_list, this);
+};
 
 /** @param {number} user_id
   * @param {boolean=} use_map_portrait - if true, use the AI base "map_portrait" icon instead of "portrait"
