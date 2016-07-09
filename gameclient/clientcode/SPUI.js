@@ -2629,6 +2629,12 @@ SPUI.FriendIcon = function(data) {
 };
 goog.inherits(SPUI.FriendIcon, SPUI.ActionButton);
 
+SPUI.FriendIcon.prototype.destroy = function() {
+    goog.base(this, 'destroy');
+    this.portrait.destroy();
+    this.name.destroy();
+    this.level.destroy();
+};
 SPUI.FriendIcon.prototype.set_user = function(user_id) {
     this.user_id = user_id;
     this.level_override = null;
