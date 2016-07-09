@@ -140,6 +140,8 @@
         "proxy_portraits": 1, // enable proxying of FB/KG profile pictures to avoid tainting the Canvas
         "portrait_proxy_cache_rev": "2", // cache "version" tag for forcing refreshes
 
+        "portrait_endpoint": 1, // load player portraits from game server instead of fetching from the social network directly
+
         "min_speak_interval": 1.5, // don't repeat same unit speech sound effect within this many seconds
 
         "map_ping_interval": 10, // number of seconds between polling the server for region map updates (when region map is up) - disabled if longpoll is active
