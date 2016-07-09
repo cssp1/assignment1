@@ -63,16 +63,20 @@ class PlayerPortraits(object):
         if not requester:
             if allow_fail: return None
             raise Exception('no async_http requester for frame_platform %r' % frame_platform)
-        requester.queue_request(time_now, url, functools.partial(self.update_complete, d, url, time_now, user_id),
-                                error_callback = functools.partial(self.update_complete, d, url, time_now, user_id),
+        requester.queue_request(time_now, url, functools.partial(self.update_complete, d, url, frame_platform, time_now, user_id),
+                                error_callback = functools.partial(self.update_complete, d, url, frame_platform, time_now, user_id),
                                 headers = headers, callback_type = requester.CALLBACK_FULL, max_tries = 1)
         return d
 
-    def update_complete(self, d, url, time_now, user_id, body = '', headers = {}, status = '500', ui_reason = None):
+    def update_complete(self, d, url, frame_platform, time_now, user_id, body = '', headers = {}, status = '500', ui_reason = None):
         #print status, headers
         try:
             if int(status) != 200:
-                raise Exception('got non-OK status %r for player portrait URL %r: %r' % (status, url, body))
+                # log this error as per-frame-platform since it's going to be common on Facebook - don't pollute main log
+                func = self.log_exception_func_map.get(frame_platform, self.log_exception_func_map['default'])
+                func('PlayerPortrait update got non-OK status %r for URL %r: %r' % (status, url, body))
+                d.callback((False, 'image/png', unknown_person_portrait_50x50_png))
+                return
             content_type = headers['content-type'][-1] if 'content-type' in headers else None
             expires = SpinHTTP.parse_http_time(headers['expires'][-1]) if 'expires' in headers else None
             last_modified = SpinHTTP.parse_http_time(headers['last-modified'][-1]) if 'last-modified' in headers else None
@@ -115,7 +119,7 @@ class PlayerPortraits(object):
                     # if fetch fails, record error and return unknown portrait
                     def on_error(f, self, target_platform):
                         func = self.log_exception_func_map.get(target_platform, self.log_exception_func_map['default'])
-                        func('PlayerPortrait update error: '+f.getTraceback().strip())
+                        func('PlayerPortrait get() error: '+f.getTraceback().strip())
                         return (False, 'image/png', unknown_person_portrait_50x50_png)
                     ret.addErrback(on_error, self, target_platform)
                     return ret
