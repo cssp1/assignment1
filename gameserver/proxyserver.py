@@ -2912,7 +2912,11 @@ class PortraitEndpoint(twisted.web.resource.Resource):
            (SpinHTTP.get_twisted_header(request, 'connection').lower() == 'keep-alive'):
             request.setHeader(b'Connection', b'keep-alive')
             request.setHeader(b'Keep-Alive', b'timeout=%d' % 30) # 30sec
-        return player_portraits.endpoint(proxy_time, request)
+        start_time = time.time()
+        ret = player_portraits.endpoint(proxy_time, request)
+        end_time = time.time()
+        admin_stats.record_latency('PlayerPortraits.endpoint', end_time-start_time)
+        return ret
 
 
 # We have to proxy Facebook and Kongregate portraits, to attach a specific Access-Control-Allow-Origin
