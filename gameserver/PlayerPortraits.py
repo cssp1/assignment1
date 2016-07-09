@@ -135,7 +135,7 @@ class PlayerPortraits(object):
 
     def endpoint_complete(self, d_ret, request):
         is_success, content_type, binary_data = d_ret
-        if content_type: request.setHeader(b'Content-Type', content_type)
+        if content_type: request.setHeader(b'Content-Type', bytes(content_type))
         request.setHeader(b'Content-Length', b'%d' % len(binary_data))
 
         if is_success:
