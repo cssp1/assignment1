@@ -3359,7 +3359,11 @@ def do_main():
                                                         'kg': kg_async_http,
                                                         'ag': ag_async_http,
                                                         'bh': bh_async_http},
-                                                       log_exception_func)
+                                                       {'fb': lambda msg: facebook_log.event(proxy_time, msg),
+                                                        'kg': lambda msg: kongregate_log.event(proxy_time, msg),
+                                                        'ag': lambda msg: armorgames_log.event(proxy_time, msg),
+                                                        'bh': lambda msg: battlehouse_log.event(proxy_time, msg),
+                                                        'default': log_exception_func})
 
     backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()

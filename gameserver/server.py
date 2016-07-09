@@ -28681,7 +28681,12 @@ class GameSite(server.Site):
                                                                  'kg': self.AsyncHTTP_Kongregate,
                                                                  'ag': self.AsyncHTTP_ArmorGames,
                                                                  'bh': self.AsyncHTTP_Battlehouse},
-                                                                self.log_exception_func)
+                                                                {'fb': self.log_facebook_exception,
+                                                                 'kg': self.log_kongregate_exception,
+                                                                 'ag': self.log_armorgames_exception,
+                                                                 'bh': self.log_battlehouse_exception,
+                                                                 'default': self.log_async_exception})
+
     def nosql_shutdown(self):
         if self.nosql_client:
             self.social_id_table = None
