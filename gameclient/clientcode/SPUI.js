@@ -2514,52 +2514,6 @@ SPUI.get_anonymous_portrait_url = function(is_myself) {
     return GameArt.art_url(filename, false);
 };
 
-SPUI.get_facebook_portrait_url = function(facebook_id) {
-    facebook_id = facebook_id.toString(); // just make sure we don't get any numeric IDs
-    if(SPUI.force_anon_portraits || anon_mode || facebook_id.indexOf('example') == 0 || !spin_facebook_oauth_token) { // not connected to FB, anonymous mode, or testing sandbox
-        return SPUI.get_anonymous_portrait_url(facebook_id === spin_facebook_user);
-    } else {
-        if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('fb_portrait/'+facebook_id+'/picture?v='+gamedata['client']['portrait_proxy_cache_rev']+'&access_token='+encodeURIComponent(spin_facebook_oauth_token), false); // "v" version is to rev the cache
-        } else {
-            return SPFB.versioned_graph_endpoint('user/picture', facebook_id+'/picture?access_token='+encodeURIComponent(spin_facebook_oauth_token));
-        }
-    }
-};
-SPUI.get_armorgames_portrait_url = function(ag_id, avatar_url) {
-    if(SPUI.force_anon_portraits || anon_mode || (ag_id && ag_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
-        return SPUI.get_anonymous_portrait_url(ag_id === spin_armorgames_user);
-    } else {
-        if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('ag_portrait/?avatar_url='+encodeURIComponent(avatar_url)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
-        } else {
-            return avatar_url;
-        }
-    }
-};
-SPUI.get_kongregate_portrait_url = function(kg_id, avatar_url) {
-    if(SPUI.force_anon_portraits || anon_mode || (kg_id && kg_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
-        return SPUI.get_anonymous_portrait_url(kg_id === spin_kongregate_user);
-    } else {
-        if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('kg_portrait/?avatar_url='+encodeURIComponent(avatar_url)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
-        } else {
-            return avatar_url;
-        }
-    }
-};
-SPUI.get_battlehouse_portrait_url = function(bh_id) {
-    if(SPUI.force_anon_portraits || anon_mode || (bh_id && bh_id.indexOf('example') == 0)) { // anonymous mode or testing sandbox
-        return SPUI.get_anonymous_portrait_url(bh_id === spin_battlehouse_user);
-    } else {
-        if(gamedata['client']['proxy_portraits']) {
-            return GameArt.art_url('bh_portrait/?bh_id='+encodeURIComponent(bh_id)+'&v='+gamedata['client']['portrait_proxy_cache_rev'], false);
-        } else {
-            return spin_battlehouse_api_path+'/api/v3/users/'+bh_id+'/image';
-        }
-    }
-};
-
 /** @param {number} user_id
     @return {string} */
 SPUI.get_portrait_endpoint_url = function(user_id) {
@@ -2586,10 +2540,8 @@ SPUI.FriendPortrait.prototype.update_display = function() {
         if(this.user_id < 0) { // set user_id negative to call up a "?" image
             this.bg_image = 'unknown_person_portrait';
             this.displayed_user_id = this.user_id; // mark as up-to-date
-            return;
-        }
 
-        if(is_ai_user_id_range(this.user_id)) {
+        } else if(is_ai_user_id_range(this.user_id)) {
             // for AIs, we pull the asset from gamedata
             var key = this.user_id.toString();
             if(!(key in gamedata['ai_bases_client']['bases'])) {
@@ -2600,47 +2552,13 @@ SPUI.FriendPortrait.prototype.update_display = function() {
                 var portrait_key = (this.use_map_portrait && 'map_portrait' in ai_base_data) ? 'map_portrait' : 'portrait';
                 this.bg_image = ai_base_data[portrait_key];
             }
-            this.displayed_user_id = this.user_id; // mark as up-to-date
-            return;
-        }
-
-        if(gamedata['client']['portrait_endpoint']) {
+        } else {
+            // human portrait - use the endpoint
             var url = SPUI.get_portrait_endpoint_url(this.user_id);
             this.raw_image = PortraitCache.get_raw_image(url);
-            this.displayed_user_id = this.user_id; // mark as up-to-date
-            return;
         }
 
-        var info = PlayerCache.query_sync_fetch(this.user_id);
-        if(info) {
-            // try social network portrait URLs
-            var url = null;
-            var urls = {'fb': (info['facebook_id'] ? SPUI.get_facebook_portrait_url(info['facebook_id']) : null),
-                        'ag': (info['ag_avatar_url'] ? SPUI.get_armorgames_portrait_url(info['ag_id'] || null, info['ag_avatar_url']) : null),
-                        'kg': (info['kg_avatar_url'] ? SPUI.get_kongregate_portrait_url(info['kg_id'] || null, info['kg_avatar_url']) : null),
-                        'bh': (info['bh_id'] ? SPUI.get_battlehouse_portrait_url(info['bh_id']) : null) };
-
-            // first try current frame platform
-            if(urls[spin_frame_platform]) {
-                url = urls[spin_frame_platform];
-            } else {
-                // now try all others
-                var frame_platforms = goog.object.getKeys(urls).sort(); // stabilize order to avoid flicker
-                for(var i = 0; i < frame_platforms.length; i++) {
-                    var u = urls[frame_platforms[i]];
-                    if(u) { url = u; break; }
-                }
-            }
-            if(url) {
-                this.raw_image = PortraitCache.get_raw_image(url);
-            } else {
-                console.log('SPUI.FriendPortrait: cannot display '+JSON.stringify(info));
-            }
-
-            this.displayed_user_id = this.user_id; // mark as up-to-date
-        } else {
-            this.bg_image = 'unknown_person_portrait'; // temporarily show unknown while pending
-        }
+        this.displayed_user_id = this.user_id; // mark as up-to-date
     }
 };
 SPUI.FriendPortrait.prototype.do_draw = function(offset) {
