@@ -70,6 +70,7 @@ import SpinNoSQL
 import SpinNoSQLLog
 import SpinNoSQLLockManager
 import SpinSQLBattles
+import MalformedJSON
 import PlayerPortraits
 import Raid
 import Scores2
@@ -14199,8 +14200,10 @@ class OGPAPI(resource.Resource):
             if ('spin_ref_user_id' in request.args):
                 my_spin_ref_user_id = str(request.args['spin_ref_user_id'][0])
             if ('spin_link_qs' in request.args):
-                my_spin_link_qs = SpinJSON.loads(request.args['spin_link_qs'][0])
-                assert my_spin_link_qs.__class__ is dict
+                # fix possibly-malformed input JSON from browsers here
+                spin_link_qs_raw = MalformedJSON.fix(request.args['spin_link_qs'][0])
+                my_spin_link_qs = SpinJSON.loads(spin_link_qs_raw)
+                assert isinstance(my_spin_link_qs, dict)
             my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
 
         else:
