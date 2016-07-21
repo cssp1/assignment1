@@ -130,7 +130,9 @@ class PlayerPortraits(object):
         return defer.succeed((False, 'image/png', unknown_person_portrait_50x50_png))
 
     def endpoint(self, time_now, request):
-        assert 'user_id' in request.args
+        if 'user_id' not in request.args:
+            request.setResponseCode(400) # BAD_REQUEST
+            return 'user_id missing'
         user_id = int(request.args['user_id'][-1])
         access_token = request.args['access_token'][-1] if 'access_token' in request.args else None
         frame_platform = request.args['frame_platform'][-1] if 'frame_platform' in request.args else None
