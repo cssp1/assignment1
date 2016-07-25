@@ -44605,7 +44605,7 @@ function handle_server_message(data) {
         var use_low_gfx = (spin_demographics['browser_name'] in gamedata['client']['force_low_gfx_by_browser']) ||
             (spin_demographics['browser_OS'] in gamedata['client']['force_low_gfx_by_os']);
         var use_high_gfx = false;
-        var use_lazy_art = gamedata['client']['lazy_art'] || (spin_demographics['browser_name'] in gamedata['client']['force_lazy_art_by_browser']);
+        var use_lazy_art = gamedata['client']['lazy_art'];
 
         use_low_gfx = player.get_any_abtest_value('force_low_gfx', use_low_gfx);
         use_high_gfx = player.get_any_abtest_value('force_high_gfx', use_high_gfx);

@@ -424,7 +424,6 @@
         "graphics_detail": { "low": 0.25, "high": 2, "default": 2 },
         "force_low_gfx_by_browser": {"Firefox": true}, // special-case Firefox to have lower graphics options
         "force_low_gfx_by_os": {"iOS": true}, // special-case iOS to have lower graphics options
-        "force_lazy_art_by_browser": {"Firefox": true}, // special-case Firefox to have lower graphics options
 
         "enable_loot_burst_effects": false,
         // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
