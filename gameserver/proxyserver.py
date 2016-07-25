@@ -2580,9 +2580,10 @@ class GameProxy(proxy.ReverseProxyResource):
         try:
             # deflect requests with bogus IPv6 stuff in the headers
             if SpinHTTP.get_twisted_header(request, 'host').startswith('[') and \
-               (not SpinHTTP.get_twisted_header(request, 'user-agent')):
+               ('::' in SpinHTTP.get_twisted_header(request, 'host')):
+               #(not SpinHTTP.get_twisted_header(request, 'user-agent')):
                 request.setResponseCode(http.BAD_REQUEST)
-                return str('We do not support IPv6 "Host" headers')
+                return str('Invalid "Host" header: %r\n' % SpinHTTP.get_twisted_header(request, 'host'))
 
             start_time = time.time()
             if self.path == '/':
