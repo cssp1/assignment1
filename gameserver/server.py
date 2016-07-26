@@ -13181,6 +13181,7 @@ class LivePlayer(Player):
         # reset high/low_gfx mode setting for Firefox players affected by re-enabling high_gfx on Firefox
         if self.browser_name == 'Firefox' and \
            self.browser_version >= 46 and \
+           isinstance(self.player_preferences, dict) and \
            'low_gfx' in self.player_preferences and \
            '20160726_firefox_gfx_pref_reset' not in self.history:
                 #gamesite.exception_log.event(server_time, 'resetting low_gfx for %r' % self.user_id)
