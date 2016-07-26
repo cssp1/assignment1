@@ -44601,40 +44601,20 @@ function handle_server_message(data) {
             }
         }
 
-        // order of precedence for graphics options is browser default << A/B test << player preference << URL query
-        var use_low_gfx = (spin_demographics['browser_name'] in gamedata['client']['force_low_gfx_by_browser']) ||
-            (spin_demographics['browser_OS'] in gamedata['client']['force_low_gfx_by_os']);
-        var use_high_gfx = false;
-        var use_lazy_art = gamedata['client']['lazy_art'];
+        var use_lazy_art = player.get_any_abtest_value('force_lazy_art', gamedata['client']['lazy_art']);
+        if(document.URL.indexOf('lazy_art=1') != -1) { use_lazy_art = true; }
+        if(document.URL.indexOf('lazy_art=0') != -1) { use_lazy_art = false; }
 
-        use_low_gfx = player.get_any_abtest_value('force_low_gfx', use_low_gfx);
-        use_high_gfx = player.get_any_abtest_value('force_high_gfx', use_high_gfx);
-        use_lazy_art = player.get_any_abtest_value('force_lazy_art', use_lazy_art);
-
-        // IGNORE player.preferences setting if the browser is in force_low_gfx_by_browser
-        if(!((spin_demographics['browser_name'] in gamedata['client']['force_low_gfx_by_browser']) ||
-             (spin_demographics['browser_OS'] in gamedata['client']['force_low_gfx_by_os']))) {
-            if('low_gfx' in player.preferences) {
-                use_low_gfx = !!player.preferences['low_gfx'];
-                if(use_low_gfx) {
-                    use_high_gfx = false;
-                }
-            } else {
-                // note: set player.preferences explicitly here, so that
-                // the browser default will get pushed into preferences
-                player.preferences['low_gfx'] = (use_low_gfx ? 1 : 0);
-            }
+        // order of precedence for graphics options is player preference << browser forcing (A/B testable) << URL query
+        var use_low_gfx = false;
+        if(read_predicate(gamedata['client']['force_low_gfx_if']).is_satisfied(player, null)) {
+            use_low_gfx = true;
+        } else if('low_gfx' in player.preferences) {
+            use_low_gfx = !!player.preferences['low_gfx'];
         }
-
-        // permanently disabled this preference, since manually turning lazy_art off is really BAD for performance
-        //if('lazy_art' in player.preferences) { use_lazy_art = !!player.preferences['lazy_art']; }
 
         if(document.URL.indexOf('low_gfx=1') != -1) { use_low_gfx = true; }
         if(document.URL.indexOf('low_gfx=0') != -1) { use_low_gfx = false; }
-        if(document.URL.indexOf('high_gfx=1') != -1) { use_high_gfx = true; }
-        if(document.URL.indexOf('high_gfx=0') != -1) { use_high_gfx = false; }
-        if(document.URL.indexOf('lazy_art=1') != -1) { use_lazy_art = true; }
-        if(document.URL.indexOf('lazy_art=0') != -1) { use_lazy_art = false; }
 
         if(!use_low_gfx && player.get_any_abtest_value('enable_canvas_oversample', gamedata['client']['enable_canvas_oversample'])) {
             canvas_oversample = window['devicePixelRatio'] || 1;
@@ -44651,12 +44631,12 @@ function handle_server_message(data) {
             }
         }
 
-        console.log('GameArt settings: low_gfx '+use_low_gfx+' high_gfx '+use_high_gfx+' lazy_art '+use_lazy_art+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
+        console.log('GameArt settings: low_gfx '+use_low_gfx+' lazy_art '+use_lazy_art+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
 
         GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, use_lazy_art, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
         if(!ctx) { throw Error('ctx not initialized'); }
-        SPFX.init(ctx, use_low_gfx, use_high_gfx);
+        SPFX.init(ctx, use_low_gfx, false);
 
         if('sound_volume' in player.preferences) {
             GameArt.sound_volume = player.preferences['sound_volume'];

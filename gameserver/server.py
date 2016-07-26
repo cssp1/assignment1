@@ -13178,6 +13178,15 @@ class LivePlayer(Player):
                     if gamedata['server'].get('fix_storage_limit', False):
                         self.resources.gain_res({res: -1 * (snap.cur_res(res) - snap.max_res(res))}, reason = 'storage_limit', break_limit = True)
 
+        # reset high/low_gfx mode setting for Firefox players affected by re-enabling high_gfx on Firefox
+        if self.browser_name == 'Firefox' and \
+           self.browser_version >= 46 and \
+           'low_gfx' in self.player_preferences and \
+           '20160726_firefox_gfx_pref_reset' not in self.history:
+                #gamesite.exception_log.event(server_time, 'resetting low_gfx for %r' % self.user_id)
+                self.history['20160726_firefox_gfx_pref_reset'] = 1
+                del self.player_preferences['low_gfx']
+
         # get rid of bloated obsolete history fields
         BLOAT = ['logins_by_day', 'purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
@@ -13201,12 +13210,6 @@ class LivePlayer(Player):
                 gamesite.exception_log.event(server_time, 'player %d fixing bad intro mail %s' % (self.user_id, repr(to_remove)))
                 for mail in to_remove:
                     self.mailbox.remove(mail)
-
-        # fix TR token item expiration time (ai_piper week 157 had incorrect expiration time without the +2day buffer)
-        if gamedata['game_id'] == 'tr' and server_time < 1433005200:
-            for item in self.inventory + self.loot_buffer:
-                if item.get('spec',None) == 'token' and item.get('expire_time',None) == 1432832400:
-                    item['expire_time'] = 1433005200
 
         self.send_inventory_intro_mail(session, None)
         self.reseed_lottery(session, force = False)

@@ -554,16 +554,21 @@
     "settings": {
         // NOTE! array size of widgets in dialogs.json:settings_dialog must be >= the number of settings here
         "low_gfx": {"name": "low_gfx", "ui_description": "Graphics Detail:", "preference_key": "low_gfx", "default_val": 0, "requires_reload": 1,
-                    "show_if": {"predicate": "AND", "subpredicates": [
-                        // 2012 Nov 28 - Firefox v16 is crapping out when low_gfx=0, so just ignore this setting for now
-                        { "predicate": "NOT", "subpredicates": [{"predicate": "BROWSER_NAME", "names": ["Firefox"]}] },
-                        { "predicate": "NOT", "subpredicates": [{"predicate": "BROWSER_OS", "os": ["iOS"]}] }
-                    ] },
+                    // hide this setting on ancient Firefox versions, which often crash with high graphics
+                    "show_if": {"predicate": "NOT", "subpredicates": [
+                        {"predicate":"AND", "subpredicates":[
+                            {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
+                            {"predicate":"OR", "subpredicates": [
+                                {"predicate":"BROWSER_VERSION", "versions": [-1,46]},
+                                {"predicate":"ANY_ABTEST", "key": "T316_firefox_force_low_gfx", "value": 1}
+                            ]}
+                        ]}
+                    ]},
                     "choices": [{"ui_name": "High",
-                                 "ui_tooltip": "Best for new computers\nusing Chrome or Internet\nExplorer. Game plays at\nhighest quality.",
+                                 "ui_tooltip": "Best for new computers using\nup-to-date web browser\nand GPU drivers.\nGame plays at highest quality.",
                                  "preference_val": 0},
                                 {"ui_name": "Low",
-                                 "ui_tooltip": "Best for older computers,\nor Firefox users. Game\nplays faster, with lower\nquality graphics.",
+                                 "ui_tooltip": "Best for older computers.\nGame plays faster,\nwith lower quality graphics.",
                                  "preference_val": 1}]},
 
         "auto_unit_control": {"name": "auto_unit_control", "ui_description": "Unit Control:", "preference_key": "auto_unit_control", "default_val": 1, "requires_reload": 0,

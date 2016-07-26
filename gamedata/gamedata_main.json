@@ -422,8 +422,16 @@
         "motd_interval": 36000, // minimum number of seconds between times the user will be shown the "Message of the Day" upon login
 
         "graphics_detail": { "low": 0.25, "high": 2, "default": 2 },
-        "force_low_gfx_by_browser": {"Firefox": true}, // special-case Firefox to have lower graphics options
-        "force_low_gfx_by_os": {"iOS": true}, // special-case iOS to have lower graphics options
+
+        // game defaults to high graphics mode. If this predicate is true, switch down to low graphics mode.
+        // note: strings.json's "low_gfx" setting show_if predicate should be the NOT of this.
+        "force_low_gfx_if": {"predicate":"AND", "subpredicates":[
+            {"predicate":"BROWSER_NAME", "names": ["Firefox"]},
+            {"predicate":"OR", "subpredicates": [
+                {"predicate":"BROWSER_VERSION", "versions": [-1,46]},
+                {"predicate":"ANY_ABTEST", "key": "T316_firefox_force_low_gfx", "value": 1}
+            ]}
+        ]},
 
         "enable_loot_burst_effects": false,
         // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
