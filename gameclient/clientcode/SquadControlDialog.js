@@ -137,8 +137,11 @@ SquadControlDialog.refresh = function(dialog) {
     // make list of tiles we're going to create
     var make_squad_tile_args = [];
 
+    // show Reserves & Base Defenders for Call/Deploy mode in order to keep ordering consistent with normal invocation
+    var SHOW_NONMOBILE_FOR_CALL_DEPLOY = true;
+
     // Reserves
-    if(dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') {
+    if(SHOW_NONMOBILE_FOR_CALL_DEPLOY || dialog.user_data['dlg_mode'] == 'normal' || dialog.user_data['dlg_mode'] == 'manage') {
         make_squad_tile_args.push({squad_id: SQUAD_IDS.RESERVES, template: 'squad_tile'});
     }
 
@@ -149,7 +152,7 @@ SquadControlDialog.refresh = function(dialog) {
     dialog.user_data['caps'] = caps;
 
     goog.array.forEach(squad_ids, function (id) {
-        if(id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
+        if(!SHOW_NONMOBILE_FOR_CALL_DEPLOY && id === SQUAD_IDS.BASE_DEFENDERS && (dialog.user_data['dlg_mode'] == 'call' || dialog.user_data['dlg_mode'] == 'deploy')) { return; }
         make_squad_tile_args.push({squad_id: id, template: 'squad_tile'});
     });
 
@@ -559,7 +562,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     var repair_in_sync = synchronizer.is_in_sync(unit_repair_sync_marker);
 
     if(dialog.user_data['squad_id'] === SQUAD_IDS.RESERVES) {
-        dialog.widgets['coverup'].show = false;
+        dialog.widgets['coverup'].show = (dlg_mode == 'deploy' || dlg_mode == 'call');
     } else if(dlg_mode == 'normal') {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
