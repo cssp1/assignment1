@@ -66,11 +66,17 @@ echo "SETUP(remote): Unpacking filesystem overlay..."
 (cd / && sudo tar zxvf /home/ec2-user/overlay-gamemaster.tar.gz)
 
 # fix permissions
-sudo chown root:root /etc/sudoers
+sudo chown -R root:root /etc
+sudo chmod 0755 / /etc /etc/mail /etc/ssh /etc/security /etc/sysconfig
+sudo chmod 0644 /etc/security/limits.conf /etc/aliases /etc/sysctl.conf
+sudo chmod 0775 /etc/rc.d/rc.local
 sudo chmod 0440 /etc/sudoers
-sudo chmod 0700 /home/*
-sudo chown -R root:root /etc/postfix /etc/aliases /etc/mail /etc /
-sudo chmod 0755 / /etc /etc/mail
+sudo mkdir -p /etc/pki/tls/private
+sudo chmod 0600 /etc/pki/tls/private/*
+sudo chmod 0644 /etc/ssh/*
+sudo chmod 0600 /etc/ssh/sshd_config /etc/ssh/*_key
+sudo chmod 0644 /etc/cron.d/spinpunch
+sudo chmod 0755 /etc/cron.spinpunch.*/*
 sudo sh -c 'chown -R ec2-user:ec2-user /home/ec2-user'
 sudo sh -c 'chown -R outgoing-smtp:outgoing-smtp /home/outgoing-smtp'
 sudo sh -c 'chown -R spanalytics:spanalytics /home/spanalytics'

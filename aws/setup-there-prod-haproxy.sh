@@ -35,6 +35,8 @@ sudo chown root:root /
 sudo chmod 0755 / /etc /etc/mail
 sudo chmod 4755 /usr/bin/sudo
 sudo chmod 0600 /etc/pki/tls/private/*
+sudo chmod 0644 /etc/ssh/*
+sudo chmod 0600 /etc/ssh/sshd_config /etc/ssh/*_key
 sudo newaliases
 
 sudo sh -c 'chown -R ec2-user:ec2-user /home/ec2-user'
