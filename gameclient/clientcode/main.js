@@ -10132,6 +10132,8 @@ function url_put_info(url, user_id, money_spent) {
         '__KONGREGATE_ID__': spin_kongregate_user ? spin_kongregate_user.toString() : '',
         '__BATTLEHOUSE_ID__': spin_battlehouse_user ? spin_battlehouse_user.toString() : '',
         '__FRAME_PLATFORM__': spin_frame_platform.toString(),
+        // ZenDesk ticket field game title ID is the lowercased, underscore_spaced full name, with non-alphabetic characters removed
+        '__TITLE_ID__': gamedata['strings']['game_name'].toLowerCase().replace(new RegExp(/ /, 'g'), '_').replace(new RegExp(/'/, 'g'), ''),
         '__ISSUE_ID__': camo,
         '__PP_CODE__': PP_CODES[pp][1]
     };
