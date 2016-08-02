@@ -181,6 +181,14 @@
                                            "ui_name": "Your account has been banned temporarily due to a suspicious gameplay pattern. Accessing the game via automated script or \"bot\" is against our Terms of Service.\n\nPlease check that your computer is free of viruses, scripts, or browser plugins that could be accessing the game without your personal input.\n\nAfter rectifying this situation, please use the Contact link below and submit a ticket to reactivate your account.",
                                            "metric_event": "0690_client_is_locked_out" },
 
+    // this does a redirect
+    "CANNOT_LOG_IN_LOGIN_ABUSE": { "ui_name": "Your account is on login cooldown",
+                                   "redirect": "https://www.battlehouse.com/excessive-gameplay-detected/" },
+    "CANNOT_LOG_IN_LOGIN_ABUSE_SEVERE": { "ui_name": "Your account is on login cooldown",
+                                          "redirect": "https://www.battlehouse.com/excessive-login-time-warning/" },
+    "CANNOT_LOG_IN_LOGIN_ABUSE_FREQUENCY": { "ui_name": "Your account is on login cooldown",
+                                             "redirect": "https://www.battlehouse.com/too-many-logins/" },
+
     // this is a warning that tells the player they will soon trigger the abuse cooldown
     "LOGIN_ABUSE_WARNING": { "ui_title": "Login Cooldown Warning",
                              "dialog": "message_dialog_big",

@@ -7493,8 +7493,9 @@
             "mf_logo": {"kind": "StaticImage", "xy":[55,90], "dimensions":[158,158], "asset": "game_logo_158x158_onblue", "show": 0},
 
             "info_button": { "show": 0, "kind": "ActionButton", "xy":[515,90], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
-                             "url_fbpayments": "http:\/\/about.battlehouse.com/july-7-2013-special-update/",
-                             "url_gamebucks": "http:\/\/about.battlehouse.com/july-7-2013-special-update-for-players-before-july-9-2012/" },
+                             "url_fbpayments": "https://www.battlehouse.com/", // obsolete
+                             "url_gamebucks": "https://www.battlehouse.com/" // obsolete
+                           },
             "transition_msg_header": { "show": 0, "kind": "TextField", "xy": [550,92], "dimensions": [150,83], "text_size": 13, "text_style": "bold",
                                        "text_hjustify": "left", "text_vjustify": "top", "ui_name": "July 7, 2013 Update:" },
             "transition_msg": { "show": 0, "kind": "TextField", "xy": [550,110], "dimensions": [130,83], "text_size": 13, //"text_style": "normal",
