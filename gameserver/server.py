@@ -16874,7 +16874,8 @@ class XSAPI(resource.Resource):
         real_currency = spell['currency'].split(':')[1]
         gamebucks_quantity = spell['quantity']
         gamebucks_ui_description = Store.format_ui_string(session, spellname, None, spell, spell['ui_name'])
-        url, method, headers, body = SpinXsolla.make_token_request(SpinConfig.config,
+        url, method, headers, body = SpinXsolla.make_token_request(SpinConfig.config, SpinConfig.game(), session.user.frame_platform,
+                                                                   session.user.user_id, session.user.social_id,
                                                                    session.user.get_xsolla_id(), session.user.get_email(),
                                                                    real_currency,
                                                                    session.user.country, session.user.locale.split('_')[0] if session.user.locale else 'en',

@@ -125,8 +125,8 @@ def make_virtual_currency_settings_update(config, gamedata):
 
 # return the (url,method,headers,body) for a request to generate an Xsolla "token" to start the purchase flow
 # @param config - from SpinConfig config.json
-def make_token_request(config,
-                       user_xs_id, user_email, user_currency, user_country, user_language,
+def make_token_request(config, game_id, frame_platform,
+                       player_id, social_id, user_xs_id, user_email, user_currency, user_country, user_language,
                        gamebucks_quantity, gamebucks_ui_description,
                        player_level, user_account_creation_time,
                        ):
@@ -139,6 +139,7 @@ def make_token_request(config,
         'purchase': { 'virtual_currency': { 'quantity': gamebucks_quantity },
                       'description': { 'value': gamebucks_ui_description } },
         'custom_parameters': { 'user_level': player_level,
+                               'spin_game_id': game_id, 'spin_frame_platform': frame_platform, 'spin_player_id': player_id, 'spin_social_id': social_id,
                                'registration_date': unparse_time(user_account_creation_time) }
     }
     if is_sandbox:
@@ -171,7 +172,7 @@ if __name__ == '__main__':
         elif key == '--update-slates': mode = 'update-slates'
 
     if mode == 'test':
-        print make_token_request(SpinConfig.config, 'xs1234', 'example@example.com',
+        print make_token_request(SpinConfig.config, game_id, 'fb', 1111, 'fb1234', 'xs1234', 'example@example.com',
                                  'USD', 'us', 'en', 100, '100 Gamebucks', 25, int(time.time()) - 10*86400)
 
     elif mode == 'update-slates':
