@@ -3605,6 +3605,7 @@ class Session(object):
 
         self.res_looter = None # ResLoot state object, set up at the beginning of each session
         self.starting_base_damage = None # copy of viewing_base.calc_base_damage() result made at the beginning of each session
+        self.starting_resources = None # resources in storage at beginning of each session (for viewing_player)
 
         self.resurrectable_objects = [] # list of resurrectable objects destroyed during current attack
         self.loot = {} # how much has been looted during the current attack e.g. {'resource1':123, 'resource2':345}
@@ -17089,6 +17090,7 @@ class GAMEAPI(resource.Resource):
                         'base_type': session.viewing_base.base_type,
                         'base_creation_time': session.viewing_base.base_creation_time,
                         'starting_base_damage': session.starting_base_damage,
+                        'starting_resources': session.starting_resources,
                         'base_times_attacked': session.viewing_base.base_times_attacked,
                         'base_ncells': session.viewing_base.ncells(),
                         'base_map_loc': copy.deepcopy(session.viewing_base.base_map_loc),
@@ -17563,6 +17565,7 @@ class GAMEAPI(resource.Resource):
 
             event_props = {'battle_outcome':outcome,
                            'starting_base_damage': session.starting_base_damage,
+                           'starting_resources': session.starting_resources,
                            'base_damage': base_damage,
                            'base_id':session.viewing_base.base_id,
                            'opponent_user_id':session.viewing_user.user_id,
@@ -17691,6 +17694,7 @@ class GAMEAPI(resource.Resource):
                                 'base_ncells': session.viewing_base.ncells(),
                                 'base_map_loc': copy.deepcopy(session.viewing_base.base_map_loc),
                                 'starting_base_damage': session.starting_base_damage, # note, this will ignore repairs since the start of the session
+                                'starting_resources': session.starting_resources,
                                 'defender_id': session.user.user_id,
                                 'defender_type': 'human',
                                 'defender_name': session.user.get_ui_name(session.player),
@@ -17837,8 +17841,9 @@ class GAMEAPI(resource.Resource):
         session.reset_attack_log()
         session.attack_finish_time = -1
         session.loot = {}
-        session.starting_base_damage = None
         session.res_looter = None
+        session.starting_base_damage = None
+        session.starting_resources = None
         session.items_expended = {}
         session.auto_resolved = False
         session.resurrectable_objects = []
@@ -18486,9 +18491,9 @@ class GAMEAPI(resource.Resource):
 
         session.res_looter = ResLoot.ResLoot(gamedata, session, session.player, session.viewing_player, session.viewing_base,
                                              session.player.stattab.get_player_stat('loot_factor_pve' if session.viewing_player.is_ai() else 'loot_factor_pvp'))
-
         # tell client about res looter state
         session.res_looter.send_update(change_retmsg)
+        session.starting_resources = session.viewing_player.resources.get_fungible_amounts()
 
         # if visiting a quarry that you own, force repairs to start
         if session.viewing_base.base_landlord_id == session.player.user_id and \
@@ -21952,6 +21957,7 @@ class GAMEAPI(resource.Resource):
                                'attacker_deployable_squads': session.deployable_squads.copy(),
                                'base_id': session.viewing_base.base_id,
                                'starting_base_damage': session.starting_base_damage,
+                               'starting_resources': session.starting_resources,
                                'opponent_user_id':session.viewing_user.user_id,
                                'opponent_level':session.viewing_player.resources.player_level,
                                'opponent_type':session.viewing_player.ai_or_human()}
