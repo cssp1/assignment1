@@ -201,7 +201,7 @@ def reload_static_includes():
     global static_includes
     STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'index_body_bh.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'facebookexternalhit.html',
+                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html',
                             'XsollaSDK.js']
     new_includes = dict([(basename, str(open('../gameclient/'+basename).read())) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
@@ -1735,6 +1735,7 @@ class GameProxy(proxy.ReverseProxyResource):
             replacements = self.get_fb_global_variables(request, visitor)
             screen_name, screen_data = get_loading_screen('fb_guest')
             replacements['$FACEBOOK_GUEST_SPLASH_IMAGE$'] = SpinJSON.dumps(screen_data)
+            replacements['$GOOGLE_ANAYTICS_SDK$'] = get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else ''
             metric_props['splash_image'] = screen_name
             expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
             ret = str(expr.sub(lambda match: replacements[match.group(0)], get_static_include('fb_guest.html')))
@@ -2235,6 +2236,8 @@ class GameProxy(proxy.ReverseProxyResource):
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
+            '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
+
             # XXX probably need a frame platform restriction on loading Xsolla
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.js') if (SpinConfig.config.get('enable_xsolla',0)) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
