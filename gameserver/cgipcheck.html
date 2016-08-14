@@ -13,7 +13,7 @@
 <script src="https://s3.amazonaws.com/$SPIN_PUBLIC_S3_BUCKET$/jquery.flot.navigate.min.js"></script>
 <style type="text/css">
 body { font-size: 14px;
-font-family: Trebuchet MS,Tahoma,Verdana,Arial,sans-serif;
+font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Fira Sans","Droid Sans","Helvetica Neue",sans-serif;
 background: #dddddd; color: #000000;
 padding:0; margin: 10px; }
 label { font-size: 14px; }
@@ -1838,7 +1838,7 @@ Status: <span id="payment_status"></span>
 <label><input id="chat_show_automated" type="checkbox" checked="1" style="height:initial;" onclick="refresh_chat();">Show automated reports</label>
 <label><input id="chat_show_tier34" type="checkbox" style="height:initial;" onclick="refresh_chat();">Show Tier 3/4 channels</label>
 <p>
-<table id="chat_table" width="100%" style="font-size:12px;font-family:sans-serif;"></table>
+<table id="chat_table" width="100%" style="font-size:12px;"></table>
 <br>
 
 </div> <!-- END mode_chat -->
@@ -1850,7 +1850,7 @@ Status: <span id="payment_status"></span>
 <div id="server_status_loading">STATUS</div>
 <div style="position:absolute;top:0px;right:0px;"><label style="margin:10px;"><input id="auto_refresh_server_status" type="checkbox" checked="1" style="height:initial;"></input>Auto</label><button onclick="refresh_server_status()" style="width:150px;height:30px;">Refresh</button></div>
 <p>
-<table id="server_status_table" width="100%" style="font-size:11px;font-family:sans-serif;padding:0;"></table>
+<table id="server_status_table" width="100%" style="font-size:11px;padding:0;"></table>
 <br>
 <button id="scm_up_button" onclick="scm_up()">SCM up</button>
 <button id="download_art_button" onclick="download_art()">Download Art</button>
