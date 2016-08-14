@@ -1735,7 +1735,7 @@ class GameProxy(proxy.ReverseProxyResource):
             replacements = self.get_fb_global_variables(request, visitor)
             screen_name, screen_data = get_loading_screen('fb_guest')
             replacements['$FACEBOOK_GUEST_SPLASH_IMAGE$'] = SpinJSON.dumps(screen_data)
-            replacements['$GOOGLE_ANAYTICS_SDK$'] = get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else ''
+            replacements['$GOOGLE_ANALYTICS_SDK$'] = get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else ''
             metric_props['splash_image'] = screen_name
             expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
             ret = str(expr.sub(lambda match: replacements[match.group(0)], get_static_include('fb_guest.html')))
