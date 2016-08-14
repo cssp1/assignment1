@@ -7,9 +7,10 @@ test_regions[piratewarmers]=kasei101
 test_regions[flavorysoda]=sector200
 test_regions[tablettransform]=sector200
 test_regions[rummagestones]=map101
+test_regions[refitskier]=sector200
 export PYTHONPATH="/home/ec2-user/twisted-13.2.0/lib64/python:$PYTHONPATH"
 
-for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummagestones flavorysoda; do
+for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummagestones flavorysoda refitskier; do
     # update to latest code
     (cd /home/ec2-user/$GAMEDIR/gameserver && \
         ../scmtool.sh force-up > /dev/null && \
