@@ -440,7 +440,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             // 20160817 client exception debugging code
                             // TypeError: Cannot read property 'max_hp' of undefined
                             if(!(o['spec'] in gamedata['units'])) {
-                                throw Error('bad stack_list: '+JSON.stringify(_obj['stack_list']));
+                                throw Error('bad stack_list: units' + JSON.stringify(goog.object.getKeys(gamedata['units'])) + ' stack_list: '+JSON.stringify(_obj['stack_list']));
                             }
                             var curmax = army_unit_hp(o);
                             var ratio = curmax[0]/Math.max(curmax[1],1);
