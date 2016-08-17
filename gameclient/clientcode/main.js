@@ -29327,6 +29327,14 @@ var SQUAD_IDS = { BASE_DEFENDERS: 0, RESERVES: -1,
 
 // return [cur,max] HP for a persisted unit
 function army_unit_hp(obj) {
+    // 20160817 client exception debugging code
+    // TypeError: Cannot read property 'max_hp' of undefined
+    if(obj === undefined) {
+        throw Error('obj is undefined');
+    } else if(!obj['spec'] || !(obj['spec'] in gamedata['units'])) {
+        throw Error('bad spec: '+(obj['spec'] ? obj['spec'] : 'missing'));
+    }
+
     var level = obj['level'] || 1;
     var spec = gamedata['units'][obj['spec']];
     var max_hp = ('max_hp' in obj ? obj['max_hp'] : get_leveled_quantity(spec['max_hp']||0, level));
