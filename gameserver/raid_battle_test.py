@@ -4,29 +4,48 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
+# Simple self-contained simulator for unit vs unit balance in battles
+# Intended to help decide how DPS/HP/COST should vary with tier and unit category
+
+# NOTE: throughout this script, we measure "Damage Per Victory" (DPV) as the key efficiency stat.
+# This is the damage that your attacking army suffers in order to kill a defending army.
+# If multiple attacks are required, because the defending army is stronger than you,
+# it accumulates the damage taken in all attacks.
+
+# DPV is expressed in units of resource cost (e.g. a Tier 1 unit takes BASE_COST damage to raise to full health).
+# "ROI" would be proportional to 1/DPV.
+
+# In the simulation runs, we compare attacks against dissimilar armies with the "baseline" DPV that results from
+# fighting a mirror copy of your own army.
+
 import sys, getopt, random, copy
 from math import pow, log, sqrt
 import ANSIColor
 
-verbose = 0
+verbose = 3 # set to 1, 2, or 3 to print more detailed output
 
-# XXX check within-tier increments
+# "power" combines the effect of DPS * damage_vs for rock/paper/scissors categories
+BASE_POWER_BETTER = 8 # vs. category you are strong against
+BASE_POWER_EQUAL = 7 # vs. same category
+BASE_POWER_WORSE = 6 # vs. category you are weak against
 
-BASE_POWER_EQUAL = 5
-BASE_POWER_BETTER = 10
-BASE_POWER_WORSE = 2
+# starting cost, HP, and space of a Tier 1 unit
 BASE_COST = 10
 BASE_HP = 30
 BASE_SPACE = 1
 
-TIER_POWER_INC = 1.8
-TIER_HP_INC = 1.8
-TIER_COST_INC = 1.5 # = econ growth
+# multiplicative increase in DPS, HP, and cost per tier
+TIER_POWER_INC = 1.55
+TIER_HP_INC = 1.55
+TIER_COST_INC = 1.5 # = per-tier economy growth rate (dictated by the master balance spreadsheet - do not change this!)
 
+# simulate this size army
 ARMY_SIZE = 6
 
+# generate unit stats
 UNIT_CATS = ['roc', 'pap', 'sci']
 UNITS = {}
+
 for tier in (1,2,3):
     for cat in UNIT_CATS:
         specname = 'tier%d_%s' % (tier, cat)
@@ -40,6 +59,8 @@ for tier in (1,2,3):
                                        }
                            }
 
+# generate an army (list of units) of a given tier
+# "portion" is a dictionary with the category composition to use (values should add up to 1)
 def make_army(tier, portion, fullness = 1):
     army = []
     qty = dict((cat, int(ARMY_SIZE//BASE_SPACE * portion[cat] * fullness + 0.5)) for cat in UNIT_CATS)
@@ -51,6 +72,7 @@ def make_army(tier, portion, fullness = 1):
             army.append({'spec': specname, 'hp': UNITS[specname]['hp'], 'max_hp': UNITS[specname]['hp']})
     return army
 
+# calculate resource cost of an army, scaled by health
 def army_cost(army):
     cost = 0
     for unit in army:
@@ -59,6 +81,7 @@ def army_cost(army):
         cost += hp_ratio * spec['cost']
     return cost
 
+# simulate a single battle between two armies, until one of them is totally dead
 def fight(a, b, randgen = None):
     if randgen is None:
         randgen = random.Random()
@@ -77,18 +100,21 @@ def fight(a, b, randgen = None):
 
         for i in (0,1):
             if len(sides[i]) < 1:
+                # one of the armies is totally dead
                 winner = 1-i; break
         if winner is not None: break
 
-        # uniformly choose next shooter from all live units
+        # uniformly choose next shooter from all living units
         shooter_i = randgen.randint(0, len(sides[0]) + len(sides[1]) - 1)
         if shooter_i < len(sides[0]):
+            i = 0
             defense = sides[1]
             shooter = sides[0][shooter_i]
         else:
+            i = 1
             defense = sides[0]
             shooter = sides[1][shooter_i - len(sides[0])]
-        # then choose target uniformly from all live units on the other side
+        # then choose target uniformly from all living units on the other side
         target = randgen.choice(defense)
 
         shooter_spec = UNITS[shooter['spec']]
@@ -98,7 +124,7 @@ def fight(a, b, randgen = None):
         for tag in target_spec['defense']:
             if tag in shooter_spec['offense']:
                 coeff *= target_spec['defense'][tag] * shooter_spec['offense'][tag]
-        #coeff = int(coeff)
+        #coeff = int(coeff) # should we quantize damage values?
         assert coeff > 0
 
         old_hp = target['hp']
@@ -113,9 +139,11 @@ def fight(a, b, randgen = None):
 
         #print i, shooter, 'shoots', target, 'coeff', coeff, 'old_hp', old_hp, 'new_hp', target['hp'], 'dmg', dmg
 
+        # accumulate damage into the total for this side
         total_damage[1-i] += dmg
 
         if target['hp'] <= 0:
+            # remove dead unit
             defense.remove(target)
             #print 'DEAD', 1-i, target, len(defense), 'left'
 
@@ -134,21 +162,24 @@ def fight(a, b, randgen = None):
 
     return winner, total_damage
 
+# run many engagements between two armies.
+# for each engagement, if army_a loses, refresh the units back to full health and fight again, until army_b is dead.
+# (but keep count of the total damage for all battles in each engagement)
 def analyze(army_a, army_b):
     randgen = random.Random()
 
-    SAMPLES = 1000
+    SAMPLES = 1000 # number of engagements to simulate
     wins = 0
     damage_samples = []
     n_attacks_samples = []
 
     for i in xrange(SAMPLES):
-        # make mutable copies
+        # make mutable copies of the armies
         a, b = [copy.copy(x) for x in army_a], [copy.copy(x) for x in army_b]
         a_damage = 0.0
         n_attacks = 0
         iter = 0
-        while iter < 99:
+        while iter < 99: # make up to 99 attacks until army_a wins
 
             winner, total_damage = fight(a, b, randgen = randgen)
             a_damage += total_damage[0] # add damage
@@ -156,10 +187,10 @@ def analyze(army_a, army_b):
 
             if winner == 0:
                 if iter == 0:
-                    wins += 1 # only count wins on first battle
+                    wins += 1 # only count wins on first attack
                 break
             else:
-                # resurrect dead army, keeping damage count
+                # resurrect the dead army_a, keeping damage counter
                 assert len(a) == 0
                 a = [copy.copy(x) for x in army_a]
             iter += 1
@@ -167,6 +198,7 @@ def analyze(army_a, army_b):
         damage_samples.append(a_damage)
         n_attacks_samples.append(n_attacks)
 
+    # calculate odds of winning on first attack
     if wins == SAMPLES:
         win_odds = float('inf')
         log_win_odds = float('inf')
@@ -179,6 +211,7 @@ def analyze(army_a, army_b):
 
     win_variance = (wins/float(SAMPLES)) * ((SAMPLES-wins)/float(SAMPLES))
 
+    # calculate median damage per victory
     damage_samples.sort()
     median_damage = (damage_samples[SAMPLES//2-1] + damage_samples[SAMPLES//2])/2.0
     #median_n_attacks = (n_attacks_samples[SAMPLES//2-1] + n_attacks_samples[SAMPLES//2])/2.0
@@ -192,6 +225,8 @@ def analyze(army_a, army_b):
         print 'wins', wins, '/', SAMPLES, 'ln(odds)', log_win_odds, 'median damage', median_damage, 'avg #attacks', avg_n_attacks
     return (wins,SAMPLES), log_win_odds, median_damage, avg_n_attacks, win_variance
 
+# harness to run simulations on army "a" vs army "b" and compare damage-per-victory against the baseline
+# print result in green if it is within "bounds", otherwise red.
 def test_efficiency(reason, bounds, a, b, dpv_baseline):
     wins, log_win_odds, median_damage, avg_n_attacks, win_variance = analyze(a,b)
 
@@ -215,6 +250,8 @@ if __name__ == '__main__':
     for specname in sorted(UNITS.keys()):
         print specname, UNITS[specname]
 
+    # make some armies of various tiers and compositions
+    print 'ARMIES'
     tier1_balanced = make_army(1, {'roc':0.34, 'pap':0.34, 'sci':0.34})
     tier1_bigger = make_army(1, {'roc':0.34, 'pap':0.34, 'sci':0.34}, fullness = 2.0)
     tier1_roc = make_army(1, {'roc':0.66, 'pap':0.166, 'sci':0.166})
@@ -234,36 +271,39 @@ if __name__ == '__main__':
     dpv_baseline = analyze(tier1_balanced, tier1_balanced)[2]
     print 'dpv_baseline', dpv_baseline
 
+    # TARGET DPV ranges that we want to control balance towards
     # all else being equal, against the same opponent:
-    TARGET_DPV_INC = [2.3,2.9] # goal DPV increase per level below target (must be >= economy growth^2)
+    TARGET_DPV_INC = [2.26,2.9] # goal DPV increase per level below target (must be >= economy growth^2)
     TARGET_DPV_DEC = [1.0/2.3,0.8] # goal DPV decrease per level above target (must be >= 1/DPV_INC)
-    BETTER_ARMY_DEC = [0.5,0.75] # target DPV decrease by having a perfectly better-matched army
+    BETTER_ARMY_DEC = [0.5,0.85] # target DPV decrease by having a perfectly better-matched army
 
+    if 1:
+        test_efficiency('vs. tier N+2 army', [pow(TARGET_DPV_INC[0],2), pow(TARGET_DPV_INC[1],2)],
+                        tier1_balanced, tier3_balanced, dpv_baseline)
+        test_efficiency('vs. tier N+1 army', TARGET_DPV_INC,
+                        tier1_balanced, tier2_balanced, dpv_baseline)
 
-    test_efficiency('vs. tier N+2', [pow(TARGET_DPV_INC[0],2), pow(TARGET_DPV_INC[1],2)],
-                    tier1_balanced, tier3_balanced, dpv_baseline)
-    test_efficiency('vs. tier N+1', TARGET_DPV_INC,
-                    tier1_balanced, tier2_balanced, dpv_baseline)
+        test_efficiency('Same army, same tier', [0.9,1.1], tier1_balanced, tier1_balanced, dpv_baseline)
 
-    test_efficiency('Same army, same tier', [0.9,1.1], tier1_balanced, tier1_balanced, dpv_baseline)
+        test_efficiency('vs. tier N-1 army', TARGET_DPV_DEC,
+                        tier2_balanced, tier1_balanced, dpv_baseline)
 
-    test_efficiency('vs. tier N-1', TARGET_DPV_DEC,
-                    tier2_balanced, tier1_balanced, dpv_baseline)
+        test_efficiency('vs. tier N-2 army', [pow(TARGET_DPV_DEC[0],2), pow(TARGET_DPV_DEC[1],2)],
+                        tier3_balanced, tier1_balanced, dpv_baseline)
 
-    test_efficiency('vs. tier N-2', [pow(TARGET_DPV_DEC[0],2), pow(TARGET_DPV_DEC[1],2)],
-                    tier3_balanced, tier1_balanced, dpv_baseline)
+        test_efficiency('Slightly better-matched army, same tier', [pow(BETTER_ARMY_DEC[0],0.5), pow(BETTER_ARMY_DEC[1],0.5)],
+                        tier1_roc, tier1_sci, dpv_baseline)
 
+    if 1:
+        test_efficiency('Perfectly better-matched army, same tier', BETTER_ARMY_DEC,
+                        tier1_roc_only, tier1_sci_only, dpv_baseline)
 
-    test_efficiency('Slightly better-matched army, same tier', [pow(BETTER_ARMY_DEC[0],0.5), pow(BETTER_ARMY_DEC[1],0.5)],
-                    tier1_roc, tier1_sci, dpv_baseline)
-    test_efficiency('Perfectly better-matched army, same tier', BETTER_ARMY_DEC,
-                    tier1_roc_only, tier1_sci_only, dpv_baseline)
-    test_efficiency('Better-matched army, lower tier', [BETTER_ARMY_DEC[0]*TARGET_DPV_INC[0],
-                                                        BETTER_ARMY_DEC[1]*TARGET_DPV_INC[1]],
-                    tier1_roc, tier2_sci, dpv_baseline)
+    if 1:
+        test_efficiency('Better-matched army, lower tier', [BETTER_ARMY_DEC[0]*TARGET_DPV_INC[0],
+                                                            BETTER_ARMY_DEC[1]*TARGET_DPV_INC[1]],
+                        tier1_roc, tier2_sci, dpv_baseline)
 
-
-    test_efficiency('Bigger army, same tier', [0.5, 0.8],
-                    tier1_bigger, tier1_balanced, dpv_baseline)
-#    test_efficiency('Bigger army, lower tier', [0.5*TARGET_DPV_INC[0], 0.8*TARGET_DPV_INC[1]],
-#                    tier1_bigger, tier2_balanced, dpv_baseline)
+        test_efficiency('Bigger army, same tier', [0.4, 0.8],
+                        tier1_bigger, tier1_balanced, dpv_baseline)
+#        test_efficiency('Bigger army, lower tier', [0.5*TARGET_DPV_INC[0], 0.8*TARGET_DPV_INC[1]],
+#                        tier1_bigger, tier2_balanced, dpv_baseline)
