@@ -111,6 +111,14 @@ class AsyncHTTPRequester(object):
             self.idle_cb = None
             cb()
 
+    # wrapper for queue_request that returns a Deferred
+    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+        d = twisted.internet.defer.Deferred()
+        self.queue_request(qtime, url, d.callback, method=method, headers=headers, postdata=postdata,
+                           error_callback = lambda err_reason, d=d: d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP error: %r' % err_reason))),
+                           preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type)
+        return d
+
     def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
