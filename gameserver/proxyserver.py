@@ -307,10 +307,7 @@ def log_request(request):
           '" getClientIP() '+repr(request.getClientIP())+' isSecure() '+repr(request.isSecure())+' parsed ip ' + repr(ip)
     return ret
 
-def set_cookie(request, cookie_name, value, duration):
-    request.addCookie(cookie_name, value, expires = SpinHTTP.format_http_time(proxy_time+duration))
-    # necessary for IE7+ to accept iframed cookies
-    request.setHeader('P3P', 'CP="CAO DSP CURa ADMa DEVa TAIa PSAa PSDa IVAi IVDi CONi OUR UNRi OTRi BUS IND PHY ONL UNI COM NAV INT DEM CNT STA PRE GOV LOC"')
+
 
 def visitors_browser_supports_xhr_eval(visitor):
     ag = visitor.demographics.get('User-Agent',None)
@@ -974,7 +971,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # check for cookie-reflect launch
         elif ('spin_rfl' in request.args) and SpinConfig.config['proxyserver'].get('enable_reflect_cookie_launch',True):
             new_qs = urllib.urlencode([(k,v[-1]) for k,v in request.args.iteritems() if (k.startswith('spin_') and k != 'spin_rfl')])
-            set_cookie(request, reflect_cookie, new_qs, SpinConfig.config['proxyserver'].get('reflect_cookie_duration',300))
+            SpinHTTP.set_twisted_cookie(request, reflect_cookie, new_qs, proxy_time + SpinConfig.config['proxyserver'].get('reflect_cookie_duration',300))
             metric_event_coded(None, '0010_reflect_cookie_launch', {'Viewed URL': request.uri, 'ip': SpinHTTP.get_twisted_client_ip(request), 'referer': SpinHTTP.get_twisted_header(request, 'referer'), 'args': request.args})
             return self.index_visit_redirect(request.args['spin_rfl'][-1])
 
@@ -993,7 +990,7 @@ class GameProxy(proxy.ReverseProxyResource):
             duration = SpinConfig.config['proxyserver'].get('anon_id_duration', 600)
             anon_id = SpinSignature.AnonID.create(proxy_time + duration,
                                                   SpinHTTP.get_twisted_client_ip(request), frame_platform, SpinConfig.config['proxy_api_secret'], str(random.randint(0,100000)))
-            set_cookie(request, cookie_name, anon_id, duration)
+            SpinHTTP.set_twisted_cookie(request, cookie_name, anon_id, proxy_time + duration)
             #exception_log.event(proxy_time, 'proxyserver: NEW cookie '+anon_id)
 
         if anon_id not in visitor_table:

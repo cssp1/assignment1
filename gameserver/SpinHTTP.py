@@ -83,6 +83,12 @@ def set_accepted(request):
 
 accepted_response_body = '{"result": "ok", "status": 202}\n'
 
+def set_twisted_cookie(request, cookie_name, value, expire_time,
+                       domain = None, path = None, secure = None, httpOnly = False):
+    request.addCookie(cookie_name, value, expires = format_http_time(expire_time),
+                      domain = domain, path = path, secure = secure, httpOnly = httpOnly)
+    # necessary for IE7+ to accept iframed cookies
+    request.setHeader('P3P', 'CP="CAO DSP CURa ADMa DEVa TAIa PSAa PSDa IVAi IVDi CONi OUR UNRi OTRi BUS IND PHY ONL UNI COM NAV INT DEM CNT STA PRE GOV LOC"')
 
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
