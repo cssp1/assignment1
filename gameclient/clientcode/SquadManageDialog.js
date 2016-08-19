@@ -435,12 +435,12 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                     } else {
                         extreme_hp_ratio = -1;
                     }
-                    goog.object.forEach(_obj['stack_list'], function(o) {
+                    goog.array.forEach(_obj['stack_list'], function(o) {
                         if(!o['pending']) {
                             // 20160817 client exception debugging code
                             // TypeError: Cannot read property 'max_hp' of undefined
                             if(!o['spec'] || !(o['spec'] in gamedata['units'])) {
-                                throw Error('bad stack_list: units' + JSON.stringify(goog.object.getKeys(gamedata['units'])) + ' stack_list entry: '+JSON.stringify(o));
+                                throw Error('bad stack_list in '+JSON.stringify(_obj)+' entry: '+JSON.stringify(o));
                             }
                             var curmax = army_unit_hp(o);
                             var ratio = curmax[0]/Math.max(curmax[1],1);
@@ -451,7 +451,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                             }
                         }
                     });
-                    is_last = (goog.object.getCount(_obj['stack_list']) === 1);
+                    is_last = (_obj['stack_list'].length === 1);
                 } else {
                     to_unassign = _obj;
                     is_last = true;
@@ -728,6 +728,8 @@ SquadManageDialog.stack_squad_units = function(squad_units) {
     var ret = [];
     var last_unit = null;
     goog.array.forEach(squad_units, function(unit) {
+        if(!unit) { throw Error('bad unit in '+JSON.stringify(squad_units)); }
+
         var hp_cur_max = army_unit_hp(unit);
 
         if(last_unit && last_unit['spec'] === unit['spec'] &&
