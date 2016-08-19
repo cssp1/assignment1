@@ -13743,20 +13743,28 @@ function inventory_item_is_usable_in_combat(spec, session) {
 }
 
 function update_combat_item_bar(dialog) {
-    var indices_by_spec = {};
+    var indices_by_spec = {}; // mapping from specname to index within entry_list
     var entry_list = [];
 
     var add_item = function(item, i) { // "i" is integer for ordinary inventory items, and {'obj_id':..., 'slot_type':..., 'slot_index':...} for equipped items
         if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) != UsableInCombat.NOT_USABLE) {
             if(item['spec'] in indices_by_spec) {
-                // group with items of identical specs
-                // note: the 'pending'/'pending_time' flags will only be taken from the first item
-                // this assumes that items get "used" in the order they are listed in player.inventory
+                // merge items of identical specs into a single entry in entry_list
+                // note: the 'pending'/'pending_time' flags will only be taken from one item, the next one "in line" to be used
                 var index = indices_by_spec[item['spec']];
                 entry_list[index]['stack'] += (item['stack']||1);
+
+                // prefer using items coming from smaller stacks first,
+                // to help players use inventory slots more efficiently
+                if((item['stack']||1) < entry_list[index]['smallest_stack']) {
+                    entry_list[index]['smallest_stack'] = (item['stack']||1);
+                    // this particular item should be used before others of its spec - swap it into the 'item' field and repoint slot to it
+                    entry_list[index]['item'] = item;
+                    entry_list[index]['slot'] = i;
+                }
             } else {
                 indices_by_spec[item['spec']] = entry_list.length;
-                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1)});
+                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1), 'smallest_stack': (item['stack']||1)});
             }
         }
     }
