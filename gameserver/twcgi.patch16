@@ -1,0 +1,14 @@
+Fix CVE-2016-1000111 by stopping the CGI server from passing client-provided Proxy headers to CGI scripts.
+
+--- twisted/web/twcgi.py   2016-08-20 20:56:54.109303685 +0000
++++ twisted/web/twcgi.py   2016-08-20 20:56:59.389375324 +0000
+@@ -116,7 +116,7 @@
+         # Propagate HTTP headers
+         for title, header in request.getAllHeaders().items():
+             envname = title.replace('-', '_').upper()
+-            if title not in ('content-type', 'content-length'):
++            if title not in ('content-type', 'content-length', 'proxy'):
+                 envname = "HTTP_" + envname
+             env[envname] = header
+         # Propagate our environment
+

@@ -103,16 +103,11 @@ echo "pip install --upgrade brotlipy"
 # FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
 echo "pip install --upgrade geoip2"
 
-# UPDATE TWISTED
-# (obsolete)
-# echo  " download from http://twistedmatrix.com/trac/wiki/Downloads and untar"
-# echo  " mkdir -p /home/ec2-user/twisted-13.2.0/lib64/python"
-# echo  " PYTHONPATH=/home/ec2-user/twisted-13.2.0/lib64/python python setup.py install --home=/home/ec2-user/twisted-13.2.0"
-# echo 'export PYTHONPATH="$PYTHONPATH:/home/ec2-user/twisted-13.2.0/lib64/python" in ~/.bash_profile'
-# echo "note: might require manual installation of newer version of zope.interface"
+# INSTALL TWISTED
 
 echo "pip install --upgrade twisted"
 echo "Apply gameserver/http.py.patchX to twisted/web/http.py wherever it is installed"
+echo "If using Twisted < 16.3.2, apply gameserver/twcgi.py.twisted16 to twisted/web/twcgi.py wherever it is installed"
 
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
