@@ -26,6 +26,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
+from twisted.protocols.policies import ProtocolWrapper
 import twisted.internet.utils
 from twisted.web import server, resource, http
 import twisted.web.error
@@ -14607,7 +14608,7 @@ class CONTROLAPI(resource.Resource):
     def handle_maint_kick(self, request):
         return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
-        gamesite.panic_kick(request.transport)
+        gamesite.panic_kick(request.channel.transport)
         return SpinJSON.dumps({'result': 'ok'})
     def handle_change_state(self, request, state = None):
         return SpinJSON.dumps({'result':gamesite.change_state(state)}, newline=True)
@@ -29181,7 +29182,7 @@ class WS_GAMEAPI(websockets.WebSocketsResource):
         # to let the gamesite know it's gone to get the accounting right
 
         # Secure connections wrap in TLSMemoryBIOProtocol too.
-        old_protocol = request.transport.protocol.wrappedProtocol if request.isSecure() else request.transport.protocol
+        old_protocol = request.channel.transport.wrappedProtocol if isinstance(request.channel.transport, ProtocolWrapper) else request.channel.transport.protocol
         assert isinstance(old_protocol, GameSite.GameProtocol)
 
         ret = websockets.WebSocketsResource.render(self, request)

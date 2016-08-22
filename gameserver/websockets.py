@@ -542,19 +542,26 @@ class WebSocketsResource(object):
 
         # And now take matters into our own hands. We shall manage the
         # transport's lifecycle.
-        transport, request.transport = request.transport, None
+        transport, request.channel.transport = request.channel.transport, None
 
         # Connect the transport to our factory, and make things go. We need to
         # do some stupid stuff here; see #3204, which could fix it.
 
-        # DJM - from websockets-tls.diff
-        if request.isSecure():
-            # Secure connections wrap in TLSMemoryBIOProtocol too.
-            transport.protocol.wrappedProtocol = protocol
+        # DJM - Autobahn uses this variant, not sure which is correct (in wrapped case,
+        # websockets-tls.diff sets transport.protocol.wrappedProtocol = protocol)
+        if isinstance(transport, ProtocolWrapper):
+        # i.e. TLS is a wrapping protocol
+            transport.wrappedProtocol = protocol
         else:
             transport.protocol = protocol
 
         protocol.makeConnection(transport)
+
+        # On Twisted 16.3.0+, the transport is paused whilst the existing
+        # request is served; there won't be any requests after us so we can
+        # just resume this ourselves.
+        if hasattr(transport, "resumeProducing"):
+            transport.resumeProducing()
 
         return NOT_DONE_YET
 
