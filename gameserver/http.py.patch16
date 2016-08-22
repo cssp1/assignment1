@@ -1,6 +1,6 @@
---- http.py.orig	2016-07-04 22:22:24.000000000 +0900
-+++ http.py	2016-07-04 22:22:38.000000000 +0900
-@@ -306,10 +306,14 @@
+--- http.py.orig	2016-08-18 15:53:15.000000000 +0000
++++ http.py	2016-08-22 23:41:16.686589560 +0000
+@@ -312,10 +312,14 @@
      else:
          raise ValueError("Unknown datetime format %r" % dateString)
  
@@ -19,36 +19,26 @@
      return int(timegm(year, month, day, hour, min, sec))
  
  
-@@ -614,14 +618,21 @@
+@@ -624,9 +628,15 @@
          if self.producer:
              log.err(RuntimeError("Producer was not unregistered for %s" % self.uri))
              self.unregisterProducer()
 -        self.channel.requestDone(self)
 -        del self.channel
--        try:
--            self.content.close()
--        except OSError:
--            # win32 suckiness, no idea why it does this
+-        if self.content is not None:
 +        if not hasattr(self, 'channel'):
 +            # DJM - this occurs periodically when serving up static art files. Probably harmless, so don't log an exception...
 +            #raise Exception('DJM TWISTED '+repr(self))
-             pass
--        del self.content
++            pass
 +        else:
 +            self.channel.requestDone(self)
 +            del self.channel
 +        if hasattr(self, 'content'):
 +            # DJM - again, spurious exception
-+            try:
-+                self.content.close()
-+            except OSError:
-+                # win32 suckiness, no idea why it does this
-+                pass
-+            del self.content
-         for d in self.notifications:
-             d.callback(None)
-         self.notifications = []
-@@ -867,6 +878,8 @@
+             try:
+                 self.content.close()
+             except OSError:
+@@ -859,6 +869,8 @@
          Indicate that all response data has been written to this L{Request}.
          """
          if self._disconnected:
@@ -57,8 +47,8 @@
              raise RuntimeError(
                  "Request.finish called on a request after its connection was lost; "
                  "use Request.notifyFinish to keep track of this.")
-@@ -1864,7 +1877,8 @@
-             self.transport.loseConnection()
+@@ -1941,7 +1953,8 @@
+ 
  
      def timeoutConnection(self):
 -        log.msg("Timing out client: %s" % str(self.transport.getPeer()))
@@ -66,4 +56,4 @@
 +        #log.msg("Timing out client: %s" % str(self.transport.getPeer()))
          policies.TimeoutMixin.timeoutConnection(self)
  
-     def connectionLost(self, reason):
+ 
