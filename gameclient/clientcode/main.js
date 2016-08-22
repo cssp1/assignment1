@@ -46589,7 +46589,7 @@ function handle_server_message(data) {
         receive_unit_repair_update(data[1]);
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
-        invoke_child_message_dialog(s['ui_title'], s['ui_description'], {dialog: s['dialog']});
+        invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});
     } else if(msg == "IDLE_CHECK") {
         invoke_idle_check_dialog(data[1]);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {
