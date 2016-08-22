@@ -114,8 +114,18 @@ class AsyncHTTPRequester(object):
     # wrapper for queue_request that returns a Deferred
     def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
         d = twisted.internet.defer.Deferred()
-        self.queue_request(qtime, url, d.callback, method=method, headers=headers, postdata=postdata,
-                           error_callback = lambda err_reason, d=d: d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP error: %r' % err_reason))),
+
+        if callback_type == self.CALLBACK_BODY_ONLY:
+            success_cb = d.callback
+            error_cb = lambda err_reason, d=d: \
+                       d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP error: %r' % err_reason)))
+        elif callback_type == self.CALLBACK_FULL:
+            success_cb = lambda body=None, headers=None, status=None, d=d: d.callback((body, headers, status))
+            error_cb = lambda ui_reason=None, body=None, headers=None, status=None, d=d: \
+                       d.errback(twisted.python.failure.Failure(Exception('AsyncHTTP error: %r' % ui_reason)))
+
+        self.queue_request(qtime, url, success_cb, method=method, headers=headers, postdata=postdata,
+                           error_callback = error_cb,
                            preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type)
         return d
 
