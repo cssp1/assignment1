@@ -24203,33 +24203,34 @@ class GAMEAPI(resource.Resource):
             user.retrieve_facebook_requests_start()
             user.retrieve_facebook_credit_info_start()
 
+            # note: as of 2016 August 22, Facebook changed the query string for App Request hits
+            # it's a bit ambiguous now - I think the only way to be SURE what kind of request
+            # it was would be to actually ping the request_id objects and inspect them!
+
             # record FB notification hits
-            if ('fb_source' in url_qs) and ('notif_t' in url_qs) and ('fb_ref' in url_qs) and \
-               (url_qs['fb_source'][0] == 'notification') and (url_qs['notif_t'][0] == 'app_notification'):
+            if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
+               ('app_request_type' not in url_qs) and ('fb_ref' in url_qs):
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
                                     'fb_ref': url_qs['fb_ref'][0]})
 
             # record FB request (invite or gift) hits
-            if ('fb_source' in url_qs) and ('notif_t' in url_qs) and ('request_ids' in url_qs) and (url_qs['fb_source'][0] == 'notification'):
+            if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
+               ('app_request_type' in url_qs) and (url_qs['app_request_type'][0] == 'user_to_user') and \
+               ('request_ids' in url_qs):
                 request_event = None
-                if url_qs['notif_t'][0] == 'app_request':
 
-                    # note: as of 2016 June 3, Facebook changed the query string for App Request hits
-                    # it's a bit ambiguous now - I think the only way to be SURE what kind of request
-                    # it was would be to actually ping the request_id objects and inspect them!
+                if 'content' in url_qs and url_qs['content'][0].startswith('send'): # this is *probably* a gift
+                    request_event = '4107_send_gifts_hit_redundant' if is_returning_user else '4106_send_gifts_hit_acquisition'
+                    request_id = url_qs['request_ids'][0].split(',')[0]
 
-                    if 'content' in url_qs and url_qs['content'][0].startswith('send:'): # this is *probably* a gift
-                        request_event = '4107_send_gifts_hit_redundant' if is_returning_user else '4106_send_gifts_hit_acquisition'
-                        request_id = url_qs['request_ids'][0].split(',')[0]
+                elif ('content' not in url_qs): # this is *probably* a friend invite
+                    request_event = '7107_invite_friends_hit_redundant' if is_returning_user else '7106_invite_friends_hit_acquisition'
 
-                    elif ('content' not in url_qs): # this is *probably* a friend invite
-                        request_event = '7107_invite_friends_hit_redundant' if is_returning_user else '7106_invite_friends_hit_acquisition'
-
-                        for request_id in url_qs['request_ids'][0].split(','):
-                            if (not is_returning_user):
-                                # update acquisition data - we need to rewrite retrieve_facebook_requests_complete(), it's old and creaky
-                                user.update_acquisition_data({'facebook_request_id': request_id.split('_')[0], 'type': 'facebook_friend_invite'}, session.player)
+                    for request_id in url_qs['request_ids'][0].split(','):
+                        if (not is_returning_user):
+                            # update acquisition data - we need to rewrite retrieve_facebook_requests_complete(), it's old and creaky
+                            user.update_acquisition_data({'facebook_request_id': request_id.split('_')[0], 'type': 'facebook_friend_invite'}, session.player)
 
 
                 if request_event:
