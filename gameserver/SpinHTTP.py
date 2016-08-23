@@ -32,6 +32,8 @@ def wrap_string(input):
 # below functions are specific to Twisted
 
 from twisted.web.server import NOT_DONE_YET
+from twisted.web.http import INTERNAL_SERVER_ERROR
+from twisted.python.failure import Failure
 
 # set cross-site allow headers on Twisted HTTP requests
 def _set_access_control_headers(request, origin, max_age):
@@ -180,3 +182,12 @@ def complete_deferred_request(body, request, http_status = None):
         request.setResponseCode(http_status)
     request.write(body)
     request.finish()
+
+# wrapper for complete_deferred_request() that handles Failure results so you can put it
+# at the end of a Deferred chain and it will do the right thing for successes and errors.
+def complete_deferred_request_safe(body, request, http_status = None):
+    if isinstance(body, Failure):
+        request.setHeader('Content-Type', 'text/plain')
+        request.setResponseCode(INTERNAL_SERVER_ERROR)
+        body = 'error: %s' % repr(body)
+    complete_deferred_request(body, request, http_status = http_status)
