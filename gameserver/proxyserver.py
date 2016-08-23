@@ -1209,13 +1209,18 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_bh(self, request, visitor):
         # example hit:
-        # http://myserver.example.com:8005/BHROOT?code=0000abcd&state=something
+        # (Mattermost OAuth provider) http://myserver.example.com:8005/BHROOT?code=0000abcd&state=something
+        # (Battlehouse loginserver) http://myserver.example.com:8005/BHROOT?bh_access_token=...
 
         if self.the_pool_is_closed():
             return self.index_visit_go_away(request, visitor)
 
+        if 'bh_access_token' in request.args:
+            # any hit, Battlehouse login server
+            return self.index_visit_do_bh_login(request, visitor, request.args['bh_access_token'][0])
+
         if not (('code' in request.args) and ('state' in request.args)):
-            # initial hit
+            # initial hit, Mattermost OAuth provider
 
             if not SpinConfig.config.get('enable_battlehouse',0) \
                and (not SpinConfig.config.get('secure_mode',0)): # do not allow in secure mode
@@ -1235,6 +1240,8 @@ class GameProxy(proxy.ReverseProxyResource):
             return str('invalid csrf_state')
 
         return self.index_visit_do_bh_auth_2(request, visitor, request.args['code'][-1])
+
+    # MATTERMOST OAUTH PROVIDER PATH
 
     def index_visit_do_bh_auth(self, request, visitor):
         scope = 'user'
@@ -1341,6 +1348,49 @@ class GameProxy(proxy.ReverseProxyResource):
                                                      'battlehouse_user_id': visitor.battlehouse_id
                                                      }))
         return self.index_visit_authorized(request, visitor)
+
+    # BATTLEHOUSE LOGIN PATH
+    def index_visit_do_bh_login(self, request, visitor, bh_access_token):
+        visitor.battlehouse_auth_token = bh_access_token
+        fields = bh_access_token.split('.')
+        if fields[0] != 'bat' or fields[1] != 'v1':
+            # bad string
+            request.setResponseCode(http.BAD_REQUEST)
+            return str('invalid bh_access_token')
+
+        bat, version, battlehouse_id, expire_time, rand_string = fields
+        if expire_time < proxy_time:
+            request.setResponseCode(http.BAD_REQUEST)
+            return str('expired bh_access_token')
+
+        # don't trust these yet! verify with loginserver first.
+        url = SpinConfig.config['battlehouse_login_path']+'/verify?' + \
+              urllib.urlencode({'bh_access_token':bh_access_token})
+        d = bh_async_http.queue_request_deferred(proxy_time, url)
+        d.addCallback(self.index_visit_do_bh_login_response, request, visitor, bh_access_token, battlehouse_id)
+        d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
+        return twisted.web.server.NOT_DONE_YET
+
+    def index_visit_do_bh_login_response(self, response, request, visitor, bh_access_token, battlehouse_id):
+        r = SpinJSON.loads(response)
+        if r['result']['status'] != 'ok' or not r['result'].get('id',None):
+            return self.index_visit_go_away(request, visitor)
+
+        visitor.set_battlehouse_id(r['result']['id'])
+        if 'country' in r['result']:
+            visitor.demographics['country'] = r['result']['country']
+        else:
+            # geolocate country
+            visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
+
+        metric_event_coded(visitor, '0020_page_view',
+                           visitor.add_demographics({#'Viewed URL': request.uri,
+                                                     'query_string': clean_qs(request.uri),
+                                                     'referer': SpinHTTP.get_twisted_header(request, 'referer') or 'unknown',
+                                                     'battlehouse_user_id': visitor.battlehouse_id
+                                                     }))
+        return self.index_visit_authorized(request, visitor)
+
 
 
     def index_visit_fb(self, request, visitor):
