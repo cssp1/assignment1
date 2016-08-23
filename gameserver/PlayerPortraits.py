@@ -43,7 +43,7 @@ class PlayerPortraits(object):
         elif frame_platform == 'bh':
             if not social_id.startswith('bh'): return None
             bh_id = social_id[2:]
-            return SpinConfig['battlehouse_api_path'] + '/api/v3/users/'+bh_id+'/image'
+            return SpinConfig.config['battlehouse_api_path'] + '/api/v3/users/'+bh_id+'/image'
         else:
             return None
 
