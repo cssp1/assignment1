@@ -3613,6 +3613,17 @@ def main(args):
         if name in matchmaking and (type(matchmaking[name]) is list):
             error |= check_cond_chain(matchmaking[name], reason='matchmaking:'+name)
 
+    if 'ladder_loot_bonus' in matchmaking or 'ladder_loot_malus' in matchmaking:
+        error |= 1; print 'migrate ladder_loot_bonus/malus to ladder_loot_bonus_by_townhall_level'
+    if 'ladder_loot_bonus_by_townhall_level' in matchmaking:
+        table = matchmaking['ladder_loot_bonus_by_townhall_level']
+        max_cc_level = len(gamedata['buildings'][gamedata['townhall']]['build_time'])
+        if len(table) != max_cc_level:
+            error |= 1; print 'ladder_loot_bonus_by_townhall_level length must equal max townhall level (%d)' % max_cc_level
+        for row in table:
+            if len(row) != max_cc_level:
+                error |= 1; print 'ladder_loot_bonus_by_townhall_level row length must equal max townhall level (%d)' % max_cc_level
+
     for name in ('loot_attacker_gains', 'loot_defender_loses'):
         if type(gamedata[name]) is dict:
             for kind, table in gamedata[name].iteritems():

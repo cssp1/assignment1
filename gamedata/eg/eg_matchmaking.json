@@ -133,10 +133,6 @@
 
     "zero_points_on_ladder_exit": 0, // whether to zero out trophy count when going from ladder to non-ladder upon region change
 
-    // loot bonus/malus stack count to apply, indexed by delta in townhall level - see pvp_loot_bonus/malus auras
-    "ladder_loot_bonus": [0,25,50], // +0, +1, +2 or more
-    "ladder_loot_malus": [0,0,0], // max is [0,50,90]  // -0, -1, -2 or more
-
     "ladder_point_decay_if": {"predicate": "ALWAYS_FALSE"}, // { "predicate": "BUILDING_LEVEL", "building_type": "toc", "trigger_level": 3 },
     "ladder_point_decay_halflife": 86400 // number of seconds after which PvP points decay to half when base severely damaged
 }

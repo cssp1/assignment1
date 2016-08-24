@@ -18420,27 +18420,19 @@ class GAMEAPI(resource.Resource):
             p = session.ladder_state['points']['defeat'][str(session.viewing_player.user_id)]
             if p < 0: session.viewing_player.player_auras.append({'spec':'trophy_pvp_minus_defender' if ('trophy_pvp_minus_defender' in gamedata['auras']) else 'trophy_pvp_minus','stack':-p})
 
-            cc_delta_kind = None
-            cc_delta_stacks = 0
+            my_townhall, their_townhall = session.player.get_townhall_level(), session.viewing_player.get_townhall_level()
 
-            if (not session.viewing_player.is_ai()):
-                cc_delta = session.player.get_townhall_level() - session.viewing_player.get_townhall_level()
-                if cc_delta < 0:
-                    cc_delta_kind = 'bonus'
-                    cc_delta = -cc_delta
-                elif cc_delta > 0:
-                    cc_delta_kind = 'malus'
-
-                if cc_delta_kind:
-                    table = gamedata['matchmaking']['ladder_loot_'+cc_delta_kind]
-                    cc_delta_stacks = table[min(cc_delta, len(table)-1)]
-                    if cc_delta_stacks > 0:
-                        aura = gamedata['auras']['pvp_loot_'+cc_delta_kind]
-                        session.player.player_auras.append({'spec':aura['name'], 'stack': cc_delta_stacks, 'strength': abs(aura['effects'][0]['strength_per_stack'])*cc_delta_stacks})
+            # look for loot bonus or malus for (attacker,defender) townhall level
+            if 'ladder_loot_bonus_by_townhall_level' in gamedata['matchmaking'] and (not session.viewing_player.is_ai()):
+                table = gamedata['matchmaking']['ladder_loot_bonus_by_townhall_level']
+                stacks = table[my_townhall-1][their_townhall-1]
+                if stacks != 0:
+                    aura = gamedata['auras']['pvp_loot_bonus' if stacks > 0 else 'pvp_loot_malus']
+                    session.player.player_auras.append({'spec':aura['name'], 'stack': abs(stacks), 'strength': abs(aura['effects'][0]['strength_per_stack'])*abs(stacks)})
 
             if gamedata['server']['log_ladder_pvp'] >= 3:
-                gamesite.exception_log.event(server_time, 'ladder spy (DMG %.02f %s %+d): %s' % \
-                                             (base_damage, cc_delta_kind if cc_delta_kind else '-', cc_delta_stacks, session.format_ladder_state()))
+                gamesite.exception_log.event(server_time, 'ladder spy (DMG %.02f %d vs %d): %s' % \
+                                             (base_damage, my_townhall, their_townhall, session.format_ladder_state()))
 
         elif (session.viewing_player is not session.player) and \
              (session.viewing_base is session.viewing_player.my_home) and \
