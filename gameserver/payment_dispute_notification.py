@@ -47,8 +47,8 @@ if __name__ == '__main__':
     user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
     player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
 
-    zd_game_id = {'mf': 'mars_frontier', 'tr':'thunder_run', 'mf2': 'war_star_empire', 'bfm':'battlefront_mars', 'dv': 'days_of_valor', 'sg':'summoners_gate'}[SpinConfig.game()]
-    player_name = user.get('alias', user.get('ag_username', user.get('kg_username', user.get('bh_username', user.get('facebook_name', 'unknown')))))
+    zd_game_id = {'mf': 'mars_frontier', 'tr':'thunder_run', 'mf2': 'war_star_empire', 'bfm':'battlefront_mars', 'dv': 'days_of_valor', 'sg':'summoners_gate', 'fs': 'firestrike'}[SpinConfig.game()]
+    player_name = user.get('alias', user.get('ag_username', user.get('kg_username', user.get('bh_username', user.get('mm_username', user.get('facebook_name', 'unknown'))))))
     player_email = user.get('email', 'unknown')
     facebook_id = response['user']['id'] if 'user' in response else user.get('facebook_id', 'unknown')
     payment_id = str(response['id'])

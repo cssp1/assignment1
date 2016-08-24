@@ -220,12 +220,14 @@ class HandleClearAlias(Handler):
     def do_exec_offline(self, user, player):
         if 'alias' in player: del player['alias']
         # needs to match User.get_real_name()
-        if user.get('kg_username'):
-            new_ui_name = user['kg_username']
+        if user.get('bh_username'):
+            new_ui_name = user['bh_username']
+        elif user.get('mm_username'):
+            new_ui_name = user['mm_username']
         elif user.get('ag_username'):
             new_ui_name = user['ag_username']
-        elif user.get('bh_username'):
-            new_ui_name = user['bh_username']
+        elif user.get('kg_username'):
+            new_ui_name = user['kg_username']
         elif user.get('facebook_first_name'):
             new_ui_name = user['facebook_first_name']
         elif user.get('facebook_name'):

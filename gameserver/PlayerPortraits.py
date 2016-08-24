@@ -40,10 +40,14 @@ class PlayerPortraits(object):
         elif frame_platform == 'ag':
             if 'ag_avatar_url' not in pcache_info: return None
             return pcache_info['ag_avatar_url']
+        elif frame_platform == 'mm':
+            if not social_id.startswith('mm'): return None
+            mm_id = social_id[2:]
+            return SpinConfig.config['mattermost_api_path'] + '/api/v3/users/'+mm_id+'/image'
         elif frame_platform == 'bh':
             if not social_id.startswith('bh'): return None
             bh_id = social_id[2:]
-            return SpinConfig.config['battlehouse_api_path'] + '/api/v3/users/'+bh_id+'/image'
+            return SpinConfig.config['battlehouse_api_path'] + '/users/'+bh_id+'/avatar'
         else:
             return None
 
@@ -169,7 +173,7 @@ if __name__ == '__main__':
                                       max_retries = -1) # never give up
 
     def run_test():
-        port = PlayerPortraits(db_client, {'fb':async_http, 'kg':async_http, 'ag':async_http, 'bh':async_http},
+        port = PlayerPortraits(db_client, {'fb':async_http, 'kg':async_http, 'ag':async_http, 'mm':async_http, 'bh':async_http},
                                lambda x: sys.stderr.write(x+'\n'))
         now = int(time.time())
         pcache_info_fb = {'social_id':'fb427233'}

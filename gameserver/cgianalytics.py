@@ -3779,7 +3779,7 @@ if __name__ == "__main__":
             query['abtest_value:currency'] = names
             qlist.append(Query(query, ui_name))
     elif overlay_mode == 'frame_platform':
-        for ui_name, names in [['Armor Games', ['ag']], ['Kongregate', ['kg']], ['Battlehouse', ['bh']], ['Facebook', ['fb','MISSING']]]:
+        for ui_name, names in [['Armor Games', ['ag']], ['Kongregate', ['kg']], ['Battlehouse', ['bh']], ['Mattermost', ['mm']], ['Facebook', ['fb','MISSING']]]:
             query['frame_platform'] = names
             qlist.append(Query(query, ui_name))
     elif overlay_mode == 'browser_name':

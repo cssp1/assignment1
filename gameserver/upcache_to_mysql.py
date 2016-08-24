@@ -85,7 +85,7 @@ lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
                                           'acquisition_ad_skynet',
                                           'country', 'country_tier', 'currency', 'timezone',
                                           'completed_tutorial',
-                                          'frame_platform', 'social_id', 'facebook_id', 'facebook_name', 'kg_id', 'kg_username', 'ag_id', 'ag_username', 'bh_id', 'bh_username',
+                                          'frame_platform', 'social_id', 'facebook_id', 'facebook_name', 'kg_id', 'kg_username', 'ag_id', 'ag_username', 'bh_id', 'bh_username', 'mm_id', 'mm_username',
                                           'money_spent', 'money_refunded', 'num_purchases', 'client:purchase_ui_opens', 'client:purchase_ui_opens_preftd', 'player_level', 'player_xp',
                                           'home_region', 'tutorial_state', 'upcache_time',
                                           'returned_[0-9]+-[0-9]+h',
