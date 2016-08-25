@@ -31,6 +31,8 @@ def wrap_string(input):
 
 # below functions are specific to Twisted
 
+from twisted import __version__ as twisted_version
+twisted_major_version = int(twisted_version.split('.')[0])
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.http import INTERNAL_SERVER_ERROR
 from twisted.python.failure import Failure
@@ -87,8 +89,14 @@ accepted_response_body = '{"result": "ok", "status": 202}\n'
 
 def set_twisted_cookie(request, cookie_name, value, expire_time,
                        domain = None, path = None, secure = None, httpOnly = False):
-    request.addCookie(cookie_name, value, expires = format_http_time(expire_time),
-                      domain = domain, path = path, secure = secure, httpOnly = httpOnly)
+    if twisted_major_version >= 16:
+        request.addCookie(cookie_name, value, expires = format_http_time(expire_time),
+                          domain = domain, path = path, secure = secure, httpOnly = httpOnly)
+    else:
+        # Twisted before 16.3.2 and before 15.5.0 are missing httpOnly param to addCookie()
+        request.addCookie(cookie_name, value, expires = format_http_time(expire_time),
+                          domain = domain, path = path, secure = secure)
+
     # necessary for IE7+ to accept iframed cookies
     request.setHeader('P3P', 'CP="CAO DSP CURa ADMa DEVa TAIa PSAa PSDa IVAi IVDi CONi OUR UNRi OTRi BUS IND PHY ONL UNI COM NAV INT DEM CNT STA PRE GOV LOC"')
 
