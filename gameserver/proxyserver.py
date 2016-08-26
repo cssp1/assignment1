@@ -1940,6 +1940,7 @@ class GameProxy(proxy.ReverseProxyResource):
         if (not SpinConfig.config.get('enable_facebook',0)) and \
            (not SpinConfig.config.get('enable_kongregate',0)) and \
            (not SpinConfig.config.get('enable_armorgames',0)) and \
+           (not SpinConfig.config.get('enable_battlehouse',0)) and \
            (not SpinConfig.config.get('enable_mattermost',0)) and \
            (not SpinGoogleAuth.twisted_request_is_local(request)) and (SpinConfig.config['proxyserver'].get('require_google_auth',1)):
             auth_info = SpinGoogleAuth.twisted_do_auth(request, 'GAME', proxy_time)
