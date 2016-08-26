@@ -1732,7 +1732,7 @@ class User:
 
     def retrieve_mm_info(self, session, retmsg):
         if (None not in (self.mm_username,)) and \
-           ((server_time - self.mm_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
+           ((server_time - self.mm_hit_time) < gamedata['server'].get('mattermost_cache_lifetime', 14400)):
             # use cached data
             return
 
@@ -1747,7 +1747,7 @@ class User:
 
     def retrieve_mm_info_start(self, session):
         assert self.mm_auth_token
-        gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
+        gamesite.AsyncHTTP_Mattermost.queue_request(server_time,
                                                      SpinConfig.config['mattermost_api_path']+'/api/v3/users/%s/get' % self.mm_id,
                                                      lambda result, _session=session: self.retrieve_mm_info_complete(_session, None, result),
                                                      headers = {'Authorization': 'Bearer '+self.mm_auth_token})
@@ -1764,6 +1764,47 @@ class User:
         self.mm_username = data['nickname']
         if 'birthday' in data: pass # no birthday data
         self.mm_hit_time = server_time
+
+        if retmsg is None:
+            if self.active_session:
+                retmsg = self.active_session.outgoing_messages
+        if retmsg is not None:
+            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
+            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+
+    def retrieve_bh_info(self, session, retmsg):
+        if (None not in (self.bh_username,)) and \
+           ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
+            # use cached data
+            return
+
+        if SpinConfig.config.get('enable_battlehouse',0):
+            self.retrieve_bh_info_start(session)
+        else:
+            # note: must match proxyserver.py test credentials
+            test_response = SpinJSON.dumps({"user_id":"4d0075c6-e9d9-4b01-b7d0-4cffa7a1e17c", "ui_name": "Dan Maas", "email": "asdf@example.com", "email_verified": True, "creation_time": 1472072770})
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_bh_info_complete(_session, None, test_response)) # delay to expose timing bugs
+
+    def retrieve_bh_info_start(self, session):
+        assert self.bh_auth_token
+        gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
+                                                     SpinConfig.config['battlehouse_api_path']+'/user/%s' % self.bh_id,
+                                                     lambda result, _session=session: self.retrieve_bh_info_complete(_session, None, result),
+                                                     headers = {'Authorization': 'Bearer '+self.bh_auth_token})
+        # update portrait
+        portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
+        session.portrait_update_launched(portrait_d)
+
+    def retrieve_bh_info_complete(self, session, retmsg, result):
+        data = SpinJSON.loads(result)
+        assert data['user_id'] == self.bh_id
+
+        self.bh_profile = data # store entire profile
+
+        self.bh_username = data['ui_name']
+        if 'birthday' in data: pass # no birthday data
+        self.bh_hit_time = server_time
 
         if retmsg is None:
             if self.active_session:
