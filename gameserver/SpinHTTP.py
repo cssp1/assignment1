@@ -193,9 +193,12 @@ def complete_deferred_request(body, request, http_status = None):
 
 # wrapper for complete_deferred_request() that handles Failure results so you can put it
 # at the end of a Deferred chain and it will do the right thing for successes and errors.
-def complete_deferred_request_safe(body, request, http_status = None):
+def complete_deferred_request_safe(body, request, http_status = None, full_traceback = False):
     if isinstance(body, Failure):
         request.setHeader('Content-Type', 'text/plain')
         request.setResponseCode(INTERNAL_SERVER_ERROR)
-        body = 'error: %s' % repr(body)
+        if full_traceback: # dangerous - includes sensitive info in public error message
+            body = 'error: %s\n%s' % (repr(body), body.getTraceback())
+        else:
+            body = 'error: %s' % repr(body)
     complete_deferred_request(body, request, http_status = http_status)
