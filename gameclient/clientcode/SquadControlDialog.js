@@ -476,7 +476,8 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     var squad_is_deployed = player.squad_is_deployed(squad_data['id']);
     var squad_is_under_repair = player.squad_is_under_repair(squad_data['id']);
     var squad_in_battle = player.squad_is_in_battle(squad_data['id']);
-    var squad_can_speedup = player.squad_speedups_enabled() && squad_is_deployed && !squad_in_battle && player.squad_is_moving(squad_data['id']);
+    var squad_is_moving = squad_is_deployed && player.squad_is_moving(squad_data['id']);
+    var squad_can_speedup = player.squad_speedups_enabled() && squad_is_moving && !squad_in_battle;
 
     dialog.widgets['space_bar'].show = dialog.widgets['space_label'].show =
         dialog.widgets['hp_bar'].show = dialog.widgets['hp_label'].show =
@@ -566,7 +567,8 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     } else if(dlg_mode == 'normal') {
         dialog.widgets['coverup'].show = hover || squad_is_under_repair || squad_in_battle || (!squad_is_deployed && squad_is_damaged);
     } else if(dlg_mode == 'deploy' || dlg_mode == 'call') {
-        can_do_action = !(squad_is_under_repair || squad_in_battle || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
+        var can_call_moving = (!('enable_call_moving_squad' in gamedata['territory'])) || gamedata['territory']['enable_call_moving_squad'];
+        can_do_action = !(squad_is_under_repair || squad_in_battle || (!can_call_moving && squad_is_moving) || !SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) || ((dlg_mode=='deploy') && squad_is_deployed) || squad_is_destroyed || (cur_units <= 0)); // || (my_status == 'quarry'));
 
         // restrictions on call to raid
         if(dialog.parent.user_data['is_raid']) {
