@@ -73,6 +73,9 @@ BEGIN
     IF (x LIKE '%_bx_%') THEN
            RETURN 'cross_promo_paid'; -- Skynet paid cross promo
         END IF;
+        IF (x LIKE '7112_%') THEN
+           RETURN 'battlehouse'; -- click from battlehouse.com
+        END IF;
     IF (x LIKE '%/') THEN
            SET x = SUBSTRING(x, 1, CHAR_LENGTH(x)-1);
         END IF;
@@ -109,6 +112,7 @@ BEGIN
            WHEN 'cross_promo' THEN 'Cross Promo (Paid)' -- legacy data
            WHEN 'cross_promo_paid' THEN 'Cross Promo (Paid)'
            WHEN 'cross_promo_free' THEN 'Cross Promo (Free)'
+           WHEN 'battlehouse' THEN 'Battlehouse'
            WHEN 'MISSING' THEN NULL
            ELSE 'FB Paid' END);
         ELSE
