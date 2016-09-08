@@ -318,6 +318,11 @@
 
     "mobile_allow_if":
     {"predicate": "OR", "subpredicates": [
+        {"predicate": "AND", "subpredicates": [
+            {"predicate": "BROWSER_HARDWARE", "hardware": ["iPad"]}, // iPad
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"} // battlehouse.com
+        ]},
+
         // "super-whitelist" that bypasses CC and hardware checks
         { "predicate": "USER_ID", "allow": [1112] },
 
