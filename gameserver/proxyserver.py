@@ -479,6 +479,10 @@ class FBVisitor(Visitor):
         return self.server_protocol + self.server_host + ':' + self.server_port + '/' + q_clean_qs(self.first_hit_uri,
                                                                                                    add_props = {'signed_request':[self.raw_signed_request,]} if self.raw_signed_request else None)
 
+    def apply_x_frame_options(self, request):
+        if SpinConfig.config.get('enable_facebook',0):
+            request.setHeader('X-Frame-Options', 'ALLOW-FROM https://apps.facebook.com')
+
 class KGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
         Visitor.__init__(self, *args, **kwargs)
@@ -522,6 +526,12 @@ class KGVisitor(Visitor):
                                                                                                           'kongregate_game_id': [self.kongregate_game_id,],
                                                                                                           'kongregate_game_url': [self.kongregate_game_url,],
                                                                                                           })
+    def apply_x_frame_options(self, request):
+        if SpinConfig.config.get('enable_kongregate',0):
+            if SpinHTTP.twisted_request_is_ssl(request):
+                request.setHeader('X-Frame-Options', 'ALLOW-FROM https://www.kongregate.com')
+            else:
+                request.setHeader('X-Frame-Options', 'ALLOW-FROM http://www.kongregate.com')
 
 class AGVisitor(Visitor):
     def __init__(self, *args, **kwargs):
@@ -548,6 +558,13 @@ class AGVisitor(Visitor):
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
         return self.server_protocol + self.server_host + ':' + self.server_port + '/AGROOT' + q_clean_qs(self.first_hit_uri, {})
+
+    def apply_x_frame_options(self, request):
+        if SpinConfig.config.get('enable_armorgames',0):
+            if SpinHTTP.twisted_request_is_ssl(request):
+                request.setHeader('X-Frame-Options', 'ALLOW-FROM https://armorgames.com')
+            else:
+                request.setHeader('X-Frame-Options', 'ALLOW-FROM http://armorgames.com')
 
 class BHVisitor(Visitor):
     def __init__(self, *args, **kwargs):
@@ -577,6 +594,14 @@ class BHVisitor(Visitor):
         # send the browser the URL to redirect to after authorizing
         return self.server_protocol + self.server_host + ':' + self.server_port + '/BHROOT' + q_clean_qs(self.first_hit_uri, {})
 
+    def apply_x_frame_options(self, request):
+        if SpinConfig.config.get('enable_battlehouse',0):
+            referer = SpinHTTP.get_twisted_header(request, 'Referer')
+            assert referer
+            parts = urlparse.urlparse(referer)
+            assert parts.netloc in ('www.battlehouse.com', 'www.losethetuba.com')
+            request.setHeader('X-Frame-Options', 'ALLOW-FROM https://'+parts.netloc)
+
 class MMVisitor(Visitor):
     def __init__(self, *args, **kwargs):
         Visitor.__init__(self, *args, **kwargs)
@@ -604,6 +629,8 @@ class MMVisitor(Visitor):
     def canvas_url_no_auth(self):
         # send the browser the URL to redirect to after authorizing
         return self.server_protocol + self.server_host + ':' + self.server_port + '/MMROOT' + q_clean_qs(self.first_hit_uri, {})
+
+    def apply_x_frame_options(self, request): raise Exception('not implemented')
 
 visitor_table = {}
 
@@ -1041,6 +1068,7 @@ class GameProxy(proxy.ReverseProxyResource):
             visitor = visitor_table[anon_id]
 
         visitor.update_on_hit(request)
+        visitor.apply_x_frame_options(request)
         return {'fb': self.index_visit_fb,
                 'kg': self.index_visit_kg,
                 'ag': self.index_visit_ag,
