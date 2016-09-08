@@ -60,6 +60,8 @@ if __name__ == '__main__':
     # detect current event
     event = None
     event_end_time = None
+    event_ui_title = None
+
     for entry in gamedata['event_schedule']:
         if entry['name'].endswith('_preannounce'): continue
         if entry['start_time'] >= server_time: continue
@@ -73,14 +75,18 @@ if __name__ == '__main__':
 
         ev = gamedata['events'][entry['name']]
         if ev['kind'] != 'current_event': continue
+        if 'ui_title' in ev:
+            ui_title = ev['ui_title']
+        elif 'chain' in ev:
+            ui_title = ev['chain'][0][1]['ui_title']
+        else:
+            continue # no idea how to get title
+
         event = ev
         event_end_time = end_time
+        event_ui_title = ui_title
 
     if event:
-        if 'ui_title' in event:
-            event_ui_title = event['ui_title']
-        else:
-            event_ui_title = event['chain'][0][1]['ui_title']
         news['event'] = {'ui_name': event_ui_title,
                          'end_time': event_end_time}
 
