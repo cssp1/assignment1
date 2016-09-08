@@ -212,7 +212,7 @@ def reload_static_includes():
                             'BrowserDetect.js', 'SPLWMetrics.js',
                             'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html',
                             'XsollaSDK.js']
-    new_includes = dict([(basename, str(open('../gameclient/'+basename).read())) for basename in STATIC_INCLUDE_FILES])
+    new_includes = dict([(basename, open('../gameclient/'+basename).read().decode('utf-8')) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
 def get_static_include(name):
     return static_includes[name]
@@ -1136,7 +1136,7 @@ class GameProxy(proxy.ReverseProxyResource):
             }
         expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
         template = get_static_include('kg_guest.html')
-        return str(expr.sub(lambda match: replacements[match.group(0)], template))
+        return expr.sub(lambda match: replacements[match.group(0)], template).encode('utf-8')
 
     def index_visit_kg_verify(self, request, visitor):
         d = defer.Deferred()
@@ -1524,7 +1524,7 @@ class GameProxy(proxy.ReverseProxyResource):
                     }
                 expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
                 template = get_static_include('facebookexternalhit.html')
-                return str(expr.sub(lambda match: replacements[match.group(0)], template))
+                return expr.sub(lambda match: replacements[match.group(0)], template).encode('utf-8')
 
             # no signed_request was sent!
             raw_log.event(proxy_time, 'index hit that did not come with a Facebook signed request: '+log_request(request))
@@ -1828,7 +1828,7 @@ class GameProxy(proxy.ReverseProxyResource):
             replacements['$GOOGLE_ANALYTICS_SDK$'] = get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else ''
             metric_props['splash_image'] = screen_name
             expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
-            ret = str(expr.sub(lambda match: replacements[match.group(0)], get_static_include('fb_guest.html')))
+            ret = expr.sub(lambda match: replacements[match.group(0)], get_static_include('fb_guest.html')).encode('utf-8')
 
         else:
             raise Exception('unknown FB auth method '+method)
@@ -2352,7 +2352,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret.append(str(line))
             return '\n'.join(ret)
         else:
-            return str(expr.sub(lambda match: replacements[match.group(0)], template))
+            return expr.sub(lambda match: replacements[match.group(0)], template).encode('utf-8')
 
     def render_API(self, request):
         update_time()
