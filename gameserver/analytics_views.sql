@@ -70,13 +70,13 @@ BEGIN
         IF (x LIKE '%_XP_%') OR (x LIKE '%5145_xp_%') THEN
            RETURN 'cross_promo_free'; -- in-game cross promo
         END IF;
-    IF (x LIKE '%_bx_%') THEN
+        IF (x LIKE '%_bx_%') THEN
            RETURN 'cross_promo_paid'; -- Skynet paid cross promo
         END IF;
         IF (x LIKE '7112_%') THEN
            RETURN 'battlehouse'; -- click from battlehouse.com
         END IF;
-    IF (x LIKE '%/') THEN
+        IF (x LIKE '%/') THEN
            SET x = SUBSTRING(x, 1, CHAR_LENGTH(x)-1);
         END IF;
         IF (x LIKE '%.com%') THEN
