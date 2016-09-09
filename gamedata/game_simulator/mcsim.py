@@ -32,7 +32,7 @@ free_resources = False # if true, assume player can get unlimited amounts of iro
 take_breaks = False # if true, waits above 15m turn into longer breaks
 collect_quests = False # if true, player always immediately collects quest rewards XXX buggy since we don't support all predicates
 min_foremen = 1 # minimum number of foremen available - useful for "what if" scenarios with multiple builders
-discount_tau = 0.25 # coolness decays by tau/e per hour
+discount_tau = 0.05 # coolness decays by tau/e per hour
 
 COOLNESS = {
     # CONSTANT
@@ -43,7 +43,7 @@ COOLNESS = {
     'generator': 0.001,
 
     # VARIABLE
-    'townhall': 50.0,
+    'townhall': 500.0,
     'tech_unlock': 1000.0,
 
     'harvester': 4.0,
@@ -53,6 +53,7 @@ COOLNESS = {
 
     'turret': 0.5, 'turret_new': 1.1,
     'warehouse': 0.1,
+    'crafting_factory': 0.01,
 
     'default': 1.0,
     }
@@ -166,6 +167,8 @@ class MockSpec(object):
             return COOLNESS['generator']
         elif self.provides_inventory:
             return COOLNESS['warehouse']
+        elif self.crafting_categories:
+            return COOLNESS['crafting_factory']
         else:
             return COOLNESS.get('default', 1.0)
 
@@ -280,6 +283,8 @@ class State(object):
         return min_wait, ', '.join(r[1] for r in wait_reasons)
 
     def get_time_to_reach_resources(self, target):
+        if free_resources: return 1
+
         rates = dict((res,0) for res in gamedata['resources'])
 
         max_wait = -1
@@ -739,7 +744,13 @@ def get_possible_actions(state, strategy):
         if min_wait >= 0:
             ret_wait.append(WaitAction(min_wait, wait_reason))
 
-    return ret_tech + ret_construct + ret_upgrade + ret_wait
+    return ret_construct + ret_upgrade + ret_tech + ret_wait
+
+def heuristic_townhall(actions):
+    prio = actions[0]
+#    for a in actions:
+#    if isinstance(a,
+    return prio
 
 def apply_gamedata_hacks(gamedata):
     if game_id in ('tr','dv'):
@@ -834,10 +845,12 @@ if __name__ == '__main__':
         elif heuristic == 'discounted-coolness':
             actions.sort(key = lambda a: -a.priority())
             action = actions[0]
+        elif heuristic == 'townhall':
+            action = heuristic_townhall(actions)
 
         if verbose >= 3:
-            print
-            print '\n'.join(map(str,actions))
+            print '\nCHOICES:'
+            print '\n'.join(map(lambda action: '\t'+str(action),actions))
 
         if verbose:
             print ' *', action
