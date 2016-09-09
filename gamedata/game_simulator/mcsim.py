@@ -217,6 +217,7 @@ class State(object):
         self.optimal_t = 0
         self.gamebucks_spent = 0
         self.player = MockPlayer()
+        self.building_choices = [] # list of building upgrades only
 
     def init_starting_conditions(self):
         # gamedata starting conditions
@@ -242,6 +243,7 @@ class State(object):
         new.optimal_t = self.optimal_t
         new.gamebucks_spent = self.gamebucks_spent
         new.player = self.player
+        new.building_choices = self.building_choices
         return new
 
     def get_min_wait(self):
@@ -423,6 +425,8 @@ class State(object):
         new.player = new.player.clone()
         new.player.my_base = new.player.my_base[:]
         new.player.my_base.append(MockBuilding(specname, 1))
+        new.building_choices = new.building_choices[:]
+        new.building_choices.append('%s L%d' % (specname, 1))
         return new
 
     def start_building_upgrade(self, specname, newlevel, idx, upgrade_time):
@@ -434,6 +438,8 @@ class State(object):
         assert not obj.is_busy()
         obj.upgrade_finish_time = self.t + upgrade_time
         new.player.my_base[idx] = obj
+        new.building_choices = new.building_choices[:]
+        new.building_choices.append('%s L%d' % (specname, newlevel))
         return new
 
     def upgrade_building(self, specname, newlevel, idx):
@@ -444,6 +450,8 @@ class State(object):
         assert obj.spec.name == specname and obj.level == newlevel - 1
         obj.level = newlevel
         new.player.my_base[idx] = obj
+        new.building_choices = new.building_choices[:]
+        new.building_choices.append('%s L%d' % (specname, newlevel))
         return new
 
     def buy_resources(self, amounts):
@@ -774,9 +782,11 @@ if __name__ == '__main__':
     heuristic = 'random'
     strategy = None
     output_filename = None
+    output_building_choices_filename = None
 
     opts, args = getopt.gnu_getopt(sys.argv, 'g:vpf', ['verbose','payer','free-resources','take-breaks',
                                                        'to-cc-level=','heuristic=','strategy=','output=',
+                                                       'output-building-choices=',
                                                        'max-iter=',
                                                        'constrain-resources=','constrain-power=','constrain-foremen='])
     for key,val in opts:
@@ -792,6 +802,7 @@ if __name__ == '__main__':
         elif key == '--strategy':
             strategy = val
         elif key == '--output': output_filename = val
+        elif key == '--output-building-choices': output_building_choices_filename = val
         elif key == '--max-iter': max_iter = int(val)
         elif key.startswith('--constrain-'):
             val = True if val in ('1','yes') else False
@@ -884,3 +895,8 @@ if __name__ == '__main__':
     if output_filename:
         with open(output_filename, 'a+') as fd:
             SpinJSON.dump(state.serialize(), fd, newline = True)
+    if output_building_choices_filename:
+        with open(output_building_choices_filename, 'w') as fd:
+            fd.write('BUILDING UPGRADE PATH:\n')
+            fd.write('\n'.join(state.building_choices))
+            fd.write('\n')
