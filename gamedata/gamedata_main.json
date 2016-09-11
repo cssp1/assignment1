@@ -33,7 +33,10 @@
         "armorgames_iframe_footer_peek": 30, // same as Facebook
 
         // true if the HTML5 fullscreen API is available
-        "truefullscreen": {"predicate": "FRAME_PLATFORM", "platform":"fb"}, // true if the HTML5 fullscreen API is available
+        "truefullscreen": {"predicate": "OR", "subpredicates": [
+            {"predicate": "FRAME_PLATFORM", "platform":"fb"},
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
+        ]},
 
         // true if app is able to to send out social platform friend invitations
         "friend_invites_enabled": {"predicate": "OR", "subpredicates": [
