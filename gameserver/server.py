@@ -16905,12 +16905,17 @@ class XSAPI(resource.Resource):
 
             else:
                 # fallback path to determine gamebucks value
-                for currency, str_value in gamedata['store']['gamebucks_open_graph_prices']:
-                    if currency == request_data['purchase']['checkout']['currency']:
+                gamesite.exception_log.event(server_time, 'player %d missing custom_parameters for purchase: %r' % (session.user.user_id, request_data['purchase']))
+
+                for entry in gamedata['store']['gamebucks_open_graph_prices']:
+                    currency, str_value = entry[0], entry[1]
+                    if currency == str(request_data['purchase']['checkout']['currency']):
                         gamebucks_amount = int((real_currency_amount / float(str_value)) + 0.5)
                         spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
+                        if spellname is None: # fallback - raw gamebuck purchase at equivalent value
+                            spellname = 'XSOLLA_PAYMENT'
+                            spellarg = gamebucks_amount
                         break
-
 
         if spellname is None:
             raise Exception('cannot determine spellname for this purchase: %r' % request_data['purchase'])
