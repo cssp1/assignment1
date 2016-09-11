@@ -44064,6 +44064,9 @@ Store.do_place_xsolla_order = function(token, on_finish, options) {
 
     metric_event('4057_xsolla_order_prompt_init', my_extend(state['metric_props'], {'client_time': client_time}));
 
+    // turn off fullscreen to show overlay
+    if(canvas_is_fullscreen) { toggle_true_fullscreen(); }
+
     XPayStationWidget['init']({'access_token': token, 'sandbox': !spin_secure_mode});
 
     XPayStationWidget['on']('close', (function (_state, _on_fail) { return function(event, data) {
