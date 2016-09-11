@@ -126,22 +126,34 @@ def make_virtual_currency_settings_update(config, gamedata):
 # return the (url,method,headers,body) for a request to generate an Xsolla "token" to start the purchase flow
 # @param config - from SpinConfig config.json
 def make_token_request(config, game_id, frame_platform,
-                       player_id, social_id, user_xs_id, user_email, user_currency, user_country, user_language,
+                       player_id, social_id, user_xs_id, user_email, user_currency, user_currency_price, user_country, user_language,
+                       spellname, spellarg,
                        gamebucks_quantity, gamebucks_ui_description,
                        player_level, user_account_creation_time,
                        ):
     is_sandbox = (not config.get('secure_mode', True)) or config.get('xsolla_sandbox_mode', False)
+    xsolla_mode = config.get('xsolla_mode', 'virtual_currency')
+    assert xsolla_mode in ('virtual_currency', 'simple_checkout')
 
     body_json = {
         'user': { 'id': { 'value': user_xs_id, 'hidden': True } },
         'settings': { 'project_id': config['xsolla_project_id'],
                       'currency': user_currency },
-        'purchase': { 'virtual_currency': { 'quantity': gamebucks_quantity },
-                      'description': { 'value': gamebucks_ui_description } },
+        'purchase': { 'description': {'value': gamebucks_ui_description } },
         'custom_parameters': { 'user_level': player_level,
                                'spin_game_id': game_id, 'spin_frame_platform': frame_platform, 'spin_player_id': player_id, 'spin_social_id': social_id,
+                               'spin_spellname': spellname,
                                'registration_date': unparse_time(user_account_creation_time) }
     }
+
+    if spellarg:
+        body_json['custom_parameters']['spin_spellarg'] = SpinJSON.dumps(spellarg)
+
+    if xsolla_mode == 'virtual_currency':
+        body_json['purchase']['virtual_currency'] = { 'quantity': gamebucks_quantity }
+    elif xsolla_mode == 'simple_checkout':
+        body_json['purchase']['checkout'] = {'amount': user_currency_price, 'currency': user_currency}
+
     if is_sandbox:
         body_json['settings']['mode'] = 'sandbox'
     if user_language:
@@ -173,7 +185,9 @@ if __name__ == '__main__':
 
     if mode == 'test':
         print make_token_request(SpinConfig.config, game_id, 'fb', 1111, 'fb1234', 'xs1234', 'example@example.com',
-                                 'USD', 'us', 'en', 100, '100 Gamebucks', 25, int(time.time()) - 10*86400)
+                                 'USD', 1.00, 'us', 'en',
+                                 'BUY_GAMEBUCKS_100_TEST', None,
+                                 100, '100 Gamebucks', 25, int(time.time()) - 10*86400)
 
     elif mode == 'update-slates':
         import requests

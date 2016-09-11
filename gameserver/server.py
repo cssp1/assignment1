@@ -16877,17 +16877,45 @@ class XSAPI(resource.Resource):
         if request_data['transaction'].get('dry_run',0) and spin_secure_mode and not SpinConfig.config.get('xsolla_sandbox_mode', False):
             raise Exception('sandbox purchases not allowed in secure mode')
 
-        gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
-        real_currency = 'xsolla:'+request_data['purchase']['virtual_currency']['currency']
-        real_currency_amount = request_data['purchase']['virtual_currency']['amount']
+        # find spellname and spellarg
+        spellname = None
+        spellarg = None
 
-        # try to find the source SKU this purchase came from
-        spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
-        if spellname is None: # fallback
-            spellname = 'XSOLLA_PAYMENT'
-            spellarg = gamebucks_amount
+        if 'virtual_currency' in request_data['purchase']:
+            real_currency = 'xsolla:'+request_data['purchase']['virtual_currency']['currency']
+            real_currency_amount = request_data['purchase']['virtual_currency']['amount']
 
-        if gamebucks_amount > 0:
+            # try to find the source SKU this purchase came from
+            gamebucks_amount = int(request_data['purchase']['virtual_currency']['quantity'])
+            spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
+            if spellname is None: # fallback
+                spellname = 'XSOLLA_PAYMENT'
+                spellarg = gamebucks_amount
+
+        elif 'checkout' in request_data['purchase']: # simple checkout
+            real_currency = 'xsolla:'+request_data['purchase']['checkout']['currency']
+            real_currency_amount = request_data['purchase']['checkout']['amount']
+
+            # look for SKU here based on order parameters
+            if 'custom_parameters' in request_data and 'spin_spellname' in request_data['custom_parameters']:
+                spellname = request_data['custom_parameters']['spin_spellname']
+                spin_spellarg = request_data['custom_parameters'].get('spin_spellarg')
+                if spin_spellarg:
+                    spellarg = SpinJSON.loads(spin_spellarg)
+
+            else:
+                # fallback path to determine gamebucks value
+                for currency, str_value in gamedata['store']['gamebucks_open_graph_prices']:
+                    if currency == request_data['purchase']['checkout']['currency']:
+                        gamebucks_amount = int((real_currency_amount / float(str_value)) + 0.5)
+                        spellname, spellarg = session.user.find_buy_gamebucks_spell(session, real_currency, real_currency_amount, gamebucks_amount)
+                        break
+
+
+        if spellname is None:
+            raise Exception('cannot determine spellname for this purchase: %r' % request_data['purchase'])
+
+        if True:
             # we (ab)use the credit order path here to share all of its metrics output
             assert request_data['payment_details']['payout']['currency'] == 'USD'
             usd_receipts = request_data['payment_details']['payout']['amount']
@@ -16931,13 +16959,15 @@ class XSAPI(resource.Resource):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 return None
         real_currency = spell['currency'].split(':')[1]
+        real_currency_price = spell['price']
         gamebucks_quantity = spell['quantity']
         gamebucks_ui_description = Store.format_ui_string(session, spellname, None, spell, spell['ui_name'])
         url, method, headers, body = SpinXsolla.make_token_request(SpinConfig.config, SpinConfig.game(), session.user.frame_platform,
                                                                    session.user.user_id, session.user.social_id,
                                                                    session.user.get_xsolla_id(), session.user.get_email(),
-                                                                   real_currency,
+                                                                   real_currency, real_currency_price,
                                                                    session.user.country, session.user.locale.split('_')[0] if session.user.locale else 'en',
+                                                                   spellname, spellarg,
                                                                    gamebucks_quantity, gamebucks_ui_description,
                                                                    session.player.level(), session.user.account_creation_time)
         if gamedata['server'].get('log_xsolla', False):
