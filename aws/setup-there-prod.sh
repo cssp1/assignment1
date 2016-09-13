@@ -101,6 +101,7 @@ echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with 
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade brotlipy"
 echo "pip install --upgrade blist"
+echo "pip install --upgrade distribute" # needed to fix import warning from "import pymongo, OpenSSL.SSL"
 
 # FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
 echo "pip install --upgrade geoip2"

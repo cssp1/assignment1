@@ -64,6 +64,7 @@ echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with 
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade asana" # for Ship Schedule integration
 echo "pip install --upgrade twisted" # for small dependencies (SpinHTTP.py - could be removed!)
+echo "pip install --upgrade distribute" # needed to fix import warning from "import pymongo, OpenSSL.SSL"
 echo "pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.5.0-cp27-none-linux_x86_64.whl"
 
 echo "MISSING: compile/install ujson library (python setup.py build; sudo python setup.py install)"
