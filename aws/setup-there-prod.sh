@@ -11,6 +11,7 @@ YUMPACKAGES+=" mongodb-org-shell mongodb-org-tools" # note: client only
 YUMPACKAGES+=" java-1.8.0-openjdk-headless" # Google Closure Compiler now requires at least Java 7
 YUMPACKAGES+=" python27-devel python27-pip"
 YUMPACKAGES+=" python27-boto python27-imaging python27-imaging-devel python27-numpy python27-simplejson"
+YUMPACKAGES+=" openssl-devel" # to compile some Python packages
 
 echo "SETUP(remote): Installing additional packages..."
 sudo yum -y -q install $YUMPACKAGES
@@ -86,8 +87,8 @@ echo "/etc/sysconfig/network hostname and sudo hostname <HOSTNAME>"
 echo "fix-ec2-mail.py (requires hostname to be correct)"
 echo "set up swap space"
 echo "/etc/spinpunch - edit anything that needs changing."
-echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
-echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
+echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias; newaliases"
+echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com-latest.tar.gz"
 
 
 # PYTHON PACKAGES
@@ -99,6 +100,7 @@ echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
 echo "pip install --upgrade brotlipy"
+echo "pip install --upgrade blist"
 
 # FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
 echo "pip install --upgrade geoip2"
