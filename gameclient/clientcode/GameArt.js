@@ -250,10 +250,19 @@ GameArt.art_url = function(filename, needs_cors) {
             protocol = spin_art_protocol;
         } else {
             var is_audio = goog.string.endsWith(filename, '.ogg') || goog.string.endsWith(filename, '.mp3');
-            if(GameArt.force_ssl_art ||
-               (spin_demographics['browser_name'] === "Explorer" ||
-                (spin_demographics['browser_name'] === 'Firefox' && spin_demographics['browser_version']>= 25) ||
-                (spin_demographics['browser_name'] === 'Chrome' && spin_demographics['browser_version']>= 38 && is_audio))) {
+            if(GameArt.force_ssl_art || (
+               // browsers that refuse to load mixed-content art
+               spin_demographics['browser_name'] === "Explorer" ||
+               (spin_demographics['browser_name'] === 'Firefox' && spin_demographics['browser_version']>= 25) ||
+               (spin_demographics['browser_name'] === 'Chrome' && spin_demographics['browser_version']>= 38 && is_audio) ||
+
+                // browsers that support HTTP/2 (we assume the CDN supports HTTP/2)
+                // Explorer >= 11 (listed above)
+                // Firefox >= 47 (listed above)
+               (spin_demographics['browser_name'] === 'Chrome' && spin_demographics['browser_version']>= 49) ||
+               (spin_demographics['browser_name'] === 'Safari' && spin_demographics['browser_version']>= 9.1) ||
+               (spin_demographics['browser_name'] === 'Opera' && spin_demographics['browser_version']>= 39)
+            )) {
                 protocol = spin_server_protocol;
             } else {
                 protocol = 'http://';
