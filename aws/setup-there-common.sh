@@ -22,11 +22,6 @@ sudo /etc/init.d/fail2ban restart
 
 echo "SETUP(remote): Getting latest package updates..."
 
-# disable automatic updates for mongodb, to avoid unexpected restarts
-if ! grep -q '^exclude' /etc/yum.conf ; then
-    sudo sh -c "echo 'exclude=mongodb*' >> /etc/yum.conf"
-fi
-
 sudo yum -y install yum-updatesd
 sudo yum -y update
 

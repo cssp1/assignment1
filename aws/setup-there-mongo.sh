@@ -20,6 +20,11 @@ sudo /etc/init.d/disable-transparent-hugepages start
 echo "SETUP(remote): Installing mongodb from mongodb.org repo..."
 sudo yum -y -q install mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-tools
 
+# NOW disable automatic updates for mongodb, to avoid unexpected restarts
+if ! grep -q '^exclude' /etc/yum.conf ; then
+    sudo sh -c "echo 'exclude=mongodb*' >> /etc/yum.conf"
+fi
+
 # fix permissions
 sudo chown -R root:root /etc
 sudo chmod 0755 / /etc /etc/mail /etc/ssh /etc/security /etc/sysconfig
@@ -62,7 +67,7 @@ echo "    create mongodb data directory and chown to mongod:mongod, chmod 2775"
 echo "    create temp directory (for backup script) and chmod 777"
 echo "    set readahead to 16kb on mongodb filesystems in /etc/udev/rules.d/85-ebs.rules"
 # echo 'ACTION=="add", KERNEL=="xvdb", ATTR{bdi/read_ahead_kb}="16"' | sudo tee -a /etc/udev/rules.d/85-ebs.rules
-# blockdev --setra 32 /dev/xvdb # yes, 32 blocks means 16kb
+# sudo blockdev --setra 32 /dev/xvdb # yes, 32 blocks means 16kb
 echo "    check /etc/mongod.conf and start server (use --quiet)"
 # MongoDB 2.4: db.addUser(), MongoDB 2.6: createUser()
 echo "    use admin; db.createUser({user:'root',pwd:'PASSWORD',roles:['root','dbAdminAnyDatabase','userAdminAnyDatabase','readWriteAnyDatabase','clusterAdmin']});"
@@ -72,4 +77,4 @@ echo "keys: /home/ec2-user/.ssh"
 echo "                     xxprod-mongo-awssecret (backups)"
 echo "                     xxprod-mongo-root-password (backups)"
 echo "configure /etc/cron.spinpunch.daily/mongo-backup.py backup script (check that SCRATCH_DIR exists!)"
-echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias"
+echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias; newaliases"
