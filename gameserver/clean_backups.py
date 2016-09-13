@@ -25,6 +25,7 @@ TASKS = [
     {'bucket': 'spinpunch-backups', 'pattern': 'thunderrun-player-data-YYYYMMDD.*', 'is_dir': True},
     {'bucket': 'spinpunch-backups', 'pattern': 'marsfrontier2-player-data-YYYYMMDD.*', 'is_dir': True},
     {'bucket': 'spinpunch-backups', 'pattern': 'battlefrontmars-player-data-YYYYMMDD.*', 'is_dir': True},
+    {'bucket': 'spinpunch-backups', 'pattern': 'firestrike-player-data-YYYYMMDD.*', 'is_dir': True},
     {'bucket': 'spinpunch-backups', 'pattern': 'summonersgate-player-data-YYYYMMDD.*', 'is_dir': True},
     {'bucket': 'spinpunch-backups', 'pattern': 'daysofvalor-player-data-YYYYMMDD.*', 'is_dir': True},
     ]

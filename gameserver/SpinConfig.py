@@ -105,6 +105,7 @@ def game_id_long(override_game_id = None):
             'bfm':'battlefrontmars',
             'dv':'daysofvalor',
             'sg':'summonersgate',
+            'fs':'firestrike',
             'em':'warclanempire'}[id]
 
 # return the path (relative to gameserver/) of the master gamedata file
