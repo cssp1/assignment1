@@ -19,7 +19,7 @@ GAME_DIR=/home/ec2-user/thunderrun
 QUERY_DATE_RANGE=`date +%m/%d/%Y -d "today -7 days"`-`date +%m/%d/%Y -d "today"`
 FILENAME_DATE_RANGE=`date +%Y%m%d -d "today -7 days"`-`date +%Y%m%d -d "today - 1 day"`
 
-for GAME_ID in mf2 tr bfm sg dv; do
+for GAME_ID in mf2 tr bfm sg dv fs; do
     GAME_ID_UPPER=`echo $GAME_ID | tr a-z A-Z`
     FILE_NAME=skynet-${GAME_ID}-${FILENAME_DATE_RANGE}.csv
     FILE_PATH=/tmp/$FILE_NAME
