@@ -32,6 +32,13 @@ def bh_detail_schema(sql_util):
                        ],
             'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
             }
+def bh_clicks_schema(sql_util):
+    return {'fields': [('day', 'INT8 NOT NULL'),
+                       ('click', 'VARCHAR(1024)'),
+                       ('count', 'INT4'),
+                       ],
+            'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
+            }
 
 # Google Analytics API boilerplate
 from apiclient.discovery import build
@@ -90,7 +97,10 @@ def get_summary_report(analytics, day_start, dt):
     report = get_report(analytics, day_start, dt, ['ga:pageviews','ga:sessions','ga:newUsers'])
     return report
 def get_detail_report(analytics, day_start, dt):
-    report = get_report(analytics, day_start, dt, ['ga:pageviews'], ['ga:fullReferrer', 'ga:pagePath'])
+    report = get_report(analytics, day_start, dt, ['ga:pageviews'], ['ga:fullReferrer', 'ga:hostname', 'ga:pagePath'])
+    return report
+def get_clicks_report(analytics, day_start, dt):
+    report = get_report(analytics, day_start, dt, ['ga:totalEvents'], ['ga:eventAction', 'ga:eventLabel'])
     return report
 
 def print_response(response):
@@ -130,11 +140,14 @@ if __name__ == '__main__':
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     bh_summary_table = cfg['table_prefix']+'bh_daily_summary'
     bh_detail_table = cfg['table_prefix']+'bh_daily_detail'
+    bh_clicks_table = cfg['table_prefix']+'bh_daily_clicks'
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
 
     for table, schema in ((bh_summary_table, bh_summary_schema(sql_util)),
-                          (bh_detail_table, bh_detail_schema(sql_util))):
+                          (bh_detail_table, bh_detail_schema(sql_util)),
+                          (bh_clicks_table, bh_clicks_schema(sql_util)),
+                          ):
         sql_util.ensure_table(cur, table, schema)
         con.commit()
 
@@ -158,9 +171,17 @@ if __name__ == '__main__':
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",referer,path,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:fullReferrer'], row['ga:pagePath'], row['ga:pageviews']) for row in report))
+                            ((day_start, row['ga:fullReferrer'], row['ga:hostname']+row['ga:pagePath'], row['ga:pageviews']) for row in report))
+
+        elif table == bh_clicks_table:
+            report = get_clicks_report(analytics, day_start, dt)
+            cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
+                            "("+sql_util.sym(interval)+",click,count) " + \
+                            "VALUES(%s,%s,%s)",
+                            ((day_start, '"%s" (%s)' % (row['ga:eventLabel'],row['ga:eventAction']), row['ga:totalEvents']) for row in report))
 
     for table, affected, interval, dt in ((bh_summary_table, set(), 'day', 86400),
-                                          (bh_detail_table, set(), 'day', 86400),):
+                                          (bh_detail_table, set(), 'day', 86400),
+                                          (bh_clicks_table, set(), 'day', 86400)):
         SpinETL.update_summary(sql_util, con, cur, table, affected, [start_time,end_time], interval, dt, verbose=verbose, dry_run=dry_run,
                                execute_func = do_update, resummarize_tail = 2*86400)
