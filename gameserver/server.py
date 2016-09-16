@@ -3142,6 +3142,12 @@ class AIInstanceTable:
         if base_data.get('auto_level', False):
             ai_player.auto_level_ai(observer)
 
+        # override base_resource_loot with latest value from the template
+        if base_data.get('base_resource_loot'):
+            ai_player.my_home.base_resource_loot = copy.deepcopy(base_data['base_resource_loot'])
+        else:
+            ai_player.my_home.base_resource_loot = None
+
         # apply base_resource_loot_randomness
         loot_randomness = base_data.get('base_resource_loot_randomness', 0)
         if loot_randomness != 0 and ai_player.my_home.base_resource_loot:
