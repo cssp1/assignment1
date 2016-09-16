@@ -100,6 +100,10 @@ def set_twisted_cookie(request, cookie_name, value, expire_time,
     # necessary for IE7+ to accept iframed cookies
     request.setHeader('P3P', 'CP="CAO DSP CURa ADMa DEVa TAIa PSAa PSDa IVAi IVDi CONi OUR UNRi OTRi BUS IND PHY ONL UNI COM NAV INT DEM CNT STA PRE GOV LOC"')
 
+def clear_twisted_cookie(request, cookie_name,
+                       domain = None, path = None, secure = None, httpOnly = False):
+    set_twisted_cookie(request, cookie_name, 'deleted', 0, domain = domain, path = path, secure = secure, httpOnly = httpOnly)
+
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
 
