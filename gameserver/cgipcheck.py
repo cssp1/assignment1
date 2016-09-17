@@ -73,7 +73,10 @@ def item_is_giveable(gamedata, spec):
     match = boost_item_expr.search(spec['name'])
     if match:
         sqty = match.groups()[1]
-        if sqty[0] == '1' and int(sqty) >= 10000: return True
+        iqty = int(sqty)
+        if (sqty[0] == '1' and iqty >= 10000) or \
+           (iqty in (50000, 250000)):
+            return True
 
     if 'use' in spec:
         if type(spec['use']) is dict:
