@@ -9,11 +9,6 @@
 import sys, os, time, calendar, getopt
 import boto.ec2, boto.rds2
 
-aws_key_file = os.path.join(os.getenv('HOME'), '.ssh', 'dmaas-awssecret')
-
-with open(aws_key_file) as key_fd:
-    aws_key, aws_secret = key_fd.readline().strip(), key_fd.readline().strip()
-
 time_now = int(time.time())
 
 class ANSIColor:
@@ -132,14 +127,15 @@ def get_rds_res_offerings(rds):
     return ret
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', [])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'v', ['region='])
     verbose = False
     region = 'us-east-1'
     for key, val in opts:
         if key == '-v': verbose = True
+        elif key == '--region': region = val
 
-    conn = boto.ec2.connect_to_region(region, aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
-    rds = boto.rds2.connect_to_region(region, aws_access_key_id=aws_key, aws_secret_access_key=aws_secret)
+    conn = boto.ec2.connect_to_region(region)
+    rds = boto.rds2.connect_to_region(region)
 
     ec2_instance_list = conn.get_only_instances()
     ec2_res_list = conn.get_all_reserved_instances()
