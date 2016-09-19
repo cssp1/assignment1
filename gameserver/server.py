@@ -1791,7 +1791,8 @@ class User:
         gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
                                                      SpinConfig.config['battlehouse_api_path']+'/user/%s' % self.bh_id,
                                                      lambda result, _session=session: self.retrieve_bh_info_complete(_session, None, result),
-                                                     headers = {'Authorization': 'Bearer '+self.bh_auth_token})
+                                                     headers = {'Authorization': 'Bearer '+self.bh_auth_token,
+                                                                'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
         session.portrait_update_launched(portrait_d)

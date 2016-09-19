@@ -1439,8 +1439,9 @@ class GameProxy(proxy.ReverseProxyResource):
 
         # don't trust these yet! verify with loginserver first.
         url = SpinConfig.config['battlehouse_api_path']+'/verify?' + \
-              urllib.urlencode({'bh_access_token':bh_access_token})
-        d = bh_async_http.queue_request_deferred(proxy_time, url)
+              urllib.urlencode({'bh_access_token':bh_access_token,
+                                'service':SpinConfig.game()})
+        d = bh_async_http.queue_request_deferred(proxy_time, url, headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
         d.addCallback(self.index_visit_do_bh_login_response, request, visitor, bh_access_token, battlehouse_id)
         d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
         return twisted.web.server.NOT_DONE_YET
