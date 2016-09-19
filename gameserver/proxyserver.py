@@ -560,7 +560,7 @@ class AGVisitor(Visitor):
 
     def allowed_frame_origin(self, request):
         if SpinConfig.config.get('enable_armorgames',0):
-            return '*.armorgames.com'
+            return 'armorgames.com'
         return None
 
 class BHVisitor(Visitor):
