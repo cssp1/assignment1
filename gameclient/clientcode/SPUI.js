@@ -3014,6 +3014,13 @@ SPUI.TextInput = function(data) {
     this.onclick = function(widget) { widget.TextInput_onclick(); };
     this.ontype = null; // called for each character typed
     this.ontextready = null; // called on "ENTER" press
+
+    // HTML input implementatio
+    this.input = document.createElement('input');
+    this.input.style.position = 'absolute';
+    this.input.type = 'text';
+
+    this.input_active = false;
 };
 goog.inherits(SPUI.TextInput, SPUI.ActionButton);
 
@@ -3080,10 +3087,39 @@ SPUI.TextInput.prototype.onkeypress = function(code, c) {
     return true;
 };
 
+SPUI.TextInput.prototype.destroy = function() {
+    if(this.input_active) {
+        this.input.blur();
+        canvas_div.removeChild(this.input);
+        this.input_active = false;
+    }
+    goog.base(this, 'destroy');
+    if(SPUI.keyboard_focus === this) {
+        SPUI.set_keyboard_focus(null);
+    }
+};
+
 SPUI.TextInput.prototype.do_draw = function(offset) {
     var disabled = (this.state == 'disabled');
     var save_str = this.str;
     var save_color = this.text_color;
+
+    if(!disabled && SPUI.keyboard_focus === this) {
+        this.input.style.left = (this.xy[0]+offset[0])+'px';
+        this.input.style.top = (this.xy[1]+offset[1])+'px';
+        this.input.style.width = (this.wh[0])+'px';
+        this.input.style.height = (this.wh[1])+'px';
+        if(!this.input_active) {
+            canvas_div.appendChild(this.input);
+            this.input.focus();
+            this.input_active = true;
+        }
+    } else {
+        if(this.input_active) {
+            canvas_div.removeChild(this.input);
+            this.input_active = false;
+        }
+    }
 
     if(!this.has_typed && this.fade_unless_hover && this.parent && this.parent.mouse_enter_time < 0) {
         if(this.fade_unless_hover < 0.005) { return false; }
@@ -3136,12 +3172,7 @@ SPUI.TextInput.prototype.TextInput_onclick = function() {
     }
     SPUI.set_keyboard_focus(this);
 };
-SPUI.TextInput.prototype.destroy = function() {
-    goog.base(this, 'destroy');
-    if(SPUI.keyboard_focus === this) {
-        SPUI.set_keyboard_focus(null);
-    }
-};
+
 SPUI.set_keyboard_focus = function(newfocus) {
     if(SPUI.keyboard_focus != newfocus) {
         if(SPUI.keyboard_focus && SPUI.keyboard_focus.onunfocus) {
