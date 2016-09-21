@@ -96,7 +96,9 @@ def get_browser(ag):
         ver = get_version(ag, 'Version')
 
     if os is None:
-        if 'Linux' in ag:
+        if 'Android' in ag:
+            os = 'Android'
+        elif 'Linux' in ag:
             os = 'Linux'
         elif 'Win' in ag:
             os = 'Windows'
