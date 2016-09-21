@@ -436,6 +436,9 @@
             ]}
         ]},
 
+        // whether to enable HTMLInputElement-based text input
+        "enable_html_text_input": {"predicate": "BROWSER_OS", "os": ["iOS", "Android"]},
+
         "enable_loot_burst_effects": false,
         // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
         "loot_text_color": {

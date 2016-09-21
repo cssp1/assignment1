@@ -10253,7 +10253,10 @@ SPINPUNCHGAME.init = function() {
         low_fonts |= true;
     }
 
-    SPUI.init(canvas, ctx, {fonts_are_thick: fonts_are_thick, low_fonts: low_fonts});
+    SPUI.init(canvas, ctx, {fonts_are_thick: fonts_are_thick,
+                            low_fonts: low_fonts,
+                            html_text_input: false // updated after receiving A/B tests
+                           });
 
     window.addEventListener("resize", on_resize_browser, false);
 
@@ -44666,6 +44669,11 @@ function handle_server_message(data) {
 
         if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, false);
+
+        // set html_text_input
+        if(read_predicate(gamedata['client']['enable_html_text_input']).is_satisfied(player)) {
+            SPUI.html_text_input = true;
+        }
 
         if('sound_volume' in player.preferences) {
             GameArt.sound_volume = player.preferences['sound_volume'];

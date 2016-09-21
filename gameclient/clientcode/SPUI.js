@@ -155,20 +155,25 @@ SPUI.desktop_font = null;
 /** @param {!HTMLCanvasElement} canvas
     @param {!CanvasRenderingContext2D} ctx
     @param {{fonts_are_thick: (boolean|undefined),
-             low_fonts: (boolean|undefined)}=} options */
+             low_fonts: (boolean|undefined),
+             html_text_input: (boolean|undefined)}=} options */
 SPUI.init = function(canvas, ctx, options) {
-    if(!options) { options = {fonts_are_thick:undefined, low_fonts:undefined}; }
+    if(!options) { options = {fonts_are_thick:undefined,
+                              low_fonts:undefined,
+                              html_text_input:undefined}; }
 
     SPUI.canvas = canvas;
     SPUI.canvas_width = 100;
     SPUI.canvas_height = 100;
     SPUI.ctx = ctx;
     SPUI.time = 0;
-    /** @type {SPUI.TextInput|null} */
+    /** @type {SPUI.TextInput|null}
+        Global pointer to the currently focused input widget, if any */
     SPUI.keyboard_focus = null;
     SPUI.fonts_are_thick = options.fonts_are_thick || false;
     SPUI.low_fonts = options.low_fonts || false;
     SPUI.desktop_font = SPUI.make_font(14, 17, 'thick');
+    SPUI.html_text_input = options.html_text_input || false;
 };
 
 SPUI.on_resize = function(new_width, new_height) {
@@ -556,6 +561,11 @@ SPUI.dripper = new Dripper.Dripper(null, -1, -1);
 SPUI.draw_all = function() {
     SPUI.root.draw([0,0]);
 
+    // control of the HTMLInput element is done here since it's hard to detect
+    // the *absence* of a focused input widget from within the widget itself
+    // (for one thing, destroy() isn't reliable since the widget can be hidden
+    // via a parent dialog without any notification to the widget)
+
     if(SPUI.keyboard_focus) {
         if(SPUI.keyboard_focus.parent && SPUI.keyboard_focus.parent.is_visible() &&
            SPUI.keyboard_focus.state !== 'disabled') {
@@ -735,7 +745,11 @@ SPUI.instantiate_widget = function(wdata) {
     } else if(wdata['kind'] === 'ScrollingTextField') {
         widget = new SPUI.ScrollingTextField(wdata);
     } else if(wdata['kind'] === 'TextInput') {
-        widget = new SPUI.TextInput(wdata);
+        if(SPUI.html_text_input) {
+            widget = new SPUI.HTMLTextInput(wdata);
+        } else {
+            widget = new SPUI.TextInput(wdata);
+        }
     } else if(wdata['kind'] === 'StaticImage') {
         widget = new SPUI.StaticImage(wdata);
     } else if(wdata['kind'] === 'FriendPortrait') {
@@ -3030,139 +3044,12 @@ SPUI.TextInput = function(data) {
     this.onfocus = null;
     /** @type {function(!SPUI.TextInput)|null} */
     this.onunfocus = null;
-
-    // HTML input implementation
-    this.input = document.createElement('input');
-    this.input.type = 'text';
-    this.input.className = 'SPUI_TextInput';
-    this.input_style = null;
-
-    this.input_keypress_func = (function (_this) { return function (e) {
-        //console.log('keypress'); console.log(e);
-        // ONLY for detecting Enter, nothing else
-        if(e.keyCode === 13) { // enter - redirect to keydown handler
-            if(_this.onkeydown(e.keyCode)) {
-                // reinitialize value in case it changed upon submission
-                _this.input.value = _this.str;
-                if(e.preventDefault) { e.preventDefault(); }
-                return false;
-            }
-        }
-        return true;
-    }; })(this);
-    this.input_input_func = (function (_this) { return function (e) {
-        //console.log('input'); console.log(e);
-        _this.input_sync();
-    }; })(this);
-    this.input_blur_func = (function (_this) { return function (e) {
-        //console.log('blur'); console.log(e);
-        _this.input_sync();
-    }; })(this);
-    this.input_active = false;
 };
 goog.inherits(SPUI.TextInput, SPUI.ActionButton);
 
-// inject a CSS fragment that will be used to turn invalid text red
-SPUI.TextInput.css_injected = false;
-SPUI.TextInput.inject_css = function() {
-    if(SPUI.TextInput.css_injected) { return; }
-    SPUI.TextInput.css_injected = true;
-    var css = 'SPUI_TextInput:invalid { color: #ff0000 !important; }';
-    var style = document.createElement('style');
-    if(style.styleSheet) {
-        style.styleSheet.cssText = css;
-    } else {
-        style.appendChild(document.createTextNode(css));
-    }
-    document.getElementsByTagName('head')[0].appendChild(style);
-};
-
-SPUI.TextInput.prototype.input_activate = function() {
-    var xy = this.get_absolute_xy();
-    this.input.style.left = xy[0].toString()+'px';
-    this.input.style.top = xy[1].toString()+'px';
-    this.input.style.width = (this.wh[0].toString())+'px';
-    this.input.style.height = (this.wh[1].toString())+'px';
-
-    // below steps only run once on initial show
-
-    if(this.input_active) { return; }
-    this.input_active = true;
-
-    SPUI.TextInput.inject_css();
-
-    this.input.style.position = 'absolute';
-    this.input.style.padding = '0';
-    this.input.style.font = this.font.str();
-    this.input.style.background = 'none';
-    this.input.style.outline = 'none';
-    this.input.style.border = 'none';
-    this.input.style.color = this.text_color.str();
-    this.input.maxLength = this.max_chars;
-
-    // set validation pattern
-    if(this.disallowed_chars) {
-        this.input.pattern = '[^'+this.disallowed_chars.join('')+']*';
-    } else if(this.allowed_chars) {
-        this.input.pattern = '['+this.allowed_chars.join('')+']*';
-    } else {
-        this.input.pattern = null;
-    }
-
-    // initialize contents
-    this.input.value = this.str;
-    this.input.addEventListener('keypress', this.input_keypress_func, false);
-    //this.input.addEventListener('compositionend', this.input_compositionend_func, false);
-    //this.input.addEventListener('keydown', this.input_keydown_func, false);
-    this.input.addEventListener('input', this.input_input_func, false);
-    this.input.addEventListener('blur', this.input_blur_func, false);
-    canvas_div.appendChild(this.input);
-    this.input.focus();
-};
-
-SPUI.TextInput.prototype.input_sync = function() {
-    // sync contents FROM HTML input TO this.str
-    var new_str = this.input.value;
-
-    // filter
-    if(new_str.length >= this.max_chars) {
-        new_str = new_str.substring(0, this.max_chars);
-    }
-    if(this.allowed_chars) {
-        new_str = new_str.replace(new RegExp('[^'+this.allowed_chars.join('')+']', 'g'), '');
-    }
-    if(this.disallowed_chars) {
-        new_str = new_str.replace(new RegExp('['+this.disallowed_chars.join('')+']', 'g'), '');
-    }
-    if(this.force_uppercase) {
-        new_str = new_str.toUpperCase();
-    }
-
-    if(this.str != new_str) {
-        this.str = new_str;
-        if(this.ontype) {
-            this.ontype(this);
-        }
-    }
-
-    // backpropagate filtering?
-    if(new_str != this.input.value) {
-        this.input.value = new_str;
-    }
-};
-
-SPUI.TextInput.prototype.input_deactivate = function() {
-    if(!this.input_active) { return; }
-    this.input_active = false;
-    this.input.blur();
-    this.str = this.input.value;
-    this.input.removeEventListener('keypress', this.input_keypress_func);
-    //this.input.removeEventListener('compositionend', this.input_compositionend_func);
-    //this.input.removeEventListener('keydown', this.input_keydown_func);
-    this.input.removeEventListener('input', this.input_input_func);
-    this.input.removeEventListener('blur', this.input_blur_func);
-    canvas_div.removeChild(this.input);
-};
+// placeholders for HTMLTextInput to override
+SPUI.TextInput.prototype.input_activate = function() {};
+SPUI.TextInput.prototype.input_deactivate = function() {};
 
 SPUI.TextInput.prototype.reset_left_char = function() {
     if(this.multiline) { return; }
@@ -3227,17 +3114,7 @@ SPUI.TextInput.prototype.onkeypress = function(code, c) {
     return true;
 };
 
-SPUI.TextInput.prototype.destroy = function() {
-    goog.base(this, 'destroy');
-    if(SPUI.keyboard_focus === this) {
-        SPUI.set_keyboard_focus(null);
-    }
-};
-
 SPUI.TextInput.prototype.do_draw = function(offset) {
-    // suppress drawing when HTML input is active
-    if(this.input_active) { return false; }
-
     var disabled = (this.state == 'disabled');
     var save_str = this.str;
     var save_color = this.text_color;
@@ -3294,6 +3171,13 @@ SPUI.TextInput.prototype.TextInput_onclick = function() {
     SPUI.set_keyboard_focus(this);
 };
 
+SPUI.TextInput.prototype.destroy = function() {
+    goog.base(this, 'destroy');
+    if(SPUI.keyboard_focus === this) {
+        SPUI.set_keyboard_focus(null);
+    }
+};
+
 /** @param {SPUI.TextInput|null} newfocus */
 SPUI.set_keyboard_focus = function(newfocus) {
     if(SPUI.keyboard_focus != newfocus) {
@@ -3312,6 +3196,162 @@ SPUI.set_keyboard_focus = function(newfocus) {
         }
     }
 };
+
+/** HTMLTextInput - new implementation of the TextInput widget that creates
+    a real HTMLInputElement to absorb input, useful on mobile and for cut/paste/IME support
+    @constructor @struct
+    @extends SPUI.TextInput */
+SPUI.HTMLTextInput = function(data) {
+    goog.base(this, data);
+
+    this.input = document.createElement('input');
+    this.input.type = 'text';
+    this.input.className = 'SPUI_HTMLTextInput';
+    this.input_style = null;
+
+    // In order to avoid breaking platform keyboard input (e.g. iOS on-screen keyboard),
+    // which is very delicate (hooking up a keydown handler breaks IME), we try to leave
+    // the HTMLInputElement alone as much as possible, and just pull strings back and
+    // forth at the last moment
+
+    // keypress handler is ONLY for detecting Enter, nothing else
+    // (to avoid disturbing the platform keyboard)
+    this.input_keypress_func = (function (_this) { return function (e) {
+        //console.log('keypress'); console.log(e);
+        if(e.keyCode === 13) { // enter - redirect to standard keydown handler
+            if(_this.onkeydown(e.keyCode)) {
+                // reinitialize value in case it changed after submission
+                // (e.g. clearing chat input on enter)
+                _this.input.value = _this.str;
+                if(e.preventDefault) { e.preventDefault(); }
+                return false;
+            }
+        }
+        return true;
+    }; })(this);
+    this.input_input_func = (function (_this) { return function (e) {
+        //console.log('input'); console.log(e);
+        _this.input_sync();
+    }; })(this);
+    this.input_blur_func = (function (_this) { return function (e) {
+        //console.log('blur'); console.log(e);
+        _this.input_sync();
+    }; })(this);
+    this.input_active = false;
+};
+goog.inherits(SPUI.HTMLTextInput, SPUI.TextInput);
+
+// inject a CSS fragment that will be used to turn invalid text red
+SPUI.HTMLTextInput.css_injected = false;
+SPUI.HTMLTextInput.inject_css = function() {
+    if(SPUI.HTMLTextInput.css_injected) { return; }
+    SPUI.HTMLTextInput.css_injected = true;
+    var css = 'SPUI_HTMLTextInput:invalid { color: #ff0000 !important; }';
+    var style = document.createElement('style');
+    if(style.styleSheet) {
+        style.styleSheet.cssText = css;
+    } else {
+        style.appendChild(document.createTextNode(css));
+    }
+    document.getElementsByTagName('head')[0].appendChild(style);
+};
+
+// make the HTMLInputElement "live"
+SPUI.HTMLTextInput.prototype.input_activate = function() {
+    var xy = this.get_absolute_xy();
+    this.input.style.left = xy[0].toString()+'px';
+    this.input.style.top = xy[1].toString()+'px';
+    this.input.style.width = (this.wh[0].toString())+'px';
+    this.input.style.height = (this.wh[1].toString())+'px';
+
+    // below steps only run once on initial show
+
+    if(this.input_active) { return; }
+    this.input_active = true;
+
+    SPUI.HTMLTextInput.inject_css();
+
+    this.input.style.position = 'absolute';
+    this.input.style.padding = '0';
+    this.input.style.font = this.font.str();
+    this.input.style.background = 'none';
+    this.input.style.outline = 'none';
+    this.input.style.border = 'none';
+    this.input.style.color = this.text_color.str();
+    this.input.maxLength = this.max_chars;
+
+    // set validation pattern
+    if(this.disallowed_chars) {
+        this.input.pattern = '[^'+this.disallowed_chars.join('')+']*';
+    } else if(this.allowed_chars) {
+        this.input.pattern = '['+this.allowed_chars.join('')+']*';
+    } else {
+        this.input.pattern = null;
+    }
+
+    // initialize contents
+    this.input.value = this.str;
+    this.input.addEventListener('keypress', this.input_keypress_func, false);
+    //this.input.addEventListener('compositionend', this.input_compositionend_func, false);
+    //this.input.addEventListener('keydown', this.input_keydown_func, false);
+    this.input.addEventListener('input', this.input_input_func, false);
+    this.input.addEventListener('blur', this.input_blur_func, false);
+    canvas_div.appendChild(this.input);
+    this.input.focus();
+};
+
+// make the HTMLInputElement "not live"
+SPUI.HTMLTextInput.prototype.input_deactivate = function() {
+    if(!this.input_active) { return; }
+    this.input_active = false;
+    this.input.blur();
+    this.str = this.input.value;
+    this.input.removeEventListener('keypress', this.input_keypress_func);
+    //this.input.removeEventListener('compositionend', this.input_compositionend_func);
+    //this.input.removeEventListener('keydown', this.input_keydown_func);
+    this.input.removeEventListener('input', this.input_input_func);
+    this.input.removeEventListener('blur', this.input_blur_func);
+    canvas_div.removeChild(this.input);
+};
+
+SPUI.HTMLTextInput.prototype.input_sync = function() {
+    // sync contents FROM HTML input TO this.str
+    var new_str = this.input.value;
+
+    // filter
+    if(new_str.length >= this.max_chars) {
+        new_str = new_str.substring(0, this.max_chars);
+    }
+    if(this.allowed_chars) {
+        new_str = new_str.replace(new RegExp('[^'+this.allowed_chars.join('')+']', 'g'), '');
+    }
+    if(this.disallowed_chars) {
+        new_str = new_str.replace(new RegExp('['+this.disallowed_chars.join('')+']', 'g'), '');
+    }
+    if(this.force_uppercase) {
+        new_str = new_str.toUpperCase();
+    }
+
+    if(this.str != new_str) {
+        this.str = new_str;
+        if(this.ontype) {
+            this.ontype(this);
+        }
+    }
+
+    // backpropagate filtering?
+    if(new_str != this.input.value) {
+        this.input.value = new_str;
+    }
+};
+
+SPUI.HTMLTextInput.prototype.do_draw = function(offset) {
+    // suppress drawing when HTML input is visible
+    if(this.input_active) { return false; }
+
+    return goog.base(this, 'do_draw', offset);
+};
+
 
 // ScrollingTextField
 
