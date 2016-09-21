@@ -176,7 +176,7 @@ var touch_modes = {
 var touch_mode = touch_modes.NONE;
 var touch_primary = false; // true if touch is the primary input method (changes unit movement behavior)
 
-if(typeof Touch === 'object') {
+if(typeof Touch === 'object' || typeof Touch === 'function') {
     touch_mode = touch_modes.TOUCHEVENT;
     touch_primary = true;
 } else if(window.navigator['msPointerEnabled'] && window.navigator['msMaxTouchPoints'] > 1) {
@@ -48072,7 +48072,7 @@ function touch_emulate_mouse(e, touchevt) {
 };
 
 function on_touchstart(e) {
-//    console.log('TOUCHSTART');
+    //console.log('touchstart'); console.log(e);
     e.preventDefault();
     if(e.changedTouches.length < 1) { return; }
     on_mousedown(touch_emulate_mouse(e, e.changedTouches[0]));
@@ -48080,7 +48080,7 @@ function on_touchstart(e) {
 }
 
 function on_touchend(e) {
-//    console.log('TOUCHEND');
+    //console.log('touchend'); console.log(e);
     e.preventDefault();
     if(e.changedTouches.length < 1) { return; }
 
@@ -48097,6 +48097,7 @@ function on_touchend(e) {
 }
 
 function on_touchmove(e) {
+    //console.log('touchmove'); console.log(e);
     e.preventDefault();
     if(e.changedTouches.length < 1) { return; }
 
