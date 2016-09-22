@@ -150,9 +150,14 @@ def cgi_get_my_endpoint():
     if ret.endswith('/'): ret = ret[:-1]
     return ret
 
+def is_unroutable_ip(ip):
+    return (ip.startswith('127.') or
+            ip.startswith('10.') or
+            ip.startswith('192.168.'))
+
 def cgi_is_local():
     import os
-    return (not os.getenv('REMOTE_ADDR')) or (os.getenv('REMOTE_ADDR') == '127.0.0.1')
+    return (not os.getenv('REMOTE_ADDR')) or (is_unroutable_ip(os.getenv('REMOTE_ADDR')))
 
 def cgi_do_auth(args, role, time_now):
     import os, Cookie
@@ -186,7 +191,7 @@ def url_to_domain(url):
     return domain
 
 def twisted_request_is_local(request, proxy_secret = None):
-    return SpinHTTP.get_twisted_client_ip(request, proxy_secret) == '127.0.0.1'
+    return is_unroutable_ip(SpinHTTP.get_twisted_client_ip(request, proxy_secret))
 
 def twisted_get_my_endpoint(request, proxy_secret = None):
     # get endpoint URL by looking at a Twisted request
