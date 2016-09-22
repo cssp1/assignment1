@@ -174,16 +174,13 @@ var touch_modes = {
     MSPOINTER: 2
 }
 var touch_mode = touch_modes.NONE;
-var touch_primary = false; // true if touch is the primary input method (changes unit movement behavior)
 
 if(typeof Touch === 'object' || typeof Touch === 'function') {
     touch_mode = touch_modes.TOUCHEVENT;
-    touch_primary = true;
 } else if(window.navigator['msPointerEnabled'] && window.navigator['msMaxTouchPoints'] > 1) {
     // be conservative here and only enable MSPointer on multi-touch hardware
     // in the future MSPointer could replace mouse input on IE10+
     touch_mode = touch_modes.MSPOINTER;
-    // touch_primary is detected from MSPointerMove events
 }
 
 // for iOS: <meta name="viewport" content="width=device-width, initial-scale=0.5, user-scalable=no"/>
@@ -47274,13 +47271,13 @@ function event_to_canvas(e) {
 
 function on_mouseup(e) {
    try {
-       do_on_mouseup(e);
+       do_on_mouseup(e, false);
    } catch (ex) {
        log_exception(ex, 'do_on_mouseup');
    }
 }
 
-function do_on_mouseup(e) {
+function do_on_mouseup(e, is_touch) {
     e.preventDefault();
 
     mouse_state.button.clear_button(/** @type {SPUI.MouseButton} */ (e.button));
@@ -47627,7 +47624,7 @@ function do_on_mouseup(e) {
                 var use_amove = false;
 
                 // in auto unit control mode and on touch screens, treat ALL (in combat) landscape clicks as a-move
-                if(session.has_attacked && (touch_primary || get_preference_setting(player.preferences, 'auto_unit_control'))) {
+                if(session.has_attacked && (is_touch || get_preference_setting(player.preferences, 'auto_unit_control'))) {
                     use_amove = true;
                     if(client_time - mouse_state.last_click_time < DOUBLE_CLICK_TIME) {
                         use_amove = false;
@@ -48075,6 +48072,14 @@ function on_touchstart(e) {
 }
 
 function on_touchend(e) {
+    try {
+        return do_on_touchend(e);
+    } catch (ex) {
+        log_exception(ex, 'do_on_touchend');
+    }
+}
+
+function do_on_touchend(e) {
     //console.log('touchend'); console.log(e);
     e.preventDefault();
     if(e.changedTouches.length < 1) { return; }
@@ -48086,7 +48091,7 @@ function on_touchend(e) {
             mouse_state.last_x = xy[0]; mouse_state.last_y = xy[1];
         }
     } else {
-        on_mouseup(touch_emulate_mouse(e, e.changedTouches[0]));
+        do_on_mouseup(touch_emulate_mouse(e, e.changedTouches[0]), true);
     }
     mouse_state.has_dragged = false;
 }
@@ -48134,6 +48139,13 @@ function on_MSPointerDown(e) {
     return on_mousedown(e);
 }
 function on_MSPointerUp(e) {
+    try {
+        return do_on_MSPointerUp(e);
+    } catch (ex) {
+        log_exception(ex, 'do_on_MSPointerUp');
+    }
+}
+function do_on_MSPointerUp(e) {
     if(e.pointerId in mspointer_state) { delete mspointer_state[e.pointerId]; }
 
     if(mouse_state.has_dragged) {
@@ -48142,7 +48154,7 @@ function on_MSPointerUp(e) {
         mouse_state.last_x = xy[0]; mouse_state.last_y = xy[1];
         e.preventDefault();
     } else {
-        return on_mouseup(e);
+        return do_on_mouseup(e, true);
     }
 }
 function on_MSPointerOut(e) {
@@ -48161,8 +48173,6 @@ function on_MSPointerMove(e) {
             pointer1 = mspointer_state[id];
         }
     }
-
-    if(e.pointerType===e.MSPOINTER_TYPE_TOUCH) { touch_primary = true; }
 
     var world = session.get_draw_world();
 
