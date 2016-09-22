@@ -10284,15 +10284,7 @@ SPINPUNCHGAME.init = function() {
     canvas.addEventListener("mousedown", on_mousedown, false);
     canvas.addEventListener("mouseup", on_mouseup, false);
     canvas.addEventListener("mousemove", on_mousemove, false);
-
-    if(!touch_primary) {
-        if(spin_demographics['browser_name'] === "Firefox") {
-            canvas.addEventListener("DOMMouseScroll", on_mousewheel, false);
-        } else {
-            canvas.addEventListener("mousewheel", on_mousewheel, false);
-        }
-    }
-
+    canvas.addEventListener("wheel", on_mousewheel, false);
 
     // allow canvas to acquire focus (and force focus when mouse is over it) so that keydown events work
     // see http://www.dbp-consulting.com/tutorials/canvas/CanvasKeyEvents.html
@@ -47930,12 +47922,7 @@ function do_on_mousewheel(e) {
     // get canvas coordinates of mouse pointer location
     var xy = event_to_canvas(e);
 
-    var delta = 0;
-    if(e.wheelDelta) {
-        delta = e.wheelDelta / 60;
-    } else if(e.detail) {
-        delta = -e.detail;
-    }
+    var delta = -e.deltaY/60; // arbitrary scale factor
 
     if(SPUI.root.on_mousewheel(xy, [0,0], delta)) {
         if(e.preventDefault) { e.preventDefault(); }
