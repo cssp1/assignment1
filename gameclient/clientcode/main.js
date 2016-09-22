@@ -10427,13 +10427,6 @@ SPINPUNCHGAME.init = function() {
         console.log('blacklisting audio on Windows Chrome version < 17.0.963.66');
     }
 
-    // iOS hangs audio
-    if(spin_demographics['browser_name'] === 'Safari' &&
-       spin_demographics['browser_OS'] === 'iOS') {
-        blacklist_audio = true;
-        console.log('blacklisting audio on iOS Safari');
-    }
-
     if(spin_demographics['browser_name'] === 'Opera') {
         blacklist_audio = true;
         console.log('blacklisting audio on Opera');
