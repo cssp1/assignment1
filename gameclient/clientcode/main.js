@@ -47919,7 +47919,12 @@ function do_on_mousewheel(e) {
     // get canvas coordinates of mouse pointer location
     var xy = event_to_canvas(e);
 
-    var delta = -e.deltaY/60; // arbitrary scale factor
+    var delta;
+    if(e.deltaMode === 1) { // lines
+        delta = -e.deltaY*0.75;
+    } else { // pixels
+        delta = -e.deltaY/60; // arbitrary scale factor
+    }
 
     if(SPUI.root.on_mousewheel(xy, [0,0], delta)) {
         if(e.preventDefault) { e.preventDefault(); }
