@@ -979,6 +979,16 @@ FriendsJoinedPredicate.prototype.ui_progress = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function ResourceStorageCapacityPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(ResourceStorageCapacityPredicate, Predicate);
+ResourceStorageCapacityPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.resource_state[this.data['res']][0] >= this.data['min'];
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function ABTestPredicate(data) {
     goog.base(this, data);
     this.test = data['test'];
@@ -1916,6 +1926,8 @@ function read_predicate(data) {
     else if(kind === 'RESOURCES_HARVESTED_AT_ONCE') {
         var resource_type = data['resource_type'];
         return new PlayerHistoryPredicate(data, 'harvested_'+resource_type+'_at_once', data['amount'], resource_type, data['amount'].toString(), '>=');
+    } else if(kind === 'RESOURCE_STORAGE_CAPACITY') {
+        return new ResourceStorageCapacityPredicate(data);
     } else if(kind === 'FRIENDS_JOINED') {
         return new FriendsJoinedPredicate(data, 'friends_in_game', data['number'], '', data['number'].toString(), '>=');
     } else if(kind === 'FRAME_PLATFORM') {
