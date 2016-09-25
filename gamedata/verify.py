@@ -2429,6 +2429,9 @@ def check_ai_base(strid, base):
                 error |= 1
                 print 'AI base %s refers to missing tech "%s"' % (strid, tech_name)
 
+    if gamedata['game_id'] == 'fs' and base.get('auto_level'):
+        error |= 1; print 'AI base %s should not have "auto_level" setting' % (strid)
+
     error |= require_art_asset(base['portrait'], 'AI base %s:portrait' % strid)
 
     for challenge in ('challenge_item','challenge_icon'):
