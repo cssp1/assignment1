@@ -54,7 +54,11 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None, override_gam
                 filename = filename.replace('$GAME_ID', game(override_game_id = override_game_id))
 
             # replace the line with the contents of the included file
-            line = load_fd_raw(open(filename), stripped = (match is include_stripped_match), path = os.path.dirname(filename))
+            line = load_fd_raw(open(filename),
+                               # note: do not pass "stripped" flag to files included recursively,
+                               # because we don't want to alter their contents!
+                               stripped = False, # (match is include_stripped_match),
+                               path = os.path.dirname(filename))
 
         js += line
     if stripped:
