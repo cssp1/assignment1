@@ -4,6 +4,3 @@
 
 # note: runs in gamedata directory, NOT in gamedata/$GAME_ID
 include Makefile.common
-
-${BUILT}/${GAME_ID}_buildings.json: ${GAME_ID}/${GAME_ID}_buildings.json
-	@echo "    ${GAME_ID}_buildings.json..." && cp $< $@

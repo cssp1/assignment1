@@ -36,6 +36,8 @@ dep:
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_hives.json --get-deps-as ${BUILT}/${GAME_ID}_hives_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_raids.json --get-deps-as ${BUILT}/${GAME_ID}_raids_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_tech.json --get-deps-as ${BUILT}/${GAME_ID}_tech_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_buildings.json --get-deps-as ${BUILT}/${GAME_ID}_buildings_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_units.json --get-deps-as ${BUILT}/${GAME_ID}_units_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_crafting.json --get-deps-as ${BUILT}/${GAME_ID}_crafting_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps gamedata_main.json --get-deps-as ${BUILT}/gamedata-${GAME_ID}.json.unverified >> ${BUILT}/deps
 
@@ -64,7 +66,11 @@ ${BUILT}/${GAME_ID}_raids_compiled.json: ${GAME_ID}/${GAME_ID}_raids.json
 	@echo "    ${GAME_ID}_raids_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@;
 ${BUILT}/${GAME_ID}_raids_server.json: ${GAMEDATA}/make_raids.py ${BUILT}/${GAME_ID}_raids_compiled.json
 	@echo "    ${GAME_ID}_raids_server.json..." && ${GAMEDATA}/make_raids.py --server ${BUILT}/${GAME_ID}_raids_compiled.json $@
-${BUILT}/${GAME_ID}_tech_compiled.json: ${GAME_ID}/${GAME_ID}_tech.json # just for invert_requirements.py, NOT actually incorprated into gamedata
+${BUILT}/${GAME_ID}_buildings_compiled.json: ${GAME_ID}/${GAME_ID}_buildings.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
+	@echo "    ${GAME_ID}_buildings_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_units_compiled.json: ${GAME_ID}/${GAME_ID}_units.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
+	@echo "    ${GAME_ID}_units_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_tech_compiled.json: ${GAME_ID}/${GAME_ID}_tech.json # just for invert_requirements.py and other scripts, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_tech_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_crafting_compiled.json: ${GAME_ID}/${GAME_ID}_crafting.json # just for invert_requirements.py, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_crafting_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
@@ -107,8 +113,8 @@ ${BUILT}/${GAME_ID}_loot_tables_compiled.json: ${BUILT}/${GAME_ID}_loot_tables.j
 	@echo "    ${GAME_ID}_loot_tables_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_promo_codes_compiled.json: ${GAME_ID}/${GAME_ID}_promo_codes.json
 	@echo "    ${GAME_ID}_promo_codes_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
-${BUILT}/${GAME_ID}_inverse_requirements.json: ${GAMEDATA}/invert_requirements.py ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json
-	@echo "    ${GAME_ID}_inverse_requirements.json..." && ${GAMEDATA}/invert_requirements.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json $@
+${BUILT}/${GAME_ID}_inverse_requirements.json: ${GAMEDATA}/invert_requirements.py ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json
+	@echo "    ${GAME_ID}_inverse_requirements.json..." && ${GAMEDATA}/invert_requirements.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json $@
 
 # master main JSON file
 ${BUILT}/gamedata-${GAME_ID}.json.unverified: ${GAMEDATA}/gamedata_main.json

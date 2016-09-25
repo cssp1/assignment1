@@ -817,7 +817,7 @@
     ,
 
     "buildings":
-#include "$GAME_ID/built/$GAME_ID_buildings.json"
+#include "$GAME_ID/$GAME_ID_buildings.json"
     ,
 
     "inert":
