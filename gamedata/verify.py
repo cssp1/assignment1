@@ -230,11 +230,17 @@ def check_mandatory_fields(specname, spec, kind):
         if level_tech != spec['name']+'_production':
             error |= 1; print '%s:level_determined_by_tech is probably a typo' % (specname,)
 
-        if gamedata['game_id'] != 'sg' and (not spec.get('resurrectable',False)) and (spec['name'] != 'repair_droid'):
+        # games where all units should be resurrectable
+        if (gamedata['game_id'] not in ('sg','fs')) and (not spec.get('resurrectable',False)) and (spec['name'] != 'repair_droid'):
             error |= 1
             print '%s is not resurrectable' % specname
+
+        # games where all units should be NOT resurrectable, YES consumable
         elif gamedata['game_id'] == 'sg' and (spec.get('resurrectable',False) or (not spec.get('consumable',False))) and spec['manufacture_category'] != 'heroes':
             error |= 1; print '%s: units in SG must be "resurrectable":0, "consumable":1 (except for hero units).' % specname
+        # games where all units should be NOT resurrectable, NOT consumable
+        elif gamedata['game_id'] == 'fs' and (spec.get('resurrectable',False) or (spec.get('consumable',False))):
+            error |= 1; print '%s: units in FS must be "resurrectable":0, "consumable":0' % specname
 
     # check predicate fields
     if 'requires' in spec:
