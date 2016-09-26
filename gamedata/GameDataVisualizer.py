@@ -6,8 +6,10 @@
 
 # pretty-print gamedata for easier human analysis
 
-from GameDataUtil import get_leveled_quantity, get_max_level
-from cStringIO import StringIO
+import SpinConfig
+from GameDataUtil import get_max_level # get_leveled_quantity
+
+gamedata = None # will be loaded later
 
 def pretty_print_time_brief(sec):
     d = int(sec/86400)
@@ -136,15 +138,16 @@ class Table(object):
         fd.write('</table>\n')
 
 class BuildingTable(Table):
-    FIELDS = {'max_hp','build_cost_iron','build_time',
+    FIELDS = {'max_hp','build_time',
               'consumes_power','provides_power',
               'production_capacity'}
 
-    def __init__(self, name, spec, tier_building = None):
+    def __init__(self, name, spec):
         max_level = get_max_level(spec)
         data = {}
         for k, v in spec.iteritems():
             if not (k in self.FIELDS or
+                    k.startswith('build_cost_') or
                     k.startswith('produces_') or
                     k.startswith('storage_')): continue
             if isinstance(v, list):
@@ -155,15 +158,15 @@ class BuildingTable(Table):
 
         tier_data = {}
 
-        if tier_building:
-            if name == tier_building:
+        if gamedata['townhall']:
+            if name == gamedata['townhall']:
                 tiers = list(range(1, max_level+1))
             elif 'requires' in spec:
                 last_tier = 1
                 tiers = []
                 for pred in spec['requires']:
                     if pred['predicate'] == 'BUILDING_LEVEL' and \
-                       pred['building_type'] == tier_building:
+                       pred['building_type'] == gamedata['townhall']:
                         tier = pred['trigger_level']
                     else:
                         tier = last_tier
@@ -176,17 +179,81 @@ class BuildingTable(Table):
 
         Table.__init__(self, name, data, tiers = tiers, tier_data = tier_data)
 
-def get_tier_summary(buildings, building_names, tier_building, n_tiers):
+class TechTable(Table):
+    FIELDS = {'research_time'}
+    SPELL_FIELDS = {'damage','cooldown','range'}
+    UNIT_FIELDS = {'build_time','max_hp'}
+
+    def __init__(self, name, spec):
+        max_level = get_max_level(spec)
+        data = {}
+        for k, v in spec.iteritems():
+            if not (k in self.FIELDS or
+                    k.startswith('cost_')): continue
+            if isinstance(v, list):
+                val = v
+            else:
+                val = [v,] * max_level
+            data[k] = val
+
+        if 'associated_unit' in spec:
+            ui_name = spec['associated_unit'] + ' / ' + name
+            unit_spec = gamedata['units'][spec['associated_unit']]
+            assert unit_spec['level_determined_by_tech'] == name
+            assert get_max_level(unit_spec) == max_level
+            for k, v in unit_spec.iteritems():
+                if not (k in self.UNIT_FIELDS or
+                        k.startswith('build_cost_')): continue
+                if isinstance(v, list):
+                    val = v
+                else:
+                    val = [v,] * max_level
+                data['unit:'+k] = val
+
+            auto_spell = gamedata['spells'][unit_spec['spells'][0]]
+            assert auto_spell['activation'] == 'auto'
+            for k, v in auto_spell.iteritems():
+                if not (k in self.SPELL_FIELDS): continue
+                if isinstance(v, list):
+                    val = v
+                else:
+                    val = [v,] * max_level
+                data['weapon:'+k] = val
+
+        else:
+            ui_name = name
+
+        tier_data = {}
+
+        if gamedata['townhall']:
+            if 'requires' in spec:
+                last_tier = 0
+                tiers = []
+                for pred in spec['requires']:
+                    tier = get_tier_requirement(pred)
+                    tier = max(last_tier, tier)
+                    tiers.append(tier)
+                    last_tier = tier
+        else:
+            tiers = None
+
+        Table.__init__(self, ui_name, data, tiers = tiers, tier_data = tier_data)
+
+def get_tier_summary(building_names, tech_names):
+    n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
+
     summary = {'power_consumed':[0]*n_tiers,
                'power_produced':[0]*n_tiers,
                'building_upgrade_res':[0]*n_tiers,
                'building_upgrade_days':[0]*n_tiers,
+               'tech_upgrade_res': [0]*n_tiers,
+               'tech_upgrade_days': [0]*n_tiers,
                'harvest_rate_daily':[0]*n_tiers,
                'storage':[0]*n_tiers,
                'repair_time':[0]*n_tiers}
 
     for name in building_names:
-        data = buildings[name]
+        data = gamedata['buildings'][name]
         max_level = get_max_level(data)
 
         level = 0
@@ -207,17 +274,15 @@ def get_tier_summary(buildings, building_names, tier_building, n_tiers):
             upgrade_days_this_tier = 0
 
             # upgrade until we can upgrade no more at this tier
-            if name == tier_building:
+            if name == gamedata['townhall']:
                 max_level_this_tier = tier
 
             elif 'requires' in data:
                 max_level_this_tier = max_level
                 for i, pred in enumerate(data['requires']):
-                    if pred['predicate'] == 'BUILDING_LEVEL' and \
-                       pred['building_type'] == tier_building:
-                        if pred['trigger_level'] > tier:
-                            max_level_this_tier = (i+1) - 1
-                            break
+                    if get_tier_requirement(pred) > tier:
+                        max_level_this_tier = (i+1) - 1
+                        break
 
             while level < max_level_this_tier:
                 # simulate upgrade
@@ -250,7 +315,61 @@ def get_tier_summary(buildings, building_names, tier_building, n_tiers):
             # note: all repair happens in parallel
             summary['repair_time'][tier-1] = max(summary['repair_time'][tier-1], repair_time_this_tier)
 
+    for name in tech_names:
+        data = gamedata['tech'][name]
+        max_level = get_max_level(data)
+        level = 0
+
+        for tier in range(1, n_tiers+1):
+            # these get re-initialized to zero each tier
+            upgrade_res_this_tier = 0
+            upgrade_days_this_tier = 0
+
+            # upgrade until we can upgrade no more at this tier
+            if 'requires' in data:
+                max_level_this_tier = max_level
+                for i, pred in enumerate(data['requires']):
+                    if get_tier_requirement(pred) > tier:
+                        max_level_this_tier = (i+1) - 1
+                        break
+
+            while level < max_level_this_tier:
+                # simulate upgrade
+                level += 1
+                upgrade_res_this_tier += data['cost_iron'][level-1]
+                # convert seconds to days
+                upgrade_days_this_tier += data['research_time'][level-1] / 86400.0
+
+            summary['tech_upgrade_res'][tier-1] += upgrade_res_this_tier
+            summary['tech_upgrade_days'][tier-1] += upgrade_days_this_tier
+
     return summary
+
+# return the minimum tier you must be at to satisfy a given predicate
+def get_tier_requirement(pred):
+    ret = 1
+    if pred['predicate'] == 'BUILDING_LEVEL':
+        if pred['building_type'] == gamedata['townhall']:
+            return pred['trigger_level']
+        else:
+            spec = gamedata['buildings'][pred['building_type']]
+            assert 'requires' in spec
+            for other_level in range(1, pred['trigger_level']+1):
+                ret = max(ret, get_tier_requirement(spec['requires'][other_level-1]))
+
+    elif pred['predicate'] == 'TECH_LEVEL':
+        spec = gamedata['tech'][pred['tech']]
+        for other_level in range(1, pred['min_level']+1):
+            ret = max(ret, get_tier_requirement(spec['requires'][other_level-1]))
+
+    elif pred['predicate'] == 'AND':
+        for sub in pred['subpredicates']:
+            ret = max(ret, get_tier_requirement(sub))
+    elif pred['predicate'] == 'ALWAYS_TRUE':
+        pass
+    else:
+        raise Exception('unhandled predicate %r' % pred)
+    return ret
 
 class PageOfTables(object):
     def __init__(self, table_list):
@@ -319,7 +438,12 @@ if __name__ == '__main__':
         print 'usage: GameDataVisualizer.py -o [output] buildings.json [--tier-building=toc]'
         sys.exit(1)
 
-    buildings = SpinJSON.load(open(args[0]))
+    gamedata = {'buildings': SpinJSON.load(open(args[0])),
+                'tech': SpinJSON.load(open(args[1])),
+                'units': SpinJSON.load(open(args[2])),
+                'spells': SpinConfig.load(args[3], stripped = True), # weapons only
+                'townhall': tier_building
+                }
 
     if out_filename == '-':
         out_fd = sys.stdout
@@ -329,24 +453,29 @@ if __name__ == '__main__':
         out_fd = out_atom.fd
 
     # get list of buildings to process
-    building_names = sorted(buildings.keys())
+    building_names = sorted(gamedata['buildings'].keys())
 
     # remove non-relevant buildings
-    building_names = filter(lambda name: (not buildings[name].get('developer_only') or \
+    building_names = filter(lambda name: (not gamedata['buildings'][name].get('developer_only') or \
                               name in ('weapon_factory', 'weapon_lab', 'turret_emplacement')),
                             building_names)
 
-    if tier_building:
+    if gamedata['townhall']:
         # put tier building first
-        building_names.remove(tier_building)
-        building_names = [tier_building,]+building_names
+        building_names.remove(gamedata['townhall'])
+        building_names = [gamedata['townhall'],]+building_names
 
-    table_list = [BuildingTable(name, buildings[name], tier_building) for name in building_names]
 
-    if tier_building:
+    # get list of techs to process
+    tech_names = sorted(gamedata['tech'].keys())
+
+    table_list = [BuildingTable(name, gamedata['buildings'][name]) for name in building_names] + \
+                 [TechTable(name, gamedata['tech'][name]) for name in tech_names]
+
+    if gamedata['townhall']:
         # add summary data
-        n_tiers = len(buildings[tier_building]['build_time'])
-        summary_data = get_tier_summary(buildings, building_names, tier_building, n_tiers)
+        summary_data = get_tier_summary(building_names, tech_names)
+        n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
         table_list = [Table('SUMMARY', {}, range(1, n_tiers+1), summary_data),] + table_list
 
     PageOfTables(table_list).as_html(out_fd)
