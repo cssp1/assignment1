@@ -249,8 +249,14 @@ def get_tier_summary(building_names, tech_names):
                'tech_upgrade_res': [0]*n_tiers,
                'tech_upgrade_days': [0]*n_tiers,
                'harvest_rate_daily':[0]*n_tiers,
-               'storage':[0]*n_tiers,
-               'repair_time':[0]*n_tiers}
+               'storage': [0]*n_tiers,
+               'squad_of_10_rep_time': [0]*n_tiers,
+               'buildings_repair_time':[0]*n_tiers}
+
+    for tier in range(1, n_tiers+1):
+        for category in ('infantry', 'armor', 'aircraft'):
+            summary['squad_of_10_rep_time'][tier-1] += \
+                                       int(3.33 * gamedata['units']['%s_tier_%d' % (category,tier)]['build_time'][0])
 
     for name in building_names:
         data = gamedata['buildings'][name]
@@ -265,7 +271,7 @@ def get_tier_summary(building_names, tech_names):
         power_produced_this_tier = 0
         harvest_rate_daily_this_tier = 0
         storage_this_tier = 0
-        repair_time_this_tier = 0
+        buildings_repair_time_this_tier = 0
 
         for tier in range(1, n_tiers+1):
 
@@ -300,7 +306,7 @@ def get_tier_summary(building_names, tech_names):
                 if 'storage_iron' in data:
                     storage_this_tier = max(storage_this_tier, data['storage_iron'][level-1])
                 if 'repair_time' in data and isinstance(data['repair_time'], list):
-                    repair_time_this_tier = max(repair_time_this_tier, data['repair_time'][level-1])
+                    buildings_repair_time_this_tier = max(buildings_repair_time_this_tier, data['repair_time'][level-1])
 
             limit = data.get('limit', 1)
             if isinstance(limit, list):
@@ -313,7 +319,7 @@ def get_tier_summary(building_names, tech_names):
             summary['harvest_rate_daily'][tier-1] += limit * harvest_rate_daily_this_tier
             summary['storage'][tier-1] += limit * storage_this_tier
             # note: all repair happens in parallel
-            summary['repair_time'][tier-1] = max(summary['repair_time'][tier-1], repair_time_this_tier)
+            summary['buildings_repair_time'][tier-1] = max(summary['buildings_repair_time'][tier-1], buildings_repair_time_this_tier)
 
     for name in tech_names:
         data = gamedata['tech'][name]
