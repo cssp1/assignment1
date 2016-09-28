@@ -3089,6 +3089,8 @@ class SpinCGIScript(twcgi.CGIScript):
 
     def runProcess(self, env, request, *args, **kwargs):
         env['SPIN_IS_SSL'] = '1' if SpinHTTP.twisted_request_is_ssl(request) else '0'
+        # override REMOTE_ADDR to handle proxying
+        env['REMOTE_ADDR'] = SpinHTTP.get_twisted_client_ip(request)
         return twcgi.CGIScript.runProcess(self, env, request, *args, **kwargs)
 
 # first stop for all requests in the hierarchy
