@@ -248,6 +248,7 @@ def get_tier_summary(building_names, tech_names):
                'building_upgrade_days':[0]*n_tiers,
                'tech_upgrade_res': [0]*n_tiers,
                'tech_upgrade_days': [0]*n_tiers,
+               'units_unlocked': [0]*n_tiers,
                'harvest_rate_daily':[0]*n_tiers,
                'storage': [0]*n_tiers,
                'squad_of_10_rep_time': [0]*n_tiers,
@@ -335,13 +336,17 @@ def get_tier_summary(building_names, tech_names):
             if 'requires' in data:
                 max_level_this_tier = max_level
                 for i, pred in enumerate(data['requires']):
-                    if get_tier_requirement(pred) > tier:
+                    if get_tier_requirement(pred, verbose = False) > tier:
                         max_level_this_tier = (i+1) - 1
                         break
 
             while level < max_level_this_tier:
                 # simulate upgrade
                 level += 1
+
+                if level == 1:
+                    summary['units_unlocked'][tier-1] += 1
+
                 upgrade_res_this_tier += data['cost_iron'][level-1]
                 # convert seconds to days
                 upgrade_days_this_tier += data['research_time'][level-1] / 86400.0
@@ -352,7 +357,7 @@ def get_tier_summary(building_names, tech_names):
     return summary
 
 # return the minimum tier you must be at to satisfy a given predicate
-def get_tier_requirement(pred):
+def get_tier_requirement(pred, verbose = False):
     ret = 1
     if pred['predicate'] == 'BUILDING_LEVEL':
         if pred['building_type'] == gamedata['townhall']:
@@ -361,16 +366,19 @@ def get_tier_requirement(pred):
             spec = gamedata['buildings'][pred['building_type']]
             assert 'requires' in spec
             for other_level in range(1, pred['trigger_level']+1):
-                ret = max(ret, get_tier_requirement(spec['requires'][other_level-1]))
+                ret = max(ret, get_tier_requirement(spec['requires'][other_level-1], verbose = verbose))
+            if verbose:
+                print pred['building_type'], 'level', pred['trigger_level'], 'at', ret
 
     elif pred['predicate'] == 'TECH_LEVEL':
         spec = gamedata['tech'][pred['tech']]
         for other_level in range(1, pred['min_level']+1):
-            ret = max(ret, get_tier_requirement(spec['requires'][other_level-1]))
-
+            ret = max(ret, get_tier_requirement(spec['requires'][other_level-1], verbose = verbose))
+        if verbose:
+            print pred['tech'], 'level', pred['min_level'], 'at', ret, spec['requires'][other_level-1]
     elif pred['predicate'] == 'AND':
         for sub in pred['subpredicates']:
-            ret = max(ret, get_tier_requirement(sub))
+            ret = max(ret, get_tier_requirement(sub, verbose = verbose))
     elif pred['predicate'] == 'ALWAYS_TRUE':
         pass
     else:
