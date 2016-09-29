@@ -591,13 +591,17 @@ class BHVisitor(Visitor):
         # send the browser the URL to redirect to after authorizing
         return self.server_protocol + self.server_host + ':' + self.server_port + '/BHROOT' + q_clean_qs(self.first_hit_uri, {})
 
+    # "battlehouse_frame_origin": "https://www.battlehouse.com",
     def allowed_frame_origin(self, request):
         if SpinConfig.config.get('enable_battlehouse',0):
-            referer = SpinHTTP.get_twisted_header(request, 'Referer')
-            assert referer
-            parts = urlparse.urlparse(referer)
-            assert parts.netloc in ('www.battlehouse.com', 'www.losethetuba.com')
-            return 'https://'+parts.netloc
+            # note: cannot user Referer for this, because game canvas reloads will
+            # have a Referer of the canvas URL, not the iframe URL
+#            referer = SpinHTTP.get_twisted_header(request, 'Referer')
+#            assert referer
+#            parts = urlparse.urlparse(referer)
+#            assert parts.netloc in ('www.battlehouse.com', 'www.losethetuba.com')
+#            return 'https://'+parts.netloc
+            return SpinConfig.config['battlehouse_frame_origin']
         return None
 
 class MMVisitor(Visitor):
