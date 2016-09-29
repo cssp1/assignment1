@@ -8294,7 +8294,7 @@ function mobile_cost_to_repair(spec, level, cur_hp, max_hp, player, cost_mode, b
         cost_ratio = player.get_any_abtest_value('unit_recycle_resources', gamedata['unit_recycle_resources'])
         // note: do not bonus this, to avoid exploits where you increase the unit's cost after it's built, then recycle it
         time_ratio = spd = 1;
-    } else if(cost_mode === COST_MODE.REPAIR && (get_leveled_quantity(spec['resurrectable'], level) || cur_hp > 0)) {
+    } else if(cost_mode === COST_MODE.REPAIR && (get_leveled_quantity(spec['resurrectable'] || false, level) || cur_hp > 0)) {
         cost_ratio = ('unit_repair_resources' in spec ? spec['unit_repair_resources'] : player.get_any_abtest_value('unit_repair_resources', gamedata['unit_repair_resources']));
         time_ratio = ('unit_repair_time' in spec ? spec['unit_repair_time'] : player.get_any_abtest_value('unit_repair_time', gamedata['unit_repair_time']));
         // XXX grab it from the building instead?
