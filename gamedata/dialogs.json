@@ -5779,8 +5779,12 @@
                         "text_size": 13, "text_hjustify": "left",
                         "text_vjustify": "top", "scrollback_buffer": -1, "invert": 1, "ui_tooltip": "", "tooltip_delay": 0 },
 
-            "scroll_up": { "kind": "ActionButton", "xy": [306,75], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
-            "scroll_down": { "kind": "ActionButton", "xy": [306,120], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+            "scroll_up": { "kind": "ActionButton", "xy": [306,75], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1,
+                           "dripper": {"rate": 4.0, "delay": 0}
+                         },
+            "scroll_down": { "kind": "ActionButton", "xy": [306,120], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1,
+                             "dripper": {"rate": 4.0, "delay": 0}
+                           },
             "loading_spinner": { "kind": "StaticImage", "xy":[311,160], "dimensions":[16,16], "asset":"loading_spinner" }
 
         }
