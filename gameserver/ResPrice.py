@@ -47,9 +47,24 @@ def cost_piecewise_linear(gamedata, session, resname, amount, currency):
 
     raise Exception('Unhandled case while calculating piecewise_linear prices. This should never happen.')
 
+def cost_by_townhall_level(gamedata, session, resname, amount, currency):
+    scale_factor = get_resource_parameter(gamedata, session, 'resource_price_formula_scale', resname)
+    price_points = get_resource_parameter(gamedata, session, 'resource_price_formula_by_townhall_level', resname)
+
+    if not session: raise Exception('must have session to compute townhall level')
+    th_level = session.player.get_townhall_level()
+    assert th_level >= 1 and th_level <= len(price_points)
+
+    res_per_gamebuck = price_points[th_level-1]
+
+    coeff = (1 / resolve_value(session, 'gamebucks_per_fbcredit', gamedata['store']['gamebucks_per_fbcredit'])) if currency != 'gamebucks' else 1
+
+    return scale_factor * coeff * amount / float(res_per_gamebuck)
+
 price_formulas = {
     'legacy_exp_log': cost_legacy_exp_log,
-    'piecewise_linear': cost_piecewise_linear
+    'piecewise_linear': cost_piecewise_linear,
+    'by_townhall_level': cost_by_townhall_level,
 }
 
 # returns the price of an arbitrary amount of fungible resources

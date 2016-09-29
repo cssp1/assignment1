@@ -180,82 +180,123 @@ if __name__ == '__main__':
 
             # these have to be created dynamically because gamedata.store influences the formulas
 
-            cur.execute("DROP FUNCTION IF EXISTS iron_water_price") # obsolete
+            # remove obsolete functions
+            cur.execute("DROP FUNCTION IF EXISTS iron_water_price")
 
-            # create base iron/water formulas first, because the res3 formula depends on them
-            for res in sorted(gamedata['resources'].keys(),
-                              key = lambda x: -1 if x in ('iron','water') else 1):
+            def get_parameter(p, resname):
+                ret = gamedata['store'][p]
+                if type(ret) is dict:
+                    ret = ret[resname]
+                return ret
 
-                # PRICE formula
-                def get_parameter(p, resname):
-                    ret = gamedata['store'][p]
-                    if type(ret) is dict:
-                        ret = ret[resname]
-                    return ret
-                formula = get_parameter('resource_price_formula', res)
-                scale_factor = get_parameter('resource_price_formula_scale', res)
-                if formula == 'legacy_exp_log':
-                    gamebucks_per_fbcredit = gamedata['store']['gamebucks_per_fbcredit']
-                    func = "IF(ABS(amount)<2, 1, %f*0.06*EXP(0.75*(LOG10(ABS(amount))-2.2*POW(LOG10(ABS(amount)),-1.25))))" % (scale_factor * gamebucks_per_fbcredit)
-                elif formula == 'piecewise_linear':
-                    points = get_parameter('resource_price_formula_piecewise_linear_points', res)
+            if game_id == 'fs': # special case for FS
+                cur.execute("DROP FUNCTION IF EXISTS iron_price")
+                cur.execute("DROP FUNCTION IF EXISTS water_price")
+                cur.execute("DROP FUNCTION IF EXISTS res3_price")
+
+                for res in gamedata['resources']:
+                    assert get_parameter('resource_price_formula', res) == 'by_townhall_level'
+
+                    scale_factor = get_parameter('resource_price_formula_scale', res)
+                    points = get_parameter('resource_price_formula_by_townhall_level', res)
+
+                    townhall_levels = len(points)
                     func = ""
-                    for i in xrange(1, len(points)):
-                        slope = float(points[i][1] - points[i - 1][1]) / (points[i][0] - points[i - 1][0])
-                        seg = "%f * (%f + %f * (ABS(amount) - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
-                        if i != len(points) - 1:
-                            seg = "IF(ABS(amount) < %f,%s," % (points[i][0], seg)
-                        func += seg
-                    func += ")" * (len(points)-2)
-                else:
-                    raise Exception('unknown resource_price_formula '+formula)
-
-                cur.execute("DROP FUNCTION IF EXISTS "+res+"_price")
-                cur.execute("CREATE FUNCTION "+res+"_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
-
-                # VALUE formula
-                if res == 'res3':
-                    # computed as a multiple of the iron value (at high prev_receipts)
-                    res3_to_iron_ratio = float(get_parameter('resource_price_formula_scale', 'res3')) / float(get_parameter('resource_price_formula_scale', 'iron'))
-                    func = "%f * iron_value(amount, townhall_level, 1000)" % res3_to_iron_ratio
-                elif res in ('iron','water'):
-                    func = ""
-                    townhall_spec = gamedata['buildings'][gamedata['townhall']]
-                    harv_spec = gamedata['buildings'][gamedata['resources'][res]['harvester_building']]
-                    townhall_levels = GameDataUtil.get_max_level(townhall_spec)
-                    harvest_rate = GameDataUtil.calc_max_harvest_rate_for_resource(gamedata, res)
-                    if verbose: print res, 'harvest_rates:', harvest_rate
-                    assert len(harvest_rate) == townhall_levels
                     for i in xrange(1,townhall_levels+1):
-                        rate = harvest_rate[i-1]/3600.0
-                        seg = "time_price(ABS(amount)/%f)" % rate
+                        res_per_gamebuck = scale_factor * float(points[i-1])
+                        seg = "ABS(amount)/%f" % res_per_gamebuck
                         if i != townhall_levels:
                             seg = "IF(townhall_level=%d, %s, " % (i, seg)
                         func += seg
                     func += ")" * (townhall_levels-1)
-                else:
-                    raise Exception('value formula not implemented for resource '+res)
 
-                # adjust iron/water value for payer/nonpayer status
-                # (nonpayers value X units of basic resources much less than payers)
-                # this is an empirical observation based on how nonpayers on average have much higher
-                # combat skill and can get large amounts of resources easily through battle.
-                # 0-9.99: 0.20x (0.15x DV 0.25x TR)
-                # 10.0-100.00: 0.66x
-                # 100.01+: 1.0x
-                if res in ('iron','water'):
+                    # adjust iron/water value for payer/nonpayer status
+                    # (nonpayers value X units of basic resources much less than payers)
+                    # this is an empirical observation based on how nonpayers on average have much higher
+                    # combat skill and can get large amounts of resources easily through battle.
+                    # 0-9.99: 0.20x (0.15x DV 0.25x TR)
+                    # 10.0-100.00: 0.66x
+                    # 100.01+: 1.0x
+
                     func = "IF(prev_receipts>100,1.0,IF(prev_receipts>=10,0.66,0.20))*"+func
 
-                if verbose: print res+'_value =', func
+                    if verbose: print res+'_value =', func
 
-                cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
-                cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+                    cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
+                    cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+
+            else: # pre-FS titles
+
+                # create base iron/water formulas first, because the res3 formula depends on them
+                for res in sorted(gamedata['resources'].keys(),
+                                  key = lambda x: -1 if x in ('iron','water') else 1):
+
+                    # PRICE formula
+                    formula = get_parameter('resource_price_formula', res)
+                    scale_factor = get_parameter('resource_price_formula_scale', res)
+                    if formula == 'legacy_exp_log':
+                        gamebucks_per_fbcredit = gamedata['store']['gamebucks_per_fbcredit']
+                        func = "IF(ABS(amount)<2, 1, %f*0.06*EXP(0.75*(LOG10(ABS(amount))-2.2*POW(LOG10(ABS(amount)),-1.25))))" % (scale_factor * gamebucks_per_fbcredit)
+                    elif formula == 'piecewise_linear':
+                        points = get_parameter('resource_price_formula_piecewise_linear_points', res)
+                        func = ""
+                        for i in xrange(1, len(points)):
+                            slope = float(points[i][1] - points[i - 1][1]) / (points[i][0] - points[i - 1][0])
+                            seg = "%f * (%f + %f * (ABS(amount) - %f))" % (scale_factor, points[i-1][1], slope, points[i-1][0])
+                            if i != len(points) - 1:
+                                seg = "IF(ABS(amount) < %f,%s," % (points[i][0], seg)
+                            func += seg
+                        func += ")" * (len(points)-2)
+                    else:
+                        raise Exception('unknown resource_price_formula '+formula)
+
+                    cur.execute("DROP FUNCTION IF EXISTS "+res+"_price")
+                    cur.execute("CREATE FUNCTION "+res+"_price (amount INT8) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+
+                    # VALUE formula
+                    if res == 'res3':
+                        # computed as a multiple of the iron value (at high prev_receipts)
+                        res3_to_iron_ratio = float(get_parameter('resource_price_formula_scale', 'res3')) / float(get_parameter('resource_price_formula_scale', 'iron'))
+                        func = "%f * iron_value(amount, townhall_level, 1000)" % res3_to_iron_ratio
+                    elif res in ('iron','water'):
+                        func = ""
+                        townhall_spec = gamedata['buildings'][gamedata['townhall']]
+                        harv_spec = gamedata['buildings'][gamedata['resources'][res]['harvester_building']]
+                        townhall_levels = GameDataUtil.get_max_level(townhall_spec)
+                        harvest_rate = GameDataUtil.calc_max_harvest_rate_for_resource(gamedata, res)
+                        if verbose: print res, 'harvest_rates:', harvest_rate
+                        assert len(harvest_rate) == townhall_levels
+                        for i in xrange(1,townhall_levels+1):
+                            rate = harvest_rate[i-1]/3600.0
+                            seg = "time_price(ABS(amount)/%f)" % rate
+                            if i != townhall_levels:
+                                seg = "IF(townhall_level=%d, %s, " % (i, seg)
+                            func += seg
+                        func += ")" * (townhall_levels-1)
+                    else:
+                        raise Exception('value formula not implemented for resource '+res)
+
+                    # adjust iron/water value for payer/nonpayer status
+                    # (nonpayers value X units of basic resources much less than payers)
+                    # this is an empirical observation based on how nonpayers on average have much higher
+                    # combat skill and can get large amounts of resources easily through battle.
+                    # 0-9.99: 0.20x (0.15x DV 0.25x TR)
+                    # 10.0-100.00: 0.66x
+                    # 100.01+: 1.0x
+                    if res in ('iron','water'):
+                        func = "IF(prev_receipts>100,1.0,IF(prev_receipts>=10,0.66,0.20))*"+func
+
+                    if verbose: print res+'_value =', func
+
+                    cur.execute("DROP FUNCTION IF EXISTS "+res+"_value")
+                    cur.execute("CREATE FUNCTION "+res+"_value (amount INT8, townhall_level INT4, prev_receipts FLOAT) RETURNS INT8 DETERMINISTIC RETURN IF(amount=0, 0, IF(amount>0,1,-1) * GREATEST(1, CEIL("+func+")))")
+
+            # ALL GAMES
 
             # some tables have res3 columns even if the game itself doesn't have res3.
             # Create a dummy function to satisfy queries.
             if 'res3' not in gamedata['resources']:
-                for FUNC, ARGS in (('res3_price', '(amount INT8)'),
-                                   ('res3_value', '(amount INT8, townhall_level INT4, prev_receipts FLOAT)')):
+                for FUNC, ARGS in (('res3_value', '(amount INT8, townhall_level INT4, prev_receipts FLOAT)'),):
                     cur.execute("DROP FUNCTION IF EXISTS "+sql_util.sym(FUNC))
                     cur.execute("CREATE FUNCTION "+sql_util.sym(FUNC)+" "+ARGS+" RETURNS INT8 DETERMINISTIC RETURN 0")
 

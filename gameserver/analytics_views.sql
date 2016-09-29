@@ -195,38 +195,10 @@ FROM $GAME_ID_credits credits;
 -- BATTLE RISK/REWARD --
 -- ---------------------
 
--- compute risk/reward for each individual battle
+--  functions to help compute risk/reward for each individual battle
 -- "value" quantities are all in units of gamebucks, where positive = good for the player, negative = bad for the player
--- note: perform all iron_water_price() conversion per-battle since it's nonlinear - simulate player risk aversion by applying it to the small quantities involved in each battle
-
 -- note: pricing formulas below are symmetric with respect to negative input amounts F(-x) = -F(x)
 -- this makes accounting easier since we can freely sum negative and positive values
-
-
--- iron/water/res3_price() are OBSOLETE - these are now updated dynamically in stats_to_sql.py because they depend on parameters in gamedata.store
--- convert an amount of iron/water to gamebucks using the in-game Store formula (note: non-linear!)
-
--- DROP FUNCTION IF EXISTS iron_water_price;
--- DROP FUNCTION IF EXISTS iron_price;
--- CREATE FUNCTION iron_price (amount INT)
--- RETURNS INT DETERMINISTIC
--- RETURN IF(amount=0, 0, IF(amount>0,1,-1) * IF(ABS(amount)<2, 1, GREATEST(1, CEIL(40.0*0.06*EXP(0.75*(LOG10(ABS(amount))-2.2*POW(LOG10(ABS(amount)),-1.25)))))));
--- DROP FUNCTION IF EXISTS water_price;
--- CREATE FUNCTION water_price (amount INT)
--- RETURNS INT DETERMINISTIC
--- RETURN IF(amount=0, 0, IF(amount>0,1,-1) * IF(ABS(amount)<2, 1, GREATEST(1, CEIL(40.0*0.06*EXP(0.75*(LOG10(ABS(amount))-2.2*POW(LOG10(ABS(amount)),-1.25)))))));
--- DROP FUNCTION IF EXISTS res3_price;
--- CREATE FUNCTION res3_price (amount INT)
--- RETURNS INT DETERMINISTIC
--- RETURN 1000*amount;
-
--- time_price() - convert a number of seconds of speedup time to gamebucks
--- OBSOLETE - updated dynamically in stats_to_sql.py because it depends on parameters in gamedata.store
-
--- DROP FUNCTION IF EXISTS time_price;
--- CREATE FUNCTION time_price (amount INT)
--- RETURNS INT DETERMINISTIC
--- RETURN IF(amount=0, 0, IF(amount>0,1,-1) * FLOOR(20*ABS(amount)/3600)+1);
 
 -- convert an item's value to gamebucks
 DROP FUNCTION IF EXISTS item_price; -- obsolete

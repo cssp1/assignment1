@@ -43462,6 +43462,15 @@ Store.get_resource_price = function(resname, amount, currency) {
             }
 
             throw Error("Unhandled case while calculating piecewise_linear prices. This should never happen.");
+        },
+        'by_townhall_level': function(_resname, _amount, _currency) {
+            var scale_factor = Store.get_resource_parameter('resource_price_formula_scale', _resname);
+            var price_points = Store.get_resource_parameter('resource_price_formula_by_townhall_level', _resname);
+
+            var th_level = player.get_townhall_level();
+            var res_per_gamebuck = price_points[th_level-1];
+            var coeff = (_currency !== 'gamebucks' ? 1.0 / player.get_any_abtest_value('gamebucks_per_fbcredit', gamedata['store']['gamebucks_per_fbcredit']) : 1.0);
+            return scale_factor * coeff * amount / res_per_gamebuck;
         }
     };
     var price_formula_name = Store.get_resource_parameter('resource_price_formula', resname);
