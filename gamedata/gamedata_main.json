@@ -151,6 +151,7 @@
         "enable_playfield_zoom": 1,
         "view_zoom_limits": [-1,0.4], // zoom limits, exp(-1) to exp(1)
         "view_zoom_click_increment": 0.2, // amount by which to increment view_zoom per click of the +/- buttons
+        "view_zoom_mousewheel_increment": 0.025, // amount by which to increment view_zoom per 1.0 "delta" mousewheel scroll
         "view_zoom_tile_border": [0.35, 0.75], // amount (source pixels) by which to enlarge dynamic backdrop tiles to hide seams [minify,maximize]
 
         // playfield speed controls (enabled by enable_playfield_speed_bar)

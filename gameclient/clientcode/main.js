@@ -9550,7 +9550,11 @@ function invoke_playfield_zoom_bar() {
     dialog.user_data['dialog'] = 'playfield_zoom_bar';
     var zoom_cb = function(incr) { return function(w) {
         player.record_feature_use('playfield_zoom');
-        set_view_zoom(view_zoom_linear + incr * gamedata['client']['view_zoom_click_increment']);
+        // quantize to avoid misalignment when used together with mousewheel zoom
+        var new_zoom = view_zoom_linear + incr * gamedata['client']['view_zoom_click_increment'];
+        var quant = gamedata['client']['view_zoom_click_increment'];
+        new_zoom = quant * Math.round(new_zoom / quant);
+        set_view_zoom(new_zoom);
     }; };
     dialog.widgets['zoom_in_button'].onclick = zoom_cb(1);
     dialog.widgets['zoom_out_button'].onclick = zoom_cb(-1);
@@ -47929,6 +47933,14 @@ function do_on_mousewheel(e) {
     }
 
     if(SPUI.root.on_mousewheel(xy, [0,0], delta)) {
+        if(e.preventDefault) { e.preventDefault(); }
+        return;
+    }
+
+    // apply desktop zoom
+    if(!selection.ui) {
+        var new_zoom = view_zoom_linear + delta * gamedata['client']['view_zoom_mousewheel_increment']
+        set_view_zoom(new_zoom);
         if(e.preventDefault) { e.preventDefault(); }
         return;
     }
