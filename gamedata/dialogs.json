@@ -675,9 +675,13 @@
             "zoom_readout": { "kind": "TextField", "xy": [0,4], "dimensions": [43,20], "text_size": 13, "text_style": "normal", "drop_shadow": 1,
                               "text_hjustify": "center", "ui_name": "Zoom", // "Zoom %d"
                               "text_color_zero": [0.8,0.8,0.8,1], "text_color_nonzero": [1,0.88,0,1] },
-            "zoom_in_button": { "kind": "ActionButton", "xy": [10,26], "dimensions": [22,20], "bg_image": "map_plus_button", "push_bg_image": 1,
+            "zoom_in_button": { "kind": "ActionButton", "xy": [0,0], "dimensions": [43,50],
+                                "bg_image_offset": [10,26],
+                                "bg_image": "map_plus_button", "push_bg_image": 1,
                                 "ui_tooltip": "Zoom in", "tooltip_delay": 0, "fixed_tooltip_offset": [-68,26] },
-            "zoom_out_button": { "kind": "ActionButton", "xy": [10,51], "dimensions": [22,20], "bg_image": "map_minus_button", "push_bg_image": 1,
+            "zoom_out_button": { "kind": "ActionButton", "xy": [0,50], "dimensions": [43,28],
+                                 "bg_image_offset": [10,1],
+                                 "bg_image": "map_minus_button", "push_bg_image": 1,
                                  "ui_tooltip": "Zoom out", "tooltip_delay": 0, "fixed_tooltip_offset": [-76,51] }
         }
     },
