@@ -601,7 +601,7 @@ class BHVisitor(Visitor):
 #            parts = urlparse.urlparse(referer)
 #            assert parts.netloc in ('www.battlehouse.com', 'www.losethetuba.com')
 #            return 'https://'+parts.netloc
-            return SpinConfig.config['battlehouse_frame_origin']
+            return SpinConfig.config['battlehouse_frame_origin'].encode('utf-8')
         return None
 
 class MMVisitor(Visitor):
