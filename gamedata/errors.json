@@ -242,7 +242,7 @@
     "DISALLOWED_IN_SECURE_MODE": { "ui_name": "This function is not allowed when game is running in secure mode" },
     "MAINT_KICK": { "ui_title": "Server Maintenance", "ui_name": "The game server needs to restart for upgrades. Please reconnect now.", "ui_button": "Reconnect" },
     "IDLE_KICK": { "ui_title": "Commander, are you there?", "ui_name": "I await your orders.", "ui_button": "I'm back" },
-    "UNKNOWN_SESSION": { "ui_title": "Momentary Disconnect", "ui_name": "Commander, we lost your signal!\nPlease reconnect now.", "ui_button": "Reconnect" },
+    "UNKNOWN_SESSION": { "ui_title": "Momentary Disconnect", "ui_name": "Commander, we lost your signal!\n\nEither the network connection failed, or you broke contact by logging in from another device.\n\nClick below to reconnect.", "ui_button": "Reconnect", "dialog": "message_dialog_big" },
     "CLIENT_NETWORK_FAILURE": { "ui_name": "Client-side internet connection failure",
                                 "ui_title": "Momentary Disconnect",
                                 "ui_description": "\nCommander, we lost your signal!\n\nOur forces await your return.\n\nCode: %d",
