@@ -6,6 +6,7 @@
 
 # pretty-print gamedata for easier human analysis
 
+from math import sqrt
 import SpinConfig
 from GameDataUtil import get_max_level # get_leveled_quantity
 
@@ -252,7 +253,9 @@ def get_tier_summary(building_names, tech_names):
                'harvest_rate_daily':[0]*n_tiers,
                'storage': [0]*n_tiers,
                'squad_of_10_rep_time': [0]*n_tiers,
-               'buildings_repair_time':[0]*n_tiers}
+               'buildings_repair_time':[0]*n_tiers,
+               'base_area': [0]*n_tiers, # square grid cells occupied by buildings
+               }
 
     for tier in range(1, n_tiers+1):
         for category in ('infantry', 'armor', 'aircraft'):
@@ -279,6 +282,7 @@ def get_tier_summary(building_names, tech_names):
             # these get re-initialized to zero each tier
             upgrade_res_this_tier = 0
             upgrade_days_this_tier = 0
+            base_area_this_tier = 0
 
             # upgrade until we can upgrade no more at this tier
             if name == gamedata['townhall']:
@@ -313,6 +317,8 @@ def get_tier_summary(building_names, tech_names):
             if isinstance(limit, list):
                 limit = limit[tier-1]
 
+            summary['base_area'][tier-1] += limit * data['gridsize'][0]*data['gridsize'][1]
+
             summary['building_upgrade_res'][tier-1] += limit * upgrade_res_this_tier
             summary['building_upgrade_days'][tier-1] += limit * upgrade_days_this_tier
             summary['power_consumed'][tier-1] += limit * power_consumed_this_tier
@@ -321,6 +327,9 @@ def get_tier_summary(building_names, tech_names):
             summary['storage'][tier-1] += limit * storage_this_tier
             # note: all repair happens in parallel
             summary['buildings_repair_time'][tier-1] = max(summary['buildings_repair_time'][tier-1], buildings_repair_time_this_tier)
+
+    # convert base_area to base_diameter
+    summary['base_diameter'] = map(lambda area: int(sqrt(area)), summary['base_area'])
 
     for name in tech_names:
         data = gamedata['tech'][name]
