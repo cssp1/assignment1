@@ -16950,6 +16950,7 @@ function invoke_level_up_dialog() {
     SPFB.AppEvents.logEvent('ACHIEVED_LEVEL', null, {'LEVEL': next_level.toString()});
 
     if('level_up_notify' in gamedata['player_xp'] &&
+       (!!gamedata['player_xp']['level_up_notify']) &&
        next_level < gamedata['player_xp']['level_up_notify'].length &&
        !gamedata['player_xp']['level_up_notify'][next_level]) {
         invoke_ui_locker();
@@ -16971,7 +16972,7 @@ function invoke_level_up_dialog() {
     //dialog.widgets['description'].str = gamedata['player_xp']['level_up_text'];
 
     // display reward consequent
-    var level_up_rewards = player.get_any_abtest_value('level_up_reward', gamedata['player_xp']['level_up_reward'] || []);
+    var level_up_rewards = player.get_any_abtest_value('level_up_reward', gamedata['player_xp']['level_up_reward'] || [null]);
     var reward_cons = level_up_rewards[Math.min(next_level, level_up_rewards.length-1)];
 
     if(reward_cons) {

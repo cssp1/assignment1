@@ -13165,7 +13165,7 @@ class LivePlayer(Player):
                         for level in xrange(1, 1+obj.level):
                             xp = obj.spec.get_leveled_quantity(obj.spec.upgrade_xp, level)
                             if xp < 0:
-                                coeff = gamedata['player_xp']['buildings'][obj.spec.name if level > 1 else 'level_1']
+                                coeff = gamedata['player_xp']['buildings'].get(obj.spec.name if level > 1 else 'level_1', 0)
                                 cost = sum((obj.spec.get_leveled_quantity(getattr(obj.spec, 'build_cost_'+res), level) for res in gamedata['resources']), 0)
                                 xp = int(coeff * cost)
                             if xp > 0:
@@ -19943,7 +19943,7 @@ class GAMEAPI(resource.Resource):
                         if object.level == 1 and 'level_1' in gamedata['player_xp']['buildings']:
                             coeff = gamedata['player_xp']['buildings']['level_1']
                         else:
-                            coeff = gamedata['player_xp']['buildings'][object.spec.name]
+                            coeff = gamedata['player_xp']['buildings'].get(object.spec.name, 0)
                         xp += int(coeff*amount)
                     xp_why.append('building')
 
@@ -20209,7 +20209,7 @@ class GAMEAPI(resource.Resource):
             if override >= 0:
                 xp_amount = override
             else:
-                xp_amount = int(gamedata['player_xp']['buildings'][object.spec.name] * \
+                xp_amount = int(gamedata['player_xp']['buildings'].get(object.spec.name, 0) * \
                                 sum((GameObjectSpec.get_leveled_quantity(getattr(object.spec, 'build_cost_'+res), object.level) for res in gamedata['resources']), 0))
             if xp_amount:
                 self.give_xp_to(session, session.player, retmsg, xp_amount, 'building', [object.x,object.y], obj_session_id = object.obj_id)
