@@ -13125,6 +13125,9 @@ class LivePlayer(Player):
                         self.mailbox_append(self.make_system_mail(gamedata['strings']['xp_migration_mail'],
                                                                   replace_s = '%d' % (new_xp - old_xp), replace_level = '%d' % new_level))
 
+        elif gamedata['player_xp'].get('recalculate_on_load'):
+            self.recalculate_player_level(session)
+
         # fix TR turret head tech XP - we forgot to add upgrade_xp to the MG and Mortar turret head techs
         if gamedata['game_id'] == 'tr' and account_creation_time < 1426718214 and self.history.get('turret_head_mg_mortar_xp_fixed',0) < 1:
             missing_xp = 0
@@ -13303,7 +13306,8 @@ class LivePlayer(Player):
         xp['research'] = 0
         for name, level in self.tech.iteritems():
             for lev in xrange(1,level+1):
-                if name in gamedata['starting_conditions']['tech'] and lev <= gamedata['starting_conditions']['tech'][name]:
+                if name not in gamedata['tech'] or \
+                   (name in gamedata['starting_conditions']['tech'] and lev <= gamedata['starting_conditions']['tech'][name]):
                     continue
                 spec = self.get_abtest_spec(TechSpec, name)
                 override = spec.get_leveled_quantity(spec.upgrade_xp, lev)
@@ -13340,8 +13344,20 @@ class LivePlayer(Player):
                 xp['quests'] += max(int(quest['reward_xp'] * new_player_xp['quests']), new_player_xp['quests_min'])
 
         total_xp = sum(xp.itervalues(), 0)
-        new_level = bisect.bisect(new_player_xp['level_xp'], total_xp) - 1
+
+        if new_player_xp.get('level_assignment') == 'townhall_level':
+            new_level = self.get_townhall_level()
+        else:
+            new_level = bisect.bisect(new_player_xp['level_xp'], total_xp) - 1
         return total_xp, new_level
+
+    def recalculate_player_level(self, session): # session can be None for offline use
+        new_xp, new_level = self.recalculate_xp()
+        if new_xp != self.resources.xp or new_level != self.resources.player_level:
+            self.resources.xp = new_xp
+            self.resources.player_level = new_level
+            if session:
+                session.deferred_player_state_update = True
 
     # reseed lottery, if cooldown is up or 'force' is true
     def reseed_lottery(self, session, force = False):
@@ -19933,6 +19949,9 @@ class GAMEAPI(resource.Resource):
                     if session.player.home_region:
                         session.player.my_home.send_map_feature_update(reason='townhall_upgrade')
 
+                    if gamedata['player_xp'].get('recalculate_on_townhall_upgrade'):
+                        session.player.recalculate_player_level(session)
+
                 # award XP for construction/upgrade
                 if object.spec.name in gamedata['player_xp']['buildings']:
                     override = object.spec.get_leveled_quantity(object.spec.upgrade_xp, object.level)
@@ -20237,6 +20256,9 @@ class GAMEAPI(resource.Resource):
             session.player.send_inventory_intro_mail(session, retmsg)
             # check for new ad network events
             session.send_adnetwork_events(retmsg)
+
+            if gamedata['player_xp'].get('recalculate_on_townhall_upgrade'):
+                session.player.recalculate_player_level(session)
 
             # keep map in sync
             if session.player.home_region:
