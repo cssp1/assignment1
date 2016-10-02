@@ -7,10 +7,15 @@
 # pretty-print gamedata for easier human analysis
 
 from math import sqrt
+import re
 import SpinConfig
 from GameDataUtil import get_max_level # get_leveled_quantity
 
 gamedata = None # will be loaded later
+
+def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(_nsre, s)]
 
 def pretty_print_time_brief(sec):
     d = int(sec/86400)
@@ -490,7 +495,7 @@ if __name__ == '__main__':
 
 
     # get list of techs to process
-    tech_names = sorted(gamedata['tech'].keys())
+    tech_names = sorted(gamedata['tech'].keys(), key=natural_sort_key)
 
     table_list = [BuildingTable(name, gamedata['buildings'][name]) for name in building_names] + \
                  [TechTable(name, gamedata['tech'][name]) for name in tech_names]
