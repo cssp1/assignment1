@@ -15713,3 +15713,8 @@ msgstr "Show multiplayer battles involving your Clan"
 msgid "* Only showing battles that occurred while this player was in your Alliance."
 msgstr "* Only showing battles that occurred while this player was in your Clan."
 
+msgid "!TX player_level_ui_name"
+msgstr "Level %d"
+
+msgid "!TX player_level_ui_tooltip"
+msgstr "Your XP: %s1 Next Level: %s2"

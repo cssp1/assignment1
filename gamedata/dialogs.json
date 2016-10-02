@@ -1002,10 +1002,11 @@
                                "flash_color": [1,1,1,1] },
 
             // note: artificially large bounding box so the tooltip is easier to hit
-            "player_level": { "kind": "TextField", "xy": [48,25], "dimensions": [75,36], "ui_name": "Level %d", "text_offset": [0,10],
+            "player_level": { "kind": "TextField", "xy": [48,25], "dimensions": [75,36],
+                              "ui_name": "!TX player_level_ui_name", "text_offset": [0,10],
                               "text_hjustify": "left", "text_vjustify": "top", "drop_shadow": 1,
                               "text_size": 13, "text_style": "thick", "tooltip_delay": 0,
-                              "ui_tooltip": "Your XP: %s1 Next Level: %s2", "fixed_tooltip_offset": [18, 72] },
+                              "ui_tooltip": "!TX player_level_ui_tooltip", "fixed_tooltip_offset": [18, 72] },
 
             "player_trophy_icon":  { "kind": "ActionButton", "xy": [138,36], "dimensions": [15,15], "bg_image": "trophy_15x15", "push_bg_image": 1 },
             "player_trophy_count": { "kind": "ActionButton", "xy": [136,35], "dimensions": [64,26], "text_offset": [-5,0],
