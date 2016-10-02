@@ -44,6 +44,10 @@ def pretty_print_qty(qty):
     return str(qty)
 
 def pretty_print_stat(key, val):
+    if isinstance(val, basestring):
+        return val.encode('utf-8')
+    if isinstance(val, list):
+        return ', '.join(pretty_print_stat(key, v) for v in val)
     if key.endswith('_time'):
         return pretty_print_time_brief(val)
     elif key.endswith('_days'):
@@ -260,6 +264,7 @@ def get_tier_summary(building_names, tech_names):
                'squad_of_10_rep_time': [0]*n_tiers,
                'buildings_repair_time':[0]*n_tiers,
                'base_area': [0]*n_tiers, # square grid cells occupied by buildings
+               'new_buildings': [[] for i in range(n_tiers)],
                }
 
     for tier in range(1, n_tiers+1):
@@ -272,6 +277,7 @@ def get_tier_summary(building_names, tech_names):
         max_level = get_max_level(data)
 
         level = 0
+        last_limit = 0
 
         # per building instance quantities
 
@@ -318,9 +324,19 @@ def get_tier_summary(building_names, tech_names):
                 if 'repair_time' in data and isinstance(data['repair_time'], list):
                     buildings_repair_time_this_tier = max(buildings_repair_time_this_tier, data['repair_time'][level-1])
 
-            limit = data.get('limit', 1)
-            if isinstance(limit, list):
-                limit = limit[tier-1]
+            if max_level_this_tier < 1:
+                limit = 0
+            else:
+                limit = data.get('limit', 1)
+                if isinstance(limit, list):
+                    limit = limit[tier-1]
+
+            # did we build a new one?
+            if limit > last_limit:
+                for k in range(limit - last_limit):
+                    summary['new_buildings'][tier-1].append('%s (%dx%d)' % (name,
+                                                                            data['gridsize'][0],
+                                                                            data['gridsize'][1]))
 
             summary['base_area'][tier-1] += limit * data['gridsize'][0]*data['gridsize'][1]
 
@@ -333,8 +349,12 @@ def get_tier_summary(building_names, tech_names):
             # note: all repair happens in parallel
             summary['buildings_repair_time'][tier-1] = max(summary['buildings_repair_time'][tier-1], buildings_repair_time_this_tier)
 
+            last_limit = limit
+
     # convert base_area to base_diameter
     summary['base_diameter'] = map(lambda area: int(sqrt(area)), summary['base_area'])
+    # ignore new buildings at first tier
+    summary['new_buildings'][0] = [['N/A']]
 
     for name in tech_names:
         data = gamedata['tech'][name]
