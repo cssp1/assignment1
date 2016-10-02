@@ -9792,7 +9792,8 @@ function flush_message_queue(force, my_timeout) {
                     //invoke_timeout_message('0600_client_idle_timeout', {}, {});
                     var s = gamedata['errors']['UNKNOWN_SESSION'];
                     invoke_timeout_message('0601_client_died_from_unknown_session', {},
-                                           {'ui_title': s['ui_title'], 'ui_description': s['ui_name'], 'ui_button': s['ui_button']});
+                                           {'ui_title': s['ui_title'], 'ui_description': s['ui_name'], 'ui_button': s['ui_button'],
+                                            'dialog': s['dialog'] || null});
                 }
                 SPINPUNCHGAME.shutdown();
             };
