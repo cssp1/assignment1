@@ -47,7 +47,10 @@ class PlayerPortraits(object):
         elif frame_platform == 'bh':
             if not social_id.startswith('bh'): return None
             bh_id = social_id[2:]
-            return SpinConfig.config['battlehouse_api_path'] + '/user/'+bh_id+'/avatar?dimensions=50x50'
+            return SpinConfig.config['battlehouse_api_path'] + '/user/'+bh_id+'/avatar?' + \
+                   urllib.urlencode({#'dimensions':'50x50',
+                                     'service':SpinConfig.game(),
+                                     'api_secret': SpinConfig.config['battlehouse_api_secret']})
         else:
             return None
 
