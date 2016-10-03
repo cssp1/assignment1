@@ -813,12 +813,12 @@
             "resource_bar_fbcredits_amount": { "show": 1,  "kind": "TextField", "xy": [678,4], "dimensions": [53,19], "ui_name": "-",
                                                "text_size": 13, "drop_shadow": 1, "text_style": "thick" },
 
-            "low_power_bg": { "kind": "SolidRect", "xy": [250,80], "dimensions": [360,45], "color":[0,0,0,0.45], "show": 0 },
+            "low_power_bg": { "kind": "SolidRect", "xy": [250,82], "dimensions": [360,40], "color":[0,0,0,0.45], "bevel": 3, "show": 0 },
             "low_power_message": { "kind": "TextField", "xy": [245,73], "dimensions": [370,40], "text_size": 13, "text_style": "bold", "drop_shadow": 1, "text_color": [1,0.88,0,1], "text_hjustify": "center", "ui_name": "Low Power - Buildings Operating at %d%\nRepair, Build, or Upgrade %POWERPLANTS", "show": 0
                                  },
 
             // used for announcing to players that they are in an A/B test, e.g. "You are in the PvP (ALPHA) test region"
-            "user_abtest_message": { "kind": "TextField", "xy": [265,65], "dimensions": [370,21], "drop_shadow": 1,
+            "user_abtest_message": { "kind": "TextField", "xy": [250,61], "dimensions": [360,21], "drop_shadow": 1,
                                      "text_color": [1,0.5,0,1], "text_size": 13, "text_hjustify": "center" },
 
             "edit_mode_message": { "show": 0, "kind": "TextField", "xy": [4,200], "dimensions": [136,32], "drop_shadow": 1,
