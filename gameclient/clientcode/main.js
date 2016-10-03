@@ -21826,7 +21826,7 @@ function change_title_rowfunc(dialog, row_col, rowdata) {
             dialog.widgets[wname].state = 'disabled_clickable';
             dialog.widgets[wname].text_color = SPUI.disabled_text_color;
             dialog.widgets[wname].tooltip.str = dialog.data['widgets']['choice']['ui_tooltip_requires'].replace('%s', pred.ui_describe(player));
-            dialog.widgets[wname].onclick = pred.ui_help(player);
+            dialog.widgets[wname].onclick = get_requirements_help(pred, null);
         }
     }
 }
@@ -36956,6 +36956,18 @@ function purchase_ui_event(event_name, extra_props) {
     @param {Object|null} order - to chain to auto-complete an attempted gamebucks order
     @param {Object|null=} options */
 function invoke_buy_gamebucks_dialog(reason, amount, order, options) {
+    if(!player.is_cheater) {
+        var pred = gamedata['store']['buy_gamebucks_dialog_enable_if'] || null;
+        if(pred) {
+            var p = read_predicate(pred);
+            if(!p.is_satisfied(player)) {
+                var helper = get_requirements_help(p);
+                if(helper) { helper(); }
+                return;
+            }
+        }
+    }
+
     var ver = eval_cond_or_literal(player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store']['buy_gamebucks_dialog_version'] || 1), player, null);
 
     // this option controls whether the game will automatically
