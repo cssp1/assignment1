@@ -16728,9 +16728,8 @@ function invoke_post_screenshot_dialog(data, filename, reason, caption_prefix) {
     img.src = data;
     dialog.widgets['image'].raw_image = img;
 
-
     // set scaling on the image to fit
-    post_screenshot_dialog_update_image_dimensions(dialog)
+    post_screenshot_dialog_update_image_dimensions(dialog);
 
     // note: some browsers (Chrome) parse the image asynchronously, so we have to wait for it to complete
     if(img.width === 0 || img.height === 0) {
@@ -16799,6 +16798,7 @@ function post_screenshot_dialog_update_image_dimensions(dialog) {
     }
     var img_dims = vec_floor(vec_scale(img_scale, [img.width, img.height]));
 
+    dialog.widgets['image'].raw_image_rescale = false; // disable automatic rescaling
     dialog.widgets['image'].xy = vec_floor(vec_add(dialog.data['widgets']['image']['xy'],
                                                    vec_scale(0.5, vec_sub(dialog.data['widgets']['image']['dimensions'], img_dims))));
     dialog.widgets['image'].wh = [img.width, img.height];

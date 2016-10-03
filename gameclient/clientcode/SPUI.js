@@ -1980,6 +1980,7 @@ SPUI.ActionButton = function(data) {
 
     // raw HTML Image element, can override bg_image
     this.raw_image = null;
+    this.raw_image_rescale = true; // by default, scale raw image to fit automatically
 
     this.fade_unless_hover = data['fade_unless_hover'] || false;
     this.alpha = data['alpha'] || 1;
@@ -2125,7 +2126,13 @@ SPUI.ActionButton.prototype.do_draw = function(offset) {
         if(this.raw_image.complete && this.raw_image.width > 0) {
             try {
                 // avoid browser barfs...
-                SPUI.ctx.drawImage(this.raw_image, 0, 0, this.wh[0], this.wh[1], this.xy[0]+img_offset[0], this.xy[1]+img_offset[1], this.wh[0], this.wh[1]); // OK
+                var source_wh;
+                if(this.raw_image_rescale) {
+                    source_wh = [this.raw_image.width, this.raw_image.height];
+                } else {
+                    source_wh = this.wh;
+                }
+                SPUI.ctx.drawImage(this.raw_image, 0, 0, source_wh[0], source_wh[1], this.xy[0]+img_offset[0], this.xy[1]+img_offset[1], this.wh[0], this.wh[1]); // OK
             } catch(e) {}
         }
         if(this.str) {
@@ -2304,6 +2311,7 @@ SPUI.StaticImage = function(data) {
 
     // caller can override this to use a raw HTML5 Image element rather than going through GameArt
     this.raw_image = null;
+    this.raw_image_rescale = true; // by default, scale raw image to fit automatically
 
     if('fill_color' in data) {
         var col = data['fill_color'];
@@ -2375,7 +2383,13 @@ SPUI.StaticImage.prototype.do_draw = function(offset) {
     if(this.raw_image && this.raw_image.complete && this.raw_image.width > 0) {
         try {
             // avoid browser barfs...
-            SPUI.ctx.drawImage(this.raw_image, 0, 0, this.wh[0], this.wh[1], this.xy[0]+offset[0], this.xy[1]+offset[1], this.wh[0], this.wh[1]); // OK
+            var source_wh;
+            if(this.raw_image_rescale) {
+                source_wh = [this.raw_image.width, this.raw_image.height];
+            } else {
+                source_wh = this.wh;
+            }
+            SPUI.ctx.drawImage(this.raw_image, 0, 0, source_wh[0], source_wh[1], this.xy[0]+offset[0], this.xy[1]+offset[1], this.wh[0], this.wh[1]); // OK
         } catch(e) {}
     } else if(this.asset) {
         // XXX duplicated code from ActionButton. Make this a mixin
