@@ -148,7 +148,7 @@ class Table(object):
         fd.write('</table>\n')
 
 class BuildingTable(Table):
-    FIELDS = {'max_hp','build_time', 'upgrade_credit_cost', 'upgrade_gamebucks_cost',
+    FIELDS = {'max_hp','build_time','upgrade_credit_cost','upgrade_gamebucks_cost',
               'consumes_power','provides_power',
               'production_capacity'}
 
@@ -252,12 +252,18 @@ class TechTable(Table):
 def get_tier_summary(building_names, tech_names):
     n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
 
+
+    # get implied relative value of resources?
+    # gamedata['store']['resource_price_formula_by_townhall_level']
+
     summary = {'power_consumed':[0]*n_tiers,
                'power_produced':[0]*n_tiers,
                'building_upgrade_res':[0]*n_tiers,
                'building_upgrade_days':[0]*n_tiers,
+               'building_upgrade_num':[0]*n_tiers,
                'tech_upgrade_res': [0]*n_tiers,
                'tech_upgrade_days': [0]*n_tiers,
+               'tech_upgrade_num': [0]*n_tiers,
                'units_unlocked': [0]*n_tiers,
                'harvest_rate_daily':[0]*n_tiers,
                'storage': [0]*n_tiers,
@@ -309,6 +315,10 @@ def get_tier_summary(building_names, tech_names):
             while level < max_level_this_tier:
                 # simulate upgrade
                 level += 1
+
+                # note: doesn't count the L1-N upgrades when limit increases
+                summary['building_upgrade_num'][tier-1] += 1
+
                 upgrade_res_this_tier += data['build_cost_iron'][level-1]
                 # convert seconds to days
                 upgrade_days_this_tier += data['build_time'][level-1] / 86400.0
@@ -380,6 +390,8 @@ def get_tier_summary(building_names, tech_names):
 
                 if level == 1:
                     summary['units_unlocked'][tier-1] += 1
+
+                summary['tech_upgrade_num'][tier-1] += 1
 
                 upgrade_res_this_tier += data['cost_iron'][level-1]
                 # convert seconds to days
