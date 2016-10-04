@@ -253,8 +253,15 @@ def get_tier_summary(building_names, tech_names):
     n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
 
 
-    # get implied relative value of resources?
-    # gamedata['store']['resource_price_formula_by_townhall_level']
+    # get implied relative value of resources
+    cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
+                         for resname in gamedata['resources'])
+    relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
+                        for resname in gamedata['resources'])
+    res_internal_weight = gamedata['store']['resource_internal_weight']
+
+    def unsplit_res(amounts):
+        return sum((relative_res[resname]*amounts[resname]*res_internal_weight[resname] for resname in amounts), 0)
 
     summary = {'power_consumed':[0]*n_tiers,
                'power_produced':[0]*n_tiers,
@@ -272,6 +279,8 @@ def get_tier_summary(building_names, tech_names):
                'base_area': [0]*n_tiers, # square grid cells occupied by buildings
                'new_buildings': [[] for i in range(n_tiers)],
                }
+    for res in gamedata['resources']:
+        summary['storage_'+res] = [0] * n_tiers
 
     for tier in range(1, n_tiers+1):
         for category in ('infantry', 'armor', 'aircraft'):
@@ -290,8 +299,8 @@ def get_tier_summary(building_names, tech_names):
         # note: these need to continue across tiers
         power_consumed_this_tier = 0
         power_produced_this_tier = 0
-        harvest_rate_daily_this_tier = 0
-        storage_this_tier = 0
+        harvest_rate_daily_this_tier = dict((res, 0) for res in gamedata['resources'])
+        storage_this_tier = dict((res, 0) for res in gamedata['resources'])
         buildings_repair_time_this_tier = 0
 
         for tier in range(1, n_tiers+1):
@@ -319,18 +328,21 @@ def get_tier_summary(building_names, tech_names):
                 # note: doesn't count the L1-N upgrades when limit increases
                 summary['building_upgrade_num'][tier-1] += 1
 
-                upgrade_res_this_tier += data['build_cost_iron'][level-1]
+                upgrade_res_this_tier += unsplit_res(dict((res,
+                                                           data['build_cost_'+res][level-1] if 'build_cost_'+res in data else 0) for res in gamedata['resources']))
+
                 # convert seconds to days
                 upgrade_days_this_tier += data['build_time'][level-1] / 86400.0
                 if 'consumes_power' in data:
                     power_consumed_this_tier = max(power_consumed_this_tier, data['consumes_power'][level-1])
                 if 'provides_power' in data:
                     power_produced_this_tier = max(power_produced_this_tier, data['provides_power'][level-1])
-                if 'produces_iron' in data:
-                    # convert per-hour to per-day
-                    harvest_rate_daily_this_tier = max(harvest_rate_daily_this_tier, 24*data['produces_iron'][level-1])
-                if 'storage_iron' in data:
-                    storage_this_tier = max(storage_this_tier, data['storage_iron'][level-1])
+                for res in gamedata['resources']:
+                    if 'produces_'+res in data:
+                        # convert per-hour to per-day
+                        harvest_rate_daily_this_tier[res] = max(harvest_rate_daily_this_tier[res], 24*data['produces_'+res][level-1])
+                    if 'storage_'+res in data:
+                        storage_this_tier[res] = max(storage_this_tier[res], data['storage_'+res][level-1])
                 if 'repair_time' in data and isinstance(data['repair_time'], list):
                     buildings_repair_time_this_tier = max(buildings_repair_time_this_tier, data['repair_time'][level-1])
 
@@ -354,8 +366,10 @@ def get_tier_summary(building_names, tech_names):
             summary['building_upgrade_days'][tier-1] += limit * upgrade_days_this_tier
             summary['power_consumed'][tier-1] += limit * power_consumed_this_tier
             summary['power_produced'][tier-1] += limit * power_produced_this_tier
-            summary['harvest_rate_daily'][tier-1] += limit * harvest_rate_daily_this_tier
-            summary['storage'][tier-1] += limit * storage_this_tier
+            summary['harvest_rate_daily'][tier-1] += limit * unsplit_res(harvest_rate_daily_this_tier)
+            summary['storage'][tier-1] += limit * unsplit_res(storage_this_tier)
+            for res in gamedata['resources']:
+                summary['storage_'+res][tier-1] += limit * storage_this_tier[res]
             # note: all repair happens in parallel
             summary['buildings_repair_time'][tier-1] = max(summary['buildings_repair_time'][tier-1], buildings_repair_time_this_tier)
 
@@ -393,7 +407,10 @@ def get_tier_summary(building_names, tech_names):
 
                 summary['tech_upgrade_num'][tier-1] += 1
 
-                upgrade_res_this_tier += data['cost_iron'][level-1]
+                upgrade_res_this_tier += unsplit_res(dict((res,
+                                                           data['cost_'+res][level-1] if 'cost_'+res in data else 0) for res in gamedata['resources']))
+
+
                 # convert seconds to days
                 upgrade_days_this_tier += data['research_time'][level-1] / 86400.0
 
