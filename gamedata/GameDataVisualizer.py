@@ -148,7 +148,7 @@ class Table(object):
         fd.write('</table>\n')
 
 class BuildingTable(Table):
-    FIELDS = {'max_hp','build_time',
+    FIELDS = {'max_hp','build_time', 'upgrade_credit_cost', 'upgrade_gamebucks_cost',
               'consumes_power','provides_power',
               'production_capacity'}
 
@@ -190,7 +190,7 @@ class BuildingTable(Table):
         Table.__init__(self, name, data, tiers = tiers, tier_data = tier_data)
 
 class TechTable(Table):
-    FIELDS = {'research_time'}
+    FIELDS = {'research_time','upgrade_credit_cost','upgrade_gamebucks_cost'}
     SPELL_FIELDS = {'damage','cooldown','range'}
     UNIT_FIELDS = {'build_time','max_hp'}
 
