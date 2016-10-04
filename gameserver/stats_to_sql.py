@@ -203,8 +203,8 @@ if __name__ == '__main__':
                     townhall_levels = len(points)
                     func = ""
                     for i in xrange(1,townhall_levels+1):
-                        res_per_gamebuck = scale_factor * float(points[i-1])
-                        seg = "ABS(amount)/%f" % res_per_gamebuck
+                        res_per_gamebuck = float(points[i-1])
+                        seg = "%f*ABS(amount)/%f" % (scale_factor, res_per_gamebuck)
                         if i != townhall_levels:
                             seg = "IF(townhall_level=%d, %s, " % (i, seg)
                         func += seg
