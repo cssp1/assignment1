@@ -490,6 +490,8 @@ if __name__ == '__main__':
                 'tech': SpinJSON.load(open(args[1])),
                 'units': SpinJSON.load(open(args[2])),
                 'spells': SpinConfig.load(args[3], stripped = True), # weapons only
+                'resources': SpinConfig.load(args[4]),
+                'store': SpinJSON.load(open(args[5])),
                 'townhall': tier_building
                 }
 
