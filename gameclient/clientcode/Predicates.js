@@ -986,6 +986,7 @@ goog.inherits(ResourceStorageCapacityPredicate, Predicate);
 ResourceStorageCapacityPredicate.prototype.is_satisfied = function(player, qdata) {
     return player.resource_state[this.data['res']][0] >= this.data['min'];
 };
+ResourceStorageCapacityPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
