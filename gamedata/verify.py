@@ -1300,18 +1300,20 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
         if expect_level is not None and expect_level != effect['strength']:
             error |= 1; print '%s: probably a typo, weapon_level "strength" should be %d' % (reason, expect_level)
     elif effect['stat'] == 'weapon_asset':
-        error |= require_art_asset(effect['strength'], reason+':weapon_asset')
-        if expect_level is not None:
-            matches = level_re.match(effect['strength'])
-            if matches:
-                level = int(matches.group('level'))
-                if level != expect_level:
-                    # special case for high-level TR/DV turret heads that don't have custom assets yet
-                    if gamedata['game_id'] in ('tr','dv') and level < expect_level and expect_level >= 17 and \
-                       'turret_head_' in matches.group('root'):
-                        pass
-                    else:
-                        error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, effect['strength'])
+        asset_list = effect['strength'] if isinstance(effect['strength'], list) else [effect['strength'],]
+        for asset in asset_list:
+            error |= require_art_asset(asset, reason+':weapon_asset')
+            if expect_level is not None:
+                matches = level_re.match(asset)
+                if matches:
+                    level = int(matches.group('level'))
+                    if level != expect_level:
+                        # special case for high-level TR/DV turret heads that don't have custom assets yet
+                        if gamedata['game_id'] in ('tr','dv') and level < expect_level and expect_level >= 17 and \
+                           'turret_head_' in matches.group('root'):
+                            pass
+                        else:
+                            error |= 1; print '%s: leveled weapon_asset %s level number does not match item name' % (reason, asset)
     return error
 
 def check_loot_table(table, reason = '', expire_time = -1, duration = -1, max_slots = -1, is_toplevel = True):
