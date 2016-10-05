@@ -1193,17 +1193,22 @@ def check_item(itemname, spec):
                     elif (not crit.get('dev_only',False)) and (crit['slot_type'] not in host_spec.get('equip_slots',{})):
                         error |= 1; print '%s: equips to %s but %s.json is missing a "%s" slot for it' % (itemname, crit['name'], source, crit['slot_type'])
                     elif ('min_level' in crit):
-                        if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < crit['min_level']:
-                            error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, crit['name'], crit['min_level'])
+                        level_list = crit['min_level'] if isinstance(crit['min_level'],list) else [crit['min_level'],]
+                        if len(level_list) != 1 and len(level_list) != spec['max_level']:
+                                error |= 1; print '%s: compatible min_level criteria has wrong length' % (itemname,)
+                        for min_level in level_list:
+                            if len(host_spec[GameDataUtil.MAX_LEVEL_FIELD[source]]) < min_level:
+                                error |= 1; print '%s: equips to %s L%d+ but the unit/building does not actually upgrade that high' % (itemname, crit['name'], min_level)
 
             if crit.get('slot_type',None) == 'turret_head':
                 if 'consumes_power' not in equip:
                     error |= 1; print '%s: equip is missing "consumes_power"' % (itemname,)
 
-            if crit.get('min_level',1) > 1:
-                if not any(('L%d or higher' % crit['min_level'] in ui_descr) or \
-                           ('Level %d or higher' % crit['min_level'] in ui_descr) for ui_descr in ui_descr_list):
-                    error |= 1; print '%s: requires min_level %d but the ui_description does not include the words "L%d or higher" or "Level %d or higher": "%s"' % (itemname, crit['min_level'], crit['min_level'], crit['min_level'], spec['ui_description'])
+            if gamedata['game_id'] != 'fs': # FS uses leveled head items
+                if crit.get('min_level',1) > 1:
+                    if not any(('L%d or higher' % crit['min_level'] in ui_descr) or \
+                               ('Level %d or higher' % crit['min_level'] in ui_descr) for ui_descr in ui_descr_list):
+                        error |= 1; print '%s: requires min_level %d but the ui_description does not include the words "L%d or higher" or "Level %d or higher": "%s"' % (itemname, crit['min_level'], crit['min_level'], crit['min_level'], spec['ui_description'])
 
             for PRED in ('requires', 'unequip_requires'):
                 if PRED in crit:

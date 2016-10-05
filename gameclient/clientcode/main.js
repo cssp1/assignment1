@@ -7203,9 +7203,10 @@ player.stored_item_iter = function(func) {
     @param {number} host_level
     @param {string} slot_type
     @param {Object} espec of the equipment item
+    @param {Object} einstance of the equipment item
     @param {boolean=} ignore_min_level ignore the min_level requirment
     @return {Object|null} */
-function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, ignore_min_level) {
+function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, einstance, ignore_min_level) {
     if(!('equip' in espec)) { return null; }
     var crit_list;
     if('compatible' in espec['equip']) {
@@ -7220,7 +7221,7 @@ function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, 
         if(('manufacture_category' in crit) && (crit['manufacture_category'] != host_spec['manufacture_category'])) { continue; }
         if(('history_category' in crit) && (crit['history_category'] != host_spec['history_category'])) { continue; }
         if(('slot_type' in crit) && crit['slot_type'] != slot_type) { continue; }
-        if(!ignore_min_level && ('min_level' in crit) && (host_level < crit['min_level'])) { continue; }
+        if(!ignore_min_level && ('min_level' in crit) && (host_level < get_leveled_quantity(crit['min_level'], einstance['level'] || 1))) { continue; }
         return crit;
     }
     return null;
@@ -7231,11 +7232,12 @@ function equip_is_compatible_with_slot(host_spec, host_level, slot_type, espec, 
     @param {Building} unit
     @param {string} slot_type
     @param {Object} espec of the equipment item
+    @param {Object} einstance of the equipment item
     @param {boolean=} ignore_min_level
     @return {Object|null}
 */
-function equip_is_compatible_with_building(unit, slot_type, espec, ignore_min_level) {
-    return equip_is_compatible_with_slot(unit.spec, unit.level, slot_type, espec, ignore_min_level);
+function equip_is_compatible_with_building(unit, slot_type, espec, einstance, ignore_min_level) {
+    return equip_is_compatible_with_slot(unit.spec, unit.level, slot_type, espec, einstance, ignore_min_level);
 }
 
 /** Return true if an item of "espec" can theoretically go into a slot on a unit spec
@@ -7244,11 +7246,12 @@ function equip_is_compatible_with_building(unit, slot_type, espec, ignore_min_le
     @param {string} specname of the unit
     @param {string} slot_type
     @param {Object} espec of the equipment item
+    @param {Object} einstance of the equipment item
     @param {boolean=} ignore_min_level
     @return {Object|null}
 */
-function equip_is_compatible_with_unit(techname, specname, slot_type, espec, ignore_min_level) {
-    return equip_is_compatible_with_slot(gamedata['units'][specname], player.tech[techname]||0, slot_type, espec, ignore_min_level);
+function equip_is_compatible_with_unit(techname, specname, slot_type, espec, einstance, ignore_min_level) {
+    return equip_is_compatible_with_slot(gamedata['units'][specname], player.tech[techname]||0, slot_type, espec, einstance, ignore_min_level);
 }
 
 /** Find any player-owned building in the session that is compatible with a given equip item
@@ -7262,7 +7265,7 @@ function find_any_compatible_building(item_spec) {
         if(crit['kind'] === 'building') {
             var ok_obj = session.for_each_real_object(function(obj) {
                 if(obj.spec['equip_slots'] && crit['slot_type'] in obj.spec['equip_slots'] &&
-                   equip_is_compatible_with_building(obj, crit['slot_type'], item_spec, true) &&
+                   equip_is_compatible_with_building(obj, crit['slot_type'], item_spec, null, true) &&
                    obj.team === 'player') {
                     return obj;
                 }
@@ -24377,14 +24380,14 @@ function update_equip_chooser(dialog) {
             var can_equip_at_any_level, can_equip_now;
             var min_level = -1; // only >0 if we don't meet the requirement right now
             if(tech) {
-                var crit = equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, true);
+                var crit = equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, item, true);
                 can_equip_at_any_level = !!crit;
-                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, false);
+                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_unit(tech['name'], tech['associated_unit'], slot_type, espec, item, false);
                 if(can_equip_at_any_level && !can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             } else {
-                var crit = equip_is_compatible_with_building(unit, slot_type, espec, true);
+                var crit = equip_is_compatible_with_building(unit, slot_type, espec, item, true);
                 can_equip_at_any_level = !!crit;
-                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_building(unit, slot_type, espec, false);
+                can_equip_now = can_equip_at_any_level && !!equip_is_compatible_with_building(unit, slot_type, espec, item, false);
                 if(can_equip_at_any_level && !can_equip_now && crit['min_level']) { min_level = crit['min_level']; }
             }
             if(!can_equip_at_any_level) { continue; }

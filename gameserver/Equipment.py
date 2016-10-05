@@ -127,7 +127,6 @@ class Equipment (object):
     # similar to client's equip_is_compatible_with*() functions
     @staticmethod
     def equip_is_compatible_with_slot(my_spec, my_level, slot_type, item, item_spec):
-        # may want to check item.get('level',1) here
         if 'equip' not in item_spec: return False
         if 'compatible' in item_spec['equip']:
             crit_list = item_spec['equip']['compatible']
@@ -139,7 +138,7 @@ class Equipment (object):
             if ('manufacture_category' in crit) and (crit['manufacture_category'] != my_spec.manufacture_category): continue
             if ('history_category' in crit) and (crit['history_category'] != my_spec.history_category): continue
             if ('slot_type' in crit) and (crit['slot_type'] != slot_type): continue
-            if ('min_level' in crit) and (my_level < crit['min_level']): continue
+            if ('min_level' in crit) and (my_level < get_leveled_quantity(crit['min_level'], item.get('level',1))): continue
             return True
         return False
 
