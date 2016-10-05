@@ -340,7 +340,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     // RESOURCE requirement
     for(var res in gamedata['resources']) {
         var resdata = gamedata['resources'][res];
-        var cost = get_leveled_quantity(recipe_spec['cost'][res]||0, recipe_level);
+        var cost = get_leveled_quantity(get_leveled_quantity(recipe_spec['cost'], recipe_level)[res]||0, recipe_level);
 
         if(!player.is_cheater && cost > 0 && ('allow_instant' in resdata) && !resdata['allow_instant']) {
             instant_requirements_ok = false;
