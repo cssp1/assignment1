@@ -269,6 +269,12 @@ class AntiAltPolicy(Policy):
 
     def check_player(self, user_id, player):
 
+        # special case for BFM on BH - disregard BH accounts
+        if SpinConfig.game() == 'bfm':
+            user = do_CONTROLAPI({'user_id':user_id, 'method':'get_raw_user'})
+            if (not user) or (user.get('frame_platform') == 'bh'):
+                return
+
         # possible race condition after player cache lookup (?)
         if player['home_region'] not in anti_alt_region_names: return
 
@@ -317,6 +323,12 @@ class AntiAltPolicy(Policy):
                 # check to see whether this is the "master" account - if not, we'll be taking action when scanning the other account
                 if master_account(our_pcache, alt_pcache) is not our_pcache:
                     continue
+
+                # special case for BFM on BH - disregard BH accounts
+                if SpinConfig.game() == 'bfm':
+                    other_user = do_CONTROLAPI({'user_id':alt_pcache['user_id'], 'method':'get_raw_user'})
+                    if (not other_user) or (other_user.get('frame_platform') == 'bh'):
+                        continue
 
                 interfering_alt_pcaches.append(alt_pcache)
 
