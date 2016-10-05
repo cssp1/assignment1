@@ -898,7 +898,7 @@ def check_crafting_recipe(recname, spec):
             error |= 1; print '%s: list of %s does not match max_level %d' % (recname, FIELD, max_level)
 
     for FIELD in ('ingredients', 'product'):
-        if max_level > 1 and type(spec[FIELD][0]) is list and len(spec[FIELD]) != max_level:
+        if FIELD in spec and max_level > 1 and type(spec[FIELD][0]) is list and len(spec[FIELD]) != max_level:
             error |= 1; print '%s: list of %s does not match max_level %d' % (recname, FIELD, max_level)
 
     if ('ui_name' not in spec):
