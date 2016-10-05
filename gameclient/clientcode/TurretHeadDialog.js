@@ -145,15 +145,16 @@ TurretHeadDialog.ondraw = function(dialog) {
                 dialog.widgets['recipe_frame'+wname].show = true;
             var can_craft = true;
 
-            var product_spec = ItemDisplay.get_inventory_item_spec(spec['product'][0]['spec']);
-            tooltip_text.push(ItemDisplay.strip_inventory_item_ui_name_level_suffix(get_crafting_recipe_ui_name(spec)));
-            dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
-
             // check for max craftable level
             var recipe_level = 1;
             if('associated_tech' in spec) {
                 recipe_level = player.tech[spec['associated_tech']] || 1;
             }
+
+            var product_item = get_crafting_recipe_product_list(spec, recipe_level)[0];
+            var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
+            tooltip_text.push(ItemDisplay.strip_inventory_item_ui_name_level_suffix(get_crafting_recipe_ui_name(spec)));
+            dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
 
             // get list of any unsatisfied requirements
             var pred = null, req = null;
@@ -319,7 +320,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         recipe_level = 1;
     }
 
-    var product_item = get_leveled_quantity(recipe_spec['product'], recipe_level);
+    var product_item = get_crafting_recipe_product_list(recipe_spec, recipe_level)[0];
     var product_level = ItemDisplay.get_inventory_item_level(product_item);
     var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
 
@@ -647,6 +648,10 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, rel
     var relative_level = (relative_to ? ItemDisplay.get_inventory_item_level(relative_to) : -1);
 
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);
+    if('level' in item) { // leveled item
+        dialog.widgets['name'].str += ' L'+item['level'].toString();
+    }
+
     // main icon
     ItemDisplay.set_inventory_item_asset(dialog.widgets['icon'], spec);
 

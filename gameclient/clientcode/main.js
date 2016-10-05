@@ -4973,7 +4973,8 @@ Building.prototype.turret_head_item = function() {
 Building.prototype.turret_head_inprogress_item = function() {
     var craft_queue = this.get_crafting_queue();
     if(craft_queue.length > 0) {
-        return gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['product'][0];
+        return get_crafting_recipe_product_list(gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']],
+                                                craft_queue[0]['craft']['level'] || 1)[0];
     }
     return null;
 };
