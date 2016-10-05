@@ -458,12 +458,14 @@ function BuildingLevelPredicate(data) {
     this.trigger_level = data['trigger_level'];
     this.trigger_qty = data['trigger_qty'] || 1;
     this.upgrading_ok = data['upgrading_ok'] || false;
+    this.obj_id = data['obj_id'] || null;
 }
 goog.inherits(BuildingLevelPredicate, Predicate);
 BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     var count = 0;
     if(session.for_each_real_object(function(obj) {
-        if(obj.spec === this.building_spec &&
+        if((!this.obj_id || this.obj_id === obj.id) &&
+           obj.spec === this.building_spec &&
            obj.team === 'player' &&
            !obj.is_under_construction()) {
             if(obj.level >= this.trigger_level) {
@@ -499,7 +501,8 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     var level_count = 0;
     var min_level = 999, need_to_upgrade_obj = null, need_to_speedup_obj = null;
     session.for_each_real_object(function(obj) {
-        if(obj.spec === this.building_spec &&
+        if((!this.obj_id || this.obj_id === obj.id) &&
+           obj.spec === this.building_spec &&
            obj.team === 'player') {
             if(obj.is_under_construction()) {
                 need_to_speedup_obj = obj;
