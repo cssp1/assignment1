@@ -42792,6 +42792,36 @@ function can_cast_spell_detailed(unit_id, spellname, spellarg) {
             });
             if(ret) { return ret; }
 
+            // check delivery slot requirement
+            if('delivery' in spellarg[0] &&
+               spellarg[0]['delivery']['slot_type'] &&
+               ('obj_id' in spellarg[0]['delivery'])) {
+                var delivery_obj = session.get_real_world().objects.get_object(spellarg[0]['delivery']['obj_id']);
+                var product_item = get_crafting_recipe_product_list(recipe_spec, recipe_level)[0];
+                var product_level = ItemDisplay.get_inventory_item_level(product_item);
+                var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
+                var compat_list;
+                if('compatible' in product_spec['equip']) {
+                    compat_list = product_spec['equip']['compatible'];
+                } else {
+                    compat_list = [product_spec['equip']];
+                }
+                goog.array.forEach(compat_list, function(compat) {
+                    if(ret) { return; } // already found a reason we cannot proceed
+                    if('min_level' in compat) {
+                        var min_level = get_leveled_quantity(compat['min_level'], product_level);
+                        if(delivery_obj.level < min_level) {
+                            var pred = read_predicate({'predicate': 'BUILDING_LEVEL',
+                                                       'building_type': delivery_obj.spec['name'],
+                                                       'trigger_level': min_level,
+                                                       'obj_id': delivery_obj.id});
+                            ret = [false, gamedata['errors']['REQUIREMENTS_NOT_SATISFIED']['ui_name'], [pred]];
+                        }
+                    }
+                });
+                if(ret) { return ret; }
+            }
+
             // check resource requirements
             var resources_needed = {};
             for(var res in gamedata['resources']) {
@@ -43326,12 +43356,34 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 if(craft_queue.length > 0) { return [-1, p_currency]; } // note: doesn't handle uncollected finished jobs
             }
 
-            // check destination slot
-            if(delivery && delivery['obj_id'] && !delivery['replace']) {
+            // check destination slot (XXX redundant with can_cast_spell_detailed)
+            if(delivery && delivery['obj_id']) {
                 var other = session.get_real_world().objects.get_object(delivery['obj_id']);
-                if(other.equipment && delivery['slot_type'] in other.equipment && other.equipment[delivery['slot_type']][delivery['slot_index']||0]) {
-                    return [-1, p_currency];
+                if(!delivery['replace']) {
+                    if(other.equipment && delivery['slot_type'] in other.equipment && other.equipment[delivery['slot_type']][delivery['slot_index']||0]) {
+                        return [-1, p_currency];
+                    }
                 }
+                var product_item = get_crafting_recipe_product_list(recipe, recipe_level)[0];
+                var product_level = ItemDisplay.get_inventory_item_level(product_item);
+                var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
+                var compat_list;
+                if('compatible' in product_spec['equip']) {
+                    compat_list = product_spec['equip']['compatible'];
+                } else {
+                    compat_list = [product_spec['equip']];
+                }
+                var ret = null;
+                goog.array.forEach(compat_list, function(compat) {
+                    if(ret) { return; } // already found a reason we cannot proceed
+                    if('min_level' in compat) {
+                        var min_level = get_leveled_quantity(compat['min_level'], product_level);
+                        if(other.level < min_level) {
+                            ret = [-1, p_currency];
+                        }
+                    }
+                });
+                if(ret) { return ret; }
             }
 
             price = get_leveled_quantity(recipe['craft_gamebucks_cost']||-1, recipe_level);

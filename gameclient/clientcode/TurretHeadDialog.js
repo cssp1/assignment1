@@ -414,6 +414,30 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     }
     dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
 
+    // BUILDING COMPATIBILITY requirement
+    if(!player.is_cheater) {
+        var compat_list;
+        if('compatible' in product_spec['equip']) {
+            compat_list = product_spec['equip']['compatible'];
+        } else {
+            compat_list = [product_spec['equip']];
+        }
+        goog.array.forEach(compat_list, function(compat) {
+            if('min_level' in compat) {
+                var min_level = get_leveled_quantity(compat['min_level'], product_level);
+                if(emplacement_obj.level < min_level) {
+                    var pred = read_predicate({'predicate': 'BUILDING_LEVEL',
+                                               'building_type': emplacement_obj.spec['name'],
+                                               'trigger_level': min_level,
+                                               'obj_id': emplacement_obj.id});
+                    req.push(pred.ui_describe(player));
+                    use_resources_requirements_ok = instant_requirements_ok = false;
+                    use_resources_helper = instant_helper = get_requirements_help(pred, null);
+                }
+            }
+        });
+    }
+
     // LIMITED EQUIPPED requirement
     if(!player.is_cheater && player.would_violate_limited_equipped(product_spec, new BuildingEquipSlotAddress(emplacement_obj.id, 'turret_head', 0))) {
         use_resources_requirements_ok = instant_requirements_ok = false;
