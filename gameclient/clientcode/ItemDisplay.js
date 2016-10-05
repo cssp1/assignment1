@@ -35,13 +35,31 @@ ItemDisplay.same_item = function(a, b) {
             a_stack === b_stack);
 };
 
-/** return gamedata spec for an item by specname, defaulting to unknown_item if not found
-    @param {string} specname */
+/** Given an item spec NAME, return its spec object.
+    Defaults to unknown_item if not found
+    @param {string} specname
+    @return {!Object} */
 ItemDisplay.get_inventory_item_spec = function(specname) {
     if(!(specname in gamedata['items'])) {
         specname = 'unknown_item';
     }
     return gamedata['items'][specname];
+};
+
+/** Given an item INSTANCE, return its level.
+    Note that some items have a fixed level from their spec (TR-style turret heads).
+    But first look inside the item instance for its own level property.
+    @param {!Object} item
+    @return {number} */
+ItemDisplay.get_inventory_item_level = function(item) {
+    if('level' in item) {
+        return item['level'];
+    }
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    if('level' in spec) {
+        return spec['level'];
+    }
+    return 1;
 };
 
 /** For items that apply a new weapon to something (e.g. turret heads), return the spellname of the weapon they apply.
@@ -53,7 +71,7 @@ ItemDisplay.get_inventory_item_weapon_spellname = function(spec) {
         for(var i = 0; i < effect_list.length; i++) {
             var effect = effect_list[i];
             if(effect['code'] == 'modstat' && (effect['stat'] == 'weapon' || effect['stat'] == 'continuous_cast') && effect['method'] == 'replace') {
-                return effect['strength'];
+                return get_leveled_quantity(effect['strength'], 1); // assume spellname does not change with level (?)
             }
         }
     }

@@ -4961,18 +4961,19 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
 };
 Building.prototype.is_turret = function() { return this.spec['history_category'] === 'turrets'; };
 Building.prototype.is_emplacement = function() { return this.spec['equip_slots'] && ('turret_head' in this.spec['equip_slots']); };
-// return the name of the turret head item equipped here, if any, otherwise null
+
+/** @return {Object|null} the instance of the turret head item equipped here, if any, otherwise null */
 Building.prototype.turret_head_item = function() {
     if(this.equipment && this.equipment['turret_head'] && this.equipment['turret_head'].length > 0) {
-        return this.equipment['turret_head'][0] ? player.decode_equipped_item(this.equipment['turret_head'][0])['spec'] : null;
+        return this.equipment['turret_head'][0] ? player.decode_equipped_item(this.equipment['turret_head'][0]) : null;
     }
     return null;
 };
-// return name of turret head item currently being crafted (assumes is_crafting() is true)
+/** @return {Object|null} the turret head item currently being crafted (assumes is_crafting() is true) */
 Building.prototype.turret_head_inprogress_item = function() {
     var craft_queue = this.get_crafting_queue();
     if(craft_queue.length > 0) {
-        return gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['product'][0]['spec'];
+        return gamedata['crafting']['recipes'][craft_queue[0]['craft']['recipe']]['product'][0];
     }
     return null;
 };
@@ -8975,7 +8976,7 @@ function get_killer_info(killer) {
             if(killer.is_minefield() && killer.is_minefield_armed()) {
                 ret['mine'] = killer.minefield_item();
             } else if(killer.is_emplacement() && killer.turret_head_item()) {
-                ret['turret_head'] = killer.turret_head_item();
+                ret['turret_head'] = killer.turret_head_item()['spec'];
             }
         }
         return ret;
@@ -18873,7 +18874,8 @@ function do_invoke_speedup_dialog(kind) {
         }
     } else if(selection.unit.is_crafting()) {
         if(selection.unit.is_emplacement()) {
-            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(selection.unit.turret_head_inprogress_item()));
+            var product = selection.unit.turret_head_inprogress_item();
+            var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
             description_finish = gamedata['strings']['speedup']['finish_turret_head'].replace('%s', ui_name);
         } else {
             description_finish = gamedata['strings']['speedup']['finish_crafting'].replace('%s', selection.unit.spec['ui_name']);
@@ -20484,11 +20486,12 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(session.home_base && obj.is_emplacement()) { // special case for emplacements
                 dialog_name = 'emplacement_context_menu';
-                var cur_item_name = obj.turret_head_item();
-                var item_spec = (cur_item_name ? ItemDisplay.get_inventory_item_spec(cur_item_name) : null);
+                var cur_item = obj.turret_head_item();
+                var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
                 var under_leveled = false;
                 if(item_spec && item_spec['associated_tech']) {
                     var tech_level = player.tech[item_spec['associated_tech']] || 0;
+                    var item_level = ItemDisplay.get_inventory_item_level(cur_item);
                     if(tech_level > item_spec['level']) {
                         under_leveled = true;
                     }
@@ -20499,11 +20502,11 @@ function invoke_building_context_menu(mouse_xy) {
                     special_buttons['head'] = [];
                     special_buttons['head'].push(new ContextMenuButton({ui_name: spell['ui_name_building_context_emplacement'],
                                                                         onclick: (function (_obj) { return function(w) { TurretHeadDialog.invoke(_obj); }; })(obj),
-                                                                        asset: (cur_item_name && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no current head is equipped, or head is under-leveled
+                                                                        asset: (cur_item && !under_leveled ? 'menu_button_resizable' : null) // yellow only if no current head is equipped, or head is under-leveled
                                                                        }));
                 }
 
-                if(cur_item_name) {
+                if(cur_item) {
                     upgrade_is_active = !under_leveled;
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
                     special_buttons['head'].push(new ContextMenuButton({ui_name: upgr_spell['ui_name_building_context_emplacement'],
@@ -20615,14 +20618,14 @@ function invoke_building_context_menu(mouse_xy) {
     }
 
     if(dialog_name == 'emplacement_context_menu') {
-        var cur_item_name = obj.turret_head_item() || obj.turret_head_inprogress_item();
+        var cur_item = obj.turret_head_item() || obj.turret_head_inprogress_item();
 
-        if(cur_item_name) {
-            var item_spec = ItemDisplay.get_inventory_item_spec(cur_item_name);
+        if(cur_item) {
+            var item_spec = ItemDisplay.get_inventory_item_spec(cur_item['spec']);
             if(item_spec) {
                 dialog.widgets['head_title'].str = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
                 if(item_spec['associated_tech']) {
-                    var item_cur_level = item_spec['level']; // note: level of item itself, NOT the tech
+                    var item_cur_level = ItemDisplay.get_inventory_item_level(cur_item); // note: level of item itself, NOT the tech
                     var tech_max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                     dialog.widgets['head_level'].show = true;
                     dialog.widgets['head_level'].str = dialog.data['widgets']['level']['ui_name'].replace('%d0', item_cur_level).replace('%d1', tech_max_level);
@@ -47733,13 +47736,14 @@ function create_mouse_tooltip() {
             }
 
             if(obj.is_building() && obj.is_emplacement() && obj.turret_head_item) {
-                var item_name = obj.turret_head_item();
-                if(item_name) {
-                    var item_spec = ItemDisplay.get_inventory_item_spec(item_name);
+                var item = obj.turret_head_item();
+                if(item) {
+                    var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
                     var ui_name = ItemDisplay.strip_inventory_item_ui_name_level_suffix(ItemDisplay.get_inventory_item_ui_name(item_spec));
                     str.push(ui_name);
-                    if((obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']])) {
-                        var cur_level = item_spec['level'];
+                    if('associated_tech' in item_spec &&
+                       (obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']])) {
+                        var cur_level = ItemDisplay.get_inventory_item_level(item);
                         var max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
@@ -49762,11 +49766,14 @@ Building.prototype.get_idle_state_legacy = function() {
         }
 
         if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
-            var item_spec = ItemDisplay.get_inventory_item_spec(this.turret_head_item());
-            // check if our tech level for this item is above its own level
-            if('level' in item_spec && 'associated_tech' in item_spec) {
+            var item = this.turret_head_item();
+            var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+
+            if('associated_tech' in item_spec) {
+                // check if our tech level for this item is above its own level
+                var item_level = ItemDisplay.get_inventory_item_level(item);
                 var tech_level = player.tech[item_spec['associated_tech']] || 0;
-                if(tech_level > item_spec['level']) {
+                if(tech_level > item_level) {
                     draw_idle_icon = 'under_leveled_turret_head';
                 }
             }
@@ -50005,11 +50012,14 @@ Building.prototype.get_idle_state_advanced = function() {
         }
 
         if(this.is_emplacement() && this.turret_head_item()) { // assumes emplacements are crafters
-            var item_spec = ItemDisplay.get_inventory_item_spec(this.turret_head_item());
-            // check if our tech level for this item is above its own level
-            if('level' in item_spec && 'associated_tech' in item_spec) {
+            var item = this.turret_head_item();
+            var item_spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+
+            if('associated_tech' in item_spec) {
+                // check if our tech level for this item is above its own level
+                var item_level = ItemDisplay.get_inventory_item_level(item);
                 var tech_level = player.tech[item_spec['associated_tech']] || 0;
-                if(tech_level > item_spec['level']) {
+                if(tech_level > item_level) {
                     draw_idle_icon = 'under_leveled_turret_head';
                 }
             }

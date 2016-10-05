@@ -99,10 +99,10 @@ TurretHeadDialog.ondraw = function(dialog) {
             if(obj.is_emplacement()) {
                 var head = obj.turret_head_item() || obj.turret_head_inprogress_item();
                 if(head) {
-                    var head_spec = ItemDisplay.get_inventory_item_spec(head);
+                    var head_spec = ItemDisplay.get_inventory_item_spec(head['spec']);
                     if('limited_equipped' in head_spec) {
                         var key = head_spec['limited_equipped'];
-                        if(head == obj.turret_head_item()) {
+                        if(head === obj.turret_head_item()) {
                             count_mounted[key] = (count_mounted[key]||0) + 1;
                         } else {
                             count_mounting[key] = (count_mounting[key]||0) + 1;
@@ -149,10 +149,16 @@ TurretHeadDialog.ondraw = function(dialog) {
             tooltip_text.push(ItemDisplay.strip_inventory_item_ui_name_level_suffix(get_crafting_recipe_ui_name(spec)));
             dialog.widgets['recipe_icon'+wname].asset = get_crafting_recipe_icon(spec);
 
+            // check for max craftable level
+            var recipe_level = 1;
+            if('associated_tech' in spec) {
+                recipe_level = player.tech[spec['associated_tech']] || 1;
+            }
+
             // get list of any unsatisfied requirements
             var pred = null, req = null;
             if(('requires' in spec) && !player.is_cheater) {
-                pred = read_predicate(spec['requires']);
+                pred = read_predicate(get_leveled_quantity(spec['requires'], recipe_level));
                 req = pred.ui_describe(player);
                 if(req) {
                     tooltip_text.push('');
@@ -265,13 +271,13 @@ TurretHeadDialog.ondraw = function(dialog) {
 
     // deal with the current item
     var emplacement_obj = dialog.user_data['emplacement'];
-    var current_name = emplacement_obj.turret_head_item();
+    var current_item = emplacement_obj.turret_head_item();
 
-    dialog.widgets['no_current'].show = !current_name;
-    dialog.widgets['current'].show = !!current_name;
+    dialog.widgets['no_current'].show = !current_item;
+    dialog.widgets['current'].show = !!current_item;
 
-    if(current_name) {
-        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_name, null);
+    if(current_item) {
+        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_item, null);
     }
 
     // click-to-select
@@ -300,15 +306,26 @@ TurretHeadDialog.ondraw = function(dialog) {
     @param {string} recipe_name of the recipe
     @param {SPUI.Dialog} parent dialog that contains the "Use Resource"/"Instant" buttons and price/time displays */
 TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_name, parent) {
-    var current_name = emplacement_obj.turret_head_item();
-    var current_spec = (current_name ? ItemDisplay.get_inventory_item_spec(current_name) : null);
+    var current_item = emplacement_obj.turret_head_item();
+    var current_spec = (current_item ? ItemDisplay.get_inventory_item_spec(current_item['spec']) : null);
     var recipe_spec = gamedata['crafting']['recipes'][recipe_name];
     var category = gamedata['crafting']['categories'][recipe_spec['crafting_category']];
-    var product_name = recipe_spec['product'][0]['spec'];
-    var product_spec = ItemDisplay.get_inventory_item_spec(product_name);
-    var product_level = product_spec['level'];
 
-    TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_name, (current_name && current_name != product_name) ? current_name : null);
+    var recipe_level;
+    if('associated_tech' in recipe_spec) {
+        recipe_level = player.tech[recipe_spec['associated_tech']] || 1;
+    } else {
+        // note: product could still have level > 1 if it's specified in the product item spec
+        recipe_level = 1;
+    }
+
+    var product_item = get_leveled_quantity(recipe_spec['product'], recipe_level);
+    var product_level = ItemDisplay.get_inventory_item_level(product_item);
+    var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
+
+    TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_item,
+                                       // show current_item for comparison, if different from product_item
+                                       (current_item && !ItemDisplay.same_item(current_item, product_item) ? current_item : null));
 
     // XXX most of this is copy/pasted from update_upgrade_dialog() - maybe unify into some kind of can_cast_spell variant
     var use_resources_offered = true;
@@ -322,7 +339,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     // RESOURCE requirement
     for(var res in gamedata['resources']) {
         var resdata = gamedata['resources'][res];
-        var cost = get_leveled_quantity(recipe_spec['cost'][res]||0, product_level);
+        var cost = get_leveled_quantity(recipe_spec['cost'][res]||0, recipe_level);
 
         if(!player.is_cheater && cost > 0 && ('allow_instant' in resdata) && !resdata['allow_instant']) {
             instant_requirements_ok = false;
@@ -356,8 +373,8 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     // POWER requirement
     if(1) {
         var old_power = (current_spec ? current_spec['equip']['consumes_power']||0 : 0);
-        var during_power = recipe_spec['consumes_power']||0;
-        var new_power = product_spec['equip']['consumes_power']||0;
+        var during_power = get_leveled_quantity(recipe_spec['consumes_power']||0, recipe_level);
+        var new_power = get_leveled_quantity(product_spec['equip']['consumes_power']||0, product_level);
         dialog.widgets['cost_power'].show =
             dialog.widgets['resource_power_icon'].show = (new_power > 0 || old_power > 0);
         if(dialog.widgets['cost_power'].show) {
@@ -377,16 +394,16 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     // TIME requirement
     parent.widgets['cost_time_bar'].show =
         parent.widgets['cost_time_clock'].show =
-        parent.widgets['cost_time'].show = (current_name != product_name);
+        parent.widgets['cost_time'].show = !current_item || !ItemDisplay.same_item(current_item, product_item);
     if(parent.widgets['cost_time'].show) {
         var speed = emplacement_obj.get_stat('crafting_speed', emplacement_obj.get_leveled_quantity(emplacement_obj.spec['crafting_speed'] || 1.0));
-        var cost_time = Math.max(1, Math.floor(get_leveled_quantity(recipe_spec['craft_time'], product_level) / speed));
+        var cost_time = Math.max(1, Math.floor(get_leveled_quantity(recipe_spec['craft_time'], recipe_level) / speed));
         parent.widgets['cost_time'].str = pretty_print_time(cost_time);
     }
 
     // PREDICATE requirement
     if(!player.is_cheater && ('requires' in recipe_spec)) {
-        var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], product_level));
+        var pred = read_predicate(get_leveled_quantity(recipe_spec['requires'], recipe_level));
         var text = pred.ui_describe(player);
         if(text) {
             req.push(text);
@@ -407,7 +424,8 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 
     // DESCRIPTION
     if(1) {
-        var descr_nlines = SPUI.break_lines(product_spec['ui_description'], dialog.widgets['description'].font, dialog.widgets['description'].wh);
+        var descr_nlines = SPUI.break_lines(get_leveled_quantity(product_spec['ui_description'], product_level),
+                                            dialog.widgets['description'].font, dialog.widgets['description'].wh);
 
         var descr_list = descr_nlines[0].split('\n');
         var descr;
@@ -418,7 +436,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         }
         dialog.widgets['description'].str = descr;
         dialog.widgets['description'].onclick = null;
-        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], {'spec':product_spec['name']}, parent);
+        ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['description'], product_item, parent);
         //dialog.widgets['description'].tooltip.str = descr_nlines[0];
     }
 
@@ -434,24 +452,24 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     if(tooltip_req_instant.length > 0) { tooltip_req_instant.splice(0, 0, parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
     if(tooltip_req_use_resources.length > 0) { tooltip_req_use_resources.splice(0, 0, parent.data['widgets']['use_resources_button']['ui_tooltip_unmet']); }
 
-    var craft_spellarg = {'recipe':recipe_name,
+    var craft_spellarg = {'recipe':recipe_name, 'level': recipe_level,
                           'delivery':{'obj_id':emplacement_obj.id, 'slot_type':'turret_head', 'slot_index': 0, 'replace': 1}
                          };
 
-    if(current_name != product_name) {
+    if(!current_item || !ItemDisplay.same_item(current_item, product_item)) {
         parent.widgets['use_resources_button'].show = use_resources_offered;
         parent.widgets['use_resources_button'].tooltip.str = null;
 
-        var slow_func = (function (_parent, _obj, _recipe_spec, _product_name, _craft_spellarg) { return function() {
+        var slow_func = (function (_parent, _obj, _recipe_spec, _product_item, _craft_spellarg) { return function() {
 
             var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
-            new_config['turret_head'] = _product_name;
+            new_config['turret_head'] = _product_item['spec'];
             send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
 
             start_crafting(_obj, _recipe_spec, _craft_spellarg);
             invoke_ui_locker(_obj.request_sync(), (function (__parent) { return function() { close_dialog(__parent); }; })(_parent));
 
-        }; })(parent, emplacement_obj, recipe_spec, product_name, craft_spellarg);
+        }; })(parent, emplacement_obj, recipe_spec, product_item, craft_spellarg);
 
         if(!emplacement_obj.is_in_sync()) {
             parent.widgets['use_resources_button'].state = 'disabled';
@@ -503,7 +521,7 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         // "Instant" button
         parent.widgets['instant_button'].tooltip.str = null;
 
-        if(get_leveled_quantity(recipe_spec['craft_gamebucks_cost']||-1, product_level) < 0) {
+        if(get_leveled_quantity(recipe_spec['craft_gamebucks_cost']||-1, recipe_level) < 0) {
             // instant upgrade not offered
             parent.widgets['instant_button'].show = parent.widgets['instant_credits'].show = false;
             parent.default_button = parent.widgets['use_resources_button'];
@@ -556,18 +574,18 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
                 parent.widgets['instant_button'].state = 'normal';
                 parent.widgets['instant_button'].str = parent.data['widgets']['instant_button']['ui_name'];
                 parent.widgets['instant_credits'].onclick =
-                    parent.widgets['instant_button'].onclick = (function (_obj, _product_name, _craft_spellarg, _parent) { return function(w) {
+                    parent.widgets['instant_button'].onclick = (function (_obj, _product_item, _craft_spellarg, _parent) { return function(w) {
                         var dialog = w.parent;
 
                         var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
-                        new_config['turret_head'] = _product_name;
+                        new_config['turret_head'] = _product_item['spec'];
                         send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
 
                         if(Store.place_user_currency_order(_obj.id, "CRAFT_FOR_MONEY", _craft_spellarg,
                                                            (function (__parent) { return function(success) { if(success) { close_dialog(__parent); } } })(_parent))) {
                             invoke_ui_locker(_obj.request_sync());
                         }
-                    }; })(emplacement_obj, product_name, craft_spellarg, parent);
+                    }; })(emplacement_obj, product_item, craft_spellarg, parent);
             }
         }
     } else { // this product is already equipped
@@ -620,17 +638,19 @@ TurretHeadDialog._remove_turret_head_anti_missile_mod = function(modchain) {
 // operates on turret_head_dialog_stats
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} emplacement_obj it will go onto
-    @param {string} name of the turret head item
-    @param {string|null} relative_to name of another item to compare this one to */
-TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, relative_to) {
-    var spec = ItemDisplay.get_inventory_item_spec(name);
-    var relative_spec = (relative_to ? ItemDisplay.get_inventory_item_spec(relative_to) : null);
+    @param {!Object} item - the turret head item
+    @param {Object|null} relative_to - another turret head item to compare this one to */
+TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, relative_to) {
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    var level = ItemDisplay.get_inventory_item_level(item);
+    var relative_spec = (relative_to ? ItemDisplay.get_inventory_item_spec(relative_to['spec']) : null);
+    var relative_level = (relative_to ? ItemDisplay.get_inventory_item_level(relative_to) : -1);
 
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);
     // main icon
     ItemDisplay.set_inventory_item_asset(dialog.widgets['icon'], spec);
 
-    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], {'spec':spec['name']});
+    ItemDisplay.attach_inventory_item_tooltip(dialog.widgets['frame'], item);
 
     var spell = ItemDisplay.get_inventory_item_weapon_spell(spec);
     var relative_spell = (relative_to ? ItemDisplay.get_inventory_item_weapon_spell(relative_spec) : null);
@@ -667,8 +687,8 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
 
             // grab the stat from the emplacement, if it has it. This might not work if there's overlap
             // between modstats that apply to emplacements (?)
-            var modchain = emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, spec, spec['level'] || 1), {'level':spec['level'] || 1});
-            var relative_modchain = (relative_to ? emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_spec['level'] || 1), {'level':relative_spec['level'] || 1}) : null);
+            var modchain = emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, spec, level), {'level':level});
+            var relative_modchain = (relative_to ? emplacement_obj.modstats[stat] || ModChain.make_chain(ModChain.get_base_value(stat, relative_spec, relative_level), {'level':relative_level}) : null);
 
             ModChain.display_label_widget(left, stat, spell, true);
 
@@ -676,7 +696,7 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
                 // strip off anti-missile mods from any other turret head (but leave alone mods from leader items etc)
                 modchain = TurretHeadDialog._remove_turret_head_anti_missile_mod(modchain);
                 modchain = TurretHeadDialog._add_anti_missile_mod(modchain, spec);
-                if(relative_modchain) {
+                if(relative_modchain && relative_spec) {
                     relative_modchain = TurretHeadDialog._remove_turret_head_anti_missile_mod(relative_modchain);
                     relative_modchain = TurretHeadDialog._add_anti_missile_mod(relative_modchain, relative_spec);
                 }
@@ -684,13 +704,13 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, name, rel
 
             var detail = ModChain.display_value_detailed(stat, modchain,
                                                          spec, // ??? emplacement_obj.spec
-                                                         spec['level'] || 1, // ???
-                                                         spell, spec['level'] || 1);
+                                                         level, // ??? emplacement_obj.level
+                                                         spell, level);
 
             var relative_detail = (relative_to ? ModChain.display_value_detailed(stat, relative_modchain,
-                                                                                 relative_spec, // ??? emplacement_obj.spec
-                                                                                 relative_spec['level'] || 1, // ???
-                                                                                 relative_spell, relative_spec['level'] || 1) : null);
+                                                                                 relative_spec,
+                                                                                 relative_level,
+                                                                                 relative_spell, relative_level) : null);
             var bbstr = detail.str;
 
             var is_delta = relative_to && (relative_detail.value != detail.value);

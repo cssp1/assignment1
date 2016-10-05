@@ -930,6 +930,9 @@ def check_crafting_recipe(recname, spec):
                len(gamedata['item_sets'][spec['associated_item_set']]['members']) > 0: # ignore empty item sets that are used only for crafting recipes
                 error |=1; print '%s: has associated_item_set "%s" but its product is not a member of that set' % (recname, spec['associated_item_set'])
 
+    if 'associated_tech' in spec and spec['associated_tech'] not in gamedata['tech']:
+        error |= 1; print '%s: associated_tech "%s" not found in tech.json' % (recname, spec['associated_tech'])
+
     for level in xrange(max_level):
         cost = GameDataUtil.get_leveled_quantity(spec['cost'], level)
         if cost is None: continue # null cost -> not craftable

@@ -16,6 +16,7 @@ goog.require('DamageAttribution');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
 goog.require('WallManager');
+goog.require('ItemDisplay'); // just for get_inventory_item_level()
 goog.require('goog.events');
 goog.require('goog.events.EventTarget');
 goog.require('goog.events.Event');
@@ -896,10 +897,18 @@ World.World.prototype.damage_attribution_key = function(obj) {
         return obj.spec['name'] + ':L' + (obj.level || 1).toString();
     } else if(obj.is_building()) {
         if(obj.is_emplacement()) {
-            var item_specname = obj.turret_head_item();
-            if(item_specname) {
-                // turret_head_whatever_L2 -> turret_head_whatever:L2
-                return item_specname.replace('_L', ':L');
+            var item = obj.turret_head_item();
+            if(item) {
+                // should return something in the form "turret_head_specname:L2"
+
+                var level = ItemDisplay.get_inventory_item_level(item);
+
+                // old-style items like turret_head_whatever_L2 -> turret_head_whatever:L2
+                if(item['spec'].indexOf('_L'+level.toString()) !== -1) {
+                    return item['spec'].replace('_L', ':L');
+                } else {
+                    return item['spec'] + ':L' + level.toString();
+                }
             }
         } else if(obj.is_turret()) {
             return obj.spec['name'] + ':L' + (obj.level || 1).toString();
