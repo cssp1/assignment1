@@ -856,7 +856,7 @@
                            },
 
     "report_confirm": { "ui_title": "Report Chat Abuse",
-                        "ui_description": "Report %target for this chat message?\n\n\"%context\"",
+                        "ui_description": "Report [b]%target[/b] for this chat message?\n\n\"%context\"\n\n[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/88917453-What-is-the-Chat-Abuse-policy-]Click here to read the chat abuse policy[/url][/u][/color].",
                         "ui_button": "Report"
                       },
     "report_sent": { "ui_title": "Report Sent",

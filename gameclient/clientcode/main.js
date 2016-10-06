@@ -15602,8 +15602,14 @@ function invoke_chat_player_context_menu(user_id, alliance_id, ui_name, report_a
     return dialog;
 }
 
-/** @param {!AdvancedChatReportArgs} args */
+/** Go through the main "Report Abuse" dialog first, to show other options like "Report offensive alliance name."
+    @param {!AdvancedChatReportArgs} args */
 function invoke_advanced_chat_report_dialog(args) {
+    invoke_report_abuse_dialog(args.user_id, args);
+}
+
+/** @param {!AdvancedChatReportArgs} args */
+function do_invoke_advanced_chat_report_dialog(args) {
     var s = gamedata['strings']['report_confirm'];
     var ui_context_censored = ChatFilter.censor(args.ui_context);
     return invoke_child_message_dialog(s['ui_title'],
@@ -15624,7 +15630,10 @@ function invoke_advanced_chat_report_dialog(args) {
                                       );
 }
 
-function invoke_report_abuse_dialog(user_id) {
+/** @param {number} user_id
+    @param {AdvancedChatReportArgs|null=} chat_report_args to hook up the "Report Chat Abuse" button
+    if no chat_report_args are present, then just give the player instructions to use the chat window's report function. */
+function invoke_report_abuse_dialog(user_id, chat_report_args) {
     var dialog_data = gamedata['dialogs']['report_abuse_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
     dialog.user_data['dialog'] = 'report_abuse_dialog';
@@ -15632,18 +15641,25 @@ function invoke_report_abuse_dialog(user_id) {
     dialog.auto_center();
     dialog.modal = true;
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    goog.array.forEach(['chat_abuse', 'hacking', 'alt_accounts', 'other'], function(reason) {
+    goog.array.forEach(['chat_abuse', 'hacking', 'alliance_abuse', 'alt_accounts', 'other'], function(reason) {
         // don't show alt-account info unless in a region
         if(reason == 'alt_accounts' && !session.region.map_enabled()) {
             dialog.widgets[reason+'_button'].show = false;
             return;
         }
-        dialog.widgets[reason+'_button'].onclick = (function (_reason) { return function(w) {
-            var s = w.parent.data['widgets'][reason+'_button'];
-            close_parent_dialog(w);
-            invoke_child_message_dialog(s['ui_name'], s['ui_instructions'].replace('%user_id', user_id.toString()),
-                                        {'dialog': 'message_dialog_big', 'use_bbcode': true});
-        }; })(reason);
+        if(reason == 'chat_abuse' && chat_report_args) {
+            dialog.widgets[reason+'_button'].onclick = (function (_chat_report_args) { return function(w) {
+                close_parent_dialog(w);
+                do_invoke_advanced_chat_report_dialog(/** @type {!AdvancedChatReportArgs} */ (_chat_report_args));
+            }; })(chat_report_args);
+        } else {
+            dialog.widgets[reason+'_button'].onclick = (function (_reason) { return function(w) {
+                var s = w.parent.data['widgets'][reason+'_button'];
+                close_parent_dialog(w);
+                invoke_child_message_dialog(s['ui_name'], s['ui_instructions'].replace('%user_id', user_id.toString()),
+                                            {'dialog': 'message_dialog_big', 'use_bbcode': true});
+            }; })(reason);
+        }
     });
 }
 
