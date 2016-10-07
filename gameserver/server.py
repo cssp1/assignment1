@@ -219,6 +219,7 @@ def is_valid_alliance_tag(tag):
                 return False
         if chat_filter.is_bad(tag): return False
         if tag.lower() in gamedata['client']['chat_filter']['bad_words']: return False
+        if tag.lower() in gamedata['client']['chat_filter']['bad_tags']: return False
     return True
 
 def is_valid_alias(name):
