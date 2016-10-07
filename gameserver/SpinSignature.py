@@ -28,6 +28,8 @@ class AnonID (object):
 
     @classmethod
     def create(cls, expire_time, ip_addr, frame_platform, secret, salt):
+        # handle IPv6 addresses
+        ip_addr = ip_addr.replace(':','.')
         tosign = ':'.join(['%d' % expire_time, ip_addr, frame_platform, salt])
         return base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest()) + '|' + tosign
     @classmethod
@@ -35,6 +37,7 @@ class AnonID (object):
         if (not input) or ('|' not in input) or len(input) < 10: return False
         sig, tosign = input.split('|')
         s_expire_time, s_ip_addr, s_frame_platform, s_salt = tosign.split(':')
+        s_ip_addr = s_ip_addr.replace('.',':')
         if int(s_expire_time) > time_now and s_ip_addr == ip_addr and s_frame_platform == frame_platform:
             if sig == base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest()):
                 return True
