@@ -3024,6 +3024,8 @@ class PortraitEndpoint(twisted.web.resource.Resource):
                 origin = SpinHTTP.get_twisted_header(request, 'origin')
             else:
                 origin = SpinHTTP.get_twisted_header(request, 'host')
+            # fix CDN retrievals from -raw servers
+            origin = origin.replace('-raw.spinpunch.com', '.spinpunch.com')
             if origin:
                 listen_host = SpinConfig.config['proxyserver'].get('external_listen_host','')
                 # XXX this may cause problems if we ever have proxyserver listen on different origins
