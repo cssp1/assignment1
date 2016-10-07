@@ -36,7 +36,11 @@ class AnonID (object):
     def verify(cls, input, time_now, ip_addr, frame_platform, secret):
         if (not input) or ('|' not in input) or len(input) < 10: return False
         sig, tosign = input.split('|')
-        s_expire_time, s_ip_addr, s_frame_platform, s_salt = tosign.split(':')
+        fields = tosign.split(':')
+        if len(fields) != 4:
+            return False
+        s_expire_time, s_ip_addr, s_frame_platform, s_salt = fields
+        # handle IPv6 addresses
         s_ip_addr = s_ip_addr.replace('.',':')
         if int(s_expire_time) > time_now and s_ip_addr == ip_addr and s_frame_platform == frame_platform:
             if sig == base64.urlsafe_b64encode(hmac.new(str(secret), msg=tosign, digestmod=hashlib.sha256).digest()):
