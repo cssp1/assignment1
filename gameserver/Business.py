@@ -82,6 +82,19 @@ class EnhanceBusiness(SingleBusiness):
         self.enhance_state = state['enhance']
     def describe_state(self): return 'enhance,%s,L%d' % (self.enhance_state['spec'], self.enhance_state['level'])
 
+class RemoveBusiness(SingleBusiness):
+    def __init__(self, remove_state = None, *args, **kwargs):
+        SingleBusiness.__init__(self, *args, **kwargs)
+        self.remove_state = remove_state
+    def persist_state(self):
+        ret = SingleBusiness.persist_state(self)
+        ret['remove'] = self.remove_state
+        return ret
+    def unpersist_state(self, state):
+        SingleBusiness.unpersist_state(self, state)
+        self.remove_state = state['remove']
+    def describe_state(self): return 'remove'
+
 class QueuedBusiness(AbstractBusiness):
     def __init__(self, klass):
         self.klass = klass

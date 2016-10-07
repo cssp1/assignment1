@@ -6284,7 +6284,7 @@ class Aura (object):
                         return True
         return False
 
-class GameObject:
+class GameObject(object):
     VIRTUAL_ID = 'VIRTUAL' # stand-in obj_id for "virtual" units
     # note that the client also has a DEAD_ID (='DEAD') for dead units,
     # but that corresponds to a unit that simply doesn't exist server-side,
@@ -6539,15 +6539,55 @@ class Mobile(GameObject):
                     return True
         return False
 
-class Inert(GameObject):
+class MapBlockingGameObject(GameObject):
+    # note: this is a recent addition, Inert/Building used to inherit directly from GameObject
+    # not all appropriate fields have been carried over yet
+    def __init__(self, *args, **kwargs):
+        GameObject.__init__(self, *args, **kwargs)
+        self.removing = None
+    def serialize_state(self, update_hp = True, update_xy = True):
+        return GameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + \
+               [self.removing.serialize_state() if self.removing else None]
+    def persist_state(self, **args):
+        ret = GameObject.persist_state(self, **args)
+        if self.removing: ret['removing'] = self.removing.persist_state()
+        return ret
+    def unpersist_state(self, state):
+        GameObject.unpersist_state(self, state)
+        if 'removing' in state:
+            self.removing = Business.reconstitute(Business.RemoveBusiness, state['removing'])
+    def is_removing(self):
+        return bool(self.removing)
+    def halt_removing(self):
+        if self.removing:
+            return self.removing.halt(server_time)
+        return False
+    def update_removing(self, undamaged_time):
+        if not self.removing: return False
+        return self.removing.resume(undamaged_time, server_time)
+    def activity_finish_time(self):
+        if self.is_removing():
+            ret = self.removing.total_time - self.removing.done_time
+            if self.removing.start_time > 0:
+                ret -= max(0, server_time - self.removing.start_time)
+            return max(0, ret)
+        return -1
+    def activity_speedup_kind(self):
+        if self.is_removing():
+            return 'remove'
+        return None
+    def update_all(self, undamaged_time = -1):
+        self.update_removing(undamaged_time)
+
+class Inert(MapBlockingGameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, metadata=None):
-        GameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
+        MapBlockingGameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
         self.metadata = metadata
         self.creation_time = -1
     def serialize_state(self, update_hp = True, update_xy = True):
-        return GameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.metadata,]
+        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.metadata,]
     def persist_state(self, **args):
-        ret = GameObject.persist_state(self, **args)
+        ret = MapBlockingGameObject.persist_state(self, **args)
         if self.metadata:
             ret['metadata'] = self.metadata
         if self.creation_time != -1:
@@ -6555,17 +6595,17 @@ class Inert(GameObject):
         return ret
 
     def unpersist_state(self, state):
-        GameObject.unpersist_state(self, state)
+        MapBlockingGameObject.unpersist_state(self, state)
         self.metadata = state.get('metadata', None)
         self.creation_time = state.get('creation_time', -1)
 
 # note: "produce" means "accumulate resource over time"
 # "manufacture" means "make mobile units" (even though this is called "Production" in the GUI)
 
-class Building(GameObject):
+class Building(MapBlockingGameObject):
 
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras):
-        GameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
+        MapBlockingGameObject.__init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras)
         self.repair_finish_time = -1
 
         # for turrets, 'disarmed' flag gets set when repairs are initiated, and cleared when fully repaired
@@ -6621,14 +6661,14 @@ class Building(GameObject):
         return ModChain.get_stat(self.modstats.get(stat, None), default_value)
 
     def heal_to_full(self):
-        GameObject.heal_to_full(self)
+        MapBlockingGameObject.heal_to_full(self)
         self.disarmed = False
 
     def serialize_state(self, update_hp = True, update_xy = True):
-        return GameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None]
+        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None]
 
     def persist_state(self, **args):
-        ret = GameObject.persist_state(self, **args)
+        ret = MapBlockingGameObject.persist_state(self, **args)
         if self.repair_finish_time > 0:
             ret['repair_finish_time'] = self.repair_finish_time
         if self.build_total_time > 0:
@@ -6663,7 +6703,7 @@ class Building(GameObject):
         return ret
 
     def unpersist_state(self, state):
-        GameObject.unpersist_state(self, state)
+        MapBlockingGameObject.unpersist_state(self, state)
         self.repair_finish_time = state.get('repair_finish_time',-1)
         self.disarmed = state.get('disarmed', False)
         self.produce_start_time = state.get('produce_start_time', -1)
@@ -6788,7 +6828,7 @@ class Building(GameObject):
         self.produce_rate = -1
 
         # now restart production
-        if self.is_damaged() or self.is_upgrading() or self.is_under_construction() or self.is_enhancing() or (self.contents >= capacity):
+        if self.is_damaged() or self.is_upgrading() or self.is_under_construction() or self.is_enhancing() or self.is_removing() or (self.contents >= capacity):
             # can't make anything
             return
 
@@ -6860,6 +6900,7 @@ class Building(GameObject):
         disrupted |= self.halt_build()
         disrupted |= self.halt_upgrade()
         disrupted |= self.halt_enhancing()
+        disrupted |= self.halt_removing() # halt removing?
         self.halt_manuf()
         self.halt_crafting(False)
         return disrupted
@@ -6913,6 +6954,7 @@ class Building(GameObject):
 
     # note! does not update_production! (should it?)
     def update_all(self, undamaged_time = -1):
+        MapBlockingGameObject.update_all(self, undamaged_time)
         self.update_repair()
         self.update_research(undamaged_time)
         self.update_upgrade(undamaged_time)
@@ -7060,6 +7102,11 @@ class Building(GameObject):
             if self.enhancing.start_time > 0:
                 ret -= max(0, server_time - self.enhancing.start_time)
             return max(0, ret)
+        elif self.is_removing():
+            ret = self.removing.total_time - self.removing.done_time
+            if self.removing.start_time > 0:
+                ret -= max(0, server_time - self.removing.start_time)
+            return max(0, ret)
         elif self.is_under_construction():
             if self.build_start_time > 0:
                 return self.build_start_time + (self.build_total_time - self.build_done_time)
@@ -7086,6 +7133,8 @@ class Building(GameObject):
             return 'upgrade,level%d' % (self.level+1)
         elif self.is_enhancing():
             return 'enhance,' + self.enhancing.describe_state()
+        elif self.is_removing():
+            return 'remove,' + self.removing.describe_state()
         elif self.is_under_construction():
             return 'construct'
         elif self.is_researching():
@@ -7106,6 +7155,8 @@ class Building(GameObject):
             return 'building_upgrade'
         elif self.is_enhancing():
             return 'building_enhance'
+        elif self.is_removing():
+            return 'remove'
         elif self.is_researching():
             return 'tech_research'
         elif self.is_manufacturing():
@@ -7117,12 +7168,12 @@ class Building(GameObject):
 
     def is_busy(self):
         return self.is_repairing() or \
-               self.is_under_construction() or self.is_upgrading() or self.is_enhancing() or \
+               self.is_under_construction() or self.is_upgrading() or self.is_enhancing() or self.is_removing() or \
                self.is_researching() or self.is_manufacturing() or \
                (self.is_crafting() and self.crafting_time_left_all() > 0)
 
     def is_using_foreman(self):
-        if self.is_under_construction() or self.is_upgrading() or self.is_enhancing(): return True
+        if self.is_under_construction() or self.is_upgrading() or self.is_enhancing(): return True # removing does not use foreman
         # check for in-progress crafting tasks that need a foreman
         if self.is_crafting():
             for entry in self.crafting.queue:
@@ -7410,7 +7461,7 @@ class Base(object):
             for obj in self.iter_objects():
                 if obj.is_building() and (not obj.is_under_construction()):
                     # power production
-                    if (not obj.is_damaged()) and (not obj.is_upgrading()) and (not obj.is_enhancing()):
+                    if (not obj.is_damaged()) and (not obj.is_upgrading()) and (not obj.is_enhancing()) and (not obj.is_removing()):
                         power[0] += obj.get_leveled_quantity(obj.spec.provides_power)
                     # power consumption
                     if obj.is_upgrading():
@@ -10292,7 +10343,7 @@ class Player(AbstractPlayer):
     def region_map_building_is_busy(self):
         region_map_building = self.find_object_by_type(gamedata['region_map_building'])
         if (not region_map_building) or \
-           ((region_map_building.is_under_construction() or region_map_building.is_upgrading() or region_map_building.is_enhancing()) and (not self.get_any_abtest_value('region_map_available_during_transmitter_upgrade', gamedata['territory']['region_map_available_during_transmitter_upgrade']))) or \
+           ((region_map_building.is_under_construction() or region_map_building.is_upgrading() or region_map_building.is_enhancing() or region_map_building.is_removing()) and (not self.get_any_abtest_value('region_map_available_during_transmitter_upgrade', gamedata['territory']['region_map_available_during_transmitter_upgrade']))) or \
            (region_map_building.is_damaged() and (not self.get_any_abtest_value('region_map_available_during_transmitter_repair', gamedata['territory']['region_map_available_during_transmitter_repair']))):
             return True
         return False
@@ -10300,7 +10351,7 @@ class Player(AbstractPlayer):
          if self.get_any_abtest_value('enable_inventory', gamedata['enable_inventory']):
              warehouse = self.find_object_by_type(gamedata['inventory_building'])
              if (not warehouse) or \
-                ((warehouse.is_under_construction() or warehouse.is_upgrading() or warehouse.is_enhancing()) and (not self.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata.get('inventory_available_during_warehouse_upgrade',False)))) or \
+                ((warehouse.is_under_construction() or warehouse.is_upgrading() or warehouse.is_enhancing() or warehouse.is_removing()) and (not self.get_any_abtest_value('inventory_available_during_warehouse_upgrade', gamedata.get('inventory_available_during_warehouse_upgrade',False)))) or \
                 (warehouse.is_damaged() and (not self.get_any_abtest_value('inventory_available_during_warehouse_repair', gamedata.get('inventory_available_during_warehouse_repair',False)))):
                  return True
          return False
@@ -10308,14 +10359,14 @@ class Player(AbstractPlayer):
          if self.squads_enabled():
              bay = self.find_object_by_type(gamedata['squad_building'])
              if (not bay) or \
-                ((bay.is_under_construction() or bay.is_upgrading() or bay.is_enhancing()) and (not self.get_any_abtest_value('squads_available_during_squad_bay_upgrade', gamedata.get('squads_available_during_squad_bay_upgrade',0)))) or \
+                ((bay.is_under_construction() or bay.is_upgrading() or bay.is_enhancing() or bay.is_removing()) and (not self.get_any_abtest_value('squads_available_during_squad_bay_upgrade', gamedata.get('squads_available_during_squad_bay_upgrade',0)))) or \
                 (bay.is_damaged() and (not self.get_any_abtest_value('squads_available_during_squad_bay_repair', gamedata.get('squads_available_during_squad_bay_repair',0)))):
                  return True
          return False
     def lottery_is_busy(self, scanner):
          if self.get_any_abtest_value('enable_lottery', gamedata['enable_lottery']):
              if (not scanner) or \
-                ((scanner.is_under_construction() or scanner.is_upgrading() or scanner.is_enhancing()) and (not self.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata.get('lottery_available_during_scanner_upgrade',False)))) or \
+                ((scanner.is_under_construction() or scanner.is_upgrading() or scanner.is_enhancing() or scanner.is_removing()) and (not self.get_any_abtest_value('lottery_available_during_scanner_upgrade', gamedata.get('lottery_available_during_scanner_upgrade',False)))) or \
                 (scanner.is_damaged() and (not self.get_any_abtest_value('lottery_available_during_scanner_repair', gamedata.get('lottery_available_during_scanner_repair',False)))):
                  return True
          return False
@@ -15870,6 +15921,9 @@ class Store(object):
             elif object.is_enhancing():
                 object.enhancing.speedup()
                 speedup_type = 'enhance'
+            elif object.is_removing():
+                object.removing.speedup()
+                speedup_type = 'remove'
             elif object.is_under_construction():
                 assert object.build_start_time > 0
                 object.build_done_time = object.build_total_time
@@ -18239,7 +18293,7 @@ class GAMEAPI(resource.Resource):
         # simulate passage of time for repairs
         session.viewing_player.unit_repair_tick()
         for obj in session.viewing_base.iter_objects():
-            if obj.is_building():
+            if obj.is_building() or obj.is_inert():
                 # simulate passage of time for repairs, and also
                 # kickstart research and upgrading if it got stopped for some reason, and the building is at full health
                 obj.update_all()
@@ -19791,14 +19845,14 @@ class GAMEAPI(resource.Resource):
     @admin_stats.measure_latency('do_ping_object')
     def do_ping_object(self, session, retmsg, object, base, force_write = False):
 
-            if not object.is_building():
-                # no need to ping objects that aren't buildings
+            if not (object.is_building() or object.is_inert()):
+                # no need to ping objects that aren't buildings or inerts
                 return
 
             if object.owner is not session.player:
                 # ping should be very cautious on objects not owned by player at his own base
                 # since this case is brand new code. Be conservative and only answer "repair" pings.
-                if object.is_repairing():
+                if object.is_building() and object.is_repairing():
                     pass
                 else:
                     return
@@ -19812,7 +19866,7 @@ class GAMEAPI(resource.Resource):
             xp = 0
             xp_why = []
 
-            if object.is_repairing():
+            if object.is_building() and object.is_repairing():
                 if server_time >= object.repair_finish_time:
                     # object fully repaired
                     did_a_repair = True
@@ -19822,7 +19876,7 @@ class GAMEAPI(resource.Resource):
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     object.update_all(undamaged_time)
 
-            if object.is_under_construction() and (object.owner is session.player):
+            if object.is_building() and object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
                 if object.build_start_time >= 0:
                     prog += (server_time - object.build_start_time)
@@ -19849,7 +19903,7 @@ class GAMEAPI(resource.Resource):
                         if object.spec.track_level_in_player_history:
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
 
-            if object.is_upgrading() and (object.owner is session.player):
+            if object.is_building() and object.is_upgrading() and (object.owner is session.player):
                 prog = object.upgrade_done_time
                 if object.upgrade_start_time >= 0:
                     prog += (server_time - object.upgrade_start_time)
@@ -19880,14 +19934,21 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
                     session.user.create_fb_open_graph_action_building_upgrade(object)
 
-            if object.is_enhancing() and (object.owner is session.player):
+            if object.is_building() and object.is_enhancing() and (object.owner is session.player):
                 if object.update_enhancing(-1):
                     # enhancing complete
                     did_an_upgrade = True # run same metrics as upgrades
                     object.enhancing = None
                     assert 0 # XXX not implemented yet
 
-            if object.is_researching() and (object.owner is session.player):
+            if object.is_removing() and (object.owner is session.player):
+                if object.update_removing(-1):
+                    # removing complete
+                    did_an_upgrade = True # run same metrics as upgrades
+                    object.removing = None
+                    gamesite.exception_log.event(server_time, "REMOVING COMPLETE")
+
+            if object.is_building() and object.is_researching() and (object.owner is session.player):
                 prog = object.research_done_time
                 if object.research_start_time >= 0:
                     prog += (server_time - object.research_start_time)
@@ -19908,14 +19969,14 @@ class GAMEAPI(resource.Resource):
                     if spec.completion:
                         session.execute_consequent_safe(spec.get_leveled_quantity(spec.completion, current+1), session.player, retmsg, reason='tech:completion')
 
-            if object.is_crafting() and (object.owner is session.player):
+            if object.is_building() and object.is_crafting() and (object.owner is session.player):
                 if object.update_crafting(-1):
                     # crafting is complete
                     # collect now if auto_collect applies
                     if gamedata['crafting']['categories'][gamedata['crafting']['recipes'][object.crafting.queue[0].craft_state['recipe']]['crafting_category']].get('auto_collect',True):
                         self.do_collect_craft(session, retmsg, object)
 
-            if object.is_manufacturing() and (object.owner is session.player):
+            if object.is_building() and object.is_manufacturing() and (object.owner is session.player):
                 did_a_manufacture |= self.do_ping_manufacturing(session, retmsg, base, object)
 
             if did_finish_construction or did_an_upgrade:
@@ -20035,6 +20096,12 @@ class GAMEAPI(resource.Resource):
                 return
             if (finish_time - server_time) <= free_time:
                 object.enhancing.speedup()
+        elif object.is_removing():
+            finish_time = object.removing.finish_time()
+            if finish_time < 0:
+                return
+            if (finish_time - server_time) <= free_time:
+                object.removing.speedup()
         elif object.is_manufacturing():
             # note: this only speeds up if ALL queued units fit in free_time
             # and there is no unit queued which has the no_free_speedup flag
@@ -20458,7 +20525,7 @@ class GAMEAPI(resource.Resource):
                                 return False
 
         # check workshop business
-        if object.is_damaged() or object.is_upgrading() or object.is_enhancing() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
+        if object.is_damaged() or object.is_upgrading() or object.is_enhancing() or object.is_removing() or object.is_under_construction() or object.is_researching() or object.is_manufacturing():
             if retmsg is not None: retmsg.append(["ERROR", "WORKSHOP_IS_BUSY", object.obj_id])
             return False
 
@@ -20956,7 +21023,8 @@ class GAMEAPI(resource.Resource):
         else:
             finish_time = server_time + build_time
 
-        newobj = instantiate_object_for_player(session.player, EnvironmentOwner if spec.kind == 'inert' else session.player,
+        newobj = instantiate_object_for_player(session.player,
+                                               EnvironmentOwner if (spec.kind == 'inert' and "REMOVE_OBSTACLE" not in spec.spells) else session.player,
                                                building_type, x=j, y=i, build_finish_time=finish_time)
 
         if build_time < 1 and spec.kind != 'inert':
@@ -20987,7 +21055,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
             return
 
-        if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading() or object.is_enhancing()):
+        if object.is_building() and (object.is_repairing() or object.is_under_construction() or object.is_upgrading() or object.is_enhancing() or object.is_removing()):
             retmsg.append(["ERROR", "CANNOT_MOVE_BUILDING_WHILE_BUSY"])
             return
 
@@ -21033,7 +21101,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "FACTORY_DAMAGED"])
             return
 
-        if object.is_upgrading() or object.is_enhancing():
+        if object.is_upgrading() or object.is_enhancing() or object.is_removing():
             retmsg.append(["ERROR", "FACTORY_IS_UPGRADING"])
             return
 

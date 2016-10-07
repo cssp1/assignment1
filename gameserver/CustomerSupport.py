@@ -750,7 +750,7 @@ class HandleResolveHomeRaid(Handler):
             session.send([["UNIT_REPAIR_UPDATE", defender_player.unit_repair_queue]])
 
         for obj in defender_player.home_base_iter():
-            if obj.is_building():
+            if obj.is_building() or obj.is_inert():
                 # simulate passage of time for repairs, and also
                 # kickstart research and upgrading if it got stopped for some reason, and the building is at full health
                 obj.update_all()
