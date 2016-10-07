@@ -6730,7 +6730,7 @@ player.is_building_location_valid_detailed = function(ji, spec, myself, options)
 
     for(var id in world.objects.objects) {
         var obj = world.objects.objects[id];
-        if(obj !== myself && obj.is_building()) {
+        if(obj !== myself && (obj.is_building() || (obj.is_inert() && obj.spec['blocks_buildings']))) {
             var hisbound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
             // if OTHER object has an exclusion zone, then apply OUR exclusion zone
             var b = (obj.spec['exclusion_zone'] ? excl_bound : bound);
@@ -40014,6 +40014,17 @@ function build_dialog_change_category(dialog, category) {
             dialog.user_data['speclist'].push(name);
         }
     }
+    dialog.user_data['speclist'].sort(function(a, b) {
+        // first sort by ui_priority high to low
+        var ui_priority_a = gamedata[(a in gamedata['buildings'] ? 'buildings' : 'inert')][a]['ui_priority'] || 0;
+        var ui_priority_b = gamedata[(b in gamedata['buildings'] ? 'buildings' : 'inert')][b]['ui_priority'] || 0;
+        if(ui_priority_a < ui_priority_b) {
+            return 1;
+        } else if(ui_priority_a > ui_priority_b) {
+            return -1;
+        }
+        return 0;
+    });
     build_dialog_scroll(dialog, 0);
 }
 
