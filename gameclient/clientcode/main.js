@@ -14070,7 +14070,7 @@ BuildUICursor.prototype.draw = function(offset) {
     // draw blocked building locations
     SPUI.ctx.fillStyle = 'rgba(255,0,0,0.25)';
     world.objects.for_each(function(obj) {
-        if(obj != selection.unit && obj.is_building() || (obj.is_inert() && obj.spec['unit_collision_gridsize'][0] != 0)) {
+        if(obj != selection.unit && obj.is_building() || (obj.is_inert() && (obj.spec['blocks_buildings'] || obj.spec['unit_collision_gridsize'][0] != 0))) {
             var bound = get_grid_bounds([obj.x,obj.y], obj.spec['gridsize']);
             shade_quad([draw_quantize(ortho_to_draw([bound[0][0], bound[1][0]])),
                         draw_quantize(ortho_to_draw([bound[0][1], bound[1][0]])),
