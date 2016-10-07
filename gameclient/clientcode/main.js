@@ -30887,6 +30887,8 @@ var ARMY_DIALOG_BUTTONS = {
             },
     'crafting': { 'production_button': { 'dialog_names': ['crafting_dialog'],
                                          'spells': ['CRAFT_FOR_FREE'],
+                                         // require at least one crafting category that works with the generic crafting GUI
+                                         'require_generic_crafting_category': 1,
                                          'onclick': function(w) {
                                              var _dialog = w.parent.parent;
                                              var category = (('category' in _dialog.user_data) ? _dialog.user_data['category'] : null);
@@ -30941,6 +30943,17 @@ function init_army_dialog_buttons(dialog, mode, my_dialog_name) {
     var use_squads = player.squads_enabled();
     goog.object.forEach(ARMY_DIALOG_BUTTONS[mode], function(data, btn) {
         if(!(btn in dialog.widgets)) { return; }
+
+        if(data['require_generic_crafting_category']) {
+            if(!goog.object.some(gamedata['crafting']['categories'], function(cat) {
+                return !('dialog' in cat);
+            })) {
+                // don't show the "Produce" buttona
+                dialog.widgets[btn].show = false;
+                return;
+            }
+        }
+
         dialog.widgets[btn].show = (use_squads || !data['require_squads']);
         var match = (data['dialog_names'] && goog.array.contains(data['dialog_names'], my_dialog_name));
         dialog.widgets[btn].onclick = (match ? null : data['onclick']);
