@@ -18,7 +18,7 @@ ObstacleDialog.invoke = function(obj) {
     dialog.user_data['obj'] = obj;
     dialog.widgets['title'].str = gamedata['spells']['REMOVE_OBSTACLE_FOR_FREE']['ui_name_long'];
     dialog.widgets['name'].str = obj.spec['ui_name_long'] || obj.spec['ui_name'];
-    dialog.widgets['description'].set_text_bbcode(obj.spec['ui_description_long'] || obj.spec['ui_description']);
+    dialog.widgets['description'].set_text_bbcode(obj.get_leveled_quantity(obj.spec['ui_description_long'] || obj.spec['ui_description']));
     dialog.widgets['use_resources_button'].str = gamedata['spells']['REMOVE_OBSTACLE_FOR_FREE']['ui_name'];
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
