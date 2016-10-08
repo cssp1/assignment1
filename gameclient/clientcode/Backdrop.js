@@ -8,6 +8,8 @@ goog.provide('Backdrop');
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
 */
 
+goog.require('goog.array');
+goog.require('goog.object');
 goog.require('Base');
 goog.require('GameArt');
 goog.require('GameObjectCollection');
@@ -30,7 +32,9 @@ Backdrop.draw_area_bounds = function(ncells) {
 
 
 /** @param {!Base.Base} base
-    @param {!GameObjectCollection.GameObjectCollection} cur_objects */
+    @param {!GameObjectCollection.GameObjectCollection} cur_objects
+    @return {!Array<!PlayfieldText>}
+*/
 Backdrop.draw_scenery = function(base, cur_objects) {
     // draw scenery objects
     var obj_list = [];
@@ -45,7 +49,10 @@ Backdrop.draw_scenery = function(base, cur_objects) {
     obj_list.sort(sort_scene_objects);
 
     // would rather not have to pass World here - using null means scenery objects can't have permanent effects
-    goog.array.forEach(obj_list, function(obj) { draw_building_or_inert(null,obj,1); });
+    var playfield_text_list = goog.array.reduce(obj_list, function(/** !Array<!PlayfieldText> */ ls, obj) {
+        var newtext = draw_building_or_inert(null,obj,1);
+        return (newtext.length > 0 ? ls.concat(newtext) : ls);
+    }, []);
 
     // draw building bases
     if(SPFX.detail >= 2) {
@@ -73,6 +80,8 @@ Backdrop.draw_scenery = function(base, cur_objects) {
             });
         }
     }
+
+    return playfield_text_list;
 }
 
 Backdrop.draw_blank = function() {
@@ -457,23 +466,27 @@ Backdrop.draw_simple = function(is_home_base, is_friendly_base, assetname) {
     @param {!GameObjectCollection.GameObjectCollection} cur_objects
     @param {boolean} is_home_base
     @param {boolean} is_friendly_base
-    @param {boolean} want_scenery */
+    @param {boolean} want_scenery
+    @return {!Array.<!PlayfieldText>}
+*/
 Backdrop.draw = function(base, cur_objects, is_home_base, is_friendly_base, want_scenery) {
     var climate_data = (base && goog.object.getCount(base.base_climate_data) > 0 ?
                         base.base_climate_data : gamedata['climates'][gamedata['default_climate']]);
     var ncells = (base ? base.ncells() : null);
+    /** @type {!Array<!PlayfieldText>} */
+    var ret = [];
 
     if(('backdrop_whole' in climate_data) && base && ncells && (ncells[0].toString()+'x'+ncells[1].toString() in climate_data['backdrop_whole'])) {
         var drawn = Backdrop.draw_whole(base, is_home_base, is_friendly_base, climate_data['backdrop_whole'][ncells[0].toString()+'x'+ncells[1].toString()]);
-        if(drawn && want_scenery) { Backdrop.draw_scenery(base, cur_objects); }
+        if(drawn && want_scenery) { ret = ret.concat(Backdrop.draw_scenery(base, cur_objects)); }
         if(ncells && (!drawn || PLAYFIELD_DEBUG)) { Backdrop.draw_area_bounds(ncells); }
     } else if('backdrop_tiles' in climate_data && base && (SPFX.detail >= 2)) {
         var drawn = Backdrop.draw_tiled(base, is_home_base, is_friendly_base, climate_data['backdrop_tiles']);
-        if(drawn && want_scenery) { Backdrop.draw_scenery(base, cur_objects); }
+        if(drawn && want_scenery) { ret = ret.concat(Backdrop.draw_scenery(base, cur_objects)); }
         if(ncells && (!drawn || PLAYFIELD_DEBUG)) { Backdrop.draw_area_bounds(ncells); }
     } else {
         var drawn = Backdrop.draw_simple(is_home_base, is_friendly_base, climate_data['backdrop']);
-        if(drawn && want_scenery && base) { Backdrop.draw_scenery(base, cur_objects); }
+        if(drawn && want_scenery && base) { ret = ret.concat(Backdrop.draw_scenery(base, cur_objects)); }
         if(ncells) { Backdrop.draw_area_bounds(ncells); }
     }
 
@@ -482,4 +495,6 @@ Backdrop.draw = function(base, cur_objects, is_home_base, is_friendly_base, want
        selection.unit !== player.virtual_units["DEPLOYER"]) {
         base.draw_base_perimeter('pre_deploy');
     }
+
+    return ret;
 };

@@ -49543,6 +49543,9 @@ function do_draw() {
                 ctx['imageSmoothingEnabled'] = true;
             }
 
+            /** @type {!Array.<!PlayfieldText>} */
+            var playfield_text_list = [];
+
             // draw backdrop
             if(get_query_string('nobackdrop') === '1') {
                 Backdrop.draw_blank();
@@ -49550,11 +49553,13 @@ function do_draw() {
                     Backdrop.draw_area_bounds(world.base.ncells());
                 }
             } else {
-                Backdrop.draw(world.base,
-                              world.objects,
-                              (world.base === null || world.base.base_id === player.home_base_id),
-                              (world.base && (world.base.base_landlord_id === session.user_id)),
-                              draw_playfield_objects);
+                playfield_text_list = playfield_text_list.concat(
+                    Backdrop.draw(world.base,
+                                  world.objects,
+                                  (world.base === null || world.base.base_id === player.home_base_id),
+                                  (world.base && (world.base.base_landlord_id === session.user_id)),
+                                  draw_playfield_objects)
+                );
             }
 
             // draw map grid
@@ -49630,9 +49635,6 @@ function do_draw() {
                 });
                 scene.sort(sort_scene_objects);
 
-                /** @type {!Array.<!PlayfieldText>} */
-                var playfield_text_list = [];
-
                 for(var i = 0; i < scene.length; i++) {
                     var obj = scene[i];
                     if(obj.is_mobile()) {
@@ -49646,7 +49648,10 @@ function do_draw() {
                             }
                         }
                     } else if(obj.is_building() || obj.is_inert()) {
-                        playfield_text_list = playfield_text_list.concat(draw_building_or_inert(world, obj, powerfac));
+                        var newtext = draw_building_or_inert(world, obj, powerfac);
+                        if(newtext.length > 0) {
+                            playfield_text_list = playfield_text_list.concat(newtext);
+                        }
                     }
                 }
 
@@ -50350,16 +50355,15 @@ function draw_building_or_inert(world, obj, powerfac) {
         status_text.push(gamedata['strings']['cursors']['repairing']+': '+pretty_print_time(obj.repair_finish_time - server_time));
     }
 
+    var progress = 0;
+
     if((obj.is_building() || obj.is_inert()) && obj.is_removing()) {
-        var progress = obj.remove_progress();
+        progress = obj.remove_progress();
         if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
             status_text.push(gamedata['strings']['cursors']['removing']+': ' + pretty_print_time(obj.remove_time_left()));
         }
-    }
-
-    if(obj.is_building() && (obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() ||
-                             obj.is_researching() || obj.is_manufacturing() || obj.is_crafting())) {
-        var progress = 0;
+    } else if(obj.is_building() && (obj.is_under_construction() || obj.is_upgrading() || obj.is_enhancing() ||
+                                    obj.is_researching() || obj.is_manufacturing() || obj.is_crafting())) {
         if(obj.is_under_construction()) {
             progress = obj.build_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
@@ -50410,14 +50414,14 @@ function draw_building_or_inert(world, obj, powerfac) {
                 status_text.push(s + ': ' + pretty_print_time(obj.manuf_time_left()));
             }
         }
+    }
 
-        if(progress >= 1) {
-            progress = 1;
-            // ping server to see if the action is finished
-            if(obj.team === 'player' && !obj.ping_sent) {
-                send_to_server.func(["PING_OBJECT", obj.id, "action_check", obj.spec['ui_name'], status_text.join('\n')]);
-                obj.ping_sent = true;
-            }
+    if(progress >= 1) {
+        progress = 1;
+        // ping server to see if the action is finished
+        if(obj.team === 'player' && !obj.ping_sent) {
+            send_to_server.func(["PING_OBJECT", obj.id, "action_check", obj.spec['ui_name'], status_text.join('\n')]);
+            obj.ping_sent = true;
         }
     }
 
@@ -50738,8 +50742,7 @@ function draw_building_or_inert(world, obj, powerfac) {
     }
 
     // draw auras and status text
-    if(world && !obj.spec['worth_less_xp']) {
-
+    if(!obj.spec['worth_less_xp']) {
         if(obj.combat_stats.stunned && !obj.is_destroyed()) {
             GameArt.assets['stun_icon'].states['normal'].draw([xy[0]+30+20*count,xy[1]-default_text_height+5], 0, 0);
             count++;
@@ -50747,7 +50750,7 @@ function draw_building_or_inert(world, obj, powerfac) {
 
         for(var i = 0; i < obj.auras.length; i++) {
             var aura = obj.auras[i];
-            if(aura.visual_effect) {
+            if(world && aura.visual_effect) {
                 var pos = obj.interpolate_pos(world);
                 aura.visual_effect.reposition([pos[0], 0, pos[1]]);
             }
