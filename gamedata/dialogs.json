@@ -9058,7 +9058,7 @@
     },
 
     "inventory_context": {
-        "dimensions": [250,160], // note: this gets resized dynamically in height to fit all the body text
+        "dimensions": [250,196], // note: this gets resized dynamically in height to fit all the body text
         "widgets": {
             "buttonbg": { "kind":"SolidRect", "xy":[45,500], "dimensions": [160,73], "color": [0.005,0.01,0.030,0.75]
                           //"outline_color":[1,0.7,0,1], "outline_width":1
@@ -9067,7 +9067,7 @@
                         "bg_image_active": "action_button_134px", "bg_image_passive": "menu_button_134px",
                         "text_size": 13, "text_style": "bold", "ui_tooltip":"", "tooltip_delay":0,
                         "max_tooltip_dimensions": [250,600],
-                        "array": [1,4], "array_offset": [0,36] },
+                        "array": [1,5], "array_offset": [0,36] },
 
 
             "bgrect": { "kind":"StaticImage", "xy":[0,0], "dimensions": [250,80], "asset": "inventory_tip_bg", "bg_image_resizable":1 },
