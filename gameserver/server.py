@@ -5921,6 +5921,7 @@ class GameObjectSpec(Spec):
         ["travel_speed", 0],
         ["gridsize", [0,0]],
         ["unit_collision_gridsize", [0,0]],
+        ["blocks_buildings", 0],
         ["quantize_location", 0],
         ["exclusion_zone", [0,0]],
         ["ignore_perimeter", 0],
@@ -7563,7 +7564,7 @@ class Base(object):
         # check for collisions with other buildings
         if not ignore_collision:
             for obj in self.iter_objects():
-                if (obj is not myself) and obj.is_building():
+                if (obj is not myself) and (obj.is_building() or (obj.is_inert() and obj.spec.blocks_buildings)):
                     hisbound = get_grid_bounds([obj.x,obj.y], obj.spec.gridsize)
                     # if OTHER object has an exclusion zone, then apply OUR exclusion zone
                     if obj.spec.exclusion_zone != [0,0]:
