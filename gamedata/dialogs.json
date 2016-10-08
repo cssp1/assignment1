@@ -2396,16 +2396,16 @@
     },
 
     "obstacle_dialog": {
-        "dimensions": [428,307],
+        "dimensions": [428,322],
         "clip_children": 0,
         "default_button": "use_resources_button",
         "widgets": {
-            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [428,307], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [428,322], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
             "title": { "kind": "TextField", "xy": [24,5], "dimensions": [388, 41], "text_size": 24, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Remove Obstacle" },
             "close_button": { "kind": "ActionButton", "xy": [398,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "sunken": {"kind": "StaticImage", "xy":[10,50], "dimensions":[410,196], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "sunken": {"kind": "StaticImage", "xy":[10,50], "dimensions":[410,211], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
             "name": { "kind": "TextField", "xy": [25,65], "dimensions": [330,65], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
                       "text_color": [1,0.8,0],
@@ -2436,11 +2436,11 @@
                                    "array": [2,1], "array_offset": [66,0] },
             "requirements_text":  { "kind": "TextField", "xy": [200,182], "dimensions": [200,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                                     "text_color": [1,0,0,1], "drop_shadow": 1 },
-            "cost_time_bar": { "kind": "StaticImage", "xy": [100,263], "dimensions": [213,22], "asset": "timer_bar_213px", "state": "offline" },
-            "cost_time_clock": { "kind": "StaticImage", "xy": [91,256], "dimensions": [35,35], "asset": "resource_icon_clock"},
-            "cost_time": { "kind": "TextField", "xy": [131,262], "dimensions": [148,24], "text_size": 13, "text_style": "thick", "drop_shadow": 1},
+            "cost_time_bar": { "kind": "StaticImage", "xy": [100,278], "dimensions": [213,22], "asset": "timer_bar_213px", "state": "offline" },
+            "cost_time_clock": { "kind": "StaticImage", "xy": [91,271], "dimensions": [35,35], "asset": "resource_icon_clock"},
+            "cost_time": { "kind": "TextField", "xy": [131,277], "dimensions": [148,24], "text_size": 13, "text_style": "thick", "drop_shadow": 1},
 
-            "use_resources_button": { "kind": "ActionButton", "xy": [280,260], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
+            "use_resources_button": { "kind": "ActionButton", "xy": [280,275], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
                                       "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Remove" }
         }
     },
