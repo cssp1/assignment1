@@ -476,7 +476,7 @@
         "activate_all_button": "Activate All", "activate_all_button_pending": "Activating...",
         "discard_button": "Discard", "discard_button_pending": "Discarding...",
         "discard_all_button": "Discard All", "discard_all_button_pending": "Discarding...",
-        "refund_button": "Sell", "refund_button_pending": "Selling...",
+        "refund_button": "Sell", "refund_all_button": "Sell All", "refund_button_pending": "Selling...", "refund_all_button_pending": "Selling...",
         "warehouse_busy": "Warehouse busy",
         "building_equip_tooltip": "Use the building Upgrade menu to equip into a building",
         "unit_equip_tooltip": "Use the Research menu to equip onto a unit type"

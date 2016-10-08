@@ -22902,8 +22902,9 @@ function update_mail_dialog_context(dialog) {
 /** If any items in item_list is marked "ui_precious", pop up a confirmation dialog about deleting them.
     Otherwise run the callback immediately.
     @param {!Array.<!Object>} item_list
-    @param {function()} action_cb */
-function confirm_item_delete(item_list, action_cb) {
+    @param {function()} action_cb
+    @param {boolean} multi - operate on entire stack, not just one from each stack */
+function confirm_item_delete(item_list, action_cb, multi) {
     var need_confirm = goog.array.some(item_list, function(item) {
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
         return !!spec['ui_precious'];
@@ -22925,7 +22926,7 @@ function confirm_item_delete(item_list, action_cb) {
         var ui_item_list = goog.array.map(precious_first, function(item) {
             var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
             var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
-            var descr = ('stack' in item ? ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']) : '') + ui_name;
+            var descr = ((multi && 'stack' in item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']) : '') + ui_name;
             return descr;
         });
         invoke_item_delete_confirm_dialog(action_cb, ui_item_list);
@@ -23015,7 +23016,7 @@ function invoke_loot_dialog(msg) {
                                              if(__w.parent) { close_parent_dialog(__w); }
                                              send_to_server.func(["LOOT_BUFFER_RELEASE", player.loot_buffer]);
                                              player.loot_buffer = [];
-                                         }; })(_w));
+                                         }; })(_w), true);
 
                                      }; })(w)});
     };
@@ -23902,7 +23903,12 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
             dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
                                                                          ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
-                                                                         spellname:"INVENTORY_REFUND_ALL"}));
+                                                                         spellname:"INVENTORY_REFUND"}));
+            if(item['stack'] && item['stack'] > 1) { // big stack
+                dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_all_button'],
+                                                                             ui_name_pending:gamedata['strings']['inventory']['refund_all_button_pending'],
+                                                                             spellname:"INVENTORY_REFUND_ALL"}));
+            }
         }
 
         dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
@@ -23972,6 +23978,8 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                 }
             } else if(butt.spellname.indexOf("INVENTORY_TRASH") == 0 || butt.spellname.indexOf("INVENTORY_REFUND") == 0) { // add confirmation prompt
                 var want_refund = (butt.spellname.indexOf("INVENTORY_REFUND") == 0);
+                var multi = (butt.spellname.indexOf("_ALL") != -1);
+
                 if(item['undiscardable']) { // really for tutorial only
                     widget.state = 'disabled';
                     widget.tooltip.str = gamedata['strings']['inventory']['undiscardable_tooltip'];
@@ -23983,30 +23991,30 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     }
                 }
 
-                widget.onclick = (function (_cb, _item, _i, _want_refund) { return function (w) {
+                widget.onclick = (function (_cb, _item, _i, _want_refund, _multi) { return function (w) {
                     var butt = w.parent.user_data['buttons'][_i];
                     var s;
                     if(_want_refund) {
                         s = gamedata['strings']['inventory_confirm_refund'];
                     } else {
-                        s = gamedata['strings']['inventory_confirm_discard_'+(butt.spellname == "INVENTORY_TRASH_ALL" ? 'all':'one')];
+                        s = gamedata['strings']['inventory_confirm_discard_'+(_multi ? 'all':'one')];
                     }
                     var spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
                     var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
-                    var descr = s['ui_description'].replace('%s', ui_name).replace('%d', ('stack' in _item ? ItemDisplay.get_inventory_item_stack_prefix(spec, _item['stack']) : ''));
+                    var descr = s['ui_description'].replace('%s', ui_name).replace('%d', ((_multi && 'stack' in _item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, _item['stack']) : ''));
                     if(_want_refund) {
-                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(spec, _item['stack'] || 1));
+                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(spec, (_multi && 'stack' in _item) ? _item['stack'] : 1));
                     }
                     invoke_child_message_dialog(s['ui_title'].replace('%s', ui_name), descr,
                                                 {'cancel_button': true,
                                                  'ok_button_ui_name': s['ui_button'],
-                                                 'on_ok': (function (__cb, _w, __item) { return function() {
+                                                 'on_ok': (function (__cb, _w, __item, __multi) { return function() {
                                                      // extra layer of confirmation for precious items
                                                      confirm_item_delete([__item], (function (___cb, __w) { return function() {
                                                          ___cb(__w);
-                                                     }; })(__cb, _w));
-                                                 }; })(_cb, w, _item)});
-                }; })(cb, item, i, want_refund);
+                                                     }; })(__cb, _w), __multi);
+                                                 }; })(_cb, w, _item, _multi)});
+                }; })(cb, item, i, want_refund, multi);
             } else {
                 widget.onclick = cb;
             }
