@@ -2086,6 +2086,8 @@ function get_max_level(spec) {
         return spec['max_hp'].length;
     } else if(spec['kind'] === 'building') {
         return spec['build_time'].length;
+    } else if(spec['kind'] === 'inert') {
+        return spec['max_level'] || 1;
     } else if('research_time' in spec) {
         return spec['research_time'].length;
     } else if('craft_time' in spec) {
@@ -20706,7 +20708,7 @@ function invoke_building_context_menu(mouse_xy) {
         dialog.widgets['level'].str += ' ('+gamedata['strings'][obj.is_minefield_armed() ? 'minefield_armed' : 'minefield_not_armed']+')';
     } else if(obj.is_inert() && ('ui_description' in spec)) {
         // this used to be an amount specified in obj.metadata (iron_deposit contents), but we decided to hide it from players
-        dialog.widgets['level'].str = spec['ui_description'].replace('%d', '??');
+        dialog.widgets['level'].str = obj.get_leveled_quantity(spec['ui_description']).replace('%d', '??');
     } else {
         dialog.widgets['level'].str = '';
     }
@@ -47946,7 +47948,11 @@ function create_mouse_tooltip() {
             if(obj.metadata && 'tooltip' in obj.metadata) {
                 str.push(obj.metadata['tooltip']);
             } else {
-                str.push(obj.spec['ui_name'] || obj.spec['name']);
+                str.push(obj.get_leveled_quantity(obj.spec['ui_name'] || obj.spec['name']));
+                var max_level = obj.get_max_ui_level();
+                if(max_level > 1) {
+                    str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', obj.level.toString()).replace('%max', max_level.toString()));
+                }
             }
         }
 
