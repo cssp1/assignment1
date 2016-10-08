@@ -109,7 +109,10 @@ def check_inert(specname, spec):
         if len(spec.get('base_types',[])) < 1:
             error |= 1
             print specname, 'has auto_spawn:1 but has no base_types, please add "base_types": ["home"] to the JSON'
-    error |= require_art_asset(spec['art_asset'], specname)
+
+    art_list = spec['art_asset'] if isinstance(spec['art_asset'], list) else [spec['art_asset'],]
+    for art in art_list:
+        error |= require_art_asset(art, specname)
     if 'continuous_cast' in spec and spec['continuous_cast'] not in gamedata['spells']:
         error |= 1; print specname, 'continuous_cast spell "%s" not found' % (spec['continuous_cast'])
     return error
