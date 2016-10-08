@@ -3614,6 +3614,7 @@ class Session(object):
         self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
+        self.deferred_object_removals = set()
         self.deferred_player_name_update = False
         self.deferred_player_trophies_update = False
 
@@ -5958,6 +5959,11 @@ class GameObjectSpec(Spec):
         ] + resource_fields("cargo") + [
         ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
         ] + resource_fields("specific_pvp_loot_fraction", default = -1) + [
+        ] + resource_fields("remove_cost") + [
+        ["remove_reward_gamebucks", 0],
+        ["remove_time", 0],
+        ["remove_ingredients", None],
+        ["remove_requires", None],
         ["spells", []],
         ["level_determined_by_tech", None],
         ["limit", -1],
@@ -5998,6 +6004,7 @@ class GameObjectSpec(Spec):
         ["auto_spawn", False],
         ["on_destroy", None],
         ["upgrade_completion", None],
+        ["remove_completion", None],
         ["provides_foremen", 0],
         ]
 
@@ -10337,6 +10344,12 @@ class Player(AbstractPlayer):
                     if busy >= self.stattab.total_foremen:
                         return True
 
+        return False
+
+    def remover_is_busy(self):
+        for obj in self.home_base_iter():
+            if (obj.is_building() or obj.is_inert()) and obj.is_removing():
+                return True
         return False
 
     def alliance_building_is_busy(self):
@@ -19867,6 +19880,7 @@ class GAMEAPI(resource.Resource):
             did_an_upgrade = False
             did_a_research = False
             did_a_manufacture = False
+            did_a_remove = False
 
             xp = 0
             xp_why = []
@@ -19949,9 +19963,26 @@ class GAMEAPI(resource.Resource):
             if object.is_removing() and (object.owner is session.player):
                 if object.update_removing(-1):
                     # removing complete
-                    did_an_upgrade = True # run same metrics as upgrades
+                    did_a_remove = True
                     object.removing = None
-                    gamesite.exception_log.event(server_time, "REMOVING COMPLETE")
+
+                    if object.spec.remove_completion:
+                        cons = object.get_leveled_quantity(object.spec.remove_completion)
+                        if cons:
+                            session.execute_consequent_safe(cons, session.player, retmsg, reason='building:remove_completion(%d)' % object.level)
+
+                    if object.is_inert():
+                        dict_increment(session.player.history, 'obstacles_removed', 1)
+
+                    reward_gamebucks = object.get_leveled_quantity(object.spec.remove_reward_gamebucks)
+                    if reward_gamebucks:
+                        session.player.resources.gain_gamebucks(reward_gamebucks, reason='obstacle_removed')
+                        dict_increment(session.player.history, 'obstacle_gamebucks', reward_gamebucks)
+                        session.setvalue_player_metric('gamebucks_balance', session.player.resources.gamebucks, bucket=True, bucket_size=15*60)
+
+                    map_pos = [object.x, object.y] if session.has_object(object.obj_id) else [-1,-1]
+                    retmsg.append(["HARVESTED_RESOURCES", {'gamebucks': reward_gamebucks}, object.obj_id, map_pos, None, None])
+
 
             if object.is_building() and object.is_researching() and (object.owner is session.player):
                 prog = object.research_done_time
@@ -20035,13 +20066,17 @@ class GAMEAPI(resource.Resource):
 
             if did_a_repair or did_finish_construction or did_an_upgrade or did_a_research or did_a_manufacture:
                 self.give_xp_to(session, object.owner, retmsg, xp, ','.join(xp_why), [object.x,object.y], obj_session_id = object.obj_id)
-
-                retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                session.deferred_player_state_update = True
                 base.nosql_write_one(object, 'do_ping_object')
             elif force_write:
                 base.nosql_write_one(object, 'do_ping_object')
 
-            session.deferred_object_state_updates.add(object)
+            if did_a_remove:
+                # postpone actual removal since other code in this
+                # call chain might rely on the object being in the session
+                session.deferred_object_removals.add(object)
+            else:
+                session.deferred_object_state_updates.add(object)
 
     def do_speedup_for_free(self, session, retmsg, object):
         assert object.is_building()
@@ -20877,6 +20912,99 @@ class GAMEAPI(resource.Resource):
         if need_history_update and (object.owner is session.player):
             session.player.send_history_update(retmsg)
 
+    def can_remove_obstacle(self, session, player, object, retmsg = None,
+                            take_resources = True, take_ingredients = True, check_predicates = True):
+
+        # check workshop business
+        if object.is_removing() or (object.is_building() and (object.is_damaged() or object.is_upgrading() or object.is_enhancing() or object.is_under_construction() or object.is_researching() or object.is_manufacturing())):
+            if retmsg is not None: retmsg.append(["ERROR", "OBSTACLE_IS_BUSY", object.obj_id])
+            return False
+
+        # check foreman availability (but not if using "Instant" which will set take_resources false)
+        if take_resources and session.player.remover_is_busy():
+            if retmsg is not None: retmsg.append(["ERROR", "REMOVER_IS_BUSY"])
+            return False
+
+        # check predicates
+        if check_predicates and object.spec.remove_requires:
+            pred = object.get_leveled_quantity(object.spec.remove_requires)
+            if (not player.is_cheater) and (not Predicates.read_predicate(pred).is_satisfied2(session, player, None)):
+                if retmsg is not None: retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", pred])
+                return False
+
+        # check resource cost
+        if take_resources:
+            for res in gamedata['resources']:
+                amount = object.get_leveled_quantity(getattr(object.spec, 'remove_cost_'+res))
+                if (not player.is_cheater) and (getattr(player.resources, res) < amount):
+                    if retmsg is not None: retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), amount])
+                    return False
+
+        # check for ingredient items
+        if take_ingredients and object.spec.remove_ingredients:
+            # have to pre-sum by specname in case there are multiple entries in the array with the same specname
+            by_specname_and_level = {}
+            if isinstance(object.spec.remove_ingredients, list) and len(object.spec.remove_ingredients) >= 1 and \
+               isinstance(object.spec.remove_ingredients[0], list):
+                ingr_list = object.spec.remove_ingredients[object.level-1]
+            else:
+                ingr_list = object.spec.remove_ingredients or []
+            for entry in ingr_list:
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if player.inventory_item_quantity(specname, level = level) < qty:
+                    if retmsg is not None: retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
+                    return False
+
+        return True
+
+    def do_remove_obstacle(self, session, player, retmsg, object,
+                           check_predicates = True, take_resources = True, take_ingredients = True, take_time = True):
+
+        if not self.can_remove_obstacle(session, player, object, retmsg = retmsg,
+                                        check_predicates = check_predicates, take_resources = take_resources, take_ingredients = take_ingredients):
+            return
+
+        # subtract resources
+        if take_resources:
+            cost = dict((res, object.get_leveled_quantity(getattr(object.spec, 'remove_cost_'+res))) for res in gamedata['resources'] \
+                        if object.get_leveled_quantity(getattr(object.spec, 'remove_cost_'+res)) > 0)
+            negative_cost = dict((res,-cost[res]) for res in cost)
+            player.resources.gain_res(negative_cost, reason='crafting')
+            admin_stats.econ_flow_player(player, 'investment', 'obstacle_removal', negative_cost)
+        else:
+            cost = {}
+
+        # subtract ingredients
+        if take_ingredients and object.spec.remove_ingredients:
+            if isinstance(object.spec.remove_ingredients, list) and len(object.spec.remove_ingredients) >= 1 and \
+               isinstance(object.spec.remove_ingredients[0], list):
+                ingr_list = object.spec.remove_ingredients[object.level-1]
+            else:
+                ingr_list = object.spec.remove_ingredients or []
+
+            for entry in ingr_list:
+                player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='remove_obstacle')
+            if player is session.player:
+                session.player.send_inventory_update(retmsg)
+
+        if take_time:
+            remove_time = object.get_leveled_quantity(object.spec.remove_time)
+        else:
+            remove_time = -1
+
+        # start removing
+        state = {'cost':cost}
+        if take_ingredients and object.spec.remove_ingredients: state['ingredients'] = copy.deepcopy(ingr_list)
+
+        object.removing = Business.RemoveBusiness(state, init_total_time = remove_time, init_start_time = server_time)
+
+        session.deferred_object_state_updates.add(object)
+        session.deferred_player_state_update = True
+        return True
+
     def do_create_inert(self, session, retmsg, spellargs):
         # XXX to make inerts work in remote bases, need to prune them
         if session.viewing_base is not session.viewing_player.my_home: return
@@ -21029,7 +21157,7 @@ class GAMEAPI(resource.Resource):
             finish_time = server_time + build_time
 
         newobj = instantiate_object_for_player(session.player,
-                                               EnvironmentOwner if (spec.kind == 'inert' and "REMOVE_OBSTACLE" not in spec.spells) else session.player,
+                                               EnvironmentOwner if (spec.kind == 'inert' and "REMOVE_OBSTACLE_FOR_FREE" not in spec.spells) else session.player,
                                                building_type, x=j, y=i, build_finish_time=finish_time)
 
         if build_time < 1 and spec.kind != 'inert':
@@ -23762,6 +23890,21 @@ class GAMEAPI(resource.Resource):
         if session.deferred_battle_history_update:
             session.deferred_battle_history_update = False
             session.player.send_battle_history_update(retmsg)
+
+        if session.deferred_object_removals:
+            removals = session.deferred_object_removals
+            session.deferred_object_removals = set()
+            for obj in removals:
+                if obj in session.deferred_object_state_updates:
+                    session.deferred_object_state_updates.remove(obj)
+                if session.viewing_base.find_object_by_id(obj.obj_id):
+                    session.viewing_base.drop_object(obj)
+                if session.has_object(obj.obj_id):
+                    retmsg.append(["OBJECT_REMOVED2", obj.obj_id])
+                    session.rem_object(obj.obj_id)
+                if obj.is_building():
+                    session.power_changed(session.viewing_base, obj, retmsg)
+                    session.deferred_player_state_update = True
 
         if session.deferred_object_state_updates:
             updates = session.deferred_object_state_updates
@@ -27281,6 +27424,15 @@ class GAMEAPI(resource.Resource):
                     return
                 self.do_collect_craft(session, retmsg, object, attempt_id_list = spellargs[0])
                 retmsg.append(["OBJECT_STATE_UPDATE2", object.serialize_state()])
+
+            elif spellname == "REMOVE_OBSTACLE_FOR_FREE":
+                if object not in session.player.home_base_iter():
+                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                    return
+                self.do_remove_obstacle(session, session.player, retmsg, object,
+                                        check_predicates = (not session.player.is_cheater),
+                                        take_resources = (not session.player.is_cheater),
+                                        take_ingredients = (not session.player.is_cheater))
 
             elif spellname == "COLLECT_DEPOSIT":
                 if object not in session.player.home_base_iter():

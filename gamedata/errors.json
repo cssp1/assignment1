@@ -19,6 +19,8 @@
     "UNIT_COUNT_LIMIT": { "ui_title": "Unit Count Limit Reached", "ui_name": "You already have the maximum number of this unit in your army" },
     "FOREMAN_IS_BUSY": { "ui_name": "Construction Workers Are Busy" },
     "WORKSHOP_IS_BUSY": { "ui_name": "Workshop is busy" },
+    "OBSTACLE_IS_BUSY": { "ui_name": "Object is busy" },
+    "REMOVER_IS_BUSY": { "ui_name": "Can only remove one obstacle at a time" },
     "CRAFT_INGREDIENT_MISSING": { "ui_name": "Missing ingredients" },
     "LAB_IS_BUSY": { "ui_name": "Laboratory is busy" },
     "LAB_DAMAGED": { "ui_name": "Building repair needed before upgrade or unlock can continue" },

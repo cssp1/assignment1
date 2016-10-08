@@ -63,6 +63,7 @@ goog.require('PlayerInfoDialog');
 goog.require('SquadControlDialog');
 goog.require('SquadManageDialog');
 goog.require('TurretHeadDialog');
+goog.require('ObstacleDialog');
 goog.require('QuestBar');
 goog.require('UpgradeBar');
 goog.require('Base');
@@ -6513,6 +6514,9 @@ player.num_deployed_raids = function() {
 player.foreman_is_busy = function() {
     return player.foremen_in_use() >= player.stattab['total_foremen'];
 };
+/** returns whether or not all removers are in use
+ * @returns {boolean} */
+player.remover_is_busy = function() { return player.removers_in_use() >= 1; };
 
 /** returns a list of buildings that are currently being worked on by a foreman
  * @returns {Array.<GameObject>} */
@@ -6527,10 +6531,23 @@ player.foreman_get_tasks = function() {
 
     return tasks;
 };
-
+/** returns a list of inerts/buildings that are currently being removed
+ * @returns {Array.<GameObject>} */
+player.remover_get_tasks = function() {
+    var tasks = [];
+    session.for_each_real_object(function(obj) {
+        if((obj.is_inert() || obj.is_building()) && obj.is_removing()) {
+            tasks.push(obj);
+        }
+    });
+    return tasks;
+};
 /** returns the number of foreman that are occupied by a task
  * @returns {number} */
 player.foremen_in_use = function() { return player.foreman_get_tasks().length; };
+/** returns the number of removers that are occupied by a task
+ * @returns {number} */
+player.removers_in_use = function() { return player.remover_get_tasks().length; };
 
 player.all_minefields_armed = function() {
     return !session.for_each_real_object(function(obj) {
@@ -20624,9 +20641,16 @@ function invoke_building_context_menu(mouse_xy) {
                     var spell = gamedata['spells']['COLLECT_DEPOSIT'];
                     buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], onclick: collect_func}));
                 }
-            } else if(spellname == "REMOVE_OBSTACLE") {
-                var spell = gamedata['spells'][spellname];
-                buttons.push(new ContextMenuButton({ui_name: spell['ui_name'], onclick: function(w) { throw Error('implement obstacle_dialog'); }}));
+            } else if(spellname == "REMOVE_OBSTACLE_FOR_FREE") {
+                if(obj.is_removing()) {
+                    buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                        onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('removing');}; })(obj)
+                                                       }));
+                } else {
+                    var spell = gamedata['spells'][spellname];
+                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'],
+                                                        onclick: goog.partial(ObstacleDialog.invoke, obj)}));
+                }
             }
         });
     }
@@ -40785,6 +40809,9 @@ function get_requirements_help(kind, arg, options) {
                 // send player to invite friends
                 noun = 'friends';
                 verb = 'invite_for_ingredients';
+            } else if('obtain_ingredients:'+item['spec'] in gamedata['strings']['requirements_help']['crafting']) {
+                // ingredient-specific message
+                verb = 'obtain_ingredients:'+item['spec'];
             }
         });
         ui_arg_s = item_list.join(', ');
