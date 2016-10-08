@@ -6577,6 +6577,10 @@ class MapBlockingGameObject(GameObject):
         if self.is_removing():
             return 'remove'
         return None
+    def activity_description(self, player):
+        if self.is_removing():
+            return 'remove,' + self.removing.describe_state()
+        return 'nothing'
     def update_all(self, undamaged_time = -1):
         self.update_removing(undamaged_time)
 
@@ -7128,14 +7132,14 @@ class Building(MapBlockingGameObject):
         else:
             return -1
     def activity_description(self, player):
+        ret = MapBlockingGameObject.activity_description(self, player)
+        if ret != 'nothing': return ret
         if self.is_repairing():
             return 'repair'
         elif self.is_upgrading():
             return 'upgrade,level%d' % (self.level+1)
         elif self.is_enhancing():
             return 'enhance,' + self.enhancing.describe_state()
-        elif self.is_removing():
-            return 'remove,' + self.removing.describe_state()
         elif self.is_under_construction():
             return 'construct'
         elif self.is_researching():
@@ -7150,14 +7154,14 @@ class Building(MapBlockingGameObject):
         else:
             return 'nothing'
     def activity_speedup_kind(self):
+        ret = MapBlockingGameObject.activity_speedup_kind(self)
+        if ret: return ret
         if self.is_repairing():
             return 'building_repair'
         elif self.is_upgrading() or self.is_under_construction():
             return 'building_upgrade'
         elif self.is_enhancing():
             return 'building_enhance'
-        elif self.is_removing():
-            return 'remove'
         elif self.is_researching():
             return 'tech_research'
         elif self.is_manufacturing():
@@ -15092,7 +15096,7 @@ class Store(object):
             always_free_speedup = False
 
             # check permission to speed up something other than a repair or upgrade
-            if (not unit.is_repairing()) and (not unit.is_upgrading()) and (not unit.is_under_construction()):
+            if unit.is_building() and (not unit.is_repairing()) and (not unit.is_upgrading()) and (not unit.is_under_construction()):
                 if unit.is_manufacturing():
                     if not session.player.unit_speedups_enabled():
                         return -1, p_currency
@@ -15912,34 +15916,34 @@ class Store(object):
 
         if spellname == "SPEEDUP_FOR_MONEY":
             object = session.get_object(unit_id)
-            if object.is_repairing():
+            if object.is_building() and object.is_repairing():
                 object.repair_finish_time = server_time - 1
                 speedup_type = 'repair'
-            elif object.is_upgrading():
+            elif object.is_building() and object.is_upgrading():
                 assert object.upgrade_start_time > 0
                 object.upgrade_done_time = object.upgrade_total_time
                 speedup_type = 'upgrade'
-            elif object.is_enhancing():
+            elif object.is_building() and object.is_enhancing():
                 object.enhancing.speedup()
                 speedup_type = 'enhance'
             elif object.is_removing():
                 object.removing.speedup()
                 speedup_type = 'remove'
-            elif object.is_under_construction():
+            elif object.is_building() and object.is_under_construction():
                 assert object.build_start_time > 0
                 object.build_done_time = object.build_total_time
                 speedup_type = 'construct'
-            elif object.is_researching():
+            elif object.is_building() and object.is_researching():
                 assert object.research_start_time > 0
                 object.research_done_time = object.research_total_time
                 speedup_type = 'research'
-            elif object.is_manufacturing():
+            elif object.is_building() and object.is_manufacturing():
                 assert object.manuf_start_time > 0
                 detail_props['unit_cost'] = cls.get_unit_cost_detail(session, session.player, manuf_queue = object.manuf_queue,
                                                                      manuf_prog = object.manuf_done_time + server_time - object.manuf_start_time)
                 object.manuf_done_time = sum([item['total_time'] for item in object.manuf_queue])
                 speedup_type = 'produce'
-            elif object.is_crafting():
+            elif object.is_building() and object.is_crafting():
                 entry = object.crafting.queue[0]
                 recipe = gamedata['crafting']['recipes'][entry.craft_state['recipe']]
                 time_left = object.crafting.finish_time() - server_time
@@ -19982,7 +19986,7 @@ class GAMEAPI(resource.Resource):
 
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
-                if object.affects_player_stattab():
+                if object.is_building() and object.affects_player_stattab():
                     object.owner.recalc_stattab(session.player)
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)

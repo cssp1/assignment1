@@ -4537,6 +4537,8 @@ function MapBlockingGameObject() {
     /** @type {World.World|null} world we've been added to */
     this.world = null;
 
+    this.sync_marker = Synchronizer.INIT; // for holding the UI until server catches up to a specific request
+
     // NESW neighbor presence - this is how much to ADD to bound size in each direction because of the presence or absence of a neighbor.
     // Only updated by WallManager.
     this.neighbors = [0,0,0,0];
@@ -4547,6 +4549,10 @@ function MapBlockingGameObject() {
 goog.inherits(MapBlockingGameObject, GameObject);
 
 MapBlockingGameObject.prototype.is_blocker = function() { return true; };
+
+MapBlockingGameObject.prototype.request_sync = function() { this.sync_marker = synchronizer.request_sync(); return this.sync_marker; };
+MapBlockingGameObject.prototype.is_in_sync = function() { return synchronizer.is_in_sync(this.sync_marker); };
+
 MapBlockingGameObject.prototype.is_removing = function() {
     return !!this.removing;
 }
@@ -4571,6 +4577,13 @@ MapBlockingGameObject.prototype.remove_time_left = function() {
 MapBlockingGameObject.prototype.remove_progress = function() {
     var bus = this.removing;
     return (bus['done_time'] + (bus['start_time'] > 0 ? (server_time - bus['start_time']) : 0))/bus['total_time'];
+};
+MapBlockingGameObject.prototype.activity_speedup_kind = function() {
+    if(this.is_removing()) {
+        return 'remove';
+    } else {
+        return null;
+    }
 };
 
 /** @override */
@@ -4823,7 +4836,6 @@ function Building() {
     // true if we sent a state ping and are waiting to hear back from server
     this.ping_sent = false;
     this.equip_pending = false; // true if we are waiting to hear back from the server on an equip request XXX use sync_marker
-    this.sync_marker = Synchronizer.INIT; // for holding the UI until server catches up to a specific request
     this.client_predictions = null; // client-side predicted manuf_queue, only non-null if out of sync
 
     // dictionary of data about the object who killed us - used to track between the actual kill and the transmission of the combat update
@@ -4850,9 +4862,6 @@ Building.prototype.apply_snapshot = function(snap) {
     if('disarmed' in snap) { this.disarmed = snap['disarmed']; }
     if('modstats' in snap) { this.modstats = snap['modstats']; }
 };
-
-Building.prototype.request_sync = function() { this.sync_marker = synchronizer.request_sync(); return this.sync_marker; };
-Building.prototype.is_in_sync = function() { return synchronizer.is_in_sync(this.sync_marker); };
 
 Building.prototype.start_client_prediction = function(field, original) {
     this.request_sync();
@@ -5171,6 +5180,8 @@ Building.prototype.time_until_finish = function() {
 };
 
 Building.prototype.activity_speedup_kind = function() {
+    var ret = goog.base(this, 'activity_speedup_kind');
+    if(ret) { return ret; }
     if(this.is_repairing()) {
         return 'building_repair';
     } else if(this.is_upgrading() || this.is_under_construction()) {
@@ -5183,8 +5194,6 @@ Building.prototype.activity_speedup_kind = function() {
         return 'unit_manufacture';
     } else if(this.is_crafting()) {
         return 'crafting';
-    } else if(this.is_removing()) {
-        return 'remove';
     } else {
         return null;
     }
@@ -18908,25 +18917,25 @@ function do_invoke_speedup_dialog(kind) {
     if(min_left < 1) { min_left = 1; }
 
     var description_finish;
-    if(selection.unit.is_repairing()) {
+    if(selection.unit.is_building() && selection.unit.is_repairing()) {
         description_finish = gamedata['strings']['speedup']['finish_repairing'].replace('%s', selection.unit.spec['ui_name']);
-    } else if(selection.unit.is_under_construction()) {
+    } else if(selection.unit.is_building() && selection.unit.is_under_construction()) {
         description_finish = gamedata['strings']['speedup']['finish_building'].replace('%s', selection.unit.spec['ui_name']);
-    } else if(selection.unit.is_upgrading()) {
+    } else if(selection.unit.is_building() && selection.unit.is_upgrading()) {
         description_finish = gamedata['strings']['speedup']['finish_upgrading'].replace('%s', selection.unit.spec['ui_name']);
     } else if(selection.unit.is_removing()) {
         description_finish = gamedata['strings']['speedup']['finish_removing'].replace('%s', selection.unit.spec['ui_name']);
-    } else if(selection.unit.is_enhancing()) {
+    } else if(selection.unit.is_building() && selection.unit.is_enhancing()) {
         // reuse the finish_upgrading text (?)
         description_finish = gamedata['strings']['speedup']['finish_upgrading'].replace('%s', selection.unit.spec['ui_name']);
-    } else if(selection.unit.is_researching()) {
+    } else if(selection.unit.is_building() && selection.unit.is_researching()) {
         var techname = selection.unit.research_item;
         if(techname in player.tech) {
             description_finish = gamedata['strings']['speedup']['finish_tech_upgrade'].replace('%s', gamedata['tech'][selection.unit.research_item]['ui_name']);
         } else {
             description_finish = gamedata['strings']['speedup']['finish_tech_unlock'].replace('%s', gamedata['tech'][selection.unit.research_item]['ui_name']);
         }
-    } else if(selection.unit.is_crafting()) {
+    } else if(selection.unit.is_building() && selection.unit.is_crafting()) {
         if(selection.unit.is_emplacement()) {
             var product = selection.unit.turret_head_inprogress_item();
             var ui_name = ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_inventory_item_spec(product['spec']));
@@ -18934,7 +18943,7 @@ function do_invoke_speedup_dialog(kind) {
         } else {
             description_finish = gamedata['strings']['speedup']['finish_crafting'].replace('%s', selection.unit.spec['ui_name']);
         }
-    } else if(selection.unit.is_manufacturing()) {
+    } else if(selection.unit.is_building() && selection.unit.is_manufacturing()) {
         description_finish = gamedata['strings']['speedup']['finish_manufacturing'].replace('%s', selection.unit.spec['ui_name']);
     } else {
         console.log('Unhandled case in invoke_speedup_dialog()');
@@ -19004,6 +19013,7 @@ function do_invoke_speedup_dialog(kind) {
 
     if(player.tutorial_state === 'speedup_open_speedup_menu' &&
        selection.unit.spec['name'] === gamedata['tutorial'][player.tutorial_state]['target'] &&
+       selection.unit.is_building() &&
        selection.unit.is_under_construction()) {
         advance_tutorial();
     }
@@ -43147,7 +43157,8 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         var allow_free_speedup = true;
         var always_free_speedup = false;
 
-        if(!unit.is_repairing() && !unit.is_upgrading() && !unit.is_under_construction() && !unit.is_enhancing() && !unit.is_removing()) {
+        // check for blockage of free speedups
+        if(unit.is_building() && !unit.is_repairing() && !unit.is_upgrading() && !unit.is_under_construction() && !unit.is_enhancing() && !unit.is_removing()) {
             if(unit.is_manufacturing()) {
                 if(!player.unit_speedups_enabled()) {
                     return [-1, p_currency];
