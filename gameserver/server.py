@@ -4697,17 +4697,17 @@ class Session(object):
             # award XP for each level achieved along the way
             xp = 0
             for step in xrange(current+1, level+1):
-                override = EnhancementSpec.get_leveled_quantity(spec.upgrade_xp, step)
+                override = EnhancementSpec.get_leveled_quantity(spec.xp, step)
                 if override >= 0:
                     xp += override
                 else:
-                    xp += int(gamedata['player_xp']['enhance'] * \
-                              sum((EnhacementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
+                    xp += int(gamedata['player_xp'].get('enhance',0) * \
+                              sum((EnhancementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
 
             gamesite.gameapi.give_xp_to(self, player, retmsg, xp, 'enhance', [obj.x,obj.y], obj.obj_id)
 
         if player is self.player:
-            retmsg.append(["NEW_ENHANCEMENT", obj_id, enh_name, level])
+            retmsg.append(["NEW_ENHANCEMENT", obj.obj_id, enh_name, level])
             self.deferred_stattab_update = True
 
         self.deferred_object_state_updates.add(obj)
@@ -5841,6 +5841,7 @@ class Spec(object):
                 'unit': 'units',
                 'inert': 'inert',
                 'tech': 'tech',
+                'enhancement': 'enhancements',
                 'aura': 'auras' }
 
     # spec quantities that are normally numbers may vary according to object or player level.

@@ -403,7 +403,7 @@ def check_levels(specname, spec):
     ignore = ('limit', 'spells', 'gridsize', 'unit_collision_gridsize', 'exclusion_zone', 'equip_icon_offset', 'elite_marker_offset', 'equip_icon_delta', 'level_flag_offset', 'effects', 'click_bounds',
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
-              'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories',
+              'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
               'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras',
               'upgrade_ingredients', 'remove_ingredients', 'research_ingredients')
     error = 0
@@ -613,7 +613,7 @@ def check_enhancement(specname, keyname, spec, maxlevel):
             for a in asset_list:
                 error |= require_art_asset(a, specname+':'+ASSET)
 
-    if ('associated_building' not in spec) and ('splash_image' not in spec) and ('icon' not in spec):
+    if 0 and ('associated_building' not in spec) and ('splash_image' not in spec) and ('icon' not in spec):
         error |= 1; print '%s: needs either an associated_building, splash_image, or icon for display purposes' % (specname)
 
     if not isinstance(spec['enhance_time'], list):
