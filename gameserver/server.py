@@ -5836,6 +5836,12 @@ class Spec(object):
             return self.remove_ingredients[level-1]
         else:
             return self.remove_ingredients or []
+    def get_upgrade_ingredients_list(self, level):
+        if isinstance(self.upgrade_ingredients, list) and len(self.upgrade_ingredients) >= 1 and \
+           isinstance(self.upgrade_ingredients[0], list):
+            return self.upgrade_ingredients[level-1]
+        else:
+            return self.upgrade_ingredients or []
 
     def __init__(self, name, data):
         self.name = name
@@ -5955,6 +5961,7 @@ class GameObjectSpec(Spec):
         ["build_time", 0],
         ["repair_time", 0],
         ] + resource_fields("build_cost") + [
+        ["upgrade_ingredients", None],
         ["upgrade_credit_cost", -1],
         ["upgrade_speedup_cost_factor", 1],
         ["upgrade_xp",-1],
@@ -6123,6 +6130,7 @@ class TechSpec(Spec):
     fields = [ ["research_credit_cost", 999],
                ] + resource_fields("cost") + [
                ["research_time", 0],
+               ["research_ingredients", None],
                ["upgrade_xp", -1],
                ["proposed_upgrade_xp", -1], # for debug messages only
                ["metric_events", ""],
@@ -6163,6 +6171,13 @@ class TechSpec(Spec):
         if self.affects_unit:
             return GameObjectSpec.lookup(self.affects_unit)
         return None
+
+    def get_research_ingredients_list(self, level):
+        if isinstance(self.research_ingredients, list) and len(self.research_ingredients) >= 1 and \
+           isinstance(self.research_ingredients[0], list):
+            return self.research_ingredients[level-1]
+        else:
+            return self.research_ingredients or []
 
 # load specs from data file
 for name, data in gamedata["buildings"].iteritems():
@@ -6648,11 +6663,13 @@ class Building(MapBlockingGameObject):
         self.upgrade_total_time = -1
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
+        self.upgrade_ingredients = None # doubles as build_ingredients
 
         self.research_item = ''
         self.research_total_time = -1
         self.research_start_time = -1
         self.research_done_time = -1
+        self.research_ingredients = None
 
         # harvester production tracking
         # NOTE: in order to minimize the amount of work the server must do to track state,
@@ -6701,10 +6718,12 @@ class Building(MapBlockingGameObject):
             ret['research_total_time'] = self.research_total_time
             ret['research_start_time'] = self.research_start_time
             ret['research_done_time'] = self.research_done_time
+            ret['research_ingredients'] = copy.deepcopy(self.research_ingredients)
         if self.upgrade_total_time > 0:
             ret['upgrade_total_time'] = self.upgrade_total_time
             ret['upgrade_start_time'] = self.upgrade_start_time
             ret['upgrade_done_time'] = self.upgrade_done_time
+            ret['upgrade_ingredients'] = copy.deepcopy(self.upgrade_ingredients)
         if self.produce_start_time > 0:
             ret['produce_start_time'] = self.produce_start_time
         if self.produce_rate > 0:
@@ -6730,6 +6749,7 @@ class Building(MapBlockingGameObject):
         self.contents = state.get('contents', 0)
 
         self.research_item = state.get('research_item', '')
+        self.research_ingredients = state.get('research_ingredients', None)
 
         # migrate old time tracking formats
         if state.get('research_finish_time', -1) > 0:
@@ -6775,6 +6795,7 @@ class Building(MapBlockingGameObject):
             self.upgrade_total_time = state.get('upgrade_total_time',-1)
             self.upgrade_start_time = state.get('upgrade_start_time',-1)
             self.upgrade_done_time = state.get('upgrade_done_time',-1)
+            self.upgrade_ingredients = state.get('upgrade_ingredients', None)
 
         self.manuf_queue = state.get('manuf_queue', [])
         if len(self.manuf_queue) > 0 and ('manuf_start_time' not in state):
@@ -13075,6 +13096,7 @@ class LivePlayer(Player):
                     if obj.is_building() and obj.is_researcher() and is_mod_tech(obj.research_item):
                         name = obj.research_item
                         obj.research_item = ''
+                        obj.research_ingredients = None
                         obj.research_total_time = -1
                         obj.research_start_time = -1
                         obj.research_done_time = -1
@@ -15355,6 +15377,12 @@ class Store(object):
                             error_reason.append('requires rare resource: %s' % resdata['name'])
                             return -1, p_currency
 
+                    ingr_list = unit.spec.get_upgrade_ingredients_list(unit.level+1)
+                    for ingr in ingr_list:
+                        if not gamedata['items'].get(ingr['spec'], {}).get('allow_instant', True):
+                            error_reason.append('requires ingredient: %r' % ingr)
+                            return -1, p_currency
+
                 price_description.append('level'+str(unit.level+1))
                 price = GameObjectSpec.get_leveled_quantity(unit.spec.upgrade_credit_cost, unit.level+1)
                 if price > 0:
@@ -15428,6 +15456,12 @@ class Store(object):
                         if (not resdata.get('allow_instant', True)) and \
                            TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res, 0), new_level) > 0:
                             error_reason.append('requires rare resource: %s' % resdata['name'])
+                            return -1, p_currency
+
+                    ingr_list = spec.get_research_ingredients_list(new_level)
+                    for ingr in ingr_list:
+                        if not gamedata['items'].get(ingr['spec'], {}).get('allow_instant', True):
+                            error_reason.append('requires ingredient: %r' % ingr)
                             return -1, p_currency
 
                 price_description.append('level'+str(new_level))
@@ -19912,6 +19946,7 @@ class GAMEAPI(resource.Resource):
                     object.build_total_time = -1
                     object.build_start_time = -1
                     object.build_done_time = -1
+                    object.upgrade_ingredients = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     if object.spec.upgrade_completion:
                         cons = object.get_leveled_quantity(object.spec.upgrade_completion)
@@ -19942,6 +19977,7 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_total_time = -1
                     object.upgrade_start_time = -1
                     object.upgrade_done_time = -1
+                    object.upgrade_ingredients = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
                     if object.spec.upgrade_completion:
                         cons = object.get_leveled_quantity(object.spec.upgrade_completion)
@@ -20003,6 +20039,7 @@ class GAMEAPI(resource.Resource):
                     tech_name = object.research_item
                     current = object.owner.tech.get(tech_name, 0)
                     object.research_item = ''
+                    object.research_ingredients = None
                     object.research_total_time = -1
                     object.research_start_time = -1
                     object.research_done_time = -1
@@ -20193,13 +20230,22 @@ class GAMEAPI(resource.Resource):
 
         # figure out how many resources to return to player
         refund = dict((res,int(gamedata['upgrade_cancel_refund']*GameObjectSpec.get_leveled_quantity(getattr(object.spec, 'build_cost_'+res), object.level+1))) for res in gamedata['resources'])
+        ingr_list = object.upgrade_ingredients
 
         object.upgrade_total_time = -1
         object.upgrade_start_time = -1
         object.upgrade_done_time = -1
+        object.upgrade_ingredients = None
 
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
         admin_stats.econ_flow_player(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
+
+        if ingr_list:
+            session.player.loot_buffer += ingr_list
+            for item in ingr_list:
+                session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='refund')
+            session.player.send_inventory_update(retmsg)
+            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
 
         power_factor = session.power_changed(session.viewing_base, object, retmsg)
 
@@ -20253,9 +20299,33 @@ class GAMEAPI(resource.Resource):
         if fail:
             return
 
+        # check for ingredient items
+        if object.spec.upgrade_ingredients:
+            # have to pre-sum by specname in case there are multiple entries in the array with the same specname
+            by_specname_and_level = {}
+            ingr_list = object.spec.get_upgrade_ingredients_list(object.level+1)
+            for entry in ingr_list:
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if session.player.inventory_item_quantity(specname, level = level) < qty:
+                    retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
+                    fail = True
+                    break
+        if fail:
+            return
+
         negative_cost = dict((res,-cost[res]) for res in cost)
         session.player.resources.gain_res(negative_cost, reason='building_upgrade')
         admin_stats.econ_flow_player(session.player, 'investment', 'buildings', negative_cost, spec = object.spec.name, level = object.level+1)
+
+        if object.spec.upgrade_ingredients:
+            ingr_list = object.spec.get_upgrade_ingredients_list(object.level+1)
+            for entry in ingr_list:
+                session.player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='upgrade_building')
+            session.player.send_inventory_update(retmsg)
+            object.upgrade_ingredients = copy.deepcopy(ingr_list) # pass ownership
 
         # stop production
         if object.is_producer():
@@ -20320,6 +20390,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_total_time = -1
         object.upgrade_start_time = -1
         object.upgrade_done_time = -1
+        object.upgrade_ingredients = None
 
         object.change_level(object.level+1)
 
@@ -20429,6 +20500,21 @@ class GAMEAPI(resource.Resource):
                 fail = True
                 retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), cost[res]])
 
+        # check for ingredient items
+        if spec.research_ingredients:
+            # have to pre-sum by specname in case there are multiple entries in the array with the same specname
+            by_specname_and_level = {}
+            ingr_list = spec.get_research_ingredients_list(current+1)
+            for entry in ingr_list:
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if session.player.inventory_item_quantity(specname, level = level) < qty:
+                    retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
+                    fail = True
+                    break
+
         if fail:
             return
 
@@ -20437,10 +20523,21 @@ class GAMEAPI(resource.Resource):
         session.player.resources.gain_res(negative_cost, reason='tech_research')
         admin_stats.econ_flow_player(session.player, 'investment', 'research', negative_cost, spec = tech_name, level = current+1)
 
+        # subtract ingredients
+        if spec.research_ingredients:
+            ingr_list = spec.get_research_ingredients_list(current+1)
+            for entry in ingr_list:
+                session.player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='research_tech')
+            session.player.send_inventory_update(retmsg)
+        else:
+            ingr_list = None
+
         object.research_item = tech_name
         object.research_total_time = int(TechSpec.get_leveled_quantity(spec.research_time, current+1)/object.get_stat('research_speed', 1))
         object.research_start_time = server_time
         object.research_done_time = 0
+        object.research_ingredients = copy.deepcopy(ingr_list)
+
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
         session.activity_classifier.researched_tech()
@@ -20461,14 +20558,22 @@ class GAMEAPI(resource.Resource):
 
         # figure out how many resources to return to player
         refund = dict((res, int(gamedata['research_cancel_refund']*TechSpec.get_leveled_quantity(getattr(spec, 'cost_'+res),level_under_research))) for res in gamedata['resources'])
+        ingr_list = object.research_ingredients
 
         object.research_item = ''
         object.research_total_time = -1
         object.research_start_time = -1
         object.research_done_time = -1
+        object.research_ingredients = None
 
         refund = session.player.resources.gain_res(refund, reason='canceled_research')
         admin_stats.econ_flow_player(session.player, 'investment', 'research', refund, spec = tech_name, level = current+1)
+        if ingr_list:
+            session.player.loot_buffer += ingr_list
+            for item in ingr_list:
+                session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='refund')
+            session.player.send_inventory_update(retmsg)
+            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
 
@@ -21100,6 +21205,23 @@ class GAMEAPI(resource.Resource):
                 fail = True
                 retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), cost[res]])
 
+        # check for ingredient items
+        if spec.upgrade_ingredients:
+            # have to pre-sum by specname in case there are multiple entries in the array with the same specname
+            by_specname_and_level = {}
+            ingr_list = spec.get_upgrade_ingredients_list(1)
+            for entry in ingr_list:
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if session.player.inventory_item_quantity(specname, level = level) < qty:
+                    retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
+                    fail = True
+                    break
+        if fail:
+            return
+
         # check power constraint, unless building requires zero power (e.g. it's a power plant)
         consumes_power = GameObjectSpec.get_leveled_quantity(spec.consumes_power_while_building, 1)
         power_state = session.viewing_base.get_power_state()
@@ -21135,11 +21257,21 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", pred])
                     return
 
+        upgrade_ingredients = None
+
         if (not is_instant):
             if (not session.player.is_cheater):
                 negative_cost = dict((res,-cost[res]) for res in cost)
                 session.player.resources.gain_res(negative_cost, reason='building_construction')
                 admin_stats.econ_flow_player(session.player, 'investment', 'buildings', negative_cost, spec = building_type, level = 1)
+
+            if spec.upgrade_ingredients:
+                ingr_list = object.spec.get_upgrade_ingredients_list(1)
+                for entry in ingr_list:
+                    session.player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='construct_building')
+                session.player.send_inventory_update(retmsg)
+                upgrade_ingredients = copy.deepcopy(ingr_list) # pass ownership
+
             build_time = GameObjectSpec.get_leveled_quantity(spec.build_time, 1)
             if build_time > 0:
                 build_time = int(build_time / session.player.stattab.get_player_stat('foreman_speed'))
@@ -21158,6 +21290,7 @@ class GAMEAPI(resource.Resource):
         newobj = instantiate_object_for_player(session.player,
                                                EnvironmentOwner if (spec.kind == 'inert' and "REMOVE_OBSTACLE_FOR_FREE" not in spec.spells) else session.player,
                                                building_type, x=j, y=i, build_finish_time=finish_time)
+        newobj.upgrade_ingredients = copy.deepcopy(upgrade_ingredients)
 
         if build_time < 1 and spec.kind != 'inert':
             newobj.build_done_time = 999 # special case for instant finish, necessary to make ping_object() do the right thing

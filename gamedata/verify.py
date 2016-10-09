@@ -178,11 +178,15 @@ def check_mandatory_fields(specname, spec, kind):
 
     # check that per-level array parameters have the right number of elements
     for check_field in ['max_hp','maxvel','turn_rate','consumes_space','armor',
-                        'requires','provides_space','build_time','repair_time','consumes_power',
+                        'requires','remove_requires',
+                        'remove_cost_gamebucks', 'remove_reward_gamebucks',
+                        'provides_space','build_time','repair_time','consumes_power',
                         'consumes_power_while_building','upgrade_credit_cost','upgrade_speedup_cost_factor','upgrade_xp','proposed_upgrade_xp',
                         'metric_events',
                         'provides_inventory','provides_squads','provides_deployed_squads','provides_squad_space','provides_total_space'] + \
     ['build_cost_'+res for res in gamedata['resources']] + \
+    ['remove_reward_'+res for res in gamedata['resources']] + \
+    ['remove_cost_'+res for res in gamedata['resources']] + \
     ['produces_'+res for res in gamedata['resources']] + \
     ['storage_'+res for res in gamedata['resources']]:
         if (check_field in spec) and (type(spec[check_field]) is list) and (len(spec[check_field]) != max_level):
@@ -400,7 +404,8 @@ def check_levels(specname, spec):
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories',
-              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras')
+              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras',
+              'upgrade_ingredients', 'remove_ingredients', 'research_ingredients')
     error = 0
 
     histogram = {}
