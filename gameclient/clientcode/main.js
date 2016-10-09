@@ -4835,6 +4835,8 @@ function Building() {
     this.manuf_done_time = -1;
 
     this.modstats = {};
+    /** @type {!Object<string, number>} current enhancement levels */
+    this.enhancements = {};
 
     // true if we sent a state ping and are waiting to hear back from server
     this.ping_sent = false;
@@ -4950,6 +4952,8 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     this.crafting = data.shift();
     this.config = data.shift();
     this.enhancing = data.shift();
+    var enh = data.shift();
+    this.enhancements = (enh !== null ? enh : {}); // convert null to empty object
 
     session.clear_building_idle_state_caches(); // for ALL buildings
 

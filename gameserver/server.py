@@ -4677,6 +4677,41 @@ class Session(object):
         else:
             gamesite.exception_log.event(server_time, 'tech completion for non-session.player! %d' % player.user_id)
 
+    def give_enhancement(self, player, retmsg, obj, enh_name, level, method, give_xp = True):
+        assert player is self.player
+        spec = player.get_abtest_spec(EnhancementSpec, enh_name)
+
+        current = obj.enhancements.get(enh_name,0) if obj.enhancements else 0
+        if current >= level: return
+
+        # cancel any ongoing research of this tech
+        if obj.is_enhancing() and obj.enhancing.enhance_state['spec'] == enh_name:
+            gamesite.gameapi.do_cancel_enhance(self, retmsg, obj)
+
+        if obj.enhancements is None: obj.enhancements = {}
+        obj.enhancements[enh_name] = level
+
+        player.recalc_stattab(self.player)
+
+        if give_xp:
+            # award XP for each level achieved along the way
+            xp = 0
+            for step in xrange(current+1, level+1):
+                override = EnhancementSpec.get_leveled_quantity(spec.upgrade_xp, step)
+                if override >= 0:
+                    xp += override
+                else:
+                    xp += int(gamedata['player_xp']['enhance'] * \
+                              sum((EnhacementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), step) for res in gamedata['resources']), 0))
+
+            gamesite.gameapi.give_xp_to(self, player, retmsg, xp, 'enhance', [obj.x,obj.y], obj.obj_id)
+
+        if player is self.player:
+            retmsg.append(["NEW_ENHANCEMENT", obj_id, enh_name, level])
+            self.deferred_stattab_update = True
+
+        self.deferred_object_state_updates.add(obj)
+
     # check for forced expirations of an inventory item by spec
     def get_item_spec_forced_expiration(self, spec, prev_expire_time = -1, ref_time = None):
         expire_time = prev_expire_time
@@ -5896,6 +5931,8 @@ class Spec(object):
             return len(self.build_time)
         elif kind == 'mobile':
             return len(self.max_hp)
+        elif kind == 'inert':
+            return self.max_level
 
         # compute max possible level
         # this is the length of the *shortest* list-valued field in gamedata.json
@@ -5983,11 +6020,13 @@ class GameObjectSpec(Spec):
         ["limit", -1],
         ["limit_requires", None],
         ["max_ui_level", None],
+        ["max_level", 1], # note: only used by inert objects, others derive max_level from other stats
         ["metric_events", ""],
         ["expires", None],
         ["client_can_create", 0],
 #        ["research_category", None],
         ["research_categories", []],
+        ["enhancement_categories", []],
         ["manufacture_category", None],
         ["requires_factory_level", 0],
         ["crafting_categories", []],
@@ -6179,6 +6218,37 @@ class TechSpec(Spec):
         else:
             return self.research_ingredients or []
 
+
+class EnhancementSpec(Spec):
+    table = {}
+    fields = [ ["enhance_credit_cost", 999],
+               ] + resource_fields("cost") + [
+               ["enhance_time", 0],
+               ["ingredients", None],
+               ["xp", -1],
+               ["enhancement_category", None],
+               ["effects", None],
+               ["completion", None],
+               ["max_ui_level", None],
+               ["developer_only", 0]
+               ]
+    @classmethod
+    def lookup(cls, name): return cls.table[name]
+    def __init__(self, name, data):
+        Spec.__init__(self, name, data)
+        self.kind = 'enhancement'
+        self.table[self.name] = self
+
+    def compute_maxlevel(self):
+        return len(self.enhance_time)
+
+    def get_ingredients_list(self, level):
+        if isinstance(self.ingredients, list) and len(self.ingredients) >= 1 and \
+           isinstance(self.ingredients[0], list):
+            return self.ingredients[level-1]
+        else:
+            return self.ingredients or []
+
 # load specs from data file
 for name, data in gamedata["buildings"].iteritems():
     GameObjectSpec(name, data)
@@ -6188,6 +6258,8 @@ for name, data in gamedata["inert"].iteritems():
     GameObjectSpec(name, data)
 for name, data in gamedata["tech"].iteritems():
     TechSpec(name, data)
+for name, data in gamedata["enhancements"].iteritems():
+    EnhancementSpec(name, data)
 
 def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1, build_finish_time = -1, metadata = None, obj_id = None, temporary = None):
     if observer:
@@ -6692,6 +6764,7 @@ class Building(MapBlockingGameObject):
         self.config = None
 
         self.modstats = {}
+        self.enhancements = None
 
     def get_stat(self, stat, default_value):
         return ModChain.get_stat(self.modstats.get(stat, None), default_value)
@@ -6701,7 +6774,7 @@ class Building(MapBlockingGameObject):
         self.disarmed = False
 
     def serialize_state(self, update_hp = True, update_xy = True):
-        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None]
+        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None, copy.deepcopy(self.enhancements)]
 
     def persist_state(self, **args):
         ret = MapBlockingGameObject.persist_state(self, **args)
@@ -6736,6 +6809,7 @@ class Building(MapBlockingGameObject):
             ret['manuf_done_time'] = self.manuf_done_time
         if self.crafting: ret['crafting'] = self.crafting.persist_state()
         if self.enhancing: ret['enhancing'] = self.enhancing.persist_state()
+        if self.enhancements: ret['enhancements'] = copy.deepcopy(self.enhancements)
         if self.config:
             ret['config'] = copy.deepcopy(self.config)
         return ret
@@ -6815,6 +6889,9 @@ class Building(MapBlockingGameObject):
             self.crafting = Business.reconstitute(lambda: Business.QueuedBusiness(Business.CraftingBusiness), state['crafting'])
         if 'enhancing' in state:
             self.enhancing = Business.reconstitute(Business.EnhanceBusiness, state['enhancing'])
+
+        if 'enhancements' in state:
+            self.enhancements = state['enhancements']
 
         if 'config' in state:
             self.config = copy.deepcopy(state['config'])
@@ -15323,7 +15400,7 @@ class Store(object):
             price_description.append('%dunits' % n_units)
             return sum_price, p_currency
 
-        elif (formula == 'upgrade') or (formula == 'research') or (formula == 'craft_gamebucks'):
+        elif (formula == 'upgrade') or (formula == 'research') or (formula == 'enhance') or (formula == 'craft_gamebucks'):
             unit = None
 
             if unit_id == GameObject.VIRTUAL_ID and session.player.is_cheater and formula == 'research':
@@ -15350,7 +15427,7 @@ class Store(object):
                     error_reason.append('cannot upgrade, research, or craft because building is damaged')
                     return -1, p_currency
                 # can't upgrade or research while busy, with the one exception that instant research is allowed if building is currently researching
-                if unit.is_busy() and (not ((formula == 'research') and unit.is_researching())):
+                if unit.is_busy() and (not ((formula == 'research' and unit.is_researching()) or (formula == 'enhance' and unit.is_enhancing()))):
                     error_reason.append('cannot upgrade, research, or craft while busy with activity: '+unit.activity_description(session.player))
                     return -1, p_currency
 
@@ -15410,6 +15487,55 @@ class Store(object):
 
                 #if 'level' in spellarg: price_description.append('level'+str(arg.recipe_level))
                 price = GameObjectSpec.get_leveled_quantity(recipe.get('craft_gamebucks_cost',-1), arg.recipe_level)
+
+            elif formula == 'enhance':
+                enh_name = spellarg[0]
+                new_level = spellarg[1]
+
+                spec = session.player.get_abtest_spec(EnhancementSpec, enh_name)
+                cur_level = unit.enhancements.get(enh_name,0) if unit.enhancements else 0
+                if new_level != cur_level + 1:
+                    error_reason.append('wrong level - current %d requested %d' % (cur_level, new_level))
+                    return -1, p_currency
+
+                # check requirements
+                max_level = spec.maxlevel
+                if spec.max_ui_level and (not session.player.is_cheater):
+                    max_level = min(max_level, Predicates.eval_cond_or_literal(spec.max_ui_level, session, session.player))
+
+                if new_level > max_level:
+                    error_reason.append('enhancement already at max level')
+                    return -1, p_currency
+                if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
+                    error_reason.append('enhancement is restricted to developer mode only')
+                    return -1, p_currency
+                if spec.enhancement_category not in unit.spec.enhancement_categories:
+                    error_reason.append(unit.spec.name+' building not capable of this enhancement '+spec.enhancement_category)
+                    return -1, p_currency
+
+                if (not session.player.is_cheater):
+                    for pred_name, pred in ((spec.requires, 'requirements'),
+                                            (spec.show_if, 'show_if')):
+                        if pred:
+                            req = EnhancementSpec.get_leveled_quantity(pred, new_level)
+                            if (not req.is_satisfied(session.player, None)):
+                                error_reason.append('enhancement %s not satisfied' % pred_name)
+                                return -1, p_currency
+
+                    for res, resdata in gamedata['resources'].iteritems():
+                        if (not resdata.get('allow_instant', True)) and \
+                           EnhancementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res, 0), new_level) > 0:
+                            error_reason.append('requires rare resource: %s' % resdata['name'])
+                            return -1, p_currency
+
+                    ingr_list = spec.get_ingredients_list(new_level)
+                    for ingr in ingr_list:
+                        if not gamedata['items'].get(ingr['spec'], {}).get('allow_instant', True):
+                            error_reason.append('requires ingredient: %r' % ingr)
+                            return -1, p_currency
+
+                price_description.append('level'+str(new_level))
+                price = EnhancementSpec.get_leveled_quantity(spec.enhance_credit_cost, new_level)
 
             else:
                 assert formula == 'research'
@@ -16267,6 +16393,16 @@ class Store(object):
 
             if tech.completion:
                 session.execute_consequent_safe(tech.get_leveled_quantity(tech.completion, session.player.tech[techname]), session.player, retmsg, reason='tech:completion')
+
+        elif spellname == "ENHANCE_FOR_MONEY":
+            object = session.get_object(unit_id)
+            enh_name = spellarg[0]
+            enh_level = spellarg[1]
+            enh_spec = session.player.get_abtest_spec(EnhancementSpec, enh_name)
+            session.give_enhancement(session.player, retmsg, object, enh_name, enh_level, 'instant')
+            session.activity_classifier.built_or_upgraded_building()
+            if enh_spec.completion:
+                session.execute_consequent_safe(enh.get_leveled_quantity(enh_spec.completion, enh_level), session.player, retmsg, reason='enhancement:completion')
 
         elif spellname.startswith("BOOST_") or spellname == "BUY_RESOURCES_TOPUP":
             arg = spellarg if spellname == "BUY_RESOURCES_TOPUP" else None
@@ -19999,9 +20135,12 @@ class GAMEAPI(resource.Resource):
             if object.is_building() and object.is_enhancing() and (object.owner is session.player):
                 if object.update_enhancing(-1):
                     # enhancing complete
-                    did_an_upgrade = True # run same metrics as upgrades
-                    object.enhancing = None
-                    assert 0 # XXX not implemented yet
+                    enh_state, object.enhancing = object.enhancing.enhance_state, None
+                    enh_spec = session.player.get_abtest_spec(EnhancementSpec, enh_state['spec'])
+                    enh_level = enh_state['level']
+                    session.give_enhancement(session.player, retmsg, object, enh_state['spec'], enh_level, 'use_resources')
+                    if enh_spec.completion:
+                        session.execute_consequent_safe(enh_spec.get_leveled_quantity(enh_spec.completion, enh_level), session.player, retmsg, reason='enhancement:completion')
 
             if object.is_removing() and (object.owner is session.player):
                 if object.update_removing(-1):
@@ -20576,6 +20715,132 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
 
         retmsg.append(["OBJECT_STATE_UPDATE", object.serialize_state(), session.player.resources.calc_snapshot().serialize()])
+
+
+    def do_enhance(self, session, retmsg, object, spellargs):
+        enh_name = spellargs[0]
+        enh_level = spellargs[1]
+
+        if object.is_damaged() or object.is_busy():
+            retmsg.append(["ERROR", "LAB_IS_BUSY", object.obj_id])
+            return
+
+        if session.player.foreman_is_busy():
+            retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+            return
+
+        spec = session.player.get_abtest_spec(EnhancementSpec, enh_name)
+
+        # get current level
+        if object.enhancements:
+            current = object.enhancements.get(enh_name, 0)
+        else:
+            current = 0
+
+        if enh_level != current+1: # wrong level requested
+            retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+            return
+
+        if current >= spec.maxlevel:
+            retmsg.append(["ERROR", "MAX_LEVEL_REACHED", spec.maxlevel])
+            return
+
+        if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
+            retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+            return
+
+        if spec.enhancement_category not in object.spec.enhancement_categories:
+            retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
+            return
+
+        fail = False
+
+        # check if requirements are satisfied
+        for reqname, reqlist in (('show_if', spec.show_if), ('activation', spec.activation), ('requires', spec.requires)):
+            if reqlist:
+                req = EnhancementSpec.get_leveled_quantity(reqlist, current+1)
+                if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+                    fail = True
+                    retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
+                                   EnhancementSpec.get_leveled_quantity(gamedata['enhancements'][enh_name][reqname], current+1)])
+                    break
+
+        cost = {}
+        for res in gamedata['resources']:
+            cost[res] = EnhancementSpec.get_leveled_quantity(getattr(spec, 'cost_'+res), current+1)
+            if (not session.player.is_cheater) and (getattr(session.player.resources, res) < cost[res]):
+                fail = True
+                retmsg.append(["ERROR", "INSUFFICIENT_"+res.upper(), cost[res]])
+
+        # check for ingredient items
+        if spec.ingredients:
+            # have to pre-sum by specname in case there are multiple entries in the array with the same specname
+            by_specname_and_level = {}
+            ingr_list = spec.get_ingredients_list(current+1)
+            for entry in ingr_list:
+                key = (entry['spec'], entry.get('level',None))
+                by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
+            for specname_level, qty in by_specname_and_level.iteritems():
+                specname, level = specname_level
+                if session.player.inventory_item_quantity(specname, level = level) < qty:
+                    retmsg.append(["ERROR", "CRAFT_INGREDIENT_MISSING", {'spec':specname, 'level':level}, qty])
+                    fail = True
+                    break
+
+        if fail:
+            return
+
+        # start the enhancement
+        negative_cost = dict((res,-cost[res]) for res in cost)
+        session.player.resources.gain_res(negative_cost, reason='building_enhancement')
+        admin_stats.econ_flow_player(session.player, 'investment', 'enhancement', negative_cost, spec = enh_name, level = current+1)
+
+        # subtract ingredients
+        if spec.ingredients:
+            ingr_list = spec.get_ingredients_list(current+1)
+            for entry in ingr_list:
+                session.player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='enhance_building')
+            session.player.send_inventory_update(retmsg)
+        else:
+            ingr_list = None
+
+        enhance_time = int(EnhancementSpec.get_leveled_quantity(spec.enhance_time, current+1) /
+                           object.get_stat('enhance_speed', 1))
+        state = {'spec': enh_name, 'level': enh_level, 'cost': cost}
+        if ingr_list:
+            state['ingredients'] = copy.deepcopy(ingr_list)
+        object.enhancing = Business.EnhanceBusiness(state, init_total_time = enhance_time, init_start_time = server_time)
+
+        session.deferred_object_state_updates.add(object)
+        session.deferred_player_state_update = True
+
+        session.activity_classifier.built_or_upgraded_building()
+
+    def do_cancel_enhance(self, session, retmsg, object):
+        if not object.is_enhancing():
+            return # ignore invalid request
+
+        enh_state = object.enhancing.enhance_state
+        enh_level = enh_state['level']
+
+        # figure out how many resources to return to player
+        refund = dict((res, int(gamedata['upgrade_cancel_refund']*enh_state['cost'].get(res,0))) \
+                      for res in gamedata['resources'])
+        ingr_list = enh_state.get('ingredients', None)
+
+        object.enhancing = None
+
+        refund = session.player.resources.gain_res(refund, reason='canceled_enhancement')
+        admin_stats.econ_flow_player(session.player, 'investment', 'enhancement', refund, spec = enh_state['spec'], level = enh_level)
+        if ingr_list:
+            session.player.loot_buffer += ingr_list
+            for item in ingr_list:
+                session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='refund')
+            session.player.send_inventory_update(retmsg)
+            retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
+
+        session.deferred_object_state_updates.add(object)
+        session.deferred_player_state_update = True
 
     # parse the dictionary of arguments sent by the client for starting a craft operation
     class CraftSpellarg(object):
@@ -27535,6 +27800,17 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_cancel_research(session, retmsg, object)
+
+            elif spellname == "ENHANCE_FOR_FREE":
+                if object not in session.player.home_base_iter():
+                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                    return
+                self.do_enhance(session, retmsg, object, spellargs)
+            elif spellname == "CANCEL_ENHANCE":
+                if object not in session.player.home_base_iter():
+                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                    return
+                self.do_cancel_enhance(session, retmsg, object)
 
             elif spellname == "CRAFT_FOR_FREE":
                 if object not in session.player.home_base_iter():
