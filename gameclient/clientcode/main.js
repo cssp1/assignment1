@@ -6963,7 +6963,7 @@ player.init_abtests = function(test_data) {
         if(test_name in gamedata['abtests'] && gamedata['abtests'][test_name]['active'] && (group in gamedata['abtests'][test_name]['groups'])) {
             var data = gamedata['abtests'][test_name]['groups'][group];
             if(data['patches_client_gamedata']) {
-                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial'];
+                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'enhancements', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial'];
                 for(var i = 0; i < kinds.length; i++) {
                     var kind = kinds[i];
                     if(kind in data) {
@@ -7772,6 +7772,9 @@ function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     return true;
 }
 
+/* Some functions to manually check for array-of-array item lists,
+   since get_leveled_quantity() won't do it right */
+
 /** @param {!Object} spec
     @param {number=} level
     @return {!Array.<!Object>} */
@@ -7784,15 +7787,44 @@ function get_crafting_recipe_product_list(spec, level) { // XXXXXX move to ItemD
 }
 
 /** @param {!Object} spec
+    @param {number} level
+    @param {string} key_name
+    @return {!Array.<!Object>} */
+function get_ingredients_list(spec, level, key_name) {
+    if(Array.isArray(spec[key_name]) && spec[key_name].length >= 1 && Array.isArray(spec[key_name][0])) {
+        return get_leveled_quantity(spec[key_name], level);
+    }
+    return spec[key_name] || [];
+}
+/** @param {!Object} spec
     @param {number=} level
     @return {!Array.<!Object>} */
-function get_crafting_recipe_ingredients_list(spec, level) { // XXXXXX move to ItemDisplay.js
-    // need to manually check for array-of-arrays, since get_leveled_quantity() won't do it right
-    if(Array.isArray(spec['ingredients']) && spec['ingredients'].length >= 1 && Array.isArray(spec['ingredients'][0])) {
-        return get_leveled_quantity(spec['ingredients'], level || 1);
+function get_crafting_recipe_ingredients_list(spec, level) { return get_ingredients_list(spec, level || 1, 'ingredients'); };
+/** @param {!Object} spec
+    @param {number=} level
+    @return {!Array.<!Object>} */
+function get_enhancement_ingredients_list(spec, level) { return get_ingredients_list(spec, level || 1, 'ingredients'); }
+/** @param {!Object} spec
+    @param {number=} level
+    @return {!Array.<!Object>} */
+function get_building_ingredients_list(spec, level) { return get_ingredients_list(spec, level || 1, 'upgrade_ingredients'); }
+/** @param {!Object} spec
+    @param {number=} level
+    @return {!Array.<!Object>} */
+function get_tech_ingredients_list(spec, level) { return get_ingredients_list(spec, level || 1, 'research_ingredients'); }
+
+/** Check if this list of ingredient items is OK for instant speedups
+    @param {!Array<!Object>} ingr_list
+    @return {boolean} */
+function ingredients_list_allows_instant(ingr_list) {
+    for(var i = 0; i < ingr_list.length; i++) {
+        var ingr_spec = ItemDisplay.get_inventory_item_spec(ingr_list[i]['spec']);
+        if('allow_instant' in ingr_spec && !ingr_spec['allow_instant']) {
+            return false;
+        }
     }
-    return spec['ingredients'] || [];
-}
+    return true;
+};
 
 /** @param {!Object} spec
     @param {number=} level */
@@ -36917,6 +36949,28 @@ function invoke_building_upgrade_congrats(spec_name, level) {
     return dialog;
 }
 
+function invoke_enhancement_congrats(obj_id, enh_name, level) {
+    var spec = gamedata['enhancements'][enh_name];
+    if(!('ui_congrats' in spec)) { return null; }
+    var text = get_leveled_quantity(spec['ui_congrats'], level);
+    if(!text) { return; }
+
+    if(!session.get_real_world().objects.has_object(obj_id)) { return; }
+
+    var host = session.get_real_world().objects.get_object(obj_id);
+
+    var asset = null, cloaked = 0;
+    if('splash_image' in spec) {
+        asset = get_leveled_quantity(spec['splash_image'], level);
+    } else {
+        asset = get_leveled_quantity(host.spec['art_asset'], level);
+        cloaked = get_leveled_quantity(host.spec['cloaked'] || 0, host.level)
+    }
+    var dialog = invoke_generic_upgrade_congrats(null, false, null, spec['ui_name'], level, text,
+                                                 asset, cloaked, null, null);
+    return dialog;
+}
+
 function invoke_tech_upgrade_congrats(spec_name) {
     var tech_spec = gamedata['tech'][spec_name];
     if(!('ui_congrats' in tech_spec)) { return; }
@@ -43400,14 +43454,15 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         return [sum_price, p_currency];
 
-    } else if(formula === 'upgrade' || formula === 'research' || formula === 'craft_gamebucks') {
+    } else if(formula === 'upgrade' || formula === 'research' || formula === 'enhance' || formula === 'craft_gamebucks') {
         var unit = null;
         if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula === 'research') {
 
         } else {
             unit = session.get_real_world().objects.get_object(unit_id);
             if(!unit.is_building() || unit.is_damaged() ||
-               (unit.is_busy() && !((formula==='research') && unit.is_researching()))) {
+               (unit.is_busy() && !(((formula==='research') && unit.is_researching()) ||
+                                    ((formula==='enhance') && unit.is_enhancing())))) {
                 return [-1, p_currency];
             }
         }
@@ -43433,6 +43488,9 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                             return [-1, p_currency]; // requires rare resource
                         }
                     }
+                }
+                if(!ingredients_list_allows_instant(get_building_ingredients_list(unit.spec, unit.level+1))) {
+                        return [-1, p_currency]; // requires rare item
                 }
             }
 
@@ -43523,6 +43581,52 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
             price = get_leveled_quantity(recipe['craft_gamebucks_cost']||-1, recipe_level);
 
+        } else if(formula === 'enhance') {
+            var enh_name = spellarg[0];
+            var new_level = spellarg[1];
+            var spec = gamedata['enhancements'][enh_name];
+
+            var cur_level = (unit.enhancements[enh_name] || 0);
+            if(new_level != cur_level + 1) {
+                return [-1, p_currency];
+            }
+
+            if(new_level > get_max_ui_level(spec)) {
+                return [-1, p_currency];
+            }
+            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
+                return [-1, p_currency];
+            }
+            if(!goog.array.contains(unit.spec['enhancement_categories'] || [],
+                                    spec['enhancement_category'])) {
+                return [-1, p_currency];
+            }
+            if(unit.level < get_leveled_quantity(spec['min_host_level']||0, new_level)) {
+                return [-1, p_currency];
+            }
+            if(('requires' in spec) && !player.is_cheater) {
+                var pred = read_predicate(get_leveled_quantity(spec['requires'], new_level));
+                if(!pred.is_satisfied(player, null)) {
+                    return [-1, p_currency];
+                }
+            }
+
+            if(!player.is_cheater) {
+                for(var res in gamedata['resources']) {
+                    var resdata = gamedata['resources'][res];
+                    if(('allow_instant' in resdata) && !resdata['allow_instant']) {
+                        if(get_leveled_quantity(spec['cost_'+res] || 0, new_level) > 0) {
+                            return [-1, p_currency]; // requires rare resource
+                        }
+                    }
+                }
+                if(!ingredients_list_allows_instant(get_enhancement_ingredients_list(spec, new_level))) {
+                    return [-1, p_currency]; // requires rare item
+                }
+            }
+
+            price = get_leveled_quantity(spec['enhance_credit_cost'], new_level);
+
         } else {
             // tech research
             var spec = gamedata['tech'][spellarg];
@@ -43577,6 +43681,9 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                             return [-1, p_currency]; // requires rare resource
                         }
                     }
+                }
+                if(!ingredients_list_allows_instant(get_tech_ingredients_list(spec, new_level))) {
+                    return [-1, p_currency]; // requires rare item
                 }
             }
 
@@ -45635,6 +45742,32 @@ function handle_server_message(data) {
         player.unit_equipment = data[1];
     } else if(msg == "ENEMY_UNIT_EQUIP_UPDATE") {
         enemy.unit_equipment = data[1];
+    } else if(msg == "NEW_ENHANCEMENT") {
+        var obj_id = data[1], enh_name = data[2], new_level = data[3];
+
+        // trigger congrats message, if applicable
+        notification_queue.push(goog.partial(invoke_enhancement_congrats, obj_id, enh_name, new_level));
+
+        // fire M&M
+        var lab = world.objects._get_object(obj_id);
+        if(lab) {
+            if(!player.is_cheater) {
+                // trigger visual effect
+                var fx_data = gamedata['client']['vfx']['building_enhancement_finish'];
+                var tech = gamedata['enhancements'][enh_name];
+                var unit = tech['associated_unit'] || tech['affects_unit'] || null;
+                var asset = lab.get_leveled_quantity(lab.spec['art_asset']);
+                var instance_data = { '%OBJECT_SPRITE': asset };
+                world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
+                                                        true,
+                                                        instance_data);
+                // hold notification until animation finishes
+                notification_queue.hold_until(client_time + 2.9);
+            }
+        }
+
+        session.clear_building_idle_state_caches(); // for ALL buildings
+
     } else if(msg == "NEW_TECH") {
         var newly_researched = data[1];
         var new_level = data[2];
