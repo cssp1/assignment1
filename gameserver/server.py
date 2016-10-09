@@ -6230,6 +6230,9 @@ class EnhancementSpec(Spec):
                ["effects", None],
                ["completion", None],
                ["max_ui_level", None],
+               # minimum level the host building must have to apply the enhancement
+               # (named min_host_level instead of min_level to avoid confusion with max_level of this spec)
+               ["min_host_level", 0],
                ["developer_only", 0]
                ]
     @classmethod
@@ -15513,6 +15516,10 @@ class Store(object):
                     error_reason.append(unit.spec.name+' building not capable of this enhancement '+spec.enhancement_category)
                     return -1, p_currency
 
+                if unit.level < EnhancementSpec.get_leveled_quantity(spec.min_host_level, new_level):
+                    error_reason.append('host level too low')
+                    return -1, p_currency
+
                 if (not session.player.is_cheater):
                     for pred_name, pred in ((spec.requires, 'requirements'),
                                             (spec.show_if, 'show_if')):
@@ -20758,6 +20765,10 @@ class GAMEAPI(resource.Resource):
             return
 
         if spec.enhancement_category not in object.spec.enhancement_categories:
+            retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
+            return
+
+        if object.level < EnhancementSpec.get_leveled_quantity(spec.min_host_level, current+1):
             retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
             return
 
