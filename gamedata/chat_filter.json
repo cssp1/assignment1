@@ -68,5 +68,5 @@
         // "pula", - innocent in Tagalog, offensive in Romanian :(
         "pizda"
     ],
-    "bad_tags": ["ass","jew"] // disallowed alliance tags (in addition to bad words above)
+    "bad_tags": ["ass","jew","dix","dic","d1c","d1x"] // disallowed alliance tags (in addition to bad words above)
 }
