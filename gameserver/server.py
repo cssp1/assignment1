@@ -5830,6 +5830,13 @@ class Spec(object):
         else:
             return recipe.get('product', [])
 
+    def get_remove_ingredients_list(self, level):
+        if isinstance(self.remove_ingredients, list) and len(self.remove_ingredients) >= 1 and \
+           isinstance(self.remove_ingredients[0], list):
+            return self.remove_ingredients[level-1]
+        else:
+            return self.remove_ingredients or []
+
     def __init__(self, name, data):
         self.name = name
 
@@ -20944,11 +20951,7 @@ class GAMEAPI(resource.Resource):
         if take_ingredients and object.spec.remove_ingredients:
             # have to pre-sum by specname in case there are multiple entries in the array with the same specname
             by_specname_and_level = {}
-            if isinstance(object.spec.remove_ingredients, list) and len(object.spec.remove_ingredients) >= 1 and \
-               isinstance(object.spec.remove_ingredients[0], list):
-                ingr_list = object.spec.remove_ingredients[object.level-1]
-            else:
-                ingr_list = object.spec.remove_ingredients or []
+            ingr_list = object.spec.get_remove_ingredients_list(object.level)
             for entry in ingr_list:
                 key = (entry['spec'], entry.get('level',None))
                 by_specname_and_level[key] = by_specname_and_level.get(key,0) + entry.get('stack',1)
@@ -20979,12 +20982,7 @@ class GAMEAPI(resource.Resource):
 
         # subtract ingredients
         if take_ingredients and object.spec.remove_ingredients:
-            if isinstance(object.spec.remove_ingredients, list) and len(object.spec.remove_ingredients) >= 1 and \
-               isinstance(object.spec.remove_ingredients[0], list):
-                ingr_list = object.spec.remove_ingredients[object.level-1]
-            else:
-                ingr_list = object.spec.remove_ingredients or []
-
+            ingr_list = object.spec.get_remove_ingredients_list(object.level)
             for entry in ingr_list:
                 player.inventory_remove_by_type(entry['spec'], entry.get('stack',1), '5130_item_activated', level = entry.get('level',None), reason='remove_obstacle')
             if player is session.player:
@@ -20997,7 +20995,8 @@ class GAMEAPI(resource.Resource):
 
         # start removing
         state = {'cost':cost}
-        if take_ingredients and object.spec.remove_ingredients: state['ingredients'] = copy.deepcopy(ingr_list)
+        if take_ingredients and object.spec.remove_ingredients:
+            state['ingredients'] = copy.deepcopy(ingr_list)
 
         object.removing = Business.RemoveBusiness(state, init_total_time = remove_time, init_start_time = server_time)
 
