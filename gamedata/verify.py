@@ -601,6 +601,58 @@ def check_tech(specname, keyname, spec, maxlevel):
 
     return error
 
+def check_enhancement(specname, keyname, spec, maxlevel):
+    error = 0
+    if spec.get('name', None) != keyname:
+        error |= 1
+        print '%s:name must match the name outside the curly braces' % specname
+
+    for ASSET in ('icon','splash_image'):
+        if (ASSET in spec):
+            asset_list = spec[ASSET] if type(spec[ASSET]) is list else [spec[ASSET],]
+            for a in asset_list:
+                error |= require_art_asset(a, specname+':'+ASSET)
+
+    if ('associated_building' not in spec) and ('splash_image' not in spec) and ('icon' not in spec):
+        error |= 1; print '%s: needs either an associated_building, splash_image, or icon for display purposes' % (specname)
+
+    if not isinstance(spec['enhance_time'], list):
+        error |= 1
+        print '%s:enhance_time MUST be a per-level list' % specname
+
+    if 'effects' in spec:
+        for effect in spec['effects']:
+            if effect['code'] != 'modstat':
+                error |= 1
+                print '%s: uses invalid effect code %s' % effect['code']
+            error |= check_modstat(effect, specname)
+
+    # check resource requirement vs CC level
+    if verbose:
+        for lev in xrange(1,len(spec['enhance_time'])+1):
+            cc_requirement = GameDataUtil.get_cc_requirement(gamedata, spec['requires'], lev) if ('requires' in spec) else 0
+            for res in gamedata['resources']:
+                cost = spec['cost_'+res][lev-1] if isinstance(spec['cost_'+res],list) else spec['cost_'+res]
+                if cost > MAX_RESOURCE_COST:
+                    error |= 1
+                    print 'enhancement %s level %d has %s cost exceeding global limit of %d' % (specname, lev, res, MAX_RESOURCE_COST)
+                if cc_requirement > 0 and cost > MAX_STORAGE[res][cc_requirement-1]:
+                    error |= 1
+                    print 'enhancement %s level %d requires CC L%d but has %s cost of %d, which exceeds max storage capacity at that CC level of %d' % (specname, lev, cc_requirement, res, cost, MAX_STORAGE[res][cc_requirement-1])
+
+    for FIELD in ('requires', 'show_if'):
+        if FIELD in spec:
+            req = spec[FIELD] if type(spec[FIELD]) is list else [spec[FIELD],]
+            for r in req:
+                error |= check_predicate(r, reason = specname+':'+FIELD)
+
+    if 'completion' in spec:
+        comp = spec['completion'] if type(spec['completion']) is list else [spec['completion'],]
+        for c in comp:
+            error |= check_consequent(c, reason = specname+':completion', context='tech')
+
+    return error
+
 def check_aura(auraname, spec, maxlevel):
     error = 0
     if spec['name'] != ':'.join(auraname.split(':')[1:]):
@@ -3403,6 +3455,11 @@ def main(args):
         e, maxlevel = check_levels('tech:'+name, data)
         error |= e
         error |= check_tech('tech:'+name, name, data, maxlevel)
+
+    for name, data in gamedata['enhancements'].iteritems():
+        e, maxlevel = check_levels('enhancement:'+name, data)
+        error |= e
+        error |= check_enhancement('enhancement:'+name, name, data, maxlevel)
 
     for name, data in gamedata['auras'].iteritems():
         e, maxlevel = check_levels('aura:'+name, data)
