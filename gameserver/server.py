@@ -20402,8 +20402,12 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
             return
 
-        if object.level >= object.spec.maxlevel:
-            retmsg.append(["ERROR", "MAX_LEVEL_REACHED", object.spec.maxlevel])
+        max_level = object.spec.maxlevel
+        if object.spec.max_ui_level and (not session.player.is_cheater):
+            max_level = min(max_level, Predicates.eval_cond_or_literal(object.spec.max_ui_level, session, session.player))
+
+        if object.level >= max_level:
+            retmsg.append(["ERROR", "MAX_LEVEL_REACHED", max_level])
             return
 
         if session.viewing_base is not session.player.my_home:
@@ -20608,8 +20612,12 @@ class GAMEAPI(resource.Resource):
         else:
             current = 0
 
-        if current >= spec.maxlevel:
-            retmsg.append(["ERROR", "MAX_LEVEL_REACHED", spec.maxlevel])
+        max_level = spec.maxlevel
+        if spec.max_ui_level and (not session.player.is_cheater):
+            max_level = min(max_level, Predicates.eval_cond_or_literal(spec.max_ui_level, session, session.player))
+
+        if current >= max_level:
+            retmsg.append(["ERROR", "MAX_LEVEL_REACHED", max_level])
             return
 
         if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
