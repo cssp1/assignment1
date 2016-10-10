@@ -40164,7 +40164,7 @@ function build_dialog_change_category(dialog, category) {
             if(spec['build_category'] != category) {
                 continue;
             }
-            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
+            if((spec['developer_only'] || spec['ui_priority'] < 0) && (spin_secure_mode || !player.is_cheater)) {
                 continue;
             }
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
