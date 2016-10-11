@@ -31260,22 +31260,39 @@ function manufacture_dialog_change_category(dialog, catname, preselect_specname)
 
     // create list of units for this category
     dialog.user_data['units'] = [];
+    // only sort if at least one item has ui_priority (otherwise leave in JSON order)
+    var use_priority_sort = false;
+
     for(var name in gamedata['units']) {
         var spec = gamedata['units'][name];
 
         if(spec['manufacture_category'] != dialog.user_data['category']) {
             continue;
         }
-        if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) {
-            continue;
-        }
+        if((spec['developer_only'] || spec['ui_priority'] === -1) && (spin_secure_mode || !player.is_cheater)) { continue; }
+
         if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
         if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
         dialog.user_data['units'].push(name);
+        if('ui_priority' in spec) { use_priority_sort = true; }
     }
 
     if(player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, 'building', (builder ? builder.spec['name'] : null), (builder ? builder.level+1 : -1), (builder ? builder.id : null));
+    }
+
+    if(use_priority_sort) {
+        dialog.user_data['units'].sort(function(a, b) {
+            // first sort by ui_priority high to low
+            var ui_priority_a = gamedata['units'][a]['ui_priority'] || 0;
+            var ui_priority_b = gamedata['units'][b]['ui_priority'] || 0;
+            if(ui_priority_a < ui_priority_b) {
+                return 1;
+            } else if(ui_priority_a > ui_priority_b) {
+                return -1;
+            }
+            return 0;
+        });
     }
 
     manufacture_dialog_scroll(dialog, 0);
