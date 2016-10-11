@@ -13962,6 +13962,10 @@ def init_game(player, add_extras):
     buildings = override['buildings'] if ('buildings' in override) else gamedata['starting_conditions']['buildings']
     for b in buildings:
         obj = instantiate_object_for_player(player, player, b['spec'], x=b['xy'][0], y=b['xy'][1], level = b.get('level',1))
+
+        if obj.is_producer():
+            obj.contents = 1 # ensure at least 1 unit for collection
+
         # begin with damage (note: must be >= the tutorial damage limit in main.js)
         obj.hp = int(b.get('hp_ratio',1) * obj.max_hp)
         player.home_base_add(obj)
