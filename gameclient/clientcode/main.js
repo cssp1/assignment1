@@ -12623,7 +12623,7 @@ function update_desktop_dialogs() {
         update_resource_bars(dialog, true, false, false);
 
         dialog.widgets['low_power_bg'].show =
-            dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.tutorial_state == "COMPLETE" && session.get_draw_world().base.power_factor() < 1);
+            dialog.widgets['low_power_message'].show = (gamedata['enable_power'] && player.quest_root.children.length < 1 && selection.ui_change_time === -1 && player.tutorial_state == "COMPLETE" && session.get_draw_world().base.power_factor() < 1);
         if(dialog.widgets['low_power_message'].show) {
             dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.get_draw_world().base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
         }
