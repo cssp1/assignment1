@@ -76,7 +76,7 @@ Congrats.cc_upgrade = function(cc, level) {
         var spec = /** @type {GameObjectSpec} */ (gamedata['buildings'][name]);
 
         // ignore developer_only / hidden specs
-        if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_developer())) { continue; }
+        if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_cheater)) { continue; }
         if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
 
         if('limit' in spec && (typeof spec['limit']) !== 'number') {
@@ -138,7 +138,7 @@ Congrats.cc_upgrade = function(cc, level) {
 Congrats.building_level_gain = function(source_spec, source_level, spec) {
 
     // ignore developer_only if in production
-    if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_developer())) { return null; }
+    if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || !player.is_cheater)) { return null; }
     if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return null; }
     if(!spec['requires'] || !(spec['requires'] instanceof Array)) { return null; } // missing or non-array-valued "requires"
 
