@@ -33978,13 +33978,16 @@ function research_dialog_change_category(dialog, category, num)
     } else {
         // fill in grid of technologies
         dialog.user_data['techs'] = [];
+        // only sort if at least one item has ui_priority (otherwise leave in JSON order)
+        var use_priority_sort = false;
 
         for(var name in gamedata['tech']) {
             var spec = gamedata['tech'][name];
             if(spec['research_category'] != category) {
                 continue;
             }
-            if(spec['developer_only'] && (spin_secure_mode || !player.is_developer())) { continue; }
+            if((spec['developer_only'] || spec['ui_priority'] === -1) && (spin_secure_mode || !player.is_cheater)) { continue; }
+
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
 
@@ -33992,6 +33995,21 @@ function research_dialog_change_category(dialog, category, num)
             if(!('associated_unit' in spec) && dialog.user_data['parent_category'] == 'army') { continue; }
 
             dialog.user_data['techs'].push(name);
+            if('ui_priority' in spec) { use_priority_sort = true; }
+        }
+
+        if(use_priority_sort) {
+            dialog.user_data['techs'].sort(function(a, b) {
+                // first sort by ui_priority high to low
+                var ui_priority_a = gamedata['tech'][a]['ui_priority'] || 0;
+                var ui_priority_b = gamedata['tech'][b]['ui_priority'] || 0;
+                if(ui_priority_a < ui_priority_b) {
+                    return 1;
+                } else if(ui_priority_a > ui_priority_b) {
+                    return -1;
+                }
+                return 0;
+            });
         }
     }
 
@@ -40148,6 +40166,9 @@ function build_dialog_change_category(dialog, category) {
             dialog.widgets['production_button'].state = 'disabled';
     }
 
+    // only sort if at least one item has ui_priority (otherwise leave in JSON order)
+    var use_priority_sort = false;
+
     if(category === 'inert') {
         for(var name in gamedata['inert']) {
             var spec = gamedata['inert'][name];
@@ -40157,6 +40178,7 @@ function build_dialog_change_category(dialog, category) {
                 continue;
             }
             dialog.user_data['speclist'].push(name);
+            if('ui_priority' in spec) { use_priority_sort = true; }
         }
     } else {
         for(var name in gamedata['buildings']) {
@@ -40170,19 +40192,22 @@ function build_dialog_change_category(dialog, category) {
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             dialog.user_data['speclist'].push(name);
+            if('ui_priority' in spec) { use_priority_sort = true; }
         }
     }
-    dialog.user_data['speclist'].sort(function(a, b) {
-        // first sort by ui_priority high to low
-        var ui_priority_a = gamedata[(a in gamedata['buildings'] ? 'buildings' : 'inert')][a]['ui_priority'] || 0;
-        var ui_priority_b = gamedata[(b in gamedata['buildings'] ? 'buildings' : 'inert')][b]['ui_priority'] || 0;
-        if(ui_priority_a < ui_priority_b) {
-            return 1;
-        } else if(ui_priority_a > ui_priority_b) {
-            return -1;
-        }
-        return 0;
-    });
+    if(use_priority_sort) {
+        dialog.user_data['speclist'].sort(function(a, b) {
+            // first sort by ui_priority high to low
+            var ui_priority_a = gamedata[(a in gamedata['buildings'] ? 'buildings' : 'inert')][a]['ui_priority'] || 0;
+            var ui_priority_b = gamedata[(b in gamedata['buildings'] ? 'buildings' : 'inert')][b]['ui_priority'] || 0;
+            if(ui_priority_a < ui_priority_b) {
+                return 1;
+            } else if(ui_priority_a > ui_priority_b) {
+                return -1;
+            }
+            return 0;
+        });
+    }
     build_dialog_scroll(dialog, 0);
 }
 
