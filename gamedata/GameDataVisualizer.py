@@ -284,8 +284,13 @@ def get_tier_summary(building_names, tech_names):
 
     for tier in range(1, n_tiers+1):
         for category in ('infantry', 'armor', 'aircraft'):
-            summary['squad_of_10_rep_time'][tier-1] += \
-                                       int(3.33 * gamedata['units']['%s_tier_%d' % (category,tier)]['build_time'][0])
+            # find units of appropriate tier (this is approximate)
+            for t in range(tier, 0, -1):
+                unit_name = '%s_tier_%d' % (category,t)
+                if unit_name in gamedata['units']:
+                    summary['squad_of_10_rep_time'][tier-1] += \
+                                                            int(3.33 * gamedata['units'][unit_name]['build_time'][0])
+                    break
 
     for name in building_names:
         data = gamedata['buildings'][name]
