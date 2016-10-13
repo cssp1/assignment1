@@ -214,6 +214,24 @@ CastClientSpellConsequent.prototype.execute = function(state) {
     state['source_obj'].cast_client_spell(this.spellname, spell, state['source_obj'], state['xy'] || null);
 };
 
+/** Client-side only - set all mobile objects on same team to aggressive
+    @constructor @struct
+    @extends Consequent */
+function AllAggressiveConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(AllAggressiveConsequent, Consequent);
+AllAggressiveConsequent.prototype.execute = function(state) {
+    if(!state || !state['source_obj']) { throw Error('no source_obj provided'); }
+    var source_obj = state['source_obj'];
+    var world = session.get_real_world();
+    session.for_each_real_object(function(obj) {
+        if(obj.is_mobile() && obj.team === source_obj.team) {
+            do_unit_command_make_aggressive(world, obj);
+        }
+    });
+};
+
 // note: normally this is done server-side for AI base completions,
 // resulting in receiving DISPLAY_MESSAGE over the network, but we
 // also implement a client-side version for quest "completion"
@@ -829,6 +847,7 @@ function read_consequent(data) {
     else if(kind === 'REPAIR_ALL') { return new RepairAllConsequent(data); }
     else if(kind === 'VISIT_BASE') { return new VisitBaseConsequent(data); }
     else if(kind === 'CAST_CLIENT_SPELL') { return new CastClientSpellConsequent(data); }
+    else if(kind === 'ALL_AGGRESSIVE') { return new AllAggressiveConsequent(data); }
     else if(kind === 'INVOKE_MISSIONS_DIALOG') { return new InvokeMissionsDialogConsequent(data); }
     else if(kind === 'INVOKE_MAIL_DIALOG') { return new InvokeMailDialogConsequent(data); }
     else if(kind === 'INVOKE_STORE_DIALOG') { return new InvokeStoreConsequent(data); }

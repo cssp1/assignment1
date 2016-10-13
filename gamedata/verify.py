@@ -1677,6 +1677,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
                         'CHANGE_TITLE',
+                        'ALL_AGGRESSIVE',
                    ])
 
 def check_consequent(cons, reason = '', context = None, context_data = None):
@@ -1881,7 +1882,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                                 'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'TAKE_ITEMS',
                                 'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                                'FOCUS_CHAT_GUI',
+                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE',
                                 'NULL']:
         # we recognize these ones, but they don't have detailed sanity checks written for them yet
         pass
