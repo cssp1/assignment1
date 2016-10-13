@@ -299,15 +299,23 @@ AllBuildingsUndamagedPredicate.prototype.do_ui_describe = function(player) {
   * @extends Predicate */
 function ObjectUndamagedPredicate(data) {
     goog.base(this, data);
-    this.spec_name = data['spec'];
+    this.spec_name = data['spec'] || null;
 }
 goog.inherits(ObjectUndamagedPredicate, Predicate);
 ObjectUndamagedPredicate.prototype.is_satisfied = function(player, qdata) {
-    return session.for_each_real_object(function(obj) {
-        if(obj.spec['name'] == this.spec_name && !obj.is_damaged() && obj.team === 'player') {
-            return true;
-        }
-    }, this);
+    // special case for use in combat
+    if(!this.spec_name) {
+        if(!qdata || !('source_obj' in qdata)) { throw Error('no source_obj provided'); }
+        var obj = qdata['source_obj'];
+        return !obj.is_damaged();
+    } else {
+        // normal case, just check player's base
+        return session.for_each_real_object(function(obj) {
+            if(obj.spec['name'] == this.spec_name && !obj.is_damaged() && obj.team === 'player') {
+                return true;
+            }
+        }, this);
+    }
 };
 ObjectUndamagedPredicate.prototype.do_ui_describe = function(player) {
     var spec = gamedata['units'][this.spec_name] || gamedata['buildings'][this.spec_name];
