@@ -20,7 +20,7 @@ def inventory_schema(sql_util): return {
                ('event_name', 'VARCHAR(128) NOT NULL')] + \
               sql_util.summary_in_dimensions() + \
               [('spec', 'VARCHAR(255) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('stack', 'INT4 NOT NULL'),
                ('expire_time', 'INT8'),
                ('reason', 'VARCHAR(32)')],
@@ -30,7 +30,7 @@ def inventory_summary_schema(sql_util): return {
     'fields': [('day', 'INT8 NOT NULL')] + \
               sql_util.summary_out_dimensions() + \
               [('spec', 'VARCHAR(255) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('event_name', 'VARCHAR(128) NOT NULL'),
                ('reason', 'VARCHAR(32)'),
                ('stack', 'INT8 NOT NULL')],

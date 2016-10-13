@@ -26,7 +26,7 @@ def lottery_schema(sql_util):
                        ('slot', 'VARCHAR(32)'),
                        # properties of the reward item
                        ('spec', 'VARCHAR(255)'),
-                       ('level', 'INT1'),
+                       ('level', 'INT2'),
                        ('stack', 'INT4'),
                        # denormalized stats on the player's warehouse, since we'll want to watch this carefully
                        ('inventory_slots_total', 'INT4'),

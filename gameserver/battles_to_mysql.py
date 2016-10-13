@@ -162,7 +162,7 @@ def battle_damage_schema(sql_util): return {
     'fields': [('battle_id', 'CHAR(24) NOT NULL'),
                ('user_id', 'INT4 NOT NULL'),
                ('mobile', 'TINYINT(1) NOT NULL'),
-               ('level', 'INT1 NOT NULL'),
+               ('level', 'INT2 NOT NULL'),
                ('stack', 'INT2 NOT NULL'),
                ('iron', 'INT4 NOT NULL'),
                ('water', 'INT4 NOT NULL'),

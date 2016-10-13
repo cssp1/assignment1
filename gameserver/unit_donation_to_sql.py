@@ -22,7 +22,7 @@ def unit_donation_schema(sql_util): return {
               [('alliance_id', 'INT4'),
                ('recipient_id', 'INT4'),
                ('spec', 'VARCHAR(32)'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('stack', 'INT2'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
@@ -32,7 +32,7 @@ def unit_donation_summary_schema(sql_util, interval): return {
               sql_util.summary_out_dimensions() + \
               [('event_name', 'VARCHAR(128) NOT NULL'),
                ('spec', 'VARCHAR(32)'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('total_stack', 'INT8'),
                ('unique_players', 'INT4')],
     'indices': {'by_'+interval: {'keys': [(interval,'ASC')]}}

@@ -30,7 +30,7 @@ def cur_levels_schema(sql_util): return {
               [
                ('kind', 'VARCHAR(16) NOT NULL'),
                ('spec', 'VARCHAR(64) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ],
     'indices': {}
     }
@@ -40,7 +40,7 @@ def cur_levels_summary_schema(sql_util, interval_name): return {
                sql_util.summary_out_dimensions()  + \
               [('kind', 'VARCHAR(16) NOT NULL'),
                ('spec', 'VARCHAR(64) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('is_maxed', 'TINYINT(1) NOT NULL'), # flag that this is the max level of the spec
                # OUTPUT
                ('num_players', 'INT8 NOT NULL')

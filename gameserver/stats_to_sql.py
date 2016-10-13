@@ -20,7 +20,7 @@ stats_schema = {
     'fields': [('kind', 'VARCHAR(16) NOT NULL'),
                ('spec', 'VARCHAR(64) NOT NULL'),
                ('stat', 'VARCHAR(64) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('value_num', 'FLOAT8'),
                ('value_str', 'VARCHAR(128)')],
     'indices': {'master': {'keys': [('kind','ASC'),('spec','ASC'),('stat','ASC'),('level','ASC')]}}
@@ -30,7 +30,7 @@ crafting_recipes_schema = {
                ('recipe_level', 'INT4'),
                ('is_output', 'TINYINT(1) NOT NULL'),
                ('resource', 'VARCHAR(64) NOT NULL'),
-               ('level', 'INT1'),
+               ('level', 'INT2'),
                ('amount', 'INT4 NOT NULL')],
     'indices': {'master': {'keys': [('recipe_id','ASC'),('is_output','ASC')]}}
     }
@@ -42,7 +42,7 @@ fishing_slates_schema = {
 quest_stats_schema = {
     'fields': [('name', 'VARCHAR(64) NOT NULL'),
                ('ui_priority', 'INT4'),
-               ('townhall_level', 'INT1'),
+               ('townhall_level', 'INT2'),
                ('reward_xp', 'INT4'),
                ('reward_gamebucks', 'INT4'),
                ('reward_iron', 'INT4'),
@@ -52,7 +52,7 @@ quest_stats_schema = {
                ('goal_history_value', 'INT4'),
                ('goal_building_spec', 'VARCHAR(64)'),
                ('goal_building_qty', 'INT1'),
-               ('goal_building_level', 'INT1'),
+               ('goal_building_level', 'INT2'),
                ],
     'indices': {'by_name': {'keys': [('name','ASC')]}}
     }
