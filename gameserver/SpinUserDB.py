@@ -8,7 +8,6 @@
 # routines for manipulating the live userdb/playerdb data
 
 import SpinConfig
-import SpinDBStore
 import SpinS3
 import AtomicFileWrite
 import sys, os, glob, hashlib
@@ -21,12 +20,6 @@ class Driver (object):
 
     # hard-coded
     min_user_id = 1111
-
-    def get_user_id_range(self):
-        sys.stderr.write('DEPRECATED use of SpinUserDB.get_user_id_range(), this should be replaced with dbserver query\n')
-        id_map_file = SpinConfig.config.get('db_dir', 'db')+'/facebook_id_map.txt'
-        id_map = SpinDBStore.JournaledMap('facebook_id_map', id_map_file, allow_write = False)
-        return [self.min_user_id, max(id_map.map.itervalues())]
 
     # this fails because some users hit the page but never logged in (e.g. due to unsupported browser bounces)
     def get_user_id_range_spotty(self):
