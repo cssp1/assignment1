@@ -1306,6 +1306,9 @@ function GameObject() {
     /** @type {null|Array<string>} */
     this.behaviors = null;
 
+    /** for behaviors to keep state between ticks */
+    this.behavior_state = {};
+
     // true if there are unsaved changes that should be sent back to
     // the server before the session is closed
     // (only applies to hitpoints, and xy position and orders for mobile units)
@@ -4264,6 +4267,26 @@ GameObject.prototype.next_ai_order = function(world) {
         this.apply_orders(world);
     }
     return false;
+};
+/** @param {!World.World} world */
+GameObject.prototype.run_behaviors = function(world) {
+    if(this.behaviors === null) { return; }
+    if(this.is_destroyed()) { return; }
+    if(this.team === 'player') { return; } // no behaviors for player-controlled objects
+    goog.array.forEach(this.behaviors, function(behavior_name) {
+        if(behavior_name === 'damage_alarm') {
+            // maybe convert this to predicate/consequent later
+            if(!('damage_alarm' in this.behavior_state)) {
+                this.behavior_state['damage_alarm'] = {'start_hp': this.hp, 'triggered': 0};
+            }
+            var state = this.behavior_state['damage_alarm'];
+            if(!state['triggered'] && this.hp < state['start_hp']) {
+                state['triggered'] = 1;
+                var cons = {'consequent': 'ALL_AGGRESSIVE'};
+                read_consequent(cons).execute({'source_obj': this});
+            }
+        }
+    }, this);
 };
 
 /** @param {!World.World} world */

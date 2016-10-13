@@ -421,6 +421,7 @@ World.World.prototype.run_unit_ticks = function() {
         if(!this.ai_paused) {
             goog.array.forEach(obj_list, function(obj) {
                 obj.ai_threatlist_update(this);
+                obj.run_behaviors(this);
                 obj.run_ai(this);
             }, this);
             goog.array.forEach(obj_list, function(obj) {
