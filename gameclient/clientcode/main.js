@@ -5911,6 +5911,7 @@ player.acquisition_campaign = null; // acquisition_campaign field, from server
 player.home_base_id = null; // base_id of player's home
 player.home_base_loc = null; // base_map_loc of player's home
 player.enable_muffins = false; // show extra-secret hidden developer features
+/** @type {boolean} */
 player.is_cheater = false; // allow breaking of unit space/building limits (NOT ON LIVE SERVER)
 player.ui_name = '(Unknown)';
 /** @type {string|null} same as on server */

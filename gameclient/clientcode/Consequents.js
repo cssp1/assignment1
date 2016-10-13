@@ -774,7 +774,7 @@ function DevEditModeConsequent(data) {
 }
 goog.inherits(DevEditModeConsequent, Consequent);
 DevEditModeConsequent.prototype.execute = function(state) {
-    player.is_cheater = 1;
+    player.is_cheater = true;
     send_to_server.func(["CAST_SPELL", 0, "CHEAT_REMOVE_LIMITS", player.is_cheater]);
 };
 
