@@ -2805,9 +2805,11 @@ if __name__ == '__main__':
             if min_impressions > 0:
                 adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']]['impressions'] < min_impressions, adgroup_list)
             if max_frequency > 0:
-                print 'frequency:\n' + '\n'.join(['%-100s %.1f' % (adgroup['name'], stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions']) if stats[adgroup['id']]['unique_impressions'] > 0 else 0) \
+                #print '\n'.join(map(repr, (stats[adgroup['id']] for adgroup in adgroup_list)))
+                print 'frequency:\n' + '\n'.join(['%-100s %.1f' % (adgroup['name'], stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions']) if stats[adgroup['id']].get('unique_impressions',0) > 0 else 0) \
                                                   for adgroup in adgroup_list if stats[adgroup['id']]])
-                adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']]['unique_impressions'] > 0 and \
+
+                adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']].get('unique_impressions',0) > 0 and \
                                       (stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions'])) >= max_frequency, adgroup_list)
             if min_age > 0:
                 adgroup_list = filter(lambda adgroup: 'created_time' in adgroup and time_now - SpinFacebook.parse_fb_time(adgroup['created_time']) >= min_age, adgroup_list)
