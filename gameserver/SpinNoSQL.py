@@ -1028,7 +1028,7 @@ class NoSQLClient (object):
         if not self.seen_facebook_ids:
             coll.create_index('user_id', unique=True)
             self.seen_facebook_ids = True
-            self.min_user_id = 1111 # hard-coded
+            self.min_user_id = SpinConfig.config.get('min_user_id', 1111)
         return coll
 
     def get_user_id_range(self):
@@ -2569,7 +2569,8 @@ if __name__ == '__main__':
             client.do_maint(time_now, cur_season, cur_week)
 
     elif mode == 'clear-locks':
-        ID_LIST = [1112,1113,1114,1115]
+        ID_LIST = range(SpinConfig.config.get('min_user_id',1111),
+                        SpinConfig.config.get('min_user_id',1111) + 11)
         LOCK_FIELDS = {'LOCK_HOLDER':1,'LOCK_TIME':1,'LOCK_STATE':1,'LOCK_OWNER':1}
         client.player_cache().update_many({'_id':{'$in':ID_LIST}}, {'$unset':LOCK_FIELDS})
         for region in set(x['home_region'] for x in client.player_cache().find({'_id':{'$in':ID_LIST}},{'home_region':1}) if x.get('home_region',None)):
@@ -2767,15 +2768,18 @@ if __name__ == '__main__':
     elif mode == 'test':
         print 'TEST'
 
+        # base user ID
+        UID = SpinConfig.config.get('min_user_id', 1111)
+
         # TEST FACEBOOK ID TABLE
         client.facebook_id_table().drop(); client.seen_facebook_ids = False
-        assert client.facebook_id_to_spinpunch_single('6', True) == 1111
-        assert client.facebook_id_to_spinpunch_single('example1', True) == 1112
-        assert client.facebook_id_to_spinpunch_single('6', False) == 1111
-        assert client.facebook_id_to_spinpunch_single('example1', False) == 1112
+        assert client.facebook_id_to_spinpunch_single('6', True) == UID+0
+        assert client.facebook_id_to_spinpunch_single('example1', True) == UID+1
+        assert client.facebook_id_to_spinpunch_single('6', False) == UID+0
+        assert client.facebook_id_to_spinpunch_single('example1', False) == UID+1
         assert client.facebook_id_to_spinpunch_single('99999', False) == -1
-        assert client.facebook_id_to_spinpunch_batch(['example1','6','99999']) == [1112,1111,-1]
-        assert client.get_user_id_range() == [1111,1112]
+        assert client.facebook_id_to_spinpunch_batch(['example1','6','99999']) == [UID+1,UID+0,-1]
+        assert client.get_user_id_range() == [UID+0,UID+1]
 
         # TEST DAU
         client.dau_table(time_now).drop(); client.seen_dau = {}
@@ -2790,33 +2794,33 @@ if __name__ == '__main__':
         # TEST LOCKS
         OWNER = 567
         client.player_cache().drop(); client.seen_player_cache = False
-        client.player_cache().insert_one({'_id':1112, 'facebook_id':'example1', 'ui_name':'Dan', 'last_mtime': time_now - 60, 'LOCK_GENERATION':5})
-        assert client.player_lock_acquire_login(1112, OWNER) == (client.LOCK_LOGGED_IN,5)
-        assert client.player_lock_acquire_login(1112, 9999)[0] < 0
-        assert client.player_lock_acquire_attack(1112, 665, -1) < 0 # already locked
-        client.player_cache().update_one({'_id':1112},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
-        assert client.player_lock_acquire_login(1112, OWNER) == (client.LOCK_LOGGED_IN,5) # stale lock is busted
+        client.player_cache().insert_one({'_id':UID+1, 'facebook_id':'example1', 'ui_name':'Dan', 'last_mtime': time_now - 60, 'LOCK_GENERATION':5})
+        assert client.player_lock_acquire_login(UID+1, OWNER) == (client.LOCK_LOGGED_IN,5)
+        assert client.player_lock_acquire_login(UID+1, 9999)[0] < 0
+        assert client.player_lock_acquire_attack(UID+1, 665, -1) < 0 # already locked
+        client.player_cache().update_one({'_id':UID+1},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        assert client.player_lock_acquire_login(UID+1, OWNER) == (client.LOCK_LOGGED_IN,5) # stale lock is busted
 
-        assert client.player_lock_get_state_batch([1112,9999]) == [(client.LOCK_LOGGED_IN,OWNER),(client.LOCK_OPEN,-1)]
-        assert client.player_lock_acquire_login(1113, OWNER) == (client.LOCK_LOGGED_IN,-1) # try uncreated player entry
-        assert client.player_lock_release(1113, 666, -1, 6)
-        assert not client.player_lock_release(1113, 666, -1, 6) # already released
-        assert client.player_lock_acquire_attack(1113, 665, -1) < 0 # stale generation
-        assert client.player_lock_acquire_attack(1113, 666, -1) == client.LOCK_BEING_ATTACKED
-        assert client.player_lock_release(1113, 667, -1, -1)
-        assert client.player_lock_release(1112, -1, -1, -1)
+        assert client.player_lock_get_state_batch([UID+1,9999]) == [(client.LOCK_LOGGED_IN,OWNER),(client.LOCK_OPEN,-1)]
+        assert client.player_lock_acquire_login(UID+2, OWNER) == (client.LOCK_LOGGED_IN,-1) # try uncreated player entry
+        assert client.player_lock_release(UID+2, 666, -1, 6)
+        assert not client.player_lock_release(UID+2, 666, -1, 6) # already released
+        assert client.player_lock_acquire_attack(UID+2, 665, -1) < 0 # stale generation
+        assert client.player_lock_acquire_attack(UID+2, 666, -1) == client.LOCK_BEING_ATTACKED
+        assert client.player_lock_release(UID+2, 667, -1, -1)
+        assert client.player_lock_release(UID+1, -1, -1, -1)
 
         # TEST PLAYER CACHE
-        assert client.player_cache_update(1112, {'ui_name':'Dr. Gonzo 1112'})
-        assert client.player_cache_update(1117, {'ui_name':'Dr. Gonzo 1117', 'player_level':99})
-        assert client.player_cache_update(1113, {'ui_name':'Dr. Gonzo 1113', 'facebook_id': 'example2'}, overwrite=True)
-        assert client.player_cache_lookup_batch([1112,1113,9999], fields = ['ui_name']) == [{'user_id': 1112, u'ui_name': u'Dr. Gonzo 1112'}, {'user_id': 1113, u'ui_name': u'Dr. Gonzo 1113'}, {}]
-        assert client.player_cache_lookup_batch([1112,1113,9999]) == [{u'last_mtime': client.time, 'user_id': 1112, u'ui_name': u'Dr. Gonzo 1112', u'facebook_id': u'example1'}, {u'last_mtime': client.time, 'user_id': 1113, u'ui_name': u'Dr. Gonzo 1113', u'facebook_id': u'example2'}, {}]
-        assert sorted(client.get_users_modified_since(1234)) == sorted([1112,1113,1117])
+        assert client.player_cache_update(UID+1, {'ui_name':'Dr. Gonzo 1112'})
+        assert client.player_cache_update(UID+6, {'ui_name':'Dr. Gonzo 1117', 'player_level':99})
+        assert client.player_cache_update(UID+2, {'ui_name':'Dr. Gonzo UID+2', 'facebook_id': 'example2'}, overwrite=True)
+        assert client.player_cache_lookup_batch([UID+1,UID+2,9999], fields = ['ui_name']) == [{'user_id': UID+1, u'ui_name': u'Dr. Gonzo 1112'}, {'user_id': UID+2, u'ui_name': u'Dr. Gonzo UID+2'}, {}]
+        assert client.player_cache_lookup_batch([UID+1,UID+2,9999]) == [{u'last_mtime': client.time, 'user_id': UID+1, u'ui_name': u'Dr. Gonzo 1112', u'facebook_id': u'example1'}, {u'last_mtime': client.time, 'user_id': UID+2, u'ui_name': u'Dr. Gonzo UID+2', u'facebook_id': u'example2'}, {}]
+        assert sorted(client.get_users_modified_since(1234)) == sorted([UID+1,UID+2,UID+6])
 
         # TEST CONTROL QUEUE
         client.ctrl_queue_table().drop(); client.seen_ctrl_queue = False
-        client.ctrl_queue_add(1112, {'foo': 'bar'})
+        client.ctrl_queue_add(UID+1, {'foo': 'bar'})
         ctrl_list = client.ctrl_queue_poll()
         assert len(ctrl_list) == 1
         assert client.ctrl_queue_reserve(ctrl_list[0]['id'])
@@ -2829,31 +2833,31 @@ if __name__ == '__main__':
 
         # TEST MESSAGES
         client.message_table().drop(); client.seen_messages = False
-        assert client.msg_poll([9999,1112]) == [0,0]
-        client.msg_send([{'to':[1112],
+        assert client.msg_poll([9999,UID+1]) == [0,0]
+        client.msg_send([{'to':[UID+1],
                           'type':'donated_units',
                           'attachments':[{'spec':'blaster_droid'},{'spec':'blaster_droid'},{'spec':'elevation_droid'}],
-                          'from':1115}])
-        assert client.msg_poll([9999,1112]) == [0,1]
-        gotten = client.msg_recv(1112)
+                          'from':UID+4}])
+        assert client.msg_poll([9999,UID+1]) == [0,1]
+        gotten = client.msg_recv(UID+1)
         assert len(gotten) == 1
-        client.msg_ack(1112, [gotten[0]['msg_id']])
-        assert client.msg_poll([9999,1112]) == [0,0]
-        assert client.msg_recv(1112) == []
+        client.msg_ack(UID+1, [gotten[0]['msg_id']])
+        assert client.msg_poll([9999,UID+1]) == [0,0]
+        assert client.msg_recv(UID+1) == []
 
-        client.msg_send([{'to': [1112,1113],
+        client.msg_send([{'to': [UID+1,UID+2],
                           'type': 'resource_gift',
                           'from': 6666,
                           'from_fbid': u"Ersan K\u00f6rpe",
                           'unique_per_sender': 'resource_gift'}])
-        client.msg_send([{'to': [1112,1113],
+        client.msg_send([{'to': [UID+1,UID+2],
                           'type': 'resource_gift',
                           'from': 6666,
                           'from_fbid': u"Ersan K\u00f6rpe",
                           'unique_per_sender': 'resource_gift'}])
-        gotten = client.msg_recv(1113, type_filter=['resource_gift'])
+        gotten = client.msg_recv(UID+2, type_filter=['resource_gift'])
         assert len(gotten) == 1
-        client.msg_ack(1113,[gotten[0]['msg_id']])
+        client.msg_ack(UID+2,[gotten[0]['msg_id']])
 
         # TEST ABTESTS
 
@@ -2876,41 +2880,41 @@ if __name__ == '__main__':
             client._table(client.region_table_name(region, TABLE)).drop()
 
         # test objects
-        obj1 = {'obj_id': id_generator.generate(), 'owner_id': 1112, 'base_id': 'h1112', 'kind': 'mobile', 'spec': 'mining_droid'}
-        obj2 = {'obj_id': id_generator.generate(), 'owner_id': 1112, 'base_id': 'h1113', 'kind': 'mobile',  'spec': 'heavy_miner'}
+        obj1 = {'obj_id': id_generator.generate(), 'owner_id': UID+1, 'base_id': 'h%d' % (UID+1), 'kind': 'mobile', 'spec': 'mining_droid'}
+        obj2 = {'obj_id': id_generator.generate(), 'owner_id': UID+1, 'base_id': 'h%d' % (UID+2), 'kind': 'mobile',  'spec': 'heavy_miner'}
         client.update_mobile_object(region, obj1)
         client.update_mobile_object(region, obj2)
         obj1['spec'] = 'blaster_droid'
         client.update_mobile_object(region, obj1)
-        print client.get_mobile_objects_by_owner(region, 1112)
-        client.drop_mobile_objects_by_base(region, 'h1112')
-        client.drop_mobile_objects_by_base(region, 'h1113')
+        print client.get_mobile_objects_by_owner(region, UID+1)
+        client.drop_mobile_objects_by_base(region, 'h%d' % (UID+1))
+        client.drop_mobile_objects_by_base(region, 'h%d' % (UID+2))
 
         # test features
 #        old_time = client.time
 #        client.set_time(old_time+600)
-        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
-        assert True == client.create_map_feature(region, 'h1112', {'base_type':'home','base_landlord_id':1112,'base_map_loc':[50,50]}, originator=1112, exclusive = -1)
+        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
+        assert True == client.create_map_feature(region, 'h%d' % (UID+1), {'base_type':'home','base_landlord_id':UID+1,'base_map_loc':[50,50]}, originator=UID+1, exclusive = -1)
 
         # base should be created with lock taken
-        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
-        client.map_feature_lock_release(region, 'h1112', 1112)
+        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
+        client.map_feature_lock_release(region, 'h%d' % (UID+1), UID+1)
 
         # exclusion zone should work
-        assert False == client.create_map_feature(region, 'h1112b', {'base_type':'home','base_landlord_id':1112,'base_map_loc':[51,51]}, exclusive = 3)
-        assert False == client.create_map_feature(region, 'h1112b', {'base_type':'home','base_landlord_id':1112,'base_map_loc':[50,50]}, exclusive = 0)
-        assert True == client.create_map_feature(region, 'h1113', {'base_type':'home','base_landlord_id':1113,'base_map_loc':[40,40]}, originator=1113, exclusive = -1)
-        assert False == client.move_map_feature(region, 'h1113', {'base_map_loc':[51,51]}, old_loc = [40,40], exclusive=3)
-        assert False == client.move_map_feature(region, 'h1113', {'base_map_loc':[50,50]}, old_loc = [40,40], exclusive=0)
-        assert client.get_map_feature_by_base_id(region, 'h1113')['base_map_loc'] == [40,40]
-        assert True == client.move_map_feature(region, 'h1113', {'base_map_loc':[30,30]}, old_loc = [40,40], exclusive=0)
-        assert client.get_map_feature_by_base_id(region, 'h1113')['base_map_loc'] == [30,30]
-        client.map_feature_lock_release(region, 'h1113', 1113, generation = 50)
+        assert False == client.create_map_feature(region, 'h%db' % (UID+1), {'base_type':'home','base_landlord_id':UID+1,'base_map_loc':[51,51]}, exclusive = 3)
+        assert False == client.create_map_feature(region, 'h%db' % (UID+1), {'base_type':'home','base_landlord_id':UID+1,'base_map_loc':[50,50]}, exclusive = 0)
+        assert True == client.create_map_feature(region, 'h%d' % (UID+2), {'base_type':'home','base_landlord_id':UID+2,'base_map_loc':[40,40]}, originator=UID+2, exclusive = -1)
+        assert False == client.move_map_feature(region, 'h%d' % (UID+2), {'base_map_loc':[51,51]}, old_loc = [40,40], exclusive=3)
+        assert False == client.move_map_feature(region, 'h%d' % (UID+2), {'base_map_loc':[50,50]}, old_loc = [40,40], exclusive=0)
+        assert client.get_map_feature_by_base_id(region, 'h%d' % (UID+2))['base_map_loc'] == [40,40]
+        assert True == client.move_map_feature(region, 'h%d' % (UID+2), {'base_map_loc':[30,30]}, old_loc = [40,40], exclusive=0)
+        assert client.get_map_feature_by_base_id(region, 'h%d' % (UID+2))['base_map_loc'] == [30,30]
+        client.map_feature_lock_release(region, 'h%d' % (UID+2), UID+2, generation = 50)
 
-        client.update_map_feature(region, 'h1112', {'protection_end_time':1234})
+        client.update_map_feature(region, 'h%d' % (UID+1), {'protection_end_time':1234})
 
-        print 'GET', client.get_map_feature_by_base_id(region, 'h1112')
-        print 'GET', list(client.get_map_features_by_landlord_and_type(region, 1112, 'home'))
+        print 'GET', client.get_map_feature_by_base_id(region, 'h%d' % (UID+1))
+        print 'GET', list(client.get_map_features_by_landlord_and_type(region, UID+1, 'home'))
         print 'GET ALL', list(client.get_map_features(region, -1))
         assert not list(client.get_map_features(region, client.time+50))
         print 'GET INCR', list(client.get_map_features(region, client.time+50))
@@ -2924,33 +2928,33 @@ if __name__ == '__main__':
         end_time = time.time()
         print 'occupancy check in: %.2fms' % (((end_time-start_time)/CHECKS)*1000)
 
-        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
-        assert client.map_feature_lock_get_state_batch(region, ['h1112','h1113','asdf']) == [(client.LOCK_BEING_ATTACKED,1112),(client.LOCK_OPEN,-1),(client.LOCK_OPEN,-1)]
+        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
+        assert client.map_feature_lock_get_state_batch(region, ['h%d' % (UID+1),'h%d' % (UID+2),'asdf']) == [(client.LOCK_BEING_ATTACKED,UID+1),(client.LOCK_OPEN,-1),(client.LOCK_OPEN,-1)]
 
         # mutex should prevent second lock
-        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
+        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
 
         # stale lock should be acquirable
-        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
-        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
+        client.region_table(region, 'map').update_one({'_id':'h%d' % (UID+1)},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
 
         # prune should clear stale locks
-        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.region_table(region, 'map').update_one({'_id':'h%d' % (UID+1)},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
         client.do_region_maint(region)
-        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
+        assert client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
 
         # keepalive should refresh locks
-        client.region_table(region, 'map').update_one({'_id':'h1112'},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
-        client.map_feature_lock_keepalive_batch(region, ['h1112','h1113'])
-        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = -1)
+        client.region_table(region, 'map').update_one({'_id':'h%d' % (UID+1)},{'$set':{'LOCK_TIME':client.time-2*client.LOCK_TIMEOUT}})
+        client.map_feature_lock_keepalive_batch(region, ['h%d' % (UID+1),'h%d' % (UID+2)])
+        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = -1)
 
         # acquire with old generation should fail
-        client.map_feature_lock_release(region, 'h1112', 1112, generation = 50)
-        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h1112', 1112, generation = 49)
+        client.map_feature_lock_release(region, 'h%d' % (UID+1), UID+1, generation = 50)
+        assert -client.LOCK_BEING_ATTACKED == client.map_feature_lock_acquire(region, 'h%d' % (UID+1), UID+1, generation = 49)
 
         if 1:
-            client.drop_map_feature(region, 'h1112')
-            client.drop_map_feature(region, 'h1113')
+            client.drop_map_feature(region, 'h%d' % (UID+1))
+            client.drop_map_feature(region, 'h%d' % (UID+2))
             assert not list(client.get_map_features(region, -1))
             print 'deletions:', list(client.get_map_features(region, client.time-50))
 
@@ -2959,10 +2963,10 @@ if __name__ == '__main__':
             client.alliance_table(TABLE).drop()
         client.seen_alliances = False
 
-        alliance_1 = client.create_alliance(u'Democratic Mars Union', "We are awesome", 'anyone', 1112, 'tetris_red', time_now, 'fb')[0]
+        alliance_1 = client.create_alliance(u'Democratic Mars Union', "We are awesome", 'anyone', UID+1, 'tetris_red', time_now, 'fb')[0]
         assert alliance_1 > 0
-        assert client.create_alliance(u'Democratic Mars Union', "We are awesomer", 'anyone', 1112, 'tetris_red', time_now, 'fb')[0] < 0 # duplicate name
-        alliance_2 = client.create_alliance(u'Mars Federation', "We are cool", 'anyone', 1113, 'bullseye_tan', time_now, 'fb', chat_tag='123')[0]
+        assert client.create_alliance(u'Democratic Mars Union', "We are awesomer", 'anyone', UID+1, 'tetris_red', time_now, 'fb')[0] < 0 # duplicate name
+        alliance_2 = client.create_alliance(u'Mars Federation', "We are cool", 'anyone', UID+2, 'bullseye_tan', time_now, 'fb', chat_tag='123')[0]
         assert alliance_2 > 0
         assert client.create_alliance(u'Temp Alliance', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb')[0] > 0
         assert client.create_alliance(u'Temp Alliance 2', "We are dead", 'anyone', 1120, 'star_orange', time_now, 'fb', chat_tag = '123')[0] < 0 # duplicate chat tag
@@ -2974,45 +2978,45 @@ if __name__ == '__main__':
         MAX_MEMBERS = 2
 
         assert not client.join_alliance(1120, 999, time_now, MAX_MEMBERS) # alliance does not exist
-        assert client.join_alliance(1112, alliance_1, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
-        assert not client.join_alliance(1112, alliance_2, time_now, MAX_MEMBERS) # already in alliance
-        assert not client.join_alliance(1112, alliance_1, time_now, MAX_MEMBERS) # already in alliance
-        assert client.join_alliance(1115, alliance_1, time_now, MAX_MEMBERS)
-        assert not client.join_alliance(1114, alliance_1, time_now, MAX_MEMBERS) # too many members
+        assert client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert not client.join_alliance(UID+1, alliance_2, time_now, MAX_MEMBERS) # already in alliance
+        assert not client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS) # already in alliance
+        assert client.join_alliance(UID+4, alliance_1, time_now, MAX_MEMBERS)
+        assert not client.join_alliance(UID+3, alliance_1, time_now, MAX_MEMBERS) # too many members
 
-        assert client.join_alliance(1113, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert client.join_alliance(UID+2, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
 
-        assert client.modify_alliance(alliance_1, 1112, ui_name = 'New Democratic Mars Union', chat_tag='ABC')[0]
-        assert not client.modify_alliance(alliance_1, 1112, chat_tag='123')[0] # duplicate chat tag
-        assert not client.modify_alliance(alliance_1, 1119, ui_name = 'New Democratic Mars Union')[0] # permissions fail
-        assert not client.modify_alliance(alliance_1, 1112, ui_name = 'Mars Federation')[0] # duplicate name
-        assert not client.modify_alliance(alliance_2, 1113, chat_tag='ABC')[0] # duplicate tag
+        assert client.modify_alliance(alliance_1, UID+1, ui_name = 'New Democratic Mars Union', chat_tag='ABC')[0]
+        assert not client.modify_alliance(alliance_1, UID+1, chat_tag='123')[0] # duplicate chat tag
+        assert not client.modify_alliance(alliance_1, UID+8, ui_name = 'New Democratic Mars Union')[0] # permissions fail
+        assert not client.modify_alliance(alliance_1, UID+1, ui_name = 'Mars Federation')[0] # duplicate name
+        assert not client.modify_alliance(alliance_2, UID+2, chat_tag='ABC')[0] # duplicate tag
 
-        assert not client.send_alliance_invite(9999, 1117, alliance_2, time_now, time_now+3600) # not sent by leader
-        assert client.send_alliance_invite(1113, 1117, alliance_2, time_now, time_now+3600)
-        assert client.join_alliance(1117, alliance_2, time_now, MAX_MEMBERS)
-        assert not client.join_alliance(1118, alliance_2, time_now, MAX_MEMBERS) # too many members
-        assert client.leave_alliance(1117) == 0
-        assert client.leave_alliance(1117) == 0
-        assert client.join_alliance(1118, alliance_2, time_now, MAX_MEMBERS)
-        assert client.kick_from_alliance(1113, alliance_2, 1118)
+        assert not client.send_alliance_invite(9999, UID+6, alliance_2, time_now, time_now+3600) # not sent by leader
+        assert client.send_alliance_invite(UID+2, UID+6, alliance_2, time_now, time_now+3600)
+        assert client.join_alliance(UID+6, alliance_2, time_now, MAX_MEMBERS)
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # too many members
+        assert client.leave_alliance(UID+6) == 0
+        assert client.leave_alliance(UID+6) == 0
+        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)
+        assert client.kick_from_alliance(UID+2, alliance_2, UID+7)
 
-        assert sorted(client.get_alliance_member_ids(alliance_1)) == [1112,1115]
-        assert client.get_alliance_members(alliance_2) == [{'user_id':1113,'role':client.ROLE_LEADER,'join_time':time_now}]
+        assert sorted(client.get_alliance_member_ids(alliance_1)) == [UID+1,UID+4]
+        assert client.get_alliance_members(alliance_2) == [{'user_id':UID+2,'role':client.ROLE_LEADER,'join_time':time_now}]
         assert client.get_alliance_info(alliance_1)['num_members'] == 2
         assert client.get_alliance_info(alliance_2)['num_members'] == 1
 
-        assert client.modify_alliance(alliance_2, 1113, join_type='invite_only')
-        assert not client.join_alliance(1118, alliance_2, time_now, MAX_MEMBERS) # not invited
-        assert not client.am_i_invited(alliance_2, 1118, time_now)
-        assert client.send_alliance_invite(1113, 1118, 2, time_now, time_now+300)
-        assert client.am_i_invited(alliance_2, 1118, time_now)
-        assert client.join_alliance(1118, alliance_2, time_now, MAX_MEMBERS)
-        assert client.leave_alliance(1118) == 0
-        assert not client.join_alliance(1118, alliance_2, time_now, MAX_MEMBERS) # not invited
-        assert client.send_join_request(1118, alliance_2, time_now, time_now+300)
-        assert client.poll_join_requests(1113, alliance_2, time_now) == [1118]
-        assert client.ack_join_request(1113, alliance_2, 1118, True, time_now, MAX_MEMBERS)
+        assert client.modify_alliance(alliance_2, UID+2, join_type='invite_only')
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # not invited
+        assert not client.am_i_invited(alliance_2, UID+7, time_now)
+        assert client.send_alliance_invite(UID+2, UID+7, 2, time_now, time_now+300)
+        assert client.am_i_invited(alliance_2, UID+7, time_now)
+        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)
+        assert client.leave_alliance(UID+7) == 0
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # not invited
+        assert client.send_join_request(UID+7, alliance_2, time_now, time_now+300)
+        assert client.poll_join_requests(UID+2, alliance_2, time_now) == [UID+7]
+        assert client.ack_join_request(UID+2, alliance_2, UID+7, True, time_now, MAX_MEMBERS)
 
         print "ALLIANCE LIST (unlimited)", client.get_alliance_list(-1)
         print "ALLIANCE LIST (limited)", client.get_alliance_list(1)
@@ -3021,51 +3025,51 @@ if __name__ == '__main__':
         print "SEARCH (limited)", client.search_alliance('', limit = 1)
 
 
-        assert client.get_users_alliance(1112, reason = 'hello') == alliance_1
-        assert client.get_users_alliance_membership(1112, reason = 'hello') == {'user_id':1112, 'alliance_id':alliance_1, 'role':client.ROLE_LEADER, 'join_time':time_now}
-        assert client.get_users_alliance(1113, reason = 'hello') == alliance_2
-        assert client.get_users_alliance([1112,1113,1115,9999]) == [1, 2, 1, -1]
+        assert client.get_users_alliance(UID+1, reason = 'hello') == alliance_1
+        assert client.get_users_alliance_membership(UID+1, reason = 'hello') == {'user_id':UID+1, 'alliance_id':alliance_1, 'role':client.ROLE_LEADER, 'join_time':time_now}
+        assert client.get_users_alliance(UID+2, reason = 'hello') == alliance_2
+        assert client.get_users_alliance([UID+1,UID+2,UID+4,9999]) == [1, 2, 1, -1]
 
         # deliberately create messed-up leadership situations
         alliance_4 = client.create_alliance(u'Leaderless Alliance', "", 'anyone', 1120, 'star_orange', time_now, 'fb')[0]
         assert alliance_4 > 0
-        assert client.join_alliance(1114, alliance_4, time_now, MAX_MEMBERS)
-        alliance_5 = client.create_alliance(u'Contested Alliance', "", 'anyone', 1116, 'star_orange', time_now, 'fb')[0]
+        assert client.join_alliance(UID+3, alliance_4, time_now, MAX_MEMBERS)
+        alliance_5 = client.create_alliance(u'Contested Alliance', "", 'anyone', UID+5, 'star_orange', time_now, 'fb')[0]
         assert alliance_5 > 0
-        assert client.join_alliance(1116, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
-        assert client.join_alliance(1117, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert client.join_alliance(UID+5, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert client.join_alliance(UID+6, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
 
         assert client.do_maint_fix_leadership_problem(alliance_1) == 0
         assert client.do_maint_fix_leadership_problem(alliance_2) == 0
-        assert client.do_maint_fix_leadership_problem(alliance_4) == 1114
-        assert client.do_maint_fix_leadership_problem(alliance_5) == 1117
+        assert client.do_maint_fix_leadership_problem(alliance_4) == UID+3
+        assert client.do_maint_fix_leadership_problem(alliance_5) == UID+6
 
-        # alliance_4 now has single leader 1114
-        # alliance_5 now has single leader 1117 and members 1116
-        assert not client.promote_alliance_member(alliance_5, 9999, 1116, client.ROLE_DEFAULT, client.ROLE_LEADER) # no permissions
-        assert not client.promote_alliance_member(alliance_5, 1116, 1117, client.ROLE_DEFAULT, client.ROLE_LEADER) # no permissions
+        # alliance_4 now has single leader UID+3
+        # alliance_5 now has single leader UID+6 and members UID+5
+        assert not client.promote_alliance_member(alliance_5, 9999, UID+5, client.ROLE_DEFAULT, client.ROLE_LEADER) # no permissions
+        assert not client.promote_alliance_member(alliance_5, UID+5, UID+6, client.ROLE_DEFAULT, client.ROLE_LEADER) # no permissions
 
-        assert client._check_alliance_member_perm(alliance_5, 1117, 'promote')
-        assert client.promote_alliance_member(alliance_5, 1117, 1116, client.ROLE_LEADER-1, client.ROLE_DEFAULT+1)
-        assert not client.promote_alliance_member(alliance_5, 1117, 1116, client.ROLE_DEFAULT, client.ROLE_DEFAULT+1) # old_role mismatch
-        assert client.promote_alliance_member(alliance_5, 1117, 1116, client.ROLE_DEFAULT+1, client.ROLE_DEFAULT)
+        assert client._check_alliance_member_perm(alliance_5, UID+6, 'promote')
+        assert client.promote_alliance_member(alliance_5, UID+6, UID+5, client.ROLE_LEADER-1, client.ROLE_DEFAULT+1)
+        assert not client.promote_alliance_member(alliance_5, UID+6, UID+5, client.ROLE_DEFAULT, client.ROLE_DEFAULT+1) # old_role mismatch
+        assert client.promote_alliance_member(alliance_5, UID+6, UID+5, client.ROLE_DEFAULT+1, client.ROLE_DEFAULT)
 
-        assert client.promote_alliance_member(alliance_5, 1117, 1116, client.ROLE_DEFAULT, client.ROLE_LEADER) # trade leadership
-        assert client.get_users_alliance_membership(1116) == {'user_id':1116, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER, 'join_time': time_now}
-        assert client.get_users_alliance_membership(1117) == {'user_id':1117, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER-1, 'join_time': time_now}
+        assert client.promote_alliance_member(alliance_5, UID+6, UID+5, client.ROLE_DEFAULT, client.ROLE_LEADER) # trade leadership
+        assert client.get_users_alliance_membership(UID+5) == {'user_id':UID+5, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER, 'join_time': time_now}
+        assert client.get_users_alliance_membership(UID+6) == {'user_id':UID+6, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER-1, 'join_time': time_now}
         assert client.do_maint_fix_leadership_problem(alliance_5, verbose=False) == 0 # make sure transition was smooth
 
-        assert client.leave_alliance(1116) == 1117 # leadership should pass to 1117
-        assert client.get_users_alliance_membership(1117) == {'user_id':1117, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER, 'join_time': time_now}
+        assert client.leave_alliance(UID+5) == UID+6 # leadership should pass to UID+6
+        assert client.get_users_alliance_membership(UID+6) == {'user_id':UID+6, 'alliance_id':alliance_5, 'role':client.ROLE_LEADER, 'join_time': time_now}
 
         # test unit donations
         client.unit_donation_requests_table().drop()
         TAG = 1234
-        assert client.request_unit_donation(1112, alliance_1, time_now, TAG, 10, 100)
-        assert client.make_unit_donation(1112, alliance_1, TAG, [10]) == (20, 100)
-        assert client.make_unit_donation(1112, alliance_1, TAG, [100]) is None
-        assert client.make_unit_donation(1112, alliance_1, TAG, [100,80,10]) == (100, 100)
-        assert client.make_unit_donation(1112, alliance_1, TAG, [1]) is None
+        assert client.request_unit_donation(UID+1, alliance_1, time_now, TAG, 10, 100)
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [10]) == (20, 100)
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100]) is None
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100,80,10]) == (100, 100)
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [1]) is None
 
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)
@@ -3073,14 +3077,14 @@ if __name__ == '__main__':
         # test chat
         client.chat_buffer_table().drop(); client.seen_chat = False
         for n in range(4):
-            client.chat_record('global_en', None, {'user_id': 1112, 'chat_name': 'test'}, 'Test message %d' % n)
-        chat_context = client.chat_get_context('global_en', 1112, time_now, 5, limit = 10)
+            client.chat_record('global_en', None, {'user_id': UID+1, 'chat_name': 'test'}, 'Test message %d' % n)
+        chat_context = client.chat_get_context('global_en', UID+1, time_now, 5, limit = 10)
         assert len(chat_context) == 4
 
         # test chat reports
         client.chat_reports_table().drop(); client.seen_chat_reports = False
         report_time = time_now - 2
-        client.chat_report('global_en', 1112, 'Reporter', 1113, 'Target', time_now, report_time, None, u'you are a poopyhead \u4f60\u597d')
+        client.chat_report('global_en', UID+1, 'Reporter', UID+2, 'Target', time_now, report_time, None, u'you are a poopyhead \u4f60\u597d')
         rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         assert len(rep_list) == 1
         rep = rep_list[0]
@@ -3089,7 +3093,7 @@ if __name__ == '__main__':
         assert not client.chat_report_resolve(rep['id'], 'ignore', time_now) # second attempt should fail
         assert len(filter(lambda x: not x.get('resolved'), client.chat_reports_get(time_now - 600, time_now + 600))) == 0
         # add an obsolete report
-        client.chat_report('global_en', 1114, 'Reporter', 1113, 'Target', time_now, report_time-60, None, 'you are a poopyhead (earlier)')
+        client.chat_report('global_en', UID+3, 'Reporter', UID+2, 'Target', time_now, report_time-60, None, 'you are a poopyhead (earlier)')
         rep_list = client.chat_reports_get(time_now - 600, time_now + 600)
         print '---'
         print '\n'.join([repr(x) for x in rep_list])

@@ -7606,7 +7606,14 @@ player.has_item_equipped = function(item_name) {
     return false;
 }
 
-function is_ai_user_id_range(id) { return (id > 0 && id <= 1100); }
+/** Check if this ID is in the range exclusively used by AI players
+    @param {number} id
+    @return {boolean} */
+function is_ai_user_id_range(id) {
+    var max_ai_user_id = ('max_ai_user_id' in gamedata ? gamedata['max_ai_user_id'] : 1100);
+    return (id > 0 && id <= max_ai_user_id);
+}
+
 function home_base_id(user_id) { return 'h' + user_id.toString(); }
 
 // NOTE: "Friend" represents AIs, True Facebook Friends, and "Rivals" (strangers the server gives you to attack)

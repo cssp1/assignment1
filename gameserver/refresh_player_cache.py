@@ -68,7 +68,7 @@ def get_lootable_buildings(player):
     return total
 
 def update_user(user_id, db_client):
-    if user_id < 1100:
+    if user_id <= gamedata.get('max_ai_user_id', 1100):
         # AI users
         return
 

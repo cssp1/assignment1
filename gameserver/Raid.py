@@ -753,7 +753,7 @@ def make_battle_summary(gamedata, nosql_client,
                                 ret['loot'][key+'_'+res] = ret['loot'].get(key+'_'+res,0) + full_cost[res]
 
     for role, user_id, pcinfo in (('attacker', attacker_id, attacker_pcinfo), ('defender', defender_id, defender_pcinfo)):
-        is_ai = 0 if user_id > 1100 else 1 # XXX really need to fix this sometime
+        is_ai = 1 if user_id <= gamedata.get('max_ai_user_id', 1100) else 0
         ret.update({role+'_id': user_id,
                     role+'_type': 'ai' if is_ai else 'human',
                     role+'_is_ai': is_ai,

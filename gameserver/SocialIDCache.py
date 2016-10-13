@@ -32,7 +32,7 @@ class SocialIDCache:
         index = []
         ret = []
         for id in social_ids:
-            if id < 1100: # AIs
+            if id in (-1, '-1', 0, '0', None): # AIs
                 ret.append(None)
             elif self.cache.has_key(id):
                 ret.append(self.cache[id])

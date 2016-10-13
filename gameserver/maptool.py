@@ -363,7 +363,7 @@ def make_valentina_mail(user_id, subject='', body='', days_to_claim=3, attachmen
 
 def refund_units(db, region_id, feature, objlist, user_id, days_to_claim = 7, ui_name = '', reason = 'expired', force_message = False, dry_run = True):
     if len(objlist) < 1: return # nothing to return
-    if user_id < 1100: return # AI user
+    if user_id <= gamedata.get('max_ai_user_id', 1100): return # AI user
     if feature['base_type'] != 'squad':
         raise Exception('cannot refund units from a feature that is not a squad')
     squad_id = int(feature['base_id'].split('_')[1])

@@ -409,11 +409,9 @@ LOTS_OF_METRICS = False
 # special case for AI fought during the rails tutorial
 LION_STONE_ID = 1002
 
-# user_id numbers lower than this are used for AIs
-MAX_AI_USER_ID = 1100
-
+# user_id numbers lower than or equal to max_user_id are used for AIs
 def is_ai_user_id_range(id):
-    return id >= 0 and id <= MAX_AI_USER_ID
+    return id > 0 and id <= gamedata.get('max_ai_user_id', 1100)
 
 class SQUAD_IDS(object):
     # None or 0 means "base defenders", -1 is "reserves", 1..N is real squads
@@ -451,6 +449,11 @@ def reload_gamedata():
         gameclient_build_date = str(open("../gameclient/compiled-client.js.date").read().strip())
 
         chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
+
+        # make sure config.json setting for min_user_id is correct
+        if 'max_ai_user_id' in gamedata:
+            if SpinConfig.config.get('min_user_id',-1) <= gamedata['max_ai_user_id']:
+                raise Exception('config.json min_user_id setting must be > gamedata["max_ai_user_id"]')
 
     except:
         writefunc = (lambda x: gamesite.exception_log.event(server_time, x)) if gamesite else (lambda x: sys.stderr.write(x+'\n'))

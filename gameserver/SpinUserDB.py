@@ -18,37 +18,6 @@ class Driver (object):
     def user_exists(self, id):
         return os.path.exists(self.get_user_path(id))
 
-    # hard-coded
-    min_user_id = 1111
-
-    # this fails because some users hit the page but never logged in (e.g. due to unsupported browser bounces)
-    def get_user_id_range_spotty(self):
-
-        # find max user_id number with binary search
-        ceiling = self.min_user_id
-        while self.user_exists(ceiling):
-            ceiling *= 2
-
-        sys.stderr.write('CEILING %d\n' % ceiling)
-
-        lo = mid = self.min_user_id
-        hi = ceiling
-
-        while lo < hi:
-            mid = (lo+hi)//2
-            #print 'lo', lo, 'hi', hi, 'mid', mid
-
-            result = self.user_exists(mid)
-            sys.stderr.write('CHECK %d: %d\n' % (mid, result))
-
-            if result:
-                lo = mid+1
-            else:
-                hi = mid
-                mid -= 1
-
-        return [self.min_user_id, mid]
-
     # optimal number of concurrent I/O processes
     def optimal_io_channels(self): return 1
     # which I/O process is best to serve a given userdb/playerdb entry
