@@ -678,6 +678,7 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
     }
 
     var was_destroyed = target.is_destroyed(); // always going be false unless we implement building repair
+    var was_damaged = (target.hp < target.max_hp);
 
     var original_target_hp = target.hp;
 
@@ -685,6 +686,16 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
     target.last_attacker = source;
     target.state_dirty |= obj_state_flags.HP;
     target.serialization_dirty = true;
+
+    if(!was_damaged && damage > 0) {
+        // first damage
+        if('on_first_damage' in target.spec) {
+            var cons = target.get_leveled_quantity(target.spec['on_first_damage']);
+            if(cons) {
+                read_consequent(cons).execute({'source_obj': target});
+            }
+        }
+    }
 
     if(target.is_building()) {
         // immediately show that repair/research/upgrade/production stops in the UI. Subsequent OBJECT_STATE_UPDATE will return correct HP value and start/stop times.
