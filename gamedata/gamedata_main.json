@@ -625,12 +625,7 @@
 
     "global_harvest_coeff": 1.0, // global scale on how fast harvesters operate (adjusts AFTER value shown in UI)
 
-    "harvest_rate_detail": false, // whether or not to show actual Units/hour harvest rate in upgrade dialog(instead of just percent relative to level 1)
-
-    "enemy_tooltip_detail": { "mobile": 1, "building": 0 }, // whether or not to show detailed info (unit/mod levels etc) in tooltips of enemy-owned objects
     "enemy_storage_detail": true, // whether or not to show fullness of enemy-owned storage buildings
-
-    "battle_log_detail": false, // whether or not to show unit/building levels in battle logs
 
     "allow_self_attack": false, // do not allow players (non-developers) to order units to attack their own units/buildings
 

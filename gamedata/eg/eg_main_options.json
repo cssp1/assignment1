@@ -181,4 +181,8 @@
 
     [{"predicate": "COUNTRY", "countries": ["tw","cn"]}, "global_zh"],
     [{"predicate": "ALWAYS_TRUE"}, "global_default"]
-]
+],
+
+"harvest_rate_detail": 0, // whether or not to show actual Units/hour harvest rate in upgrade dialog(instead of just percent relative to level 1)
+
+"enemy_tooltip_detail": { "mobile": 1, "building": 1 } // whether or not to show detailed info (unit/mod levels etc) in tooltips of enemy-owned objects
