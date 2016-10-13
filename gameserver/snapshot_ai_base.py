@@ -29,6 +29,9 @@ def pretty_print_array(f, name, out, final):
         f.write(',')
     f.write('\n')
 
+# fields that should be copied verbatim from GameObject state
+OBJECT_FIELDS = ['equipment','orders','patrol','pack_id','behaviors']
+
 # convert playerdb base to AI base
 def from_playerdb(player, output, force_unit_level):
     out = {}
@@ -54,7 +57,8 @@ def from_playerdb(player, output, force_unit_level):
         specname = obj['spec']
         props = {'spec': specname, 'xy': obj['xy']}
         props['force_level'] = obj.get('level',1)
-        if 'equipment' in obj: props['equipment'] = obj['equipment']
+        for field in OBJECT_FIELDS:
+            if field in obj: props[field] = obj[field]
         if specname in gamedata['buildings']:
             spec = gamedata['buildings'][specname]
             if output == 'quarry':
@@ -68,8 +72,6 @@ def from_playerdb(player, output, force_unit_level):
         elif specname in gamedata['units']:
             if force_unit_level > 0:
                 props['force_level'] = force_unit_level
-            if 'orders' in obj: props['orders'] = obj['orders']
-            if 'patrol' in obj: props['patrol'] = obj['patrol']
             props['force_level'] = obj.get('level',1)
             if obj.get('squad_id',0) != 0: continue # do not include units that belong to squads other than base defenders
             out['units'].append(props)
@@ -113,12 +115,15 @@ def to_playerdb(player_filename, player, base_id):
         props = {'spec':building['spec'],
                  'xy':building['xy'],
                  'level':building.get('level',1)}
-        if 'equipment' in building: props['equipment'] = building['equipment']
+        for field in OBJECT_FIELDS:
+            if field in building:
+                props[field] = building[field]
         my_base.append(props)
     for unit in base['units']:
         props = {'spec':unit['spec'], 'level':unit.get('level',1), 'xy': unit['xy']}
-        if 'orders' in unit: props['orders'] = unit['orders']
-        if 'patrol' in unit: props['patrol'] = unit['patrol']
+        for field in OBJECT_FIELDS:
+            if field in unit:
+                props[field] = unit[field]
         my_base.append(props)
     for scenery in base.get('scenery',[]):
         my_base.append({'spec':scenery['spec'], 'xy': scenery['xy']})

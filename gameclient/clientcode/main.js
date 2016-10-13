@@ -1303,6 +1303,8 @@ function GameObject() {
     this.team = 'invalid';
     this.level = 1;
     this.equipment = null;
+    /** @type {null|Array<string>} */
+    this.behaviors = null;
 
     // true if there are unsaved changes that should be sent back to
     // the server before the session is closed
@@ -1877,6 +1879,7 @@ GameObject.prototype.receive_state = function(data, init, is_deploying) {
     this.team = data.shift();
     this.level = data.shift();
     this.equipment = data.shift();
+    this.behaviors = data.shift();
 
     this.update_stats(null);
     if(updated_hp >= 0) {
@@ -8181,6 +8184,8 @@ function Mobile() {
     this.squad_id = null;
     this.orders = [];
     this.patrol = null;
+    /** @type {null|string} */
+    this.pack_id = null;
     this.temporary = null;
 
     // client side reference only, the authoritive source is player.unit_repair_queue
@@ -8466,6 +8471,7 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
     this.squad_id = data.shift();
     var orders = data.shift();
     var patrol = data.shift();
+    this.pack_id = data.shift();
     this.temporary = data.shift();
 
     if(patrol !== null) { this.patrol = !!patrol; }

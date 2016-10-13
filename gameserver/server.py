@@ -6412,6 +6412,7 @@ class GameObject(object):
         self.level = level
         self.auras = auras
         self.equipment = None
+        self.behaviors = None
 
         self.max_hp = self._calc_max_hp()
         if (hp < 0) or (hp > self.max_hp):
@@ -6486,7 +6487,7 @@ class GameObject(object):
         return [self.obj_id, self.spec.name, x, y,
                 self.hp if update_hp else -1,
                 self.max_hp,
-                self.team, self.level, self.equipment]
+                self.team, self.level, self.equipment, self.behaviors]
 
     def serialize_auras(self):
         ser = [aura.serialize_aura() for aura in self.auras] if self.auras else None
@@ -6505,6 +6506,9 @@ class GameObject(object):
 
         if self.equipment:
             props['equipment'] = self.equipment
+
+        if self.behaviors:
+            props['behaviors'] = self.behaviors
 
         if self.force_ai_level is not None:
             props['force_ai_level'] = self.force_ai_level
@@ -6534,6 +6538,7 @@ class GameObject(object):
 
         self.level = min(max(state.get('level',1), 1), self.spec.maxlevel)
         self.equipment = state.get('equipment', None)
+        self.behaviors = state.get('behaviors', None)
 
         self.update_max_hp()
         max_hp = self.max_hp
@@ -6589,9 +6594,10 @@ class Mobile(GameObject):
         self.squad_id = None
         self.orders = None
         self.patrol = None
+        self.pack_id = None
         self.temporary = temporary # indicates a "temporary" unit like a security team
     def serialize_state(self, fake_xy = None, update_hp = True):
-        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol, self.temporary]
+        return GameObject.serialize_state(self, fake_xy = fake_xy, update_hp = update_hp) + [self.squad_id,self.orders, self.patrol, self.pack_id, self.temporary]
     def persist_state(self, **args):
         ret = GameObject.persist_state(self, **args)
         if self.squad_id is not None:
@@ -6600,6 +6606,8 @@ class Mobile(GameObject):
             ret['orders'] = self.orders
         if self.patrol:
             ret['patrol'] = self.patrol
+        if self.pack_id:
+            ret['pack_id'] = self.pack_id
         if self.temporary:
             ret['temporary'] = self.temporary
         return ret
@@ -6612,6 +6620,7 @@ class Mobile(GameObject):
             else:
                 gamesite.exception_log.event(server_time, 'Mobile orders that are not a list: %s' % repr(orders))
         self.patrol = int(not (not state.get('patrol', None)))
+        self.pack_id = state.get('pack_id', None)
         self.squad_id = state.get('squad_id', None)
         self.temporary = state.get('temporary', None)
 
@@ -6628,6 +6637,7 @@ class Mobile(GameObject):
         self.x = self.y = -1
         self.ensure_mobile_position(base_ncells)
         self.patrol = None
+        self.pack_id = None # ?
         self.orders = copy.copy(gamedata['client']['squad_deploy_ai_orders'])
 
     def get_auto_spell(self):
@@ -14119,6 +14129,7 @@ def setup_ai_base(strid, cb):
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
             if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
+            if 'behaviors' in p: obj.behaviors = copy.deepcopy(p['behaviors'])
             if 'hp_ratio' in p: obj.hp = int(obj.hp * p['hp_ratio'])
 
             # max out harvesters
@@ -14131,8 +14142,11 @@ def setup_ai_base(strid, cb):
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
 
+            if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
             if 'orders' in p: obj.orders = p['orders']
             if 'patrol' in p: obj.patrol = p['patrol']
+            if 'behaviors' in p: obj.behaviors = copy.deepcopy(p['behaviors'])
+            if 'pack_id' in p: obj.pack_id = p['pack_id']
             if 'temporary' in p: obj.temporary = p['temporary']
             player.home_base_add(obj)
 
@@ -23737,7 +23751,7 @@ class GAMEAPI(resource.Resource):
             if session.viewing_base.is_nosql_base() and (obj in session.viewing_base.iter_objects()): # XXX inefficient
                 # this will write (for hives/quarries) or not write (for player homes), as appropriate
                 session.viewing_base.nosql_write_one(obj, 'OBJECT_COMBAT_UPDATES')
-                # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
+                # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','equipment','pack_id','behaviors','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
 
             elif owning_player and obj.is_mobile() and (not obj.spec.consumable) and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
                  ((owning_player is not session.player) or owning_player.squad_is_deployed(obj.squad_id or 0)):
@@ -28219,13 +28233,17 @@ class GAMEAPI(resource.Resource):
                                                                 level = data.get('force_level', data.get('level',1)))
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
                             if 'equipment' in data: obj.equipment = data['equipment']
+                            if 'behaviors' in data: obj.behaviors = data['behaviors']
                             session.player.home_base_add(obj)
                         for data in base.get('units',[]):
                             obj = instantiate_object_for_player(session.player, session.player, data['spec'], x=data['xy'][0], y=data['xy'][1],
                                                                 level = data.get('force_level', data.get('level',1)))
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
+                            if 'equipment' in data: obj.equipment = data['equipment']
                             if 'orders' in data: obj.orders = data['orders']
                             if 'patrol' in data: obj.patrol = data['patrol']
+                            if 'pack_id' in data: obj.pack_id = data['pack_id']
+                            if 'behaviors' in data: obj.behaviors = data['behaviors']
                             if 'temporary' in data: obj.temporary = data['temporary']
                             session.player.home_base_add(obj)
                         for data in base.get('scenery',[]):
@@ -28278,12 +28296,16 @@ class GAMEAPI(resource.Resource):
                                 props = {'spec':spec, 'xy': [obj.x,obj.y],
                                          'force_level': obj.level }
                                 if obj.equipment: props['equipment'] = obj.equipment
+                                if obj.behaviors: props['behaviors'] = obj.behaviors
                                 out['buildings'].append(props)
                             elif obj.is_mobile():
                                 if obj.is_temporary(): continue # don't save these
                                 props = {'spec': obj.spec.name, 'xy': [obj.x, obj.y] }
+                                if obj.equipment: props['equipment'] = obj.equipment
+                                if obj.behaviors: props['behaviors'] = obj.behaviors
                                 if obj.orders: props['orders'] = obj.orders
                                 if obj.patrol: props['patrol'] = obj.patrol
+                                if obj.pack_id: props['pack_id'] = obj.pack_id
                                 if obj.force_ai_level is not None: props['force_level'] = obj.force_ai_level
                                 out['units'].append(props)
                             elif obj.owner is EnvironmentOwner:

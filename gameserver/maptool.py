@@ -145,7 +145,8 @@ def nosql_write_all_objects(region_id, base_id, owner_id, objlist):
                  'spec': obj['spec']}
 
         if obj.get('level',1) != 1: props['level'] = obj['level']
-        for FIELD in ('xy','stack','orders','patrol','equipment','produce_start_time','produce_rate','contents'):
+        for FIELD in ('xy','stack','orders','patrol','equipment','produce_start_time','produce_rate','contents',
+                      'pack_id','behaviors'):
             if FIELD in obj: props[FIELD] = obj[FIELD]
 
         if spec['kind'] == 'mobile':
@@ -165,7 +166,8 @@ def nosql_read_all_objects(region_id, base_id, base_landlord_id):
                   }
         for FIELD in ('level', 'hp_ratio', 'tag', 'metadata', 'creation_time', 'repair_finish_time', 'disarmed',
                       'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time', 'squad_id',
-                      'orders','patrol','equipment','produce_start_time','produce_rate','contents'):
+                      'orders','patrol','equipment','produce_start_time','produce_rate','contents',
+                      'pack_id','behaviors'):
             if FIELD in state:
                 props[FIELD] = state[FIELD]
 
