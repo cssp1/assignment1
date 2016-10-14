@@ -582,9 +582,11 @@ def pretty_cents(cents):
     return sign+'$%.2f' % (0.01*abs(cents))
 
 # numeric counters inside adstats that we care about
-ADSTATS_COUNTERS = ['spend', 'spent', 'frequency',
-                    'clicks', 'unique_clicks', 'impressions', 'unique_impressions', 'reach',
-                    'social_clicks', 'unique_social_clicks', 'social_impressions', 'unique_social_impressions', 'social_reach']
+ADSTATS_COUNTERS_QUERY = \
+['spend', 'frequency',
+ 'clicks', 'unique_clicks', 'impressions', 'unique_impressions', 'reach',
+ 'social_clicks', 'unique_social_clicks', 'social_impressions', 'unique_social_impressions', 'social_reach']
+ADSTATS_COUNTERS = ADSTATS_COUNTERS_QUERY + ['spent'] # since we internally use "spent", which is deprecated by Facebook
 ADSTATS_DATA_FIELDS = ['relevance_score', 'actions'] # JSON object fields from adstats we want to store
 
 # actual query of Facebook API for adstats
@@ -602,7 +604,10 @@ def _adstats_pull(db, adgroup_list, time_range = None):
         query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[1])),
                                                      # FB API is inclusive of last day, so subtract one day
                                                      'until': chop_to_date(max(time_range[0] + utc_pacific_offset(time_range[1]),
-                                                                               time_range[1] - 86400 + utc_pacific_offset(time_range[1])))}})
+                                                                               time_range[1] - 86400 + utc_pacific_offset(time_range[1])))},
+                                      'fields': 'date_stop,date_start,ad_id,account_id,adset_id,campaign_id,' + \
+                                      ','.join(ADSTATS_COUNTERS_QUERY + ADSTATS_DATA_FIELDS)
+                                      })
     else:
         query = ''
 
@@ -632,6 +637,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
         # Old API returned "spent" cents, new API returns "spend" dollars - convert back to cents
         if 'spend' in x:
             assert 'spent' not in x
+            x['spend'] = float(x['spend'])
             x['spent'] = int(100*x['spend']+0.5)
         elif 'spent' in x:
             assert 'spend' not in x
@@ -784,7 +790,7 @@ def adstats_record(db, adgroup_list, time_range):
             if 'clicks' in stat: del stat['clicks'] # get rid of bad data
             for a in stat['actions']:
                 if a['action_type'] == 'link_click':
-                    obj['clicks'] = a['value']
+                    obj['clicks'] = int(a['value'])
 
         elif 'clicks' not in stat:
             # oh dear, Facebook made click counting really complicated now
@@ -2796,7 +2802,7 @@ if __name__ == '__main__':
             if max_frequency > 0:
                 for adgroup in adgroup_list:
                     stat = stats[adgroup['id']]
-                    if stat and (stat['impressions'] > 150) and (stat['unique_impressions'] <= 0):
+                    if stat and (stat['impressions'] > 150) and (stat.get('unique_impressions',0) <= 0):
                         raise Exception('did not get valid unique_ adstats for ad %s - time range boundaries are wrong:\n%s' % (adgroup['name'], stat))
 
 
