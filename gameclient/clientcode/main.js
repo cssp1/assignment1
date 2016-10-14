@@ -4274,8 +4274,8 @@ GameObject.prototype.run_behaviors = function(world) {
     if(this.is_destroyed()) { return; }
     if(this.team === 'player') { return; } // no behaviors for player-controlled objects
     goog.array.forEach(this.behaviors, function(behavior_name) {
+        // maybe convert these into predicates/consequents later?
         if(behavior_name === 'damage_alarm') {
-            // maybe convert this to predicate/consequent later
             if(!('damage_alarm' in this.behavior_state)) {
                 this.behavior_state['damage_alarm'] = {'start_hp': this.hp, 'triggered': 0};
             }
@@ -4342,19 +4342,28 @@ GameObject.prototype.run_ai = function(world) {
         var shoot_range = auto_spell_range;
 
         var offense_or_defense;
+        var /** string */ other_team;
         if(this.team == 'player') {
             offense_or_defense = (session.viewing_base.base_landlord_id == session.user_id ? 'defense' : 'offense');
+            other_team = 'enemy';
         } else {
             offense_or_defense = (session.viewing_base.base_landlord_id == session.user_id ? 'offense' : 'defense');
+            other_team = 'player';
         }
 
         var leash_radius = -1;
-        // do not leash during tutorial, it causes problems...
-        if(!this.ai_aggressive && player.get_any_abtest_value('enable_leash_radius', gamedata['enable_leash_radius']) && (player.tutorial_state == "COMPLETE")) {
-            if('leash_radius' in this.spec) {
-                leash_radius = this.get_leveled_quantity(this.spec['leash_radius']);
-            } else {
-                leash_radius = gamedata['map']['leash_radius'][this.team][offense_or_defense];
+
+        // check whether unit should leash
+        if(player.get_any_abtest_value('enable_leash_radius', gamedata['enable_leash_radius']) &&
+           (player.tutorial_state == "COMPLETE") // no leashing during tutorial
+          ) {
+            // leash if (not aggressive) OR (aggressive, but no enemies are in the world)
+            if(!this.ai_aggressive || !world.team_map_accel.has_any_of_team(other_team)) {
+                if('leash_radius' in this.spec) {
+                    leash_radius = this.get_leveled_quantity(this.spec['leash_radius']);
+                } else {
+                    leash_radius = gamedata['map']['leash_radius'][this.team][offense_or_defense];
+                }
             }
         }
 
