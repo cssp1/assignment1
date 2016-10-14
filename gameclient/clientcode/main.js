@@ -4285,6 +4285,25 @@ GameObject.prototype.run_behaviors = function(world) {
                 var cons = {'consequent': 'ALL_AGGRESSIVE'};
                 read_consequent(cons).execute({'source_obj': this});
             }
+        } else if(behavior_name === 'pack_aggro') {
+            if(!('pack_aggro' in this.behavior_state)) {
+                this.behavior_state['pack_aggro'] = {'triggered': 0};
+            }
+            var state = this.behavior_state['pack_aggro'];
+            if(!state['triggered'] && this.ai_target) {
+                state['triggered'] = 1;
+                session.for_each_real_object(function(obj) {
+                    if(obj.is_mobile() && obj.pack_id === this.pack_id && obj.team === this.team) {
+                        // note: include self in this iteration!
+
+                        //do_unit_command_attack(world, obj, this.ai_target, false, true);
+                        // note: we don't want to persist this aggro to the server for subsequent attacks!
+                        // so just set the AI mode without going through the "orders" path
+                        //do_unit_command_make_aggressive(world, obj);
+                        obj.ai_aggressive = true;
+                    }
+                }, this);
+            }
         }
     }, this);
 };

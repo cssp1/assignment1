@@ -227,7 +227,10 @@ AllAggressiveConsequent.prototype.execute = function(state) {
     var world = session.get_real_world();
     session.for_each_real_object(function(obj) {
         if(obj.is_mobile() && obj.team === source_obj.team) {
-            do_unit_command_make_aggressive(world, obj);
+            // note: we don't want to persist this aggro to the server for subsequent attacks!
+            // so just set the AI mode without going through the "orders" path
+            //do_unit_command_make_aggressive(world, obj);
+            obj.ai_aggressive = true;
         }
     });
 };
