@@ -48753,16 +48753,20 @@ function do_on_mousedown(e) {
 /** @param {!World.World} world
     @param {!GameObject} unit
     @param {!GameObject} target
-    @param {boolean} add_waypoint */
-function do_unit_command_attack(world, unit, target, add_waypoint) {
+    @param {boolean} add_waypoint
+    @param {boolean} also_make_aggressive */
+function do_unit_command_attack(world, unit, target, add_waypoint, also_make_aggressive) {
     if(target.is_destroyed() || target.is_indestructible()) { return; }
     if(!unit.is_shooter()) { return; }
     if(unit === target) { return; }
     if(!unit.can_shoot_at(target)) { return; }
 
-    unit.new_order(world, {'state': ai_states.AI_ATTACK_SPECIFIC,
-                           'target': target.id},
-                   !add_waypoint);
+    var order = {'state': ai_states.AI_ATTACK_SPECIFIC,
+                 'target': target.id};
+    if(also_make_aggressive) {
+        order['aggressive'] = 1;
+    }
+    unit.new_order(world, order, !add_waypoint);
 }
 
 /** @param {!World.World} world
@@ -48773,9 +48777,9 @@ function unit_command_attack(world, target, add_waypoint) {
 
     selection.unit.speak('attack');
 
-    do_unit_command_attack(world, selection.unit, target, add_waypoint);
+    do_unit_command_attack(world, selection.unit, target, add_waypoint, false);
     for(var i = 0; i < selection.multi.length; i++) {
-        do_unit_command_attack(world, selection.multi[i], target, add_waypoint);
+        do_unit_command_attack(world, selection.multi[i], target, add_waypoint, false);
     }
 }
 
