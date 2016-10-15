@@ -719,7 +719,7 @@ var canvas_is_fullscreen = false;
 
 // scaling factor from actual screen pixels to "logical" canvas pixels, >1 when browser is in HiDPI "retina" mode
 // see http://www.html5rocks.com/en/tutorials/canvas/hidpi/ (but note backingStorePixelRatio should be just window.devicePixelRatio)
-var canvas_oversample = 1;
+var canvas_oversample = window['devicePixelRatio'] || 1;
 
 
 // server_time is our estimate of the server's clock, in (floating-point) seconds
@@ -45067,6 +45067,8 @@ function handle_server_message(data) {
 
         if(!use_low_gfx && player.get_any_abtest_value('enable_canvas_oversample', gamedata['client']['enable_canvas_oversample'])) {
             canvas_oversample = window['devicePixelRatio'] || 1;
+        } else {
+            canvas_oversample = 1;
         }
 
         var enable_audio = (!blacklist_audio) && (get_query_string('enable_audio') !== '0') && buzz.isSupported() && (buzz.isMP3Supported() || buzz.isOGGSupported());
@@ -49574,7 +49576,7 @@ function do_draw() {
 
         if(loading_screen_image.complete && loading_screen_image.width > 0) {
             try { // this sometimes fails on FireFox even if 'complete' is true
-                ctx.drawImage(loading_screen_image, x, y);
+                ctx.drawImage(loading_screen_image, x, y, 736, 423);
             } catch (e) {}
             // use white text
         } else {
