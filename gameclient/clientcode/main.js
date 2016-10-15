@@ -51353,6 +51353,8 @@ function draw_unit(world, unit) {
         draw_centered_text(ctx, 'DEST: '+(unit.ai_dest ? unit.ai_dest[0]+','+unit.ai_dest[1] : 'null'), [xy[0],xy[1]+60]);
         if(unit.squad_id) {
             draw_centered_text(ctx, 'SQUAD: '+unit.squad_id.toString(), [xy[0],xy[1]+75]);
+        } else if(unit.pack_id) {
+            draw_centered_text(ctx, 'PACK: '+unit.pack_id, [xy[0],xy[1]+75]);
         }
         if(unit.ai_threatlist !== null) {
             var s_list = goog.array.map(unit.ai_threatlist, function(entry) { return JSON.stringify(entry); });
