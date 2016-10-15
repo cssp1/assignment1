@@ -31709,11 +31709,19 @@ function update_manufacture_dialog(dialog) {
                         // prompt player to speedup upgrade
                         invoke_child_speedup_dialog('production');
                     } else if(builder.level < get_leveled_quantity(gamedata['units'][spec_name]['requires_factory_level']||0, unlock_level)) {
-                        var err = gamedata['errors']['FACTORY_LEVEL_TOO_LOW'];
-                        var builder_name = builder.spec['ui_name'];
-                        invoke_child_message_dialog(err['ui_title'].replace('%s', builder_name),
-                                                    err['ui_help'].replace('%s', builder_name).replace('%d', get_leveled_quantity(gamedata['units'][spec_name]['requires_factory_level']||0, unlock_level).toString()),
-                                                    {'dialog':'message_dialog_big'});
+                        var helper = get_requirements_help(read_predicate({'predicate':'BUILDING_LEVEL',
+                                                                           'building_type': builder.spec['name'],
+                                                                           'trigger_level': get_leveled_quantity(gamedata['units'][spec_name]['requires_factory_level']||0, unlock_level),
+                                                                           'obj_id': builder.id}));
+                        if(helper) {
+                            helper();
+                        } else {
+                            var err = gamedata['errors']['FACTORY_LEVEL_TOO_LOW'];
+                            var builder_name = builder.spec['ui_name'];
+                            invoke_child_message_dialog(err['ui_title'].replace('%s', builder_name),
+                                                        err['ui_help'].replace('%s', builder_name).replace('%d', get_leveled_quantity(gamedata['units'][spec_name]['requires_factory_level']||0, unlock_level).toString()),
+                                                        {'dialog':'message_dialog_big'});
+                        }
                     } else if(not_enough_res) {
                         var helper = get_requirements_help('resources', resources_needed, {continuation:send_command});
                         if(helper) {
