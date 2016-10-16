@@ -10,7 +10,7 @@ import SpinJSON
 import SpinConfig
 import AtomicFileWrite
 import LootTable
-import sys, copy, getopt, os, random
+import sys, copy, getopt, os, random, subprocess
 
 gamedata = None
 
@@ -703,7 +703,7 @@ def get_loot_sample(loot_table, randgen, extra_test = None):
 
 
 def is_token_event(data):
-    if 'loot' in data:
+    if 'loot' in data and (data['loot'][diff][-1]):
         randgen = random.Random(1234) # mock random number generator
         for difficulty in data['difficulties']:
             if diff in data['loot']:
@@ -948,7 +948,11 @@ if __name__ == '__main__':
             if not os.path.exists(test_file):
                 raise Exception('%s does not exist - make sure you are running this command in the gamedata/ directory' % test_file)
 
-            base_file_dir = '%s/%s_ai_bases_%s' % (game_id, game_id, event_dirname)
+            if 'ai_base_sources' in data:
+                # AI bases will be built dynamically by this script and saved in gamedata/$GAME_ID/built/ directory
+                base_file_dir = '%s/built/%s_ai_bases_%s' % (game_id, game_id, event_dirname)
+            else:
+                base_file_dir = '%s/%s_ai_bases_%s' % (game_id, game_id, event_dirname)
             if not os.path.exists(base_file_dir):
                 sys.stderr.write('creating directory %s\n' % base_file_dir)
                 os.mkdir(base_file_dir)
@@ -1075,7 +1079,8 @@ if __name__ == '__main__':
                         raise Exception('base_richness value must be a number: %r' % rich)
                     json += [("base_richness", data['base_richness'][diff][i])]
 
-                json.append(('auto_level',1))
+                if game_id != 'fs':
+                    json.append(('auto_level',1))
 
                 for FIELD in ('ui_info_url', 'analytics_tag'):
                     if FIELD in data: json.append((FIELD, data[FIELD]))
@@ -1549,10 +1554,28 @@ if __name__ == '__main__':
                         raise Exception('unknown base_filename_convention')
 
                     base_file_path = base_file_dir + '/' + base_file.replace('$GAME_ID', game_id)
+
+                    if 'ai_base_sources' in data:
+                        relative_path = 'built/$GAME_ID_ai_bases_%s/%s' % (event_dirname, base_file)
+                        editable_base_file = '$GAME_ID/'+data['ai_base_sources'][diff][i]
+
+                        # generate the base file using the prep script
+                        args = ['$GAME_ID/$GAME_ID_prep_ai_base.py'.replace('$GAME_ID', game_id),
+                                editable_base_file.replace('$GAME_ID', game_id),
+                                '--tier=%d' % (data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base']),
+                                '--ui-name=%s %s L%d' % (data['event_name'], diff, i+1),
+                                base_file_path]
+                        #sys.stderr.write('\n'.join(args) + '\n')
+                        subprocess.check_call(args)
+
+                    else:
+                        relative_path = '$GAME_ID_ai_bases_%s/%s' % (event_dirname, base_file)
+                        editable_base_file = '$GAME_ID/'+relative_path
+
                     if os.path.exists(base_file_path):
                         pass
                     else:
-                        # create the base JSON file
+                        # create an empty base contents file to use as a starting point
                         sys.stderr.write('creating %s\n' % base_file_path)
                         fd = open(base_file_path, 'w')
                         for i in xrange(len(base)):
@@ -1565,8 +1588,7 @@ if __name__ == '__main__':
                                 print >> fd, ''
                         pass
 
-                    relative_path = '$GAME_ID_ai_bases_%s/%s' % (event_dirname, base_file)
-                    base_json = [("base_source_file", '$GAME_ID/'+relative_path),
+                    base_json = [("base_source_file", editable_base_file),
                                  '#include_stripped "%s"' % (include_prefix + relative_path)]
                 else:
                     base_json = base
@@ -1613,8 +1635,13 @@ if __name__ == '__main__':
                 ("ui_difficulty_index", ui_difficulty_index),
                 ("portrait", data['villain_portrait'][diff]),
                 ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
-                ("auto_level", 1),
                 ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
+
+            if 'base_resource_loot' in data and data['base_resource_loot'][diff][0] is not None:
+                json += [("base_resource_loot", {})]
+
+            if game_id != 'fs':
+                json.append(('auto_level',1))
 
             if 'villain_map_portrait' in data:
                 json += [("map_portrait", data['villain_map_portrait'][diff])]

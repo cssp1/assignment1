@@ -30,6 +30,7 @@ echo "Running SCM maintenance..."
 ../scmtool.sh clean
 
 echo "Clearing gamedata build directories..."
+rm -rf ../gamedata/*/built/*_ai_bases_*/
 rm -f ../gamedata/*/built/*
 
 if [ -e ../gamedata/linebreak/Makefile ]; then
