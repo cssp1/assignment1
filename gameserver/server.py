@@ -18787,6 +18787,15 @@ class GAMEAPI(resource.Resource):
         session.player.apply_regional_auras()
         session.viewing_player.apply_regional_auras()
 
+        # apply general-purpose loot malus
+        if session.viewing_player is not session.player:
+            malus = gamedata.get('townhall_loot_malus', 1)
+            if malus < 1:
+                # player townhall minus opponent townhall
+                delta = session.player.get_townhall_level() - session.viewing_player.get_townhall_level()
+                if delta >= 1:
+                    session.player.do_apply_aura('townhall_loot_malus', strength = math.pow(malus, delta), ignore_limit = True)
+
         # set up PvP point auras
         if session.ladder_state:
             p = session.ladder_state['points']['victory'][str(session.player.user_id)]
