@@ -451,7 +451,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     }
 
     parent.widgets['profile_button'].state = 'active';
-    parent.widgets['achievements_button'].state = (player.get_any_abtest_value('enable_ingame_achievements', gamedata['client']['enable_ingame_achievements']) ? 'normal' : 'disabled');
+    parent.widgets['achievements_button'].show = player.get_any_abtest_value('enable_ingame_achievements', gamedata['client']['enable_ingame_achievements'] || false);
     parent.widgets['statistics_button'].state = 'normal';
     parent.widgets['statistics_button'].show = player.get_any_abtest_value('enable_score_history', gamedata['client']['enable_score_history']);
 

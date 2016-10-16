@@ -238,8 +238,6 @@
         // maximize alliance chat frame when requesting unit donations
         "unit_donation_request_maximize_chat": 1,
 
-        // enable "Achievements" tab on player info dialog
-        "enable_ingame_achievements": 1,
         // show "CATEGORY Achievements Complete: xx%" on top of the Achievements tab
         "show_achievement_complete_pct": 1,
 

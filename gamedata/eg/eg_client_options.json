@@ -2,6 +2,9 @@
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
+// enable "Achievements" tab on player info dialog
+"enable_ingame_achievements": 1,
+
 "friend_invite_prompt_interval": 432000, // interval between (on login) prompts to invite Facebook friends
 
 "enable_post_screenshot": 1, // enable Post Screenshot (on Facebook) feature
