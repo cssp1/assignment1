@@ -5,6 +5,8 @@
 // enable "Achievements" tab on player info dialog
 "enable_ingame_achievements": 1,
 
+"map_dialog_ai_difficulty": "level", // show difficulty indicator for AIs on Attack menu, determined by AI's player_level
+
 "friend_invite_prompt_interval": 432000, // interval between (on login) prompts to invite Facebook friends
 
 "enable_post_screenshot": 1, // enable Post Screenshot (on Facebook) feature

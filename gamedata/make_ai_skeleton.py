@@ -189,11 +189,14 @@ def dump_json_toplevel(blob, depth=0, fd = sys.stdout):
 
 # create the "ui_progress" block that goes into an AI base/attack
 # "cur"/"max" are within this difficulty and the "overall" versions are across all difficulties put together
-def format_ui_progress(cur, max, overall_cur, overall_max):
+def format_ui_progress(cur, max, overall_cur, overall_max, show_level = False):
     if overall_cur == cur and overall_max == max:
-        return {"cur": cur, "max": max}
+        ret = {"cur": cur, "max": max}
     else:
-        return {"cur": cur, "max": max, "overall_cur": overall_cur, "overall_max": overall_max}
+        ret = {"cur": cur, "max": max, "overall_cur": overall_cur, "overall_max": overall_max}
+    if show_level:
+        ret['show_level'] = 1
+    return ret
 
 def completion_valentina_message(picture = None, text = None, extra = ''):
     assert picture is not None and type(picture) is str
@@ -1056,7 +1059,7 @@ if __name__ == '__main__':
                     (data['event_ui_name'], (' (%s difficulty)' % diff if len(data['difficulties'])>1 else ''),
                      "\nAI Enemy: %s" % data['villain_ui_name'] if data['villain_ui_name'] != data['event_ui_name'] else '', unskipped_count+1, num_unskipped_bases,
                      data['final_reward_info'][diff], ('\n'+data['extra_ui_info']) if 'extra_ui_info' in data else '')),
-                    ("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
+                    ("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases, show_level = (game_id == 'fs'))),
                     ("ui_difficulty", diff),
                     ("ui_priority", ui_priority),
                     ("ui_difficulty_index", ui_difficulty_index),

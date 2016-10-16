@@ -7704,18 +7704,35 @@ Friend.prototype.get_player_level = function() {
 };
 
 Friend.prototype.classify_ai_difficulty = function() {
-    var p_level = player.resource_state['player_level'];
-    var gap = (p_level >= 5 ? 5 : 3);
-    if(this.player_level_memo < 3) {
-        return 'easy';
-    } else if(this.player_level_memo < 9) {
-        return 'medium';
-    } else if(this.player_level_memo < 15) {
-        return 'hard';
-    } else if(this.player_level_memo < 25) {
-        return 'monstrous';
+    var mode = player.get_any_abtest_value('map_dialog_ai_difficulty', gamedata['client']['map_dialog_ai_difficulty']);
+    if(mode == 'tier') {
+        var player_tier = player.resource_state['player_level'];
+        var my_tier = this.player_level_memo;
+        if(my_tier >= player_tier + 3) {
+            return 'extreme';
+        } else if(my_tier >= player_tier + 2) {
+            return 'monstrous';
+        } else if(my_tier >= player_tier + 1) {
+            return 'hard';
+        } else if(my_tier >= player_tier) {
+            return 'medium';
+        } else {
+            return 'easy';
+        }
     } else {
-        return 'extreme';
+        var p_level = player.resource_state['player_level'];
+        var gap = (p_level >= 5 ? 5 : 3);
+        if(this.player_level_memo < 3) {
+            return 'easy';
+        } else if(this.player_level_memo < 9) {
+            return 'medium';
+        } else if(this.player_level_memo < 15) {
+            return 'hard';
+        } else if(this.player_level_memo < 25) {
+            return 'monstrous';
+        } else {
+            return 'extreme';
+        }
     }
 };
 
@@ -35789,9 +35806,11 @@ function map_dialog_change_page(dialog, chapter, page) {
                 dialog.widgets['row_progress_str'+row].show = false;
                 if(friend.is_ai()) {
                     if(base && ('ui_progress' in base)) {
-                        // hide level/difficulty display
-                        dialog.widgets['row_level'+row].show = false;
-                        dialog.widgets['row_ai_difficulty'+row].show = false;
+                        // hide level/difficulty display, unless base asks for it
+                        if(!base['ui_progress']['show_level']) {
+                            dialog.widgets['row_level'+row].show = false;
+                            dialog.widgets['row_ai_difficulty'+row].show = false;
+                        }
 
                         dialog.widgets['row_progress'+row].show = true;
                         dialog.widgets['row_progress_str'+row].show = true;

@@ -209,7 +209,6 @@
         "map_dialog_warn_rivals": true, // show Valentina warning about breaking attack protection when viewing list of human rivals
 
         "enable_enemy_unit_tips": true, // show tips about new enemy units the first time you see them (see gamedata['strings']['enemy_unit_*'])
-        "map_dialog_ai_difficulty": true, // show difficulty indicator for AIs on Attack menu
 
         "plus_buttons": 1, // enable "+" help from Valentina
         "friendly_build_dialog": 1, // DO show "Upgrade CC for more" prompt on Build dialog
