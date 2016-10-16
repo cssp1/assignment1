@@ -968,8 +968,9 @@ if __name__ == '__main__':
                 base_file_dir = '%s/built/%s_ai_bases_%s' % (game_id, game_id, event_dirname)
             else:
                 base_file_dir = '%s/%s_ai_bases_%s' % (game_id, game_id, event_dirname)
+
             if not os.path.exists(base_file_dir):
-                sys.stderr.write('creating directory %s\n' % base_file_dir)
+                #sys.stderr.write('creating directory %s\n' % base_file_dir)
                 os.mkdir(base_file_dir)
 
         base_id = data['starting_base_id']
