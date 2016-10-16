@@ -865,7 +865,19 @@ if __name__ == '__main__':
             data_buf = open(skeleton_filename).read()
         except:
             raise Exception('skeleton file not found: %s' % skeleton_filename)
-        data = eval(data_buf)
+
+        # hack - old skeleton files are pure expressions, new ones are full Python modules
+        if 'import ' in data_buf:
+            # Treat it as a Python module. Allow imports from gamedata/$GAME_ID.
+            # Assume the final output is set to a variable called "output".
+            sys.path.append('./'+game_id)
+            import imp
+            temp_module = imp.new_module('skeleton')
+            exec data_buf in temp_module.__dict__
+            data = temp_module.output
+        else:
+            # Treat it as a plain expression
+            data = eval(data_buf)
 
     event_dirname = data.get('event_dirname', data['event_name'])
 
