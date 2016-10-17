@@ -1518,6 +1518,20 @@ PreDeployUnitsPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function HostileUnitExistsPredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(HostileUnitExistsPredicate, Predicate);
+HostileUnitExistsPredicate.prototype.is_satisfied = function(player, qdata) {
+    return session.for_each_real_object(function(obj) {
+        if(obj.is_mobile() && !obj.is_destroyed() && obj.team === 'enemy') {
+            return true;
+        }
+    }, this) || false;
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function HostileUnitNearPredicate(data) {
     goog.base(this, data);
 }
@@ -1986,6 +2000,8 @@ function read_predicate(data) {
         return new HasDeployedPredicate(data);
     } else if(kind === 'PRE_DEPLOY_UNITS') {
         return new PreDeployUnitsPredicate(data);
+    } else if(kind === 'HOSTILE_UNIT_EXISTS') {
+        return new HostileUnitExistsPredicate(data);
     } else if(kind === 'HOSTILE_UNIT_NEAR') {
         return new HostileUnitNearPredicate(data);
     } else if(kind === 'DIALOG_OPEN') {

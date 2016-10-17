@@ -800,12 +800,13 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
         } else if(target.is_building() || target.is_inert()) {
             target.state_dirty |= obj_state_flags.URGENT;
 
-            // mark the tracked quest as dirty so we can update any quest tips
-            player.quest_tracked_dirty = true;
             if(target.is_building()) {
                 session.set_battle_outcome_dirty();
             }
         }
+
+        // mark the tracked quest as dirty so we can update any quest tips
+        player.quest_tracked_dirty = true;
 
     } else if(damage < 0) {
         // healing
