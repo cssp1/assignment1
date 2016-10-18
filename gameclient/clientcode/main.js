@@ -4304,6 +4304,25 @@ GameObject.prototype.run_behaviors = function(world) {
                     }
                 }, this);
             }
+        } else if(behavior_name === 'aggro_pulse') {
+            if(!('aggro_pulse' in this.behavior_state)) {
+                this.behavior_state['aggro_pulse'] = {'triggered': 0};
+            }
+            var state = this.behavior_state['aggro_pulse'];
+            if(!state['triggered'] && this.ai_target) {
+                state['triggered'] = 1;
+                var radius = ('aggro_radius' in this.spec ? this.get_leveled_quantity(this.spec['aggro_radius']) :
+                              gamedata['map']['aggro_radius'][this.team]['defense']); // assume this is a defending unit
+                var objlist = session.get_real_world().query_objects_within_distance(this.raw_pos(), radius,
+                                                                                     { only_team: this.team,
+                                                                                       ignore_object: this,
+                                                                                       mobile_only: true });
+                goog.array.forEach(objlist, function(entry) {
+                    // note: we don't want to persist this aggro to the server for subsequent attacks!
+                    // so just set the AI mode without going through the "orders" path
+                    entry.obj.ai_aggressive = true;
+                }, this);
+            }
         }
     }, this);
 };
