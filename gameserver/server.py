@@ -8842,13 +8842,16 @@ class Player(AbstractPlayer):
             self.recalc_stattab(self)
         return success
 
-    def apply_regional_auras(self):
+    def apply_regional_auras(self, is_defender = False):
         ret = False
         aura_list = []
         if self.home_region and (self.home_region in gamedata['regions']) and \
            ('auras' in gamedata['regions'][self.home_region]):
             aura_list += gamedata['regions'][self.home_region]['auras']
         aura_list += gamedata.get('default_player_auras',[])
+
+        if is_defender:
+            aura_list += gamedata.get('defender_auras',[])
 
         for data in aura_list:
             aura_name = data['aura_name']
@@ -18784,8 +18787,8 @@ class GAMEAPI(resource.Resource):
         session.viewing_player.prune_player_auras(is_session_change = True)
 
         # apply regional auras
-        session.player.apply_regional_auras()
-        session.viewing_player.apply_regional_auras()
+        session.player.apply_regional_auras(is_defender = False)
+        session.viewing_player.apply_regional_auras(is_defender = True)
 
         # apply general-purpose loot malus
         if session.viewing_player is not session.player:
