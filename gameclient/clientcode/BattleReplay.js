@@ -113,9 +113,11 @@ BattleReplay.Recorder.prototype.compare_snapshots = function(reason) {
 };
 
 BattleReplay.Recorder.prototype.before_control = function() {
+    /*
     if(player.is_developer()) {
         console.log('Recorded snapshot '+this.snapshot_count.toString());
     }
+    */
     var snap = {'tick_time': this.world.last_tick_time,
                 'objects': this.world.objects.serialize_incremental()};
     if(this.snapshots.length < 1) {
