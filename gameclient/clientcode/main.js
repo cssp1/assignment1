@@ -48473,7 +48473,7 @@ function do_on_mousemove(e) {
     if(!session.has_world()) { return; }
     var world = session.get_draw_world();
 
-    if(session.viewing_base && !session.has_attacked) {
+    if(session.viewing_base && (!session.has_attacked || gamedata['client']['enable_mouse_tooltip_in_battle'])) {
         var found = find_object_at_screen_pixel(world, xy, screen_to_ortho(xy), true);
         if(mouse_state.hovering_over != found) {
             if(mouse_state.hovering_over && mouse_tooltip) {
