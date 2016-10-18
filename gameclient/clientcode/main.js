@@ -10994,10 +10994,11 @@ function init_desktop_dialogs() {
         dialog.widgets['home_button'].str = dialog.data['widgets']['home_button']['ui_name'+(session.using_squad_deployment() ? '_squads' : '')];
 
         // dynamically set up unit deployment bar
-        var deployment_bar = (gamedata['unit_deploy_style'] == 'drip' ? 'unit_deployment_bar_drip' : 'unit_deployment_bar_batch');
-        var d = new SPUI.Dialog(gamedata['dialogs'][deployment_bar]);
+        var d = new SPUI.Dialog(gamedata['dialogs']['unit_deployment_bar_'+(gamedata['unit_deploy_style'] || 'batch')]);
         if(gamedata['unit_deploy_style'] == 'drip') {
             d.user_data['drip_unit'] = null; // which unit is currently selected
+        } else if(gamedata['unit_deploy_style'] == 'squad') {
+            d.user_data['selected_squad_id'] = null; // which squad_id is currently selected
         }
         dialog.add(d); dialog.widgets['unit_deployment_bar'] = d;
     }
@@ -12197,17 +12198,33 @@ function update_combat_resource_bars(dialog) {
         dialog.widgets['unit_space_prog'].progress = session.deployed_unit_space/deployable_space;
         dialog.widgets['unit_space_bar'].tooltip.str = dialog.data['widgets']['unit_space_bar']['ui_tooltip'].replace('%ATTACK_SPACE_BUILDING', gamedata['buildings'][attack_space_building()]['ui_name']);
 
-        // is deploy cursor active?
-        if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') {
-            // are any deployment buttons grayed out?
-            var btm = desktop_dialogs['desktop_bottom'];
-            if(btm && btm.mouse_enter_time > 0) {
+        // if player is almost out of deployable unit space, display a message to that effect
+
+        // are any deployment buttons grayed out?
+        var btm = desktop_dialogs['desktop_bottom'];
+        if(btm && btm.mouse_enter_time > 0) {
+            if(gamedata['unit_deploy_style'] === 'squad') {
+                var ulist = btm.widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'];
+                if(ulist) {
+                    for(var i = 0; i < ulist.length; i++) {
+                        var d = btm.widgets['unit_deployment_bar'].widgets['squad'+i.toString()];
+                        var bg = d.widgets['bg'];
+                        var hovering = bg.mouse_enter_time && bg.mouse_enter_time > 0;
+                        if(hovering && d.user_data['can_deploy'] === false) { // yes, button is grayed out
+                            out_of_space = true;
+                            break;
+                        }
+                    }
+                }
+            } else if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') {
+                // in individual-unit deploy styles, only show if deploy cursor active
                 var ulist = btm.user_data['deploy_button_specs'];
                 if(ulist) {
                     for(var i = 0; i < ulist.length; i++) {
                         var specname = ulist[i];
                         var d = btm.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
-                        var btn = d.widgets[(gamedata['unit_deploy_style'] == 'drip' ? 'frame' : 'plus_one')];
+                        var btn = d.widgets[(gamedata['unit_deploy_style'] == 'drip' || gamedata['unit_deploy_style'] == 'squad' ?
+                                             'frame' : 'plus_one')];
                         var hovering = false;
                         goog.object.forEach(d.widgets, function(w) { if(w.mouse_enter_time && w.mouse_enter_time > 0) { hovering = true; } });
 
@@ -13383,19 +13400,20 @@ function update_desktop_dialogs() {
             dialog.widgets['climate_restrictions'].str = dialog.data['widgets']['climate_restrictions']['ui_name'].replace('%name', session.viewing_base.climate.data['ui_name']).replace('%s', session.viewing_base.climate.describe_climate_restrictions());
         }
 
-        dialog.widgets['deployable_squads'].show = player.squads_enabled() && session.deployable_squads.length > 0 && session.viewing_base.base_landlord_id != session.user_id &&
-            session.region.data && session.region.data['storage'] == 'nosql';
+        dialog.widgets['deployable_squads'].show = (player.squads_enabled() && session.deployable_squads.length > 0 && /* squads available */
+                                                    session.viewing_base.base_landlord_id != session.user_id && /* at foreign base */
+                                                    (session.region.data && session.region.data['storage'] == 'nosql') && /* on the map */
+                                                    (gamedata['unit_deploy_style'] !== 'squad') /* not using squad deploy style */
+                                                   );
         if(dialog.widgets['deployable_squads'].show) {
-                var ui_list = [];
-                goog.array.forEach(session.deployable_squads, function(squad_id) {
-                    if(squad_id.toString() in player.squads) {
-                        ui_list.push('['+player.squads[squad_id.toString()]['ui_name']+']');
-                    }
-                });
-                dialog.widgets['deployable_squads'].str = dialog.data['widgets']['deployable_squads']['ui_name'].replace('%s', ui_list.join(', '));
-            }
-
-        var ROWS = dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['array'][0];
+            var ui_list = [];
+            goog.array.forEach(session.deployable_squads, function(squad_id) {
+                if(squad_id.toString() in player.squads) {
+                    ui_list.push('['+player.squads[squad_id.toString()]['ui_name']+']');
+                }
+            });
+            dialog.widgets['deployable_squads'].str = dialog.data['widgets']['deployable_squads']['ui_name'].replace('%s', ui_list.join(', '));
+        }
 
         if(!session.has_attacked || (session.viewing_base.base_landlord_id == session.user_id &&
                                      session.region.data && session.region.data['storage'] == 'nosql')) {
@@ -13441,10 +13459,7 @@ function update_desktop_dialogs() {
 
             dialog.widgets['home_button'].show = true;
             dialog.widgets['home_button'].state = (player.tutorial_state === "COMPLETE") ? 'normal':'disabled';
-
-            for(var i = 0; i < ROWS; i++) {
-                dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()].show = false;
-            }
+            dialog.widgets['unit_deployment_bar'].show = false;
 
             // reset dialog to normal dimensions
             dialog.wh = [dialog.data['dimensions'][0],
@@ -13463,338 +13478,10 @@ function update_desktop_dialogs() {
                 dialog.widgets['ladder_switch_price'].show =
                 dialog.widgets['ladder_switch_button'].show =
                 dialog.widgets['home_button'].show = false;
-            var i = 0;
 
-            // first see how many we need to skip, in order to show the most powerful units
-            var unique_specs = {};
-            session.foreach_deployable_unit(function(obj) {
-                unique_specs[obj['spec']] = 1;
-            });
-            var uniques = goog.object.getCount(unique_specs);
-
-            if(player.unit_donation_enabled() && player.has_donated_units()) { uniques += 1; }
-
-            var skip = 0;
-            if(uniques > ROWS) {
-                skip = uniques - ROWS;
-            }
-
-            dialog.user_data['deploy_button_specs'] = [];
-            var any_can_deploy = false;
-
-            for(var specname in gamedata['units']) {
-                var spec = gamedata['units'][specname];
-
-                if(!(specname in unique_specs)) { continue; }
-                if(!session.viewing_base.climate.can_deploy_unit_of_spec(spec)) { continue; }
-                if(skip > 0) { skip--; continue; }
-                var home_qty = session.count_deployable_units_of_spec(specname);
-                var in_battle_qty = session.count_post_deploy_units_of_spec(specname);
-                var deploy_qty = session.count_pre_deploy_units_of_spec(specname);
-
-                dialog.user_data['deploy_button_specs'].push(specname);
-
-                var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
-                d.show = true;
-
-                // set up callbacks
-                var incr_callback = function (name, incr) { return function() {
-                    // check quantity limit
-                    incr = Math.min(incr, session.count_deployable_units_of_spec(name) - session.count_pre_deploy_units_of_spec(name));
-
-                    // check deployment space limit
-                    var space = gamedata['units'][name]['consumes_space'];
-                    if(space > 0) {
-                        var limit = get_player_stat(player.stattab, 'deployable_unit_space');
-                        incr = Math.min(incr, Math.floor((limit - session.deployed_unit_space)/space));
-                    }
-
-                    if(incr < 1) { return false; }
-
-                    // set up deployment cursor.
-                    // for tutorial, hold off until all units are readied for deployment
-                    if(player.tutorial_state != "COMPLETE" && gamedata['tutorial'][player.tutorial_state]['next'] != 'place_robots_message') {
-                    } else if(selection.spellname != "DEPLOY_UNITS") {
-                        change_selection(player.virtual_units["DEPLOYER"]);
-                        selection.spellname = "DEPLOY_UNITS";
-                        var cursor = new DeployUICursor();
-                        change_selection_ui_under(cursor);
-                    }
-
-                    var is_zombie = false;
-                    for(var i = 0; i < incr; i++) {
-                        var obj_zomb = session.get_next_deployable_unit(name);
-                        var obj = obj_zomb[0]; is_zombie |= obj_zomb[1];
-                        session.pre_deploy_units[obj['obj_id']] = obj;
-                        if(gamedata['unit_deploy_style'] != 'drip') {
-                            // batch-style unit deployment predicts deployed_unit_space as the cursor fills up, drip-style does not
-                            session.deployed_unit_space += space;
-                        }
-                    }
-
-                    if(!session.weak_zombie_warned &&
-                       (player.tutorial_state == "COMPLETE") &&
-                       is_zombie) {
-                        session.weak_zombie_warned = true;
-                        invoke_weak_zombie_tip(name);
-                    }
-
-                    player.quest_tracked_dirty = true;
-                    if(player.tutorial_state.indexOf('deploy_robots_action') != -1) { advance_tutorial(); }
-                    return true;
-                }; };
-
-
-                var tip = spec['ui_name']+'\n'+spec['ui_tip'];
-                if('ui_tip2' in spec) { tip += '\n'+spec['ui_tip2']; }
-                var can_deploy;
-
-                if(gamedata['unit_deploy_style'] == 'drip') {
-                    can_deploy = (session.deployed_unit_space+spec['consumes_space'] <= get_player_stat(player.stattab, 'deployable_unit_space'));
-
-                    var init_deployer = (function(_incr_callback) { return function(_specname) {
-                        if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
-                        change_selection(player.virtual_units["DEPLOYER"]);
-                        selection.spellname = "DEPLOY_UNITS";
-                        var cursor = new DeployUICursor();
-                        change_selection_ui_under(cursor);
-
-                        _incr_callback(_specname, session.count_deployable_units_of_spec(_specname) - session.count_pre_deploy_units_of_spec(_specname))();
-
-                    };})(incr_callback);
-
-                    // initialize drip_unit
-                    if(d.parent.user_data['drip_unit'] === null && can_deploy) {
-                        d.parent.user_data['drip_unit'] = specname;
-                        d.parent.user_data['drip_unit_push_time'] = -1;
-                        init_deployer(specname);
-                    }
-                    d.user_data['specname'] = specname;
-                    if('icon' in spec) {
-                        d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
-                    } else {
-                        d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
-                    }
-                    d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
-                    d.widgets['stack'].str = home_qty.toString();
-                    d.widgets['frame'].state = (d.parent.user_data['drip_unit'] == specname ? 'active': (can_deploy ? 'normal' : 'disabled'));
-                    d.widgets['frame'].tooltip.str = tip;
-                    d.widgets['frame'].tooltip.delay = 0.25;
-
-                    d.widgets['frame'].onclick = (function (_init_deployer) { return function(w) {
-                        var _d = w.parent;
-                        _d.parent.user_data['drip_unit'] = _d.user_data['specname'];
-                        change_selection_ui(null);
-                        _init_deployer(_d.user_data['specname']);
-                    }; })(init_deployer);
-
-                } else {
-                    can_deploy = (deploy_qty < home_qty) &&
-                        (session.deployed_unit_space+spec['consumes_space'] <= get_player_stat(player.stattab, 'deployable_unit_space'));
-
-                    d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name'];
-                    d.widgets['plus_one'].show = true;
-
-                    d.widgets['cancel'].show = (deploy_qty > 0);
-                    d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
-
-                    d.widgets['bg'].tooltip.str = tip;
-                    d.widgets['unit'].bg_image = get_leveled_quantity(spec['art_asset'],1);
-                    d.widgets['unit'].state = 'icon';
-                    d.widgets['unit'].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
-                    d.widgets['counter'].str = deploy_qty.toString()+'/'+home_qty.toString();
-
-                    d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = incr_callback(specname, 1);
-                    d.widgets['plus_all'].onclick = incr_callback(specname, 10);
-
-                    d.widgets['cancel'].onclick = (function (name) { return function() {
-                        // un-pre-deploy the weakest unit
-                        var weakest = session.get_weakest_pre_deploy_unit(name);
-
-                        if(weakest) {
-                            delete session.pre_deploy_units[weakest['obj_id']];
-                            session.deployed_unit_space -= get_leveled_quantity(gamedata['units'][weakest['spec']]['consumes_space'], weakest['level']||1);
-                        }
-
-                        // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
-                        if(session.has_deployed) {
-                            var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
-                            if(!any_left) {
-                                change_selection(null);
-                            }
-                        }
-                    }; })(specname);
-
-                    // disable non-applicable buttons in tutorial
-                    if(player.tutorial_state != "COMPLETE") {
-                        d.widgets['unit'].onclick = null;
-                        d.widgets['plus_one'].state = 'disabled';
-                        d.widgets['cancel'].show = false;
-                        if('button' in gamedata['tutorial'][player.tutorial_state] &&
-                           gamedata['tutorial'][player.tutorial_state]['button'].indexOf('DEPLOY_UNIT:') == 0 &&
-                           gamedata['tutorial'][player.tutorial_state]['button'].split(':')[1] != specname) {
-                            d.widgets['plus_all'].state = 'disabled';
-                        }
-                    }
-                }
-
-                any_can_deploy |= can_deploy;
-
-                i += 1;
-                if(i >= ROWS) {
-                    //console.log('Ran out of space to display deployable units!');
-                    break;
-                }
-            }
-
-            // DONATED UNITS
-            if(i < ROWS && player.unit_donation_enabled() && player.has_donated_units() &&
-               !session.viewing_base.climate.has_climate_unit_restrictions()) {
-
-                var specname = 'DONATED_UNITS';
-                dialog.user_data['deploy_button_specs'].push(specname);
-                var deploy_qty = session.count_pre_deploy_donated_units();
-                var home_qty = player.count_donated_units();
-                var consumes_space = (gamedata['donated_units_take_space'] ? player.donated_units_space() : 0);
-                if(consumes_space) { throw Error('this case not handled'); }
-                var can_deploy;
-
-                // set up callbacks
-                var add_donated_units = function() {
-                    // set up deployment cursor
-                    if(selection.spellname != "DEPLOY_UNITS") {
-                        change_selection(player.virtual_units["DEPLOYER"]);
-                        selection.spellname = "DEPLOY_UNITS";
-                        var cursor = new DeployUICursor();
-                        change_selection_ui_under(cursor);
-                    }
-                    // queue the units
-                    goog.object.forEach(player.donated_units, function(entry) {
-                        // note that we could just do one at a time now!
-                        // note: "spec" is not required for the server protocol, but we need it to simplify do_deploy() FX and DeployUICursor.destroy()
-                        var new_entry = {'obj_id': entry['obj_id'], 'spec': entry['spec'], 'source': 'donated'};
-                        session.pre_deploy_units[new_entry['obj_id']] = new_entry;
-                        // (note: would add deployed_unit_space requirement here, in non-drip mode, if we wanted to track it)
-                    });
-
-                    player.quest_tracked_dirty = true;
-                };
-
-                var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
-                d.show = true;
-
-                if(gamedata['unit_deploy_style'] == 'drip') {
-                    can_deploy = true;
-
-                    var init_deployer = (function(_add_donated_units) { return function() {
-                        if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
-                        change_selection(player.virtual_units["DEPLOYER"]);
-                        selection.spellname = "DEPLOY_UNITS";
-                        var cursor = new DeployUICursor();
-                        change_selection_ui_under(cursor);
-                        _add_donated_units();
-                    };})(add_donated_units);
-
-                    // initialize drip_unit
-                    if(d.parent.user_data['drip_unit'] === null && can_deploy) {
-                        d.parent.user_data['drip_unit'] = specname;
-                        d.parent.user_data['drip_unit_push_time'] = -1;
-                        init_deployer();
-                    }
-                    d.user_data['specname'] = specname;
-                    d.widgets['item'].asset = player.donated_units_icon();
-
-                    d.widgets['stack'].str = home_qty.toString();
-                    d.widgets['frame'].state = (d.parent.user_data['drip_unit'] == specname ? 'active': (can_deploy ? 'normal' : 'disabled'));
-                    d.widgets['frame'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
-                    d.widgets['frame'].tooltip.delay = 0.25;
-
-                    d.widgets['frame'].onclick = (function (_init_deployer) { return function(w) {
-                        var _d = w.parent;
-                        _d.parent.user_data['drip_unit'] = _d.user_data['specname'];
-                        change_selection_ui(null);
-                        _init_deployer();
-                    }; })(init_deployer);
-
-                } else {
-                    can_deploy = (deploy_qty < home_qty);
-                    d.widgets['bg'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
-                    d.widgets['unit'].bg_image = player.donated_units_icon();
-                    d.widgets['unit'].state = 'normal';
-                    d.widgets['counter'].str = deploy_qty+'/'+home_qty;
-
-                    d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
-                    d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name_donated_units'];
-
-                    d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = d.widgets['plus_all'].onclick = add_donated_units;
-                    d.widgets['plus_one'].show = false;
-
-                    d.widgets['cancel'].show = (deploy_qty > 0);
-                    d.widgets['cancel'].onclick = (function (name, _consumes_space) { return function() {
-                        // remove all donations from pre_deploy_units
-                        session.pre_deploy_units = goog.object.filter(session.pre_deploy_units, function(entry) { return entry['source'] !== 'donated'; });
-                        // note: deployed_unit_space tracking would go here
-
-                        // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
-                        if(session.has_deployed) {
-                            var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
-                            if(!any_left) {
-                                change_selection(null);
-                            }
-                        }
-
-                    }; })(specname, consumes_space);
-                }
-
-                any_can_deploy |= can_deploy;
-
-                i += 1;
-            }
-
-            if(gamedata['unit_deploy_style'] == 'drip' && !any_can_deploy &&
-               selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') {
-                // cannot drip-deploy any more units
-                change_selection_ui(null);
-            }
-
-            var ONEROW = 11;
-            var show_rows = Math.max(i, ONEROW); // always show at least one full row
-            var show_cols = Math.floor((i+ONEROW-1)/ONEROW);
-            var vpad = dialog.widgets['unit_deployment_bar'].data['dimensions'][1] - (dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['xy'][1] + dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['dimensions'][1]);
-            var col_height = (vpad+dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['dimensions'][1]);
-
-            for(var k = 0; k < i; k++) {
-                // position widgets into columns
-                var col = Math.floor(k/ONEROW);
-                var wdat = dialog.widgets['unit_deployment_bar'].data['widgets']['unit'];
-                var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+k.toString()];
-                d.xy = [wdat['xy'][0]+(k%ONEROW)*wdat['array_offset'][0],
-                        wdat['xy'][1]+(show_cols-col-1)*col_height];
-                var tipwidget = (gamedata['unit_deploy_style'] == 'drip' ? 'frame' : 'bg');
-                if(d.widgets[tipwidget].fixed_tooltip_offset) {
-                    // reposition donated units tooltip so it does not obscure the button
-                    if(dialog.user_data['deploy_button_specs'][k] == 'DONATED_UNITS' &&
-                       d.widgets[tipwidget].tooltip.str) {
-                        d.widgets[tipwidget].fixed_tooltip_offset = vec_add(d.data['widgets'][tipwidget]['fixed_tooltip_offset'],
-                                                                            [0, -Math.floor((d.widgets[tipwidget].tooltip.str.split('\n').length-1.5)*SPUI.desktop_font.leading)]);
-                    }
-                }
-            }
-
-            // set .wh of dialog so that dialog is the right size, and mouse clicks will always be trapped
-            dialog.wh = dialog.widgets['unit_deployment_bar'].wh = [ONEROW * dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['array_offset'][0],
-                                                                    show_cols * col_height + dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['xy'][1]];
-
-            while(i < ROWS) {
-                dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()].show = (i < show_rows);
-                goog.object.forEach(dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()].widgets, function(w, wname) {
-                    if(wname != 'bg') {
-                        w.show = false;
-                    }
-                });
-                i += 1;
-            }
-
+            dialog.widgets['unit_deployment_bar'].show = true;
+            var deploy_info = update_unit_deployment_bar(dialog);
+            var show_cols = deploy_info.show_cols;
             if(dialog.widgets['deployable_squads'].show) {
                 dialog.widgets['deployable_squads'].xy = vec_add(dialog.data['widgets']['deployable_squads']['xy'],
                                                                  vec_scale(show_cols-1, dialog.data['widgets']['deployable_squads']['xy_per_col']));
@@ -13806,6 +13493,7 @@ function update_desktop_dialogs() {
             }
 
         } // END session HAS attacked
+
     } // END not home base
 
     // center at bottom of game window
@@ -13829,6 +13517,551 @@ function update_desktop_dialogs() {
         global_spell_icon.set_spell(selection.unit, namsp ? namsp[0] : null, namsp ? namsp[1] : null);
         global_spell_icon.xy = [dialog.xy[0]+60, dialog.xy[1]-40];
     }
+}
+
+/** @param {!SPUI.Dialog} dialog is desktop_bottom_visitor, not the unit_deployment_bar itself
+    (we need to tweak some other widget position depending on what is shown on the bar)
+    @return {{show_cols: number}} */
+function update_unit_deployment_bar(dialog) {
+    if(gamedata['unit_deploy_style'] === 'squad') {
+        return update_unit_deployment_bar_squad(dialog);
+    } else {
+        return update_unit_deployment_bar_batch_or_drip(dialog);
+    }
+}
+
+/** @param {!SPUI.Dialog} dialog is desktop_bottom_visitor, not the unit_deployment_bar itself
+    @return {{show_cols: number}} */
+function update_unit_deployment_bar_squad(dialog) {
+    var max_icons = dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['array'][0];
+    var i = 0;
+
+    dialog.widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'] = [];
+
+    // detect when pre_deploy_units got cleared out, e.g. by pressing Escape
+    if(goog.object.isEmpty(session.pre_deploy_units)) {
+        dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] = null;
+    }
+
+    var selected_squad_id = dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'];
+
+    // scan deployable units for info
+    var squad_ids_passing_climate_restrictions = {}; // for check against climate restrictions
+    var min_space_by_squad_id = {}; // minimum space to deploy one unit from this squad
+    var total_space_by_squad_id = {}; // total space still deployable in this squad
+    var max_build_time_by_squad_id = {}; // for deciding on which unit is the "coolest"
+    var representative_specname_by_squad_id = {};
+
+    // note: this skips already-deployed units
+    session.foreach_deployable_unit(function (army_unit) {
+        var squad_id = army_unit['squad_id'] || 0
+        var spec = gamedata['units'][army_unit['spec']];
+        var level = army_unit['level'] || 1;
+        var space = get_leveled_quantity(spec['consumes_space'] || 0, level);
+        var build_time = get_leveled_quantity(spec['build_time'] || 0, level);
+
+        squad_ids_passing_climate_restrictions[squad_id] = 1;
+
+        if(!(squad_id in min_space_by_squad_id) || space < min_space_by_squad_id[squad_id]) {
+            min_space_by_squad_id[squad_id] = space;
+        }
+        total_space_by_squad_id[squad_id] = (total_space_by_squad_id[squad_id] || 0) + space;
+        if(!(squad_id in max_build_time_by_squad_id) || build_time > max_build_time_by_squad_id[squad_id]) {
+            max_build_time_by_squad_id[squad_id] = build_time;
+            representative_specname_by_squad_id[squad_id] = army_unit['spec'];
+        }
+    });
+
+    goog.array.forEach(session.deployable_squads, function(squad_id) {
+        if(i >= max_icons) {
+            //console.log('Ran out of space to display deployable units!');
+            return;
+        }
+
+        if(!(squad_id in squad_ids_passing_climate_restrictions)) { return; }
+
+        var squad = player.squads[squad_id.toString()];
+        dialog.widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'].push(squad_id);
+
+        var d = dialog.widgets['unit_deployment_bar'].widgets['squad'+i.toString()];
+        d.show = true;
+        d.user_data['squad_id'] = squad_id;
+
+        var deploy_limit = session.deployed_unit_space - (selected_squad_id in total_space_by_squad_id ? total_space_by_squad_id[selected_squad_id] : 0);
+        var can_deploy = (squad_id in squad_ids_passing_climate_restrictions) &&
+            (deploy_limit+min_space_by_squad_id[squad_id] <= get_player_stat(player.stattab, 'deployable_unit_space'));
+        d.user_data['can_deploy'] = can_deploy;
+
+        d.widgets['cancel'].onclick = function(w) {
+            var d = w.parent;
+            var dialog = d.parent.parent;
+            // switch away from current selection
+            goog.object.forEach(session.pre_deploy_units, function(obj, obj_id) {
+                var spec = gamedata['units'][obj['spec']];
+                session.deployed_unit_space -= get_leveled_quantity(spec['consumes_space'] || 0, obj['level']||1);
+            });
+            goog.object.clear(session.pre_deploy_units);
+            dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] = null;
+            change_selection_ui(null);
+        };
+        d.widgets['cancel'].show = (selected_squad_id == squad_id);
+
+        // set up callbacks
+        var onclick = (function (_d) { return function() {
+            var squad_id = _d.user_data['squad_id'];
+            var dialog = _d.parent.parent;
+            if(dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] === squad_id) { return; }
+            if(dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] !== null) {
+                // switch away from current selection
+                goog.object.forEach(session.pre_deploy_units, function(obj, obj_id) {
+                    var spec = gamedata['units'][obj['spec']];
+                    session.deployed_unit_space -= get_leveled_quantity(spec['consumes_space'] || 0, obj['level']||1);
+                });
+                goog.object.clear(session.pre_deploy_units);
+                dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] = null;
+            }
+
+            // at this point we are sure at least one unit can be deployed from this squad
+            var is_zombie = null;
+
+            session.foreach_deployable_unit(function (army_unit) {
+                if((army_unit['squad_id'] || 0) !== squad_id) { return; }
+
+                var spec = gamedata['units'][army_unit['spec']];
+                var level = army_unit['level'] || 1;
+                var space = get_leveled_quantity(spec['consumes_space'] || 0, level);
+
+                // check deployment space limit
+                if(session.deployed_unit_space + space > get_player_stat(player.stattab, 'deployable_unit_space')) {
+                    return;
+                }
+
+                if(!is_zombie && gamedata['zombie_debuff_threshold'] >= 0) {
+                    var curmax = army_unit_hp(army_unit);
+                    var ratio = curmax[0]/Math.max(curmax[1],1);
+                    if(ratio < gamedata['zombie_debuff_threshold']) { is_zombie = army_unit['spec']; }
+                }
+
+                session.pre_deploy_units[army_unit['obj_id']] = army_unit;
+                session.deployed_unit_space += space;
+            });
+
+            // set up deployment cursor.
+            dialog.widgets['unit_deployment_bar'].user_data['selected_squad_id'] = squad_id;
+            if(!(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor')) {
+                change_selection(player.virtual_units["DEPLOYER"]);
+                selection.spellname = "DEPLOY_UNITS";
+                var cursor = new DeployUICursor();
+                change_selection_ui_under(cursor);
+            }
+
+            if(!session.weak_zombie_warned && is_zombie) {
+                session.weak_zombie_warned = true;
+                invoke_weak_zombie_tip(is_zombie);
+            }
+
+            player.quest_tracked_dirty = true;
+            return true;
+        }; })(d);
+        var frame_state = (selected_squad_id == squad_id ?
+                           'active': (can_deploy ? 'normal' : 'disabled'));
+        var squad_ui_name = squad['ui_name'] || '';
+        d.widgets['name'].str = squad_ui_name;
+        unit_icon_set(d.widgets['icon'], representative_specname_by_squad_id[squad_id], -1, null, onclick, frame_state, null, false);
+        d.widgets['bg'].onclick = (can_deploy ? onclick : null);
+        d.widgets['bg_highlight'].show = (frame_state != 'disabled');
+        d.widgets['bg_highlight'].fade_unless_hover = (frame_state === 'active' ? 0 : d.data['widgets']['bg_highlight']['fade_unless_hover']);
+        d.widgets['bg_highlight'].outline_color = SPUI.make_colorv(d.data['widgets']['bg_highlight'][(frame_state === 'active' ? 'outline_color_active' : 'outline_color')]);
+        d.widgets['name'].text_color = SPUI.make_colorv(d.data['widgets']['name'][(frame_state === 'active' ?
+                                                                                   'text_color_active' :
+                                                                                   (frame_state === 'disabled' ?
+                                                                                    'text_color_disabled' :
+                                                                                    'text_color'))]);
+
+        // override unit_icon_set here
+        d.widgets['icon'].widgets['frame'].show =
+            d.widgets['icon'].widgets['slot'].show = false;
+        i += 1;
+    });
+
+    // DONATED UNITS
+    if(i < max_icons && player.unit_donation_enabled() && player.has_donated_units() &&
+       !session.viewing_base.climate.has_climate_unit_restrictions()) {
+        throw Error('donated units not supported');
+    }
+
+    var ONEROW = 11;
+    var show_rows = Math.max(i, ONEROW); // always show at least one full row
+    var show_cols = Math.floor((i+ONEROW-1)/ONEROW);
+    var vpad = dialog.widgets['unit_deployment_bar'].data['dimensions'][1] - (dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['xy'][1] + dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['dimensions'][1]);
+    var col_height = (vpad+dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['dimensions'][1]);
+
+    for(var k = 0; k < i; k++) {
+        // position widgets into columns
+        var col = Math.floor(k/ONEROW);
+        var wdat = dialog.widgets['unit_deployment_bar'].data['widgets']['squad'];
+        var d = dialog.widgets['unit_deployment_bar'].widgets['squad'+k.toString()];
+        d.xy = [wdat['xy'][0]+(k%ONEROW)*wdat['array_offset'][0],
+                wdat['xy'][1]+(show_cols-col-1)*col_height];
+        if(d.widgets['bg'].fixed_tooltip_offset) {
+            // reposition donated units tooltip so it does not obscure the button
+            if(dialog.widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'][k] === 'DONATED_UNITS' &&
+               d.widgets['bg'].tooltip.str) {
+                d.widgets['bg'].fixed_tooltip_offset = vec_add(d.data['widgets']['bg']['fixed_tooltip_offset'],
+                                                               [0, -Math.floor((d.widgets['bg'].tooltip.str.split('\n').length-1.5)*SPUI.desktop_font.leading)]);
+            }
+        }
+    }
+
+    // set .wh of dialog so that dialog is the right size, and mouse clicks will always be trapped
+    dialog.wh = dialog.widgets['unit_deployment_bar'].wh = [ONEROW * dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['array_offset'][0],
+                                                            show_cols * col_height + dialog.widgets['unit_deployment_bar'].data['widgets']['squad']['xy'][1]];
+
+    while(i < max_icons) {
+        dialog.widgets['unit_deployment_bar'].widgets['squad'+i.toString()].show = (i < show_rows);
+        goog.object.forEach(dialog.widgets['unit_deployment_bar'].widgets['squad'+i.toString()].widgets, function(w, wname) {
+                w.show = false;
+        });
+        i += 1;
+    }
+
+    return {show_cols: show_cols};
+}
+
+/** @param {!SPUI.Dialog} dialog is desktop_bottom_visitor, not the unit_deployment_bar itself
+    @return {{show_cols: number}} */
+function update_unit_deployment_bar_batch_or_drip(dialog) {
+    var max_icons = dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['array'][0];
+    var i = 0;
+
+    // first see how many we need to skip, in order to show the most powerful units
+    var unique_specs = {};
+    session.foreach_deployable_unit(function(obj) {
+        unique_specs[obj['spec']] = 1;
+    });
+    var uniques = goog.object.getCount(unique_specs);
+
+    if(player.unit_donation_enabled() && player.has_donated_units()) { uniques += 1; }
+
+    var skip = 0;
+    if(uniques > max_icons) {
+        skip = uniques - max_icons;
+    }
+
+    dialog.user_data['deploy_button_specs'] = [];
+    var any_can_deploy = false;
+
+    for(var specname in gamedata['units']) {
+        var spec = gamedata['units'][specname];
+
+        if(!(specname in unique_specs)) { continue; }
+        if(!session.viewing_base.climate.can_deploy_unit_of_spec(spec)) { continue; }
+        if(skip > 0) { skip--; continue; }
+        var home_qty = session.count_deployable_units_of_spec(specname);
+        var in_battle_qty = session.count_post_deploy_units_of_spec(specname);
+        var deploy_qty = session.count_pre_deploy_units_of_spec(specname);
+
+        dialog.user_data['deploy_button_specs'].push(specname);
+
+        var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
+        d.show = true;
+
+        // set up callbacks
+        var incr_callback = function (name, incr) { return function() {
+            // check quantity limit
+            incr = Math.min(incr, session.count_deployable_units_of_spec(name) - session.count_pre_deploy_units_of_spec(name));
+
+            // check deployment space limit
+            var space = gamedata['units'][name]['consumes_space'];
+            if(space > 0) {
+                var limit = get_player_stat(player.stattab, 'deployable_unit_space');
+                incr = Math.min(incr, Math.floor((limit - session.deployed_unit_space)/space));
+            }
+
+            if(incr < 1) { return false; }
+
+            // set up deployment cursor.
+            // for tutorial, hold off until all units are readied for deployment
+            if(player.tutorial_state != "COMPLETE" && gamedata['tutorial'][player.tutorial_state]['next'] != 'place_robots_message') {
+            } else if(selection.spellname != "DEPLOY_UNITS") {
+                change_selection(player.virtual_units["DEPLOYER"]);
+                selection.spellname = "DEPLOY_UNITS";
+                var cursor = new DeployUICursor();
+                change_selection_ui_under(cursor);
+            }
+
+            var is_zombie = false;
+            for(var i = 0; i < incr; i++) {
+                var obj_zomb = session.get_next_deployable_unit(name);
+                var obj = obj_zomb[0]; is_zombie |= obj_zomb[1];
+                session.pre_deploy_units[obj['obj_id']] = obj;
+                if(gamedata['unit_deploy_style'] != 'drip') {
+                    // batch-style unit deployment predicts deployed_unit_space as the cursor fills up, drip-style does not
+                    session.deployed_unit_space += space;
+                }
+            }
+
+            if(!session.weak_zombie_warned &&
+               (player.tutorial_state == "COMPLETE") &&
+               is_zombie) {
+                session.weak_zombie_warned = true;
+                invoke_weak_zombie_tip(name);
+            }
+
+            player.quest_tracked_dirty = true;
+            if(player.tutorial_state.indexOf('deploy_robots_action') != -1) { advance_tutorial(); }
+            return true;
+        }; };
+
+        var tip = spec['ui_name']+'\n'+spec['ui_tip'];
+        if('ui_tip2' in spec) { tip += '\n'+spec['ui_tip2']; }
+        var can_deploy;
+
+        if(gamedata['unit_deploy_style'] == 'drip') {
+            can_deploy = (session.deployed_unit_space+spec['consumes_space'] <= get_player_stat(player.stattab, 'deployable_unit_space'));
+
+            var init_deployer = (function(_incr_callback) { return function(_specname) {
+                if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
+                change_selection(player.virtual_units["DEPLOYER"]);
+                selection.spellname = "DEPLOY_UNITS";
+                var cursor = new DeployUICursor();
+                change_selection_ui_under(cursor);
+
+                _incr_callback(_specname, session.count_deployable_units_of_spec(_specname) - session.count_pre_deploy_units_of_spec(_specname))();
+
+            };})(incr_callback);
+
+            // initialize drip_unit
+            if(d.parent.user_data['drip_unit'] === null && can_deploy) {
+                d.parent.user_data['drip_unit'] = specname;
+                d.parent.user_data['drip_unit_push_time'] = -1;
+                init_deployer(specname);
+            }
+            d.user_data['specname'] = specname;
+            if('icon' in spec) {
+                d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
+            } else {
+                d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
+            }
+            d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
+            d.widgets['stack'].str = home_qty.toString();
+            d.widgets['frame'].state = (d.parent.user_data['drip_unit'] == specname ? 'active': (can_deploy ? 'normal' : 'disabled'));
+            d.widgets['frame'].tooltip.str = tip;
+            d.widgets['frame'].tooltip.delay = 0.25;
+
+            d.widgets['frame'].onclick = (function (_init_deployer) { return function(w) {
+                var _d = w.parent;
+                _d.parent.user_data['drip_unit'] = _d.user_data['specname'];
+                change_selection_ui(null);
+                _init_deployer(_d.user_data['specname']);
+            }; })(init_deployer);
+
+        } else {
+            can_deploy = (deploy_qty < home_qty) &&
+                (session.deployed_unit_space+spec['consumes_space'] <= get_player_stat(player.stattab, 'deployable_unit_space'));
+
+            d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name'];
+            d.widgets['plus_one'].show = true;
+
+            d.widgets['cancel'].show = (deploy_qty > 0);
+            d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
+
+            d.widgets['bg'].tooltip.str = tip;
+            d.widgets['unit'].bg_image = get_leveled_quantity(spec['art_asset'],1);
+            d.widgets['unit'].state = 'icon';
+            d.widgets['unit'].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
+            d.widgets['counter'].str = deploy_qty.toString()+'/'+home_qty.toString();
+
+            d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = incr_callback(specname, 1);
+            d.widgets['plus_all'].onclick = incr_callback(specname, 10);
+
+            d.widgets['cancel'].onclick = (function (name) { return function() {
+                // un-pre-deploy the weakest unit
+                var weakest = session.get_weakest_pre_deploy_unit(name);
+
+                if(weakest) {
+                    delete session.pre_deploy_units[weakest['obj_id']];
+                    session.deployed_unit_space -= get_leveled_quantity(gamedata['units'][weakest['spec']]['consumes_space'], weakest['level']||1);
+                }
+
+                // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
+                if(session.has_deployed) {
+                    var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
+                    if(!any_left) {
+                        change_selection(null);
+                    }
+                }
+            }; })(specname);
+
+            // disable non-applicable buttons in tutorial
+            if(player.tutorial_state != "COMPLETE") {
+                d.widgets['unit'].onclick = null;
+                d.widgets['plus_one'].state = 'disabled';
+                d.widgets['cancel'].show = false;
+                if('button' in gamedata['tutorial'][player.tutorial_state] &&
+                   gamedata['tutorial'][player.tutorial_state]['button'].indexOf('DEPLOY_UNIT:') == 0 &&
+                   gamedata['tutorial'][player.tutorial_state]['button'].split(':')[1] != specname) {
+                    d.widgets['plus_all'].state = 'disabled';
+                }
+            }
+        }
+
+        any_can_deploy |= can_deploy;
+
+        i += 1;
+        if(i >= max_icons) {
+            //console.log('Ran out of space to display deployable units!');
+            break;
+        }
+    }
+
+    // DONATED UNITS
+    if(i < max_icons && player.unit_donation_enabled() && player.has_donated_units() &&
+       !session.viewing_base.climate.has_climate_unit_restrictions()) {
+
+        var specname = 'DONATED_UNITS';
+        dialog.user_data['deploy_button_specs'].push(specname);
+        var deploy_qty = session.count_pre_deploy_donated_units();
+        var home_qty = player.count_donated_units();
+        var consumes_space = (gamedata['donated_units_take_space'] ? player.donated_units_space() : 0);
+        if(consumes_space) { throw Error('this case not handled'); }
+        var can_deploy;
+
+        // set up callbacks
+        var add_donated_units = function() {
+            // set up deployment cursor
+            if(selection.spellname != "DEPLOY_UNITS") {
+                change_selection(player.virtual_units["DEPLOYER"]);
+                selection.spellname = "DEPLOY_UNITS";
+                var cursor = new DeployUICursor();
+                change_selection_ui_under(cursor);
+            }
+            // queue the units
+            goog.object.forEach(player.donated_units, function(entry) {
+                // note that we could just do one at a time now!
+                // note: "spec" is not required for the server protocol, but we need it to simplify do_deploy() FX and DeployUICursor.destroy()
+                var new_entry = {'obj_id': entry['obj_id'], 'spec': entry['spec'], 'source': 'donated'};
+                session.pre_deploy_units[new_entry['obj_id']] = new_entry;
+                // (note: would add deployed_unit_space requirement here, in non-drip mode, if we wanted to track it)
+            });
+
+            player.quest_tracked_dirty = true;
+        };
+
+        var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
+        d.show = true;
+
+        if(gamedata['unit_deploy_style'] == 'drip') {
+            can_deploy = true;
+
+            var init_deployer = (function(_add_donated_units) { return function() {
+                if(selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') { return; }
+                change_selection(player.virtual_units["DEPLOYER"]);
+                selection.spellname = "DEPLOY_UNITS";
+                var cursor = new DeployUICursor();
+                change_selection_ui_under(cursor);
+                _add_donated_units();
+            };})(add_donated_units);
+
+            // initialize drip_unit
+            if(d.parent.user_data['drip_unit'] === null && can_deploy) {
+                d.parent.user_data['drip_unit'] = specname;
+                d.parent.user_data['drip_unit_push_time'] = -1;
+                init_deployer();
+            }
+            d.user_data['specname'] = specname;
+            d.widgets['item'].asset = player.donated_units_icon();
+
+            d.widgets['stack'].str = home_qty.toString();
+            d.widgets['frame'].state = (d.parent.user_data['drip_unit'] == specname ? 'active': (can_deploy ? 'normal' : 'disabled'));
+            d.widgets['frame'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
+            d.widgets['frame'].tooltip.delay = 0.25;
+
+            d.widgets['frame'].onclick = (function (_init_deployer) { return function(w) {
+                var _d = w.parent;
+                _d.parent.user_data['drip_unit'] = _d.user_data['specname'];
+                change_selection_ui(null);
+                _init_deployer();
+            }; })(init_deployer);
+
+        } else {
+            can_deploy = (deploy_qty < home_qty);
+            d.widgets['bg'].tooltip.str = gamedata['auras']['donated_units']['ui_description'] + '\n' + player.donated_units_description('\n');
+            d.widgets['unit'].bg_image = player.donated_units_icon();
+            d.widgets['unit'].state = 'normal';
+            d.widgets['counter'].str = deploy_qty+'/'+home_qty;
+
+            d.widgets['plus_one'].state = d.widgets['plus_all'].state = (can_deploy ? 'normal' : 'disabled');
+            d.widgets['plus_all'].str = d.data['widgets']['plus_all']['ui_name_donated_units'];
+
+            d.widgets['unit'].onclick = d.widgets['plus_one'].onclick = d.widgets['plus_all'].onclick = add_donated_units;
+            d.widgets['plus_one'].show = false;
+
+            d.widgets['cancel'].show = (deploy_qty > 0);
+            d.widgets['cancel'].onclick = (function (name, _consumes_space) { return function() {
+                // remove all donations from pre_deploy_units
+                session.pre_deploy_units = goog.object.filter(session.pre_deploy_units, function(entry) { return entry['source'] !== 'donated'; });
+                // note: deployed_unit_space tracking would go here
+
+                // if in combat, and no more units are left in session.pre_deploy_units, kill the cursor
+                if(session.has_deployed) {
+                    var any_left = goog.object.getCount(session.pre_deploy_units) > 0;
+                    if(!any_left) {
+                        change_selection(null);
+                    }
+                }
+            }; })(specname, consumes_space);
+        }
+        any_can_deploy |= can_deploy;
+        i += 1;
+    }
+
+    if(gamedata['unit_deploy_style'] == 'drip' && !any_can_deploy &&
+       selection.ui && selection.ui.user_data && selection.ui.user_data['cursor'] == 'DeployUICursor') {
+        // cannot drip-deploy any more units
+        change_selection_ui(null);
+    }
+
+    var ONEROW = 11;
+    var show_rows = Math.max(i, ONEROW); // always show at least one full row
+    var show_cols = Math.floor((i+ONEROW-1)/ONEROW);
+    var vpad = dialog.widgets['unit_deployment_bar'].data['dimensions'][1] - (dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['xy'][1] + dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['dimensions'][1]);
+    var col_height = (vpad+dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['dimensions'][1]);
+
+    for(var k = 0; k < i; k++) {
+        // position widgets into columns
+        var col = Math.floor(k/ONEROW);
+        var wdat = dialog.widgets['unit_deployment_bar'].data['widgets']['unit'];
+        var d = dialog.widgets['unit_deployment_bar'].widgets['unit'+k.toString()];
+        d.xy = [wdat['xy'][0]+(k%ONEROW)*wdat['array_offset'][0],
+                wdat['xy'][1]+(show_cols-col-1)*col_height];
+        var tipwidget = (gamedata['unit_deploy_style'] == 'drip' || gamedata['unit_deploy_style'] == 'squad' ?
+                         'frame' : 'bg');
+        if(d.widgets[tipwidget].fixed_tooltip_offset) {
+            // reposition donated units tooltip so it does not obscure the button
+            if(dialog.user_data['deploy_button_specs'][k] == 'DONATED_UNITS' &&
+               d.widgets[tipwidget].tooltip.str) {
+                d.widgets[tipwidget].fixed_tooltip_offset = vec_add(d.data['widgets'][tipwidget]['fixed_tooltip_offset'],
+                                                                    [0, -Math.floor((d.widgets[tipwidget].tooltip.str.split('\n').length-1.5)*SPUI.desktop_font.leading)]);
+            }
+        }
+    }
+
+    // set .wh of dialog so that dialog is the right size, and mouse clicks will always be trapped
+    dialog.wh = dialog.widgets['unit_deployment_bar'].wh = [ONEROW * dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['array_offset'][0],
+                                                            show_cols * col_height + dialog.widgets['unit_deployment_bar'].data['widgets']['unit']['xy'][1]];
+
+    while(i < max_icons) {
+        dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()].show = (i < show_rows);
+        goog.object.forEach(dialog.widgets['unit_deployment_bar'].widgets['unit'+i.toString()].widgets, function(w, wname) {
+            if(wname != 'bg') {
+                w.show = false;
+            }
+        });
+        i += 1;
+    }
+
+    return {show_cols: show_cols};
 }
 
 function init_combat_item_bar() {
@@ -18386,6 +18619,25 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                         parent = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].widgets['unit'+i.toString()];
                         parent_offset = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].get_absolute_xy();
                         found_widget_name = 'plus_all';
+                        break;
+                    }
+                }
+            }
+            if(!found_widget_name) {
+                dialog.show = false; return;
+            }
+        } else if(widget_name && widget_name.indexOf('DEPLOY_SQUAD:') == 0) {
+            var squad_id = parseInt(widget_name.split(':')[1], 10);
+            var ulist = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'];
+            found_widget_name = null;
+            if(ulist) {
+                console.log('looking for '+squad_id.toString()+' in '+JSON.stringify(ulist));
+                for(var i = 0; i < ulist.length; i++) {
+                    if(ulist[i] === squad_id) {
+                        parent = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].widgets['squad'+i.toString()];
+                        parent_offset = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].get_absolute_xy();
+                        found_widget_name = 'icon';
+                        console.log("HERE! "+found_widget_name);
                         break;
                     }
                 }

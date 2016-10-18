@@ -1142,7 +1142,7 @@
                                    "drop_shadow": 1, "text_hjustify": "left" },
             "unit_space_message_bg": { "kind": "SolidRect", "xy": [0,217], "dimensions": [280,62], "color":[0,0,0,0.45], "show": 0 },
             "unit_space_message_line": { "kind": "Line", "xy": [27, 203], "dimensions": [7, 14], "color": [1,0.88,0,1], "stroke_width": 3, "show": 0 },
-            "unit_space_message_rect": { "kind": "SolidRect", "xy": [-2, 168], "dimensions": [145, 35], "color":[0,0,0,0], "outline_color": [1,0.88,0,1], "outline_width": 2, "show": 0 },
+            "unit_space_message_rect": { "kind": "SolidRect", "xy": [-2, 168], "dimensions": [145, 35], "color":[0,0,0,0], "outline_color": [1,0.88,0,1], "outline_width": 2, "bevel": 3, "show": 0 },
             "unit_space_message": { "kind": "TextField", "xy": [8,220], "dimensions": [254,34], "text_size": 13, "text_style": "bold",
                                     "text_hjustify": "left", "drop_shadow": 1, "text_color": [1,0.88,0,1],
                                     "ui_name": "Not enough room. Attack now, or\nremove units before adding more.\nUpgrade %ATTACK_SPACE_BUILDING to raise limit.", "show": 0
@@ -1286,6 +1286,39 @@
         "widgets": {
             "unit": { "kind": "Dialog", "dialog": "item_display", "xy": [0,63], "dimensions": [50,50],
                       "array":[15,1], "array_offset":[60,0] }
+        }
+    },
+
+    "unit_deployment_squad": {
+        "dimensions": [120,93],
+        "widgets": {
+            "bg": { "kind": "ActionButton", "xy": [0,0], "dimensions": [120,93],
+                    "bg_image": "dialog_resizable", "bg_image_resizable": 1,
+                    "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset":[0,-53] },
+            "bg_highlight": { "kind": "SolidRect", "xy": [2,2], "dimensions": [116,89],
+                              "color": [0,0,0,0], "bevel": 3,
+                              "outline_color": [0.6,0.6,0,1],
+                              "outline_color_active": [1,1,0,1],
+                              "fade_unless_hover": 0.5,
+                              "outline_width": 2 },
+            "sunken": { "kind": "StaticImage", "xy": [35,16], "dimensions": [50,50], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "icon": { "kind": "Dialog", "dialog": "unit_icon", "xy": [35,21], "dimensions": [50,50] },
+
+            "name": { "kind": "TextField", "xy": [2,69], "dimensions": [116,19], "clip_to": [2,69,116,19],
+                      "text_hjustify": "center", "text_size": 13,
+                      "text_color": [0.6,0.6,0.6], "text_color_active": [1,1,1],
+                      "text_color_disabled": [0.25,0.25,0.25] },
+            "cancel": { "kind": "ActionButton", "xy": [99,3], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1 }
+        }
+    },
+
+    "unit_deployment_bar_squad": {
+        "dimensions": [726,140],
+        "clip_children": 0,
+        "transparent_to_mouse": 1,
+        "widgets": {
+            "squad": { "kind": "Dialog", "dialog": "unit_deployment_squad", "xy": [0,40], "dimensions": [120,93],
+                       "array":[8,1], "array_offset":[130,0] }
         }
     },
 
