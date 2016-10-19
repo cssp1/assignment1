@@ -4167,7 +4167,6 @@
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     "fancy_victory_dialog": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "ok_button",
         "clip_children": 0,
@@ -4555,6 +4554,8 @@
         },
 
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+
             "sunken_main": {"kind": "StaticImage", "xy":[8,35], "dimensions":[755,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "winner_portrait":  {"kind": "FriendPortrait", "xy":[229,46], "dimensions":[50,50] },
@@ -5419,13 +5420,13 @@
     },
 
     "you_were_attacked_dialog": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,515], // leave extra vertical space (+30px) for "halt" message
         "screenshot_clip_to": [0,0,770,485],
         "clip_children": 0,
         "default_button": "repair_instant_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[770,515],"asset":"dialog_resizable","bg_image_resizable":1},
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "splash_bg": { "kind": "SolidRect", "xy": [331,49], "dimensions": [410,338], "color": [0,0,0,1] },
             "splash": {"kind": "StaticImage", "xy":[332,50], "dimensions":[408,336], "asset": "splash_defense" },
             "divider": { "kind": "Line", "xy": [306, 56], "dimensions": [0, 383], "color": [0,0,0,0.5], "stroke_width": 1 },
@@ -5883,10 +5884,10 @@
     },
 
     "sirenum_message": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "ok_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[7,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418_red" },
             "picture": {"kind": "StaticImage", "xy":[20,45], "dimensions":[351,395], "asset": "sirenum_big" },
             "title": { "kind": "TextField", "xy": [413,73], "dimensions": [305, 23], "text_size": 20, "text_style": "bold",
@@ -6624,11 +6625,11 @@
     },
 
     "fullscreen_instructions": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "ok_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "sunken2": {"kind": "StaticImage", "xy":[457,53], "dimensions":[290,382], "asset": "dialog_sunken_290x382_gray" },
             "picture_frame": { "kind": "SolidRect", "xy": [15,42], "dimensions": [193,404], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
             "picture": {"kind": "StaticImage", "xy":[16,43], "dimensions":[191,402], "asset": "fullscreen_191x402" },
@@ -6662,11 +6663,11 @@
     },
 
     "daily_tip": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "ok_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "picture": {"kind": "StaticImage", "xy":[21,50], "dimensions":[727,388], "asset": "" },
 
             // optional second picture sprite
@@ -6739,11 +6740,11 @@
     },
 
     "flash_offer_dialog": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "ok_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "picture": {"kind": "StaticImage", "xy":[21,50], "dimensions":[727,388], "asset": "" },
 
             "description": { "show": 0, "kind": "TextField", "xy": [176,43], "dimensions": [319,95], "text_size": 13,
@@ -6788,11 +6789,11 @@
     },
 
     "region_map_help": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "close_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "titlebar": {"kind": "SolidRect", "xy":[23,52], "dimensions":[718,37], "color": [0.063,0.176,0.36,1]},
             "title": {"kind": "TextField", "xy": [37,52], "dimensions":[720,37], "text_size":19, "text_style":"thick", "text_color":[1,1,1,1],
                       "ui_name": "Regional Maps Help", "text_hjustify": "left"},
@@ -6825,11 +6826,11 @@
     },
 
     "settings_dialog": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "close_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "titlebar": {"kind": "SolidRect", "xy":[23,52], "dimensions":[718,37], "color": [0.063,0.176,0.36,1]},
             "title": {"kind": "TextField", "xy": [37,52], "dimensions":[720,37], "text_size":19, "text_style":"thick", "text_color":[1,1,1,1],
                       "ui_name": "Settings", "text_hjustify": "left"},
@@ -6863,11 +6864,11 @@
     },
 
     "sprobe_dialog": {
-        "bg_image": "dialog_770x485_bg",
         "dimensions": [770,485],
         "default_button": "close_button",
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "titlebar": {"kind": "SolidRect", "xy":[23,52], "dimensions":[718,37], "color": [0.063,0.176,0.36,1]},
             "title": {"kind": "TextField", "xy": [37,52], "dimensions":[720,37], "text_size":19, "text_style":"thick", "text_color":[1,1,1,1],
                       "ui_name": "Connection Test", "text_hjustify": "left"},
@@ -8115,9 +8116,9 @@
                       "asset":"dialog_glow_resizable", "bg_image_resizable": 1, "composite_mode": "lighter",
                       "fade":1, "duration": 3, "fade_peak": 0.1, "delay": 0},
 
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset": "dialog_770x485_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
 
-            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418" },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "sunken2": {"kind": "StaticImage", "xy":[457,53], "dimensions":[290,382], "asset": "dialog_sunken_290x382_gray" },
             "valentina": {"kind": "StaticImage", "xy":[20,45], "dimensions":[193,397], "asset": "valentina_193x397" },
 
@@ -8352,7 +8353,7 @@
                       "asset":"dialog_glow_resizable", "bg_image_resizable": 1, "composite_mode": "lighter",
                       "fade":1, "duration": 3, "fade_peak": 0.1, "delay": 0},
 
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset": "dialog_770x485_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[770,485], "asset":"dialog_resizable","bg_image_resizable":1 },
 
             "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[754,418], "asset": "dialog_sunken_754x418_alt" },
             "sunken2": {"kind": "StaticImage", "xy":[457,47], "dimensions":[290,392], "asset": "dialog_sunken_290x382_gray", "bg_image_resizable":1 },
