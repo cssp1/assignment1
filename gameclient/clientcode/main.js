@@ -31727,8 +31727,8 @@ function manufacture_dialog_scroll(dialog, page) {
 function manufacture_dialog_select_unit(dialog, name) {
     dialog.user_data['current_unit'] = name;
 
+    //dialog.widgets['coverup_queue'].show =
     dialog.widgets['coverup_all'].show =
-        dialog.widgets['coverup_queue'].show =
         dialog.widgets['click_to_unlock'].show =
         dialog.widgets['click_to_unlock_button'].show =
         dialog.widgets['click_to_produce_arrow'].show =
@@ -32215,14 +32215,14 @@ function update_manufacture_dialog(dialog) {
 
             if(price == 0) {
                 closure = (function(_builder) { return function() {
-                    if(selection.ui.widgets['coverup_queue'].show) { return; } // ???
+                    //if(selection.ui.widgets['coverup_queue'].show) { return; } // ???
                     send_to_server.func(["CAST_SPELL", _builder.id, "SPEEDUP_FOR_FREE"]);
                     invoke_ui_locker(_builder.request_sync(), function() { change_selection(null); });
                 }; })(builder);
             } else if(price > 0) {
                 closure = (function(_builder) { return function() {
                     var dialog = selection.ui;
-                    if(dialog.widgets['coverup_queue'].show) { return; }
+                    //if(dialog.widgets['coverup_queue'].show) { return; }
                     var cleanup_cb = (function (_dialog) { return function() {
                     }; })(dialog);
 
