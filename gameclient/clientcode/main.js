@@ -42951,7 +42951,9 @@ function init_damage_vs_icons(dialog, spec, weapon_spell) {
             } else {
                 throw Error('unknown manuf category or object kind '+CATS[i][1]);
             }
-            widget.tooltip.str = gamedata['strings']['damage_vs_ui_qualities'][q] + ' vs. '+ ui_name;
+            widget.tooltip.str = gamedata['strings']['damage_vs_string']
+                .replace('%quality', gamedata['strings']['damage_vs_ui_qualities'][q])
+                .replace('%category', ui_name);
         }
     }
 };

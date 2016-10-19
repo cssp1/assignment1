@@ -71,6 +71,7 @@
     "damage_vs_qualities": ["ineffective", "poor", "good", "excellent"],
     // only these are user-visible strings
     "damage_vs_ui_qualities": ["Ineffective", "Fair", "Good", "Excellent"],
+    "damage_vs_string": "%quality vs %category",
 
     "unboosted_value": "%val (Level %lev Base %stat)",
     "boosted_value": "(Level %modlev Mod)",
