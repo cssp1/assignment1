@@ -49927,10 +49927,29 @@ function do_draw() {
             ctx.font = "bold 15px sans-serif";
         } catch(e) {}
 
-        // because we're a Web 2.0 app, yo!
-        ctx.fillText(gamedata['strings']['loading_screen_beta'], x+215, y+398);
-        ctx.fillText(msg, x+450, y+398);
+        /** @type {!Array<{str: string, xy: !Array<number>}>} */
+        var text_to_draw = [];
+
+        // beta message
+        if(gamedata['strings']['loading_screen_beta']) {
+            text_to_draw.push({str: gamedata['strings']['loading_screen_beta'], xy: [x+215, y+398]});
+        }
+        text_to_draw.push({str:msg, xy: [x+450, y+398]});
+
+        // drop shadow
+        ctx.save();
+        ctx.fillStyle = '#000000';
+        goog.array.forEach(text_to_draw, function(entry) {
+            ctx.fillText(entry.str, entry.xy[0]+1, entry.xy[1]+1);
+        });
         ctx.restore();
+
+        // main text
+        goog.array.forEach(text_to_draw, function(entry) {
+            ctx.fillText(entry.str, entry.xy[0], entry.xy[1]);
+        });
+        ctx.restore();
+
         }
 
     } else if(client_state == client_states.RUNNING || client_state == client_states.TIMED_OUT) {
