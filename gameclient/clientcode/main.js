@@ -4282,25 +4282,51 @@ GameObject.prototype.run_behaviors = function(world) {
             var state = this.behavior_state['damage_alarm'];
             if(!state['triggered'] && this.hp < state['start_hp']) {
                 state['triggered'] = 1;
-                var cons = {'consequent': 'ALL_AGGRESSIVE'};
-                read_consequent(cons).execute({'source_obj': this});
+                session.for_each_real_object(function(obj) {
+                    if(obj.is_mobile() && obj.team === this.team) {
+                        // note: we don't want to persist this aggro to the server for subsequent attacks!
+                        // so just set the AI mode without going through the "orders" path
+                        //do_unit_command_make_aggressive(world, obj);
+                        obj.ai_aggressive = true;
+                        // and suppress leashing for the rest of the battle
+                        obj.ai_leash_after = GameTypes.TickCount.infinity;
+                    }
+                }, this);
             }
         } else if(behavior_name === 'pack_aggro') {
             if(!('pack_aggro' in this.behavior_state)) {
-                this.behavior_state['pack_aggro'] = {'triggered': 0};
+                this.behavior_state['pack_aggro'] = {'next_trigger': new GameTypes.TickCount(0)};
             }
             var state = this.behavior_state['pack_aggro'];
-            if(!state['triggered'] && this.ai_target) {
-                state['triggered'] = 1;
+            var holdoff_ticks = relative_time_to_tick('leash_holdoff_time' in gamedata['map'] ?
+                                                      gamedata['map']['leash_holdoff_time'] : 5);
+            if(GameTypes.TickCount.gt(world.combat_engine.cur_tick, state['next_trigger']) && this.ai_target) {
+                // don't fire again until TWO holdoff periods
+                state['next_trigger'] = GameTypes.TickCount.add(world.combat_engine.cur_tick,
+                                                                GameTypes.TickCount.scale(2, holdoff_ticks));
                 session.for_each_real_object(function(obj) {
                     if(obj.is_mobile() && obj.pack_id === this.pack_id && obj.team === this.team) {
                         // note: include self in this iteration!
-
+                        if(obj !== this) {
+                            // synchronize trigger time for him too
+                            if(!('pack_aggro' in obj.behavior_state)) {
+                                obj.behavior_state['pack_aggro'] = {'next_trigger': state['next_trigger']};
+                            } else {
+                                obj.behavior_state['pack_aggro']['next_trigger'] =
+                                    GameTypes.TickCount.max(state['next_trigger'],
+                                                            obj.behavior_state['pack_aggro']['next_trigger']);
+                            }
+                        }
                         //do_unit_command_attack(world, obj, this.ai_target, false, true);
                         // note: we don't want to persist this aggro to the server for subsequent attacks!
                         // so just set the AI mode without going through the "orders" path
                         //do_unit_command_make_aggressive(world, obj);
                         obj.ai_aggressive = true;
+
+                        // and suppress leashing temporarily
+                        obj.ai_leash_after = GameTypes.TickCount.max(obj.ai_leash_after,
+                                                                     GameTypes.TickCount.add(world.combat_engine.cur_tick,
+                                                                                             holdoff_ticks));
                     }
                 }, this);
             }
@@ -4329,6 +4355,8 @@ GameObject.prototype.run_behaviors = function(world) {
 
 /** @param {!World.World} world */
 GameObject.prototype.run_ai = function(world) {
+    this.is_leashing = false;
+
     if(this.is_destroyed()) {
         this.ai_stop();
         return;
@@ -4391,12 +4419,18 @@ GameObject.prototype.run_ai = function(world) {
 
         var leash_radius = -1;
 
+        // for leashing, we care whether the aggressive setting is only temporary (e.g. from pack aggro)
+        // or ordered by the player
+        //var is_permanently_aggressive = this.ai_aggressive;
+        var is_permanently_aggressive = this.ai_aggressive && (this.orders.length > 0 && this.orders[0]['aggressive']);
+
         // check whether unit should leash
         if(player.get_any_abtest_value('enable_leash_radius', gamedata['enable_leash_radius']) &&
+           GameTypes.TickCount.gt(world.combat_engine.cur_tick, this.ai_leash_after) &&
            (player.tutorial_state == "COMPLETE") // no leashing during tutorial
           ) {
             // leash if (not aggressive) OR (aggressive, but no enemies are in the world)
-            if(!this.ai_aggressive || !world.team_map_accel.has_any_of_team(other_team)) {
+            if(!is_permanently_aggressive || !world.team_map_accel.has_any_of_team(other_team)) {
                 if('leash_radius' in this.spec) {
                     leash_radius = this.get_leveled_quantity(this.spec['leash_radius']);
                 } else {
@@ -4416,6 +4450,7 @@ GameObject.prototype.run_ai = function(world) {
                 if(leash_distance >= leash_radius) {
                     // ignore all targets, leash!
                     shoot_range = 0;
+                    this.is_leashing = true;
                 }
             }
         }
@@ -4474,31 +4509,31 @@ GameObject.prototype.run_ai = function(world) {
                 // if no target has been found yet, and we're mobile, then move towards the nearest enemy object
                 // within aggro radius
                 if(this.ai_aggressive || this.ai_state === ai_states.AI_ATTACK_ANY || this.ai_state === ai_states.AI_ATTACK_MOVE_AGGRO) {
+                    var ncells = session.viewing_base.ncells();
+                    var entire_map = Math.max(ncells[0], ncells[1]);
 
                     // only pursue targets within aggro radius
                     var aggro_radius;
-
-                    // if aggressive or a healer, use the entire map
-                    if(this.ai_aggressive /* || auto_spell['help'] */) {
-                        // entire map
-                        var ncells = session.viewing_base.ncells();
-                        aggro_radius = Math.max(ncells[0], ncells[1]);
+                    if('aggro_radius' in this.spec) {
+                        aggro_radius = this.get_leveled_quantity(this.spec['aggro_radius']);
                     } else {
-                        if('aggro_radius' in this.spec) {
-                            aggro_radius = this.get_leveled_quantity(this.spec['aggro_radius']);
-                        } else {
-                            aggro_radius = gamedata['map']['aggro_radius'][this.team][offense_or_defense];
-                        }
+                        aggro_radius = gamedata['map']['aggro_radius'][this.team][offense_or_defense];
+                    }
 
-                        // if unit is too far from its origin point, leash back
-                        if(leash_distance > 0) {
-                            if(leash_distance >= leash_radius) {
-                                // leash back
-                                aggro_radius = 0;
-                            } else {
-                                // limit aggro to "gap" (distance remaining before leash ends) plus weapon range, to avoid oscillation when aggro expands after beginning to leash
-                                aggro_radius = Math.min(aggro_radius, (leash_radius - leash_distance) + shoot_range);
-                            }
+                    // if aggressive (or a healer), use the entire map
+                    if(this.is_permanently_aggressive /* || auto_spell['help'] */) {
+                        aggro_radius = entire_map;
+                    } else if(this.ai_aggressive) {
+                        if(leash_distance < 0) {
+                            aggro_radius = entire_map;
+                        } else if(leash_distance >= leash_radius) {
+                            // leash back
+                            aggro_radius = 0;
+                            this.is_leashing = true;
+                        } else {
+                            // constrain aggro to not take the unit beyond leash radius again
+                            // limit aggro to "gap" (distance remaining before leash ends) plus weapon range, to avoid oscillation when aggro expands after beginning to leash
+                            aggro_radius = Math.max(0, Math.min(aggro_radius, (leash_radius - leash_distance) + shoot_range));
                         }
                     }
 
@@ -8281,6 +8316,9 @@ function Mobile() {
     /** @type {?Array.<number>} */
     this.ai_dest = null;
     this.ai_aggressive = false;
+    /** @type {!GameTypes.TickCount} at which unit should resume leashing */
+    this.ai_leash_after = new GameTypes.TickCount(0);
+    this.is_leashing = false; // for debugging only
 
     // Movement of mobile units is handled by the client using a
     // StarCraft-style deterministic simulation. The server only
@@ -8606,6 +8644,8 @@ Mobile.prototype.receive_state = function(data, init, is_deploying) {
 
                 ((session.viewing_base.base_landlord_id === session.user_id) && (this.team != 'player'))) {
                 this.ai_aggressive = true;
+                // attacking units should never leash
+                this.ai_leash_after = GameTypes.TickCount.infinity;
             }
 
             // propagate orders to server
@@ -51660,6 +51700,11 @@ function draw_unit(world, unit) {
             if(s) {
                 draw_centered_text(ctx, s, [xy[0], xy[1]+75]);
             }
+        }
+        if(GameTypes.TickCount.lt(world.combat_engine.cur_tick, unit.ai_leash_after)) {
+            draw_centered_text(ctx, '(leashing surpressed)', [xy[0],xy[1]+90]);
+        } else if(unit.is_leashing) {
+            draw_centered_text(ctx, 'LEASHING', [xy[0],xy[1]+90]);
         }
     }
 
