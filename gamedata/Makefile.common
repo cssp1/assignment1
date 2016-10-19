@@ -1,7 +1,6 @@
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
-# -*- mode: makefile -*-
 
 # gamedata Make rules common to all game titles
 # note: run from the root gamedata/ directory
@@ -164,7 +163,7 @@ all: ${BUILT}/gamedata-${GAME_ID}.json \
 
 # create a localized .json from the main compiled gamedata.json
 .PRECIOUS: ${BUILT}/gamedata-${GAME_ID}-%.json
-${BUILT}/gamedata-${GAME_ID}-%.json: ${BUILT}/gamedata-${GAME_ID}.json ${GAME_ID}/localize/${GAME_ID}-%.po
+${BUILT}/gamedata-${GAME_ID}-%.json: ${BUILT}/gamedata-${GAME_ID}.json ${GAMEDATA}/localize.py ${GAME_ID}/localize/${GAME_ID}-%.po
 	@echo "Creating localization gamedata-${GAME_ID}-${*}.json..." && \
 	${GAMEDATA}/localize.py -g $GAME_ID --mode apply --quiet --locale $* $< ${GAME_ID}/localize/${GAME_ID}-${*}.po $@
 
@@ -172,3 +171,7 @@ ${BUILT}/gamedata-${GAME_ID}-%.json: ${BUILT}/gamedata-${GAME_ID}.json ${GAME_ID
 ${BUILT}/gamedata-${GAME_ID}-%.js: ${BUILT}/gamedata-${GAME_ID}-%.json
 	@echo "  Formatting final gamedata-${GAME_ID}-${*}.js..." && \
 	/bin/echo -n "var gamedata = " > $@ && "${GAMEDATA}/${LINEBREAK}" < $< >> $@
+
+# Local Variables:
+# mode: makefile
+# End:

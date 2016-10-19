@@ -55,8 +55,9 @@ def get_strings(path, data, filter = None):
             ret += get_strings(path+'[]', item, filter = filter)
     else:
         assert is_dictlike(data)
+        if 'predicate' in data: return ret # skip predicates
         for k, v in data.iteritems():
-            if is_dictlike(v):
+            if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 ret += get_strings(path+'/'+k, v, filter = filter)
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny')):
@@ -64,7 +65,7 @@ def get_strings(path, data, filter = None):
     return ret
 
 # parts of gamedata that need their ui_whatever things translated
-TRANSLATE_CATEGORIES = ('dialogs','resources','spells','units','buildings','tech','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions')
+TRANSLATE_CATEGORIES = ('dialogs','resources','spells','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions')
 
 def do_extract(gamedata, outfile, verbose = True):
     if verbose: print >>sys.stderr, "read gamedata game_id", gamedata['game_id'], "built", gamedata['gamedata_build_info']['date']
@@ -92,8 +93,9 @@ def put_strings(data, entries, filter = None, verbose = False):
             put_strings(item, entries, filter = filter, verbose = verbose)
     else:
         assert is_dictlike(data)
+        if 'predicate' in data: return # skip predicates
         for k, v in data.iteritems():
-            if is_dictlike(v):
+            if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 put_strings(v, entries, filter = filter, verbose = verbose)
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))):
