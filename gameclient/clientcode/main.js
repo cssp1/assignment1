@@ -4425,7 +4425,7 @@ GameObject.prototype.run_ai = function(world) {
         var is_permanently_aggressive = this.ai_aggressive && (this.orders.length > 0 && this.orders[0]['aggressive']);
 
         // check whether unit should leash
-        if(player.get_any_abtest_value('enable_leash_radius', gamedata['enable_leash_radius']) &&
+        if(this.is_mobile() && player.get_any_abtest_value('enable_leash_radius', gamedata['enable_leash_radius']) &&
            GameTypes.TickCount.gt(world.combat_engine.cur_tick, this.ai_leash_after) &&
            (player.tutorial_state == "COMPLETE") // no leashing during tutorial
           ) {
