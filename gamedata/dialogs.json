@@ -2663,12 +2663,12 @@
     },
 
     "upgrade_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736, 423],
         "mod_tech_offset": [24,24], // pixel offset of mod techs so they don't appear exactly on top of the parent regular tech
         "clip_children": 0,
         "default_button": "instant_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[8,64], "dimensions":[720,257], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
             "title_bold": { "kind": "TextField", "xy": [30,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
@@ -2879,10 +2879,10 @@
     },
 
     "upgrade_mod_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736, 423],
         "default_button": "instant_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[8,66], "dimensions":[720,251], "asset": "dialog_sunken_720x251_alt" },
 
             "title_bold": { "kind": "TextField", "xy": [10,8], "dimensions": [123, 48], "text_size": 30, "text_style": "thick",
@@ -3744,10 +3744,9 @@
     },
 
     "alliance_promote_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset": "dialog_736x423_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name_promote": "Promote %name to %role?", "ui_name_demote": "Demote %name to %role?" },
@@ -4071,10 +4070,10 @@
     },
 
     "map_ladder_pvp_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "close_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,18], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "!TX desktop map/attack button" },
@@ -6532,10 +6531,10 @@
     },
 
     "battle_log_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "clip_children": 0,
         "dimensions": [736,423],
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Battle Log" },
@@ -7215,10 +7214,10 @@
     },
 
     "squad_manage": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "save_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "sunken_left": {"kind": "StaticImage", "xy":[36,36], "dimensions":[350,378], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
@@ -8067,14 +8066,13 @@
 
 
     "cc_upgrade_congrats_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "ok_button",
         "widgets": {
             "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,483],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
                       "fade":1, "duration": 3, "fade_peak": 0.2, "delay": 0},
 
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset": "dialog_736x423_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
 
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
@@ -8392,10 +8390,10 @@
     },
 
     "abtest_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "close_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "DEV Set A/B Test Cohort" },
@@ -9346,10 +9344,10 @@
     },
 
     "change_region_dialog": {
-        "bg_image": "dialog_736x423_bg",
         "dimensions": [736,423],
         "default_button": "close_button",
         "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,423], "asset":"dialog_resizable","bg_image_resizable":1 },
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick", "text_hjustify": "left", "ui_name": "Relocate Base" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
