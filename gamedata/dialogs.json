@@ -2653,7 +2653,7 @@
                                 "text_size": 13, "text_style": "thick", "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Space: %s" },
 
             // only shown when nothing is selected
-            "coverup_all": { "show": 0, "kind": "StaticImage", "xy": [282,81], "dimensions": [430,175],
+            "coverup_all": { "show": 0, "kind": "StaticImage", "xy": [280,72], "dimensions": [438,185],
                              "bg_image_resizable":1, "asset": "dialog_sunken_resizable",
                              "transparent_to_mouse": false },
             "coverup_queue": { "show": 0, "kind": "SolidRect", "xy": [285,256], "dimensions": [428,150], "color": [0.0354,0.0517,0.0797,1] },
