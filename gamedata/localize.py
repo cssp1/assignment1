@@ -48,17 +48,23 @@ def accum_entry(entries, msgid, where, verbose):
 # need this because we don't know what kind of crazy OrderedDict class the JSON parser is using
 def is_dictlike(obj): return (type(obj) not in (str,unicode,list)) and hasattr(obj, '__getitem__')
 
-def get_strings(path, data, filter = None):
+def get_strings(path, data, filter = None, is_strings_json = False):
+    # strings.json needs special-case handling since it has some strange nested structures
+
     ret = []
     if type(data) is list:
         for item in data:
-            ret += get_strings(path+'[]', item, filter = filter)
+            ret += get_strings(path+'[]', item, filter = filter, is_strings_json = is_strings_json)
     else:
         assert is_dictlike(data)
         if 'predicate' in data: return ret # skip predicates
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
-                ret += get_strings(path+'/'+k, v, filter = filter)
+                ret += get_strings(path+'/'+k, v, filter = filter, is_strings_json = is_strings_json)
+            elif is_strings_json and isinstance(v, list) and len(v) >= 1 and isinstance(v[0], basestring) and \
+                 (k not in ('damage_vs_qualities','periods')):
+                for item in v:
+                    ret.append((item, path+'/'+k+'[]'))
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny')):
                     ret.append((v, path+'/'+k))
@@ -72,7 +78,7 @@ def do_extract(gamedata, outfile, verbose = True):
     po = polib.POFile(check_for_duplicates = True, encoding = 'utf-8', wrapwidth = -1)
     po.metadata = { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Transfer-Encoding': '8bit' }
     entries = {} # map from msgid->POEntry
-    map(lambda msgid_where: accum_entry(entries, msgid_where[0], msgid_where[1], verbose=verbose), get_strings('strings', gamedata['strings'], filter = None))
+    map(lambda msgid_where: accum_entry(entries, msgid_where[0], msgid_where[1], verbose=verbose), get_strings('strings', gamedata['strings'], filter = None, is_strings_json = True))
     for category in TRANSLATE_CATEGORIES:
         map(lambda msgid_where: accum_entry(entries, msgid_where[0], msgid_where[1], verbose=verbose), get_strings(category, gamedata[category], filter = 'ui_'))
     map(po.append, sorted(entries.values(), key = lambda x: x.msgid))
@@ -87,16 +93,20 @@ def get_translation(v, entries, verbose):
     if verbose: print >>sys.stderr, "untranslated string", '"'+v+'"'
     return v
 
-def put_strings(data, entries, filter = None, verbose = False):
+def put_strings(data, entries, filter = None, is_strings_json = False, verbose = False):
     if type(data) is list:
         for item in data:
-            put_strings(item, entries, filter = filter, verbose = verbose)
+            put_strings(item, entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
     else:
         assert is_dictlike(data)
         if 'predicate' in data: return # skip predicates
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
-                put_strings(v, entries, filter = filter, verbose = verbose)
+                put_strings(v, entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
+            elif is_strings_json and isinstance(v, list) and len(v) >= 1 and isinstance(v[0], basestring) and \
+                 (k not in ('damage_vs_qualities','periods')):
+                for i, item in enumerate(v):
+                    v[i] = get_translation(item, entries, verbose)
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))):
                     data[k] = get_translation(v, entries, verbose)
@@ -105,7 +115,7 @@ def do_apply(locale, gamedata, input_po_file, output_json_file, verbose = True):
     po = polib.pofile(input_po_file, encoding = 'utf-8', wrapwidth = -1)
     entries = dict([(entry.msgid, entry.msgstr) for entry in po])
     # translate in place
-    put_strings(gamedata['strings'], entries, filter = None, verbose = verbose)
+    put_strings(gamedata['strings'], entries, filter = None, is_strings_json = True, verbose = verbose)
     for category in TRANSLATE_CATEGORIES:
         put_strings(gamedata[category], entries, filter = 'ui_', verbose = verbose)
     atom = AtomicFileWrite.AtomicFileWrite(output_json_file, 'w')
