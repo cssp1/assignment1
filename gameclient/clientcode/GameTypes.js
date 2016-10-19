@@ -34,7 +34,10 @@ GameTypes.TickCount.prototype.copy = function() { return new GameTypes.TickCount
 /** @param {!CombatEngine.Coeff} s
     @param {!GameTypes.TickCount} a
     @return {!GameTypes.TickCount} */
-GameTypes.TickCount.scale = function(s, a) { return new GameTypes.TickCount(Math.floor(s*a.count+0.5)); };
+GameTypes.TickCount.scale = function(s, a) {
+    if(a.is_infinite()) { return GameTypes.TickCount.infinity; }
+    return new GameTypes.TickCount(Math.floor(s*a.count+0.5));
+};
 
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
@@ -44,17 +47,29 @@ GameTypes.TickCount.equal = function(a, b) { return a.count === b.count; };
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {boolean} */
-GameTypes.TickCount.gte = function(a, b) { return a.count >= b.count; };
+GameTypes.TickCount.gte = function(a, b) {
+    if(a.is_infinite()) { return true; }
+    if(b.is_infinite()) { return false; }
+    return a.count >= b.count;
+};
 
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {boolean} */
-GameTypes.TickCount.gt = function(a, b) { return a.count > b.count; };
+GameTypes.TickCount.gt = function(a, b) {
+    if(a.is_infinite()) { return true; }
+    if(b.is_infinite()) { return false; }
+    return a.count > b.count;
+};
 
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {boolean} */
-GameTypes.TickCount.lt = function(a, b) { return a.count < b.count; };
+GameTypes.TickCount.lt = function(a, b) {
+    if(a.is_infinite()) { return false; }
+    if(b.is_infinite()) { return true; }
+    return a.count < b.count;
+};
 
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
@@ -64,12 +79,18 @@ GameTypes.TickCount.lte = function(a, b) { return a.count <= b.count; };
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {!GameTypes.TickCount} */
-GameTypes.TickCount.add = function(a, b) { return new GameTypes.TickCount(a.count+b.count); };
+GameTypes.TickCount.add = function(a, b) {
+    if(a.is_infinite() || b.is_infinite()) { return GameTypes.TickCount.infinity; }
+    return new GameTypes.TickCount(a.count+b.count);
+};
 
 /** @param {!GameTypes.TickCount} a
     @param {!GameTypes.TickCount} b
     @return {!GameTypes.TickCount} */
-GameTypes.TickCount.max = function(a, b) { return new GameTypes.TickCount(Math.max(a.count, b.count)); };
+GameTypes.TickCount.max = function(a, b) {
+    if(a.is_infinite() || b.is_infinite()) { return GameTypes.TickCount.infinity; }
+    return new GameTypes.TickCount(Math.max(a.count, b.count));
+};
 
 
 // The following is a temporary band-aid to help with the refactoring of main.js.
