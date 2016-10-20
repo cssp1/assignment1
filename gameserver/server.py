@@ -2669,7 +2669,8 @@ class User:
                 else:
                     self.facebook_first_name = self.facebook_name.split(' ')[0]
 
-                if 'birthday' in self.facebook_profile:
+                if 'birthday' in self.facebook_profile and len(self.facebook_profile['birthday'].split('/')) == 3:
+                    # some Facebook profiles return a yearless birthday - ignore these
                     try:
                         m, d, y = map(int, self.facebook_profile['birthday'].split('/'))
                         self.birthday = SpinConfig.cal_to_unix((y,m,d))
