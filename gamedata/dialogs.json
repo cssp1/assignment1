@@ -5250,10 +5250,10 @@
     },
 
     "tutorial_slideshow_dialog": {
-        "bg_image": "tutorial_slideshow_dialog_bg",
         "dimensions": [736,423],
         "default_button": "next_button",
         "widgets": {
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [736,423], "asset": "dialog_resizable", "bg_image_resizable": 1},
             "image": { "kind": "StaticImage", "xy": [18,21], "dimensions": [703,333] },
             "description":  { "kind": "TextField", "xy": [29,353], "dimensions": [552,48], "text_size": 15, "text_leading": 19, "text_hjustify": "left",
                               "ui_name": ""},
@@ -5264,10 +5264,10 @@
         }
     },
     "tutorial_valentina_help_message": {
-        "bg_image": "dialog_501x188_bg",
         "dimensions": [501,188],
         "default_button": "ok_button",
         "widgets": {
+            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [501,188], "asset": "dialog_resizable", "bg_image_resizable": 1 },
             "sunken": {"kind": "StaticImage", "xy":[11,12], "dimensions":[153,164], "asset": "dialog_sunken_153x164" },
             "picture":{"kind": "StaticImage", "xy":[16,17], "dimensions":[143,155], "asset": "valentina_143x155" },
             //"alloy_picture":{"kind": "StaticImage", "xy":[61,65], "dimensions":[50,50], "show": 0 }, // note: if used, should vary with alloy icon A/B test!
