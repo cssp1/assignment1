@@ -32,7 +32,10 @@ class PlayerPortraits(object):
                 return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait.jpg'
             elif fb_id.startswith('example2'):
                 return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait2.jpg'
-            tok = access_token or SpinConfig.config.get('facebook_app_access_token','')
+            if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False):
+                tok = SpinConfig.config['facebook_app_access_token']
+            else:
+                tok = access_token or SpinConfig.config.get('facebook_app_access_token','')
             return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fb_id) + '?' + urllib.urlencode({'access_token': tok})
         elif frame_platform == 'kg':
             if 'kg_avatar_url' not in pcache_info: return None
@@ -172,7 +175,7 @@ if __name__ == '__main__':
                                               lambda x: sys.stderr.write(x+'\n'))
     db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
                                       identity = 'PlayerPortraits.py',
-                                      log_exception_func_map = {'default': lambda x: sys.stderr.write(x+'\n')},
+                                      log_exception_func = lambda x: sys.stderr.write(x+'\n'),
                                       max_retries = -1) # never give up
 
     def run_test():
