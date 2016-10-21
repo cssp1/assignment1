@@ -154,7 +154,20 @@ BattleReplay.Recorder.prototype.before_damage_effects = function() {
     // serialize the rest of the combat engine
     var eng = this.world.combat_engine;
     var snap = this.snapshots[this.snapshots.length-1]['combat_engine'];
-    var dmg = eng.damage_effect_queue.serialize_incremental();
+    var dmg;
+
+    // XXXXXX CombatEngine.Queue.serialize_incremental() doesn't work
+    // for the first snapshot if existing damage effects are queued.
+    // This is due to the placement of damage_effect_queue.clear_dirty_added()
+    // which will clear out dirty_added on the previous tick before recording starts.
+    // Until a proper fix is made, work around this by using non-incremental serialization
+    // on the first tick.
+    if(this.snapshots.length === 1) {
+        dmg = eng.damage_effect_queue.serialize();
+    } else {
+        dmg = eng.damage_effect_queue.serialize_incremental();
+    }
+
     if(dmg) {
         snap['damage_effect_queue'] = dmg;
     }
