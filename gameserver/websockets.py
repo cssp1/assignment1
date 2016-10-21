@@ -261,9 +261,12 @@ class WebSocketsProtocol(ProtocolWrapper):
     codec = None
     dumb_pong = False # temporary hack to work around Chrome v39+ Websockets code that doesn't like to receive data with a PONG
 
-    def __init__(self, *args, **kwargs):
-        ProtocolWrapper.__init__(self, *args, **kwargs)
+    # capture the peer address here since parsing it from a proxied HTTP request is complex
+    # (see calls to SpinHTTP.* below) and we don't want to repeat that work.
+    def __init__(self, factory, wrappedProtocol, spin_peer_addr = None):
+        ProtocolWrapper.__init__(self, factory, wrappedProtocol)
         self.pending_frames = []
+        self.spin_peer_addr = spin_peer_addr
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -278,7 +281,8 @@ class WebSocketsProtocol(ProtocolWrapper):
             frames, self.buf = parse_hybi07_frames(self.buf)
         except WSException:
             # Couldn't parse all the frames, something went wrong, let's bail.
-            log.err()
+            # DJM - for debugging, include the peer address we were talking to
+            log.err(_why = 'while communicating with '+str(self.spin_peer_addr))
             self.loseConnection()
             return
 
@@ -406,6 +410,10 @@ class WebSocketsFactory(WrappingFactory):
     """
 
     protocol = WebSocketsProtocol
+
+    # pass extra addr parameter to WebsocketsProtocol to remember the peer address
+    def buildProtocol(self, addr):
+        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr)
 
 class WebSocketsResource(object):
     """
