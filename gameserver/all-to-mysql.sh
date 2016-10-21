@@ -57,7 +57,7 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./battle_risk_reward_to_sql.py -q --prune --parallel 16
 
   # send SpinReminder notification
-  if [[ "${GAME_ID}" == "tr" ]]; then
+  if [[ "${GAME_ID}" == "tr" || "${GAME_ID}" == "dv" ]]; then
       ./SpinReminders.py --from "all-to-mysql.sh" --subject "${GAME_ID} daily metrics" --body "new battle_risk_reward data available" \
                          --recipients "`./SpinConfig.py --getvar server_status_recipients`"
   fi
