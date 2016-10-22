@@ -22958,10 +22958,8 @@ class GAMEAPI(resource.Resource):
             return False
 
         params['api_secret'] = SpinConfig.config['battlehouse_api_secret'] # add secret at the last moment
-        d = gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST',
-                                                                  postdata = urllib.urlencode(params),
-                                                                  headers = {'Content-Type': 'application/x-www-form-urlencoded'})
-        d.addCallback(lambda result: gamesite.exception_log.event(server_time, repr(result))) # XXXXXX
+        d = gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
+
         metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
                                                                      'ref': sp_ref,
                                                                      'fb_ref': fb_ref})

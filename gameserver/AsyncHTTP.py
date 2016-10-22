@@ -13,6 +13,8 @@ import twisted.web.error
 import traceback
 import time
 from collections import deque
+from urllib import urlencode
+from copy import copy
 
 class AsyncHTTPRequester(object):
     # there are two "modes" for the callbacks on a request:
@@ -35,6 +37,7 @@ class AsyncHTTPRequester(object):
             self.error_callback = error_callback
             self.preflight_callback = preflight_callback
             self.callback_called = 0 # for debugging only
+            assert postdata is None or isinstance(postdata, basestring)
             self.postdata = postdata
             self.fire_time = qtime
             self.max_tries = max_tries
@@ -149,6 +152,17 @@ class AsyncHTTPRequester(object):
                 assert not isinstance(v, list)
                 if not (isinstance(v, bytes) or isinstance(v, basestring)): # XXX basestring should be deprecated in favor of unicode
                     raise Exception('unexpected header %r type %r' % (k, type(v)))
+
+        if postdata:
+            if isinstance(postdata, dict):
+                # convert to form encoding
+                postdata = urlencode(postdata).encode('utf-8')
+                if headers:
+                    headers = copy(headers) # don't mutate caller's headers
+                else:
+                    headers = {}
+                headers['Content-Type'] = 'application/x-www-form-urlencoded'
+
         request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
 
         self.queue.append(request)
