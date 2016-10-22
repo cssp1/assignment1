@@ -1515,7 +1515,7 @@ class HandleSendNotification(Handler):
             session.send([["NOTIFICATION", self.text]], flush_now = True)
             return ReturnValue(result = 'ok')
 
-        if not session.user.facebook_id:
+        if not session.user.social_id:
             return ReturnValue(result = 'no social network to send notification')
         if (not session.player.get_any_abtest_value('enable_fb_notifications', self.gamedata['enable_fb_notifications'])):
             return ReturnValue(result = 'disabled by global enable_fb_notifications setting')
@@ -1558,8 +1558,8 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, session.user.facebook_id, self.text, self.config_name or self.ref_override, fb_ref,
-                                                            session.player.get_denormalized_summary_props('brief')) or self.simulate:
+        if self.gamesite.gameapi.do_send_notification_to(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
+                                                         session.player.get_denormalized_summary_props('brief')) or self.simulate:
             session.player.last_fb_notification_time = self.time_now
             session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
             if self.config:
@@ -1573,7 +1573,7 @@ class HandleSendNotification(Handler):
         return ReturnValue(result = 'ok')
 
     def exec_offline(self, user, player):
-        if not user.get('facebook_id'):
+        if not user.get('social_id'):
             return ReturnValue(result = 'no social network to send notification')
         if not self.gamedata['enable_fb_notifications']:
             return ReturnValue(result = 'disabled by global enable_fb_notifications setting')
@@ -1619,8 +1619,8 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        if self.gamesite.gameapi.do_send_fb_notification_to(self.user_id, user['facebook_id'], self.text, self.config_name or self.ref_override, fb_ref,
-                                                            self.get_denormalized_summary_props_offline(user, player)) or self.simulate:
+        if self.gamesite.gameapi.do_send_notification_to(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
+                                                         self.get_denormalized_summary_props_offline(user, player)) or self.simulate:
             player['last_fb_notification_time'] = self.time_now
             player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
             if self.config:

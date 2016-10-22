@@ -16584,7 +16584,7 @@ class Store(object):
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
                     if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        gamesite.gameapi.do_send_fb_notification_to(session.user.user_id, session.user.facebook_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
+                        gamesite.gameapi.do_send_notification_to(session.user.user_id, session.user.social_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
@@ -22910,8 +22910,7 @@ class GAMEAPI(resource.Resource):
         data_str = open(SpinConfig.gamedata_filename()).read()
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
-    def do_send_fb_notification_to(self, to_user_id, to_facebook_id, text, sp_ref, fb_ref, summary_props):
-        # see http://developers.facebook.com/docs/app_notifications/
+    def do_send_notification_to(self, to_user_id, to_social_id, text, sp_ref, fb_ref, summary_props):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
@@ -22931,6 +22930,45 @@ class GAMEAPI(resource.Resource):
         else:
             raise Exception('unhandled text type %r' % type(text))
 
+        if to_social_id.startswith('fb'):
+            return self.do_send_notification_to_fb(to_user_id, to_social_id[2:], text, sp_ref, fb_ref, summary_props)
+        elif to_social_id.startswith('bh'):
+            return self.do_send_notification_to_bh(to_user_id, to_social_id[2:], text, sp_ref, fb_ref, summary_props)
+        return False
+
+    def do_send_notification_to_bh(self, to_user_id, to_bh_id, text, sp_ref, fb_ref, summary_props):
+        if sp_ref not in gamedata['fb_notifications']['notifications'] or \
+           ('email' not in gamedata['fb_notifications']['notifications'][sp_ref]):
+            gamesite.exception_log.event(server_time, 'fb_notifications needs "email" data for ref %s' % (sp_ref))
+            return False
+
+        email_conf = gamedata['fb_notifications']['notifications'][sp_ref]['email']
+        params = {'service': SpinConfig.game(),
+                  'ui_subject': email_conf['ui_subject'].encode('utf-8'),
+                  'ui_headline': email_conf['ui_headline'].encode('utf-8'),
+                  'ui_body': text.encode('utf-8'),
+                  'ui_cta': email_conf['ui_cta'].encode('utf-8'),
+                  'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (sp_ref, fb_ref),
+                  }
+
+        url = SpinConfig.config['battlehouse_api_path'] + '/user/' + to_bh_id + '/notify'
+
+        if not SpinConfig.config['enable_battlehouse']:
+            gamesite.exception_log.event(server_time, 'Battlehouse disabled: BH notification POST %s query %r sum %r' % (url, params, summary_props))
+            return False
+
+        params['api_secret'] = SpinConfig.config['battlehouse_api_secret'] # add secret at the last moment
+        d = gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST',
+                                                                  postdata = urllib.urlencode(params),
+                                                                  headers = {'Content-Type': 'application/x-www-form-urlencoded'})
+        d.addCallback(lambda result: gamesite.exception_log.event(server_time, repr(result))) # XXXXXX
+        metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
+                                                                     'ref': sp_ref,
+                                                                     'fb_ref': fb_ref})
+        return True
+
+    def do_send_notification_to_fb(self, to_user_id, to_facebook_id, text, sp_ref, fb_ref, summary_props):
+        # see http://developers.facebook.com/docs/app_notifications/
         params = {'href': '',
                   'ref': fb_ref,
                   'template': text }
@@ -25038,6 +25076,20 @@ class GAMEAPI(resource.Resource):
             user.retrieve_ag_info(session, retmsg)
         elif session.user.frame_platform == 'bh':
             user.retrieve_bh_info(session, retmsg)
+
+            # record BH notification hits
+            if ('bh_source' in url_qs) and (url_qs['bh_source'][0] == 'notification') and \
+               ('ref' in url_qs) and ('fb_ref' in url_qs):
+                ref = url_qs['ref'][0]
+                metric_event_coded(user.user_id, '7131_fb_notification_hit',
+                                   {'sum': session.player.get_denormalized_summary_props('brief'),
+                                    'ref': ref,
+                                    'fb_ref': url_qs['fb_ref'][0]})
+                dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
+                # reset unacked counter
+                if 'notification:'+ref+':unacked' in player.history:
+                    del player.history['notification:'+ref+':unacked']
+
         elif session.user.frame_platform == 'mm':
             user.retrieve_mm_info(session, retmsg)
 
