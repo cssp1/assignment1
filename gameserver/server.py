@@ -22949,6 +22949,7 @@ class GAMEAPI(resource.Resource):
                   'ui_body': text.encode('utf-8'),
                   'ui_cta': email_conf['ui_cta'].encode('utf-8'),
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (sp_ref, fb_ref),
+                  'tags': SpinConfig.game()+'_'+fb_ref,
                   }
 
         url = SpinConfig.config['battlehouse_api_path'] + '/user/' + to_bh_id + '/notify'
