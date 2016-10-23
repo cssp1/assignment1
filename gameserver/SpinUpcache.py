@@ -292,6 +292,7 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'PLAYER_AURA_SPEEDUP_FOR_MONEY': 'player_aura_speedup',
                          'UPGRADE_BARRIERS_LEVEL2': 'barriers', 'UPGRADE_BARRIERS_LEVEL3': 'barriers', 'UPGRADE_BARRIERS_LEVEL4': 'barriers',
                          'CHANGE_REGION_INSTANTLY': 'change_region',
+                         'SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY': 'squad_movement',
                          'BUY_LOTTERY_TICKET': 'lottery',
                          'FREE_RANDOM_ITEM': 'free_items',
                          'FREE_RANDOM_DAILY_ITEM': 'free_items',
