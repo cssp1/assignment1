@@ -19,7 +19,7 @@ time_now = int(time.time())
 # return a list of strings describing metrics alerts
 def get_issues(data, game_id):
     issues = []
-    if data['hau'] > 10:
+    if data['hau'] > 25:
         hau = float(data['hau']) # denominator for per-HAU metrics
         if data['cdn_fails'] and float(data['cdn_fails'])/hau >= 0.2:
             issues.append('CDN Issues per HAU >= 0.2')
