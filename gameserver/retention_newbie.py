@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 # load some standard Python libraries
-import sys, time, urllib, urllib2, getopt, traceback, random, re, functools
+import sys, time, urllib, requests, getopt, traceback, random, re, functools
 import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
@@ -179,11 +179,23 @@ class Sender(object):
         self.sent_now = 0
         self.msg_fd = msg_fd
         self.fb_notifications_log = SpinLog.FBNotificationsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.db_client, 'log_fb_notifications'))
+        self.enable_fb = SpinConfig.config.get('enable_facebook', False)
+        self.enable_bh = SpinConfig.config.get('enable_battlehouse', False)
+        self.active_platforms = []
+        if self.enable_fb: self.active_platforms.append('fb')
+        if self.enable_bh: self.active_platforms.append('bh')
+        self.requests_session = requests.Session()
 
     # pass in the player_cache entry
-    def notify_user(self, user_id, pcache, index = -1, total_count = -1):
+    def notify_user(self, user_id, pcache, index = -1, total_count = -1, only_frame_platform = None):
 
         self.seen += 1
+
+        frame_platform = pcache.get('frame_platform',None)
+        # for testing purposes, skip everything not on this platform
+        if only_frame_platform is not None and frame_platform != only_frame_platform:
+            return
+
         print >> self.msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id),
 
         #print >> self.msg_fd, 'PCACHE:', repr(pcache)
@@ -192,18 +204,18 @@ class Sender(object):
             print >> self.msg_fd, '(player_cache says) tutorial not complete'
             return
 
-        if pcache.get('frame_platform',None) != 'fb':
-            print >> self.msg_fd, '(player_cache says) frame_platform != "fb"'
+        if frame_platform not in self.active_platforms:
+            print >> self.msg_fd, '(player_cache says) frame_platform is not active'
             return
 
-        facebook_id = None
-        if 'social_id' in pcache and pcache['social_id'].startswith('fb'):
-            facebook_id = pcache['social_id'][2:]
-        elif 'facebook_id' in pcache:
-            facebook_id = str(pcache['facebook_id'])
+        platform_id = None
+        if 'social_id' in pcache and pcache['social_id'].startswith(frame_platform):
+            platform_id = pcache['social_id'][2:]
+        elif frame_platform == 'fb' and 'facebook_id' in pcache:
+            platform_id = str(pcache['facebook_id'])
 
-        if (not facebook_id) or (len(facebook_id) < 3):
-            print >> self.msg_fd, '(player_cache says) invalid facebook_id: %s' % repr(facebook_id)
+        if (not platform_id) or (len(platform_id) < 3):
+            print >> self.msg_fd, '(player_cache says) invalid platform_id: %r' % platform_id
             return
 
         if pcache.get('LOCK_STATE',0) != 0:
@@ -283,6 +295,7 @@ class Sender(object):
         for key, func in CHECKERS_BY_PRIORITY:
             config = gamedata['fb_notifications']['notifications'].get(key, None)
             if not config: continue
+            if frame_platform == 'bh' and 'email' not in config: continue
             if player.get('creation_time',-1) < config.get('min_account_creation_time',-1): continue
 
             min_interval = config.get('min_interval', -1)
@@ -302,8 +315,9 @@ class Sender(object):
             # and (player['abtests'].get('T210_nnh_notification', None) == 'on'):
             # send critical notification
             config = gamedata['fb_notifications']['notifications'][critical_ref]
-            if (elder and config.get('enable_elder', True)) or \
-               ((not elder) and config.get('enable_newbie', True)):
+            if ((elder and config.get('enable_elder', True)) or \
+               ((not elder) and config.get('enable_newbie', True))) and \
+               (frame_platform != 'bh' or 'email' in config):
                 ref = critical_ref
                 replace_s = ''
 
@@ -364,26 +378,43 @@ class Sender(object):
                 print >> self.msg_fd, 'written!'
 
                 if actually_send_it:
-                    postdata = urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token'],
-                                                 'href': '',
-                                                 'ref': config['ref'] + ref_suffix,
-                                                 'template': text.encode('utf-8') })
-                    request = urllib2.Request(SpinFacebook.versioned_graph_endpoint('notification', str(facebook_id)+'/notifications'), data = postdata)
-                    request.get_method = lambda: 'POST'
-                    print >> self.msg_fd, 'request:', postdata
-                    if SpinConfig.config['enable_facebook']:
-                        try:
-                            ret = urllib2.urlopen(request, timeout=10).read()
-                            print >> self.msg_fd, 'notification sent!'
-                            print >> self.msg_fd, 'GOT:', str(ret)
-                        except:
-                            print >> self.msg_fd, 'FB API error:', traceback.format_exc()
+                    if frame_platform == 'fb':
+                        url = SpinFacebook.versioned_graph_endpoint('notification', str(platform_id)+'/notifications')
+                        params = {'access_token': SpinConfig.config['facebook_app_access_token'],
+                                  'href': '',
+                                  'ref': config['ref'] + ref_suffix,
+                                  'template': text.encode('utf-8') }
+                    elif frame_platform == 'bh':
+                        url = SpinConfig.config['battlehouse_api_path'] + '/user/' + platform_id + '/notify'
+                        email_conf = config['email']
+                        params = {'service': SpinConfig.game(),
+                                  'api_secret': SpinConfig.config['battlehouse_api_secret'],
+                                  'ui_subject': email_conf['ui_subject'].encode('utf-8'),
+                                  'ui_headline': email_conf['ui_headline'].encode('utf-8'),
+                                  'ui_body': text.encode('utf-8'),
+                                  'ui_cta': email_conf['ui_cta'].encode('utf-8'),
+                                  'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
+                                  }
+                    else:
+                        raise Exception('unexpected frame_platform %r' % frame_platform)
 
-                        self.fb_notifications_log.event(time_now, {'user_id': user_id,
-                                                                   'event_name': '7130_fb_notification_sent', 'code':7130,
-                                                                   'sum': SpinETL.get_denormalized_summary_props(gamedata, player, user, 'brief'),
-                                                                   'ref': config['ref'],
-                                                                   'fb_ref': config['ref'] + ref_suffix})
+                    print >> self.msg_fd, 'request:', url, params
+
+                    try:
+                        response = self.requests_session.post(url, data = params, timeout = 10)
+                        if response.status_code == 200:
+                            print >> self.msg_fd, 'notification sent!'
+                            print >> self.msg_fd, 'GOT:', response.text
+                        else:
+                            raise Exception('unexpected response code %d body %r' % (response.status_code, response.text))
+                    except:
+                        print >> self.msg_fd, 'API error:', traceback.format_exc()
+
+                    self.fb_notifications_log.event(time_now, {'user_id': user_id,
+                                                               'event_name': '7130_fb_notification_sent', 'code':7130,
+                                                               'sum': SpinETL.get_denormalized_summary_props(gamedata, player, user, 'brief'),
+                                                               'ref': config['ref'],
+                                                               'fb_ref': config['ref'] + ref_suffix})
 
                     # RETURN HITS WILL LOOK LIKE THIS:
                     # http://apps.facebook.com/marsfrontier/?fb_source=notification&fb_ref=harv_full&ref=notif&notif_t=app_notification
@@ -411,7 +442,7 @@ class NullFD(object):
     def write(self, stuff): pass
 
 
-def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
+def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame_platform):
     msg_fd = sys.stderr if verbose else NullFD()
 
     # reconnect to DB to avoid subprocesses sharing conenctions
@@ -429,7 +460,7 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
                                                                        'last_fb_notification_time', 'LOCK_STATE'])
     for i in xrange(len(batch)):
         try:
-            sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count)
+            sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
         except Exception as e:
@@ -442,10 +473,8 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose):
     print >> msg_fd, 'batch %d done' % batch_num
     sender.finish()
 
-def run_batch_packed(arg): return run_batch(arg[0], arg[1], arg[2], arg[3], arg[4])
-
 def my_slave(input):
-    run_batch(input['batch_num'], input['batch'], input['total_count'], input['limit'], input['dry_run'], input['verbose'])
+    run_batch(input['batch_num'], input['batch'], input['total_count'], input['limit'], input['dry_run'], input['verbose'], input['only_frame_platform'])
 
 # main program
 if __name__ == '__main__':
@@ -453,12 +482,13 @@ if __name__ == '__main__':
         SpinParallel.slave(my_slave)
         sys.exit(0)
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','test', 'limit=', 'parallel=', 'quiet'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','test', 'limit=', 'parallel=', 'quiet', 'frame-platform='])
     dry_run = False
     test = False
     limit = -1
     parallel = -1
     verbose = True
+    only_frame_platform = None
 
     for key, val in opts:
         if key == '--dry-run':
@@ -471,6 +501,8 @@ if __name__ == '__main__':
             parallel = int(val)
         elif key == '--quiet':
             verbose = False
+        elif key == '--frame-platform':
+            only_frame_platform = val
 
     with SpinSingletonProcess.SingletonProcess('retention-newbie-%s' % (SpinConfig.config['game_id'],)):
 
@@ -494,12 +526,12 @@ if __name__ == '__main__':
 
         if parallel <= 1:
             for batch_num in xrange(len(batches)):
-                run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose)
+                run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose, only_frame_platform)
         else:
             SpinParallel.go([{'batch_num':batch_num,
                               'batch':batches[batch_num],
                               'total_count':total_count,
-                              'limit':limit, 'verbose':verbose,
+                              'limit':limit, 'verbose':verbose, 'only_frame_platform': only_frame_platform,
                               'dry_run':dry_run} for batch_num in xrange(len(batches))],
                             [sys.argv[0], '--slave'],
                             on_error = 'break', nprocs=parallel, verbose = False)
