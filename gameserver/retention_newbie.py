@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 # load some standard Python libraries
-import sys, time, urllib, requests, getopt, traceback, random, re, functools
+import sys, time, requests, getopt, traceback, random, re, functools
 import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog, SpinETL
 import SpinFacebook
@@ -14,24 +14,14 @@ import SpinSingletonProcess
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
-# for non-critical-window notifications:
+critical_re = re.compile('([0-9]+)h')
+retain_re = re.compile('retain_([0-9]+)h')
 
 # skip users last modified a long time ago
 MAX_MTIME_AGE = 3*24*60*60 # 3 days
 
 # skip users last modified fewer than this many seconds ago
 MIN_MTIME_AGE = 5*60
-
-# collect the critical post-creation-time-window notifications
-critical_re = re.compile('([0-9]+)h')
-CRITICALS = {}
-for key, val in gamedata['fb_notifications']['notifications'].iteritems():
-    if val.get('enable_elder', True) or val.get('enable_newbie', True):
-        match = critical_re.match(key)
-        if match:
-            num_hours = int(match.group(1))
-            # time range to which this notification applies
-            CRITICALS[key] = [num_hours*60*60, (num_hours+24)*60*60]
 
 # process batches of this many users at once
 BATCH_SIZE = 100
@@ -43,7 +33,7 @@ def get_leveled_quantity(qty, level):
         return qty[level-1]
     return qty
 
-def check_harv_full(player):
+def check_harv_full(pcache, player, config):
     total_harvesters = 0
     full_harvesters = 0
 
@@ -65,7 +55,7 @@ def check_harv_full(player):
 
     return 'harv_full', '', None
 
-def check_upgrade_complete(ref, building_type, specific_level, player):
+def check_upgrade_complete(ref, building_type, specific_level, pcache, player, config):
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if building_type != 'ALL' and obj['spec'] != building_type: continue
@@ -75,7 +65,7 @@ def check_upgrade_complete(ref, building_type, specific_level, player):
                 ui_name = gamedata['buildings'][obj['spec']]['ui_name']
                 return ref, ui_name, None
     return None, None, None
-def check_research_complete(player):
+def check_research_complete(pcache, player, config):
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if ('research_item' in obj) and ('research_start_time' in obj) and ('research_total_time' in obj) and (obj['research_start_time'] > 0):
@@ -83,7 +73,7 @@ def check_research_complete(player):
                 ui_name = gamedata['tech'][obj['research_item']]['ui_name']
                 return 'research_complete', ui_name, None
     return None, None, None
-def check_production_complete(player):
+def check_production_complete(pcache, player, config):
     any_manuf = False
     all_complete = True
     for obj in player['my_base']:
@@ -98,7 +88,7 @@ def check_production_complete(player):
     if any_manuf and all_complete:
         return 'production_complete', '', None
     return None, None, None
-def check_army_repaired(player):
+def check_army_repaired(pcache, player, config):
     if 'unit_repair_queue' in player and len(player['unit_repair_queue']) > 0:
         tags = dict([(item.get('tag',0), 1) for item in player['unit_repair_queue']])
         item = player['unit_repair_queue'][-1]
@@ -116,7 +106,14 @@ def check_army_repaired(player):
                     return None, None, None # damaged
             return 'army_repaired', '', None
     return None, None, None
-def check_fishing_complete(player):
+def check_retain(pcache, player, config):
+    num_hours = int(retain_re.match(config['ref']).group(1))
+    if player['history'].get('fb_notification:'+config['ref']+':last_time',-1) > pcache.get('last_login_time',-1):
+        return None, None, None # already sent this one since last login
+    if (time_now - pcache.get('last_login_time',-1)) >= num_hours*3600:
+        return config['ref'], '', None # send it
+    return None, None, None
+def check_fishing_complete(pcache, player, config):
     prefs = player.get('player_preferences', {})
     if type(prefs) is dict and (not prefs.get('enable_fishing_notifications',True)): return None, None, None
     for obj in player['my_base']:
@@ -160,10 +157,38 @@ CHECKERS = {
     'research_complete': check_research_complete,
     'production_complete': check_production_complete,
     'army_repaired': check_army_repaired,
-    'fishing_complete': check_fishing_complete
+    'fishing_complete': check_fishing_complete,
+    'retain_': check_retain,
     }
-CHECKERS_BY_PRIORITY = sorted(filter(lambda k_v: k_v[0] in gamedata['fb_notifications']['notifications'], CHECKERS.items()),
-                              key = lambda k_v: -gamedata['fb_notifications']['notifications'][k_v[0]]['priority'])
+
+# list of (-priority, ref, check_func) sorted in descending priority (increasing negative priority) order
+CHECKERS_BY_PRIORITY = []
+
+# separately collect the critical post-creation-time-window notifications
+CRITICALS = {}
+
+for key, val in gamedata['fb_notifications']['notifications'].iteritems():
+    if val.get('enable_elder', True) or val.get('enable_newbie', True):
+        match = critical_re.match(key)
+        if match:
+            # post-creation-time-window notification, handled specially
+            num_hours = int(match.group(1))
+            # time range to which this notification applies
+            CRITICALS[key] = [num_hours*60*60, (num_hours+24)*60*60]
+            continue
+        match = retain_re.match(key)
+        if match:
+            # haven't-logged-in-for-a-while notification, handled regularly,
+            # but raise MAX_MTIME_AGE if necessary
+            num_hours = int(match.group(1))
+            # widen the time window to make sure we catch everyone (max retain wait + 1 day)
+            MAX_MTIME_AGE = max(MAX_MTIME_AGE, num_hours*60*60 + 24*60*60)
+            CHECKERS_BY_PRIORITY.append((-val['priority'], key, CHECKERS['retain_']))
+            continue
+        if key in CHECKERS: # regular checker
+            CHECKERS_BY_PRIORITY.append((-val['priority'], key, CHECKERS[key]))
+
+CHECKERS_BY_PRIORITY.sort()
 
 # functions to mutate player after sending a notification
 FINISHERS = {'fishing_complete': finish_fishing_complete }
@@ -292,7 +317,7 @@ class Sender(object):
         replace_s = ''
         checker_state = None
 
-        for key, func in CHECKERS_BY_PRIORITY:
+        for prio, key, func in CHECKERS_BY_PRIORITY:
             config = gamedata['fb_notifications']['notifications'].get(key, None)
             if not config: continue
             if frame_platform == 'bh' and 'email' not in config: continue
@@ -308,7 +333,7 @@ class Sender(object):
                 continue
 
             #print >> self.msg_fd, 'checking %s...' % key
-            ref, replace_s, checker_state = func(player)
+            ref, replace_s, checker_state = func(pcache, player, config)
             if ref: break
 
         if (not ref) and critical_ref:
@@ -366,9 +391,13 @@ class Sender(object):
                 actually_send_it = True
 
             if actually_send_it:
-                player['last_fb_notification_time'] = time_now
+                # update last_fb_notification_time, but skip this for retain_* notifications,
+                # since we might want to try more at different intervals
+                if not retain_re.match(ref):
+                    player['last_fb_notification_time'] = time_now
                 player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
                 player['history']['fb_notification:'+ref+':sent'] = player['history'].get('fb_notification:'+ref+':sent',0)+1
+                player['history']['fb_notification:'+ref+':last_time'] = time_now
 
             # write player even if not sending the notification
             player['generation'] = generation+1
