@@ -1658,7 +1658,17 @@ EXTENDED_TUTORIAL_QUESTS = {
            'blaster_attack',
            'upgrade_central_computer_level_2',
            'activate_an_item'],
-    'sg': []
+    'sg': [],
+    'fs': ['reclaim_base',
+           'gather_resources',
+           'train_troops',
+           'attack_an_outpost',
+           'upgrade_generator_level_2',
+           'build_flight_center',
+           'unlock_aircraft_tier_1',
+           'new_unit_attack',
+           'activate_an_item',
+           'upgrade_toc_level_2'],
     }
 
 TUTORIAL_AI = {
@@ -1674,6 +1684,7 @@ TUTORIAL_AI = {
             {'ui_name': 'Crimson Armada (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels': 25},
             ],
     'sg': [{'ui_name': 'Rall (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels':25}],
+    'fs': [],
     }
 
 TECH_BUILDINGS = {
@@ -1682,7 +1693,8 @@ TECH_BUILDINGS = {
     'tr': ['academy', 'maintenance_bay', 'flight_center'],
     'dv': ['academy', 'maintenance_bay', 'flight_center'],
     'bfm': ['rover_lab', 'transport_lab', 'starcraft_lab'],
-    'sg': []
+    'sg': [],
+    'fs': ['academy', 'maintenance_bay', 'flight_center'],
     }
 
 UNITS_BY_CATEGORY = dict([(cat, sorted([k for k in gamedata['units'].iterkeys() if \
@@ -1711,6 +1723,7 @@ EVENT_STAGES = {
     'dv': [{'ui_name': 'Hamilton', 'key': 'hamilton', 'difficulties': ['normal'], 'check_levels': range(0,-1)}],
     'bfm': [],
     'sg': [],
+    'fs': [],
     }
 EVENT_DIFFICULTIES = {
     'normal': {'key': '', 'ui_name': 'Normal'},
@@ -1762,6 +1775,7 @@ CUSTOM_STAGES = {
     ],
     'mf': [],
     'mf2': [],
+    'fs': [],
 }
 
 FUNNEL_BASIC = [
