@@ -46,4 +46,19 @@
     {"predicate": "ANY_ABTEST", "key": "enable_replay_playback", "value": 1}
 ]},
 
-"report_damage_attribution": 1 // enable damage attribution data collection
+"report_damage_attribution": 1, // enable damage attribution data collection
+
+// client/server connection settings
+"ajax_config": {
+    "default": {
+        // number of seconds to wait before deciding that an outstanding AJAX request has failed
+        "message_timeout_hello": 12, // timeout used for CLIENT_HELLO connection attempt
+        "message_timeout_gameplay": 120, // timeout used for normal gameplay messages
+        "enable_proxy": 1 },
+    "high_latency": {
+        // for bad internet connections (non-Tier 1/2), extend the initial timeout instead of falling back to proxy,
+        // since it's more likely people just have slow connections instead of business firewalls.
+        "message_timeout_hello": 120,
+        "message_timeout_gameplay": 120,
+        "enable_proxy": 1 } // needed for haproxy setup
+}
