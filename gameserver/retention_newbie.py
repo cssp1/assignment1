@@ -423,6 +423,7 @@ class Sender(object):
                                   'ui_body': text.encode('utf-8'),
                                   'ui_cta': email_conf['ui_cta'].encode('utf-8'),
                                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
+                                  'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
                                   }
                     else:
                         raise Exception('unexpected frame_platform %r' % frame_platform)
