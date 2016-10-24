@@ -47428,8 +47428,10 @@ function handle_server_message(data) {
         var str = data[1], tag = data[2];
         if(player.is_developer()) { console.log("CLIENT_TRACKING_PIXEL_IMAGE "+str); }
         var img = new Image();
-        //img.src = (location.protocol=='http:'?'http':'https')+'://'+str;
-        img.src = 'https://'+str;
+        if(str.indexOf('http') !== 0) {
+            str = 'https://'+str; // default to HTTPS
+        }
+        img.src = str;
         result = true;
         send_to_server.func(["CLIENT_TRACKING_PIXEL_IMAGE_RESULT", tag, result]);
     } else if(msg == "FORCE_RELOAD") {
