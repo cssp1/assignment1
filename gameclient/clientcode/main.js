@@ -29825,11 +29825,17 @@ function unit_icon_set(dialog, specname, qty, obj, onclick, frame_state_override
 
     dialog.widgets['icon'].show = dialog.widgets['slot'].show = dialog.widgets['stack'].show = dialog.widgets['frame'].show = !!spec;
     if(spec) {
+        var max_level = get_max_ui_level(gamedata['tech'][spec['level_determined_by_tech']]);
+        var cur_level = (obj && ('level' in obj) ? obj['level'] :
+                         player.tech[spec['level_determined_by_tech']] || 1);
+        var level_str = gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString());
         dialog.widgets['icon'].asset = get_leveled_quantity(spec['art_asset'], 1);
         dialog.widgets['icon'].state = 'icon';
         dialog.widgets['stack'].str = (qty > 1 ? pretty_print_number(qty) : null);
         dialog.widgets['frame'].onclick = (onclick ? onclick : null);
-        dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override : (onclick ? spec['ui_name'] + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') : null));
+        dialog.widgets['frame'].tooltip.str = (tooltip_override ? tooltip_override :
+                                               (onclick ? spec['ui_name'] + '\n'+level_str + (('ui_tip' in spec) ? '\n'+spec['ui_tip'] : '') :
+                                                null));
         if(enable_dripper) {
             dialog.widgets['frame'].dripper_cb = dialog.user_data['my_dripper_cb'];
             dialog.widgets['frame'].dripper_rate = 4.0;
