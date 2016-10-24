@@ -10421,6 +10421,11 @@ SPINPUNCHGAME.init = function() {
     window.addEventListener("beforeunload", SPINPUNCHGAME.shutdown, false);
     window.addEventListener("unload", SPINPUNCHGAME.shutdown, false);
 
+    // register bh.com iframe postMessage handler
+    if(spin_frame_platform === 'bh') {
+        window.addEventListener("message", on_postMessage, false);
+    }
+
     if(document.URL.indexOf('anon_mode=1') != -1) { anon_mode = true; }
     if(document.URL.indexOf('dev_linkbar=1') != -1) { document.getElementById('canvas_div').style.height = '50%'; }
 
@@ -10784,6 +10789,18 @@ SPINPUNCHGAME.init = function() {
 
     SPFB.AppEvents.activateApp();
 };
+
+function on_postMessage(e) {
+    if(spin_battlehouse_api_path.indexOf(e.origin) !== 0) {
+        console.log('unexpected origin '+e.origin+' for postMessage, ignoring.');
+        return;
+    }
+    var data = JSON.parse(e.data);
+    if('bh_access_token' in data) {
+        // update the access token
+        spin_battlehouse_access_token = data['bh_access_token'];
+    }
+}
 
 // spawn desktop dialogs
 // This should be called every time the session changes, because the dialogs are different
