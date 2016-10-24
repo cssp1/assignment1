@@ -287,7 +287,12 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
         d.user_data['squad_id'] = squad_id;
         d.user_data['icon_unit_specname'] = null;
         d.widgets['manage_button'].onclick = function(w) {
-            SquadManageDialog.invoke_squad_manage(w.parent.user_data['squad_id']);
+            var squad_id = w.parent.user_data['squad_id'];
+            if(squad_id === SQUAD_IDS.RESERVES) {
+                // "Managing" reserves is the same as opening Base Defenders
+                squad_id = SQUAD_IDS.BASE_DEFENDERS;
+            }
+            SquadManageDialog.invoke_squad_manage(squad_id);
         };
         d.widgets['delete_button'].onclick = function(w) {
             var _d = w.parent, _dialog = _d.parent;
@@ -591,7 +596,7 @@ SquadControlDialog.update_squad_tile = function(dialog) {
     }
 
     dialog.widgets['delete_button'].show = (dlg_mode=='normal') && hover && SQUAD_IDS.is_mobile_squad_id(dialog.user_data['squad_id']) && !squad_is_deployed && !squad_in_battle;
-    dialog.widgets['manage_button'].show = (dlg_mode=='normal') && hover && dialog.user_data['squad_id'] != SQUAD_IDS.RESERVES && !squad_in_battle;
+    dialog.widgets['manage_button'].show = (dlg_mode=='normal') && hover && !squad_in_battle;
 
     dialog.widgets['deploy_button'].show = (dlg_mode=='deploy') && hover && can_do_action;
     dialog.widgets['call_button'].show = (dlg_mode=='call') && hover && can_do_action;
