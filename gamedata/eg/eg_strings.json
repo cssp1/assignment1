@@ -544,7 +544,7 @@
     "footer_linkbar_content": [
         // Like only
         [{"predicate": "ALWAYS_TRUE"},
-         "&nbsp;&nbsp;&nbsp;<font size=\"-1\"><a href=\"\/\/www.facebook.com/141835099310946/?ref=ingame_linkbar\" target=\"_blank\">Like Example Game on Facebook</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=\"\/\/www.XXXXXX.com/terms\" target=\"_blank\">Terms of Service</a></font>"
+         "&nbsp;&nbsp;&nbsp;<a href=\"\/\/www.facebook.com/141835099310946/?ref=ingame_linkbar\" target=\"_blank\">Like Example Game on Facebook</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href=\"\/\/www.XXXXXX.com/terms\" target=\"_blank\">Terms of Service</a>"
         ]],
 
     // unsupported_browser_landing MOVED to config.json:proxyserver
