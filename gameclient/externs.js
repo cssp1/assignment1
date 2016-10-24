@@ -8,6 +8,12 @@ var SPLWMetrics = {
     "send_event": function () {}
 };
 
+// Battlehouse Login
+var BHSDK = {
+    "bh_access_token_renew_async": function() {},
+    "invite_gui": function() {},
+};
+
 // Global variables that are sent to the client by our proxyserver via proxy_index.html template replacements
 var spin_pageload_begin;
 var spin_demographics;
