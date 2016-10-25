@@ -121,10 +121,9 @@ def api_version_number(feature):
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
     return protocol + subdomain + '.facebook.com/'+api_version_string(feature) + path
 
-def versioned_graph_endpoint_secure(feature, path, protocol = 'https://', subdomain = 'graph', access_token = None):
-    # XXX reads credentials via SpinConfig
-    if access_token is None:
-        access_token = SpinConfig.config['facebook_app_access_token']
+def versioned_graph_endpoint_secure(feature, path, protocol = 'https://', subdomain = 'graph'):
+    # since appsecret_proof is enabled, we cannot allow substitution of client-side access tokens here, since calls originate from the server
+    access_token = SpinConfig.config['facebook_app_access_token']
     ret = versioned_graph_endpoint(feature, path, protocol, subdomain)
     ret += '?' + urllib.urlencode({'access_token': access_token,
                                    'appsecret_proof': hmac.new(str(SpinConfig.config['facebook_app_secret']),

@@ -17,7 +17,7 @@ import SpinConfig
 import SpinJSON
 from urllib import urlencode
 import requests
-import sys, os, getopt, time
+import sys, getopt, time
 
 time_now = int(time.time())
 verbose = False
@@ -37,8 +37,6 @@ if __name__ == '__main__':
 
     payment_id = args[0]
 
-    access_token = os.getenv('ACCESS_TOKEN') or SpinConfig.config['facebook_app_access_token']
-
     requests_session = requests.Session()
     client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
     social_id_table = SocialIDCache.SocialIDCache(client)
@@ -49,7 +47,7 @@ if __name__ == '__main__':
     while (not response) and (attempt < 10):
         attempt += 1
         try:
-            url = SpinFacebook.versioned_graph_endpoint_secure('payment', payment_id, access_token = access_token)+'&'+\
+            url = SpinFacebook.versioned_graph_endpoint_secure('payment', payment_id)+'&'+\
                                                                urlencode({'fields': SpinFacebook.PAYMENT_FIELDS})
             resp = requests_session.get(url, timeout = 30)
             resp.raise_for_status()

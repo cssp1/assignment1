@@ -32,11 +32,9 @@ class PlayerPortraits(object):
                 return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait.jpg'
             elif fb_id.startswith('example2'):
                 return 'https://s3.amazonaws.com/spinpunch-public/anon_portrait2.jpg'
-            if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False):
-                tok = SpinConfig.config['facebook_app_access_token']
-            else:
-                tok = access_token or SpinConfig.config.get('facebook_app_access_token','')
-            return SpinFacebook.versioned_graph_endpoint_secure('user/picture', '%s/picture' % fb_id, access_token = tok)
+
+            # since enabling appsecret_proof requirement, we can no longer use client-side access tokens here
+            return SpinFacebook.versioned_graph_endpoint_secure('user/picture', '%s/picture' % fb_id)
 
         elif frame_platform == 'kg':
             if 'kg_avatar_url' not in pcache_info: return None

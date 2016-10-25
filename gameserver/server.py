@@ -2432,7 +2432,7 @@ class User:
                 print 'unhandled Facebook app request type', my_data
 
             # tell Facebook to delete the request (even if processing it caused an error)
-            delete_url = SpinFacebook.versioned_graph_endpoint_secure('apprequest', str(request_id), access_token=self.access_token)+'&'+urllib.urlencode({'method':'delete'})
+            delete_url = SpinFacebook.versioned_graph_endpoint_secure('apprequest', str(request_id))+'&'+urllib.urlencode({'method':'delete'})
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
 
     def retrieve_facebook_requests_start_v2(self):
@@ -2558,23 +2558,18 @@ class User:
 
     # launch the asynchronous HTTP requests to Facebook's servers
     def retrieve_facebook_info_start(self, session):
-        assert self.fb_oauth_token
-        session_tok = self.fb_oauth_token
-        app_tok = SpinConfig.config['facebook_app_access_token']
+        #assert self.fb_oauth_token
+        #session_tok = self.fb_oauth_token
 
-        #endpoint = 'me'
         endpoint = str(self.facebook_id)
 
-        # mysterious Facebook behavior - some graph calls require the
-        # APP access token, and some require the OAUTH_TOKEN passed in
-        # for the login session
+        # XXXXXX now we always have to use using app_tok here because of appsecret_proof.
+        # This results in no birthday info and no is_eligible_promo data.
+        # We'll need to do client-side queries for those
 
-        # this is a bad hack just for Thunder Run while it's not whitelisted in the U.S. - we use the app token rather than the session token
-        tok = app_tok if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok
-
-        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint, access_token=tok)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions' # app_tok results in no birthday info and no is_eligible_promo data
-        friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends', access_token=tok)+'?limit=500&offset=0' # app_tok
-        likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes', access_token=tok)+'?limit=500&offset=0' # app_tok
+        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions'
+        friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
+        likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'?limit=500&offset=0'
 
         # keep track of outstanding requests
         self.fb_retrieve_semaphore = set(['profile', 'friends', 'likes'])
