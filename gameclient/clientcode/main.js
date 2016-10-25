@@ -34663,7 +34663,7 @@ function update_research_dialog(dialog) {
                         }
                     }; })(lab);
                 } else {
-                    dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_inprogress'].replace('%d',(current+1).toString()).replace('%s',pretty_print_time(lab.research_time_left()));
+                    dialog.widgets['grid_status'+widget_name].str = dialog.data['widgets']['grid_status']['ui_name_inprogress'].replace('%d',(current+1).toString()).replace('%s',pretty_print_time_brief(lab.research_time_left()));
                     var price = Store.get_user_currency_price(lab.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null);
                     if(price == 0) {
                         cb = (function(_lab) { return function() {
