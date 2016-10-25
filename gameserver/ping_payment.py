@@ -49,8 +49,8 @@ if __name__ == '__main__':
     while (not response) and (attempt < 10):
         attempt += 1
         try:
-            url = SpinFacebook.versioned_graph_endpoint('payment', payment_id)+'?'+urlencode({'access_token':access_token,
-                                                                                              'fields': SpinFacebook.PAYMENT_FIELDS})
+            url = SpinFacebook.versioned_graph_endpoint_secure('payment', payment_id, access_token = access_token)+'&'+\
+                                                               urlencode({'fields': SpinFacebook.PAYMENT_FIELDS})
             resp = requests_session.get(url, timeout = 30)
             resp.raise_for_status()
             response = SpinJSON.loads(resp.content)

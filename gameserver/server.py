@@ -1953,9 +1953,8 @@ class User:
 
         if not SpinConfig.config['enable_facebook']: return
 
-        url = SpinFacebook.versioned_graph_endpoint('payment', str(self.facebook_id)+'/payment_transactions') + '?' + \
-              urllib.urlencode(dict(request_id=request_id, access_token=SpinConfig.config['facebook_app_access_token'],
-                                    fields=SpinFacebook.PAYMENT_FIELDS))
+        url = SpinFacebook.versioned_graph_endpoint_secure('payment', str(self.facebook_id)+'/payment_transactions') + '&' + \
+              urllib.urlencode({'request_id':request_id, 'fields':SpinFacebook.PAYMENT_FIELDS})
 
         if gamedata['server']['log_fbpayments'] >= 2:
             gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s SEND %s' % (session.player.user_id, request_id, url))
@@ -2433,12 +2432,11 @@ class User:
                 print 'unhandled Facebook app request type', my_data
 
             # tell Facebook to delete the request (even if processing it caused an error)
-            delete_url = SpinFacebook.versioned_graph_endpoint('apprequest', str(request_id))+'?'+urllib.urlencode(dict(access_token=self.fb_oauth_token, method='delete')) # SpinConfig.config['facebook_app_access_token']?
+            delete_url = SpinFacebook.versioned_graph_endpoint_secure('apprequest', str(request_id), access_token=self.access_token)+'&'+urllib.urlencode({'method':'delete'})
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
 
     def retrieve_facebook_requests_start_v2(self):
-        request_url = SpinFacebook.versioned_graph_endpoint('apprequests', '%s/apprequests' % self.facebook_id) + \
-                                                 '?'+ urllib.urlencode(dict(access_token = SpinConfig.config['facebook_app_access_token']))
+        request_url = SpinFacebook.versioned_graph_endpoint_secure('apprequests', '%s/apprequests' % self.facebook_id)
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_paged_v2(result))
 
     def retrieve_facebook_requests_paged_v2(self, result, buffer = None):
@@ -2500,8 +2498,8 @@ class User:
             limit = 50 # facebook limits batches to 50
             batches = [batch[i:i+limit] for i in xrange(0, len(batch), limit)]
             for this_batch in batches:
-                delete_url = SpinFacebook.versioned_graph_endpoint('apprequests', '') + \
-                             '?' + urllib.urlencode(dict(access_token=SpinConfig.config['facebook_app_access_token'], batch=SpinJSON.dumps(this_batch)))
+                delete_url = SpinFacebook.versioned_graph_endpoint_secure('apprequests', '') + \
+                             '&' + urllib.urlencode({'batch':SpinJSON.dumps(this_batch)})
                 gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
     def create_fb_open_graph_action(self, action, params):
@@ -2518,10 +2516,9 @@ class User:
             if config['enable']:
 
                 params = params.copy()
-                params['access_token'] = SpinConfig.config['facebook_app_access_token']
                 params['ref'] = 'og_%s__%d' % (action, self.user_id)
                 query = urllib.urlencode(params)
-                url = SpinFacebook.versioned_graph_endpoint('open_graph', self.facebook_id+'/'+SpinConfig.config['facebook_app_namespace']+':'+action)
+                url = SpinFacebook.versioned_graph_endpoint_secure('open_graph', self.facebook_id+'/'+SpinConfig.config['facebook_app_namespace']+':'+action)
 
                 if gamedata['server']['log_fb_open_graph']:
                     gamesite.exception_log.event(server_time, 'create_fb_open_graph_action("%s", %s)' % (url, repr(params)))
@@ -2563,9 +2560,7 @@ class User:
     def retrieve_facebook_info_start(self, session):
         assert self.fb_oauth_token
         session_tok = self.fb_oauth_token
-        session_tok_qs = urllib.urlencode(dict(access_token=session_tok))
         app_tok = SpinConfig.config['facebook_app_access_token']
-        app_tok_qs = urllib.urlencode(dict(access_token=app_tok))
 
         #endpoint = 'me'
         endpoint = str(self.facebook_id)
@@ -2575,11 +2570,11 @@ class User:
         # for the login session
 
         # this is a bad hack just for Thunder Run while it's not whitelisted in the U.S. - we use the app token rather than the session token
-        tok_qs = app_tok_qs if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok_qs
+        tok = app_tok if SpinConfig.config.get('use_facebook_app_access_token_for_user_data',False) else session_tok
 
-        profile_url = SpinFacebook.versioned_graph_endpoint('user', endpoint)+'?fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions&'+tok_qs # app_tok_qs results in no birthday info and no is_eligible_promo data
-        friends_url = SpinFacebook.versioned_graph_endpoint('friend', endpoint+'/friends')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
-        likes_url = SpinFacebook.versioned_graph_endpoint('like', endpoint+'/likes')+'?limit=500&offset=0&'+tok_qs # app_tok_qs
+        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint, access_token=tok)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions' # app_tok results in no birthday info and no is_eligible_promo data
+        friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends', access_token=tok)+'?limit=500&offset=0' # app_tok
+        likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes', access_token=tok)+'?limit=500&offset=0' # app_tok
 
         # keep track of outstanding requests
         self.fb_retrieve_semaphore = set(['profile', 'friends', 'likes'])
@@ -12135,10 +12130,9 @@ class Player(AbstractPlayer):
             return
 
         self.last_fb_score_update = server_time
-        params = {'access_token': SpinConfig.config['facebook_app_access_token'],
-                  'score': str(value) }
+        params = {'score': str(value) }
         query = urllib.urlencode(params)
-        url = SpinFacebook.versioned_graph_endpoint('score', str(facebook_id)+'/scores')
+        url = SpinFacebook.versioned_graph_endpoint_secure('score', str(facebook_id)+'/scores')
         if SpinConfig.config['enable_facebook']:
             gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = query, max_tries = 1)
         else:
@@ -22959,7 +22953,7 @@ class GAMEAPI(resource.Resource):
             return False
 
         params['api_secret'] = SpinConfig.config['battlehouse_api_secret'] # add secret at the last moment
-        d = gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
+        gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
 
         metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
                                                                      'ref': sp_ref,
@@ -22971,13 +22965,11 @@ class GAMEAPI(resource.Resource):
         params = {'href': '',
                   'ref': fb_ref,
                   'template': text }
-        url = SpinFacebook.versioned_graph_endpoint('notification', str(to_facebook_id)+'/notifications')
+        url = SpinFacebook.versioned_graph_endpoint_secure('notification', str(to_facebook_id)+'/notifications')
 
         if not SpinConfig.config['enable_facebook']:
-            gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r sum %r' % (url, params, summary_props))
+            gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r sum %r' % (to_facebook_id, params, summary_props))
             return False
-
-        params['access_token'] = SpinConfig.config['facebook_app_access_token'] # add secret at the last moment
 
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
         metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
@@ -25492,10 +25484,9 @@ class GAMEAPI(resource.Resource):
             if player_data.get('fb_published', False): continue
 
             endpoint = OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('achievement'), 'name': name})
-            params = {'access_token': SpinConfig.config['facebook_app_access_token'],
-                      'achievement': str(endpoint) }
+            params = {'achievement': str(endpoint)}
             query = urllib.urlencode(params)
-            url = SpinFacebook.versioned_graph_endpoint('achievement', str(session.user.facebook_id)+'/achievements')
+            url = SpinFacebook.versioned_graph_endpoint_secure('achievement', str(session.user.facebook_id)+'/achievements')
             if SpinConfig.config['enable_facebook']:
                 if gamedata['server']['log_fb_achievements']:
                     gamesite.exception_log.event(server_time, 'send_fb_achievements(POST %s query %s)' % (url, query))

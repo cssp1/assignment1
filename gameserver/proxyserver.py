@@ -1659,10 +1659,8 @@ class GameProxy(proxy.ReverseProxyResource):
         d = defer.Deferred()
         d.addCallback(SpinHTTP.complete_deferred_request, request)
         sc = self.OAuthVerifier(self, request, visitor, token, d)
-        url = SpinFacebook.versioned_graph_endpoint('oauth', 'debug_token') + '?' + \
-              urllib.urlencode({'input_token':token,
-                                'access_token': SpinConfig.config['facebook_app_access_token'],
-                                })
+        url = SpinFacebook.versioned_graph_endpoint_secure('oauth', 'debug_token') + '&' + \
+              urllib.urlencode({'input_token':token})
         if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 2:
             exception_log.event(proxy_time, 'verifying OAuth token: ' + url)
         fb_queue_request('oauth/debug_token', proxy_time, url, sc.on_response, error_callback = sc.on_error)
@@ -1728,7 +1726,7 @@ class GameProxy(proxy.ReverseProxyResource):
         def go(self):
             fb_queue_request('user/permissions',
                              proxy_time,
-                             SpinFacebook.versioned_graph_endpoint('user/permissions', str(self.visitor.facebook_id)+'/permissions')+'?'+urllib.urlencode({'access_token':SpinConfig.config['facebook_app_access_token']}),
+                             SpinFacebook.versioned_graph_endpoint_secure('user/permissions', str(self.visitor.facebook_id)+'/permissions'),
                              self.on_response, error_callback = self.on_error)
             if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 3:
                 exception_log.event(proxy_time, 'proxyserver: index_visit_check_scope(attempt %d) facebook ID %s' % (self.attempt, self.visitor.facebook_id))
@@ -2657,10 +2655,8 @@ class GameProxy(proxy.ReverseProxyResource):
                             self.d.callback('')
                     pinger = FBRTAPI_payment_pinger(payment_id, pay, d)
                     fb_queue_request('payment', proxy_time,
-                                     SpinFacebook.versioned_graph_endpoint('payment', payment_id) + \
-                                     '?'+urllib.urlencode({'access_token': SpinConfig.config['facebook_app_access_token'],
-                                                           'fields':SpinFacebook.PAYMENT_FIELDS
-                                                           }),
+                                     SpinFacebook.versioned_graph_endpoint_secure('payment', payment_id) + \
+                                     '&'+urllib.urlencode({'fields':SpinFacebook.PAYMENT_FIELDS}),
                                      pinger.on_response, error_callback = pinger.on_error, max_tries = 4)
                     # fire-and-forget - let the pinger go asynchronously
                     return ''

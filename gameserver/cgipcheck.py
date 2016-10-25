@@ -348,9 +348,8 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             else:
                 raise Exception('unknown payment method '+method)
 
-            fb_args['access_token'] = SpinConfig.config['facebook_app_access_token']
             fb_args['fields'] = SpinFacebook.PAYMENT_FIELDS
-            request = urllib2.Request(SpinFacebook.versioned_graph_endpoint('payment', fb_path)+'?'+urllib.urlencode(fb_args))
+            request = urllib2.Request(SpinFacebook.versioned_graph_endpoint_secure('payment', fb_path)+'&'+urllib.urlencode(fb_args))
             request.get_method = lambda: fb_method
             result = {'result': urllib2.urlopen(request).read().strip()}
 

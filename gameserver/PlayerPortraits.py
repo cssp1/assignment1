@@ -36,7 +36,8 @@ class PlayerPortraits(object):
                 tok = SpinConfig.config['facebook_app_access_token']
             else:
                 tok = access_token or SpinConfig.config.get('facebook_app_access_token','')
-            return SpinFacebook.versioned_graph_endpoint('user/picture', '%s/picture' % fb_id) + '?' + urllib.urlencode({'access_token': tok})
+            return SpinFacebook.versioned_graph_endpoint_secure('user/picture', '%s/picture' % fb_id, access_token = tok)
+
         elif frame_platform == 'kg':
             if 'kg_avatar_url' not in pcache_info: return None
             return pcache_info['kg_avatar_url']
@@ -179,8 +180,11 @@ if __name__ == '__main__':
                                       max_retries = -1) # never give up
 
     def run_test():
+        def my_log_exception(x):
+            sys.stderr.write(x+'\n')
         port = PlayerPortraits(db_client, {'fb':async_http, 'kg':async_http, 'ag':async_http, 'mm':async_http, 'bh':async_http},
-                               lambda x: sys.stderr.write(x+'\n'))
+                               {'fb': my_log_exception, 'kg':my_log_exception, 'ag':my_log_exception, 'mm':my_log_exception, 'bh':my_log_exception,
+                               'default': my_log_exception})
         now = int(time.time())
         pcache_info_fb = {'social_id':'fb427233'}
         pcache_info_kg = {'social_id':'kgexample', 'kg_avatar_url':'http://cdn4.kongcdn.com/assets/resize-image/50x50/assets/avatars/defaults/frog.png'}

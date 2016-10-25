@@ -6,7 +6,7 @@
 
 import SpinConfig # for API version settings
 import SpinJSON
-import base64, hmac, hashlib, time, calendar, os
+import base64, hmac, hashlib, time, calendar, os, urllib
 
 #
 # FACEBOOK API tools
@@ -120,6 +120,17 @@ def api_version_number(feature):
 
 def versioned_graph_endpoint(feature, path, protocol = 'https://', subdomain = 'graph'):
     return protocol + subdomain + '.facebook.com/'+api_version_string(feature) + path
+
+def versioned_graph_endpoint_secure(feature, path, protocol = 'https://', subdomain = 'graph', access_token = None):
+    # XXX reads credentials via SpinConfig
+    if access_token is None:
+        access_token = SpinConfig.config['facebook_app_access_token']
+    ret = versioned_graph_endpoint(feature, path, protocol, subdomain)
+    ret += '?' + urllib.urlencode({'access_token': access_token,
+                                   'appsecret_proof': hmac.new(str(SpinConfig.config['facebook_app_secret']),
+                                                               msg=str(access_token),
+                                                               digestmod=hashlib.sha256).digest()})
+    return ret
 
 # list of fields to query on Graph API "payment" objects
 PAYMENT_FIELDS = 'id,user,application,actions,refundable_amount,items,country,request_id,created_time,payout_foreign_exchange_rate,tax,tax_country,disputes'

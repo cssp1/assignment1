@@ -408,9 +408,8 @@ class Sender(object):
 
                 if actually_send_it:
                     if frame_platform == 'fb':
-                        url = SpinFacebook.versioned_graph_endpoint('notification', str(platform_id)+'/notifications')
-                        params = {'access_token': SpinConfig.config['facebook_app_access_token'],
-                                  'href': '',
+                        url = SpinFacebook.versioned_graph_endpoint_secure('notification', str(platform_id)+'/notifications')
+                        params = {'href': '',
                                   'ref': config['ref'] + ref_suffix,
                                   'template': text.encode('utf-8') }
                     elif frame_platform == 'bh':
