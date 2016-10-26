@@ -29,7 +29,8 @@ input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
 .ui-tabs-nav { line-height: 120%; }
 table, th, td { border: 1px solid #808080; border-collapse: collapse; padding: 0px; }
 .spin_chat_report_td { padding: 5px; }
-.spin_server_status_td { }
+.spin_server_status_td { padding: 0px 2px; }
+.spin_td_nowrap { white-space: nowrap; }
 .spin_server_status_td_div { overflow: hidden; }
 </style>
 
@@ -1054,13 +1055,13 @@ var server_status_interval = 15;
 
 var server_status_fields = [{'name':'server_name','type':'server_name'},
                             {'name':'state','type':'state'},
-                            {'name':'sessions','var':'active_sessions','type':'active_sessions'},
-                            {'name':'$_sessions','var':'paying_sessions','type':'int'},
+                            {'name':'ssn','var':'active_sessions','type':'active_sessions'},
+                            {'name':'$ssn','var':'paying_sessions','type':'int'},
                             //{'name':'clients','var':'active_protocol_clients','type':'int'},
                             //{'name':'requests','var':'active_protocol_requests','type':'int'},
-                            {'name':'load_unhalted','type':'load'},
-                            {'name':'mem_free','var':'machine_stats:machine_mem_free_mb','type':'memory_free'},
-                            {'name':'disk_free','var':'machine_stats','type':'disk_free'},
+                            {'name':'load','var':'load_unhalted','type':'load'},
+                            {'name':'memfree','var':'machine_stats:machine_mem_free_mb','type':'memory_free'},
+                            {'name':'diskfree','var':'machine_stats','type':'disk_free'},
                             {'name':'gameclient_build','type':'build'},
                             {'name':'gamedata_build','type':'build'}
                            ];
@@ -1154,7 +1155,7 @@ var refresh_server_status_row = function(row, item) {
 
                 if(cur_proxy_builds['gameclient_build']) {
                     if(item['gameclient_build'] != cur_proxy_builds['gameclient_build'] || item['gamedata_build'] != cur_proxy_builds['gamedata_build']) {
-                        s += ' <font color="#c00000">(mismatch)</font>';
+                        s += ' <font color="#c00000">mismatch</font>';
                     }
                 }
 
@@ -1179,7 +1180,14 @@ var refresh_server_status_row = function(row, item) {
                 }
 
             } else if(field['type'] == 'build') {
-                s = val;
+                // usually these can be passed directly to Date() constructor
+                var val_date;
+                try {
+                    val_date = new Date(val);
+                    s = val_date.toUTCString().slice(5,25);
+                } catch (e) {
+                    s = '???';
+                }
                 if(cur_proxy_builds['gameclient_build']) {
                     if(item['gameclient_build'] != cur_proxy_builds['gameclient_build'] || item['gamedata_build'] != cur_proxy_builds['gamedata_build']) {
                         s = '<font color="#c00000">'+s+'</font>';
@@ -1191,6 +1199,9 @@ var refresh_server_status_row = function(row, item) {
         }
         var s_div = $('<div>', {html: s}).addClass('spin_server_status_td_div');
         var cell = $('<td>').addClass('spin_server_status_td');
+        if(field['type'] == 'server_name') {
+            cell.addClass('spin_td_nowrap');
+        }
         cell.append(s_div);
         row.append(cell);
     });
