@@ -49927,8 +49927,15 @@ function do_draw() {
 
         ctx.save();
 
-        // clear to white
+        // clear to white (or gradient on BH)
+        if(spin_frame_platform === 'bh') {
+            var grad = ctx.createLinearGradient(0,0,0,canvas_height);
+            grad.addColorStop(0,'#363636');
+            grad.addColorStop(1,'#121212');
+            ctx.fillStyle = grad;
+        }
         ctx.fillRect(0,0,canvas_width,canvas_height);
+        ctx.fillStyle = '#ffffff';
 
         // draw "Loading..." screen
 
