@@ -12547,6 +12547,7 @@ class LivePlayer(Player):
     # Add as much of this one item stack to inventory as
     # possible. Return size of the stack that was added to inventory.
     # this function should NOT throw exceptions, as it would cause item-duping bugs
+    @admin_stats.measure_latency('inventory_add_item')
     def inventory_add_item(self, item, max_slots):
         if 'spec' not in item:
             gamesite.exception_log.event(server_time, 'inventory_add_item: invalid item '+repr(item))
@@ -24286,6 +24287,8 @@ class GAMEAPI(resource.Resource):
                         latency_tag = msg[0] + '('+msg[2]+')'
                     elif msg[0] == "INVENTORY_USE":
                         latency_tag = msg[0] + '('+msg[2]['spec']+')'
+                    elif msg[0] == "LOOT_BUFFER_TAKE":
+                        latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
                     elif 0 and msg[0] == "QUARRY_QUERY":
                         latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
                     else:
