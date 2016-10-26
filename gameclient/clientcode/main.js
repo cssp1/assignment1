@@ -17127,7 +17127,7 @@ function invoke_invite_friends_dialog(reason) {
         call_with_facebook_permissions('user_friends', (function (_reason) { return function() {
             FBInviteFriends.invoke_fb_invite_friends_dialog(reason);
         }; })(reason));
-    } if(spin_frame_platform == 'bh') {
+    } else if(spin_frame_platform == 'bh') {
         if(!spin_battlehouse_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
 
         BHInvites.invoke_invite_code_dialog();
