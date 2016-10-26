@@ -47808,7 +47808,13 @@ function invoke_timeout_message(event_name, props, options) {
         }; })(options);
 
     // deactivate simulation and do not send any more pings
-    client_state = client_states.TIMED_OUT;
+    // if we loaded a base, then we need to go to TIMED_OUT state
+    // otherwise, go to UNABLE_TO_LOGIN state
+    if(client_state == client_states.LOADING) {
+        client_state = client_states.UNABLE_TO_LOGIN;
+    } else if(client_state != client_states.UNABLE_TO_LOGIN) {
+        client_state = client_states.TIMED_OUT;
+    }
 
     if(!options['continue_graphics']) {
         // scale back on CPU usage after client dies

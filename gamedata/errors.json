@@ -141,8 +141,9 @@
     "LADDER_MATCH_FAILED": { "ui_title": "No Worthy Opponent Found", "ui_name": "Could not find a suitable opponent.\n\nPlease try again later." },
 
     "CANNOT_LOG_IN_SERVER_OVERLOAD": { "ui_title": "Temporary login error",
-                                       "ui_name": "Cannot log in because the game server is overloaded, please try back later.",
-                                       "ui_button": null },
+                                       "ui_name": "Cannot log in because the game server is overloaded with activity.\n\nPlease try back in a few minutes.",
+                                       "ui_button": null,
+                                       "dialog": "message_dialog_big" },
 
     "CANNOT_LOG_IN_IO_FAIL": { "ui_title": "Temporary server error",
                                "ui_name": "Server database error. Please try back later.",
