@@ -28691,7 +28691,7 @@ function alliance_list_create_tab_update_create_button(d) {
         var res = null;
         for(var r in spell['price']) { res = r; } // XXX hard-coded for one resource
         d.widgets['price_display'].str = pretty_print_number(spell['price'][res]);
-
+        d.widgets['price_icon'].asset = gamedata['resources'][res]['icon_small'];
         var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_create_requirement'});
         var pred_ok = pred.is_satisfied(player, null);
 
