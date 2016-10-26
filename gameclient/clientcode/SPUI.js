@@ -4073,3 +4073,36 @@ SPUI.CooldownClock.prototype.do_draw = function(offset) {
 
     return true;
 };
+
+
+/** Copy text to clipboard
+    @param {string} s */
+SPUI.copy_text_to_clipboard = function(s) {
+
+    // See https://github.com/zenorocha/clipboard.js (MIT license)
+    var isRTL = document.documentElement.getAttribute('dir') === 'rtl';
+
+    var fakeElem = document.createElement('textarea');
+    // Prevent zooming on iOS
+    fakeElem.style.fontSize = '12pt';
+    // Reset box model
+    fakeElem.style.border = '0';
+    fakeElem.style.padding = '0';
+    fakeElem.style.margin = '0';
+    // Move element out of screen horizontally
+    fakeElem.style.position = 'fixed';
+    fakeElem.style[isRTL ? 'right' : 'left'] = '-9999px';
+    // Move element to the same position vertically
+    fakeElem.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
+    fakeElem.setAttribute('readonly', '');
+    fakeElem.value = s;
+
+    document.body.appendChild(fakeElem);
+
+    fakeElem.focus();
+    fakeElem.setSelectionRange(0, fakeElem.value.length);
+
+    document.execCommand('copy');
+
+    document.body.removeChild(fakeElem);
+};

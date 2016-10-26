@@ -12,38 +12,6 @@ goog.require('BattleReplay');
 goog.require('FBShare');
 goog.require('SPUI');
 
-/** Copy text to clipboard - may want to move this into a separate library
-    @param {string} s */
-BattleReplayGUI.copy_text_to_clipboard = function(s) {
-
-    // See https://github.com/zenorocha/clipboard.js (MIT license)
-    var isRTL = document.documentElement.getAttribute('dir') === 'rtl';
-
-    var fakeElem = document.createElement('textarea');
-    // Prevent zooming on iOS
-    fakeElem.style.fontSize = '12pt';
-    // Reset box model
-    fakeElem.style.border = '0';
-    fakeElem.style.padding = '0';
-    fakeElem.style.margin = '0';
-    // Move element out of screen horizontally
-    fakeElem.style.position = 'fixed';
-    fakeElem.style[isRTL ? 'right' : 'left'] = '-9999px';
-    // Move element to the same position vertically
-    fakeElem.style.top = (window.pageYOffset || document.documentElement.scrollTop) + 'px';
-    fakeElem.setAttribute('readonly', '');
-    fakeElem.value = s;
-
-    document.body.appendChild(fakeElem);
-
-    fakeElem.focus();
-    fakeElem.setSelectionRange(0, fakeElem.value.length);
-
-    document.execCommand('copy');
-
-    document.body.removeChild(fakeElem);
-};
-
 /** @param {!BattleReplay.Player} replay_player
     @param {string|null} link_url
     @param {Object<string,string>|null} link_qs
@@ -69,7 +37,7 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
             var dialog = w.parent;
             var link_url = dialog.user_data['link_url'];
             var s = gamedata['strings']['copy_replay_link_success'];
-            BattleReplayGUI.copy_text_to_clipboard(link_url);
+            SPUI.copy_text_to_clipboard(link_url);
             invoke_child_message_dialog(s['ui_title'],
                                         s['ui_description'].replace('%URL', link_url)
                                        // {'dialog': 'message_dialog_big'}
