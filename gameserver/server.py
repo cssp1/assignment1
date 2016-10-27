@@ -16574,7 +16574,7 @@ class Store(object):
                     config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
                     if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        gamesite.gameapi.do_send_notification_to(session.user.user_id, session.user.social_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
+                        gamesite.gameapi.send_offline_notification(session.user.user_id, session.user.social_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
                     config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
@@ -22900,77 +22900,105 @@ class GAMEAPI(resource.Resource):
         data_str = open(SpinConfig.gamedata_filename()).read()
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
-    def do_send_notification_to(self, to_user_id, to_social_id, text, sp_ref, fb_ref, summary_props):
+    def send_offline_notification(self, to_user_id, to_social_id, text, sp_ref, fb_ref, summary_props,
+                                  replacements = None):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
-        # ensure text is a UTF-8 encoded str(), which urllib.urlencode() will turn into percent-escaped UTF-8
-        if type(text) is str:
-            try:
-                text = text.decode('utf-8').encode('utf-8')
-            except Exception as e:
-                gamesite.exception_log.event(server_time, 'error UTF-8 decoding-encoding text for FB notification: %r %r\n%r' % (type(text), text, e))
-                return False
-        elif type(text) is unicode:
-            try:
-                text = text.encode('utf-8')
-            except Exception as e:
-                gamesite.exception_log.event(server_time, 'error UTF-8 encoding text for FB notification: %r %r\n%r' % (type(text), text, e))
-                return False
-        else:
-            raise Exception('unhandled text type %r' % type(text))
-
         if to_social_id.startswith('fb'):
-            return self.do_send_notification_to_fb(to_user_id, to_social_id[2:], text, sp_ref, fb_ref, summary_props)
+            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'fb')
+            sent = self.send_offline_notification_fb(to_user_id, to_social_id[2:], message)
         elif to_social_id.startswith('bh'):
-            return self.do_send_notification_to_bh(to_user_id, to_social_id[2:], text, sp_ref, fb_ref, summary_props)
-        return False
+            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'bh')
+            sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message)
+        else:
+            sent = False
 
-    def do_send_notification_to_bh(self, to_user_id, to_bh_id, text, sp_ref, fb_ref, summary_props):
-        if sp_ref not in gamedata['fb_notifications']['notifications'] or \
-           ('email' not in gamedata['fb_notifications']['notifications'][sp_ref]):
-            gamesite.exception_log.event(server_time, 'fb_notifications needs "email" data for ref %s' % (sp_ref))
-            return False
+        if sent:
+            metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
+                                                                         'ref': sp_ref,
+                                                                         'fb_ref': fb_ref})
+        return sent
 
-        email_conf = gamedata['fb_notifications']['notifications'][sp_ref]['email']
+    # pack up the localized ui_* parameters for an outgoing notification
+    # messages can have
+    # text only, no sp_ref, so sp_ref.email: just a one-line message
+    # text and sp_ref, no sp_ref.email: one-line message with extra tracking params
+    # text and sp_ref and sp_ref.email: full notification suitable for use with bh.com email system
+
+    class NotificationMessage(object):
+        def __init__(self, sp_ref, fb_ref, replacements, text, frame_platform, format = None):
+            self.sp_ref = sp_ref
+            self.fb_ref = fb_ref
+            self.format = format or 'game' # 'game' or 'bh', only as a cue to the client for how to display it
+
+            conf = gamedata['fb_notifications']['notifications'].get(sp_ref)
+
+            if text:
+                if isinstance(text, str):
+                    text = text.decode('utf-8')
+                self.ui_body = self.apply_replacements(replacements, text)
+            elif conf:
+                self.ui_body = self.apply_replacements(replacements, conf['ui_name'])
+            else:
+                raise Exception('notification needs either "text" or a valid "ref"')
+
+            if conf:
+                email_conf = gamedata['fb_notifications']['notifications'][sp_ref].get('email')
+                if email_conf:
+                    self.ui_subject = self.apply_replacements(replacements, email_conf['ui_subject'])
+                    self.ui_headline = self.apply_replacements(replacements, email_conf['ui_headline'])
+                    self.ui_cta = self.apply_replacements(replacements, email_conf['ui_cta'])
+                elif frame_platform == 'bh':
+                    raise Exception('need full "email" data for notification ref %s' % sp_ref)
+
+        def serialize(self): # return JSON format to send to client
+            ret = {'format': self.format,
+                   'ui_body': self.ui_body}
+            if self.ui_subject: ret['ui_subject'] = self.ui_subject
+            if self.ui_headline: ret['ui_headline'] = self.ui_headline
+            if self.ui_cta: ret['ui_cta'] = self.ui_cta
+            return ret
+
+        @staticmethod
+        def apply_replacements(replacements, text):
+            if replacements:
+                for k, v in replacements.iteritems():
+                    text = text.replace(k, v)
+            return text
+
+    def send_offline_notification_bh(self, to_user_id, to_bh_id, message):
         params = {'service': SpinConfig.game(),
-                  'ui_subject': email_conf['ui_subject'].encode('utf-8'),
-                  'ui_headline': email_conf['ui_headline'].encode('utf-8'),
-                  'ui_body': text.encode('utf-8'),
-                  'ui_cta': email_conf['ui_cta'].encode('utf-8'),
-                  'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (sp_ref, fb_ref),
-                  'tags': SpinConfig.game()+'_'+fb_ref,
+                  'ui_subject': message.ui_subject.encode('utf-8'),
+                  'ui_headline': message.ui_headline.encode('utf-8'),
+                  'ui_body': message.ui_body.encode('utf-8'),
+                  'ui_cta': message.ui_cta.encode('utf-8'),
+                  'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
+                  'tags': SpinConfig.game()+'_'+message.fb_ref,
                   }
 
         url = SpinConfig.config['battlehouse_api_path'] + '/user/' + to_bh_id + '/notify'
 
         if not SpinConfig.config['enable_battlehouse']:
-            gamesite.exception_log.event(server_time, 'Battlehouse disabled: BH notification POST %s query %r sum %r' % (url, params, summary_props))
+            gamesite.exception_log.event(server_time, 'Battlehouse disabled: BH notification POST %s query %r' % (url, params))
             return False
 
         params['api_secret'] = SpinConfig.config['battlehouse_api_secret'] # add secret at the last moment
         gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
-
-        metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
-                                                                     'ref': sp_ref,
-                                                                     'fb_ref': fb_ref})
         return True
 
-    def do_send_notification_to_fb(self, to_user_id, to_facebook_id, text, sp_ref, fb_ref, summary_props):
+    def send_offline_notification_fb(self, to_user_id, to_facebook_id, message):
         # see http://developers.facebook.com/docs/app_notifications/
         params = {'href': '',
-                  'ref': fb_ref,
-                  'template': text }
+                  'ref': message.fb_ref,
+                  'template': message.ui_body.encode('utf-8') }
         url = SpinFacebook.versioned_graph_endpoint_secure('notification', str(to_facebook_id)+'/notifications')
 
         if not SpinConfig.config['enable_facebook']:
-            gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r sum %r' % (to_facebook_id, params, summary_props))
+            gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r' % (to_facebook_id, params))
             return False
 
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
-        metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
-                                                                     'ref': sp_ref,
-                                                                     'fb_ref': fb_ref})
         return True
 
     def do_send_gifts(self, session, retmsg, arg):

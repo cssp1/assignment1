@@ -47086,8 +47086,15 @@ function handle_server_message(data) {
             session.start_recording(replay_token, client_time + (finish_time - server_time) + 5); // approximate battle end client_time, plus some fudge
         }
     } else if(msg == "NOTIFICATION") {
-        var text = data[1]; // SPHTTP.unwrap_string(data[1]);
-        user_log.msg(text, new SPUI.Color(1,1,0,1));
+        var message = data[1]; // SPHTTP.unwrap_string(data[1]);
+        var format = ('format' in message ? message['format'] : 'game');
+        if(format === 'bh' && spin_frame_platform === 'bh') {
+            // use BHSDK format
+            BHSDK.bh_popup_message({'ui_subject': message['ui_subject'] || null,
+                                    'ui_body': message['ui_body']});
+        } else {
+            user_log.msg(message['ui_body'], new SPUI.Color(1,1,0,1));
+        }
     } else if(msg == "CHAT_RECV") {
         var channel_name = data[1];
         var sender_info = data[2];

@@ -1478,7 +1478,9 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         return ReturnValue(result = 'ok')
 
 class HandleSendNotification(Handler):
-    # useful for sending one-off
+    # send notification to a player who might be online OR offline
+    # in online case, display in-game
+    # if offline case, use platform notification system (e.g. FB notification or bh.com email)
 
     def __init__(self, *pargs, **pkwargs):
         Handler.__init__(self, *pargs, **pkwargs)
@@ -1497,7 +1499,20 @@ class HandleSendNotification(Handler):
         # enable sending notification even if one was already sent since last logout
         self.multi_per_logout = bool(int(self.args.get('multi_per_logout','0')))
 
-        self.text = self.args['text'] # should be Unicode
+        # should be "bh" (for battlehouse.com) or "game" (for plain game message)
+        self.format = self.args.get('format', 'game')
+
+        if 'text' in self.args:
+            self.text = self.args['text'] # should be Unicode
+        else:
+            if self.config is None:
+                raise Exception('must supply either "text" or a notification config')
+            self.text = None
+
+        if 'replacements' in self.args:
+            self.replacements = SpinJSON.loads(self.args['replacements'])
+        else:
+            self.replacements = None
 
         # optional override of the "ref" referer parameter. Only used if no "config" is selected.
         self.ref_override = self.args.get('ref',None)
@@ -1509,11 +1524,19 @@ class HandleSendNotification(Handler):
         # if true, and player is logged in, send via an in-game text notification instead of using the social network
         self.send_ingame = bool(int(self.args.get('send_ingame','0')))
 
+        # if true, FORCE an offline message to be sent, IN ADDITION to in-game text notification (if there is one)
+        self.send_offline = bool(int(self.args.get('send_offline','0')))
+
     # no logging
     def exec_online(self, session, retmsg):
         if self.send_ingame:
-            session.send([["NOTIFICATION", self.text]], flush_now = True)
-            return ReturnValue(result = 'ok')
+            message = self.gamesite.gameapi.NotificationMessage(self.config['ref'] if self.config else None,
+                                                                self.config['ref'] if self.config else None, # not really fb_ref, but shouldn't matter
+                                                                self.replacements, self.text, session.user.frame_platform,
+                                                                format = self.format)
+            session.send([["NOTIFICATION", message.serialize()]], flush_now = True)
+            if not self.send_offline:
+                return ReturnValue(result = 'ok')
 
         if not session.user.social_id:
             return ReturnValue(result = 'no social network to send notification')
@@ -1558,8 +1581,9 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        if self.gamesite.gameapi.do_send_notification_to(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
-                                                         session.player.get_denormalized_summary_props('brief')) or self.simulate:
+        if self.gamesite.gameapi.send_offline_notification(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
+                                                           session.player.get_denormalized_summary_props('brief'),
+                                                           replacements = self.replacements) or self.simulate:
             session.player.last_fb_notification_time = self.time_now
             session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
             if self.config:
@@ -1619,8 +1643,9 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        if self.gamesite.gameapi.do_send_notification_to(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
-                                                         self.get_denormalized_summary_props_offline(user, player)) or self.simulate:
+        if self.gamesite.gameapi.send_offline_notification(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
+                                                           self.get_denormalized_summary_props_offline(user, player),
+                                                           replacements = self.replacements) or self.simulate:
             player['last_fb_notification_time'] = self.time_now
             player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
             if self.config:
