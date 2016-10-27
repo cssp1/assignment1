@@ -26,6 +26,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
+from twisted.internet.defer import inlineCallbacks # , returnValue
 from twisted.protocols.policies import ProtocolWrapper
 import twisted.internet.utils
 from twisted.web import server, resource, http
@@ -1046,6 +1047,8 @@ class UserTable:
               ('bh_hit_time', int),
               ('bh_profile', None),
               ('bh_username', None),
+              ('bh_mentor_player_id_cache', int), # not authoritative - must query bhlogin server
+              ('bh_trainee_player_ids_cache', None), # not authoritative - must query bhlogin server
               ('mm_id', str),
               ('mm_hit_time', int),
               ('mm_profile', None),
@@ -1283,6 +1286,8 @@ class User:
         self.bh_profile = None
         self.bh_hit_time = -1
         self.bh_username = None
+        self.bh_mentor_player_id_cache = None
+        self.bh_trainee_player_ids_cache = None
 
         # Mattermost profile data
         self.mm_auth_token = None # auth token from proxyserver login
@@ -1817,6 +1822,49 @@ class User:
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+
+    @inlineCallbacks
+    def accept_bh_invite(self, session, invite_code):
+        assert self.bh_auth_token
+        url = SpinConfig.config['battlehouse_api_path']+ '/invite_accept?' + \
+              urllib.urlencode({'service': SpinConfig.game(),
+                                'code': invite_code,
+                                'state': 'init'})
+        headers = {'Authorization': 'Bearer '+self.bh_auth_token,
+                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
+        response = SpinJSON.loads(response_raw)
+
+        if 'error' in response:
+            # error - local notification only
+            session.send([["NOTIFICATION", {"format":"bh", "ui_body": response['error']}]], flush_now = True)
+
+        elif 'result' in response:
+            # success
+            sender_bh_id = response['result']['creator_id']
+            sender_player_id = gamesite.social_id_table.social_id_to_spinpunch('bh'+sender_bh_id, False)
+            assert sender_player_id > 0
+            self.bh_mentor_player_id_cache = sender_player_id
+
+            sender_info = gamesite.gameapi.do_query_player_cache(session, [sender_player_id],
+                                                                 fields = ['ui_name', 'real_name'],
+                                                                 reason = 'accept_bh_invite')[0]
+
+            # local+offline notification to sender and target
+            replacements = SpinJSON.dumps({'%SENDER_UI_NAME': sender_info['ui_name'],
+                                           '%SENDER_REAL_NAME': sender_info.get('real_name', sender_info['ui_name']),
+                                           '%TARGET_UI_NAME': self.get_ui_name(session.player),
+                                           '%TARGET_REAL_NAME': self.get_real_name()})
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
+                                                          'send_ingame':1,'send_offline':1,'format':'bh',
+                                                          'user_id':sender_player_id,
+                                                          'replacements':replacements,
+                                                          'config':'bh_invite_accepted_sender'})
+            gamesite.do_CONTROLAPI(sender_player_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
+                                                      'send_ingame':1,'send_offline':1,'format':'bh',
+                                                      'user_id':self.user_id,
+                                                      'replacements':replacements,
+                                                      'config':'bh_invite_accepted_target'})
 
     def retrieve_ag_info(self, session, retmsg):
         if (None not in (self.ag_username, self.ag_avatar_url, self.ag_friend_ids)) and \
@@ -2821,6 +2869,9 @@ class PlayerTable:
 
               ('unit_repair_queue', None, None),
               ('unit_equipment', None, None),
+
+              ('mentor_player_id_cache', None, None), # not authoritative - must query bhlogin server
+              ('trainee_player_ids_cache', None, None), # not authoritative - must query bhlogin server
               ]
 
     # old fields that should be deleted when seen
@@ -8360,6 +8411,9 @@ class Player(AbstractPlayer):
         self.birthday = None # UNIX timestamp of midnight of the player's birthday, None if no birthday info available
         self.developer = None
 
+        self.mentor_player_id_cache = None
+        self.trainee_player_ids_cache = None
+
         self.reset()
 
     def reset(self):
@@ -8539,6 +8593,9 @@ class Player(AbstractPlayer):
         # persist unrecognized data from JSON file
         self.foreign_data = {}
 
+        self.mentor_player_id_cache = None
+        self.trainee_player_ids_cache = None
+
     def sync_with_user(self, user):
         # grab the fields that need to be copied over from the User
         self.frame_platform = user.frame_platform
@@ -8548,6 +8605,8 @@ class Player(AbstractPlayer):
         self.price_region = SpinConfig.price_region_map.get(self.country, 'unknown')
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
+        self.mentor_player_id_cache = user.bh_mentor_player_id_cache
+        self.trainee_player_ids_cache = user.bh_trainee_player_ids_cache
 
     # call this function right after tutorial_state becomes "COMPLETE" to set up post-tutorial state
     def set_post_tutorial_state(self):
@@ -25106,6 +25165,9 @@ class GAMEAPI(resource.Resource):
                 # reset unacked counter
                 if 'notification:'+ref+':unacked' in player.history:
                     del player.history['notification:'+ref+':unacked']
+
+            if ('bh_invite' in url_qs):
+                user.accept_bh_invite(session, url_qs['bh_invite'][-1])
 
         elif session.user.frame_platform == 'mm':
             user.retrieve_mm_info(session, retmsg)
