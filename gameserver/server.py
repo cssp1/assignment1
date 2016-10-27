@@ -1644,11 +1644,6 @@ class User:
 
     def populate_friends_who_play(self, session):
 
-        self.repopulate_ai_list(session)
-
-        if (self.facebook_friends is None) and (self.kg_friend_ids is None) and (self.ag_friend_ids is None):
-            return # probably still waiting on the API
-
         # batch query for game player IDs
         social_id_list = []
         if self.facebook_friends:
@@ -1658,7 +1653,16 @@ class User:
         if self.ag_friend_ids:
             social_id_list += ['ag'+str(x) for x in self.ag_friend_ids]
 
+        # note: this call is free if social_id_list is empty, it won't hit the database
         friend_id_list = gamesite.social_id_table.social_id_to_spinpunch_batch(social_id_list)
+
+        if self.bh_mentor_player_id_cache is not None:
+            friend_id_list.append(self.bh_mentor_player_id_cache)
+        if self.bh_trainee_player_ids_cache is not None:
+            friend_id_list += self.bh_trainee_player_ids_cache
+
+        if not friend_id_list:
+            return # probably still waiting on the API
 
         # filter out friends who are not game players, and friends who we've already told the client about
         friend_id_list = filter(lambda x: (x is not None) and (x not in self.client_friends), friend_id_list)
@@ -1824,6 +1828,37 @@ class User:
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
 
     @inlineCallbacks
+    def retrieve_bh_friends(self, session):
+        assert self.bh_auth_token
+        url = SpinConfig.config['battlehouse_api_path']+ '/user/'+self.bh_id+'/invites?' + \
+              urllib.urlencode({'service': SpinConfig.game()})
+        headers = {'Authorization': 'Bearer '+self.bh_auth_token,
+                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
+        response = SpinJSON.loads(response_raw)
+        if 'result' in response:
+            bh_ids_to_look_up = []
+            if response['result']['my_inviter']:
+                bh_ids_to_look_up.append(response['result']['my_inviter']['sender_id'])
+            for entry in response['result']['my_targets']:
+                bh_ids_to_look_up.append(entry['target_id'])
+            user_ids = gamesite.social_id_table.social_id_to_spinpunch_batch(['bh'+id for id in bh_ids_to_look_up])
+            bh_id_to_user_id = dict(zip(bh_ids_to_look_up, user_ids))
+
+            if response['result']['my_inviter']:
+                session.player.mentor_player_id_cache = \
+                self.bh_mentor_player_id_cache = bh_id_to_user_id[response['result']['my_inviter']['sender_id']]
+            else:
+                session.player.mentor_player_id_cache = \
+                self.bh_mentor_player_id_cache = None
+
+            session.player.trainee_player_ids_cache = \
+            self.bh_trainee_player_ids_cache = [bh_id_to_user_id[entry['target_id']] \
+                                                for entry in response['result']['my_targets']]
+
+        self.populate_friends_who_play(session)
+
+    @inlineCallbacks
     def accept_bh_invite(self, session, invite_code):
         assert self.bh_auth_token
         url = SpinConfig.config['battlehouse_api_path']+ '/invite_accept?' + \
@@ -1865,6 +1900,8 @@ class User:
                                                       'user_id':self.user_id,
                                                       'replacements':replacements,
                                                       'config':'bh_invite_accepted_target'})
+
+            self.populate_friends_who_play(session)
 
     def retrieve_ag_info(self, session, retmsg):
         if (None not in (self.ag_username, self.ag_avatar_url, self.ag_friend_ids)) and \
@@ -25169,6 +25206,8 @@ class GAMEAPI(resource.Resource):
             if ('bh_invite' in url_qs):
                 user.accept_bh_invite(session, url_qs['bh_invite'][-1])
 
+            user.retrieve_bh_friends(session)
+
         elif session.user.frame_platform == 'mm':
             user.retrieve_mm_info(session, retmsg)
 
@@ -25345,6 +25384,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
 
         # check cache and begin background retrieval of user's Facebook info
+        user.repopulate_ai_list(session)
         user.populate_friends_who_play(session)
 
         # send applicable daily messages
