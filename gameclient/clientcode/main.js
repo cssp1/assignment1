@@ -7771,8 +7771,10 @@ Friend.prototype.classify_ai_difficulty = function() {
             return 'hard';
         } else if(my_tier >= player_tier) {
             return 'medium';
-        } else {
+        } else if(my_tier >= player_tier - 1) {
             return 'easy';
+        } else {
+            return 'obsolete';
         }
     } else {
         var p_level = player.resource_state['player_level'];
@@ -36125,7 +36127,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                         if(difficulty) {
                             show_difficulty = true;
                             dialog.widgets['row_ai_difficulty'+row].str = dialog.data['widgets']['row_ai_difficulty']['ui_name_'+difficulty];
-                            var COLOR_MAP = {'easy': SPUI.good_text_color,
+                            var COLOR_MAP = {'obsolete': SPUI.disabled_text_color,
+                                             'easy': SPUI.good_text_color,
                                              'medium': SPUI.warning_text_color,
                                              'hard': SPUI.error_text_color,
                                              'monstrous': SPUI.error_text_color,
