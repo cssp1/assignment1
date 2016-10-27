@@ -1895,11 +1895,13 @@ class User:
                                                           'user_id':sender_player_id,
                                                           'replacements':replacements,
                                                           'config':'bh_invite_accepted_sender'})
-            gamesite.do_CONTROLAPI(sender_player_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
-                                                      'send_ingame':1,'send_offline':1,'format':'bh',
-                                                      'user_id':self.user_id,
-                                                      'replacements':replacements,
-                                                      'config':'bh_invite_accepted_target'})
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'repopulate_friends',
+                                                          'user_id':sender_player_id})
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
+                                                          'send_ingame':1,'send_offline':1,'format':'bh',
+                                                          'user_id':self.user_id,
+                                                          'replacements':replacements,
+                                                          'config':'bh_invite_accepted_target'})
 
             self.populate_friends_who_play(session)
 

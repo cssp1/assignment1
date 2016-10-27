@@ -1477,6 +1477,14 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         session.send([["INVOKE_FACEBOOK_AUTH", scope, "Test", "Test authorization"]], flush_now = True)
         return ReturnValue(result = 'ok')
 
+class HandleRepopulateFriends(Handler): # no logging
+    def exec_offline(self, user, player): ReturnValue(result = 'ok') # no-op
+    def exec_online(self, session, retmsg):
+        if session.user.frame_platform == 'bh':
+            session.user.retrieve_bh_friends(session)
+            # this will call populate_friends_who_play() when finished
+        return ReturnValue(result = 'ok')
+
 class HandleSendNotification(Handler):
     # send notification to a player who might be online OR offline
     # in online case, display in-game
@@ -1766,6 +1774,7 @@ methods = {
     'demote_alliance_leader': HandleDemoteAllianceLeader,
     'kick_alliance_member': HandleKickAllianceMember,
     'reset_idle_check_state': HandleResetIdleCheckState,
+    'repopulate_friends': HandleRepopulateFriends,
     'ai_attack': HandleAIAttack,
     'push_gamedata': HandlePushGamedata,
     'force_reload': HandleForceReload,
