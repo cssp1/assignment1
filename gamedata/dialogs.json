@@ -466,7 +466,7 @@
 
             "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1 },
             "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
-                       "clip_to": [38,145,287,36], "max_chars": 15, "allowed_chars": "0123456789",
+                       "clip_to": [38,145,287,36], "max_chars": 15, "allowed_chars": ["0","1","2","3","4","5","6","7","8","9"],
                        "text_color": [0,0,0,1], "blank_on_enter": false },
             "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Send Answer"}
         }
@@ -490,7 +490,7 @@
             "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "layout": {"vjustify": "bottom"} },
             "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
                        //"clip_to": [38,145,287,36], // doesn't work with resizing
-                       "max_chars": 6, "disallowed_chars": "\"'",
+                       "max_chars": 6, "disallowed_chars": ["\"","'"],
                        "text_color": [0,0,0,1], "blank_on_enter": false, "require_string": "DELETE", "layout": {"vjustify": "bottom"} },
             "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                            "state": "disabled", "ui_name": "Confirm", "layout": {"vjustify": "bottom"}},
