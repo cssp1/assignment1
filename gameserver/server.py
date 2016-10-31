@@ -26,7 +26,7 @@ if sys.platform == 'linux2':
 
 from twisted.python import log, failure
 from twisted.internet import reactor, task, defer, protocol
-from twisted.internet.defer import inlineCallbacks # , returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.protocols.policies import ProtocolWrapper
 import twisted.internet.utils
 from twisted.web import server, resource, http
@@ -1904,6 +1904,48 @@ class User:
                                                           'config':'bh_invite_accepted_target'})
 
             self.populate_friends_who_play(session)
+
+    @inlineCallbacks
+    def complete_bh_invite(self, session):
+        assert self.bh_auth_token
+        url = SpinConfig.config['battlehouse_api_path']+ '/invite_state?' + \
+              urllib.urlencode({'service': SpinConfig.game(),
+                                'state': 'complete'})
+        headers = {'Authorization': 'Bearer '+self.bh_auth_token,
+                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
+        response = SpinJSON.loads(response_raw)
+
+        if 'error' in response or ('result' not in response):
+            # error - local notification only
+            raise Exception(response['error'])
+
+        else:
+            # success
+            sender_bh_id = response['result']['creator_id']
+            sender_player_id = gamesite.social_id_table.social_id_to_spinpunch('bh'+sender_bh_id, False)
+            assert sender_player_id > 0
+
+            sender_info = gamesite.gameapi.do_query_player_cache(session, [sender_player_id],
+                                                                 fields = ['ui_name', 'real_name'],
+                                                                 reason = 'complete_bh_invite')[0]
+
+            # local+offline notification to sender and target
+            replacements = SpinJSON.dumps({'%SENDER_UI_NAME': sender_info['ui_name'],
+                                           '%SENDER_REAL_NAME': sender_info.get('real_name', sender_info['ui_name']),
+                                           '%TARGET_UI_NAME': self.get_ui_name(session.player),
+                                           '%TARGET_REAL_NAME': self.get_real_name()})
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
+                                                          'send_ingame':1,'send_offline':1,'format':'bh',
+                                                          'user_id':sender_player_id,
+                                                          'replacements':replacements,
+                                                          'config':'bh_invite_completed_sender'})
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
+                                                          'send_ingame':1,'send_offline':1,'format':'bh',
+                                                          'user_id':self.user_id,
+                                                          'replacements':replacements,
+                                                          'config':'bh_invite_completed_target'})
+            returnValue(True)
 
     def retrieve_ag_info(self, session, retmsg):
         if (None not in (self.ag_username, self.ag_avatar_url, self.ag_friend_ids)) and \

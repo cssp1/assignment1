@@ -569,6 +569,20 @@ class DisplayDailyTipConsequent(Consequent):
         assert self.data['consequent'] == 'DISPLAY_DAILY_TIP'
         retmsg.append([self.data['consequent'], self.name])
 
+class InviteCompleteConsequent(Consequent):
+    def __init__(self, data):
+        Consequent.__init__(self, data)
+        # key that will (atomically) track success of this operation
+        self.player_history_key = data['player_history_key']
+    def execute(self, session, player, retmsg, context=None):
+        if player.history.get(self.player_history_key, 0) >= 1:
+            return # already completed
+        d = session.user.complete_bh_invite(session)
+        d.addCallback(self.after_execute, session)
+    def after_execute(self, result, session):
+        assert result is True
+        session.player.history[self.player_history_key] = 1
+
 class HealAllUnitsConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -618,6 +632,7 @@ def read_consequent(data):
     elif kind == 'MARK_BIRTHDAY': return MarkBirthdayConsequent(data)
     elif kind == 'CHANGE_TITLE': return ChangeTitleConsequent(data)
     elif kind == 'DISPLAY_DAILY_TIP': return DisplayDailyTipConsequent(data)
+    elif kind == 'INVITE_COMPLETE': return InviteCompleteConsequent(data)
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)

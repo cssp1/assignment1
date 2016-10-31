@@ -820,6 +820,10 @@ class HasAliasPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return bool(player.alias)
 
+class HasMentorPredicate(Predicate):
+    def is_satisfied(self, player, qdata):
+        return bool(player.mentor_player_id_cache)
+
 class HasTitlePredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1052,6 +1056,8 @@ def read_predicate(data):
         return UsingTitlePredicate(data)
     elif kind == 'HAS_ALIAS':
         return HasAliasPredicate(data)
+    elif kind == 'HAS_MENTOR':
+        return HasMentorPredicate(data)
     elif kind == 'PLAYER_LEVEL':
         return PlayerLevelPredicate(data)
     elif kind == 'LADDER_PLAYER':
