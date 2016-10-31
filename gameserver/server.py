@@ -14764,12 +14764,13 @@ class CONTROLAPI(resource.Resource):
                     else:
                         user_json = None
                     self.val = self.handler.exec_offline(user_json, player_json)
+
+                assert self.val and isinstance(self.val, CustomerSupport.ReturnValue)
+
             except:
                 gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r: %s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc().strip())) # OK
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
-
-            assert self.val and isinstance(self.val, CustomerSupport.ReturnValue)
 
             if self.val.async:
                 assert isinstance(self.val.async, defer.Deferred) # sanity check
