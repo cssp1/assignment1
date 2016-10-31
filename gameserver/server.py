@@ -1859,7 +1859,7 @@ class User:
         self.populate_friends_who_play(session)
 
     @inlineCallbacks
-    def accept_bh_invite(self, session, invite_code):
+    def accept_bh_invite(self, session, invite_code, is_acquisition):
         assert self.bh_auth_token
         url = SpinConfig.config['battlehouse_api_path']+ '/invite_accept?' + \
               urllib.urlencode({'service': SpinConfig.game(),
@@ -1880,6 +1880,20 @@ class User:
             sender_player_id = gamesite.social_id_table.social_id_to_spinpunch('bh'+sender_bh_id, False)
             assert sender_player_id > 0
             self.bh_mentor_player_id_cache = sender_player_id
+
+            metric_event_coded(self.user_id,
+                               '7106_invite_friends_hit_acquisition' if is_acquisition else \
+                               '7107_invite_friends_hit_redundant',
+                               {'attempt_id': invite_code,
+                                'request_id': str(sender_player_id),
+                                'message': sender_bh_id,
+                                'sum': session.player.get_denormalized_summary_props('brief')})
+
+            metric_event_coded(self.user_id, '7121_mentorship_init',
+                               {'attempt_id': invite_code,
+                                'request_id': str(sender_player_id),
+                                'message': sender_bh_id,
+                                'sum': session.player.get_denormalized_summary_props('brief')})
 
             sender_info = gamesite.gameapi.do_query_player_cache(session, [sender_player_id],
                                                                  fields = ['ui_name', 'real_name'],
@@ -1925,6 +1939,11 @@ class User:
             sender_bh_id = response['result']['creator_id']
             sender_player_id = gamesite.social_id_table.social_id_to_spinpunch('bh'+sender_bh_id, False)
             assert sender_player_id > 0
+
+            metric_event_coded(self.user_id, '7122_mentorship_complete',
+                               {'request_id': str(sender_player_id),
+                                'message': sender_bh_id,
+                                'sum': session.player.get_denormalized_summary_props('brief')})
 
             sender_info = gamesite.gameapi.do_query_player_cache(session, [sender_player_id],
                                                                  fields = ['ui_name', 'real_name'],
@@ -25256,7 +25275,7 @@ class GAMEAPI(resource.Resource):
                     del player.history['notification:'+ref+':unacked']
 
             if ('bh_invite' in url_qs):
-                user.accept_bh_invite(session, url_qs['bh_invite'][-1])
+                user.accept_bh_invite(session, url_qs['bh_invite'][-1], not is_returning_user)
 
             user.retrieve_bh_friends(session)
 

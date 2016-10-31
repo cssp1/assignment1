@@ -48,5 +48,7 @@ BHInvites.do_invoke_invite_code_dialog = function(code, url) {
     dialog.auto_center();
     dialog.modal = true;
 
+    metric_event('7101_invite_friends_ingame_prompt', {'sum': player.get_denormalized_summary_props('brief')});
+
     return dialog;
 };

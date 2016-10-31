@@ -396,6 +396,8 @@ def FBRequestsLogFilter(child):
                                   '7105_invite_friends_fb_fail',
                                   '7106_invite_friends_hit_acquisition',
                                   '7107_invite_friends_hit_redundant',
+                                  '7121_mentorship_init',
+                                  '7122_mentorship_complete',
                                   ])
 def FBSharingLogFilter(child):
     return JSONLogFilter(child,
