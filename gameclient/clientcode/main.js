@@ -10801,7 +10801,7 @@ function on_postMessage(e) {
     var data = JSON.parse(e.data);
     if('bh_access_token' in data) {
         // update the access token
-        spin_battlehouse_access_token = data['bh_access_token'];
+        spin_battlehouse_access_token = /** string */ (data['bh_access_token']);
     }
 }
 

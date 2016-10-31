@@ -11,7 +11,11 @@ var SPLWMetrics = {
 // Battlehouse Login
 var BHSDK = {
     "bh_access_token_renew_async": function() {},
-    "bh_invite_code_get": function() {},
+    /** @param {string} service
+        @param {function({code: string, url: string}): null} cb */
+    "bh_invite_code_get": function(service, cb) {},
+    /** @param {{ui_subject: string, ui_body: string}} params */
+    "bh_popup_message": function(params) {}
 };
 
 // Global variables that are sent to the client by our proxyserver via proxy_index.html template replacements
@@ -64,6 +68,8 @@ var spin_battlehouse_enabled;
 var spin_battlehouse_user;
 /** @type {string} */
 var spin_battlehouse_api_path;
+/** @type {string} */
+var spin_battlehouse_access_token;
 /** @type {boolean} */
 var spin_facebook_enabled;
 /** @type {string} */
