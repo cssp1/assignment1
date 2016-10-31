@@ -1478,7 +1478,7 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         return ReturnValue(result = 'ok')
 
 class HandleRepopulateFriends(Handler): # no logging
-    def exec_offline(self, user, player): ReturnValue(result = 'ok') # no-op
+    def exec_offline(self, user, player): return ReturnValue(result = 'ok') # no-op
     def exec_online(self, session, retmsg):
         if session.user.frame_platform == 'bh':
             session.user.retrieve_bh_friends(session)
