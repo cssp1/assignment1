@@ -20215,10 +20215,6 @@ class GAMEAPI(resource.Resource):
                     object.build_done_time = -1
                     object.upgrade_ingredients = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
-                    if object.spec.upgrade_completion:
-                        cons = object.get_leveled_quantity(object.spec.upgrade_completion)
-                        if cons:
-                            session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
                     # run metrics for home-base buildings
                     if base is object.owner.my_home:
@@ -20230,6 +20226,11 @@ class GAMEAPI(resource.Resource):
                             session.setmax_player_metric(object.spec.history_category+'_built', num_cat, bucket = bool(object.spec.worth_less_xp))
                         if object.spec.track_level_in_player_history:
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
+
+                    if object.spec.upgrade_completion:
+                        cons = object.get_leveled_quantity(object.spec.upgrade_completion)
+                        if cons:
+                            session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
             if object.is_building() and object.is_upgrading() and (object.owner is session.player):
                 prog = object.upgrade_done_time
@@ -20246,10 +20247,6 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_done_time = -1
                     object.upgrade_ingredients = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
-                    if object.spec.upgrade_completion:
-                        cons = object.get_leveled_quantity(object.spec.upgrade_completion)
-                        if cons:
-                            session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
                     # run metrics for home-base buildings
                     if base is object.owner.my_home:
@@ -20262,6 +20259,11 @@ class GAMEAPI(resource.Resource):
                         if object.spec.track_level_in_player_history:
                             session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
                     session.user.create_fb_open_graph_action_building_upgrade(object)
+
+                    if object.spec.upgrade_completion:
+                        cons = object.get_leveled_quantity(object.spec.upgrade_completion)
+                        if cons:
+                            session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
             if object.is_building() and object.is_enhancing() and (object.owner is session.player):
                 if object.update_enhancing(-1):
@@ -20723,6 +20725,11 @@ class GAMEAPI(resource.Resource):
             # keep map in sync
             if session.player.home_region:
                 session.player.my_home.send_map_feature_update(reason='townhall_upgrade')
+
+        if object.spec.upgrade_completion:
+            cons = object.get_leveled_quantity(object.spec.upgrade_completion)
+            if cons:
+                session.execute_consequent_safe(cons, session.player, retmsg, reason='building:upgrade_completion(%d)' % object.level)
 
         session.user.create_fb_open_graph_action_building_upgrade(object)
         session.activity_classifier.built_or_upgraded_building()
