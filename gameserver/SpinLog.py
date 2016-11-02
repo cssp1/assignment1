@@ -398,6 +398,7 @@ def FBRequestsLogFilter(child):
                                   '7107_invite_friends_hit_redundant',
                                   '7121_mentorship_init',
                                   '7122_mentorship_complete',
+                                  '7123_mentorship_count_update',
                                   ])
 def FBSharingLogFilter(child):
     return JSONLogFilter(child,
