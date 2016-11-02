@@ -72,6 +72,9 @@ def get_loot(tables, tab, tabname = 'toplevel', depth = 0, cond_resolver = None,
         if 'multi_stack' in data:
             for item in ret:
                 item['stack'] = item.get('stack',1) * data['multi_stack']
+        if 'multi_duration' in data:
+            for item in ret:
+                item['item_duration'] = data['multi_duration']
     elif data.get('nothing',False):
         return []
     else:
