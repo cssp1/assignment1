@@ -51,6 +51,7 @@
                             "deployed": "Deployed at (%s)",
                             "raid_guard": "Guarding %s",
                             "traveling": "Traveling to (%s) (%time)",
+                            "order_cooldown": "Regrouping... (%time)",
                             "returning_to_home_base": "Returning (%time)",
                             "quarry": "Guarding Quarry %s",
                             "in_battle": "In Combat at (%s)",

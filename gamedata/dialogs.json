@@ -7142,6 +7142,7 @@
                     "color_deployed": [0,0.05,0.025,1], "outline_color_deployed": [0.4,0.8,0.4,1],
                     "color_returning_to_home_base": [0,0.05,0.025,1], "outline_color_returning_to_home_base": [0.4,0.8,0.4,1],
                     "color_traveling" :[0,0.05,0.025,1], "outline_color_traveling": [0.4,0.8,0.4,1],
+                    "color_order_cooldown" :[0,0.05,0.025,1], "outline_color_order_cooldown": [0.4,0.8,0.4,1],
                     "color_quarry": [0,0.025,0.05,1], "outline_color_quarry": [0.4,0.8,0.8,1],
                     "color_raid_guard": [0,0.025,0.05,1], "outline_color_raid_guard": [0.4,0.8,0.8,1]
                   },

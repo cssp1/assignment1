@@ -512,6 +512,9 @@ SquadControlDialog.update_squad_tile = function(dialog) {
                 my_status_s = squad_data['map_loc'][0].toString()+','+squad_data['map_loc'][1].toString();
             }
             my_status_time = pretty_print_time_brief(Math.max(squad_data['map_path'][squad_data['map_path'].length-1]['eta'] - server_time, 1));
+        } else if(player.cooldown_active('squad_order:'+squad_data['id'].toString())) {
+            my_status = 'order_cooldown';
+            my_status_time = pretty_print_time_brief(player.cooldown_togo('squad_order:'+squad_data['id'].toString()));
         } else {
             var feat = (session.region.map_enabled() ? session.region.find_feature_at_coords(squad_data['map_loc']) : null);
             if(feat && feat['base_type'] == 'quarry') {

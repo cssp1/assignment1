@@ -9919,6 +9919,13 @@ class Player(AbstractPlayer):
             squad['max_cargo'] = max_cargo
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
+
+        cdtime = gamedata['territory'].get('squad_order_cooldown', 0)
+        if cdtime > 0:
+            cdname = 'squad_order:%d' % squad_id
+            self.cooldown_trigger(cdname, cdtime)
+            session.deferred_player_cooldowns_update = True
+
         return True, [feature], None
 
     # limit # of steps to prevent DDOS
@@ -9927,11 +9934,17 @@ class Player(AbstractPlayer):
         max_steps = map_dimensions[0]+map_dimensions[1]
         return coords[:max_steps]
 
-    def squad_step(self, session, squad_id, coords, raid_mode, path_choices = None):
+    def squad_step(self, session, squad_id, coords, raid_mode, path_choices = None, bypass_cooldown = False):
         # path_choices is an optional dictionary of possible paths {"x,y": path...}
         # when the client is not sure exactly where a moving squad will halt before embarking on the new path.
         assert (gamesite.nosql_client and self.home_region)
         assert SQUAD_IDS.is_mobile_squad_id(squad_id)
+
+        # check cooldown for non-halt commands
+        if (coords or path_choices) and (not bypass_cooldown):
+            cdname = 'squad_order:%d' % squad_id
+            if self.cooldown_active(cdname):
+                return False, [], ["CANNOT_MOVE_SQUAD_ON_COOLDOWN", squad_id] # squad doesn't even exist
 
         rollback_feature = self.squad_get_rollback_props(squad_id)
         if not rollback_feature: return False, [], ["INVALID_SQUAD"] # squad doesn't even exist
@@ -10229,6 +10242,14 @@ class Player(AbstractPlayer):
                 gamesite.nosql_client.map_feature_lock_release(self.home_region, self.squad_base_id(squad_id), self.user_id,
                                                                generation = new_lock_gen,
                                                                do_hook = False, reason='squad_step')
+
+        if not bypass_cooldown:
+            # adjust squad_order cooldown to finish after end of movement
+            cdtime = gamedata['territory'].get('squad_order_cooldown', 0)
+            if cdtime > 0:
+                cdname = 'squad_order:%d' % squad_id
+                self.cooldown_trigger(cdname, new_path[-1]['eta'] + cdtime - server_time)
+                session.deferred_player_cooldowns_update = True
 
         return True, [new_entry], None
 
@@ -16396,6 +16417,8 @@ class Store(object):
 
                 new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
                 squad['map_path'] = new_path
+                session.player.cooldown_reset('squad_order:%d' % squad_id)
+                session.deferred_player_cooldowns_update = True
                 retmsg.append(["REGION_MAP_UPDATES", session.player.home_region, [new_entry], server_time])
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
@@ -28972,7 +28995,7 @@ class GAMEAPI(resource.Resource):
                     # (this is the only chance to step towards something other than home base)
                     step_success = True
                     try:
-                        step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, raid_mode)
+                        step_success, step_map_features, error_code = session.player.squad_step(session, squad_id, raid_path, raid_mode, bypass_cooldown = True)
                         map_features += step_map_features
                     finally:
                         if not step_success:

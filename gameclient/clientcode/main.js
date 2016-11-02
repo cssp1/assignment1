@@ -30724,6 +30724,11 @@ player.advance_squads = function() {
             player.squad_set_client_data(squad_data['id'], 'move_pending', false);
         }
 
+        // don't touch squads that are on cooldown
+        if(player.cooldown_active('squad_order:'+squad_data['id'].toString())) {
+            return;
+        }
+
         // don't try to drive squads around outside home base (only because the server doesn't take the commands)
         if(!session.home_base) { return; }
 
@@ -47706,7 +47711,7 @@ function handle_server_message(data) {
                 invoke_speedup_dialog('crafting');
             }
         } else if(name == "INVALID_MAP_LOCATION" || name == "CANNOT_ALTER_SQUAD_WHILE_UNDER_ATTACK" ||
-                  name == "SQUAD_RACE_CONDITION" ||
+                  name == "SQUAD_RACE_CONDITION" || name == "CANNOT_MOVE_SQUAD_ON_COOLDOWN" ||
                   name.indexOf("CANNOT_DEPLOY_SQUAD") == 0 ||
                   name.indexOf("CANNOT_DEPLOY_RAID") == 0) {
             // stop whatever AI action the squad was trying to do

@@ -1099,7 +1099,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     buttons.push([gamedata['strings']['regional_map']['move'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
                         _mapwidget.cursor = new RegionMap.MoveCursor(_mapwidget, _squad_data['map_loc'], _squad_data['id'], _feature['base_icon']);
-                    }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending')) ? 'disabled' : 'normal')]);
+                    }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending') || player.cooldown_active('squad_order:'+squad_data['id'].toString())) ? 'disabled' : 'normal')]);
                 }
 
                 // RECALL button
@@ -2173,7 +2173,8 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 var squad_data = player.squads[squad_sid];
                 if((squad_data && squad_data['pending']) ||
                    player.squad_get_client_data(squad_id, 'move_pending') ||
-                   player.squad_get_client_data(squad_id, 'halt_pending')
+                   player.squad_get_client_data(squad_id, 'halt_pending') ||
+                   (!moving && player.cooldown_active('squad_order:'+squad_sid))
                   ) {
                     squad_pending = true;
                 }
