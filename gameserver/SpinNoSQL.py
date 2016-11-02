@@ -2444,21 +2444,27 @@ class NoSQLClient (object):
         return self._table('unit_donation_requests')
 
     def request_unit_donation(self, *args): return self.instrument('request_unit_donation', self._request_unit_donation, args)
-    def _request_unit_donation(self, user_id, alliance_id, time_now, tag, cur_space, max_space):
-        self.unit_donation_requests_table().update_one({'_id':user_id}, {'$set':{'alliance_id':alliance_id, 'time':time_now, 'tag':tag, 'space_left':max_space - cur_space, 'max_space':max_space}}, upsert=True)
+    def _request_unit_donation(self, user_id, alliance_id, time_now, tag, cur_space, max_space, region_id):
+        props = {'alliance_id':alliance_id, 'time':time_now, 'tag':tag, 'space_left':max_space - cur_space, 'max_space':max_space}
+        if region_id:
+            props['region_id'] = region_id
+        self.unit_donation_requests_table().update_one({'_id':user_id}, {'$set':props}, upsert=True)
         return True
 
     def invalidate_unit_donation_request(self, *args): return self.instrument('invalidate_unit_donation_request', self._invalidate_unit_donation_request, args)
     def _invalidate_unit_donation_request(self, user_id): return bool(self.unit_donation_requests_table().delete_one({'_id':user_id}).deleted_count)
 
     def make_unit_donation(self, *args): return self.instrument('make_unit_donation', self._make_unit_donation, args)
-    def _make_unit_donation(self, recipient_id, alliance_id, tag, space_array):
+    def _make_unit_donation(self, recipient_id, alliance_id, tag, space_array, region_id):
         # If the outstanding donation request exists, attempt to increment cur_space (atomically) by each entry
         # of space_array in sequence (it should be sorted largest to smallest), stopping when we find an amount
         # of space such that cur_space + donated_space <= max_space.
         for donated_space in space_array:
-            ret = self.unit_donation_requests_table().find_one_and_update({'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
-                                                                           'space_left': { '$gte': donated_space } },
+            qs = {'_id':recipient_id, 'alliance_id':alliance_id, 'tag':tag,
+                  'space_left': { '$gte': donated_space } }
+            if region_id:
+                qs['region_id'] = region_id
+            ret = self.unit_donation_requests_table().find_one_and_update(qs,
                                                                           {'$inc':{'space_left':-donated_space}},
                                                                           upsert = False,
                                                                           projection={'space_left':1,'max_space':1},
@@ -3065,11 +3071,12 @@ if __name__ == '__main__':
         # test unit donations
         client.unit_donation_requests_table().drop()
         TAG = 1234
-        assert client.request_unit_donation(UID+1, alliance_1, time_now, TAG, 10, 100)
-        assert client.make_unit_donation(UID+1, alliance_1, TAG, [10]) == (20, 100)
-        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100]) is None
-        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100,80,10]) == (100, 100)
-        assert client.make_unit_donation(UID+1, alliance_1, TAG, [1]) is None
+        assert client.request_unit_donation(UID+1, alliance_1, time_now, TAG, 10, 100, 'region01')
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [10], 'region02') is None
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [10], 'region01') == (20, 100)
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100], 'region01') is None
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [100,80,10], 'region01') == (100, 100)
+        assert client.make_unit_donation(UID+1, alliance_1, TAG, [1], 'region01') is None
 
         # test maintenance
         #client.do_maint(time_now, cur_season, cur_week)

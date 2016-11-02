@@ -15213,11 +15213,20 @@ ChatUnitDonation.prototype.apply = function(output, req, node) {
     var pct = (100.0*(this.cur_space/this.max_space)).toFixed(0);
     var text;
 
+    var region_ui_name = (req['region_id'] && req['region_id'] in gamedata['regions'] ? gamedata['regions'][req['region_id']]['ui_name'] : '');
+
     if(req['recipient_id'] === session.user_id) {
-        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat'][region_ui_name ? 'you_region' : 'you'].replace('%pct', pct).replace('%region', region_ui_name));
     } else {
         var kind = (req['i_donated'] ? 'you_have_donated' : 'you_have_not_donated');
-        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), req['callback'] ? {onclick:req['callback']} : null);
+        if(region_ui_name) {
+            if(!session.region.data || (session.region.data['id'] !== req['region_id'])) {
+                kind += '_different_region';
+            } else {
+                kind += '_region';
+            }
+        }
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()).replace('%region', region_ui_name), req['callback'] ? {onclick:req['callback']} : null);
     }
 
     output.revise_text(node, text);
@@ -15354,11 +15363,14 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             return; // request is stale
         }
         var tag = sender_info['tag'] || 0;
+        var region_ui_name = (sender_info['region_id'] && sender_info['region_id'] in gamedata['regions'] ?
+                              gamedata['regions'][sender_info['region_id']]['ui_name'] : '');
 
         if(tag in tab.user_data['unit_donation_requests']) { return; } // already seen (?)
         var req = tab.user_data['unit_donation_requests'][tag] = {'node':null, // updated below
                                                                   'callback': null, // updated below
                                                                   'tag':tag, 'cur_space': sender_info['cur_space'], 'max_space':sender_info['max_space'],
+                                                                  'region_id': sender_info['region_id'] || null,
                                                                   'i_donated':false, 'my_xp': 0, 'dialog': null,
                                                                   'recipient_id': sender_info['user_id'],
                                                                   'recipient_fbid': sender_info['facebook_id'],
@@ -15366,14 +15378,21 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
         var pct = (100.0*(sender_info['cur_space']/sender_info['max_space'])).toFixed(0);
         var text;
         if(req['recipient_id'] == session.user_id) {
-            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['you'].replace('%pct', pct));
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat'][region_ui_name ? 'you_region' : 'you'].replace('%pct', pct).replace('%region', region_ui_name));
         } else {
             var kind = 'you_have_not_donated';
+            if(region_ui_name) {
+                if(!session.region.data || (session.region.data['id'] !== sender_info['region_id'])) {
+                    kind += '_different_region';
+                } else {
+                    kind += '_region';
+                }
+            }
             req['callback'] = (function (_req) { return function(w, mloc) {
                 change_selection_ui(null);
                 _req['dialog'] = invoke_unit_donation_dialog(_req);
             }; })(req);
-            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()), {onclick:req['callback']});
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['unit_donation_chat']['other'][kind].replace('%pct', pct).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()).replace('%region', region_ui_name), {onclick:req['callback']});
         }
         if(is_prepend) {
             req['node'] = tab.widgets['output'].prepend_text(text);
@@ -25458,6 +25477,13 @@ function resolve_unit_donation_problem() {
 
 function invoke_unit_donation_dialog(req) {
     if(resolve_unit_donation_problem()) { return null; }
+
+    if(req['region_id'] && gamedata['unit_donation_restrict_region'] &&
+       (!session.region.data || session.region.data['id'] !== req['region_id'])) {
+        // wrong region - offer to relocate
+        invoke_find_on_map(req['region_id'], [0,0]);
+        return null;
+    }
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['unit_donation_dialog']);
     dialog.user_data['dialog'] = 'unit_donation_dialog';

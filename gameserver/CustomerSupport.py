@@ -1352,6 +1352,9 @@ class HandleChangeRegion(Handler):
                 self.gamesite.nosql_client.drop_map_feature(old_region, base_id, originator=self.user_id, reason='CustomerSupport')
 
                 # skip modifying ladder scores and on_enter consequent
+                if self.gamedata.get('unit_donation_restrict_region', False):
+                    self.gamesite.sql_client.invalidate_unit_donation_request(self.user_id)
+                    player['donated_units'] = {}
             else:
                 # changed location within one region - no need to drop old stuff
                 pass

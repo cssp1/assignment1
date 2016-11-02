@@ -14043,6 +14043,11 @@ class LivePlayer(Player):
                         # be careful about leaving the player in a broken state here!
                         session.execute_consequent_safe(cons, self, retmsg, reason='change_region:on_enter(%s)' % self.my_home.base_region)
 
+                if gamedata.get('unit_donation_restrict_region', False):
+                    gamesite.sql_client.invalidate_unit_donation_request(self.user_id)
+                    self.donated_units = {}
+                    retmsg.append(["DONATED_UNITS_UPDATE", self.donated_units])
+
             else:
                 # changed location within one region - no need to drop old stuff
                 pass
@@ -29159,18 +29164,19 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if not gamesite.sql_client.request_unit_donation(session.player.user_id, alliance_id, server_time, tag, cur_space, max_space):
+                    region_id = session.player.home_region if gamedata.get('unit_donation_restrict_region', False) else None
+                    if not gamesite.sql_client.request_unit_donation(session.player.user_id, alliance_id, server_time, tag, cur_space, max_space, region_id):
                         success = False
 
                 if success:
                     session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
                     if session.increment_player_metric('unit_donations_requested', 1, time_series = False):
                         session.deferred_history_update = True
-                    metric_event_coded(session.player.user_id, '4140_unit_donation_requested', {'alliance_id':alliance_id,'tag':tag,'max_space':max_space,'cur_space':cur_space})
+                    metric_event_coded(session.player.user_id, '4140_unit_donation_requested', {'alliance_id':alliance_id,'tag':tag,'max_space':max_space,'cur_space':cur_space,'region_id': region_id})
                     if session.alliance_chat_channel:
                         session.do_chat_send(session.alliance_chat_channel,
-                                             'I need units! (tag %d cur %d max %d)' % (tag, cur_space, max_space),
-                                             bypass_gag = True, props = {'type':'unit_donation_request', 'tag':tag, 'max_space':max_space, 'cur_space':cur_space})
+                                             'I need units! (tag %d cur %d max %d region %r)' % (tag, cur_space, max_space, region_id),
+                                             bypass_gag = True, props = {'type':'unit_donation_request', 'tag':tag, 'max_space':max_space, 'cur_space':cur_space, 'region_id': region_id})
 
                 # send this regardless of success state
                 retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
@@ -29241,8 +29247,10 @@ class GAMEAPI(resource.Resource):
                             attachments.append(p)
 
                 if success:
+                    region_id = session.player.home_region if gamedata.get('unit_donation_restrict_region', False) else None
+
                     total_space = sum([u.get_leveled_quantity(u.spec.consumes_space) for u in units])
-                    result = gamesite.sql_client.make_unit_donation(recipient_id, alliance_id, tag, [total_space])
+                    result = gamesite.sql_client.make_unit_donation(recipient_id, alliance_id, tag, [total_space], region_id)
 
                 if success:
                     if result:
