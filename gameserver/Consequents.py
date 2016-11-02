@@ -595,6 +595,21 @@ class HealAllBuildingsConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         session.heal_all_buildings(retmsg)
 
+class SendMessageConsequent(Consequent):
+    def execute(self, session, player, retmsg, context=None):
+        if self.data['to'] == '%MENTOR':
+            recipient_user_id = player.mentor_player_id_cache
+        else:
+            raise Exception('unknown "to" %r' % self.data['to'])
+
+        replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
+                        '%MY_REAL_NAME': session.user.get_real_name() }
+        msg = player.make_system_mail(self.mail_template, to_user_id = recipient_user_id, replacements = replacements)
+        session.msg_send([msg])
+
+        # ensure it's delivered quickly
+        session.do_CONTROLAPI(session.user.user_id, {'user_id':recipient_user_id,'method':'receive_mail'})
+
 class LibraryConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -635,6 +650,7 @@ def read_consequent(data):
     elif kind == 'INVITE_COMPLETE': return InviteCompleteConsequent(data)
     elif kind == 'HEAL_ALL_UNITS': return HealAllUnitsConsequent(data)
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
+    elif kind == 'SEND_MESSAGE': return SendMessageConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)
     elif kind in ('INVOKE_UPGRADE_DIALOG','INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','INVOKE_LOTTERY_DIALOG',
                   'INVOKE_OFFER_CHOICE','INVOKE_MISSIONS_DIALOG','INVOKE_MAIL_DIALOG',

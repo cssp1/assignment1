@@ -5542,6 +5542,12 @@ class Session(object):
         portrait_d.addCallbacks(lambda _, self=self: self.send([["PLAYER_PORTRAIT_UPDATE"]], flush_now = True),
                                 lambda _, self=self: report_and_absorb_deferred_failure(_, self))
 
+    # for Consequents to access the msg_client
+    def msg_send(self, *args, **kwargs):
+        return gamesite.msg_client.msg_send(*args, **kwargs)
+    def do_CONTROLAPI(self, *args, **kwargs):
+        return gamesite.do_CONTROLAPI(*args, **kwargs)
+
 class SessionChange(object):
     # This holds the state of an ongoing asynchronous session change request
     # begin() returns a Deferred that will later fire with a list of arguments
