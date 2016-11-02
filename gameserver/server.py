@@ -12384,6 +12384,12 @@ class Player(AbstractPlayer):
         elif 'attachments' in data:
             ret['attachments'] = data['attachments']
 
+        if 'attachments_loot_table' in data:
+            ret['attachments_loot_table'] = data['attachments_loot_table']
+
+        if 'on_receipt' in data:
+            ret['on_receipt'] = data['on_receipt']
+
         for PRED in ('show_if', 'discard_if'):
             if PRED in data:
                 ret[PRED] = data[PRED]
