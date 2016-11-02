@@ -1701,10 +1701,14 @@ class HandleApplyAllianceLeavePointLoss(Handler):
 class HandleReceiveMail(Handler):
     # alerts server handling a logged-in player to push new mail immediately
     # send this after queueing the mail through SpinNoSQL
+    need_user = False
+    need_player = False
     # note: no logging
     def exec_offline(self, json_user, json_player): return ReturnValue(result = 'ok') # no-op
     def exec_online(self, session, retmsg):
-        self.gamesite.gameapi.do_receive_mail(session, retmsg)
+        stat = self.gamesite.gameapi.do_receive_mail(session, retmsg)
+        if stat and stat['new_mail']:
+            session.deferred_mailbox_update = True
         return ReturnValue(result = 'ok')
 
 class HandlePlayerBatch(Handler):
