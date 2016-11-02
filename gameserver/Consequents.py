@@ -603,12 +603,14 @@ class SendMessageConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         if self.data['to'] == '%MENTOR':
             recipient_user_id = player.mentor_player_id_cache
+            if recipient_user_id is None:
+                raise Exception('mentor_player_id_cache is None')
         else:
             raise Exception('unknown "to" %r' % self.data['to'])
 
         replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
                         '%MY_REAL_NAME': session.user.get_real_name() }
-        msg = player.make_system_mail(self.mail_template, to_user_id = recipient_user_id, replacements = replacements)
+        msg = player.make_system_mail(self.data['mail_template'], to_user_id = recipient_user_id, replacements = replacements)
         session.msg_send([msg])
 
         # ensure it's delivered quickly
