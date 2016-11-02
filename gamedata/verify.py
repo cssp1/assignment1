@@ -1678,7 +1678,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'CHANGE_TITLE', 'INVITE_COMPLETE',
+                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE',
                         'ALL_AGGRESSIVE',
                    ])
 
@@ -1703,6 +1703,8 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code'):
             error |= 1
             print '%s: GIVE_LOOT consequent has bad "reason", it should be "%s"' % (reason, context)
+        if 'mail_template' in cons:
+            error |= check_mail_template(cons['mail_template'], reason = reason + ':mail_template')
     elif cons['consequent'] == "IF":
         error |= check_predicate(cons['if'], reason = reason, context = context, context_data = context_data)
         error |= check_consequent(cons['then'], reason = reason, context = context, context_data = context_data)
@@ -1850,6 +1852,11 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             if type(qty) is not int:
                 error |= 1; print '%s: bad qty value %s' % (reason, repr(qty))
 
+    elif cons['consequent'] == 'SEND_MESSAGE':
+        if cons.get('to') != '%MENTOR':
+            error |= 1; print '%s: SEND_MESSAGE invalid "to"' % reason
+        error |= check_mail_template(cons['mail_template'], reason = reason + ':mail_template')
+
     elif cons['consequent'] == 'PRELOAD_ART_ASSET':
         if 'unit_name' in cons:
             error |= check_unit_name(cons['unit_name'], reason)
@@ -1900,6 +1907,16 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     else:
         error |= 1; print '%s: invalid consequent %s' % (reason, cons['consequent'])
 
+    return error
+
+def check_mail_template(data, reason = ''):
+    error = 0
+    for FIELD in ('ui_subject', 'ui_body'):
+        if FIELD not in data:
+            error |= 1; print '%s: missing "%s"' % (reason, FIELD)
+    if 'attachments' in data:
+        for entry in data['attachments']:
+            error |= check_item_name(entry['spec'], reason + ':attachments')
     return error
 
 def check_showcase_hack(cons, reason = ''):
