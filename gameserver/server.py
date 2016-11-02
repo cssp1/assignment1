@@ -23418,6 +23418,20 @@ class GAMEAPI(resource.Resource):
                         else:
                             msg['expire_time'] = server_time + msg['receipt_duration']
 
+                    if 'attachments_loot_table' in msg:
+                        # add attachments with result from a loot table
+                        if msg['attachments_loot_table'] in gamedata['loot_tables']:
+                            loot_items = session.get_loot_items(session.player, gamedata['loot_tables'][msg['attachments_loot_table']]['loot'], -1, -1)
+                            if isinstance(msg.get('attachments'), list):
+                                msg['attachments'] += loot_items
+                            else:
+                                msg['attachments'] = loot_items
+
+                        else:
+                            gamesite.exception_log.event(server_time, 'mail referenced invalid attachments_loot_table %s' % msg['attachments_loot_table'])
+
+                        del msg['attachments_loot_table']
+
                     session.player.mailbox_append(msg, safe_not_to_copy = True)
                     ret['new_mail'] = True
 
