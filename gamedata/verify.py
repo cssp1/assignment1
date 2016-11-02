@@ -1917,6 +1917,9 @@ def check_mail_template(data, reason = ''):
     if 'attachments' in data:
         for entry in data['attachments']:
             error |= check_item_name(entry['spec'], reason + ':attachments')
+    if 'on_receipt' in data:
+        if data['on_receipt'] not in gamedata['consequent_library']:
+            error |= 1; print '%s: invalid on_receipt LIBRARY consequent "%s"' % (reason, data['on_receipt'])
     return error
 
 def check_showcase_hack(cons, reason = ''):
