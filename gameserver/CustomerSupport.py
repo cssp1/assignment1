@@ -1694,6 +1694,16 @@ class HandleApplyAllianceLeavePointLoss(Handler):
                 retmsg.append(["PLAYER_CACHE_UPDATE", [self.gamesite.gameapi.get_player_cache_props(user, player, None)]])
         return ReturnValue(result = 'ok')
 
+
+class HandleReceiveMail(Handler):
+    # alerts server handling a logged-in player to push new mail immediately
+    # send this after queueing the mail through SpinNoSQL
+    # note: no logging
+    def exec_offline(self, json_user, json_player): return ReturnValue(result = 'ok') # no-op
+    def exec_online(self, session, retmsg):
+        self.gamesite.gameapi.do_receive_mail(session, retmsg)
+        return ReturnValue(result = 'ok')
+
 class HandlePlayerBatch(Handler):
     read_only = True
     need_user = False
@@ -1782,6 +1792,7 @@ methods = {
     'offer_payer_promo': HandleOfferPayerPromo,
     'invoke_facebook_auth': HandleInvokeFacebookAuth,
     'send_notification': HandleSendNotification,
+    'receive_mail': HandleReceiveMail,
     'apply_alliance_leave_point_loss': HandleApplyAllianceLeavePointLoss,
     'player_batch': HandlePlayerBatch,
     # not implemented yet: join_abtest, clear_abtest
