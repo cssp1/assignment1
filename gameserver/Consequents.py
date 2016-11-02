@@ -118,6 +118,10 @@ class MetricEventConsequent(Consequent):
                 else:
                     del props[k] # silently drop the property
 
+            # grab a player history key
+            elif isinstance(props[k], dict) and '$player_history' in props[k]:
+                props[k] = player.history.get(props[k]['$player_history'], 0)
+
             # context variables
             elif isinstance(props[k], basestring) and len(props[k]) >= 1 and props[k][0] == '$':
                 context_key = props[k][1:]
