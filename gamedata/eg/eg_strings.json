@@ -210,15 +210,22 @@
     "unit_donation_chat": {
         // your own reinforcement requests
         "you": ":: [color=#ffff00]You requested units[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
+        "you_region": ":: [color=#ffff00]You requested units in %region[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
 
         // reinforcement requests put in by other players
         "other": {
             // if you have not donated units yet
             "you_have_not_donated": ":: [color=#ffff00]%recipient requests units. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
+            "you_have_not_donated_region": ":: [color=#ffff00]%recipient requests units in %region. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
+            "you_have_not_donated_different_region": ":: [color=#ffff00]%recipient requests units in %region.[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]",
 
             // if you have donated units
             "you_have_donated": ":: [color=#ffff00]%recipient requests units. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]\n:: Thank you! : [color=#ff00ff]You earned +%xp XP[/color]",
-            "stale": ":: [color=#ffff00]%recipient withdraws this unit request[/color]"
+            "you_have_donated_region": ":: [color=#ffff00]%recipient requests units in %region. *Click to donate*[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]\n:: Thank you! : [color=#ff00ff]You earned +%xp XP[/color]",
+            "you_have_donated_different_region": ":: [color=#ffff00]%recipient requests units in %region.[/color]\n:: [color=#c0c0c0]%pct% of maximum space donated[/color]\n:: Thank you! : [color=#ff00ff]You earned +%xp XP[/color]",
+
+            "stale": ":: [color=#ffff00]%recipient withdraws this unit request[/color]",
+            "stale_region": ":: [color=#ffff00]%recipient withdraws this unit request[/color]"
         }
     },
 
