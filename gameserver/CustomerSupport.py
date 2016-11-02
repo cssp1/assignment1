@@ -604,13 +604,16 @@ class HandleGiveItem(MessageSender):
 class HandleSendMessage(MessageSender):
     def make_message(self):
         expire_time = (int(self.args['expire_time']) if 'expire_time' in self.args else self.time_now + 30*24*60*60)
-        return {'type':'mail',
-                'expire_time': expire_time,
-                'msg_id': self.get_msg_id(),
-                'from_name': self.args.get('message_sender', 'Customer Support'),
-                'to': [self.user_id],
-                'subject':self.args.get('message_subject', 'Support Issue'),
-                'body': self.args['message_body']}
+        ret = {'type':'mail',
+               'expire_time': expire_time,
+               'msg_id': self.get_msg_id(),
+               'from_name': self.args.get('message_sender', 'Customer Support'),
+               'to': [self.user_id],
+               'subject':self.args.get('message_subject', 'Support Issue'),
+               'body': self.args['message_body']}
+        if 'attachments' in self.args:
+            ret['attachments'] = SpinJSON.loads(self.args['attachments'])
+        return ret
 
 class HandleSquadDockUnits(Handler):
     need_user = False
