@@ -1960,7 +1960,7 @@ class User:
                                                           'replacements':replacements,
                                                           'config':'bh_invite_completed_sender'})
             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
-                                                          'send_ingame':1,'send_offline':1,'format':'bh',
+                                                          'send_ingame':1,'send_offline':0,'format':'bh', # note: no email on this one
                                                           'user_id':self.user_id,
                                                           'replacements':replacements,
                                                           'config':'bh_invite_completed_target'})
