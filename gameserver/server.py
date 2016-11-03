@@ -18082,8 +18082,9 @@ class GAMEAPI(resource.Resource):
 
                     if ('fb_open_graph' in base) and base['fb_open_graph'].get('enable', True):
                         session.user.create_fb_open_graph_action('conquer',
-                                                                 {OGPAPI.object_type('base'): OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('base'),
-                                                                                                                                   'user_id':session.viewing_user.user_id})})
+                                                                 {OGPAPI.object_type('base'):
+                                                                  OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('base'),
+                                                                                                       'user_id':session.viewing_user.user_id})})
                     if gamedata.get('pve_repair_on_victory', False):
                         session.viewing_base.reset_to_full_health()
                         # almost always want to persist also, otherwise loot state would be lost!
@@ -18100,11 +18101,15 @@ class GAMEAPI(resource.Resource):
                     if 'failure' in base and outcome == 'defeat':
                         completion_consequent = base['failure']
 
-                    # store all "trash" bases and uncompleted "story" bases as temporary instances
-                    if (outcome != 'victory' and gamedata.get('pve_repair_on_defeat', False)) or gamedata.get('pve_repair_on_victory', False):
-                        session.viewing_base.reset_to_full_health()
+                    if base.get('reset_on_defeat', False):
+                        io_type = 'del_ai_instance'
+                    else:
+                        # store all "trash" bases and uncompleted "story" bases as temporary instances
+                        if (outcome != 'victory' and gamedata.get('pve_repair_on_defeat', False)) or \
+                           gamedata.get('pve_repair_on_victory', False):
+                            session.viewing_base.reset_to_full_health()
 
-                    io_type = 'store_ai_instance'
+                        io_type = 'store_ai_instance'
 
                     # get rid of Lion Stone
                     if LION_STONE_ID in session.user.client_ai_friends:
