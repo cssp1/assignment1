@@ -711,7 +711,7 @@
     "daily_attack_interval": 86400, // minimum number of seconds between auto-generated AI attacks
     "daily_attack_chance": 0.10, // probability of receiving a daily attack, per login, once you are otherwise eligible
 
-    "gift_interval": 86400, // minimum number of seconds between times users can send free gifts to each other
+    "gift_interval": 82800, // minimum number of seconds between times users can send free gifts to each other (23 hours)
 
     "gift_amount_base": 0.03, // base iron/water gift amount, as fraction of max resource capacity
     "gift_amount_randomness": 0.25, // gift amount varies by +/- this much (fraction of base amount, 0-1)
