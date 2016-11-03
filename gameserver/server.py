@@ -11616,7 +11616,6 @@ class Player(AbstractPlayer):
             return
 
         level = self.tech.get(tech_name, 1)
-        state_updates = []
         for obj in self.home_base_iter():
             if obj.is_building() and obj.is_manufacturing():
                 for item in obj.manuf_queue:
