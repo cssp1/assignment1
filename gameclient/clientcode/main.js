@@ -18715,13 +18715,11 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             var ulist = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].user_data['deploy_button_squad_ids'];
             found_widget_name = null;
             if(ulist) {
-                console.log('looking for '+squad_id.toString()+' in '+JSON.stringify(ulist));
                 for(var i = 0; i < ulist.length; i++) {
                     if(ulist[i] === squad_id) {
                         parent = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].widgets['squad'+i.toString()];
                         parent_offset = desktop_dialogs['desktop_bottom'].widgets['unit_deployment_bar'].get_absolute_xy();
                         found_widget_name = 'icon';
-                        console.log("HERE! "+found_widget_name);
                         break;
                     }
                 }
