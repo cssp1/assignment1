@@ -13784,7 +13784,8 @@ class LivePlayer(Player):
                 sent = True
 
 
-            if (not self.history.get('free_transmitter_given', False)) and self.get_any_abtest_value('give_free_transmitter', False):
+            if 'free_transmitter_mail' in gamedata['strings'] and \
+               (not self.history.get('free_transmitter_given', False)) and self.get_any_abtest_value('give_free_transmitter', False):
                 transmitter_spec = self.get_abtest_spec(GameObjectSpec, 'transmitter')
                 if GameObjectSpec.get_leveled_quantity(transmitter_spec.requires,1).is_satisfied2(session, self, None):
                     self.history['free_transmitter_given'] = 1

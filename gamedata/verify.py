@@ -3531,6 +3531,15 @@ def main(args):
         if data.get('icon',None):
             error |= require_art_asset(data['icon'], 'strings:idle_buildings:'+name+':icon')
 
+    for name, data in gamedata['strings'].iteritems():
+        if name.endswith('_mail'):
+            error |= check_mail_template(data, reason = 'strings:'+name)
+        elif name.startswith('enemy_unit_'):
+            specname = name[len('enemy_unit_'):]
+            if specname not in gamedata['buildings'] and \
+               specname not in gamedata['units']:
+                error |= 1; print 'invalid %s in strings.json' % (name,)
+
     if type(gamedata['continent_assignment']) is list:
         continent_list = [val for pred, val in gamedata['continent_assignment']]
     else:

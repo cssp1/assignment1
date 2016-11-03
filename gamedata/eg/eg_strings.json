@@ -693,11 +693,6 @@
                               "ui_subject": "Your First Item", // subject line
                               "ui_body": "Greetings Commander,\n\nHere's your first message. This message contains an item. Win more items via battles or missions.\n\nWARNING: Messages expire, store items quickly.",
                               "attachments": [{"spec":"packaged_tutorial_droid","undiscardable":1}] },
-    "free_transmitter_mail": { "ui_from": "Narrator",
-                               "duration": -1,
-                               "ui_subject": "Free Transmitter",
-                               "ui_body": "Greetings Commander! As of today, a Transmitter is required to access the Regional Map.\n\nIn gratitude for your commitment to Example Game, here is an item that will build your Transmitter for free.",
-                               "attachments": [{"spec":"transmitter_kit"}] },
 
     "trim_unit_space_mail_townhall": { "ui_from": "Narrator",
                                        "duration": 604800,
