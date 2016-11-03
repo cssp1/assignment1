@@ -855,9 +855,23 @@ def get_any_game_server():
     qs = {'type':SpinConfig.game(), 'state':'ok',
           'gamedata_build': proxysite.proxy_root.static_resources['gamedata-%s-en_US.js' % SpinConfig.game()].build_date,
           'gameclient_build': proxysite.proxy_root.static_resources['compiled-client.js'].build_date}
-    result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
+    method = SpinConfig.config['proxyserver'].get('load_balance_method', 'least_load')
+    result = None
+    if method == 'least_load':
+        temp = db_client.server_status_query(qs, fields = {'hostname':1, 'game_http_port':1}, sort = 'load', limit = 1)
+        if temp:
+            result = temp[0]
+    elif method == 'random':
+        temp = db_client.server_status_query(qs, fields = {'hostname':1, 'game_http_port':1})
+        if temp:
+            result = random.choice(temp)
+    else:
+        # whatever the DB server gives us. *This will be biased towards a single server, concentrating the load*.
+        result = db_client.server_status_query_one(qs, fields = {'hostname':1, 'game_http_port':1})
+
     if result:
         return (result['hostname'], result['game_http_port'])
+
     return None
 
 # keep track of outstanding async session termination requests, so that we can cancel overlapped ones
