@@ -514,6 +514,8 @@ class AdminStats:
         self.latency = {}
         self.quarry_cache_misses = 0
         self.quarry_cache_hits = 0
+        self.controlapi_calls_by_method = {}
+        self.ogpapi_calls_by_type = {}
 
     # convenience method when you have a live player instance
     def econ_flow_player(self, player, *args, **kwargs):
@@ -623,7 +625,7 @@ class AdminStats:
                 'load_unhalted': self.get_load(),
                 'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
                 'active_sessions': self.get_active_sessions(),
-                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>0),0),
+                'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>=10.0),0),
                 'active_protocol_clients': len(gamesite.active_clients),
                 'active_protocol_requests': len(gamesite.active_requests),
                 }
@@ -685,6 +687,22 @@ class AdminStats:
                                                                        props['user_id'],
                                                                        props['gamebucks_amount'],
                                                                        props['description'])
+        ret += '</table>'
+        return ret
+
+    def get_controlapi_calls(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Method</td><td>N</td></tr>'
+        for name, calls in sorted(self.controlapi_calls_by_method.items()):
+            ret += '<tr><td>%s</td><td>%d</td></tr>' % (name, calls)
+        ret += '</table>'
+        return ret
+
+    def get_ogpapi_calls(self):
+        ret = '<table border="1" cellspacing="1">'
+        ret += '<tr><td>Type</td><td>N</td></tr>'
+        for name, calls in sorted(self.ogpapi_calls_by_type.items()):
+            ret += '<tr><td>%s</td><td>%d</td></tr>' % (name, calls)
         ret += '</table>'
         return ret
 
@@ -14526,6 +14544,9 @@ class OGPAPI(resource.Resource):
 
         ret = '<!DOCTYPE html>\n<html>\n'
         type = request.args['type'][0]
+
+        admin_stats.ogpapi_calls_by_type[type] = admin_stats.ogpapi_calls_by_type.get(type,0) + 1
+
         # order of precedence:
         # image_url > art_asset_file > art_asset_s3
         image_url = None
@@ -14759,13 +14780,15 @@ class CONTROLAPI(resource.Resource):
             secret = str(request.args['secret'][0])
             method = str(request.args['method'][0])
 
+            admin_stats.controlapi_calls_by_method[method] = admin_stats.controlapi_calls_by_method.get(method,0) + 1
+
             # Twisted gives us request.args in the form of raw bytes
             # I think in most cases we want to immediately convert to Unicode strings here.
             # Though maybe a future bulk-data-transfer call would want to preserve raw bytes?
             args = dict([(k, unicode(urllib.unquote(v[0]).decode('utf-8'))) for k, v in request.args.iteritems() if k not in ('secret','method')])
-
-            with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
-                ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
+            with admin_stats.latency_measurer('CONTROLAPI(ALL)'):
+                with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
+                    ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
 
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
@@ -30640,6 +30663,10 @@ class AdminResource(resource.Resource):
 
         ret += '<hr><b>AsyncHTTP_CONTROLAPI</b><p>'
         ret += gamesite.AsyncHTTP_CONTROLAPI.get_stats_html(server_time)
+        ret += '<hr><b>CONTROLAPI Calls</b><p>'
+        ret += admin_stats.get_controlapi_calls()
+        ret += '<hr><b>OGPAPI Calls</b><p>'
+        ret += admin_stats.get_ogpapi_calls()
 
         ret += '</body></html>'
         ret = ret.encode('utf-8')
