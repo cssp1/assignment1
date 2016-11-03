@@ -9750,9 +9750,10 @@ function invoke_playfield_controls_bar() {
 }
 function update_playfield_controls_bar(dialog) {
     // on the old horizontal controls bar, there isn't enough space to show away from home or in battle.
-    dialog.widgets['screenshot_button'].show = ((player.tutorial_state == "COMPLETE") &&
-                                                (dialog.user_data['dialog'] == 'playfield_controls_bar_vertical' || (session.home_base && !session.has_attacked)) &&
-                                                post_screenshot_enabled());
+    dialog.widgets['screenshot_button'].show = (session.enable_combat_resource_bars &&
+                                                ((player.tutorial_state == "COMPLETE") &&
+                                                 (dialog.user_data['dialog'] == 'playfield_controls_bar_vertical' || (session.home_base && !session.has_attacked)) &&
+                                                 post_screenshot_enabled()));
 
     if(dialog.user_data['dialog'] == 'playfield_controls_bar_horizontal') {
         var top = desktop_dialogs['desktop_top'];
@@ -9817,6 +9818,9 @@ function update_playfield_zoom_bar(dialog) {
     dialog.widgets['zoom_readout'].text_color = SPUI.make_colorv(dialog.data['widgets']['zoom_readout']['text_color_'+(view_zoom_linear === 0 ? 'zero' : 'nonzero')]);
     dialog.widgets['zoom_in_button'].state = (view_zoom_linear >= gamedata['client']['view_zoom_limits'] ? 'disabled' : 'normal');
     dialog.widgets['zoom_out_button'].state = (view_zoom_linear < gamedata['client']['view_zoom_limits'] ? 'disabled' : 'normal');
+
+    // hide if combat resource bars are off, but still compute position for dialogs anchored to this
+    dialog.show = !!session.enable_combat_resource_bars;
 }
 
 /** @param {BattleReplay.Player|null=} replay_player */
@@ -9891,6 +9895,9 @@ function update_playfield_speed_bar(dialog) {
 
     dialog.widgets['pause_button'].show =
         dialog.widgets['restart_button'].show = is_replay;
+
+    // hide if combat resource bars are off, but still compute position for dialogs anchored to this
+    dialog.show = !!session.enable_combat_resource_bars;
 }
 
 var last_flush_time = 0;
@@ -11529,7 +11536,7 @@ function update_enemy_portrait_dialog(dialog) {
 // update the resource loot bars on the enemy player
 // note: fancy flashing and dynamic movement not implemented
 function update_enemy_resource_bars(dialog) {
-    dialog.show = !!session.res_looter && session.viewing_base.base_type != 'squad';
+    dialog.show = session.enable_combat_resource_bars && !!session.res_looter && session.viewing_base.base_type != 'squad';
     if(!dialog.show) { return; }
 
     var convention = gamedata['client']['visiting_portrait_convention'] || 'both_players';
@@ -12312,7 +12319,9 @@ function update_combat_resource_bars(dialog) {
 }
 
 function update_aura_bar(dialog) {
-    dialog.show = (player.tutorial_state == "COMPLETE") && desktop_dialogs['player_portrait_dialog'].show;
+    dialog.show = (session.enable_combat_resource_bars &&
+                   (player.tutorial_state == "COMPLETE") &&
+                   desktop_dialogs['player_portrait_dialog'].show);
 
     // position relative to player
     dialog.xy = vec_add([desktop_dialogs['player_portrait_dialog'].xy[0], 0], [9,64]);
