@@ -11594,6 +11594,9 @@ class Player(AbstractPlayer):
 
     # raise the level/auras of all units affected by tech_name to the current tech level
     def update_unit_levels(self, observer, tech_name, session, retmsg):
+        if not gamedata.get('update_unit_levels_on_tech_upgrade', True):
+            return
+
         level = self.tech.get(tech_name, 1)
         state_updates = []
         for obj in self.home_base_iter():
@@ -11602,14 +11605,11 @@ class Player(AbstractPlayer):
                     spec = self.get_abtest_spec(GameObjectSpec, item['spec_name'])
                     if spec.level_determined_by_tech == tech_name:
                         item['level'] = level
-                if session.has_object(obj.obj_id): state_updates.append(obj)
+                session.deferred_object_state_updates.add(obj)
             elif obj.is_mobile():
                 if obj.spec.level_determined_by_tech == tech_name:
                     obj.change_level(max(obj.level, level))
-                    if session.has_object(obj.obj_id): state_updates.append(obj)
-
-        res = self.resources.calc_snapshot().serialize()
-        for obj in state_updates: retmsg.append(["OBJECT_STATE_UPDATE", obj.serialize_state(), res])
+                    session.deferred_object_state_updates.add(obj)
 
     def space_required_for_units(self, units):
         total = 0
