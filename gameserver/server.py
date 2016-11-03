@@ -12371,10 +12371,11 @@ class Player(AbstractPlayer):
         self.mailbox.append(msg)
 
     # ugly API, needs rework
-    def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, extra_props = None,
+    def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, to_user_id_list = None,
+                         extra_props = None,
                          replace_s = '', replace_level = '', replace_time = '', replace_day = '', replacements = None):
 
-        if to_user_id is None: to_user_id = self.user_id
+        if to_user_id is None and to_user_id_list is None: to_user_id = self.user_id
 
         # "data" should be an entry in gamedata['strings']
         if duration is None:
@@ -12387,7 +12388,7 @@ class Player(AbstractPlayer):
 
         ret = {'type':'mail',
                'msg_id': generate_mail_id(),
-               'to': [to_user_id]}
+               'to': to_user_id_list if to_user_id_list is not None else [to_user_id]}
 
         for src_key, dst_key in (('ui_from','from_name'), ('ui_subject','subject'), ('ui_body','body')):
             ret[dst_key] = data[src_key].replace('%s',replace_s).replace('%level',replace_level).replace('%time',replace_time).replace('%day',replace_day)
@@ -23208,6 +23209,66 @@ class GAMEAPI(resource.Resource):
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
         return True
 
+    def do_send_gifts_bh(self, session, arg):
+        if session.user.frame_platform != 'bh':
+            session.send([["ERROR", "SERVER_PROTOCOL"]])
+            return None
+
+        replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
+                        '%MY_REAL_NAME': session.user.get_real_name() }
+
+        to_send = []
+
+        # to my mentor
+        if session.user.bh_mentor_player_id_cache and \
+           (not session.player.cooldown_active('send_gift:%d' % session.user.bh_mentor_player_id_cache)):
+            to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_mentor_gift_mail'],
+                                                           duration = gamedata['gift_interval'],
+                                                           to_user_id = session.user.bh_mentor_player_id_cache, replacements = replacements,
+                                                           extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
+
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,
+                                                          'send_ingame':0,'send_offline':1,'format':'bh',
+                                                          'user_id':session.user.bh_mentor_player_id_cache,
+                                                          'replacements':SpinJSON.dumps(replacements),
+                                                          'config':'bh_invite_daily_gift'})
+
+        # to my trainees
+        if session.user.bh_trainee_player_ids_cache:
+            recipient_ids = filter(lambda id: not session.player.cooldown_active('send_gift:'+str(id)), session.user.bh_trainee_player_ids_cache)
+            if recipient_ids:
+                to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_trainee_gift_mail'],
+                                                               duration = gamedata['gift_interval'],
+                                                               to_user_id_list = recipient_ids, replacements = replacements,
+                                                               extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
+                for recipient_id in recipient_ids:
+                    gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,
+                                                                  'send_ingame':0,'send_offline':1,'format':'bh',
+                                                                  'user_id':recipient_id,
+                                                                  'replacements':SpinJSON.dumps(replacements),
+                                                                  'config':'bh_invite_daily_gift'})
+
+
+        all_recipient_ids = sum((msg['to'] for msg in to_send), [])
+
+        if len(to_send) > 0:
+            gamesite.msg_client.msg_send(to_send)
+
+            for recipient_id in all_recipient_ids:
+                session.player.cooldown_trigger('send_gift:'+str(recipient_id), gamedata['gift_interval'])
+            session.deferred_player_cooldowns_update = True
+
+            session.increment_player_metric('gifts_sent', len(all_recipient_ids), time_series = False, bucket = True)
+            session.deferred_history_update = True
+
+            metric_event_coded(session.user.user_id, '4120_send_gift_completed',
+                               {'sum': session.player.get_denormalized_summary_props('brief'),
+                                'recipients': all_recipient_ids
+                                })
+
+        session.send([["SEND_GIFTS_BH_COMPLETE", len(all_recipient_ids)]])
+        return None
+
     def do_send_gifts(self, session, retmsg, arg):
         if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
             return
@@ -26826,6 +26887,8 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "SEND_GIFTS2":
             self.do_send_gifts(session, retmsg, arg)
+        elif arg[0] == "SEND_GIFTS_BH":
+            return self.do_send_gifts_bh(session, arg)
 
         elif arg[0] == "LEVEL_ME_UP":
             self.do_level_up(session, retmsg, arg)
