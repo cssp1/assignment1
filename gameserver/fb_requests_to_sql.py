@@ -105,6 +105,10 @@ if __name__ == '__main__':
 
                 if row['sum'].get('developer',False): continue # skip events by developers
 
+                if row['event_name'] == '4120_send_gift_completed' and ('recipients' in row):
+                    # just record the count
+                    row['batch'] = len(row['recipients'])
+
                 keyvals = [('time',row['time']),
                            ('user_id',row['user_id']),
                            ('event_name',row['event_name'])] + \

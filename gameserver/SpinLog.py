@@ -389,6 +389,8 @@ def FBRequestsLogFilter(child):
                                   '4106_send_gifts_hit_acquisition',
                                   '4107_send_gifts_hit_redundant',
 
+                                  '4120_send_gift_completed',
+
                                   '7101_invite_friends_ingame_prompt',
                                   '7102_invite_friends_ingame_fb_prompt',
                                   '7103_invite_friends_fb_prompt',
