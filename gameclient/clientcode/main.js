@@ -18897,14 +18897,15 @@ function update_tutorial_arrow_for_landscape(_dialog, _unit_name, _loc, _directi
         dialog.show = true;
         dialog.user_data['reticle_loc'] = null;
         dialog.user_data['reticle_pos'] = null;
-        dialog.user_data['reticle_size'] = null;
+        dialog.user_data['reticle_size'] = 0;
 
         var unit = null;
+        var reticle_size = 0;
         if(unit_name) {
             unit = find_object_by_type(unit_name);
             if(unit) {
                 var effsize = ('unit_collision_gridsize' in unit.spec && unit.spec['unit_collision_gridsize'][0] > 0 ? unit.spec['unit_collision_gridsize'] : unit.spec['gridsize'])[0];
-                dialog.user_data['reticle_size'] = 10 * effsize;
+                reticle_size = 10 * effsize;
             } else {
                 dialog.show = false;
             }
@@ -18927,10 +18928,14 @@ function update_tutorial_arrow_for_landscape(_dialog, _unit_name, _loc, _directi
             dialog.user_data['reticle_loc'] = loc;
             xy = ortho_to_screen(loc);
             dialog.user_data['reticle_pos'] = [xy[0],xy[1]];
-            dialog.user_data['reticle_size'] = 50;
+            reticle_size = 50;
         } else {
             xy = [0,0];
         }
+
+        dialog.user_data['reticle_size'] = ('override_reticle_size' in dialog.user_data ?
+                                            dialog.user_data['override_reticle_size'] :
+                                            reticle_size);
 
         var arrow_dims = dialog.data['widgets']['arrow']['dimensions'];
         var wave = Math.floor(8*Math.sin(4*client_time));

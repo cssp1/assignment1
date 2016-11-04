@@ -99,6 +99,7 @@ function TutorialArrowConsequent(data) {
     this.widget_name = data['widget_name'] || null;
 
     this.direction = data['direction'] || 'down';
+    this.reticle_size = data['reticle_size'] || null;
     this.buildable = data['buildable'] || null;
     this.child = data['child'] || false;
 }
@@ -111,6 +112,9 @@ TutorialArrowConsequent.prototype.execute = function(state) {
         player.quest_root.add(dialog);
     }
     if(this.arrow_type == 'landscape') {
+        if(this.reticle_size) {
+            dialog.user_data['override_reticle_size'] = this.reticle_size;
+        }
         dialog.ondraw = update_tutorial_arrow_for_landscape(dialog, this.target_name, this.coordinates, this.direction, this.buildable);
         dialog.afterdraw = tutorial_arrow_draw_reticle;
         dialog.ondraw(dialog); // call once here to init position
