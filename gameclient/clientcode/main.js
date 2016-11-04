@@ -7559,7 +7559,8 @@ player.crafting_queue_ingredients_and_products_iter = function(func) {
                 var recipe_name = bus['craft']['recipe'];
                 var recipe = gamedata['crafting']['recipes'][recipe_name] || null;
                 if(recipe) {
-                    goog.array.forEach(recipe['product'], function(prod) {
+                    var product_list = get_crafting_recipe_product_list(recipe, bus['craft']['level'] || 1);
+                    goog.array.forEach(product_list, function(prod) {
                         if('spec' in prod) { // only works on deterministic products!
                             var address = null;
                             var delivery = bus['craft']['delivery'];
@@ -7569,7 +7570,7 @@ player.crafting_queue_ingredients_and_products_iter = function(func) {
                             func(prod, address);
                         }
                     });
-                    var ingr_list = bus['craft']['ingredients'] || null;
+                    var ingr_list = get_crafting_recipe_ingredients_list(recipe, bus['craft']['level'] || 1);
                     if(ingr_list && gamedata['crafting']['categories'][recipe['crafting_category']]['refund_ingredients']) {
                         // only check ingredients if they are refundable and thus available to the player if cancelled
                         goog.array.forEach(ingr_list, (function(ingr_item) { func(ingr_item, null); }));

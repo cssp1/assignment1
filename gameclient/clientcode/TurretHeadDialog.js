@@ -205,6 +205,7 @@ TurretHeadDialog.ondraw = function(dialog) {
                 } else {
                     TurretHeadDialog.select_recipe(w.parent, _name);
                 }
+                player.quest_tracked_dirty = true;
             }; })(name);
 
             dialog.widgets['recipe_gray_outer'+wname].show = !can_craft;

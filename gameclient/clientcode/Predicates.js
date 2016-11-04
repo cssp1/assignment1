@@ -1410,6 +1410,9 @@ SelectedPredicate.prototype.is_satisfied = function(player, qdata) {
             if(this.state == 'under_construction' && (!selection.unit.is_building() || !selection.unit.is_under_construction())) {
                 return false;
             }
+            if(this.state == 'crafting' &&  (!selection.unit.is_building() || !selection.unit.is_crafting())) {
+                return false;
+            }
             return true;
         }
         return false;
@@ -1574,6 +1577,7 @@ function DialogOpenPredicate(data) {
     this.page_name = data['dialog_page'] || null;
     this.chapter_name = data['dialog_chapter'] || null;
     this.category_name = data['dialog_category'] || null;
+    this.match_user_data = data['match_user_data'] || null;
 }
 goog.inherits(DialogOpenPredicate, Predicate);
 
@@ -1585,6 +1589,13 @@ DialogOpenPredicate.prototype.is_satisfied = function(player, qdata) {
                 if(this.page_name && d.user_data['page'] != this.page_name) { return false; }
                 if(this.chapter_name && d.user_data['chapter'] != this.chapter_name) { return false; }
                 if(this.category_name && d.user_data['category'] != this.category_name) { return false; }
+                if(this.match_user_data) {
+                    for(var k in this.match_user_data) {
+                        if(d.user_data[k] !== this.match_user_data[k]) {
+                            return false;
+                        }
+                    }
+                }
                 return true;
             } else {
                 if(d.children && d.children.length > 0) {
