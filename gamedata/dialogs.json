@@ -1295,7 +1295,7 @@
                     "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset":[0,-53] },
             "bg_highlight": { "kind": "SolidRect", "xy": [2,2], "dimensions": [116,89],
                               "color": [0,0,0,0], "bevel": 3,
-                              "outline_color": [0.6,0.6,0,1],
+                              "outline_color": [1,1,0,1],
                               "outline_color_active": [1,1,0,1],
                               "fade_unless_hover": 0.5,
                               "outline_width": 2 },
