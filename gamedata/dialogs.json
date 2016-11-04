@@ -9674,7 +9674,7 @@
     "loading_base_dialog": {
         "dimensions": [300,120],
         "widgets": {
-            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33] },
+            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33], "bevel": 3 },
             "loading_text": { "kind": "TextField", "xy": [8,-1], "dimensions": [300,60], "text_size": 16, "text_style": "bold", "text_color":[1,1,1,1],
                               "ui_name": "Loading Base...",
                               "ui_name_loading": "Loading Base...",
@@ -9687,7 +9687,7 @@
     "loading_ladder_base_dialog": {
         "dimensions": [300,120],
         "widgets": {
-            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33] },
+            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33], "bevel": 3 },
             "loading_text": { "kind": "TextField", "xy": [8,-1], "dimensions": [300,60], "text_size": 16, "text_style": "bold", "text_color":[1,1,1,1],
                               "ui_name": "Finding Rival..." },
             "loading_spinner": { "kind": "StaticImage", "xy":[65,22], "dimensions":[16,16], "asset":"loading_spinner" }
@@ -9697,7 +9697,7 @@
     "retreating_dialog": {
         "dimensions": [300,120],
         "widgets": {
-            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33] },
+            "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33], "bevel": 3 },
             "loading_text": { "kind": "TextField", "xy": [8,-1], "dimensions": [300,60], "text_size": 16, "text_style": "bold", "text_color":[1,1,1,1], "ui_name": "Retreating in %d...", "ui_name_now": "Retreating Now..." },
             "loading_spinner": { "kind": "StaticImage", "xy":[70,22], "dimensions":[16,16], "asset":"loading_spinner" }
         }
