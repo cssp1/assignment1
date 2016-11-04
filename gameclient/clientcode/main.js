@@ -50160,7 +50160,7 @@ function do_draw() {
         // update quest tips UI
         if(selection.ui_change_time > 0) {
             if(client_time - selection.ui_change_time >= ((player.quest_tracked ? player.quest_tracked['ui_quiet_time'] : null) || gamedata['client']['ui_quiet_time']) &&
-               !notification_queue.pending() &&
+               ((player.quest_tracked && player.quest_tracked['ui_quiet_time'] === 0) || !notification_queue.pending()) &&
                synchronizer.is_globally_in_sync()) {
                 selection.ui_change_time = -1;
                 player.quest_tracked_dirty = true;
@@ -50173,7 +50173,7 @@ function do_draw() {
             player.quest_landscape_arrow = null;
             if(player.quest_tracked && player.tutorial_state === "COMPLETE" &&
                (('tips' in player.quest_tracked) || player.quest_tracked['force_claim']) &&
-               !notification_queue.pending() &&
+               ((player.quest_tracked && player.quest_tracked['ui_quiet_time'] === 0) || !notification_queue.pending()) &&
                !session.is_replay() &&
                (session.home_base || player.quest_tracked['tips_in_enemy_base'])) {
 
