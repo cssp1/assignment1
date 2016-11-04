@@ -259,6 +259,8 @@ class HandleCheckIdle(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleRecordAltLogin(Handler):
+    need_user = False
+
     def __init__(self, *args, **kwargs):
         Handler.__init__(self, *args, **kwargs)
         self.other_id = int(self.args['other_id'])
@@ -299,6 +301,8 @@ class HandleRecordAltLogin(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleIgnoreAlt(Handler):
+    need_user = False
+
     def do_exec_online(self, session, retmsg):
         other_id = int(self.args['other_id'])
         if str(other_id) not in session.player.known_alt_accounts:
@@ -315,6 +319,8 @@ class HandleIgnoreAlt(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleUnignoreAlt(Handler):
+    need_user = False
+
     def do_exec_online(self, session, retmsg):
         other_id = int(self.args['other_id'])
         if str(other_id) in session.player.known_alt_accounts and \
