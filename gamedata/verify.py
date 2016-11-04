@@ -1845,7 +1845,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             if type(data) is dict:
                 qty = data['qty']
                 min_level = data.get('min_level', 1)
-                if min_level > len(gamedata['units'][name][GameDataUtil.MAX_LEVEL_FIELD['units']]):
+                if min_level < 999 and min_level > len(gamedata['units'][name][GameDataUtil.MAX_LEVEL_FIELD['units']]):
                     error |= 1; print '%s: GIVE_UNITS min_level is higher than max unit level' % reason
             else:
                 qty = data

@@ -8366,6 +8366,8 @@ def spawn_units(owner, base, units, temporary = False,
         else:
             level = min_level
 
+        level = min(level, spec.maxlevel) # don't exceed max level
+
         space = GameObjectSpec.get_leveled_quantity(spec.consumes_space, level)
 
         for i in range(qty):
