@@ -4350,6 +4350,19 @@ GameObject.prototype.run_behaviors = function(world) {
                     entry.obj.ai_aggressive = true;
                 }, this);
             }
+        } else if(behavior_name === 'team_flip') {
+            if(!('team_flip' in this.behavior_state)) {
+                this.behavior_state['team_flip'] = {'triggered': 0};
+            }
+            var state = this.behavior_state['team_flip'];
+            if(!state['triggered']) {
+                state['triggered'] = 1;
+                if(this.team === 'player') {
+                    this.team = 'enemy';
+                } else if(this.team === 'enemy') {
+                    this.team = 'player';
+                }
+            }
         }
     }, this);
 };
