@@ -22947,7 +22947,11 @@ class GAMEAPI(resource.Resource):
                 # reinforcement
                 session.open_attack_log(-1, -1,-1)
             else:
-                replay_token = session.open_attack_log(session.attack_finish_time, session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
+                if ai_data and not ai_data.get('enable_battle_log',True):
+                    # skip logging
+                    replay_token = session.open_attack_log(-1, -1, -1)
+                else:
+                    replay_token = session.open_attack_log(session.attack_finish_time, session.user.user_id, session.viewing_user.user_id, base_id = session.viewing_base.base_id if (session.viewing_base is not session.viewing_player.my_home) else None)
                 props_3820 =  {'attacker_user_id': session.user.user_id,
                                'attacker_level': session.player.resources.player_level,
                                'attacker_deployable_squads': session.deployable_squads.copy(),
