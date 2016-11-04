@@ -45781,7 +45781,7 @@ function handle_server_message(data) {
         var opprole = (battle_summary['attacker_id'] === session.user_id ? 'defender' : 'attacker');
 
         var battle_opponent_name = battle_summary[opprole+'_name'];
-        var battle_opponent_user_id = battle_summary[opprole+'_user_id'];
+        var battle_opponent_user_id = battle_summary[opprole+'_id'];
         var battle_opponent_level = battle_summary[opprole+'_level'];
 
         for(var res in battle_loot) { if(battle_loot[res]) { player.flash_res_time[res] = client_time; } }
