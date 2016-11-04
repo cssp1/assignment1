@@ -5420,7 +5420,11 @@ class Session(object):
             for cd in cd_list:
                 self.player.cooldown_trigger(cd, gamedata['server']['track_battle_streaks'], add_stack = 1)
 
-        replay_token = self.open_attack_log(self.attack_finish_time, self.incoming_attack_id if (self.incoming_attack_id > 0) else -1, self.user.user_id)
+        if self.incoming_attack_data and (not self.incoming_attack_data.get('enable_battle_log', True)):
+            replay_token = self.open_attack_log(-1, -1, -1)
+        else:
+            replay_token = self.open_attack_log(self.attack_finish_time, self.incoming_attack_id if (self.incoming_attack_id > 0) else -1, self.user.user_id)
+
         self.attack_event(self.user.user_id, '3850_ai_attack_start', {})
         if self.player.player_auras:
             censored_player_auras = self.player.player_auras_censored()
