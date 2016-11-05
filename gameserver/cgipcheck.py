@@ -605,7 +605,8 @@ def get_client_perf_series(nosql_client, name, source_key, qs, rescale = 1):
                                                                  {'$group':{'_id': { '$subtract' :['$time', {'$mod':['$time', 3600]}] },
                                                                             'average': {'$avg': '$rate'}}},
                                                                  {'$sort':{'_id':1}}
-                                                                 ])]}
+                                                                 ]) \
+                     if row['average'] is not None]}
 
 def get_server_latency(nosql_client):
     time_range = [time_now - 1*86400, time_now]
