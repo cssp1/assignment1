@@ -9560,7 +9560,7 @@
             "copied": { "kind": "ActionButton", "xy": [120,115], "dimensions": [475,18],
                         "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
                         "ui_name": "Click to copy link",
-                        "ui_name_after": "Link copied to clipboard"
+                        "ui_name_after": "Link copied to clipboard! Use Ctrl-V to paste elsewhere."
                       },
             "ok_button": { "kind": "ActionButton", "xy": [488,176], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
         }
