@@ -27846,6 +27846,14 @@ class GAMEAPI(resource.Resource):
                                         spellarg = copy.copy(spellarg)
                                     spellarg += extra_spellargs
 
+                                # XXX special case for GIVE_UNITS items with their own level - read min_level
+                                item_level = item.get('level', 1)
+                                if spellname == 'GIVE_UNITS' and 'max_level' in spec and isinstance(spellarg, dict):
+                                    spellarg = copy.deepcopy(spellarg)
+                                    for k, v in spellarg.iteritems():
+                                        if isinstance(v, dict) and v.get('min_level') == 'from_item':
+                                            v['min_level'] = item_level
+
                                 one_success = self.execute_spell(session, retmsg, spellname, spellarg, reason = 'item')
                             elif 'consequent' in use:
                                 # do abort here on exceptions
