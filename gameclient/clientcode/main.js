@@ -7807,6 +7807,19 @@ Friend.prototype.classify_ai_difficulty = function() {
     }
 };
 
+/** @param {!Friend} a
+    @param {!Friend} b
+    @return {number} */
+Friend.compare_by_player_level = function(a,b) {
+    if(a.get_player_level() > b.get_player_level()) {
+        return -1;
+    } else if(a.get_player_level() < b.get_player_level()) {
+        return 1;
+    } else {
+        return 0;
+    }
+};
+
 function get_alliance_logo_asset(logo) {
     if(logo) {
         var name = 'alicon_'+logo.toString();
@@ -11151,20 +11164,10 @@ function scroll_friend_bar(dialog, page) {
         }
     }
 
-    var compare_by_player_level = function (a,b) {
-        if(a.get_player_level() > b.get_player_level()) {
-            return -1;
-        } else if(a.get_player_level() < b.get_player_level()) {
-            return 1;
-        } else {
-            return 0;
-        }
-    };
-
     // sort high-level list by player level (HIGH TO LOW)
-    friend_list_hi.sort(compare_by_player_level);
+    friend_list_hi.sort(Friend.compare_by_player_level);
 
-    friend_list_lo.sort(compare_by_player_level);
+    friend_list_lo.sort(Friend.compare_by_player_level);
 
     /*
     // sort low-level list by login time (recent to old) XXX needs PlayerCache info
@@ -36002,16 +36005,8 @@ function map_dialog_change_page(dialog, chapter, page) {
             }
             return 0;
         };
-        var compare_by_player_level = function(a,b) {
-            if(a.get_player_level() < b.get_player_level()) {
-                return 1;
-            } else if(a.get_player_level() > b.get_player_level()) {
-                return -1;
-            } else {
-                return 0;
-            }
-        };
-        item_list.sort(goog.array.contains(['computers','hitlist'], chapter) ? compare_by_ai_level : compare_by_player_level);
+        item_list.sort(goog.array.contains(['computers','hitlist'], chapter) ?
+                       compare_by_ai_level : Friend.compare_by_player_level);
     }
 
 
