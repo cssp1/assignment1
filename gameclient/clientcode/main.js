@@ -34,7 +34,6 @@ goog.require('Congrats');
 goog.require('GameArt');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
-goog.require('LootTable');
 goog.require('Session');
 goog.require('SPUI');
 goog.require('SPText');

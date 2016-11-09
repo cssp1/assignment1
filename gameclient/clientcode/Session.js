@@ -14,6 +14,7 @@ goog.require('GameObjectCollection');
 goog.require('BattleReplay');
 goog.require('Region');
 goog.require('World');
+goog.require('LootTable');
 goog.require('goog.object');
 goog.require('goog.array');
 
