@@ -337,6 +337,7 @@
         "added_to_warehouse": "+Added to Warehouse",
         "adding_to_storage": "+Adding to Storage",
         "returned_to_warehouse": "Returned to Warehouse",
+        "gift_sent": "Gift Sent",
         "discarded": "Discarded",
         "refunded": "Sold",
         "activated": "Activated",
