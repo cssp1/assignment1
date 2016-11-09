@@ -9540,30 +9540,6 @@
         }
     },
 
-    "bh_invite_code_dialog": {
-        "dimensions": [636, 214],
-        "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,220], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,130], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
-
-            "close_button": { "kind": "ActionButton", "xy": [608,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [8,48], "dimensions": [620,18],
-                             "text_hjustify": "center", "text_size": 17,
-                             "ui_name": "↓ Here is your invite link ↓"
-                           },
-            "link": { "kind": "ActionButton", "xy": [8,86], "dimensions": [620,18],
-                      "text_hjustify": "center", "text_size": 17, "text_color": [1,1,0],
-                      "ui_name": "https://www.battlehouse.com/play/refitskier/?bh_invite=3184818234823"
-                    },
-            "copied": { "kind": "ActionButton", "xy": [0,119], "dimensions": [620,18],
-                        "text_hjustify": "center", "text_size": 15, "text_color": [0.8,0.8,0.8],
-                        "ui_name": "↑ Click to copy link ↑",
-                        "ui_name_after": "Link copied to clipboard! Use Ctrl-V to paste elsewhere."
-                      },
-            "ok_button": { "kind": "ActionButton", "xy": [488,175], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
-        }
-    },
-
     "map_bookmarks_dialog": {
         "dimensions": [512,396],
         "default_button": "close_button",
@@ -9698,6 +9674,127 @@
             "loading_rect": { "kind": "SolidRect", "xy": [0,0], "dimensions": [300,60], "color":[0,0,0,0.33], "bevel": 3 },
             "loading_text": { "kind": "TextField", "xy": [8,-1], "dimensions": [300,60], "text_size": 16, "text_style": "bold", "text_color":[1,1,1,1], "ui_name": "Retreating in %d...", "ui_name_now": "Retreating Now..." },
             "loading_spinner": { "kind": "StaticImage", "xy":[70,22], "dimensions":[16,16], "asset":"loading_spinner" }
+        }
+    },
+
+    "bh_invite_code_dialog": {
+        "dimensions": [636, 214],
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,220], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,130], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+
+            "close_button": { "kind": "ActionButton", "xy": [608,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+            "description": { "kind": "TextField", "xy": [8,48], "dimensions": [620,18],
+                             "text_hjustify": "center", "text_size": 17,
+                             "ui_name": "↓ Here is your invite link ↓"
+                           },
+            "link": { "kind": "ActionButton", "xy": [8,86], "dimensions": [620,18],
+                      "text_hjustify": "center", "text_size": 17, "text_color": [1,1,0],
+                      "ui_name": "https://www.battlehouse.com/play/refitskier/?bh_invite=3184818234823"
+                    },
+            "copied": { "kind": "ActionButton", "xy": [0,119], "dimensions": [620,18],
+                        "text_hjustify": "center", "text_size": 15, "text_color": [0.8,0.8,0.8],
+                        "ui_name": "↑ Click to copy link ↑",
+                        "ui_name_after": "Link copied to clipboard! Use Ctrl-V to paste elsewhere."
+                      },
+            "ok_button": { "kind": "ActionButton", "xy": [488,175], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
+        }
+    },
+
+    "bh_invite_dialog_invite_tab": {
+        "dimensions": [736,423],
+        "clip_children": 0,
+        "widgets": {
+            "sunken": {"kind": "StaticImage", "xy":[12,60], "dimensions":[711,350], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "topbar": { "kind": "SolidRect", "xy": [14,62], "dimensions":[707,33], "color": [0,0,0,0.25] },
+            "subtitle": { "kind": "TextField", "xy": [24,62], "dimensions": [706,33], "text_size": 13,
+                          "text_hjustify": "left", "text_color": [0.8,0.8,0.8],
+                          "ui_name": "Recruit friends to train with you in %game and earn exclusive rewards!"},
+
+            "instructions_label": { "kind": "TextField", "xy": [36,115], "dimensions": [460,33], "text_hjustify": "left", "text_style": "bold", "text_size": 15, "ui_name": "Instructions" },
+
+            "instructions": { "kind": "TextField", "xy": [36,155], "dimensions": [246,200], "text_hjustify": "left", "text_vjustify": "top", "text_size": 13, "text_color": [0.8,0.8,0.8],
+                              "ui_name": "Click \"Get Invite Link\" to see your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
+            "get_link_button": { "kind": "ActionButton", "xy": [60,294], "dimensions": [198,38],
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "ui_name": "Get Invite Link", "text_size": 15, "text_style": "bold"},
+
+            "next_sunken": {"kind": "StaticImage", "xy":[299,108], "dimensions":[214,248], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "next_label": { "kind": "TextField", "xy": [299,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Next: Trainee #%d" },
+            "next_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [321,157], "dimensions": [50,50],
+                           "array": [3,2], "array_offset":[60,70] },
+            "next_description": { "kind": "TextField", "xy": [317,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
+                              "ui_name": "Rewards you will earn when your next trainee reaches %req" },
+            "bonus_label": { "kind": "TextField", "xy": [510,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Trainee #%d Bonus" },
+            "bonus_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [528,157], "dimensions": [50,50],
+                             "array": [3,2], "array_offset":[60,70] },
+            "bonus_description": { "kind": "TextField", "xy": [528,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
+                              "ui_name": "Recruit %more more trainees for this powerful bonus!" }
+        }
+    },
+
+    "bh_invite_dialog_gifts_tab": {
+        "dimensions": [736,423],
+        "clip_children": 0,
+        "widgets": {
+            "sunken": {"kind": "StaticImage", "xy":[12,60], "dimensions":[711,350], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "topbar": { "kind": "SolidRect", "xy": [14,62], "dimensions":[707,33], "color": [0,0,0,0.25] },
+            "subtitle": { "kind": "TextField", "xy": [24,62], "dimensions": [706,33], "text_size": 13,
+                          "text_hjustify": "left", "text_color": [0.8,0.8,0.8],
+                          "ui_name": "Send your mentor and trainees a FREE gift item once per day. (%req required to receive gifts)"},
+            "your_trainees_label": { "kind": "TextField", "xy": [50,96], "dimensions": [460,33], "text_hjustify": "left", "text_style": "normal", "text_size": 15, "ui_name": "Your Trainees (%cur/%max Accepted, %complete/%max at %req)" },
+
+            "trainees_sunken": {"kind": "StaticImage", "xy":[50,128], "dimensions":[458,258], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "friend_icon": { "kind": "FriendIcon", "xy": [116,138], "dimensions": [50,73],
+                             "array": [3,2], "array_offset": [138,128] },
+            "friend_status": { "kind": "TextField", "xy": [77,211], "dimensions": [130,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "top", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1,
+                               "array": [3,2], "array_offset": [138,128] },
+            "send_gift_button": { "kind": "ActionButton", "xy": [94,218], "dimensions": [96,28],
+                                  "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                  "ui_name": "Send Gift", "text_size": 13, "text_style": "bold",
+                                  "array": [3,2], "array_offset": [138,128] },
+
+            "mentor_friend_icon": { "kind": "FriendIcon", "xy": [600,138], "dimensions": [50,73] },
+            "mentor_friend_status": { "kind": "TextField", "xy": [560,211], "dimensions": [130,17], "text_size": 13, "text_hjustify": "center", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1},
+            "mentor_send_gift_button": { "kind": "ActionButton", "xy": [577,232], "dimensions": [96,28],
+                                         "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                         "ui_name": "Send Gift", "text_size": 13, "text_style": "bold"},
+
+
+
+            "send_all_button": { "kind": "ActionButton", "xy": [559,339], "dimensions": [138,38],
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "ui_name": "Send All Gifts", "text_size": 13, "text_style": "bold"},
+
+            "scroll_left": { "kind": "ActionButton", "xy": [20,200], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left", "push_bg_image": 1},
+            "scroll_right": { "kind": "ActionButton", "xy": [518,200], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_right", "push_bg_image": 1},
+
+            "your_mentor_label": { "kind": "TextField", "xy": [520,96], "dimensions": [200,33], "text_hjustify": "center", "text_style": "bold", "text_size": 17, "ui_name": "Your Mentor" },
+
+            "scroll_text": { "kind": "TextField", "xy": [62,387], "dimensions": [181,17], "text_size": 13, "text_hjustify": "left", "ui_name": "Showing %d1-%d2 of %d3", "text_color": [0.4,0.4,0.4,1] }
+        }
+    },
+
+    "bh_invite_dialog": {
+        "dimensions": [736,423],
+        "clip_children": 0,
+        "widgets": {
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "title": { "kind": "TextField", "xy": [18,10], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "Mentorship Rewards" },
+
+            "invite_tab_button": { "kind": "ActionButton", "xy": [418,15],  "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                    "bg_image": "menu_button_136px", "ui_name": "Your Rewards" },
+            "gifts_tab_button": { "kind": "ActionButton", "xy": [556,15], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+                                  "bg_image": "menu_button_136px", "ui_name": "Daily Gifts" },
+
+            "gifts_tab": { "show": 0, "kind": "Dialog", "xy": [0,0], "dimensions": [736,423], "dialog": "bh_invite_dialog_gifts_tab" },
+            "invite_tab": { "kind": "Dialog", "xy": [0,0], "dimensions": [736,423], "dialog": "bh_invite_dialog_invite_tab" }
         }
     },
 

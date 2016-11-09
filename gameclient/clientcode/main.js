@@ -7769,6 +7769,7 @@ function Friend(user_id, is_real_friend, info, relationship) {
     this.is_ai_memo = (info['social_id'] == 'ai' || (info['facebook_id'] && (info['facebook_id'] === -1 || info['facebook_id'] === '-1')));
     this.ui_name_memo = PlayerCache._get_ui_name(info) || 'Unknown(Friend)';
     this.player_level_memo = info['player_level'] || 1;
+    this.townhall_level_memo = info[gamedata['townhall']+'_level'] || 1;
 }
 
 Friend.prototype.get_facebook_id = function() { return this.facebook_id_memo; };
@@ -7780,6 +7781,16 @@ Friend.prototype.is_giftable = function() {
 };
 Friend.prototype.is_mentor = function() { return this.relationship === 'mentor'; };
 Friend.prototype.is_trainee = function() { return this.relationship === 'trainee'; };
+Friend.prototype.is_bh_invite_complete = function() {
+    var complete_pred = gamedata['predicate_library']['bh_invite_complete'];
+    if(!complete_pred || complete_pred['predicate'] !== 'PLAYER_HISTORY' ||
+       complete_pred['key'] != gamedata['townhall']+'_level' ||
+       !complete_pred['ui_name']) {
+        throw Error('unhandled bh_invite_complete predicate');
+    }
+    return this.get_townhall_level() >= complete_pred['value'];
+};
+
 Friend.prototype.get_player_level = function() {
     if(this.is_ai_memo) { return this.player_level_memo; } // assume AI levels do not change
     var info = PlayerCache.query_sync_fetch(this.user_id);
@@ -7788,7 +7799,14 @@ Friend.prototype.get_player_level = function() {
     }
     return this.player_level_memo; // fallback
 };
-
+Friend.prototype.get_townhall_level = function() {
+    if(this.is_ai_memo) { return this.townhall_level_memo; } // assume AI levels do not change
+    var info = PlayerCache.query_sync_fetch(this.user_id);
+    if(info) {
+        return info[gamedata['townhall']+'_level'] || 1;
+    }
+    return this.townhall_level_memo; // fallback
+};
 Friend.prototype.classify_ai_difficulty = function() {
     var mode = player.get_any_abtest_value('map_dialog_ai_difficulty', gamedata['client']['map_dialog_ai_difficulty']);
     if(mode == 'tier') {
@@ -17194,7 +17212,7 @@ function invoke_invite_friends_dialog(reason) {
     } else if(spin_frame_platform == 'bh') {
         if(!spin_battlehouse_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
 
-        BHInvites.invoke_invite_code_dialog();
+        BHInvites.invoke_invite_friends_dialog();
 
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
@@ -17492,6 +17510,8 @@ function invoke_send_gifts(to_user, reason, info_list) {
         return null; // async!
     } else if(spin_frame_platform === 'ag') {
         return AGSendRequests.invoke_send_gifts_dialog(to_user, reason, info_list || null);
+    } else if(spin_frame_platform === 'bh') {
+        return BHInvites.invoke_send_gifts_dialog(reason);
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
     }
@@ -46806,6 +46826,8 @@ function handle_server_message(data) {
 
     } else if(msg == "SEND_GIFTS_BH_COMPLETE") {
         var id_list = data[1];
+        var dialog = find_dialog('bh_invite_dialog');
+        BHInvites.gifts_complete(dialog.widgets['gifts_tab'], id_list);
 
     } else if(msg == "SESSION_LOOT_UPDATE") {
         session.last_loot = session.loot;
