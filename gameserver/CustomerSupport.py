@@ -1490,11 +1490,21 @@ class HandleInvokeFacebookAuth(Handler): # no logging
         return ReturnValue(result = 'ok')
 
 class HandleRepopulateFriends(Handler): # no logging
+    need_user = False
+    need_player = False
     def exec_offline(self, user, player): return ReturnValue(result = 'ok') # no-op
     def exec_online(self, session, retmsg):
         if session.user.frame_platform == 'bh':
             session.user.retrieve_bh_friends(session)
             # this will call populate_friends_who_play() when finished
+        return ReturnValue(result = 'ok')
+
+class HandlePlayerCacheUpdate(Handler): # no logging
+    need_user = False
+    need_player = False
+    def exec_offline(self, user, player): return ReturnValue(result = 'ok') # no-op
+    def exec_online(self, session, retmsg):
+        session.send([["PLAYER_CACHE_UPDATE", SpinJSON.loads(self.args['props'])]])
         return ReturnValue(result = 'ok')
 
 class HandleSendNotification(Handler):
@@ -1801,6 +1811,7 @@ methods = {
     'kick_alliance_member': HandleKickAllianceMember,
     'reset_idle_check_state': HandleResetIdleCheckState,
     'repopulate_friends': HandleRepopulateFriends,
+    'player_cache_update': HandlePlayerCacheUpdate,
     'ai_attack': HandleAIAttack,
     'push_gamedata': HandlePushGamedata,
     'force_reload': HandleForceReload,

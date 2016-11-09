@@ -1984,6 +1984,13 @@ class User:
                                                           'user_id':sender_player_id,
                                                           'replacements':replacements,
                                                           'config':'bh_invite_completed_sender'})
+
+            # update sender's view of the "friend" so it shows as completed
+            # (this assumes that the player cache entry is sufficient to determine whether the invite is completed)
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'player_cache_update',
+                                                          'user_id':sender_player_id,
+                                                          'props': SpinJSON.dumps([gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)])
+                                                          })
             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
                                                           'send_ingame':1,'send_offline':0,'format':'bh', # note: no email on this one
                                                           'user_id':self.user_id,
@@ -23265,6 +23272,10 @@ class GAMEAPI(resource.Resource):
                         '%MY_REAL_NAME': session.user.get_real_name() }
 
         to_send = []
+
+        # note: check that the client supplies a valid player_id, but do not
+        # bother testing whether the recipient qualifies as "bh_invite_complete" -
+        # it's not a big deal if players send daily gifts to incomplete trainees.
 
         # to my mentor
         if session.user.bh_mentor_player_id_cache and \
