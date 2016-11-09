@@ -6621,9 +6621,19 @@ player.squad_bumping_enabled = function() { return player.get_territory_setting(
 
 player.unit_speedups_enabled = function() { return player.is_cheater || !('enable_unit_speedups' in gamedata) || gamedata['enable_unit_speedups']; };
 player.crafting_speedups_enabled = function() { return player.is_cheater || !('enable_crafting_speedups' in gamedata) || gamedata['enable_crafting_speedups']; };
-player.resource_gifts_enabled = function() { return (player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']) &&
-                                                     (spin_frame_platform == 'fb' ||
-                                                      spin_frame_platform == 'ag')); };
+player.resource_gifts_enabled = function() {
+    var pred_or_literal = player.get_any_abtest_value('enable_resource_gifts', gamedata['enable_resource_gifts']);
+    var pred_ok;
+    if(typeof(pred_or_literal) === 'object') {
+        pred_ok = read_predicate(pred_or_literal).is_satisfied(player, null);
+    } else {
+        pred_ok = !!pred_or_literal;
+    }
+    return (pred_ok &&
+            (spin_frame_platform == 'fb' ||
+             spin_frame_platform == 'ag' ||
+             (spin_frame_platform == 'bh' && friend_invites_enabled())));
+};
 player.upgrade_bar_enabled = function() { return player.get_any_abtest_value('enable_upgrade_bar', gamedata['client']['enable_upgrade_bar']) &&
                                           read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null); };
 
