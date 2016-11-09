@@ -782,17 +782,29 @@ SPUI.instantiate_widget = function(wdata) {
 // return suffixed name for array widgets, like "button0,1"
 /** @param {string} array_name
  *  @param {Array.<number>} array_dims
- *  @param {Array.<number>} xy
+ *  @param {number|!Array<number>} xy
  */
 SPUI.get_array_widget_name = function(array_name, array_dims, xy) {
+    var x, y;
+    if(typeof(xy) === 'number') { // handle 1D arrays
+        if(array_dims[0] > 1 && array_dims[1] > 1) {
+            throw Error('2D array but given 1D coords');
+        } else if(array_dims[1] > 1) {
+            x = 0; y = xy;
+        } else {
+            y = 0; x = xy;
+        }
+    } else {
+        x = xy[0]; y = xy[1];
+    }
     if(array_dims[0] > 1 && array_dims[1] > 1) {
-        return array_name+xy[0].toString()+','+xy[1].toString();
+        return array_name+x.toString()+','+y.toString();
     } else if(array_dims[0] > 1) {
-        if(xy[1] != 0) { throw Error('array '+array_name+' element out of bounds'); }
-        return array_name+xy[0].toString();
+        if(y != 0) { throw Error('array '+array_name+' element out of bounds'); }
+        return array_name+x.toString();
     } else if(array_dims[1] > 1) {
-        if(xy[0] != 0) { throw Error('array '+array_name+' element out of bounds'); }
-        return array_name+xy[1].toString();
+        if(x != 0) { throw Error('array '+array_name+' element out of bounds'); }
+        return array_name+y.toString();
     } else {
         return array_name;
     }
