@@ -22929,6 +22929,33 @@ function scrollable_dialog_change_page(dialog, page) {
     dialog.widgets['scroll_right'].onclick = (function (_dialog) { return function() { scrollable_dialog_change_page(_dialog, _dialog.user_data['page']+1); }; })(dialog);
 }
 
+/** Find the 'row' coordinates, as passed to rowfunc, of the visible elements for this rowdata element.
+    If not visible, returns null
+    @param {!SPUI.Dialog} dialog
+    @param {*} rowdata
+    @return {null|number|!Array<number>} */
+function scrollable_dialog_find_row(dialog, rowdata) {
+    var index = dialog.user_data['rowdata'].indexOf(rowdata);
+    if(index < 0) { return null; }
+    var rows_per_page = dialog.user_data['rows_per_page'];
+    var cols_per_page = dialog.user_data['cols_per_page'] || 1;
+    var items_per_page = rows_per_page * cols_per_page;
+    var page_num = Math.floor(index / items_per_page);
+    if(page_num !== dialog.user_data['page']) { return null; }
+
+    var roworder = dialog.user_data['roworder'] || 'top_bottom_left_right';
+    var page_index = index - page_num * items_per_page;
+    var row, col;
+    if(roworder === 'left_right_top_bottom') {
+        row = Math.floor(page_index / cols_per_page);
+        col = page_index % cols_per_page;
+    } else {
+        col = Math.floor(page_index / rows_per_page);
+        row = page_index % rows_per_page;
+    }
+    return (cols_per_page == 1 ? row : [col,row]);
+}
+
 function invoke_mail_dialog(do_animation) {
     if(!player.get_any_abtest_value('enable_inventory', gamedata['enable_inventory'])) { return null; }
     var dialog = new SPUI.Dialog(gamedata['dialogs']['mail_dialog']);
