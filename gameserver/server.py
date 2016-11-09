@@ -23317,6 +23317,10 @@ class GAMEAPI(resource.Resource):
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
+        if session.user.frame_platform == 'bh':
+            session.send([["ERROR", "SERVER_PROTOCOL"]])
+            return None
+
         if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
             return
 
