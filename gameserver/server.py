@@ -19469,6 +19469,7 @@ class GAMEAPI(resource.Resource):
                 'trophies_pvp': player.ladder_points(),
                 'trophies_pvv': player.trophies_pvv()
                 }
+        ret[gamedata['townhall']+'_level'] = player.get_townhall_level()
         if user.facebook_id: ret['facebook_id'] = user.facebook_id
         if user.ag_id: ret['ag_id'] = user.ag_id
         if user.kg_id: ret['kg_id'] = user.kg_id
@@ -19485,7 +19486,8 @@ class GAMEAPI(resource.Resource):
         # only allow retrieval of a few user-visible fields
         manual_fields = (fields is not None)
         if fields is None:
-            fields = ['user_id', 'player_level', 'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
+            fields = ['user_id', 'player_level', gamedata['townhall']+'_level',
+                      'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
                       'facebook_id', 'kg_id', 'ag_id', 'bh_id', 'mm_id',
