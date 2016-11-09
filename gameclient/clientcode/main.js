@@ -17212,7 +17212,7 @@ function invoke_invite_friends_dialog(reason) {
     } else if(spin_frame_platform == 'bh') {
         if(!spin_battlehouse_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
 
-        BHInvites.invoke_invite_friends_dialog();
+        BHInvites.invoke_invite_friends_dialog(reason);
 
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
