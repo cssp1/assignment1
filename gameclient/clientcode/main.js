@@ -46788,7 +46788,7 @@ function handle_server_message(data) {
         gift_received(sender_user_id, sender_info, loot);
 
     } else if(msg == "SEND_GIFTS_BH_COMPLETE") {
-        var num_sent = data[1];
+        var id_list = data[1];
 
     } else if(msg == "SESSION_LOOT_UPDATE") {
         session.last_loot = session.loot;

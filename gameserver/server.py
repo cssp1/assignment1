@@ -23247,7 +23247,7 @@ class GAMEAPI(resource.Resource):
         gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
         return True
 
-    def do_send_gifts_bh(self, session, arg):
+    def do_send_gifts_bh(self, session, client_id_list):
         if session.user.frame_platform != 'bh':
             session.send([["ERROR", "SERVER_PROTOCOL"]])
             return None
@@ -23259,6 +23259,7 @@ class GAMEAPI(resource.Resource):
 
         # to my mentor
         if session.user.bh_mentor_player_id_cache and \
+           (session.user.bh_mentor_player_id_cache in client_id_list) and \
            (not session.player.cooldown_active('send_gift:%d' % session.user.bh_mentor_player_id_cache)):
             to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_mentor_gift_mail'],
                                                            duration = gamedata['gift_interval'],
@@ -23273,7 +23274,8 @@ class GAMEAPI(resource.Resource):
 
         # to my trainees
         if session.user.bh_trainee_player_ids_cache:
-            recipient_ids = filter(lambda id: not session.player.cooldown_active('send_gift:'+str(id)), session.user.bh_trainee_player_ids_cache)
+            recipient_ids = filter(lambda id: id in session.user.bh_trainee_player_ids_cache, client_id_list)
+            recipient_ids = filter(lambda id: not session.player.cooldown_active('send_gift:'+str(id)), recipient_ids)
             if recipient_ids:
                 to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_trainee_gift_mail'],
                                                                duration = gamedata['gift_interval'],
@@ -23304,7 +23306,7 @@ class GAMEAPI(resource.Resource):
                                 'recipients': all_recipient_ids
                                 })
 
-        session.send([["SEND_GIFTS_BH_COMPLETE", len(all_recipient_ids)]])
+        session.send([["SEND_GIFTS_BH_COMPLETE", all_recipient_ids]])
         return None
 
     def do_send_gifts(self, session, retmsg, arg):
@@ -26926,7 +26928,7 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "SEND_GIFTS2":
             self.do_send_gifts(session, retmsg, arg)
         elif arg[0] == "SEND_GIFTS_BH":
-            return self.do_send_gifts_bh(session, arg)
+            return self.do_send_gifts_bh(session, arg[1])
 
         elif arg[0] == "LEVEL_ME_UP":
             self.do_level_up(session, retmsg, arg)
