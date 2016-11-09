@@ -7752,10 +7752,16 @@ function home_base_id(user_id) { return 'h' + user_id.toString(); }
 // NOTE: "Friend" represents AIs, True Facebook Friends, and "Rivals" (strangers the server gives you to attack)
 // to differentiate, use is_ai() and is_real_friend
 
-/** @constructor @struct */
-function Friend(user_id, is_real_friend, info) {
+/** @constructor @struct
+    @param {number} user_id
+    @param {boolean} is_real_friend
+    @param {!Object<string,?>} info
+    @param {string|null} relationship (null, 'mentor', or 'trainee')
+ */
+function Friend(user_id, is_real_friend, info, relationship) {
     this.user_id = user_id;
     this.is_real_friend = !!is_real_friend;
+    this.relationship = relationship;
 
     // store some PlayerCache properties to preserve them even across a clear()
     if(!info) { throw Error('no pcache_data for '+this.user_id.toString()); }
@@ -7773,6 +7779,8 @@ Friend.prototype.get_ui_name = function() { return this.ui_name_memo; };
 Friend.prototype.is_giftable = function() {
     return !this.is_ai() && player.resource_gifts_enabled() && !player.cooldown_active('send_gift:'+this.user_id.toString());
 };
+Friend.prototype.is_mentor = function() { return this.relationship === 'mentor'; };
+Friend.prototype.is_trainee = function() { return this.relationship === 'trainee'; };
 Friend.prototype.get_player_level = function() {
     if(this.is_ai_memo) { return this.player_level_memo; } // assume AI levels do not change
     var info = PlayerCache.query_sync_fetch(this.user_id);
@@ -35961,7 +35969,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                 if(('show_if' in ai_base) && !read_predicate(ai_base['show_if']).is_satisfied(player, null)) { return; }
                 // create a fake Friend entry for the AI
                 var info = {'social_id': 'ai', 'ui_name': ai_base['ui_name'], 'player_level': ai_base['resources']['player_level']};
-                item_list.push(new Friend(parseInt(sid,10), false, info));
+                item_list.push(new Friend(parseInt(sid,10), false, info, null));
             });
         } else {
             // first filter the list of friends down to those who should appear on this page
@@ -47076,8 +47084,9 @@ function handle_server_message(data) {
         var user_id = data[1];
         var is_real_friend = data[2]
         var pcache_data = data[3];
+        var relationship = data[4];
         if(pcache_data) { PlayerCache.update_batch(pcache_data); }
-        var friend = new Friend(user_id, is_real_friend, pcache_data[0]);
+        var friend = new Friend(user_id, is_real_friend, pcache_data[0], relationship);
         player.friends.push(friend);
         if(session.home_base) {
             if(desktop_dialogs['desktop_bottom'] && desktop_dialogs['desktop_bottom'].widgets['friend_bar']) {

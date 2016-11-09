@@ -1707,9 +1707,16 @@ class User:
 
             self.client_social_friends.add(friend_id)
 
+            relationship = None
+            if friend_id == self.bh_mentor_player_id_cache:
+                relationship = 'mentor'
+            elif self.bh_trainee_player_ids_cache and (friend_id in self.bh_trainee_player_ids_cache):
+                relationship = 'trainee'
+
             session.send([["ADD_FRIEND", friend_id,
                            True, # is a real Facebook friend (not a stranger)
-                           [friend_props]
+                           [friend_props],
+                           relationship
                            ]])
 
         if not session.player.history.has_key('initial_friends_in_game'):
