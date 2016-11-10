@@ -100,6 +100,12 @@ BHInvites.do_invoke_invite_dialog = function(tabname, reason) {
         BHInvites.invite_dialog_change_tab(w.parent, 'gifts');
     };
 
+    dialog.widgets['gifts_tab'].user_data['n_giftable'] = 0
+    dialog.widgets['gifts_jewel'].ondraw = function(w) {
+        w.user_data['count'] = w.parent.widgets['gifts_tab'].user_data['n_giftable'];
+        update_notification_jewel(w);
+    };
+
     /** @type {!Array<!Friend>} */
     var trainee_list = [];
     /** @type {Friend|null} */
@@ -109,12 +115,12 @@ BHInvites.do_invoke_invite_dialog = function(tabname, reason) {
         if(friend.is_mentor()) {
             mentor = friend;
             if(friend.is_giftable()) {
-                dialog.user_data['n_giftable'] += 1;
+                dialog.widgets['gifts_tab'].user_data['n_giftable'] += 1;
             }
         } else if(friend.is_trainee()) {
             trainee_list.push(friend);
             if(friend.is_giftable()) {
-                dialog.user_data['n_giftable'] += 1;
+                dialog.widgets['gifts_tab'].user_data['n_giftable'] += 1;
             }
         }
     });
@@ -171,8 +177,6 @@ BHInvites.init_gifts_tab = function(dialog, mentor, trainee_list) {
     dialog.widgets['subtitle'].str = dialog.data['widgets']['subtitle']['ui_name']
         .replace('%req', dialog.parent.user_data['ui_complete_pred']);
 
-    dialog.user_data['n_giftable'] = 0;
-
     var max_trainee_num = BHInvites.get_max_trainee_num();
     dialog.widgets['your_trainees_label'].str = dialog.data['widgets']['your_trainees_label']['ui_name']
         .replace('%cur', trainee_list.length.toString())
@@ -190,6 +194,7 @@ BHInvites.init_gifts_tab = function(dialog, mentor, trainee_list) {
         if(is_complete) {
             dialog.widgets['mentor_send_gift_button'].state = mentor.is_giftable() ? 'normal' : 'disabled';
             dialog.widgets['mentor_send_gift_button'].onclick = (function (_mentor) { return function(w) {
+                GameArt.play_canned_sound('harvest_sound');
                 send_to_server.func(["SEND_GIFTS_BH", [_mentor.user_id]]);
                 var dialog = w.parent;
                 BHInvites.send_gift_effects(dialog, _mentor.user_id);
@@ -219,6 +224,7 @@ BHInvites.init_gifts_tab = function(dialog, mentor, trainee_list) {
                 id_list.push(friend.user_id);
             }
         });
+        GameArt.play_canned_sound('harvest_sound');
         send_to_server.func(["SEND_GIFTS_BH", id_list]);
         goog.array.forEach(id_list, function(id) { BHInvites.send_gift_effects(dialog, id); });
     };
@@ -242,6 +248,7 @@ BHInvites.trainee_rowfunc = function(dialog, row_coord, rowdata) {
             dialog.widgets['send_gift_button'+row].state = rowdata.is_giftable() ? 'normal' : 'disabled';
             dialog.widgets['friend_icon'+row].onclick =
                 dialog.widgets['send_gift_button'+row].onclick = (function (_friend) { return function(w) {
+                    GameArt.play_canned_sound('harvest_sound');
                     send_to_server.func(["SEND_GIFTS_BH", [_friend.user_id]]);
                     BHInvites.send_gift_effects(w.parent, _friend.user_id);
                 }; })(rowdata);
