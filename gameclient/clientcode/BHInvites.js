@@ -34,6 +34,7 @@ BHInvites.do_invoke_invite_code_dialog = function(code, url) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['bh_invite_code_dialog']);
     dialog.user_data['dialog'] = 'bh_invite_code_dialog';
     dialog.user_data['url'] = url;
+    dialog.user_data['metric_sent'] = false;
     dialog.widgets['close_button'].onclick =
         dialog.widgets['ok_button'].onclick = close_parent_dialog;
 
@@ -45,22 +46,31 @@ BHInvites.do_invoke_invite_code_dialog = function(code, url) {
             var dialog = w.parent;
             SPUI.copy_text_to_clipboard(dialog.user_data['url']);
             dialog.widgets['copied'].str = dialog.data['widgets']['copied']['ui_name_after'];
+            if(!dialog.user_data['metric_sent']) {
+                dialog.user_data['metric_sent'] = true;
+                metric_event('7102_invite_friends_ingame_bh_link_copied', {'sum': player.get_denormalized_summary_props('brief')});
+            }
         };
 
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
-    metric_event('7101_invite_friends_ingame_prompt', {'sum': player.get_denormalized_summary_props('brief')});
-
     return dialog;
 };
 
 
 BHInvites.invoke_invite_friends_dialog = function(reason) {
+    metric_event('7101_invite_friends_ingame_prompt', {'method': reason,
+                                                       'sum': player.get_denormalized_summary_props('brief')});
+
     return BHInvites.do_invoke_invite_dialog('invite', reason);
 };
+
 BHInvites.invoke_send_gifts_dialog = function(reason) {
+    metric_event('4101_send_gifts_ingame_prompt', {'api':'bh', 'api_version': 1,
+                                                   'method': reason,
+                                                   'sum': player.get_denormalized_summary_props('brief')});
     return BHInvites.do_invoke_invite_dialog('gifts', reason);
 };
 

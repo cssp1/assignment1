@@ -393,6 +393,7 @@ def FBRequestsLogFilter(child):
 
                                   '7101_invite_friends_ingame_prompt',
                                   '7102_invite_friends_ingame_fb_prompt',
+                                  '7102_invite_friends_ingame_bh_link_copied',
                                   '7103_invite_friends_fb_prompt',
                                   '7104_invite_friends_fb_success',
                                   '7105_invite_friends_fb_fail',
