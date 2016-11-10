@@ -5415,7 +5415,7 @@
             "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
             "ok_button": { "kind": "ActionButton", "xy": [257,278], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite friends" }
+                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends", "ui_name_bh": "More Info" }
         }
     },
 
@@ -5608,13 +5608,18 @@
 
 
             "title": { "kind": "TextField", "xy": [178,35], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
-                       "text_hjustify": "left", "ui_name": "Send Mystery Gifts to Friends" },
+                       "text_hjustify": "left", "ui_name": "Send Mystery Gifts to Friends",
+                       "ui_name_bh": "Daily Gifts"
+                     },
             "description": { "kind": "TextField", "xy": [178,69], "dimensions": [277, 25], "text_size": 13, "text_style": "normal",
-                             "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Each gift contains resources your friends can use." },
+                             "text_hjustify": "left", "text_vjustify": "top",
+                             "ui_name": "Each gift contains resources your friends can use.",
+                             "ui_name_bh": "Commander, it's time to reward your mentor and trainees with bonus items!"
+                           },
             "close_button": { "kind": "ActionButton", "xy": [463,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
             "send_button": { "kind": "ActionButton", "xy": [214,240], "dimensions": [206,40], "text_size": 13, "text_style": "bold",
-                             "bg_image": "action_button_206px", "ui_name": "Send Gifts to Friends" }
+                             "bg_image": "action_button_206px", "ui_name": "Send Free Gifts Now" }
         }
     },
 

@@ -44,6 +44,11 @@
             // {"predicate": "FRAME_PLATFORM", "platform":"kg"} // note: requires whitelisting to call kongregate.services.showInvitationBox()
         ]},
 
+        // on bh.com, don't show close button on daily invite/gift prompts
+        "invite_prompt_closeable": {"predicate": "NOT", "subpredicates": [
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
+        ]},
+
         // true if friend bar should be shown at bottom of screen
         "friend_bar_enabled": {"predicate": "OR", "subpredicates" :[
             {"predicate": "FRAME_PLATFORM", "platform":"fb"}

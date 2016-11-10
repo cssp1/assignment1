@@ -17490,10 +17490,22 @@ function invoke_gift_prompt_dialog() {
 
         dialog.widgets['close_button'].onclick = close_parent_dialog;
 
+        if(!read_predicate(gamedata['client']['invite_prompt_closeable']).is_satisfied(player)) {
+            dialog.widgets['close_button'].show = 0;
+        }
+
         dialog.widgets['send_button'].onclick = (function (_info_list) { return function(w) {
             change_selection(null);
             invoke_send_gifts(null, 'gift_prompt_dialog', _info_list);
         }; })(ret);
+
+        // customize text per platform
+        goog.array.forEach(['title','description'], function(wname) {
+            var widget = dialog.widgets[wname];
+            if('ui_name_'+spin_frame_platform in widget.data) {
+                widget.set_text_with_linebreaking(widget.data['ui_name_'+spin_frame_platform]);
+            }
+        });
     });
 };
 
@@ -19124,7 +19136,12 @@ function setup_invite_friends_prompt(dialog, reason) {
 
     var descr = '';
     if(num_friends < 1) {
-        descr += tut_data['ui_description_has_no_friends'];
+        // customize text per platform
+        if('ui_description_has_no_friends_'+spin_frame_platform in tut_data) {
+            descr += tut_data['ui_description_has_no_friends_'+spin_frame_platform];
+        } else {
+            descr += tut_data['ui_description_has_no_friends'];
+        }
     } else if(num_friends < 2) {
         descr += tut_data['ui_description_has_one_friend'].replace('%s', friend_name);
     } else if(num_friends < 3) {
@@ -19134,6 +19151,7 @@ function setup_invite_friends_prompt(dialog, reason) {
     }
 
     dialog.widgets['description'].str += descr;
+    dialog.widgets['description'].set_text_with_linebreaking(dialog.widgets['description'].str);
 
     // fill in friend widgets
     var row = 0;
@@ -19145,6 +19163,9 @@ function setup_invite_friends_prompt(dialog, reason) {
         row++;
     }
 
+    if('ui_name_'+spin_frame_platform in dialog.widgets['ok_button'].data) {
+        dialog.widgets['ok_button'].str = dialog.widgets['ok_button'].data['ui_name_'+spin_frame_platform];
+    }
     dialog.widgets['ok_button'].onclick = function(w) {
         var reason = w.parent.user_data['invite_friends_reason'];
         change_selection(null);
@@ -19171,8 +19192,13 @@ function invoke_invite_friends_prompt() {
 
     setup_invite_friends_prompt(dialog, 'invite_friends_prompt');
 
-    dialog.widgets['close_button'].show = true;
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
+    if(!read_predicate(gamedata['client']['invite_prompt_closeable']).is_satisfied(player)) {
+        dialog.widgets['close_button'].show = 0;
+    } else {
+        dialog.widgets['close_button'].show = 1;
+    }
+
     return dialog;
 }
 
