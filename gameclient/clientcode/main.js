@@ -11273,7 +11273,7 @@ function scroll_friend_bar(dialog, page) {
             dialog.xy = vec_add(w.get_absolute_xy(), [-50, -161]);
             dialog.widgets['spy_button'].onclick = function(w) { visit_base(w.parent.user_data['user_id']); };
 
-            dialog.widgets['gift_button'].show = (!!fbid && player.resource_gifts_enabled());
+            dialog.widgets['gift_button'].show = player.resource_gifts_enabled();
             if(dialog.widgets['gift_button'].show) {
                 if(dialog.user_data['is_giftable']) {
                     dialog.widgets['gift_button'].state = 'normal';
