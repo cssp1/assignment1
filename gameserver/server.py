@@ -1906,7 +1906,17 @@ class User:
 
         if 'error' in response:
             # error - local notification only
-            session.send([["NOTIFICATION", {"format":"bh", "ui_body": response['error']}]], flush_now = True)
+            notify_client = True
+
+            if response.get('error_code') == 'AlreadyLinkedError':
+                # don't show "already linked" error repeatedly
+                if session.player.cooldown_active('bh_invite_already_linked_error_displayed'):
+                    notify_client = False
+                else:
+                    session.player.cooldown_trigger('bh_invite_already_linked_error_displayed', 3*86400)
+
+            if notify_client:
+                session.send([["NOTIFICATION", {"format":"bh", "ui_body": response['error']}]], flush_now = True)
 
         elif 'result' in response:
             # success
