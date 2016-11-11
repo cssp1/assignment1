@@ -1578,6 +1578,7 @@ if __name__ == '__main__':
                         # generate the base file using the prep script
                         args = ['$GAME_ID/$GAME_ID_prep_ai_base.py'.replace('$GAME_ID', game_id),
                                 editable_base_file.replace('$GAME_ID', game_id),
+                                '--enhancements=%s' % SpinConfig.gamedata_component_filename('enhancements_compiled.json', override_game_id = game_id),
                                 '--tier=%d' % (data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base']),
                                 '--ui-name=%s %s L%d' % (data['event_name'], diff, i+1),
                                 base_file_path]
