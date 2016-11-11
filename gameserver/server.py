@@ -8364,21 +8364,25 @@ def spawn_units(owner, base, units, temporary = False,
     for name, data in units.iteritems():
         if (name not in gamedata['units']): continue
 
+        spec = observer.get_abtest_spec(GameObjectSpec, name)
+
         if xyloc:
             x, y = xyloc
         else:
             x, y = get_spawn_location_for_unit(name, base)
 
+        force_level = None
         if type(data) is int:
             qty = data
             min_level = 1
         else:
             qty = data.get('qty',1)
             min_level = data.get('min_level',1)
+            force_level = data.get('force_level',None)
 
-        spec = observer.get_abtest_spec(GameObjectSpec, name)
-
-        if spec.level_determined_by_tech:
+        if force_level is not None:
+            level = force_level
+        elif spec.level_determined_by_tech:
             # if player doesn't have prerequisite tech, still give the unit at level 1
             level = max(owner.tech.get(spec.level_determined_by_tech, 1), min_level)
         else:
