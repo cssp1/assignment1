@@ -609,7 +609,7 @@ class SendMessageConsequent(Consequent):
             raise Exception('unknown "to" %r' % self.data['to'])
 
         replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
-                        '%MY_REAL_NAME': session.user.get_real_name() }
+                        '%MY_UI_AND_REAL_NAME': session.user.get_ui_and_real_name(session.player)}
         msg = player.make_system_mail(self.data['mail_template'], to_user_id = recipient_user_id, replacements = replacements)
         session.msg_send([msg])
 

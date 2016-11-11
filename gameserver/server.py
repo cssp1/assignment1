@@ -1402,6 +1402,15 @@ class User:
         if player.alias: return player.get_titled_alias()
         return self.get_real_name()
 
+    # return the name that should be shown in out-of-game notifications
+    def get_ui_and_real_name(self, player):
+        ui_name = self.get_ui_name(player)
+        real_name = self.get_real_name()
+        if ui_name == real_name:
+            return ui_name
+        else:
+            return ui_name + ' (' + real_name + ')'
+
     def get_ui_name_searchable(self, player):
         # get the name that should be referenced for case-insensitive searches (that want to use a case-sensitive index)
         if player.alias:
@@ -1925,10 +1934,15 @@ class User:
                                                                  reason = 'accept_bh_invite')[0]
 
             # local+offline notification to sender and target
+            if 'real_name' in sender_info:
+                sender_ui_and_real_name = sender_info['ui_name'] + ' (' + sender_info['real_name'] + ')'
+            else:
+                sender_ui_and_real_name = sender_info['ui_name']
             replacements = SpinJSON.dumps({'%SENDER_UI_NAME': sender_info['ui_name'],
-                                           '%SENDER_REAL_NAME': sender_info.get('real_name', sender_info['ui_name']),
+                                           '%SENDER_UI_AND_REAL_NAME': sender_ui_and_real_name,
                                            '%TARGET_UI_NAME': self.get_ui_name(session.player),
-                                           '%TARGET_REAL_NAME': self.get_real_name()})
+                                           '%TARGET_UI_AND_REAL_NAME': self.get_ui_and_real_name(session.player)})
+
             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
                                                           'send_ingame':1,'send_offline':1,'format':'bh',
                                                           'user_id':sender_player_id,
@@ -1975,10 +1989,14 @@ class User:
                                                                  reason = 'complete_bh_invite')[0]
 
             # local+offline notification to sender and target
+            if 'real_name' in sender_info:
+                sender_ui_and_real_name = sender_info['ui_name'] + ' (' + sender_info['real_name'] + ')'
+            else:
+                sender_ui_and_real_name = sender_info['ui_name']
             replacements = SpinJSON.dumps({'%SENDER_UI_NAME': sender_info['ui_name'],
-                                           '%SENDER_REAL_NAME': sender_info.get('real_name', sender_info['ui_name']),
+                                           '%SENDER_UI_AND_REAL_NAME': sender_ui_and_real_name,
                                            '%TARGET_UI_NAME': self.get_ui_name(session.player),
-                                           '%TARGET_REAL_NAME': self.get_real_name()})
+                                           '%TARGET_UI_AND_REAL_NAME': self.get_ui_and_real_name(session.player)})
             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
                                                           'send_ingame':1,'send_offline':1,'format':'bh',
                                                           'user_id':sender_player_id,
@@ -23285,7 +23303,7 @@ class GAMEAPI(resource.Resource):
             return None
 
         replacements = {'%MY_UI_NAME': session.user.get_ui_name(session.player),
-                        '%MY_REAL_NAME': session.user.get_real_name() }
+                        '%MY_UI_AND_REAL_NAME': session.user.get_ui_and_real_name(session.player)}
 
         to_send = []
 
