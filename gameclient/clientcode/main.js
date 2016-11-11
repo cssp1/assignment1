@@ -13129,7 +13129,9 @@ function update_desktop_dialogs() {
 
         if(gifts_waiting && !selection.ui) {
             // show bigass "click-me" arrow
-            if(!dialog.user_data['you_have_gift_arrow'] && tutorial_root.children.length==0) {
+            if(!dialog.user_data['you_have_gift_arrow'] &&
+               tutorial_root.children.length==0 &&
+               player.quest_root.children.length==0) {
                 dialog.user_data['you_have_gift_arrow'] = make_tutorial_arrow_for_button('desktop_bottom', 'missions_button', 'down');
             }
         } else {
