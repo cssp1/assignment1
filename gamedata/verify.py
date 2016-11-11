@@ -1351,8 +1351,13 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
         error |= 1; print '%s: stat %s is missing from gamedata.strings.modstats.stats' % (reason, effect['stat'])
 
     if effect['stat'] == 'on_destroy' and ('strength' in effect):
-        for entry in effect['strength']:
-            error |= check_consequent(entry, reason = '%s:strength' % reason)
+        if isinstance(effect['strength'][0], list):
+            per_level_list = effect['strength']
+        else:
+            per_level_list = [effect['strength']]
+        for entry in per_level_list:
+            for element in entry:
+                error |= check_consequent(element, reason = '%s:strength' % reason)
 
     if effect['stat'] == 'weapon':
         if effect['strength'] not in gamedata['spells']:

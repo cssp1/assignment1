@@ -11405,6 +11405,17 @@ class Player(AbstractPlayer):
                                                 aura_level = level # same level as item
                                             player.do_apply_aura(effect['aura_name'], strength = strength, duration = -1, level = aura_level,
                                                                  stack = effect.get('stack',-1), data = effect.get('data',None), ignore_limit = True)
+                        # apply local building enhancements
+                        if obj.enhancements:
+                            for enh_name, enh_level in obj.enhancements.iteritems():
+                                if enh_name not in gamedata['enhancements']: continue
+                                enh_spec = observer.get_abtest_spec(EnhancementSpec, enh_name)
+                                if enh_spec.effects:
+                                    for i, effect in enumerate(enh_spec.effects):
+                                        if effect['code'] == 'modstat':
+                                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                                strength = self.get_modstat_strength(effect, enh_level)
+                                                self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'enhancement', enh_name, {'effect':i, 'level':enh_level})
 
             # calculate effect of techs
             for tech_name, level in player.tech.iteritems():
