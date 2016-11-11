@@ -7361,13 +7361,13 @@ class Building(MapBlockingGameObject):
     def minefield_item(self): # note: returns spec name
         item = Equipment.equip_get(self.equipment, ('mine',0))
         if item: return item['spec']
-        if this.config and this.config['mine'] and len(this.config['mine']) > 0:
-            if isinstance(this.config['mine'], basestring):
-                return this.config['mine']
-            elif isinstance(this.config['mine'][0], basestring):
-                return this.config['mine'][0]
+        if self.config and self.config['mine'] and len(self.config['mine']) > 0:
+            if isinstance(self.config['mine'], basestring):
+                return self.config['mine']
+            elif isinstance(self.config['mine'][0], basestring):
+                return self.config['mine'][0]
             else:
-                return this.config['mine'][0]['spec']
+                return self.config['mine'][0]['spec']
         return None
     def is_emplacement(self):
         return self.spec.equip_slots and ('turret_head' in self.spec.equip_slots)
