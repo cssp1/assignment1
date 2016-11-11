@@ -1824,27 +1824,30 @@ class User:
         if (None not in (self.bh_username,)) and \
            ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
             # use cached data
-            return
+            return defer.succeed(True)
 
         if SpinConfig.config.get('enable_battlehouse',0):
-            self.retrieve_bh_info_start(session)
+            return self.retrieve_bh_info_start(session)
         else:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({"user_id":"4d0075c6-e9d9-4b01-b7d0-4cffa7a1e17c", "ui_name": "Dan Maas", "email": "asdf@example.com", "email_verified": True, "creation_time": 1472072770})
-            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_bh_info_complete(_session, None, test_response)) # delay to expose timing bugs
+            d = make_deferred('retrieve_bh_info')
+            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_bh_info_complete(_session, None, d, test_response)) # delay to expose timing bugs
+            return d
 
     def retrieve_bh_info_start(self, session):
         assert self.bh_auth_token
+        d = make_deferred('retrieve_bh_info')
         gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
                                                      SpinConfig.config['battlehouse_api_path']+('/user/%s' % self.bh_id) + '?service=' + SpinConfig.game(),
-                                                     lambda result, _session=session: self.retrieve_bh_info_complete(_session, None, result),
+                                                     lambda result, _session=session, _d=d: self.retrieve_bh_info_complete(_session, None, _d, result),
                                                      headers = {'Authorization': 'Bearer '+self.bh_auth_token,
                                                                 'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
         session.portrait_update_launched(portrait_d)
 
-    def retrieve_bh_info_complete(self, session, retmsg, result):
+    def retrieve_bh_info_complete(self, session, retmsg, d, result):
         data = SpinJSON.loads(result)
         assert data['user_id'] == self.bh_id
 
@@ -1860,6 +1863,7 @@ class User:
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+        d.callback(True)
 
     @inlineCallbacks
     def retrieve_bh_friends(self, session):
@@ -25482,7 +25486,7 @@ class GAMEAPI(resource.Resource):
         elif session.user.frame_platform == 'ag':
             user.retrieve_ag_info(session, retmsg)
         elif session.user.frame_platform == 'bh':
-            user.retrieve_bh_info(session, retmsg)
+            bh_deferred = user.retrieve_bh_info(session, retmsg)
 
             # record BH notification hits
             if ('bh_source' in url_qs) and (url_qs['bh_source'][0] == 'notification') and \
@@ -25498,8 +25502,12 @@ class GAMEAPI(resource.Resource):
                     del player.history['notification:'+ref+':unacked']
 
             if ('bh_invite' in url_qs):
-                user.accept_bh_invite(session, url_qs['bh_invite'][-1], not is_returning_user)
+                # delay this until the first info query finishes, so that bh_username is valid
+                bh_deferred.addCallback(lambda result, _session=session, _url_qs=url_qs, _is_returning_user=is_returning_user: \
+                                        _session.user.accept_bh_invite(_session, _url_qs['bh_invite'][-1],
+                                                                       not _is_returning_user))
 
+            # this can proceed asynchronously
             user.retrieve_bh_friends(session)
 
         elif session.user.frame_platform == 'mm':
