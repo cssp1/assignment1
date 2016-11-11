@@ -193,6 +193,9 @@ BHInvites.init_gifts_tab = function(dialog, mentor, trainee_list) {
         dialog.widgets['mentor_friend_status'].show = !is_complete;
         if(is_complete) {
             dialog.widgets['mentor_send_gift_button'].state = mentor.is_giftable() ? 'normal' : 'disabled';
+            var togo = player.cooldown_togo('send_gift:'+mentor.user_id.toString());
+            dialog.widgets['mentor_send_gift_button'].tooltip.str = (togo > 0 ? dialog.data['widgets']['mentor_send_gift_button']['ui_tooltip'].replace('%s', pretty_print_time_brief(togo)) : null);
+
             dialog.widgets['mentor_send_gift_button'].onclick = (function (_mentor) { return function(w) {
                 GameArt.play_canned_sound('harvest_sound');
                 send_to_server.func(["SEND_GIFTS_BH", [_mentor.user_id]]);
@@ -246,6 +249,9 @@ BHInvites.trainee_rowfunc = function(dialog, row_coord, rowdata) {
         dialog.widgets['friend_status'+row].show = !is_complete;
         if(is_complete) {
             dialog.widgets['send_gift_button'+row].state = rowdata.is_giftable() ? 'normal' : 'disabled';
+            var togo = player.cooldown_togo('send_gift:'+rowdata.user_id.toString());
+            dialog.widgets['send_gift_button'+row].tooltip.str = (togo > 0 ? dialog.data['widgets']['send_gift_button']['ui_tooltip'].replace('%s', pretty_print_time_brief(togo)) : null);
+
             dialog.widgets['friend_icon'+row].onclick =
                 dialog.widgets['send_gift_button'+row].onclick = (function (_friend) { return function(w) {
                     GameArt.play_canned_sound('harvest_sound');
