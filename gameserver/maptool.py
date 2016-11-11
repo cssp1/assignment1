@@ -145,7 +145,7 @@ def nosql_write_all_objects(region_id, base_id, owner_id, objlist):
                  'spec': obj['spec']}
 
         if obj.get('level',1) != 1: props['level'] = obj['level']
-        for FIELD in ('xy','stack','orders','patrol','equipment','produce_start_time','produce_rate','contents',
+        for FIELD in ('xy','stack','orders','patrol','equipment','enhancements','produce_start_time','produce_rate','contents',
                       'pack_id','behaviors'):
             if FIELD in obj: props[FIELD] = obj[FIELD]
 
@@ -166,7 +166,7 @@ def nosql_read_all_objects(region_id, base_id, base_landlord_id):
                   }
         for FIELD in ('level', 'hp_ratio', 'tag', 'metadata', 'creation_time', 'repair_finish_time', 'disarmed',
                       'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time', 'squad_id',
-                      'orders','patrol','equipment','produce_start_time','produce_rate','contents',
+                      'orders','patrol','equipment','enhancements','produce_start_time','produce_rate','contents',
                       'pack_id','behaviors'):
             if FIELD in state:
                 props[FIELD] = state[FIELD]
@@ -274,7 +274,7 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
                 dst['orders'].append(order)
         if 'patrol' in src: dst['patrol'] = src['patrol']
         if 'equipment' in src: dst['equipment'] = copy.deepcopy(src['equipment'])
-
+        if 'enhancements' in src: dst['enhancements'] = copy.deepcopy(src['enhancements'])
         if 'production_capacity' in spec:
             dst['produce_start_time'] = 1
             dst['produce_rate'] = 999999
@@ -668,8 +668,8 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
                'xy': transform(xform, p['xy']) }
         if 'force_level' in p: obj['level'] = p['force_level']
         elif p.get('level',1)!=1: obj['level'] = p['level']
-        if 'equipment' in p:
-            obj['equipment'] = copy.deepcopy(p['equipment'])
+        if 'equipment' in p: obj['equipment'] = copy.deepcopy(p['equipment'])
+        if 'enhancements' in p: obj['enhancements'] = copy.deepcopy(p['enhancements'])
         spec = gamedata['buildings'][obj['spec']]
         if 'production_capacity' in spec:
             obj['contents'] = get_leveled_quantity(spec['production_capacity'], obj.get('level',1))

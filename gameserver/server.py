@@ -14363,6 +14363,7 @@ def setup_ai_base(strid, cb):
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
             if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
+            if 'enhancements' in p: obj.enhancements = copy.deepcopy(p['enhancements'])
             if 'behaviors' in p: obj.behaviors = copy.deepcopy(p['behaviors'])
             if 'hp_ratio' in p: obj.hp = int(obj.hp * p['hp_ratio'])
 
@@ -28680,6 +28681,7 @@ class GAMEAPI(resource.Resource):
                                                                 level = data.get('force_level', data.get('level',1)))
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
                             if 'equipment' in data: obj.equipment = data['equipment']
+                            if 'enhancements' in data: obj.enhancements = data['enhancements']
                             if 'behaviors' in data: obj.behaviors = data['behaviors']
                             session.player.home_base_add(obj)
                         for data in base.get('units',[]):
@@ -28743,6 +28745,7 @@ class GAMEAPI(resource.Resource):
                                 props = {'spec':spec, 'xy': [obj.x,obj.y],
                                          'force_level': obj.level }
                                 if obj.equipment: props['equipment'] = obj.equipment
+                                if obj.enhancements: props['enhancements'] = obj.enhancements
                                 if obj.behaviors: props['behaviors'] = obj.behaviors
                                 out['buildings'].append(props)
                             elif obj.is_mobile():
