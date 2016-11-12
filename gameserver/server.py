@@ -1846,6 +1846,7 @@ class User:
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
         session.portrait_update_launched(portrait_d)
+        return d
 
     def retrieve_bh_info_complete(self, session, retmsg, d, result):
         data = SpinJSON.loads(result)
