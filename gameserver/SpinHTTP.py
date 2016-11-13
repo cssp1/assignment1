@@ -202,7 +202,7 @@ def complete_deferred_request_safe(body, request, http_status = None, full_trace
         request.setHeader('Content-Type', 'text/plain')
         request.setResponseCode(INTERNAL_SERVER_ERROR)
         if full_traceback: # dangerous - includes sensitive info in public error message
-            body = 'error: %s\n%s' % (repr(body), body.getTraceback())
+            body = '{"error": "%s"}\n' % (repr(repr(body) + '\n' + body.getTraceback())[1:-1]) # convert enclosing ' to "
         else:
-            body = 'error: %s' % repr(body)
+            body = '{"error": "%s"}\n' % repr(body)
     complete_deferred_request(body, request, http_status = http_status)
