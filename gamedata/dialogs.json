@@ -9755,7 +9755,8 @@
 
             "friend_icon": { "kind": "FriendIcon", "xy": [116,138], "dimensions": [50,73],
                              "array": [3,2], "array_offset": [138,128] },
-            "friend_status": { "kind": "TextField", "xy": [77,211], "dimensions": [130,17], "text_size": 13, "text_hjustify": "center", "text_vjustify": "top", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1,
+            "friend_status": { "kind": "TextField", "xy": [77,211], "dimensions": [130,17], "text_size": 12, "text_leading": 14,
+                               "text_hjustify": "center", "text_vjustify": "top", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1,
                                "array": [3,2], "array_offset": [138,128] },
             "send_gift_button": { "kind": "ActionButton", "xy": [94,218], "dimensions": [96,28],
                                   "bg_image": "action_button_resizable", "bg_image_resizable": 1,
@@ -9764,7 +9765,8 @@
                                   "array": [3,2], "array_offset": [138,128] },
 
             "mentor_friend_icon": { "kind": "FriendIcon", "xy": [600,138], "dimensions": [50,73] },
-            "mentor_friend_status": { "kind": "TextField", "xy": [560,211], "dimensions": [130,17], "text_size": 13, "text_hjustify": "center", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1},
+            "mentor_friend_status": { "kind": "TextField", "xy": [560,211], "dimensions": [130,17], "text_size": 12, "text_leading": 14,
+                                      "text_hjustify": "center", "ui_name": "Incomplete:\n%s Required", "text_color": [1,0,0], "drop_shadow": 1},
             "mentor_send_gift_button": { "kind": "ActionButton", "xy": [577,232], "dimensions": [96,28],
                                          "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                          "ui_name": "Send Gift", "text_size": 13, "text_style": "bold",
