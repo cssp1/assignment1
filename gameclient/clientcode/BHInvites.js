@@ -357,5 +357,6 @@ BHInvites.get_nth_trainee_rewards = function(n) {
                            }
                            return read_predicate(pred).is_satisfied(player, null);
                        }).item_list;
+    ret = collapse_item_list(ret);
     return ret;
 };
