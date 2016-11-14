@@ -23387,7 +23387,11 @@ class GAMEAPI(resource.Resource):
             session.send([["ERROR", "SERVER_PROTOCOL"]])
             return None
 
-        if not session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False)):
+        pred_or_literal = session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False))
+        if (not pred_or_literal) or \
+           (isinstance(pred_or_literal, dict) and \
+            (not Predicates.read_predicate(pred_or_literal).is_satisfied(session.player, None))):
+            session.send([["ERROR", "SERVER_PROTOCOL"]])
             return
 
         request_id = arg[1]
