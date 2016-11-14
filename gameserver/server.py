@@ -1856,7 +1856,11 @@ class User:
 
         self.bh_username = data['ui_name']
         if 'birthday' in data: pass # no birthday data
-        self.bh_hit_time = server_time
+        last_hit_time, self.bh_hit_time = self.bh_hit_time, server_time
+
+        if last_hit_time < 0:
+            # on very first hit, force player cache update to publish ui_name
+            session.player.send_player_cache_update(session, 'change_alias')
 
         if retmsg is None:
             if self.active_session:
