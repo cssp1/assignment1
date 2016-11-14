@@ -41,11 +41,7 @@
         // true if app is able to to send out social platform friend invitations
         "friend_invites_enabled": {"predicate": "OR", "subpredicates": [
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "AND", "subpredicates": [
-                // bh.com: enable for BFM while invite feature is in development
-                {"predicate": "FRAME_PLATFORM", "platform":"bh"},
-                {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"}
-            ]}
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
         ]},
 
         // on bh.com, don't show close button on daily invite/gift prompts
@@ -56,11 +52,7 @@
         // true if friend bar should be shown at bottom of screen
         "friend_bar_enabled": {"predicate": "OR", "subpredicates" :[
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},
-            {"predicate": "AND", "subpredicates": [
-                // bh.com: enable for BFM while invite feature is in development
-                {"predicate": "FRAME_PLATFORM", "platform":"bh"},
-                {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"}
-            ]}
+            {"predicate": "FRAME_PLATFORM", "platform":"bh"}
         ]},
 
         "startup_div_fade_time": 0.5, // when using "div" spin_loading_screen_mode, fade away the startup div over this many seconds
