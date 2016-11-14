@@ -88,7 +88,7 @@ def item_is_giveable(gamedata, spec):
                 return True
     return False
 
-def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint, nosql_client):
+def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_hint_cookie_name, my_endpoint, nosql_client):
     log_bookmark = nosql_client.log_bookmark_get(spin_token_data['spin_user'], 'ALL')
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
     gamedata['ai_bases_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_server.json"))
@@ -100,6 +100,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, my_endpoint,
         '$SPIN_TOKEN$': spin_token_raw,
         '$SPIN_TOKEN_DATA$': SpinJSON.dumps(spin_token_data),
         '$SPIN_TOKEN_COOKIE_NAME$': spin_token_cookie_name,
+        '$SPIN_LOGIN_HINT_COOKIE_NAME$': spin_login_hint_cookie_name,
         '$SPIN_TOKEN_DOMAIN$': SpinConfig.config['spin_token_domain'],
         '$GOOGLE_ACCESS_TOKEN$': spin_token_data['google_access_token'],
         '$GOOGLE_TRANSLATE_ENABLED$': 'true' if SpinConfig.config.get('google_translate_api_key') else 'false',
@@ -661,6 +662,7 @@ if __name__ == "__main__":
         if auth_info['ok']:
             print do_gui(auth_info['spin_token'], auth_info['raw_token'],
                          SpinGoogleAuth.spin_token_cookie_name(),
+                         SpinGoogleAuth.spin_login_hint_cookie_name(),
                          SpinGoogleAuth.cgi_get_my_endpoint(),
                          nosql_client)
         elif 'redirect' in auth_info:

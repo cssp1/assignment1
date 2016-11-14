@@ -9,7 +9,8 @@ import urllib, urllib2, urlparse, traceback
 
 # Generic Google code
 
-def google_auth_prompt_redirect(client_id, redirect_uri, scope = 'email', csrf_state = None, final_url = None):
+def google_auth_prompt_redirect(client_id, redirect_uri, scope = 'email',
+                                csrf_state = None, final_url = None, login_hint = None):
     assert csrf_state
     assert final_url
     csrf_state += '|'+urllib.quote(final_url)
@@ -19,6 +20,8 @@ def google_auth_prompt_redirect(client_id, redirect_uri, scope = 'email', csrf_s
               'scope':'email',
               'state':csrf_state,
               'approval_prompt':'auto'}
+    if login_hint:
+        params['login_hint'] = login_hint
     url = 'https://accounts.google.com/o/oauth2/v2/auth?'+urllib.urlencode(params)
     return '<html><body onload="location.href = \'%s\';"></body></html>' % url
 
@@ -138,6 +141,8 @@ def do_auth(raw_token, realm, realm_secret, role, time_now, my_endpoint):
 
 def spin_token_cookie_name():
     return 'spin_'+spin_token_realm()+'_token'
+def spin_login_hint_cookie_name():
+    return 'spin_'+spin_token_realm()+'_login_hint'
 
 # convenience functions for CGI scripts run from proxyserver (pcheck, analytics)
 # these trust SPIN_IS_SSL and REMOTE_ADDR, which are checked via proxyserver.

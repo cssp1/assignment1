@@ -7,6 +7,7 @@
 # CGI script that handles the Google login process
 
 import cgi, cgitb
+import Cookie
 import sys, os, time, datetime, functools
 import urlparse
 import pymongo # 3.0+ OK
@@ -61,9 +62,27 @@ if __name__ == "__main__":
             print 'can only give auth for URLs within %s' % MY_DOMAIN
             sys.exit(0)
 
+        # get login hint, if available
+        cookie_string = os.getenv('HTTP_COOKIE')
+        C = Cookie.SimpleCookie()
+        if cookie_string:
+            C.load(cookie_string)
+        if SpinGoogleAuth.spin_login_hint_cookie_name() in C:
+            login_hint = str(C[SpinGoogleAuth.spin_login_hint_cookie_name()].value)
+
+            # and clear it after one use, in case there's an error
+            print 'Set-Cookie: %s=%s;domain=.%s;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT;' % \
+                  (SpinGoogleAuth.spin_login_hint_cookie_name(), '', MY_DOMAIN)
+
+        else:
+            login_hint = None
+
         print
         print SpinGoogleAuth.google_auth_prompt_redirect(SpinConfig.config['google_client_id'],
-                                                         my_endpoint, csrf_state = gen_csrf_state(tbl, remote_addr), final_url = final_url)
+                                                         my_endpoint,
+                                                         csrf_state = gen_csrf_state(tbl, remote_addr),
+                                                         final_url = final_url,
+                                                         login_hint = login_hint)
         sys.exit(0)
 
     else:
@@ -81,8 +100,9 @@ if __name__ == "__main__":
             print result['error']
             sys.exit(0)
 
+        google_profile = SpinGoogleAuth.get_google_user_info(result['access_token'])
         auth = SpinGoogleAuth.auth_spinpunch_user(result['access_token'], result['expires_in'],
-                                                  SpinGoogleAuth.get_google_user_info(result['access_token']),
+                                                  google_profile,
                                                   SpinConfig.config['realm_users'],
                                                   SpinConfig.config['spin_token_realm'],
                                                   SpinConfig.config['spin_token_secret'],
@@ -94,8 +114,14 @@ if __name__ == "__main__":
             cookie_name = SpinGoogleAuth.spin_token_cookie_name()
             cookie_expires = SpinHTTP.format_http_time(auth['expires_at'])
             print 'Set-Cookie: %s=%s;domain=.%s;path=/;expires=%s;' % (cookie_name, spin_token, MY_DOMAIN, cookie_expires)
+
+            # set memo of the google account email to short-cut future login attempts
+            print 'Set-Cookie: %s=%s;domain=.%s;path=/;expires=%s;' % \
+                  (SpinGoogleAuth.spin_login_hint_cookie_name(), google_profile['email'],
+                   MY_DOMAIN, SpinHTTP.format_http_time(auth['expires_at'] + 30*86400))
+
             print
-            print '<html><body onload="location.href = \'%s\';">Authenticated! Loading %s...</body></html>' % (final_url, final_url)
+            print '<html><body onload="location.href = \'%s\';">Authenticated %s! Loading %s...</body></html>' % (final_url, google_profile['email'], final_url)
             sys.exit(0)
         else:
             print

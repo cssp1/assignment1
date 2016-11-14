@@ -41,6 +41,7 @@ table, th, td { border: 1px solid #808080; border-collapse: collapse; padding: 0
 var spin_token = '$SPIN_TOKEN$'; var spin_token_data = $SPIN_TOKEN_DATA$;
 var spin_url = '$SPIN_URL$'; var spin_game_id = '$SPIN_GAME_ID$';
 var spin_token_cookie_name = '$SPIN_TOKEN_COOKIE_NAME$';
+var spin_login_hint_cookie_name = '$SPIN_LOGIN_HINT_COOKIE_NAME$';
 var spin_token_domain = '$SPIN_TOKEN_DOMAIN$';
 var spin_giveable_items = $SPIN_GIVEABLE_ITEMS$;
 var spin_regions = $SPIN_REGIONS$;
@@ -53,6 +54,7 @@ var spin_wss_available = $SPIN_WSS_AVAILABLE$;
 
 var delete_cookie = function() {
     document.cookie = spin_token_cookie_name+'=;path=/;domain=.'+spin_token_domain+';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = spin_login_hint_cookie_name+'=;path=/;domain=.'+spin_token_domain+';expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 }
 
 var gui_locked = false;
