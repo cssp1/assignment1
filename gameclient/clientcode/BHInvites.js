@@ -357,6 +357,21 @@ BHInvites.get_nth_trainee_rewards = function(n) {
                            }
                            return read_predicate(pred).is_satisfied(player, null);
                        }).item_list;
+
+    // move gamebucks to the front so that collapse will find them
+    ret.sort(function(a,b) {
+        if(a['spec'] === 'gamebucks' && b['spec'] !== 'gamebucks') {
+            return -1;
+        } else if(a['spec'] !== 'gamebucks' && b['spec'] === 'gamebucks') {
+            return 1;
+        } else if(a['spec'] < b['spec']) {
+            return -1;
+        } else if(a['spec'] > b['spec']) {
+            return 1;
+        } else {
+            return 0;
+        }
+    });
     ret = collapse_item_list(ret);
     return ret;
 };
