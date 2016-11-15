@@ -2575,6 +2575,11 @@ class GameProxy(proxy.ReverseProxyResource):
                 return str('1')
 
         elif self.path == '/METRICSAPI':
+            if not ('event' in request.args and \
+                    'props' in request.args):
+                request.setResponseCode(http.BAD_REQUEST)
+                return str('invalid parameters')
+
             SpinHTTP.set_access_control_headers(request)
             request.setHeader('Content-Type', 'image/gif')
             request.setHeader('Pragma','no-cache, no-store')
