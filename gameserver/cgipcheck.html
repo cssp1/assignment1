@@ -1138,7 +1138,9 @@ var refresh_server_status_row = function(row, item) {
                 s = val.toFixed(0);
                 var has_regions = Object.keys(spin_regions).length > 0;
                 var warn_if_over = (has_regions ? 100 : 300);
-                if(('game_http_port' in item) && val >= warn_if_over) {
+                var has_stuck_sessions = (item['stuck_sessions']||0) > 0;
+                if(item['type'] !== 'proxyserver' &&
+                   (val >= warn_if_over || has_stuck_sessions)) {
                     s = '<font color="#ff0000">'+s+'</font>';
                 }
             } else if(field['type'] == 'server_name') {

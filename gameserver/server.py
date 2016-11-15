@@ -626,6 +626,7 @@ class AdminStats:
                 'machine_stats': MachineStats.get_stats(filesystems = machine_stats_filesystems),
                 'active_sessions': self.get_active_sessions(),
                 'paying_sessions': sum((1 for session in iter_sessions() if session.player.history.get('money_spent',0)>=10.0),0),
+                'stuck_sessions': sum((1 for session in iter_sessions() if server_time - session.last_active_time >= 2*gamedata['server']['session_timeout']),0),
                 'active_protocol_clients': len(gamesite.active_clients),
                 'active_protocol_requests': len(gamesite.active_requests),
                 }
