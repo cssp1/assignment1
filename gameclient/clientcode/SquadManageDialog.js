@@ -507,7 +507,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             unit_icon_set(dialog.widgets[wname], obj['spec'],
                           ('stack' in obj ? obj['stack'] : 1),
                           // for stacks, create a fake object that has the right spec and level for display
-                          ('stack_list' in obj ? {'spec': obj['spec'], 'level': obj['level']} : obj),
+                          ('stack_list' in obj ? {'spec': obj['spec'], 'level': (obj['level']||1)} : obj),
                           onclick, icon_state,
                           (obj['in_manuf_queue'] ? gamedata['strings']['squads']['in_manuf_queue'] : null),
                           enable_dripper);
