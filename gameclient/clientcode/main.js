@@ -29979,7 +29979,7 @@ function find_friend_by_user_id(uid) {
 /** @param {SPUI.Dialog} dialog
     @param {string|null} specname
     @param {number=} qty, -1 if irrelevant
-    @param {string|null=} obj
+    @param {Object<string,?>|null=} obj
     @param {function(SPUI.DialogWidget)|null=} onclick
     @param {string|null=} frame_state_override
     @param {string|null=} tooltip_override
@@ -30097,6 +30097,10 @@ function compare_specnames(a,b) {
 function army_unit_compare(a,b) {
     var cmp = compare_specnames(a['spec'], b['spec']);
     if(cmp != 0) { return cmp; }
+    var alevel = a['level']||1, blevel = b['level']||1;
+    // use level to break ties
+    if(alevel < blevel) { return 1; }
+    if(alevel > blevel) { return -1; }
     // use current health ratio to break ties
     var acurmax = army_unit_hp(a), aratio = acurmax[0]/Math.max(acurmax[1],1);
     var bcurmax = army_unit_hp(b), bratio = bcurmax[0]/Math.max(bcurmax[1],1);

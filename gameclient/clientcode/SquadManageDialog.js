@@ -150,8 +150,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     // scan for units
 
     // mapping of specname -> quantity in reserves
-    var reserve_units_by_type = {};
-    var reserve_pending_by_type = {};
+    var reserve_units_by_type_and_level = {};
+    var reserve_pending_by_type_and_level = {};
 
     // list of army units in this squad
     var squad_units = [];
@@ -167,15 +167,18 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
     goog.object.forEach(player.my_army, function(obj, obj_id) {
         var obj_squad_id = obj['squad_id'] || 0;
+        var obj_level = obj['level'] || 1;
+        var obj_key = obj['spec']+':'+obj_level.toString();
+
         if(obj_squad_id === SQUAD_IDS.RESERVES) {
-            reserve_units_by_type[obj['spec']] = (reserve_units_by_type[obj['spec']]||0) + 1;
-            if(obj['pending']) { reserve_pending_by_type[obj['spec']] = true; }
+            reserve_units_by_type_and_level[obj_key] = (reserve_units_by_type_and_level[obj_key]||0) + 1;
+            if(obj['pending']) { reserve_pending_by_type_and_level[obj_key] = true; }
         } else if(obj_squad_id === dialog.user_data['squad_id']) {
             squad_units.push(obj);
-            cur_squad_space += get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space']||0, obj['level']||1);
+            cur_squad_space += get_leveled_quantity(gamedata['units'][obj['spec']]['consumes_space']||0, obj_level);
             var curmax = army_unit_hp(obj);
             cur_hp += curmax[0]; max_hp += curmax[1];
-            var speed = get_leveled_quantity(gamedata['units'][obj['spec']]['maxvel']||0, obj['level']||1);
+            var speed = get_leveled_quantity(gamedata['units'][obj['spec']]['maxvel']||0, obj_level);
             if(travel_speed < 0) {
                 travel_speed = speed;
             } else {
@@ -202,8 +205,23 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
     dialog.widgets['includes_manufacturing'].show = (dialog.user_data['squad_id'] === SQUAD_IDS.BASE_DEFENDERS) && (!player.squads_enabled() || !gamedata['produce_to_reserves']);
 
-    var reserve_types_to_show = goog.object.getKeys(reserve_units_by_type);
-    reserve_types_to_show.sort(compare_specnames);
+    var reserve_types_and_levels_to_show = goog.object.getKeys(reserve_units_by_type_and_level);
+    reserve_types_and_levels_to_show.sort(function(a, b) {
+        var a_fields = a.split(':'), b_fields = b.split(':');
+        var a_specname = a_fields[0], b_specname = b_fields[0];
+        if(a_specname !== b_specname) {
+            return compare_specnames(a_specname, b_specname);
+        } else {
+            var a_level = parseInt(a_fields[1],10), b_level = parseInt(b_fields[1],10);
+            if(a_level < b_level) {
+                return 1;
+            } else if(a_level > b_level) {
+                return -1;
+            } else {
+                return 0;
+            }
+        }
+    });
     squad_units.sort(army_unit_compare);
 
     // show manufacture-queued units in base defenders, after all other units
@@ -221,7 +239,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     // stack squad units together as much as possible
     var stacked_squad_units = SquadManageDialog.stack_squad_units(squad_units);
 
-    var reserve_columns = dialog.user_data['reserve_columns'] = (reserve_types_to_show.length < dialog.data['widgets']['reserve_unit']['array_max'][0]*dialog.data['widgets']['reserve_unit']['array_max'][1] ? dialog.data['widgets']['reserve_unit']['array_max'][0] : Math.ceil((reserve_types_to_show.length+1)/dialog.data['widgets']['reserve_unit']['array_max'][1]));
+    var reserve_columns = dialog.user_data['reserve_columns'] = (reserve_types_and_levels_to_show.length < dialog.data['widgets']['reserve_unit']['array_max'][0]*dialog.data['widgets']['reserve_unit']['array_max'][1] ? dialog.data['widgets']['reserve_unit']['array_max'][0] : Math.ceil((reserve_types_and_levels_to_show.length+1)/dialog.data['widgets']['reserve_unit']['array_max'][1]));
     var squad_columns = dialog.user_data['squad_columns'] = (stacked_squad_units.length < dialog.data['widgets']['squad_unit']['array_max'][0]*dialog.data['widgets']['squad_unit']['array_max'][1] ? dialog.data['widgets']['squad_unit']['array_max'][0] : Math.ceil((stacked_squad_units.length+1)/dialog.data['widgets']['squad_unit']['array_max'][1]));
 
     dialog.user_data['reserve_scroll_limits'] = [0, Math.max(0, reserve_columns-dialog.data['widgets']['reserve_unit']['array_max'][0]) * dialog.data['widgets']['reserve_unit']['array_offset'][0]];
@@ -264,14 +282,14 @@ SquadManageDialog.update_squad_manage = function(dialog) {
         dialog.widgets['deployed_unit_icon'].rotating = squad_is_moving;
     }
 
-    dialog.widgets['reserve_none_label'].show = !squad_is_deployed && (reserve_types_to_show.length < 1);
+    dialog.widgets['reserve_none_label'].show = !squad_is_deployed && (reserve_types_and_levels_to_show.length < 1);
     if(dialog.widgets['reserve_none_label'].show) {
         dialog.widgets['reserve_none_label'].str = dialog.data['widgets']['reserve_none_label']['ui_name'+(squad_units.length >= 1 ? '' : '_squad_empty')];
     }
 
     dialog.widgets['squad_none_label'].show = !squad_is_deployed && (squad_units.length < 1);
     if(dialog.widgets['squad_none_label'].show) {
-        dialog.widgets['squad_none_label'].str = dialog.data['widgets']['squad_none_label']['ui_name'+(reserve_types_to_show.length >= 1 ? '' : '_reserves_empty')];
+        dialog.widgets['squad_none_label'].str = dialog.data['widgets']['squad_none_label']['ui_name'+(reserve_types_and_levels_to_show.length >= 1 ? '' : '_reserves_empty')];
     }
 
     dialog.widgets['squad_loading_spinner'].show = false;
@@ -280,13 +298,16 @@ SquadManageDialog.update_squad_manage = function(dialog) {
     dialog.widgets['arrow'].show = false;
 
     // note: buttons can be turned off below
-    var can_assign_all = !squad_is_deployed && (reserve_types_to_show.length >= 1);
+    var can_assign_all = !squad_is_deployed && (reserve_types_and_levels_to_show.length >= 1);
     var can_unassign_all = !squad_is_deployed && (squad_units.length >= 1)
 
     // RESERVES
     if(!squad_is_deployed) {
         var grid_x = 0, grid_y = 0;
-        goog.array.forEach(reserve_types_to_show, function(specname) {
+        goog.array.forEach(reserve_types_and_levels_to_show, function(key) {
+            var fields = key.split(':');
+            var specname = fields[0];
+            var level = parseInt(fields[1], 10);
             var wname = 'reserve_unit'+grid_x.toString()+','+grid_y.toString();
             if(!(wname in dialog.widgets)) {
                 dialog.widgets[wname] = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['reserve_unit']['dialog']], dialog.data['widgets']['reserve_unit']);
@@ -295,7 +316,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             dialog.widgets[wname].xy = vec_add(vec_add(dialog.data['widgets']['reserve_unit']['xy'], [-dialog.user_data['reserve_scroll_pos'],0]),
                                                vec_mul([grid_x,grid_y], dialog.data['widgets']['reserve_unit']['array_offset']));
 
-            var onclick = (function (_pred_ok, _pred_help, _squad_id, _specname, _cur_squad_space, _max_squad_space) { return function(w, button) {
+            var onclick = (function (_pred_ok, _pred_help, _squad_id, _specname, _level, _cur_squad_space, _max_squad_space) { return function(w, button) {
                     var dialog = w.parent;
                     if(!_pred_ok) {
                         if(_pred_help) {
@@ -323,7 +344,7 @@ SquadManageDialog.update_squad_manage = function(dialog) {
                         extreme_hp_ratio = -1;
                     }
                     goog.object.forEach(player.my_army, function(o) {
-                        if(o['squad_id'] === SQUAD_IDS.RESERVES && o['spec'] === _specname) {
+                        if(o['squad_id'] === SQUAD_IDS.RESERVES && o['spec'] === _specname && (o['level']||1) === _level) {
                             candidate_count += 1;
                             if(!o['pending']) {
                                 var space = get_leveled_quantity(gamedata['units'][o['spec']]['consumes_space']||0, o['level']||1);
@@ -369,19 +390,19 @@ SquadManageDialog.update_squad_manage = function(dialog) {
 
                     return true; // stop dripper
 
-            }; })(pred_ok, pred_help, dialog.user_data['squad_id'], specname, cur_squad_space, max_squad_space);
+            }; })(pred_ok, pred_help, dialog.user_data['squad_id'], specname, level, cur_squad_space, max_squad_space);
 
             var icon_state = ((!pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
 
-            dialog.widgets['reserve_loading_spinner'].show |= !!(reserve_pending_by_type[specname]);
+            dialog.widgets['reserve_loading_spinner'].show |= !!(reserve_pending_by_type_and_level[key]);
 
-            if(icon_state || reserve_pending_by_type[specname]) {
+            if(icon_state || reserve_pending_by_type_and_level[key]) {
                 can_assign_all = false;
             }
 
             var enable_dripper = !!gamedata['client']['squad_manage_dripper'];
 
-            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type[specname], null, onclick, icon_state, null, enable_dripper);
+            unit_icon_set(dialog.widgets[wname], specname, reserve_units_by_type_and_level[key], {'spec':specname, 'level':level}, onclick, icon_state, null, enable_dripper);
             if(!icon_state && dialog.widgets[wname].mouse_enter_time > 0) {
                 dialog.widgets['arrow'].show = true;
                 dialog.widgets['arrow'].xy = dialog.widgets[wname].xy;
@@ -485,7 +506,8 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             var icon_state = ((obj['pending'] || !pred_ok || squad_is_under_repair || squad_is_deployed || squad_in_battle) ? 'disabled_clickable' : null);
             unit_icon_set(dialog.widgets[wname], obj['spec'],
                           ('stack' in obj ? obj['stack'] : 1),
-                          ('stack_list' in obj ? null : obj),
+                          // for stacks, create a fake object that has the right spec and level for display
+                          ('stack_list' in obj ? {'spec': obj['spec'], 'level': obj['level']} : obj),
                           onclick, icon_state,
                           (obj['in_manuf_queue'] ? gamedata['strings']['squads']['in_manuf_queue'] : null),
                           enable_dripper);
