@@ -1469,6 +1469,12 @@ class GameProxy(proxy.ReverseProxyResource):
         if r['result']['status'] != 'ok' or not r['result'].get('id',None):
             return self.index_visit_go_away(request, visitor)
 
+        # redirect unverified accounts here
+        if 'trust_level' in r['result']:
+            if r['result']['trust_level'] < 10:
+                # XXX temporary
+                return ('<html><body><h2 style="color:#ff0; font-family: sans-serif;">Account setup incomplete.<p>Use \"My Account\" link at top-right to add and verify an email address, then reload this page.</h2></body></html>').encode('utf-8')
+
         visitor.set_battlehouse_id(r['result']['id'])
         if 'country' in r['result']:
             visitor.demographics['country'] = r['result']['country']
