@@ -308,8 +308,19 @@ ModChain.display_value = function(value, display_mode, context) {
             goog.array.forEach(value, function(data) {
                 if(!(data['aura_name'] in gamedata['auras'])) { throw Error('bad value for aura modstat: '+data['aura_name'].toString()); }
                 var spec = gamedata['auras'][data['aura_name']];
-                // XXX display aura level somehow?
-                ui_list.push((context == 'widget' && ('ui_name_short' in spec)) ? spec['ui_name_short'] : spec['ui_name']);
+                var ui_aura = (context == 'widget' && ('ui_name_short' in spec)) ? spec['ui_name_short'] : spec['ui_name'];
+
+                // add strength info
+                if(context != 'widget') {
+                    if('aura_strength' in data) {
+                        if(typeof(data['aura_strength'] === 'number')) {
+                            ui_aura += ' '+(100*data['aura_strength']).toFixed(parsed.precision)+'%';
+                        }
+                    }
+                    ui_aura += '\n'+spec['ui_description'];
+                }
+
+                ui_list.push(ui_aura);
             });
             ui_value = ui_list.join(', ');
         } else if(parsed.mode == 'on_destroy') {

@@ -42108,6 +42108,10 @@ function update_upgrade_dialog(dialog) {
                     if(('cargo_'+resname) in spec) { feature_list.push('cargo_'+resname); }
                 });
             }
+
+            if('permanent_auras' in spec) {
+                feature_list.push('permanent_auras');
+            }
         } else if('associated_item' in tech) {
             var item_spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level)));
             var auto_spell = get_auto_spell_for_item(item_spec);
@@ -42202,8 +42206,9 @@ function update_upgrade_dialog(dialog) {
             feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
         }
 
-        // test for new-style modstats
-        //if('damage_taken' in unit.modstats) { feature_list.push('damage_taken'); }
+        if('permanent_auras' in unit.spec) {
+            feature_list.push('permanent_auras');
+        }
 
     } // END is a building
 
