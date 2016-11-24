@@ -51621,9 +51621,13 @@ function draw_building_or_inert(world, obj, powerfac) {
                 var pos = obj.interpolate_pos(world);
                 aura.visual_effect.reposition([pos[0], 0, pos[1]]);
             }
-            if(aura.spec['visual_effect'] || (aura.spec['show'] === 0)) { continue; } // aura has its own graphics
-            draw_aura(xy, [xy[0]+30+20*count, xy[1]-default_text_height+5], aura);
-            count++;
+            if(aura.expire_tick.is_infinite()) {
+                // don't draw permanent auras on buildings
+                continue;
+            }
+            if(draw_aura(xy, [xy[0]+30+20*count, xy[1]-default_text_height+5], aura)) {
+                count++;
+            }
         }
 
         // draw status text
@@ -51958,9 +51962,9 @@ function draw_unit(world, unit) {
         if(aura.visual_effect) {
             aura.visual_effect.reposition([curpos[0], unit.altitude, curpos[1]]);
         }
-        if(aura.spec['visual_effect'] || (aura.spec['show'] === 0)) { continue; } // aura has its own graphics
-        draw_aura(xy, [xy[0]+15*count, xy[1]-35], aura);
-        count++;
+        if(draw_aura(xy, [xy[0]+15*count, xy[1]-35], aura)) {
+            count++;
+        }
     }
 
     if(CLICK_DETECTION_DEBUG) { draw_click_detection(unit); }
@@ -51977,15 +51981,20 @@ function draw_unit(world, unit) {
 
 /** @param {Array.<number>} xy
     @param {Array.<number>} indicator_xy
-    @param {!Aura} aura */
+    @param {!Aura} aura
+    @return {boolean} if shown */
 function draw_aura(xy, indicator_xy, aura) {
+    if(aura.spec['visual_effect'] // aura has its own graphics
+       || aura.spec['show'] === 0 // aura is hidden
+      ) { return false; } // don't draw
+
     // skip weak_zombie here
     // (it's handled separately for UI consistency when debuff is not actually applied)
     if(('effects' in aura.spec) && aura.spec['effects'].length > 0) {
         for(var j = 0; j < aura.spec['effects'].length; j++) {
             var eff = aura.spec['effects'][j];
             if(eff['code'] === 'weak_zombie') {
-                return;
+                return false;
             }
         }
     }
@@ -52015,6 +52024,7 @@ function draw_aura(xy, indicator_xy, aura) {
     }
 
     draw_clock(indicator_xy, color+'1.0)', aura.start_tick, aura.expire_tick);
+    return true;
 }
 
 /** @param {Array.<number>} xy
