@@ -276,10 +276,17 @@ def check_mandatory_fields(specname, spec, kind):
             error |= 1; print '%s manufacture category %s not found in gamedata.strings.manufacture_categories' % (specname, spec['manufacture_category'])
 
     if spec.get('permanent_auras',None):
-        for a in spec['permanent_auras']:
-            if a['aura_name'] not in gamedata['auras']:
-                error |= 1
-                print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
+        alist_list = spec['permanent_auras']
+        if len(alist_list) >= 1 and (isinstance(alist_list[0], list) or alist_list[0] is None):
+            pass
+        else:
+            alist_list = [alist_list]
+        for alist in alist_list:
+            if alist:
+                for a in alist:
+                    if a['aura_name'] not in gamedata['auras']:
+                        error |= 1
+                        print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
 
     for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect','upgrade_finish_effect'):
         if EFFECT in spec:

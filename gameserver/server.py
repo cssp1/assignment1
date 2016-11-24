@@ -6502,9 +6502,14 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
     auras = None
 
     if spec.permanent_auras:
-         if not auras: auras = []
-         for a in spec.permanent_auras:
-              Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
+        perm = spec.permanent_auras
+        if len(perm) >= 1 and (isinstance(perm[0], list) or perm[0] is None): # could be a list of per-level lists, or a plain all-level list
+            perm = spec.get_leveled_quantity(perm, level)
+
+        if perm:
+            if not auras: auras = []
+            for a in perm:
+                Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
 
     if obj_id is None: obj_id = gamesite.nosql_id_generator.generate() # for on-the-fly creation not associated with file loads - like new unit production
 

@@ -21,12 +21,22 @@ ModChain.ModChain;
 ModChain.get_base_value = function(stat, spec, level) {
     if(stat == 'maxvel') {
         return 1; // this is a scaling factor in the combat engine
+    } else if(stat == 'permanent_auras') {
+        // special case since this could be a list of per-level lists, or a plain all-level list
+        if(stat in spec) {
+            var val = spec[stat];
+            if(Array.isArray(val) && val.length >= 1 && (Array.isArray(val[0]) || val[0] === null)) {
+                return get_leveled_quantity(val, level);
+            } else {
+                return val;
+            }
+        } else {
+            return null;
+        }
     } else if(stat in spec) {
         return get_leveled_quantity(spec[stat], level);
     } else if(stat == 'armor') { // annoying special cases
         return 0;
-    } else if(stat == 'permanent_auras') {
-        return null;
     } else if(stat == 'on_destroy') {
         return null;
     } else if(stat == 'repair_price_cap') {

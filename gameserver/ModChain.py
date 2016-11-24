@@ -11,12 +11,19 @@ def get_leveled_quantity(qty, level): # XXX duplicate
 
 def get_base_value(stat, spec, level):
     if stat == 'maxvel': return 1 # this is a scaling factor in the combat engine
+    elif stat == 'permanent_auras': # special case since this could be a list of per-level lists, or a plain all-level list
+        if hasattr(spec, stat):
+            val = getattr(spec, stat)
+            if isinstance(val, list) and len(val) >= 1 and (isinstance(val[0], list) or val[0] is None):
+                return get_leveled_quantity(val, level)
+            else:
+                return val
+        else:
+            return None
     elif hasattr(spec, stat): return get_leveled_quantity(getattr(spec, stat), level)
     elif stat == 'armor': # XXX annoying special case
         return 0
     elif stat == 'on_destroy':
-        return None
-    elif stat == 'permanent_auras':
         return None
     elif stat == 'repair_price_cap':
         return -1
