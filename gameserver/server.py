@@ -6498,7 +6498,6 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
     else:
         spec = GameObjectSpec.lookup(specname)
 
-    # auras have to be in place BEFORE object instantiation, because they can change max_hp etc
     auras = None
 
     if spec.permanent_auras:
@@ -6561,7 +6560,10 @@ def reconstitute_object(observer, player, state, context = 'unknown'):
             state['obj_id'] = gamesite.nosql_id_generator.generate()
 
     # create fresh object
-    obj = instantiate_object_for_player(observer, owner, specname, obj_id = state['obj_id'])
+    # awkward - reach into state to set level
+    # this is because permanent_auras might be keyed by level and instantiate_object_for_player needs to know the level
+    obj = instantiate_object_for_player(observer, owner, specname, obj_id = state['obj_id'],
+                                        level = state.get('force_level', state.get('level', 1)))
 
     try:
         # apply mutated state (level, hp, etc)
