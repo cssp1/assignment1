@@ -1099,6 +1099,10 @@ Aura.prototype.apply = function(world, obj) {
             obj.combat_stats.disarmed += this.strength;
         } else if(code === 'range_reduction') {
             obj.combat_stats.weapon_range *= Math.max(0, (1-this.strength));
+            obj.combat_stats.effective_weapon_range *= Math.max(0, (1-this.strength));
+        } else if(code === 'range_boosted') {
+            obj.combat_stats.weapon_range *= Math.max(0, (1+this.strength));
+            obj.combat_stats.effective_weapon_range *= Math.max(0, (1+this.strength));
         } else if(code === 'weak_zombie') {
             obj.combat_stats.maxvel *= this.spec['zombie_speed'];
             obj.combat_stats.weapon_damage *= this.spec['zombie_damage'];

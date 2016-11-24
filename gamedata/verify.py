@@ -706,7 +706,7 @@ def check_aura(auraname, spec, maxlevel):
             # client-side codes (implemented in main.js)
             elif effect['code'] in ('speed_boosted', 'defense_boosted', 'defense_weakened', 'radiation_hardened',
                                     'frozen', 'ice_shielded', 'ice_encrusted', 'moving_in_swamp', 'swamp_shielded',
-                                    'rate_of_fire_boosted', 'damage_boosted',
+                                    'rate_of_fire_boosted', 'damage_boosted', 'range_boosted',
                                     'armor_boosted', 'damage_booster', 'defense_booster', 'stunned', 'disarmed', 'hacked', 'range_reduction', 'weak_zombie',
                                     'on_fire', 'projectile_speed_reduced', 'cast_spell_continuously'):
                 if not spec.get('client',False):
