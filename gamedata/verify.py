@@ -288,6 +288,17 @@ def check_mandatory_fields(specname, spec, kind):
                         error |= 1
                         print '%s:permanent_auras refers to an aura that does not exist (%s)' % (specname, a['aura_name'])
 
+    if spec.get('permanent_modstats', None):
+        mlist_list = spec['permanent_modstats']
+        if len(mlist_list) >= 1 and (isinstance(mlist_list[0], list) or mlist_list[0] is None):
+            pass
+        else:
+            mlist_list = [mlist_list]
+        for mlist in mlist_list:
+            if mlist:
+                for m in mlist:
+                    error |= check_modstat(m, specname + ':permanent_modstats')
+
     for EFFECT in ('pre_deploy_effect','post_deploy_effect','explosion_effect','damaged_effect','movement_effect','permanent_effect','upgrade_finish_effect'):
         if EFFECT in spec:
             vfx_list = spec[EFFECT] if type(spec[EFFECT]) is list else [spec[EFFECT],]
@@ -411,7 +422,7 @@ def check_levels(specname, spec):
               # note: the 3D weapon_offset must be a per-level array, since there is no easy way to distinguish it from a 3-level scalar
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
-              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras',
+              'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'permanent_modstats',
               'upgrade_ingredients', 'remove_ingredients', 'research_ingredients')
     error = 0
 

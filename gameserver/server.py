@@ -6280,6 +6280,7 @@ class GameObjectSpec(Spec):
         ["quarry_invul", False],
         ["equip_slots", None],
         ["permanent_auras", None],
+        ["permanent_modstats", None],
         ["auto_spawn", False],
         ["on_destroy", None],
         ["upgrade_completion", None],
@@ -11430,6 +11431,17 @@ class Player(AbstractPlayer):
                     # reset modstats
                     if obj.modstats: obj.modstats = {}
                     if ((not obj.spec.worth_less_xp) or obj.spec.equip_slots):
+
+                        # apply local building permanent_modstats
+                        if obj.spec.permanent_modstats:
+                            pmlist = obj.spec.permanent_modstats
+                            if len(pmlist) >= 1 and (isinstance(pmlist[0], list) or pmlist[0] is None):
+                                pmlist = obj.get_leveled_quantity(pmlist)
+                            if pmlist:
+                                for pm in pmlist:
+                                    strength = self.get_modstat_strength(pm, obj.level)
+                                    self.apply_modstat_to_building(obj, pm['stat'], pm['method'], strength, 'building', obj.spec.name, {'level':obj.level})
+
                         # apply local building equipment
                         for item in Equipment.equip_iter(obj.equipment):
                             if item['spec'] in gamedata['items']:
