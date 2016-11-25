@@ -733,8 +733,8 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, rel
             }
 
             var detail = ModChain.display_value_detailed(stat, modchain,
-                                                         spec, // ??? emplacement_obj.spec
-                                                         level, // ??? emplacement_obj.level
+                                                         spec, level,
+                                                         // NOT emplacement_obj.spec, emplacement_obj.level,
                                                          spell, level);
 
             var relative_detail = (relative_to ? ModChain.display_value_detailed(stat, relative_modchain,

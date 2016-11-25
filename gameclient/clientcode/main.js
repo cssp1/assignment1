@@ -42210,8 +42210,22 @@ function update_upgrade_dialog(dialog) {
             feature_list = feature_list.concat(get_weapon_spell_features2(unit.spec, auto_spell));
         }
 
-        if('permanent_auras' in unit.spec) {
+        if(unit.spec['permanent_auras']) {
             feature_list.push('permanent_auras');
+        }
+        if(unit.spec['permanent_modstats']) {
+            var pm_list = unit.spec['permanent_modstats'];
+            if(pm_list.length >= 1 && (Array.isArray(pm_list[0]) || pm_list[0] === null)) {
+                pm_list = unit.get_leveled_quantity(pm_list);
+            }
+            goog.array.forEach(pm_list, function(pm) {
+                var stat = pm['stat'];
+                if(stat in gamedata['strings']['modstats']['stats'] &&
+                   gamedata['strings']['modstats']['stats'][stat]['display'] !== null &&
+                   !goog.array.contains(feature_list, stat)) {
+                    feature_list.push(stat);
+                }
+            });
         }
 
     } // END is a building
@@ -42332,8 +42346,17 @@ function update_upgrade_dialog(dialog) {
         } else {
 
         var spec = null;
-        var old_spell_level = old_level, new_spell_level = new_level; // levels keying the auto_spell stats we are displaying
         var old_chain_level = old_level, new_chain_level = new_level; // levels for the (spec's) stats at the base of the modchain
+
+        // levels keying the auto_spell stats we are displaying
+        // will be the same in most cases, except when weapon_level is set by a modstat (i.e. turret heads)
+        var old_spell_level, new_spell_level;
+        if(unit && unit.is_building() && unit.modstats['weapon_level']) {
+            old_spell_level = new_spell_level = ModChain.get_stat(unit.modstats['weapon_level'], unit.level);
+        } else {
+            old_spell_level = old_level;
+            new_spell_level = new_level;
+        }
 
         if(!tech) {
             spec = unit.spec;
@@ -42372,6 +42395,7 @@ function update_upgrade_dialog(dialog) {
         }
 
         if(new_level <= max_level) {
+            // make a version of the chain that shows improvements at next level
             var new_base_value = ModChain.get_base_value(stat_name, spec, new_chain_level);
             new_chain = (modchain ? ModChain.recompute_with_new_base_val(modchain, new_base_value, new_chain_level) : ModChain.make_chain(new_base_value, {'level':new_chain_level}));
         }
@@ -42396,6 +42420,31 @@ function update_upgrade_dialog(dialog) {
 
         if(rebase_old !== null) { old_chain = (old_chain ? ModChain.recompute_with_new_base_val(old_chain, rebase_old, old_chain_level) : ModChain.make_chain(rebase_old, {'level':old_chain_level})); }
         if(rebase_new !== null) { new_chain = (new_chain ? ModChain.recompute_with_new_base_val(new_chain, rebase_new, new_chain_level) : ModChain.make_chain(rebase_new, {'level':new_chain_level})); }
+
+        // incorporate effects of permanent modstats
+        // actually, just project what will happen at new_chain_level, since
+        // current modstat chain should already include the current-elvel effects
+        if(spec['permanent_modstats']) {
+            var pm_list = spec['permanent_modstats'];
+
+            if(new_level <= max_level) {
+                if(pm_list.length >= 1 && (Array.isArray(pm_list[0]) || pm_list[0] === null)) {
+                    pm_list = get_leveled_quantity(pm_list, new_level);
+                }
+                goog.array.forEach(pm_list, function(pm) {
+                    if(pm['stat'] === stat_name) {
+                        var method = pm['method'];
+                        var kind = spec['kind'] || null;
+                        var source = spec['name'];
+                        // update new_chain (old_chain should already reflect the right values)
+                        if(!new_chain) {
+                            new_chain = ModChain.make_chain(ModChain.get_base_value(stat_name, spec, new_chain_level), {'level':new_chain_level});
+                        }
+                        new_chain = ModChain.add_or_replace_mod(new_chain, method, get_leveled_quantity(pm['strength'], new_level), kind, source, {'level':new_level});
+                    }
+                });
+            }
+        }
 
         // incorporate effects of mod techs
         if(tech && tech['affects_unit']) {
@@ -42431,7 +42480,13 @@ function update_upgrade_dialog(dialog) {
                 throw Error('cannot determine auto_spell for tech '+tech['name']);
             }
         } else {
-            old_auto_spell = new_auto_spell = unit.get_auto_spell();
+            if(unit.is_building() && unit.modstats['weapon_level']) {
+                // when showing stats that affect a mounted weapon,
+                // show the _modifier version on the base object
+                old_auto_spell = new_auto_spell = null;
+            } else {
+                old_auto_spell = new_auto_spell = unit.get_auto_spell();
+            }
         }
 
         feature_widget(dialog, grid_y, 0).show = true;

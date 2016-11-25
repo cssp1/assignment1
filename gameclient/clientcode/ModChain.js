@@ -68,6 +68,22 @@ ModChain.get_base_value = function(stat, spec, level) {
         var thing = stat.replace('provides_limited_equipped:','');
         return get_leveled_quantity(spec['provides_limited_equipped'][thing]||0, level);
     } else {
+        /*
+        if(spec['permanent_modstats']) {
+            // grab "strength" for this level as the "base"
+            var pm_list = spec['permanent_modstats'];
+            if(pm_list.length >= 1 && (Array.isArray(pm_list[0]) || pm_list[0] === null)) {
+                pm_list = get_leveled_quantity(pm_list, level);
+            }
+            for(var i = 0; i < pm_list.length; i++) {
+                var pm = pm_list[i];
+                if(pm['stat'] === stat) {
+                    return get_leveled_quantity(pm['strength'], level);
+                }
+            }
+        }
+        */
+
         return 1;
     }
 };
@@ -529,11 +545,16 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
     @param {boolean} enable_tooltip */
 ModChain.display_label_widget = function(widget, stat, auto_spell, enable_tooltip) {
     // flip over to a different variant for one-shot weapons
-    if(stat == 'weapon_damage' && auto_spell['kills_self']) {
+    if(stat == 'weapon_damage' && auto_spell && auto_spell['kills_self']) {
         stat = 'weapon_damage_kills_self';
-    } else if(stat == 'weapon_range' && auto_spell['code'] === 'pbaoe') {
-        // flip over to a different variant for point-blank AoE weapons
-        stat = 'weapon_range_pbaoe'; // this is the trigger range, not the harmful radius
+    } else if(stat == 'weapon_range') {
+        if(!auto_spell) {
+            // this is a range modifier for a mounted weapon that will mod the weapon spell later
+            stat = 'weapon_range_modifier';
+        } else if(auto_spell['code'] === 'pbaoe') {
+            // flip over to a different variant for point-blank AoE weapons
+            stat = 'weapon_range_pbaoe'; // this is the trigger range, not the harmful radius
+        }
     }
 
     var ui_data = gamedata['strings']['modstats']['stats'][stat];
@@ -602,17 +623,26 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
         extra = ui_data['ui_extra'].replace('%DPS', ModChain.display_value(modchain['val'], ui_data['display'], 'tooltip')).replace('%SHOT', ModChain.display_value(modchain['val']*base_cooldown, ui_data['display'], 'tooltip')).replace('%COOLDOWN', base_cooldown.toFixed(2));
     } else if(goog.array.contains(['weapon_range','effective_weapon_range','splash_range','min_range','accuracy'], stat)) {
         // special case for weapon stats other than damage
-        if(stat == 'weapon_range' && auto_spell['code'] === 'pbaoe') {
-            // flip over to a different variant for point-blank AoE weapons
-            ui_data = gamedata['strings']['modstats']['stats']['weapon_range_pbaoe']; // this is the trigger range, not the harmful radius
+        show_base = !!auto_spell;
+
+        if(stat == 'weapon_range') {
+            if(!auto_spell) {
+                ui_data = gamedata['strings']['modstats']['stats']['weapon_range_modifier'];
+
+            } else if(auto_spell['code'] === 'pbaoe') {
+                // flip over to a different variant for point-blank AoE weapons
+                ui_data = gamedata['strings']['modstats']['stats']['weapon_range_pbaoe']; // this is the trigger range, not the harmful radius
+            }
         }
 
-        show_base = true;
         // these stats correspond to spell parameters with slightly different names
         var source_stat = {'weapon_range':'range', 'effective_weapon_range':'effective_range'}[stat] || stat;
         // allow manual override of values displayed in GUI, to help with distance unit mismatches
         if(source_stat == 'splash_range' && ('ui_splash_range' in auto_spell)) { source_stat = 'ui_splash_range'; }
-        modchain = ModChain.recompute_with_new_base_val(modchain, get_leveled_quantity(auto_spell[source_stat]||0,auto_spell_level), level);
+        modchain = ModChain.recompute_with_new_base_val(modchain,
+                                                        (auto_spell ? get_leveled_quantity(auto_spell[source_stat]||0,auto_spell_level)
+                                                         : ModChain.get_base_value(stat, spec, level)),
+                                                        level);
     } else if(stat == 'weapon') {
         show_base = true;
     }
