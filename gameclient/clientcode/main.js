@@ -18869,6 +18869,13 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         // copy any animation the parent dialog is doing
         dialog.transform = parent.transform;
 
+        // copy opacity of parent widget
+        if(btn.alpha !== undefined) {
+            dialog.widgets['arrow'].alpha = btn.alpha;
+        } else {
+            dialog.widgets['arrow'].alpha = 1;
+        }
+
         // hack - remove then add it back to make it on top (of the tutorial UI)
         var root = dialog.parent;
         if(root === tutorial_root) {
