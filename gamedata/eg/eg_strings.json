@@ -1427,6 +1427,8 @@
 
             // well, we could use on_destroy for other things, like self-destructs...
             "on_destroy": { "ui_name": "Security Team", "ui_tooltip": "Temporary units that spawn when this object is destroyed.\nSecurity team fights for revenge until the battle is over.", "display": "on_destroy" },
+            "on_damage": { "ui_name": "Security Team", "ui_tooltip": "Temporary units that spawn when this object is damaged.\nSecurity team fights for revenge until the battle is over.", "display": "on_damage" },
+            "on_approach": { "ui_name": "Security Team", "ui_tooltip": "Temporary units that spawn when enemies approach this building.\nSecurity team fights for revenge until the battle is over.", "display": "on_approach" },
 
             // for GUI only - rebased version of provides_space
             "deployable_unit_space": { "ui_name": "Attack Size", "ui_tooltip": "Unit space that can be deployed into battle at once", "display": "integer" },
