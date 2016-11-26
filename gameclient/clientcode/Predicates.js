@@ -1542,16 +1542,18 @@ goog.inherits(HostileUnitNearPredicate, Predicate);
 HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!qdata || !('source_obj' in qdata)) { throw Error('no source_obj provided'); }
     var obj = qdata['source_obj'];
+    var distance = ('distance' in qdata ? qdata['distance'] : this.data['distance']);
+
     if(obj.ai_target) {
-        return vec_distance(obj.raw_pos(), obj.ai_target.raw_pos()) < this.data['distance'];
+        return vec_distance(obj.raw_pos(), obj.ai_target.raw_pos()) < distance;
     }
-    var obj_list = session.get_real_world().query_objects_within_distance(obj.raw_pos(), this.data['distance'],
+    var obj_list = session.get_real_world().query_objects_within_distance(obj.raw_pos(), distance,
                                                  { ignore_object: obj,
                                                    exclude_invul: true,
                                                    only_team: (obj.team == 'enemy' ? 'player' : 'enemy'),
                                                    exclude_barriers: false,
                                                    mobile_only: false,
-                                                   exclude_flying: this.data['exclude_flying'],
+                                                   exclude_flying: !!this.data['exclude_flying'],
                                                    flying_only: false,
                                                    exclude_invisible_to: obj.team,
                                                    tag: 'HOSTILE_UNIT_NEAR'

@@ -6283,6 +6283,8 @@ class GameObjectSpec(Spec):
         ["permanent_modstats", None],
         ["auto_spawn", False],
         ["on_destroy", None],
+        ["on_damage", None],
+        ["on_approach", None],
         ["upgrade_completion", None],
         ["remove_completion", None],
         ["provides_foremen", 0],
@@ -6652,6 +6654,9 @@ class GameObject(object):
 
         # used for AI bases only
         self.force_ai_level = None
+
+        # flag that indicates the on_approach consequent has already been run during this session
+        self.on_approach_fired = False
 
     # (private) calculate current max HP, taking level into account
     def _calc_max_hp(self):
@@ -18991,6 +18996,9 @@ class GAMEAPI(resource.Resource):
             # don't let non-repair-droid players see repair droids in others' bases
             if obj.spec.name == 'repair_droid': continue
 
+            # reset on_approach flag
+            obj.on_approach_fired = False
+
             # last-chance check on unit level
             if obj.owner: obj.ensure_level(obj.owner.tech.get(obj.spec.level_determined_by_tech, 1))
             if obj.is_mobile(): obj.ensure_mobile_position(session.viewing_base.ncells())
@@ -19009,6 +19017,7 @@ class GAMEAPI(resource.Resource):
                         assert state['owner_id'] == session.viewing_player.user_id
                         obj = reconstitute_object(session.player, session.viewing_player, state, context = '%d vs %d at %s: defending_squads %d' % (session.player.user_id, session.viewing_player.user_id, session.viewing_base.base_id, squad_id))
                         if (not session.viewing_base.can_deploy_unit(obj.spec)): continue # ignore inapplicable units
+                        obj.on_approach_fired = False
                         obj.ensure_level(session.viewing_player.tech.get(obj.spec.level_determined_by_tech, 1))
                         obj.ensure_mobile_position(session.viewing_base.ncells())
                         session.add_object(obj)
@@ -24277,6 +24286,23 @@ class GAMEAPI(resource.Resource):
                 if update_viewing_player and session.has_attacked:
                     retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
+    def fire_on_approach(self, session, retmsg, id, xy):
+        if not session.has_object(id): return
+        obj = session.get_object(id)
+        if obj.on_approach_fired: return
+        if obj.is_destroyed(): return
+
+        cons_list = None
+        if obj.is_building():
+            cons_list = obj.get_stat('on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
+        elif obj.is_mobile():
+            cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_approach', obj.get_leveled_quantity(obj.spec.on_approach))
+
+        if cons_list:
+            obj.on_approach_fired = True
+            for cons in cons_list:
+                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy)}, reason='on_approach(%s)' % obj.spec.name)
+
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
         if not obj:
@@ -26700,6 +26726,9 @@ class GAMEAPI(resource.Resource):
 
         elif arg[0] == "OBJECT_COMBAT_UPDATES":
             self.object_combat_updates(session, retmsg, arg[1])
+
+        elif arg[0] == "ON_APPROACH":
+            self.fire_on_approach(session, retmsg, arg[1], arg[2])
 
         elif arg[0] == "AUTO_RESOLVE":
             self.auto_resolve(session, retmsg)

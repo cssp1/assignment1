@@ -1313,6 +1313,10 @@ function GameObject() {
     /** for behaviors to keep state between ticks */
     this.behavior_state = {};
 
+    /** @type {boolean} flag that the on_approach consequent has fired this session.
+        Note: not synchronized with the server. Assumed to be set false each new session. */
+    this.on_approach_fired = false;
+
     // true if there are unsaved changes that should be sent back to
     // the server before the session is closed
     // (only applies to hitpoints, and xy position and orders for mobile units)
@@ -4588,6 +4592,28 @@ GameObject.prototype.run_ai = function(world) {
 
     if('special_ai' in this.spec) {
         read_consequent(this.spec['special_ai']).execute({'source_obj':this}); // , 'xy': this.raw_pos()});
+    }
+
+    // on_approach handling - XXX convert this to a special_ai ?
+
+    // @type {Array<Object<string,?>>|null} List of consequents
+    var on_approach = (this.is_mobile() ? get_unit_stat(this.team === 'player' ? player.stattab : enemy.stattab,
+                                                        this.spec['name'], 'on_approach', null) :
+                       this.is_building() ? this.get_stat('on_approach', null) : null);
+
+    if(!session.is_replay() && on_approach && !this.on_approach_fired) {
+        var pred = read_predicate({'predicate': 'HOSTILE_UNIT_NEAR'});
+        if(pred.is_satisfied(player, {'source_obj': this,
+                                      'distance': gamedata['map']['aggro_radius'][this.team]['defense']
+                                     })) {
+            goog.array.forEach(on_approach, function(cons) {
+                if(this.on_approach_fired) { return; }
+                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos()]);
+                    this.on_approach_fired = true;
+                }
+            }, this);
+        }
     }
 };
 
@@ -42112,7 +42138,9 @@ function update_upgrade_dialog(dialog) {
             if(get_leveled_quantity(spec['limit']||0, 1) > 0) {
                 feature_list.push('limit');
             }
+            if('on_damage' in spec) { feature_list.push('on_damage'); }
             if('on_destroy' in spec) { feature_list.push('on_destroy'); }
+            if('on_approach' in spec) { feature_list.push('on_approach'); }
 
             if(player.raids_enabled()) { // raids - show cargo stats
                 goog.object.forEach(gamedata['resources'], function(resdata, resname) {

@@ -1238,8 +1238,8 @@ def check_item(itemname, spec):
                                    {'code':'modstat', 'stat':'ice_effects', 'method': '*=(1-strength)', 'strength': effect['strength']}]
                 elif effect['code'] == 'damage_boosted':
                     replacement = {'code':'modstat', 'stat':'weapon_damage', 'method': '*=(1+strength)', 'strength': effect['strength']}
-                elif effect['code'] == 'on_destroy':
-                    replacement = {'code':'modstat', 'stat':'on_destroy', 'method':'concat', 'strength':[effect['consequent']]}
+                elif effect['code'] in ('on_destroy','on_damage','on_approach'):
+                    replacement = {'code':'modstat', 'stat':effect['code'], 'method':'concat', 'strength':[effect['consequent']]}
                 print '%s: obsolete effect code "%s" - replace with: %s' % (itemname,effect['code'], SpinJSON.dumps(replacement))
             if effect['code'] == 'modstat':
                 error |= check_modstat(effect, reason = 'item %s: effects' % itemname,
@@ -1247,7 +1247,7 @@ def check_item(itemname, spec):
                                        expect_item_sets = set((spec['item_set'],)) if 'item_set' in spec else None)
                 if effect['stat'] == 'permanent_auras' and not any(x['kind'] == 'building' for x in spec['equip'].get('compatible',[spec['equip']])):
                     error |= 1; print '%s: permanent_auras mods are not supported on mobile units (buildings only)' % itemname
-                if effect['stat'] == 'on_destroy' and 'strength' in effect:
+                if effect['stat'] in ('on_destroy','on_damage','on_approach') and ('strength' in effect):
                     for cons in effect['strength']:
                         if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
                             if cons.get('persist') and not all('ersist' in ui_descr for ui_descr in ui_descr_list):
@@ -1338,7 +1338,9 @@ MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', '
                                           'damage_taken', 'armor', 'unit_repair_speed', 'unit_repair_cost',
                                           'manufacture_speed', 'manufacture_cost', 'repair_speed', 'swamp_effects',
                                           'research_speed', 'crafting_speed', 'manufacture_speed', 'weapon', 'weapon_level', 'weapon_asset', 'permanent_auras', 'continuous_cast',
-                                          'anti_air', 'anti_missile', 'resurrection', 'on_destroy', 'splash_range','effective_range','accuracy']),
+                                          'anti_air', 'anti_missile', 'resurrection', 'splash_range','effective_range','accuracy',
+                                          'on_destroy', 'on_damage', 'on_approach',
+                                          ]),
                     'player': set(['foreman_speed', 'loot_factor_pvp', 'loot_factor_pve', 'loot_factor_tokens', 'travel_speed', 'deployable_unit_space',
                                    'chat_template', 'chat_gagged', 'quarry_yield_bonus', 'turf_quarry_yield_bonus',
                                    'combat_time_scale'])}
@@ -1368,7 +1370,7 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
     if (effect['stat'] not in gamedata['strings']['modstats']['stats']) and (affects != 'player'):
         error |= 1; print '%s: stat %s is missing from gamedata.strings.modstats.stats' % (reason, effect['stat'])
 
-    if effect['stat'] == 'on_destroy' and ('strength' in effect):
+    if effect['stat'] in ('on_destroy','on_damage','on_approach') and ('strength' in effect):
         if isinstance(effect['strength'][0], list):
             per_level_list = effect['strength']
         else:
@@ -2418,7 +2420,7 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                             else:
                                 equip_spec = gamedata['items'][item['spec']]
                                 for effect in equip_spec['equip']['effects']:
-                                    if effect['code'] == 'modstat' and effect['stat'] == 'on_destroy':
+                                    if effect['code'] == 'modstat' and effect['stat'] in ('on_destroy','on_damage','on_approach'):
                                         conslist = effect['strength']
                                         for cons in conslist:
                                             if cons['consequent'] == 'SPAWN_SECURITY_TEAM':

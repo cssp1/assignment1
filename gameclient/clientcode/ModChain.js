@@ -37,7 +37,7 @@ ModChain.get_base_value = function(stat, spec, level) {
         return get_leveled_quantity(spec[stat], level);
     } else if(stat == 'armor') { // annoying special cases
         return 0;
-    } else if(stat == 'on_destroy') {
+    } else if(stat == 'on_destroy' || stat == 'on_damage' || stat == 'on_approach') {
         return null;
     } else if(stat == 'repair_price_cap') {
         return -1;
@@ -253,10 +253,11 @@ ModChain.recompute_without_mod = function(old_chain, index) {
 
 // OK to reference gamedata directly for GUI-only stuff
 
-/** Return textual description of an on_destroy modstat, which usually means a security team
+/** Return textual description of an on_destroy/on_damage/on_approach modstat, which usually means a security team
+    @param {string} condition
     @param {Array.<!Object>|null} value
     @param {string} context */
-ModChain.display_value_on_destroy = function(value, context) {
+ModChain.display_value_secteam = function(condition, value, context) {
     if(!value) { return gamedata['strings']['modstats']['none']; }
     if(context == 'widget') { return gamedata['strings']['modstats']['on_destroy_widget']; }
     var total = [];
@@ -272,7 +273,7 @@ ModChain.display_value_on_destroy = function(value, context) {
                 v += ' '+gamedata['strings']['modstats']['security_team_persist'];
             }
         } else {
-            throw Error('unhandled on_destroy consequent '+(val['consequent']||'UNKNOWN').toString());
+            throw Error('unhandled '+condition+' consequent '+(val['consequent']||'UNKNOWN').toString());
         }
         total.push(v);
     }
@@ -346,8 +347,8 @@ ModChain.display_value = function(value, display_mode, context) {
                 });
                 ui_value = ui_list.join(', ');
             }
-        } else if(parsed.mode == 'on_destroy') {
-            return ModChain.display_value_on_destroy(value, context);
+        } else if(parsed.mode == 'on_destroy' || parsed.mode == 'on_damage' || parsed.mode == 'on_approach') {
+            return ModChain.display_value_secteam(parsed.mode, value, context);
         } else if(parsed.mode == 'literal') {
             ui_value = value.toString();
         } else {
