@@ -266,7 +266,18 @@ ModChain.display_value_secteam = function(condition, value, context) {
         if(val['consequent'] == 'SPAWN_SECURITY_TEAM') {
             var units = [];
             for(var specname in val['units']) {
-                units.push(gamedata['strings']['modstats']['security_team_unit'].replace('%qty', val['units'][specname].toString()).replace('%name', gamedata['units'][specname]['ui_name']));
+                var entry = val['units'][specname];
+                var qty;
+                var ui_level = '';
+                if(typeof(entry) === 'number') {
+                    qty = entry;
+                } else if('qty' in entry) {
+                    qty = entry['qty'];
+                    if('force_level' in entry) {
+                        ui_level = ' L'+entry['force_level'].toString();
+                    }
+                }
+                units.push(gamedata['strings']['modstats']['security_team_unit'].replace('%qty', qty.toString()).replace('%name', gamedata['units'][specname]['ui_name'] + ui_level));
             }
             v = gamedata['strings']['modstats']['security_team'].replace('%units', units.join(', '));
             if(val['persist']) {
