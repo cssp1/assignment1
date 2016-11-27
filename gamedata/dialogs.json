@@ -248,6 +248,8 @@
                                    "ui_name": "Factory Is Busy" },
             "title_research":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Laboratory Is Busy" },
+            "title_enhance":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
+                                 "ui_name": "Building Is Busy" },
             "title_crafting":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Building Is Busy" },
             "title_removing":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",

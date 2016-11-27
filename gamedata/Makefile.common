@@ -118,8 +118,8 @@ ${BUILT}/${GAME_ID}_loot_tables_compiled.json: ${BUILT}/${GAME_ID}_loot_tables.j
 	@echo "    ${GAME_ID}_loot_tables_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_promo_codes_compiled.json: ${GAME_ID}/${GAME_ID}_promo_codes.json
 	@echo "    ${GAME_ID}_promo_codes_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
-${BUILT}/${GAME_ID}_inverse_requirements.json: ${GAMEDATA}/invert_requirements.py ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json
-	@echo "    ${GAME_ID}_inverse_requirements.json..." && ${GAMEDATA}/invert_requirements.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json $@
+${BUILT}/${GAME_ID}_inverse_requirements.json: ${GAMEDATA}/invert_requirements.py ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_units_compiled.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json ${BUILT}/${GAME_ID}_enhancements_compiled.json
+	@echo "    ${GAME_ID}_inverse_requirements.json..." && ${GAMEDATA}/invert_requirements.py -g ${GAME_ID} ${GAME_ID}/${GAME_ID}_predicate_library.json ${BUILT}/${GAME_ID}_units_compiled.json ${BUILT}/${GAME_ID}_buildings_compiled.json ${BUILT}/${GAME_ID}_tech_compiled.json ${BUILT}/${GAME_ID}_crafting_compiled.json ${BUILT}/${GAME_ID}_enhancements_compiled.json $@
 
 # master main JSON file
 ${BUILT}/gamedata-${GAME_ID}.json.unverified: ${GAMEDATA}/gamedata_main.json

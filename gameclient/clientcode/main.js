@@ -2096,14 +2096,16 @@ GameObject.prototype.is_under_construction = function() {
 };
 
 function get_max_level(spec) {
-    if(spec['kind'] === 'mobile') {
+    if('kind' in spec && spec['kind'] === 'mobile') {
         return spec['max_hp'].length;
-    } else if(spec['kind'] === 'building') {
+    } else if('kind' in spec && spec['kind'] === 'building') {
         return spec['build_time'].length;
-    } else if(spec['kind'] === 'inert') {
+    } else if('kind' in spec && spec['kind'] === 'inert') {
         return spec['max_level'] || 1;
     } else if('research_time' in spec) {
         return spec['research_time'].length;
+    } else if('enhance_time' in spec) {
+        return spec['enhance_time'].length;
     } else if('craft_time' in spec) {
         return spec['craft_time'].length;
     } else {
@@ -41751,6 +41753,12 @@ function invoke_upgrade_building_dialog(preselect_building) { return invoke_upgr
     @param {SPUI.Dialog|null=} prev_dialog */
 function invoke_upgrade_tech_dialog(techname, prev_dialog) { return invoke_upgrade_dialog_generic(techname, prev_dialog || null, null); }
 
+// upgrade an enhancement
+/** @param {!GameObject} obj
+    @param {string} enhname
+    @param {SPUI.Dialog|null=} prev_dialog */
+function invoke_upgrade_enhancement_dialog(obj, enhname, prev_dialog) { return invoke_upgrade_dialog_generic(enhname, prev_dialog || null, obj); }
+
 /** @param {string} techname
     @param {SPUI.Dialog|null} prev_dialog
     @param {GameObject|null} preselect */
@@ -41775,7 +41783,9 @@ function invoke_upgrade_dialog_generic(techname, prev_dialog, preselect) {
     dialog.user_data['dialog'] = 'upgrade_dialog';
     dialog.user_data['unit'] = (preselect || selection.unit); // buildings only
     dialog.user_data['techname'] = techname;
-    dialog.user_data['tech'] = (techname !== 'BUILDING' ? gamedata['tech'][techname] : null);
+    dialog.user_data['tech'] = (techname === 'BUILDING' ? null :
+                                (techname in gamedata['tech'] ? gamedata['tech'][techname] :
+                                 (techname in gamedata['enhancements'] ? gamedata['enhancements'][techname] : null)));
     dialog.user_data['equip_slots_by_type'] = {};
     dialog.user_data['prev_dialog'] = prev_dialog;
     dialog.user_data['context'] = null;
@@ -41840,13 +41850,19 @@ function update_upgrade_dialog(dialog) {
 
     var old_level, max_level;
 
-    if(techname != 'BUILDING') {
-        old_level = (techname in player.tech ? player.tech[techname] : 0);
-        max_level = get_max_ui_level(tech);
-    } else {
+    if(techname === 'BUILDING') {
         old_level = unit.level;
         max_level = unit.get_max_ui_level();
+    } else if(techname in gamedata['tech']) {
+        old_level = (techname in player.tech ? player.tech[techname] : 0);
+        max_level = get_max_ui_level(tech);
+    } else if(techname in gamedata['enhancements']) {
+        old_level = (unit.enhancements ? unit.enhancements[techname] || 0 : 0);
+        max_level = get_max_ui_level(tech);
+    } else {
+        throw Error('unhandled case');
     }
+
     var new_level = old_level + 1;
 
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
@@ -41874,7 +41890,7 @@ function update_upgrade_dialog(dialog) {
 
     // is the appropriate building busy?
     var builder;
-    if(tech) {
+    if(tech && ('research_category' in tech)) {
         var builder_type = get_lab_for(tech['research_category']);
         builder = find_object_by_type(builder_type);
         if(!builder && !player.is_cheater) {
@@ -41969,8 +41985,10 @@ function update_upgrade_dialog(dialog) {
                     state = 'normal';
                     pos_state = 'xy_splash';
                 }
-            } else { // TECH icon
+            } else if('icon' in tech) { // TECH icon
                 asset = get_leveled_quantity(tech['icon'], (new_level > max_level ? max_level : new_level));
+            } else {
+                throw Error('no icon/image for tech '+tech['name']);
             }
 
             if(!GameArt.assets[asset].has_state(state)) { // fallback for missing hero/normal_disabled
@@ -42085,9 +42103,29 @@ function update_upgrade_dialog(dialog) {
 
         }
 
-        var cost_time = get_leveled_quantity((tech ? tech['research_time'] : unit.spec['build_time']), new_level);
-        if(tech && builder) {
-            cost_time = Math.floor(cost_time / builder.get_stat('research_speed',1));
+        var time_arr;
+        var tech_speed = 1;
+        if(tech) {
+            if('research_time' in tech) {
+                time_arr = tech['research_time'];
+                if(builder) {
+                    tech_speed = builder.get_stat('research_speed',1);
+                }
+            } else if('enhance_time' in tech) {
+                time_arr = tech['enhance_time'];
+                if(builder) {
+                    tech_speed = builder.get_stat('enhance_speed',1);
+                }
+            } else {
+                throw Error('time_arr not found for tech '+tech['name']);
+            }
+        } else {
+            time_arr = unit.spec['build_time'];
+        }
+
+        var cost_time = get_leveled_quantity(time_arr, new_level);
+        if(tech_speed != 1) {
+            cost_time = Math.floor(cost_time / tech_speed);
         } else if(!tech && unit && cost_time > 0) {
             cost_time = Math.floor(cost_time / get_player_stat(player.stattab, 'foreman_speed'));
         }
@@ -42160,6 +42198,11 @@ function update_upgrade_dialog(dialog) {
         } else if('associated_building' in tech) {
             feature_list.push('limit:'+tech['associated_building']);
         } else if('affects_unit' in tech && tech['effects']) { // mod techs
+            if(tech['effects'].length != 1 || tech['effects'][0]['code'] !== 'modstat') {
+                throw Error('do not know how to parse these effects: '+JSON.stringify(tech['effects']));
+            }
+            feature_list.push(tech['effects'][0]['stat']);
+        } else if('enhancement_category' in tech && tech['effects']) { // enhancement
             if(tech['effects'].length != 1 || tech['effects'][0]['code'] !== 'modstat') {
                 throw Error('do not know how to parse these effects: '+JSON.stringify(tech['effects']));
             }
@@ -42263,6 +42306,19 @@ function update_upgrade_dialog(dialog) {
             });
         }
 
+        // detect enhanceable stats
+        if(unit.spec['enhancement_categories']) {
+            for(var enh_name in gamedata['enhancements']) {
+                var enh_tech = gamedata['enhancements'][enh_name];
+                if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
+                    var stat = enh_tech['effects'][0]['stat'];
+                    if(!goog.array.contains(feature_list, stat)) {
+                        feature_list.push(stat);
+                    }
+                }
+            }
+        }
+
     } // END is a building
 
     // gather misc. new-style modstats
@@ -42338,8 +42394,8 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
-    // mod techs need to show stats for "Level 0" unresearched state
-    var show_level_0 = (tech && tech['affects_unit']);
+    // mod techs and enhancements need to show stats for "Level 0" unresearched state
+    var show_level_0 = (tech && (tech['affects_unit'] || tech['enhancement_category']));
 
     var grid_y = 0;
     var delta_color = SPUI.make_colorv(dialog.data['widgets']['col0,']['delta_color']);
@@ -42405,6 +42461,8 @@ function update_upgrade_dialog(dialog) {
             spec = ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level))); // note! doesn't handle item type changing!
         } else if('associated_building' in tech) {
             spec = gamedata['buildings'][tech['associated_building']];
+        } else if('enhance_time' in tech) {
+            spec = unit.spec;
         } else {
             throw Error('cannot display feature '+stat_name+' for upgrade that has no building or associated unit or item');
         }
@@ -42422,6 +42480,8 @@ function update_upgrade_dialog(dialog) {
             if(item_host_building && item_host_building.modstats[stat_name]) {
                 modchain = item_host_building.modstats[stat_name];
             }
+        } else if('enhance_time' in tech) {
+            modchain = unit.modstats[stat_name] || null;
         }
 
         var old_chain = null, new_chain = null;
@@ -42458,7 +42518,7 @@ function update_upgrade_dialog(dialog) {
 
         // incorporate effects of permanent modstats
         // actually, just project what will happen at new_chain_level, since
-        // current modstat chain should already include the current-elvel effects
+        // current modstat chain should already include the current-level effects
         if(spec['permanent_modstats']) {
             var pm_list = spec['permanent_modstats'];
 
@@ -42481,11 +42541,11 @@ function update_upgrade_dialog(dialog) {
             }
         }
 
-        // incorporate effects of mod techs
-        if(tech && tech['affects_unit']) {
+        // incorporate effects of mod techs and enhancements
+        if(tech && (tech['affects_unit'] || tech['enhancement_category'])) {
             var effect = tech['effects'][0];
             var method = effect['method'];
-            var kind = 'tech';
+            var kind = (tech['enhancement_category'] ? 'enhancement' : 'tech');
             var source = tech['name'];
             if(old_level > 0) {
                 if(!old_chain) {
@@ -42509,7 +42569,7 @@ function update_upgrade_dialog(dialog) {
             } else if('associated_item' in tech) {
                 old_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.max(1,old_level))));
                 new_auto_spell = get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level,max_level))));
-            } else if('associated_building' in tech) {
+            } else if('associated_building' in tech || 'enhance_time' in tech) {
                 old_auto_spell = new_auto_spell = null;
             } else {
                 throw Error('cannot determine auto_spell for tech '+tech['name']);
@@ -42546,8 +42606,9 @@ function update_upgrade_dialog(dialog) {
         }
         }
 
+        // status bar/buttons for mod techs and enhancements
         var mod_tech = null;
-
+        var enh_tech = null;
         // XXXXXX inefficient
         if(tech) {
             for(var other_name in gamedata['tech']) {
@@ -42559,29 +42620,61 @@ function update_upgrade_dialog(dialog) {
                     break;
                 }
             }
+        } else if(unit && unit.is_building() && unit.spec['enhancement_categories']) {
+            for(var other_name in gamedata['enhancements']) {
+                var other_tech = gamedata['enhancements'][other_name];
+                if(goog.array.contains(unit.spec['enhancement_categories'], other_tech['enhancement_category']) &&
+                   other_tech['effects'] && other_tech['effects'][0]['stat'] == stat_name &&
+                   (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
+                    enh_tech = other_tech;
+                    break;
+                }
+            }
         }
 
         dialog.widgets['mod_bar'+grid_y.toString()].show =
             dialog.widgets['mod_text'+grid_y.toString()].show =
-            dialog.widgets['mod_button'+grid_y.toString()].show = !!mod_tech;
-        if(mod_tech) {
+            dialog.widgets['mod_button'+grid_y.toString()].show = !!(mod_tech || enh_tech);
+
+        if(mod_tech || enh_tech) {
             // handler for click on "Modify" button
-            var mod_onclick = (function (_mod_tech) { return function(w) {
-                invoke_upgrade_tech_dialog(_mod_tech['name']);
-            }; })(mod_tech);
+            var mod_onclick = (function (_unit, _mod_tech, _enh_tech) { return function(w) {
+                if(_mod_tech) {
+                    invoke_upgrade_tech_dialog(_mod_tech['name']);
+                } else if(_enh_tech) {
+                    invoke_upgrade_enhancement_dialog(_unit, _enh_tech['name']);
+                }
+            }; })(unit, mod_tech, enh_tech);
 
             var mod_text_mode = 'ui_name';
             var mod_text_color = 'text_color';
-            if((player.tech[mod_tech['name']]||0) >= get_max_ui_level(mod_tech)) {
+
+            var cur_mod_level, max_mod_level;
+            if(mod_tech) {
+                cur_mod_level = player.tech[mod_tech['name']]||0;
+                max_mod_level = get_max_ui_level(mod_tech);
+            } else if(enh_tech) {
+                cur_mod_level = unit.enhancements ? unit.enhancements[enh_tech['name']]||0 : 0;
+                max_mod_level = get_max_ui_level(enh_tech);
+            }
+
+            if(cur_mod_level >= max_mod_level) {
                 mod_text_mode = 'ui_name_maxed';
                 mod_text_color = 'text_color_maxed';
             } else if(builder && (builder.is_damaged() || builder.time_until_finish() > 0)) {
-                if(builder.research_item === mod_tech['name']) {
+                if(mod_tech && builder.research_item === mod_tech['name']) {
                     mod_text_mode = 'ui_name_busy';
                     mod_text_color = 'text_color_busy';
                     mod_onclick = (function (_builder) { return function(w) {
                         change_selection_unit(_builder);
                         invoke_child_speedup_dialog('research');
+                    }; })(builder);
+                } else if(enh_tech && unit && unit.is_enhancing() && unit.enhancing['enhance']['spec'] === enh_tech['name']) {
+                    mod_text_mode = 'ui_name_busy';
+                    mod_text_color = 'text_color_busy';
+                    mod_onclick = (function (_builder) { return function(w) {
+                        change_selection_unit(_builder);
+                        invoke_child_speedup_dialog('enhance');
                     }; })(builder);
                 } else {
                     mod_text_mode = 'ui_name_other_busy';
@@ -42593,7 +42686,7 @@ function update_upgrade_dialog(dialog) {
                 dialog.widgets['mod_text'+grid_y.toString()].onclick = mod_onclick;
             dialog.widgets['mod_text'+grid_y.toString()].str = dialog.data['widgets']['mod_text'][mod_text_mode];
             dialog.widgets['mod_text'+grid_y.toString()].text_color = SPUI.make_colorv(dialog.data['widgets']['mod_text'][mod_text_color]);
-            dialog.widgets['mod_bar'+grid_y.toString()].progress = (player.tech[mod_tech['name']]||0) / get_max_ui_level(mod_tech);
+            dialog.widgets['mod_bar'+grid_y.toString()].progress = cur_mod_level / max_mod_level;
             dialog.widgets['mod_button'+grid_y.toString()].tooltip.str = (enable_tooltip ? dialog.data['widgets']['mod_button']['ui_tooltip'] : null);
         }
 
@@ -42738,7 +42831,7 @@ function update_upgrade_dialog(dialog) {
     }
 
     // get tech requirements
-    var req_spec = null;
+    var req_spec = {'predicate': 'ALWAYS_TRUE'};
     if(tech) {
         if('requires' in tech) {
             req_spec = tech['requires'];
@@ -42774,7 +42867,20 @@ function update_upgrade_dialog(dialog) {
             invoke_child_speedup_dialog('speedup');
         };
     } else if(req_spec && !player.is_cheater) {
-        var pred = read_predicate(get_leveled_quantity(req_spec, new_level));
+        var pred_raw = get_leveled_quantity(req_spec, new_level);
+
+        // add requirement for enhancement host building level
+        if(tech && unit && 'min_host_level' in tech) {
+            var req_host_level = get_leveled_quantity(tech['min_host_level'], new_level);
+            if(unit.level < req_host_level) {
+                pred_raw = {'predicate': 'AND', 'subpredicates': [
+                    pred_raw,
+                    {'predicate': 'BUILDING_LEVEL', 'building_type': unit.spec['name'], 'trigger_level': req_host_level,
+                     'obj_id': unit.id}]};
+            }
+        }
+
+        var pred = read_predicate(pred_raw);
         var text = pred.ui_describe(player);  // XXX make ui_describe return a list
         if(text) {
             req.push(text);
@@ -42811,7 +42917,7 @@ function update_upgrade_dialog(dialog) {
     } else {
         flavor_text = unit.spec['ui_description'] || '';
     }
-    dialog.widgets['flavor_text'].set_text_with_linebreaking(flavor_text);
+    dialog.widgets['flavor_text'].set_text_with_linebreaking(get_leveled_quantity(flavor_text, Math.min(new_level, max_level)));
 
     // connect button widget onclick() handlers
 
@@ -42834,7 +42940,12 @@ function update_upgrade_dialog(dialog) {
             // tell the server to research this tech
             var builder = _dialog.user_data['builder'] || null;
             if(builder) {
-                send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", _dialog.user_data['techname']]);
+                if('enhance_time' in _dialog.user_data['tech']) {
+                    var cur_level = builder.enhancements ? builder.enhancements[_dialog.user_data['techname']] || 0 : 0;
+                    send_to_server.func(["CAST_SPELL", builder.id, "ENHANCE_FOR_FREE", _dialog.user_data['techname'], cur_level+1]);
+                } else {
+                    send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", _dialog.user_data['techname']]);
+                }
                 invoke_ui_locker(builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
             } else {
                 close_dialog(_dialog);
@@ -42932,8 +43043,16 @@ function update_upgrade_dialog(dialog) {
     }
 
     // "Instant" button
+    var credit_check = -1; // only check if cost is <0
+    if(tech && 'research_credit_cost' in tech) {
+        credit_check = tech['research_credit_cost'];
+    } else if(tech && 'enhance_credit_cost' in tech) {
+        credit_check = tech['enhance_credit_cost'];
+    } else if(unit && 'upgrade_credit_cost' in unit.spec) {
+        credit_check = unit.spec['upgrade_credit_cost'];
+    }
 
-    if(get_leveled_quantity(tech ? (gamedata['tech'][techname]['research_credit_cost']||-1) : (unit.spec['upgrade_credit_cost']||-1), new_level) < 0) {
+    if(get_leveled_quantity(credit_check, new_level) < 0) {
         // instant upgrade not offered
         dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = false;
         dialog.default_button = dialog.widgets['use_resources_button'];
@@ -42952,7 +43071,9 @@ function update_upgrade_dialog(dialog) {
     var price;
     if(tech) {
         if(builder || player.is_cheater) {
-            price = Store.get_user_currency_price(builder ? builder.id : GameObject.VIRTUAL_ID, gamedata['spells']['RESEARCH_FOR_MONEY'], techname);
+            var spell = gamedata['spells'][('enhance_time' in tech ? 'ENHANCE_FOR_MONEY' : 'RESEARCH_FOR_MONEY')];
+            var spellarg = ('enhance_time' in tech ? [techname, new_level] : techname);
+            price = Store.get_user_currency_price(builder ? builder.id : GameObject.VIRTUAL_ID, spell, spellarg);
         } else {
             price = -1;
         }
@@ -42993,9 +43114,14 @@ function update_upgrade_dialog(dialog) {
             dialog.widgets['instant_credits'].onclick =
                 dialog.widgets['instant_button'].onclick = function(w) {
                     var dialog = w.parent; if(!dialog) { return; }
-                    var builder = dialog.user_data['builder'], techname = dialog.user_data['techname'];
+                    var builder = dialog.user_data['builder'], techname = dialog.user_data['techname'], tech = dialog.user_data['tech'];
                     if(builder) {
-                        send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", techname]);
+                        if('enhance_time' in tech) {
+                            send_to_server.func(["CAST_SPELL", builder.id, "ENHANCE_FOR_FREE", techname,
+                                                 (builder.enhancements ? builder.enhancements[techname]||0 : 0) + 1]);
+                        } else {
+                            send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", techname]);
+                        }
                         send_to_server.func(["CAST_SPELL", builder.id, "SPEEDUP_FOR_FREE"]);
                         builder.request_sync();
                     }
@@ -43031,10 +43157,17 @@ function update_upgrade_dialog(dialog) {
                 dialog.widgets['instant_credits'].onclick =
                     dialog.widgets['instant_button'].onclick = function(widget) {
                         var dialog = widget.parent; if(!dialog) { return; }
-                        var builder = dialog.user_data['builder'], techname = dialog.user_data['techname'];
+                        var builder = dialog.user_data['builder'], techname = dialog.user_data['techname'], tech = dialog.user_data['tech'];
 
                         if(builder || player.is_cheater) {
-                            if(Store.place_user_currency_order(builder ? builder.id : GameObject.VIRTUAL_ID, "RESEARCH_FOR_MONEY", techname, cleanup_cb)) {
+                            var status;
+                            if('enhance_time' in tech) {
+                                status = Store.place_user_currency_order(builder.id, "ENHANCE_FOR_MONEY",
+                                                                         [techname, (builder.enhancements ? builder.enhancements[techname]||0 : 0) + 1], cleanup_cb);
+                            } else {
+                                status = Store.place_user_currency_order(builder ? builder.id : GameObject.VIRTUAL_ID, "RESEARCH_FOR_MONEY", techname, cleanup_cb);
+                            }
+                            if(status) {
                                 invoke_ui_locker(builder ? builder.request_sync() : synchronizer.request_sync());
                             }
                         }
@@ -43067,7 +43200,7 @@ function update_upgrade_dialog(dialog) {
     update_upgrade_dialog_equipment(dialog);
 
     if(player.upgrade_bar_enabled()) {
-        UpgradeBar.invoke(dialog, (tech ? 'tech' : 'building'),
+        UpgradeBar.invoke(dialog, (tech ? ('enhance_time' in tech ? 'enhancement' : 'tech') : 'building'),
                           (tech ? techname : (unit ? unit.spec['name'] : null)),
                           new_level, (unit ? unit.id : null));
     }

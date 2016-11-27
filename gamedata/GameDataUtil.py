@@ -13,7 +13,8 @@ def get_leveled_quantity(qty, level):
 
 # note: these are the officially-defined parameters that determine the max level of a spec
 # it is mandatory that these be level-dependent arrays in the spec, even if the value does not change with level
-MAX_LEVEL_FIELD = {'units': 'max_hp', 'buildings': 'build_time', 'tech': 'research_time'}
+MAX_LEVEL_FIELD = {'units': 'max_hp', 'buildings': 'build_time', 'tech': 'research_time',
+                   'enhancement': 'enhance_time'}
 
 def get_max_level(spec):
     if ('kind' in spec):
@@ -23,10 +24,12 @@ def get_max_level(spec):
             kind = 'buildings'
     elif 'research_time' in spec:
         kind = 'tech'
+    elif 'enhance_time' in spec:
+        kind = 'enhancement'
     elif 'product' in spec: # crafting recipe
-        return 1
+        return spec.get('max_level', 1)
     else:
-        raise Exception('cannot determine kind')
+        raise Exception('cannot determine kind of %r' % spec)
     return len(spec[MAX_LEVEL_FIELD[kind]])
 
 def get_kind(spec):

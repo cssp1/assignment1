@@ -531,6 +531,9 @@ ModChain.display_tooltip = function(stat, modchain, show_base, ui_data) {
                 } else if(mod['kind'] == 'tech') {
                     var tspec = gamedata['tech'][mod['source']];
                     ls.push(fmt.replace('%delta',ui_delta).replace('%thing', tspec['ui_name'] + ' L'+mod['level'].toString()));
+                } else if(mod['kind'] == 'enhancement') {
+                    var espec = gamedata['enhancements'][mod['source']];
+                    ls.push(fmt.replace('%delta',ui_delta).replace('%thing', espec['ui_name'] + ' L'+mod['level'].toString()));
                 } else if(mod['kind'] == 'aura') {
                     var togo = null;
                     if((mod['end_time']||-1) > 0) {

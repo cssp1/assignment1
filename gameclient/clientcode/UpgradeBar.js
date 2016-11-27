@@ -112,6 +112,11 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         dialog.widgets['upgrade_button'].onclick = (function (_specname) { return function(w) {
             invoke_upgrade_tech_dialog(_specname);
         }; })(specname);
+    } else if(kind == 'enhancement') {
+        spec = gamedata['enhancements'][specname];
+        dialog.widgets['upgrade_button'].onclick = (function (_obj_id, _specname) { return function(w) {
+            invoke_upgrade_enhancement_dialog(session.get_real_world().objects.get_object(_obj_id), _specname);
+        }; })(obj_id, specname);
     } else {
         throw Error('unknown kind '+kind);
     }
@@ -130,7 +135,7 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
 
     var ui_goodies_list = [];
     var goodies_list = null;
-    if(specname in gamedata['inverse_requirements'][kind]) {
+    if((kind in gamedata['inverse_requirements']) && (specname in gamedata['inverse_requirements'][kind])) {
         goodies_list = get_leveled_quantity(gamedata['inverse_requirements'][kind][specname], new_level);
     }
     if(goodies_list === null) { goodies_list = []; }
@@ -151,6 +156,12 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
             if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
             temp = temp.replace('%THING', tech_spec['ui_name']);
             linkcode = 'tech='+goody['tech'];
+        } else if('enhancement' in goody) {
+            var tech_spec = gamedata['enhancements'][goody['enhancement']];
+            if(tech_spec['developer_only'] && !player.is_developer()) { return; }
+            if(('show_if' in tech_spec) && !read_predicate(tech_spec['show_if']).is_satisfied(player,null)) { return; }
+            temp = temp.replace('%THING', tech_spec['ui_name']);
+            linkcode = 'enhancement='+goody['enhancement'];
         } else if('building' in goody) {
             var building_spec = gamedata['buildings'][goody['building']];
             if(building_spec['developer_only'] && !player.is_developer()) { return; }
@@ -226,6 +237,9 @@ UpgradeBar.update_contents = function(dialog, kind, specname, new_level, obj_id)
         'tech': {'onclick': function(specname) { return function(w, mloc) {
             invoke_upgrade_tech_dialog(specname);
         }; } },
+        'enhancement': {'onclick': (function(_obj_id) { return function(specname) { return function(w, mloc) {
+            invoke_upgrade_enhancement_dialog(session.get_real_world().objects.get_object(_obj_id), specname);
+        }; }; })(obj_id) },
         'crafting_recipe': {'onclick': function(specname) { return function(w, mloc) {
             var recipe = gamedata['crafting']['recipes'][specname];
             var catdata = gamedata['crafting']['categories'][recipe['crafting_category']];
