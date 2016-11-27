@@ -15857,7 +15857,7 @@ class Store(object):
                     return -1, p_currency
 
                 if (not session.player.is_cheater):
-                    for pred_name, pred in ((spec.requires, 'requirements'),
+                    for pred, pred_name in ((spec.requires, 'requirements'),
                                             (spec.show_if, 'show_if')):
                         if pred:
                             req = EnhancementSpec.get_leveled_quantity(pred, new_level)
