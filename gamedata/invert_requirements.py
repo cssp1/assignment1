@@ -70,7 +70,12 @@ def do_get_requirements(gamedata, kind, spec, level):
                 factories = [name for name in gamedata['buildings'] if unit_spec['manufacture_category'] == gamedata['buildings'][name].get('manufacture_category')]
                 if len(factories) == 1:
                     name = factories[0]
-                    ret += [{'predicate': 'BUILDING_LEVEL', 'building_type': name, 'trigger_level': unit_spec['requires_factory_level'][level-1]}]
+                    if isinstance(unit_spec['requires_factory_level'], list):
+                        req_level = unit_spec['requires_factory_level'][level-1]
+                    else:
+                        assert isinstance(unit_spec['requires_factory_level'], int)
+                        req_level = unit_spec['requires_factory_level']
+                    ret += [{'predicate': 'BUILDING_LEVEL', 'building_type': name, 'trigger_level': req_level}]
 
     return prune_array(ret)
 
