@@ -281,6 +281,7 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'BUY_PROTECTION': 'protection', # dummy entry, parsed as a special case
                          'SPEEDUP_FOR_MONEY': 'speedup',
                          'RESEARCH_FOR_MONEY': 'research',
+                         'ENHANCE_FOR_MONEY': 'enhancement',
                          'CRAFT_FOR_MONEY': 'crafting',
                          'UPGRADE_FOR_MONEY': 'building_upgrade',
                          'BOOST_IRON_10PCT': 'resource_boost', 'BOOST_IRON_25PCT': 'resource_boost', 'BOOST_IRON_50PCT': 'resource_boost', 'BOOST_IRON_100PCT': 'resource_boost',
@@ -344,7 +345,14 @@ def classify_purchase(gamedata, descr):
             if len(fields) >= 5:
                 descr += ',%s' % (fields[4])
             fields = descr.split(',') # reparse
-
+        elif action == 'enhance':
+            catname = 'enhancement'
+            #   SPEEDUP_FOR_MONEY,drone_lab,enhance,drone_lab_secteam,level2
+            # ->ENHANCE_FOR_MONEY,drone_lab_secteam,drone_lab,level2
+            descr = 'ENHANCE_FOR_MONEY,%s,%s' % (fields[3],fields[1])
+            if len(fields) >= 5:
+                descr += ',%s' % (fields[4])
+            fields = descr.split(',') # reparse
         elif action == 'repair':
             catname = 'repair'
         elif action == 'manufacture':
@@ -401,6 +409,16 @@ def classify_purchase(gamedata, descr):
         #unit = string.join(fields[1].split('_')[:-1], '_')
         subcat = sn
 
+    elif catname == 'enhancement':
+        # ENHANCE_FOR_MONEY,barracks_secteam,barracks,level2
+        fields = descr.split(',')
+        spec_name = fields[1]
+        if len(fields) >= 4:
+            if fields[3].startswith('level'):
+                level = int(fields[3][5:]) # "levelNN"
+            elif fields[3].startswith('L'):
+                level = int(fields[3][1:]) # "LNN"
+        subcat = spec_name
     elif catname == 'building_upgrade':
         spec_name = fields[1]
         if fields[2].startswith('level'):
