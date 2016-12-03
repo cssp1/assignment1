@@ -42443,7 +42443,16 @@ function update_upgrade_dialog(dialog) {
         // will be the same in most cases, except when weapon_level is set by a modstat (i.e. turret heads)
         var old_spell_level, new_spell_level;
         if(unit && unit.is_building() && unit.modstats['weapon_level']) {
-            old_spell_level = new_spell_level = ModChain.get_stat(unit.modstats['weapon_level'], unit.level);
+            old_spell_level = ModChain.get_stat(unit.modstats['weapon_level'], unit.level);
+            // are we looking at a tech that affects weapon_level, or something else?
+            if(tech && tech['associated_item'] &&
+               get_auto_spell_for_item(ItemDisplay.get_inventory_item_spec(get_leveled_quantity(tech['associated_item'], Math.min(new_level, max_level))))) {
+                // this tech (presumably) affects the weapon level, so show increases
+                new_spell_level = Math.min(new_level, max_level);
+            } else {
+                // something else - do not show improvement in spell level
+                new_spell_level = old_spell_level;
+            }
         } else {
             old_spell_level = old_level;
             new_spell_level = new_level;
