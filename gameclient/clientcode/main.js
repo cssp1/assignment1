@@ -12903,7 +12903,7 @@ function update_desktop_dialogs() {
                                                       !(player.quest_tracked && player.quest_tracked['ui_step']) &&
                                                       !session.has_attacked &&
                                                       !session.incoming_attack_pending());
-        dialog.widgets['user_abtest_message'].str = player.get_any_abtest_value('ui_user_abtest_message', gamedata['strings']['ui_user_abtest_message'] || null);
+        dialog.widgets['user_abtest_message'].str = eval_cond_or_literal(player.get_any_abtest_value('ui_user_abtest_message', gamedata['strings']['ui_user_abtest_message'] || null), player, null) || null;
 
         dialog.widgets['edit_mode_message'].show = !!player.is_cheater;
 
