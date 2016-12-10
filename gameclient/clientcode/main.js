@@ -45972,8 +45972,10 @@ function handle_server_message(data) {
         player.facebook_third_party_id = data[1];
     } else if(msg == "PLAYER_UI_NAME_UPDATE") {
         player.ui_name = data[1];
-        var dlg = desktop_dialogs['desktop_top'];
-        if(dlg && dlg.widgets['player_portrait']) { dlg.widgets['player_portrait'].invalidate(); } // reset avatar image
+        var dlg = desktop_dialogs['player_portrait_dialog'];
+        if(dlg && dlg.widgets['player_portrait']) {
+            dlg.widgets['player_portrait'].invalidate();
+        } // reset avatar image
     } else if(msg == "PLAYER_ALIAS_UPDATE") {
         player.alias = data[1];
     } else if(msg == "PLAYER_TITLES_UPDATE") {

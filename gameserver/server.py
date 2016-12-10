@@ -1833,7 +1833,7 @@ class User:
             # note: must match proxyserver.py test credentials
             test_response = SpinJSON.dumps({"user_id":"4d0075c6-e9d9-4b01-b7d0-4cffa7a1e17c", "ui_name": "Dan Maas", "email": "asdf@example.com", "email_verified": True, "creation_time": 1472072770})
             d = make_deferred('retrieve_bh_info')
-            reactor.callLater(2, lambda _self=self, _session=session, _retmsg=retmsg: _self.retrieve_bh_info_complete(_session, None, d, test_response)) # delay to expose timing bugs
+            reactor.callLater(2, lambda _self=self, _session=session: _self.retrieve_bh_info_complete(_session, d, test_response)) # delay to expose timing bugs
             return d
 
     def retrieve_bh_info_start(self, session):
@@ -1841,7 +1841,7 @@ class User:
         d = make_deferred('retrieve_bh_info')
         gamesite.AsyncHTTP_Battlehouse.queue_request(server_time,
                                                      SpinConfig.config['battlehouse_api_path']+('/user/%s' % self.bh_id) + '?service=' + SpinConfig.game(),
-                                                     lambda result, _session=session, _d=d: self.retrieve_bh_info_complete(_session, None, _d, result),
+                                                     lambda result, _session=session, _d=d: self.retrieve_bh_info_complete(_session, _d, result),
                                                      headers = {'Authorization': 'Bearer '+self.bh_auth_token,
                                                                 'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
         # update portrait
@@ -1849,7 +1849,7 @@ class User:
         session.portrait_update_launched(portrait_d)
         return d
 
-    def retrieve_bh_info_complete(self, session, retmsg, d, result):
+    def retrieve_bh_info_complete(self, session, d, result):
         data = SpinJSON.loads(result)
         assert data['user_id'] == self.bh_id
 
@@ -1863,12 +1863,10 @@ class User:
             # on very first hit, force player cache update to publish ui_name
             session.player.send_player_cache_update(session, 'change_alias')
 
-        if retmsg is None:
-            if self.active_session:
-                retmsg = self.active_session.outgoing_messages
-        if retmsg is not None:
-            retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
-            retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+        session.send([["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]],
+                      ["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player), 'retrieve_bh_info_complete']],
+                     flush_now = True)
+
         d.callback(True)
 
     @inlineCallbacks
