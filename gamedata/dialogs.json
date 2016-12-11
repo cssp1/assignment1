@@ -2723,8 +2723,8 @@
                        "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [143,132],
                        "array": [1,8], "array_offset": [0,19] },
 
-            "feature_scroll_up": { "show":0, "kind": "ActionButton", "xy": [242,115], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
-            "feature_scroll_down": { "show":0, "kind": "ActionButton", "xy": [242,160], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+            "feature_scroll_up": { "show":0, "kind": "ActionButton", "xy": [35,65], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
+            "feature_scroll_down": { "show":0, "kind": "ActionButton", "xy": [55,62], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
 
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
             "equip_type": { "kind": "TextField", "xy": [58,239], "dimensions": [58,18], "text_size": 13, "text_hjustify": "left",
@@ -2756,21 +2756,21 @@
             "equip_loading_spinner": { "kind": "StaticImage", "xy":[75,276], "dimensions":[16,16], "asset":"loading_spinner",
                                        "show": 0, "array": [5,1], "array_offset": [60,0] },
 
-            "mod_bar": { "kind": "ProgressBar", "xy": [222, 102], "dimensions": [55, 15], "outline_width": 1,
+            "mod_bar": { "kind": "ProgressBar", "xy": [232, 102], "dimensions": [55, 15], "outline_width": 1,
                          "full_color": [0.05,0.21,0.10,1],
                          //"full_mouseover_color": [0.1,0.71,0.20,1],
                          "empty_color": [0.025,0.025,0.025,1], "outline_color": [0.02,0.02,0.02,1],
                          "array": [1,8], "array_offset": [0,19], "show": 0
                        },
-            "mod_text": { "kind": "ActionButton", "xy": [222,102], "dimensions": [55,15], "text_size": 11, "text_style": "normal", "text_hjustify": "center",
+            "mod_text": { "kind": "ActionButton", "xy": [232,102], "dimensions": [55,15], "text_size": 11, "text_style": "normal", "text_hjustify": "center",
                           "text_color": [0,1,0,1], "text_color_busy": [1,1,0,1], "text_color_other_busy": [1,1,0,1],
                           "text_color_maxed": [0.66,0.66,0.66,1],
-                          "ui_name": "Modify", "ui_name_busy": "Speed Up", "ui_name_other_busy": "Busy...", "ui_name_none": "None",
+                          "ui_name": "L%cur of %max", "ui_name_busy": "Speed Up", "ui_name_other_busy": "Busy...", "ui_name_none": "None",
                           "ui_name_maxed": "Maxed",
                           "ui_tooltip": "", "tooltip_delay": 0, "drop_shadow": 1,
                           "array": [1,8], "array_offset": [0,19], "show": 0
                         },
-            "mod_button": { "kind": "ActionButton", "xy": [278,101], "dimensions": [22,20], "bg_image": "resource_bar_add_button",
+            "mod_button": { "kind": "ActionButton", "xy": [288,101], "dimensions": [22,20], "bg_image": "resource_bar_add_button",
                             "array": [1,8], "array_offset": [0,19], "state": "normal",
                             "ui_tooltip": "Click to modify", "tooltip_delay": 0,"fixed_tooltip_offset": [268,133],
                             "show": 0

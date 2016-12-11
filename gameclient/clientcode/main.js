@@ -42693,7 +42693,7 @@ function update_upgrade_dialog(dialog) {
 
             dialog.widgets['mod_button'+grid_y.toString()].onclick =
                 dialog.widgets['mod_text'+grid_y.toString()].onclick = mod_onclick;
-            dialog.widgets['mod_text'+grid_y.toString()].str = dialog.data['widgets']['mod_text'][mod_text_mode];
+            dialog.widgets['mod_text'+grid_y.toString()].str = dialog.data['widgets']['mod_text'][mod_text_mode].replace('%cur', cur_mod_level.toString()).replace('%max', max_mod_level.toString());
             dialog.widgets['mod_text'+grid_y.toString()].text_color = SPUI.make_colorv(dialog.data['widgets']['mod_text'][mod_text_color]);
             dialog.widgets['mod_bar'+grid_y.toString()].progress = cur_mod_level / max_mod_level;
             dialog.widgets['mod_button'+grid_y.toString()].tooltip.str = (enable_tooltip ? dialog.data['widgets']['mod_button']['ui_tooltip'] : null);

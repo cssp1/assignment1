@@ -256,10 +256,17 @@ ModChain.recompute_without_mod = function(old_chain, index) {
 /** Return textual description of an on_destroy/on_damage/on_approach modstat, which usually means a security team
     @param {string} condition
     @param {Array.<!Object>|null} value
-    @param {string} context */
-ModChain.display_value_secteam = function(condition, value, context) {
+    @param {string} context
+    @param {number|null=} ui_mod_level */
+ModChain.display_value_secteam = function(condition, value, context, ui_mod_level) {
     if(!value) { return gamedata['strings']['modstats']['none']; }
-    if(context == 'widget') { return gamedata['strings']['modstats']['on_destroy_widget']; }
+    if(context == 'widget') {
+        var ret = gamedata['strings']['modstats']['on_destroy_widget'];
+        if(ui_mod_level) {
+            ret = ret.replace('%level', ui_mod_level.toString());
+        }
+        return ret;
+    }
     var total = [];
     for(var i = 0; i < value.length; i++) {
         var val = value[i], v;
@@ -306,8 +313,11 @@ ModChain.parse_display_mode = function(mode_string) {
 /** Return a textual description of the final post-modification value of a stat
     @param {?} value
     @param {string|null} display_mode
-    @param {string} context */
-ModChain.display_value = function(value, display_mode, context) {
+    @param {string} context
+    @param {number|null=} ui_mod_level - optional hint to show in the display
+                          (this is the "level" of the whole modchain, used for enhancements)
+*/
+ModChain.display_value = function(value, display_mode, context, ui_mod_level) {
     var ui_value;
     if(display_mode) {
         var parsed = ModChain.parse_display_mode(display_mode);
@@ -359,7 +369,7 @@ ModChain.display_value = function(value, display_mode, context) {
                 ui_value = ui_list.join(', ');
             }
         } else if(parsed.mode == 'on_destroy' || parsed.mode == 'on_damage' || parsed.mode == 'on_approach') {
-            return ModChain.display_value_secteam(parsed.mode, value, context);
+            return ModChain.display_value_secteam(parsed.mode, value, context, ui_mod_level);
         } else if(parsed.mode == 'literal') {
             ui_value = value.toString();
         } else {
@@ -680,10 +690,25 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
         color = (is_worse ? SPUI.make_colorv([1,1,0,1]) : SPUI.good_text_color);
     }
 
-    return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget'),
+    return {str: ModChain.display_value(modchain['val'], ui_data['display']||null, 'widget', ModChain.get_ui_mod_level(modchain)),
             value: modchain['val'],
             tooltip: gamedata['strings']['modstats']['tooltip_'+(!show_base && (modchain['mods'].length<2) ? 'base':'mods')].replace('%NAME', ui_data['ui_name']).replace('%DESCRIPTION', ui_data['ui_tooltip']).replace('%MODS', ModChain.display_tooltip(stat, modchain, show_base, ui_data)) + (extra ? '\n\n'+extra : ''),
             color: color};
+};
+
+/** @param {Object|null} modchain
+    @return {number|null} */
+ModChain.get_ui_mod_level = function(modchain) {
+    if(!modchain) { return null; }
+    var ret = 0;
+    goog.array.forEach(modchain['mods'], function(mod) {
+        if('level' in mod &&
+           (mod['kind'] === 'tech' ||
+            mod['kind'] === 'enhancement')) {
+            ret = Math.max(ret, mod['level']);
+        }
+    });
+    return (ret > 0 ? ret : null);
 };
 
 /** same as above, and then apply to a SPUI widget
