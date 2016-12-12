@@ -15,7 +15,8 @@ import SpinS3
 from SkynetLib import spin_targets, bid_coeff, \
      encode_one_param, encode_params, decode_params, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
      decode_adgroup_name, adgroup_name_is_bad, make_variable_regexp, adgroup_dtgt_filter_query, mongo_enc
-from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL
+from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL, \
+     BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
 
 HTTPLIB = 'requests'
 if HTTPLIB == 'requests':
@@ -1582,13 +1583,24 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         elif ad_type in (4,32,432):
             #creative['actor_name'] = title_text # but this gets ignored
 
+            if link_destination == 'bh_com':
+                page_id = BATTLEHOUSE_PAGE_ID
+                page_token = BATTLEHOUSE_PAGE_TOKEN
+            else:
+                page_id = game_data['page_id']
+                page_token = game_data['page_token']
+                #creative['mobile_store'] = 'fb_canvas'
+                #if 'app_icon' in game_data:
+                #    creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
+                creative['object_store_url'] = 'https://apps.facebook.com/'+game_data['namespace']+'/'
+
             if 0: # out-of-line creation
-                page_post_id = page_feed_post_make(db, game_data['page_id'], game_data['page_token'],
+                page_post_id = page_feed_post_make(db, page_id, page_token,
                                                    base_link_url, caption_text, title_text, body_text, tgt['image'],
                                                    call_to_action_type(tgt))
                 creative['object_story_id'] = page_post_id
             else: # inline creation
-                creative['object_story_spec'] = SpinJSON.dumps({'page_id': game_data['page_id'],
+                creative['object_story_spec'] = SpinJSON.dumps({'page_id': page_id,
                                                                 'link_data': {
                     'call_to_action': {'type': call_to_action_type(tgt),
                                        'value': {'link':base_link_url,
@@ -1603,10 +1615,6 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
             creative['url_tags'] = link_qs
             #creative['link_url'] = link_url
-            #creative['mobile_store'] = 'fb_canvas'
-            #if 'app_icon' in game_data:
-            #    creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
-            creative['object_store_url'] = 'https://apps.facebook.com/'+game_data['namespace']+'/'
 
         if ad_type == 1 and link_destination == 'app':
             # assert image is 871x627
