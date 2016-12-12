@@ -1608,11 +1608,12 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             # assert image is 871x627
             creative['related_fan_page'] = game_data['app_id'] # optional - this is the App ID for the App
         elif ad_type in (4,32,432):
+            pass
             # assert image is 871x627 (Type 1/4) or 1200x627 (Type 32)
 #            creative['actor_id'] = game_data['page_id']
 #            creative['object_id'] = game_data['app_id'] # App ID
-            if 'actor_name' not in creative:
-                creative['actor_name'] = game_data['app_name']
+#            if 'actor_name' not in creative:
+#                creative['actor_name'] = game_data['app_name']
 
     elif ad_type in (25,27):
         creative['url_tags'] = link_qs
@@ -1759,12 +1760,16 @@ def adgroup_targeting(db, tgt):
         ret['friends_of_connections'] = [{'id':game_data['app_id']}]
 
     # do not show on mobile devices
+    ret['device_platforms'] = ['desktop']
+
+    # show FB app ads on Facebook only (not Instagram or audience network)
+    if tgt.get('destination','app') in ('app','appcenter','app_page'):
+        ret['publisher_platforms'] = ['facebook']
+
     if tgt['ad_type'] == 32:
-        ret['page_types'] = ['desktopfeed']
+        ret['facebook_positions'] = ['feed']
     elif tgt['ad_type'] == 4:
-        ret['page_types'] = ['rightcolumn']
-    else:
-        ret['page_types'] = ['desktop']
+        ret['facebook_positions'] = ['right_hand_column']
 
     if tgt.get('include_already_connected_to_game',False):
         pass
