@@ -1402,7 +1402,7 @@ def check_modstat(effect, reason, affects = None, expect_level = None, expect_it
                     level = int(matches.group('level'))
                     if level != expect_level:
                         # special case for high-level TR/DV turret heads that don't have custom assets yet
-                        if gamedata['game_id'] in ('tr','dv') and level < expect_level and expect_level >= 17 and \
+                        if gamedata['game_id'] in ('tr','dv') and level < expect_level and expect_level >= 11 and \
                            'turret_head_' in matches.group('root'):
                             pass
                         else:
