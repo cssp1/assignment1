@@ -1861,7 +1861,7 @@ class User:
 
         if last_hit_time < 0:
             # on very first hit, force player cache update to publish ui_name
-            session.player.send_player_cache_update(session, 'change_alias')
+            gamesite.gameapi.send_player_cache_update(session, 'retrieve_bh_info_complete')
 
         session.send([["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]],
                       ["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player), 'retrieve_bh_info_complete']],
@@ -1922,6 +1922,8 @@ class User:
                     notify_client = False
                 else:
                     session.player.cooldown_trigger('bh_invite_already_linked_error_displayed', 3*86400)
+            else:
+                gamesite.exception_log.event(server_time, 'accept_bh_invite(%s): bad response %r' % (invite_code, response))
 
             if notify_client:
                 session.send([["NOTIFICATION", {"format":"bh", "ui_body": response['error']}]], flush_now = True)
