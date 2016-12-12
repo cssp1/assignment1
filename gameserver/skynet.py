@@ -1547,6 +1547,10 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         link_url = base_link_url + '?' + link_qs
         #creative['call_to_action_type'] = 'OPEN_LINK' # 'PLAY_GAME'
         caption_text = game_data['app_name']
+    elif link_destination == 'bh_com':
+        base_link_url = 'https://www.battlehouse.com/play/'+game_data['namespace']
+        link_url = base_link_url + '?' + link_qs
+        caption_text = game_data['app_name']
     else:
         raise Exception('unknown link destination type '+link_destination)
 
