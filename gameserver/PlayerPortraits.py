@@ -82,8 +82,12 @@ class PlayerPortraits(object):
         try:
             if int(status) != 200:
                 # log this error as per-frame-platform since it's going to be common on Facebook - don't pollute main log
-                func = self.log_exception_func_map.get(frame_platform, self.log_exception_func_map['default'])
-                func('PlayerPortrait update got non-OK status %r for URL %r: %r' % (status, url, body))
+                if frame_platform == 'bh' and int(status) == 502:
+                    # don't bother logging BHLogin portrait retrieval failures
+                    pass
+                else:
+                    func = self.log_exception_func_map.get(frame_platform, self.log_exception_func_map['default'])
+                    func('PlayerPortrait update got non-OK status %r for URL %r: %r' % (status, url, body))
                 d.callback((False, 'image/png', unknown_person_portrait_50x50_png))
                 return
             content_type = headers['content-type'][-1] if 'content-type' in headers else None
