@@ -39,6 +39,16 @@ def bh_clicks_schema(sql_util):
                        ],
             'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
             }
+def bh_login_campaign_summary_schema(sql_util):
+    return {'fields': [('day', 'INT8 NOT NULL'),
+                       ('event_name', 'VARCHAR(1024) NOT NULL'),
+                       ('event_data', 'VARCHAR(1024)'),
+                       ('campaign_source', 'VARCHAR(1024)'),
+                       ('campaign_id', 'VARCHAR(1024)'),
+                       ('count', 'INT4 NOT NULL'),
+                       ],
+            'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
+            }
 def bh_login_summary_schema(sql_util):
     return {'fields': [('day', 'INT8 NOT NULL'),
                        ('event_name', 'VARCHAR(1024) NOT NULL'),
@@ -97,6 +107,7 @@ def get_report(analytics, day_start, dt, list_of_metrics, list_of_dimensions = N
     if list_of_dimensions:
         ret = []
         for row in rows:
+#            if verbose: print row
             d = dict((met, int(row['metrics'][0]['values'][i])) for i, met in enumerate(list_of_metrics))
             d.update(dict((dim, row['dimensions'][j]) for j, dim in enumerate(list_of_dimensions)))
             ret.append(d)
@@ -110,7 +121,7 @@ def get_summary_report(analytics, day_start, dt):
 def get_detail_report(analytics, day_start, dt):
     report = get_report(analytics, day_start, dt, ['ga:pageviews'], ['ga:fullReferrer', 'ga:hostname', 'ga:pagePath'])
     return report
-def get_event_report(analytics, categories, day_start, dt):
+def get_event_report(analytics, categories, day_start, dt, extra_dimensions = []):
     filter_clause = {'dimensionName': 'ga:eventCategory',
                      'expressions': categories}
     if len(categories) > 1:
@@ -118,7 +129,7 @@ def get_event_report(analytics, categories, day_start, dt):
     else:
         filter_clause['operator'] = 'EXACT'
 
-    report = get_report(analytics, day_start, dt, ['ga:totalEvents'], ['ga:eventAction', 'ga:eventLabel'],
+    report = get_report(analytics, day_start, dt, ['ga:totalEvents'], ['ga:eventAction', 'ga:eventLabel'] + extra_dimensions,
                         dimension_filter_clauses = [{'filters': [filter_clause]}])
     return report
 
@@ -161,6 +172,7 @@ if __name__ == '__main__':
     bh_detail_table = cfg['table_prefix']+'bh_daily_detail'
     bh_clicks_table = cfg['table_prefix']+'bh_daily_clicks'
     bh_login_summary_table = cfg['table_prefix']+'bh_login_daily_summary'
+    bh_login_campaign_summary_table = cfg['table_prefix']+'bh_login_campaign_daily_summary'
 
     cur = con.cursor(MySQLdb.cursors.DictCursor)
 
@@ -168,12 +180,13 @@ if __name__ == '__main__':
                           (bh_detail_table, bh_detail_schema(sql_util)),
                           (bh_clicks_table, bh_clicks_schema(sql_util)),
                           (bh_login_summary_table, bh_login_summary_schema(sql_util)),
+                          (bh_login_campaign_summary_table, bh_login_campaign_summary_schema(sql_util)),
                           ):
         sql_util.ensure_table(cur, table, schema)
         con.commit()
 
     # find applicable time range
-    start_time = calendar.timegm([2016,9,1,0,0,0]) # start collecting data September 1, 2016
+    start_time = calendar.timegm([2016,12,5,0,0,0]) # start collecting data December 5, 2016
     end_time = 86400 * (time_now // 86400) # start of today
 
     analytics = initialize_analyticsreporting()
@@ -205,11 +218,28 @@ if __name__ == '__main__':
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",event_name,event_data,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:eventAction'],row.get('ga:eventLabel',None), row['ga:totalEvents']) for row in report))
+                            ((day_start,
+                              row['ga:eventAction'],
+                              row.get('ga:eventLabel',None),
+                              row['ga:totalEvents']) for row in report))
+        elif table == bh_login_campaign_summary_table:
+            report = get_event_report(analytics, ["bhlogin"], day_start, dt,
+                                      extra_dimensions = ['ga:source', 'ga:campaignCode'])
+            cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
+                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_source,campaign_id,count) " + \
+                            "VALUES(%s,%s,%s,%s,%s,%s)",
+                            ((day_start,
+                              row['ga:eventAction'],
+                              row.get('ga:eventLabel',None),
+                              row.get('ga:source',None),
+                              row.get('ga:campaignCode',None),
+                              row['ga:totalEvents']) for row in report))
 
     for table, affected, interval, dt in ((bh_summary_table, set(), 'day', 86400),
                                           (bh_detail_table, set(), 'day', 86400),
                                           (bh_clicks_table, set(), 'day', 86400),
-                                          (bh_login_summary_table, set(), 'day', 86400)):
+                                          (bh_login_summary_table, set(), 'day', 86400),
+                                          (bh_login_campaign_summary_table, set(), 'day', 86400),
+                                          ):
         SpinETL.update_summary(sql_util, con, cur, table, affected, [start_time,end_time], interval, dt, verbose=verbose, dry_run=dry_run,
                                execute_func = do_update, resummarize_tail = 2*86400)
