@@ -1916,12 +1916,16 @@ class User:
             # error - local notification only
             notify_client = True
 
-            if response.get('error_code') == 'AlreadyLinkedError':
-                # don't show "already linked" error repeatedly
-                if session.player.cooldown_active('bh_invite_already_linked_error_displayed'):
+            known_errors = {'AlreadyLinkedError': 'bh_invite_already_linked_error_displayed',
+                            'SelfInviteError': 'bh_invite_self_invite_error_displayed'}
+
+            if response.get('error_code') in known_errors:
+                # don't show same error repeatedly
+                cd_name = known_errors[response['error_code']]
+                if session.player.cooldown_active(cd_name):
                     notify_client = False
                 else:
-                    session.player.cooldown_trigger('bh_invite_already_linked_error_displayed', 3*86400)
+                    session.player.cooldown_trigger(cd_name, 3*86400)
             else:
                 gamesite.exception_log.event(server_time, 'accept_bh_invite(%s): bad response %r' % (invite_code, response))
 
