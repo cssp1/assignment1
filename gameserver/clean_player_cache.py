@@ -16,8 +16,8 @@ import time, re
 import SpinJSON, SpinConfig
 
 time_now = int(time.time())
-weekly_score_pattern = re.compile('^(score|quarry_resources|hive_kill_points|trophies|tokens_looted)_.*_wk([0-9]+)$')
-season_score_pattern = re.compile('^(score|quarry_resources|hive_kill_points|trophies|tokens_looted)_.*_s([0-9]+)$')
+weekly_score_pattern = re.compile('^(score|quarry_resources|hive_kill_points|damage_inflicted_pve|trophies|tokens_looted)_.*_wk([0-9]+)$')
+season_score_pattern = re.compile('^(score|quarry_resources|hive_kill_points|damage_inflicted_pve|trophies|tokens_looted)_.*_s([0-9]+)$')
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 cur_season = -1 # always prune
 cur_week = -1 # always prune

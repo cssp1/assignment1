@@ -245,6 +245,7 @@ SCORE_FIELDS = {
     'conquests': {'history_prefix': 'score_conquests'},
     'havoc_caused': {'history_prefix': 'score_havoc'},
     'damage_inflicted': {'history_prefix': 'score_damage'},
+    'damage_inflicted_pve': {'history_prefix': 'score_damage_pve'},
     'quarry_resources': {'history_prefix': 'quarry_resources', 'region_specific': True},
     'strongpoint_resources': {'history_prefix': 'strongpoint_resources', 'region_specific': True, 'leaderboard_query_is_region_specific': False},
     'hive_kill_points': {'history_prefix': 'hive_kill_points', 'region_specific': True, 'leaderboard_query_is_region_specific': False},
@@ -18499,6 +18500,8 @@ class GAMEAPI(resource.Resource):
                     stats['resources_looted'] = sum((session.loot.get(res,0) for res in gamedata['resources']),0)
                     stats['havoc_caused'] = session.loot.get('havoc_caused',0) if is_conquest else 0
                     stats['damage_inflicted'] = session.loot.get('damage_inflicted',0)
+                    if session.viewing_player.is_ai():
+                        stats['damage_inflicted_pve'] = session.loot.get('damage_inflicted',0)
                     stats['hive_kill_points'] = session.loot.get('hive_kill_points',0) # must be set via SESSION_LOOT consequent
 
                 stats['tokens_looted'] = sum([item.get('stack',1) for item in session.loot.get('items',[]) \

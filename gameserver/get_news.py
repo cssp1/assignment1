@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # score leaders
     news['score_leaders'] = {}
-    for category in ('xp', 'resources_looted', 'damage_inflicted', 'trophies_pvp', 'hive_kill_points', 'tokens_looted'):
+    for category in ('xp', 'resources_looted', 'damage_inflicted', 'damage_inflicted_pve', 'trophies_pvp', 'hive_kill_points', 'tokens_looted'):
         leaders_list = api.player_scores2_get_leaders([(category, make_point(FREQ_WEEK, pvp_week, SPACE_ALL, SPACE_ALL_LOC))], 1)[0]
         if not leaders_list: continue
         leader = leaders_list[0]

@@ -1102,6 +1102,8 @@ class HandleResolveHomeRaid(Handler):
                 stats['resources_looted'] = sum((summary['loot'].get(res,0) for res in self.gamedata['resources']),0)
                 stats['havoc_caused'] = summary['loot'].get('havoc_caused',0) if is_conquest else 0
                 stats['damage_inflicted'] = summary['loot'].get('damage_inflicted',0)
+                if defender_player.is_ai():
+                    stats['damage_inflicted_pve'] = summary['loot'].get('damage_inflicted',0)
 
                 # update defender's trophy stats immediately
                 if actual_loot.get('viewing_trophies_pvp',0):
