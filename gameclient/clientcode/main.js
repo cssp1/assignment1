@@ -49043,6 +49043,21 @@ function create_mouse_tooltip() {
                 }
             }
 
+            // show enhancements, on player only
+            if(obj.team === 'player' && obj.enhancements) {
+                for(var enh_name in obj.enhancements) {
+                    if(enh_name in gamedata['enhancements']) {
+                        var enh_level = obj.enhancements[enh_name];
+                        var enh_ui_name = gamedata['enhancements'][enh_name]['ui_name']
+                        //str.push(enh_ui_name + ' L'+enh_level.toFixed(0));
+                        str.push(enh_ui_name + ' ' +
+                                 gamedata['strings']['cursors']['level_x_of_y']
+                                 .replace('%cur', enh_level.toFixed(0))
+                                 .replace('%max', get_max_level(gamedata['enhancements'][enh_name]).toFixed(0)));
+                    }
+                }
+            }
+
             if(player.get_any_abtest_value('enable_equipment', gamedata['client']['enable_equipment'])) {
                 // list equipped items
 
