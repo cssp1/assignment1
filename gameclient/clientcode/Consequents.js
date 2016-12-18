@@ -558,6 +558,20 @@ InvokeMapConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeLeaderboardConsequent(data) {
+    goog.base(this, data);
+    self.period = data['period'] || null;
+    self.mode = data['mode'] || null;
+    self.chapter = data['chapter'] || null;
+}
+goog.inherits(InvokeLeaderboardConsequent, Consequent);
+InvokeLeaderboardConsequent.prototype.execute = function(state) {
+    change_selection_ui(null);
+    invoke_leaderboard(self.period, self.mode, self.chapter);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function InvokeManufactureDialogConsequent(data) {
     goog.base(this, data);
     this.category = data['category'] || null;
@@ -864,6 +878,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_BUILD_DIALOG') { return new InvokeBuildDialogConsequent(data); }
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
     else if(kind === 'INVOKE_MAP_DIALOG') { return new InvokeMapConsequent(data); }
+    else if(kind === 'INVOKE_LEADERBOARD_DIALOG') { return new InvokeLeaderboardConsequent(data); }
     else if(kind === 'INVOKE_MANUFACTURE_DIALOG') { return new InvokeManufactureDialogConsequent(data); }
     else if(kind === 'INVOKE_BLUEPRINT_CONGRATS') { return new InvokeBlueprintCongratsConsequent(data); }
     else if(kind === 'INVOKE_CHANGE_REGION_DIALOG') { return new InvokeChangeRegionDialogConsequent(data); }

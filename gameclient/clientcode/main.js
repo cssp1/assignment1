@@ -27468,9 +27468,9 @@ function compare_achievements(_achdata) {
     };
 }
 
-/** @param {string=} force_period
-    @param {string=} force_mode
-    @param {string=} force_chapter */
+/** @param {string|null=} force_period
+    @param {string|null=} force_mode
+    @param {string|null=} force_chapter */
 function invoke_leaderboard(force_period, force_mode, force_chapter) {
     player.record_feature_use('leaderboard');
 
