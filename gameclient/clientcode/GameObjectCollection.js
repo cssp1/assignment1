@@ -230,6 +230,10 @@ GameObjectCollection.GameObjectCollection.prototype.apply_snapshot = function(sn
         }
         if('changed' in snap) {
             goog.object.forEach(snap['changed'], function(/** !Object<string,?> */ s, /** string */ id) {
+                if(!this.has_object(id)) {
+                    console.log('attempt to change nonexistent object! '+id);
+                    return;
+                }
                 var obj = this.objects[id];
                 obj.apply_snapshot(s);
             }, this);
