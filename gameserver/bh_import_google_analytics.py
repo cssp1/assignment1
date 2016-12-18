@@ -63,9 +63,6 @@ from apiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
 
 import httplib2
-from oauth2client import client
-from oauth2client import file
-from oauth2client import tools
 
 SCOPES = ['https://www.googleapis.com/auth/analytics.readonly']
 DISCOVERY_URI = ('https://analyticsreporting.googleapis.com/$discovery/rest')
