@@ -110,9 +110,13 @@ def ensure_keys_are_unique(targets):
 ensure_keys_are_unique(spin_targets)
 
 def make_variable_regexp(template):
-    return template.replace('$DATE', '(?P<DATE>[0-9]{8})').replace('$COUNTRY', '(?P<COUNTRY>[a-z,]+)')+'$'
+    return template \
+           .replace('$DATE', '(?P<DATE>[0-9]{8})') \
+           .replace('$COUNTRY', '(?P<COUNTRY>[a-z,]+)') \
+           .replace('$GAME', '(?P<GAME>[a-z0-9,]+)') \
+           +'$'
 
-MATCH_VARIABLES = ('DATE', 'COUNTRY')
+MATCH_VARIABLES = ('DATE', 'COUNTRY', 'GAME')
 def collapse_match_variables(template, matches):
     # perform variable replacements from the matching abbrev into the value
     for varname in MATCH_VARIABLES:
