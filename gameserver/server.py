@@ -507,7 +507,7 @@ class AdminStats:
         self.revenue = 0.0
         self.users_seen = set()
         self.paying_users_seen = set()
-        self.new_users_seen = set()
+        self.new_users_logged_in = set()
         self.last_payments = collections.deque([], 10)
         self.last_gamebucks = collections.deque([], 10)
         self.campaigns = {}
@@ -575,7 +575,7 @@ class AdminStats:
         if is_paying:
             self.paying_users_seen.add(user_id)
         if is_new:
-            self.new_users_seen.add(user_id)
+            self.new_users_logged_in.add(user_id)
 
     def add_revenue(self, user_id, dollar_amount, descr):
         self.revenue += dollar_amount
@@ -594,8 +594,10 @@ class AdminStats:
 
     def add_logout(self, user_id, campaign, length):
         # only track FIRST visits
-        if user_id not in self.new_users_seen:
+        if user_id not in self.new_users_logged_in:
             return
+
+        self.new_users_logged_in.remove(user_id)
 
         if campaign not in self.campaigns:
             self.campaigns[campaign] = {'lengths': collections.deque([], 5), 'num': 0}
@@ -638,17 +640,9 @@ class AdminStats:
         up_days = up_hours/24.0
         props['uptime hours'] = up_hours
         props['revenue'] = self.revenue
-        props['revenue/day (projected)'] = self.revenue / up_days
-        props['revenue (developers)'] = self.developer_revenue
         props['unique users'] = len(self.users_seen)
-        props['unique paying users'] = len(self.paying_users_seen)
-        props['unique new users'] = len(self.new_users_seen)
         DAU = len(self.users_seen) / up_days
-        PDAU = len(self.paying_users_seen) / up_days
         props['DAU (projected)'] = DAU
-        props['PDAU (projected)'] = PDAU
-        props['ARPDAU (projected)'] = self.revenue / (DAU+0.0001)
-        props['ARPPDAU (paying, projected)'] = self.revenue / (PDAU+0.0001)
         return props
 
     def get_campaigns(self):
