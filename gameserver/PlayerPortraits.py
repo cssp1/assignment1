@@ -179,8 +179,8 @@ class PlayerPortraits(object):
         request.setHeader(b'Content-Length', b'%d' % len(binary_data))
 
         if is_success:
-            # Cache for 1m by default
-            max_age = 60
+            # Cache for 1 hour by default
+            max_age = 3600
             request.setHeader(b'Cache-Control', b'max-age=%d' % (max_age))
         else:
             # failed portraits should not be cached
