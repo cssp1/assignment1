@@ -6450,6 +6450,7 @@ class TechSpec(Spec):
 class EnhancementSpec(Spec):
     table = {}
     fields = [ ["enhance_credit_cost", 999],
+               ["enhance_gamebucks_cost", 999],
                ] + resource_fields("cost") + [
                ["enhance_time", 0],
                ["ingredients", None],
@@ -15738,7 +15739,7 @@ class Store(object):
             price_description.append('%dunits' % n_units)
             return sum_price, p_currency
 
-        elif (formula == 'upgrade') or (formula == 'research') or (formula == 'enhance') or (formula == 'craft_gamebucks'):
+        elif (formula == 'upgrade') or (formula == 'research') or (formula.startswith('enhance')) or (formula == 'craft_gamebucks'):
             unit = None
 
             if unit_id == GameObject.VIRTUAL_ID and session.player.is_cheater and formula == 'research':
@@ -15765,7 +15766,7 @@ class Store(object):
                     error_reason.append('cannot upgrade, research, or craft because building is damaged')
                     return -1, p_currency
                 # can't upgrade or research while busy, with the one exception that instant research is allowed if building is currently researching
-                if unit.is_busy() and (not ((formula == 'research' and unit.is_researching()) or (formula == 'enhance' and unit.is_enhancing()))):
+                if unit.is_busy() and (not ((formula == 'research' and unit.is_researching()) or (formula.startswith('enhance') and unit.is_enhancing()))):
                     error_reason.append('cannot upgrade, research, or craft while busy with activity: '+unit.activity_description(session.player))
                     return -1, p_currency
 
@@ -15826,7 +15827,7 @@ class Store(object):
                 #if 'level' in spellarg: price_description.append('level'+str(arg.recipe_level))
                 price = GameObjectSpec.get_leveled_quantity(recipe.get('craft_gamebucks_cost',-1), arg.recipe_level)
 
-            elif formula == 'enhance':
+            elif formula.startswith('enhance'):
                 enh_name = spellarg[0]
                 new_level = spellarg[1]
 
@@ -15877,7 +15878,13 @@ class Store(object):
                             return -1, p_currency
 
                 price_description.append('level'+str(new_level))
-                price = EnhancementSpec.get_leveled_quantity(spec.enhance_credit_cost, new_level)
+                if formula == 'enhance_gamebucks':
+                    p_currency = 'gamebucks'
+                    price = EnhancementSpec.get_leveled_quantity(spec.enhance_gamebucks_cost, new_level)
+                elif formula == 'enhance':
+                    price = EnhancementSpec.get_leveled_quantity(spec.enhance_credit_cost, new_level)
+                else:
+                    raise Exception('unhandled formula/cost %r for %r' % (formula, enh_name))
 
             else:
                 assert formula == 'research'

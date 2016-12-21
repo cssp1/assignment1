@@ -44322,7 +44322,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         return [sum_price, p_currency];
 
-    } else if(formula === 'upgrade' || formula === 'research' || formula === 'enhance' || formula === 'craft_gamebucks') {
+    } else if(formula === 'upgrade' || formula === 'research' || formula.indexOf('enhance') === 0 || formula === 'craft_gamebucks') {
         var unit = null;
         if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula === 'research') {
 
@@ -44330,7 +44330,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
             unit = session.get_real_world().objects.get_object(unit_id);
             if(!unit.is_building() || unit.is_damaged() ||
                (unit.is_busy() && !(((formula==='research') && unit.is_researching()) ||
-                                    ((formula==='enhance') && unit.is_enhancing())))) {
+                                    ((formula.indexOf('enhance') === 0) && unit.is_enhancing())))) {
                 return [-1, p_currency];
             }
         }
@@ -44449,7 +44449,7 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
             price = get_leveled_quantity(recipe['craft_gamebucks_cost']||-1, recipe_level);
 
-        } else if(formula === 'enhance') {
+        } else if(formula.indexOf('enhance') === 0) {
             var enh_name = spellarg[0];
             var new_level = spellarg[1];
             var spec = gamedata['enhancements'][enh_name];
@@ -44493,7 +44493,14 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 }
             }
 
-            price = get_leveled_quantity(spec['enhance_credit_cost'], new_level);
+            if(formula === 'enhance_gamebucks' && 'enhance_gamebucks_cost' in spec) {
+                p_currency = 'gamebucks';
+                price = get_leveled_quantity(spec['enhance_gamebucks_cost'], new_level);
+            } else if(formula === 'enhance' && 'enhance_credit_cost' in spec) {
+                price = get_leveled_quantity(spec['enhance_credit_cost'], new_level);
+            } else {
+                throw Error('unhandled formula/cost '+formula+' for '+enh_name);
+            }
 
         } else {
             // tech research
