@@ -43055,10 +43055,16 @@ function update_upgrade_dialog(dialog) {
     var credit_check = -1; // only check if cost is <0
     if(tech && 'research_credit_cost' in tech) {
         credit_check = tech['research_credit_cost'];
+    } else if(tech && 'research_gamebucks_cost' in tech) {
+        credit_check = tech['research_gamebucks_cost'];
     } else if(tech && 'enhance_credit_cost' in tech) {
         credit_check = tech['enhance_credit_cost'];
+    } else if(tech && 'enhance_gamebucks_cost' in tech) {
+        credit_check = tech['enhance_gamebucks_cost'];
     } else if(unit && 'upgrade_credit_cost' in unit.spec) {
         credit_check = unit.spec['upgrade_credit_cost'];
+    } else if(unit && 'upgrade_gamebucks_cost' in unit.spec) {
+        credit_check = unit.spec['upgrade_gamebucks_cost'];
     }
 
     if(get_leveled_quantity(credit_check, new_level) < 0) {
@@ -44322,14 +44328,14 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
         }
         return [sum_price, p_currency];
 
-    } else if(formula === 'upgrade' || formula === 'research' || formula.indexOf('enhance') === 0 || formula === 'craft_gamebucks') {
+    } else if(formula === 'upgrade' || formula.indexOf('research') === 0 || formula.indexOf('enhance') === 0 || formula === 'craft_gamebucks') {
         var unit = null;
-        if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula === 'research') {
+        if(unit_id == GameObject.VIRTUAL_ID && player.is_cheater && formula.indexOf('research') === 0) {
 
         } else {
             unit = session.get_real_world().objects.get_object(unit_id);
             if(!unit.is_building() || unit.is_damaged() ||
-               (unit.is_busy() && !(((formula==='research') && unit.is_researching()) ||
+               (unit.is_busy() && !(((formula.indexOf('research') === 0) && unit.is_researching()) ||
                                     ((formula.indexOf('enhance') === 0) && unit.is_enhancing())))) {
                 return [-1, p_currency];
             }
@@ -44562,7 +44568,15 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 }
             }
 
-            price = get_leveled_quantity(spec['research_credit_cost'], new_level);
+            if(formula === 'research_gamebucks' && 'research_gamebucks_cost' in spec) {
+                p_currency = 'gamebucks';
+                price = get_leveled_quantity(spec['research_gamebucks_cost'], new_level);
+            } else if(formula === 'research' && 'research_credit_cost' in spec) {
+                price = get_leveled_quantity(spec['research_credit_cost'], new_level);
+            } else {
+                throw Error('unhandled formula/cost '+formula+' for '+spellarg);
+            }
+
             var factor = player.get_any_abtest_value('tech_muffin_factor', gamedata['store']['tech_muffin_factor']);
             if(factor != 1) {
                 price = Math.round(factor*price);
