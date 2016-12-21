@@ -44368,7 +44368,12 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 }
             }
 
-            price = get_leveled_quantity(unit.spec['upgrade_credit_cost']||-1, unit.level+1);
+            if('upgrade_gamebucks_cost' in unit.spec) {
+                p_currency = 'gamebucks';
+                price = get_leveled_quantity(unit.spec['upgrade_gamebucks_cost']||-1, unit.level+1);
+            } else {
+                price = get_leveled_quantity(unit.spec['upgrade_credit_cost']||-1, unit.level+1);
+            }
             var factor = player.get_any_abtest_value('building_muffin_factor', gamedata['store']['building_muffin_factor']);
             if(factor != 1) {
                 price = Math.round(factor*price);

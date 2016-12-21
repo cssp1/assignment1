@@ -6225,6 +6225,7 @@ class GameObjectSpec(Spec):
         ] + resource_fields("build_cost") + [
         ["upgrade_ingredients", None],
         ["upgrade_credit_cost", -1],
+        ["upgrade_gamebucks_cost", -1],
         ["upgrade_speedup_cost_factor", 1],
         ["upgrade_xp",-1],
         ["proposed_upgrade_xp", -1], # for debug messages only
@@ -15801,7 +15802,12 @@ class Store(object):
                             return -1, p_currency
 
                 price_description.append('level'+str(unit.level+1))
-                price = GameObjectSpec.get_leveled_quantity(unit.spec.upgrade_credit_cost, unit.level+1)
+                if unit.spec.upgrade_gamebucks_cost is not -1:
+                    p_currency = 'gamebucks'
+                    price = GameObjectSpec.get_leveled_quantity(unit.spec.upgrade_gamebucks_cost, unit.level+1)
+                else:
+                    price = GameObjectSpec.get_leveled_quantity(unit.spec.upgrade_credit_cost, unit.level+1)
+
                 if price > 0:
                     factor = session.player.get_any_abtest_value('building_muffin_factor', gamedata['store']['building_muffin_factor'])
                     if factor != 1:
