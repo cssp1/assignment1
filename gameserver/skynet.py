@@ -1469,7 +1469,7 @@ def adimage_get_s3_url(db, image):
         print 'done'
     return entry['url']
 
-def _page_feed_post_make(db, page_id, page_token, link, caption, title, body, image, call_to_action):
+def _page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action):
     params = {'access_token': page_token,
               'call_to_action': SpinJSON.dumps({'type': call_to_action,
                                                 'value': {'link':link,
@@ -1480,14 +1480,16 @@ def _page_feed_post_make(db, page_id, page_token, link, caption, title, body, im
               'published': 'false'
               }
     if caption: params['caption'] = caption
+    if description: params['description'] = description
     entry = fb_api(SpinFacebook.versioned_graph_endpoint('page/feed', page_id+'/feed'), post_params = params)
     return entry
 
-def page_feed_post_make(db, page_id, page_token, link, caption, title, body, image, call_to_action):
+def page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action):
     if dry_run: return '0'
     page_post_key = {'page_id': page_id,
                      'link': link,
                      'caption': caption,
+                     'description': description,
                      'title': title,
                      'body': body,
                      'image': image,
@@ -1497,7 +1499,7 @@ def page_feed_post_make(db, page_id, page_token, link, caption, title, body, ima
     if cached:
         return cached['id']
     else:
-        entry = _page_feed_post_make(db, page_id, page_token, link, caption, title, body, image, call_to_action)
+        entry = _page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action)
         assert entry and entry['id']
         entry['_id'] = page_post_key_hash
         entry[spin_field('key')] = page_post_key
@@ -1533,7 +1535,8 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
     link_qs = 'spin_campaign=%s&%s=%s' % (campaign_name, tgt_key, spin_atgt)
     link_destination = tgt.get('destination','app')
-    caption_text = None
+    link_caption = None
+    link_description = None
 
     if link_destination == 'app':
         base_link_url = 'https://apps.facebook.com/'+game_data['namespace']+'/'
@@ -1547,11 +1550,12 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         base_link_url = 'https://www.facebook.com/'+game_data['page_id']+'/'
         link_url = base_link_url + '?' + link_qs
         #creative['call_to_action_type'] = 'OPEN_LINK' # 'PLAY_GAME'
-        caption_text = game_data['app_name']
+        link_caption = game_data['app_name']
     elif link_destination == 'bh_com':
         base_link_url = 'https://www.battlehouse.com/play/'+game_data['namespace']
         link_url = base_link_url + '?' + link_qs
-        caption_text = game_data['app_name']
+        link_caption = None # FB requires that this include the domain of the link game_data['app_name']
+        link_description = 'Multiplayer - Free-to-play - Clan Wars'
     else:
         raise Exception('unknown link destination type '+link_destination)
 
@@ -1596,22 +1600,25 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
             if 0: # out-of-line creation
                 page_post_id = page_feed_post_make(db, page_id, page_token,
-                                                   base_link_url, caption_text, title_text, body_text, tgt['image'],
+                                                   base_link_url, link_caption, link_description, title_text, body_text, tgt['image'],
                                                    call_to_action_type(tgt))
                 creative['object_story_id'] = page_post_id
             else: # inline creation
-                creative['object_story_spec'] = SpinJSON.dumps({'page_id': page_id,
-                                                                'link_data': {
-                    'call_to_action': {'type': call_to_action_type(tgt),
-                                       'value': {'link':base_link_url,
-                                                 'link_title':title_text}},
-                    'message': body_text,
-                    'name': title_text,
-                    'link': base_link_url,
-                    'caption': game_data['app_name'],
-                    'picture': adimage_get_s3_url(db, tgt['image']),
-                    }
-                                                                })
+                cr_params = {'page_id': page_id,
+                             'link_data': {'call_to_action': {'type': call_to_action_type(tgt),
+                                                              'value': {'link':base_link_url,
+                                                                        'link_title':title_text}},
+                                           'message': body_text,
+                                           'name': title_text,
+                                           'link': base_link_url,
+                                           'picture': adimage_get_s3_url(db, tgt['image']),
+                                           }
+                             }
+                if link_caption:
+                    cr_params['link_data']['caption'] = link_caption
+                if link_description:
+                    cr_params['link_data']['description'] = link_description
+                creative['object_story_spec'] = SpinJSON.dumps(cr_params)
 
             creative['url_tags'] = link_qs
             #creative['link_url'] = link_url
