@@ -15758,8 +15758,8 @@ function display_user_chat_body(body, base_props, home_region) {
 
     // perform final BBCode substitution, eating head of disp_body_safe and appending to tail of disp_body_final
     if(gamedata['strings']['chat_map_coords_regex'] && home_region) {
-        var map_coords_re = new RegExp(gamedata['strings']['chat_map_coords_regex'], 'g');
         while(true) {
+            var map_coords_re = new RegExp(gamedata['strings']['chat_map_coords_regex'], 'g');
             var result = map_coords_re.exec(disp_body_safe);
             if(result === null) { break; }
             // transfer the part of the string before the match
