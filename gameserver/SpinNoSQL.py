@@ -2630,7 +2630,7 @@ if __name__ == '__main__':
         stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc))
 
         if mode == 'leaders':
-            # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources damage_inflicted_pve; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
+            # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources damage_inflicted_pve trainee_completions; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
 
             leader_data = s2.player_scores2_get_leaders([stat_axes], 10)[0]
             assert time_scope == Scores2.FREQ_SEASON
@@ -2652,7 +2652,7 @@ if __name__ == '__main__':
 
 
         elif mode == 'winners':
-            assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources', 'hive_kill_points', 'damage_inflicted_pve')
+            assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources', 'hive_kill_points', 'damage_inflicted_pve', 'trainee_completions')
 
             top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
 

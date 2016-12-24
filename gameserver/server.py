@@ -255,6 +255,7 @@ SCORE_FIELDS = {
     'trophies_pvv': {'history_prefix': 'trophies_pvv'},
     'tokens_looted': {'history_prefix': 'tokens_looted'},
     'achievement_points': {'history_prefix': 'achievement_points'},
+    'trainee_completions': {'history_prefix': 'trainee_completions'},
     }
 
 SCORES2_MIGRATION_VERSION = 9
@@ -1893,6 +1894,14 @@ class User:
             self.bh_trainee_player_ids_cache = [bh_id_to_user_id[entry['target_id']] \
                                                 for entry in response['result']['my_targets']]
 
+            assert self.bh_id
+            completed_count = sum((1 for entry in response['result']['my_targets'] \
+                                   if entry.get('state') == 'complete' and \
+                                      entry.get('state_change_sender_id') == self.bh_id), 0)
+            if completed_count != session.player.history.get('trainee_completions', 0):
+                session.setmax_player_metric('trainee_completions', completed_count)
+                session.player.modify_scores({'trainee_completions':completed_count}, method='=', reason='retrieve_bh_friends')
+
         self.populate_friends_who_play(session)
 
     @inlineCallbacks
@@ -2028,6 +2037,9 @@ class User:
                                                           'user_id':sender_player_id,
                                                           'props': SpinJSON.dumps([gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)])
                                                           })
+            # tell sender to re-query list of trainees
+            gamesite.do_CONTROLAPI(session.user.user_id, {'method':'repopulate_friends',
+                                                          'user_id':sender_player_id})
             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'force':1,'multi_per_logout':1,
                                                           'send_ingame':1,'send_offline':0,'format':'bh', # note: no email on this one
                                                           'user_id':self.user_id,
