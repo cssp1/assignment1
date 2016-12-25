@@ -39,12 +39,19 @@ if __name__ == '__main__':
     battle_count = client.battles_table().find({'time': {'$gte': server_time - 86400}}).count()
     # number of players online right now
     online_count = client.sessions_table().count()
+    # number of logins within last week
+    logins_last_7d = client.log_buffer_table('log_sessions').find({'time': {'$gte': server_time - 7*86400}}).count()
+    # total number of player accounts created
+    accounts_created_total = client.player_cache().count()
 
     news = {'time': server_time,
             'game_id': gamedata['game_id'],
             'ui_game': gamedata['strings']['game_name'],
             'battles_last_24h': battle_count,
-            'online_count': online_count}
+            'logins_last_7d': logins_last_7d,
+            'online_count': online_count,
+            'accounts_created_total': accounts_created_total,
+            }
 
     # score leaders
     news['score_leaders'] = {}
