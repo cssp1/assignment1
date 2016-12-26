@@ -472,7 +472,7 @@ class FBVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.facebook_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = self.server_protocol + 'apps.facebook.com/' + SpinConfig.config['facebook_app_namespace'] + '/' + q_clean_qs(request.uri)
+        self.game_container = 'https://apps.facebook.com/' + SpinConfig.config['facebook_app_namespace'] + '/' + q_clean_qs(request.uri)
 
     # canvas_url is the URL for the CONTENTS of the iframe, used for refreshing/reloading the game - SHOULD include signed_request
     def canvas_url(self):
