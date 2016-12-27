@@ -15928,9 +15928,6 @@ function init_chat_frame() {
     if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances'])) {
         dialog.user_data['channel_names'].push('ALLIANCE');
     }
-    if(0 && player.is_developer()) {
-        dialog.user_data['channel_names'].push('DEVELOPER');
-    }
 
     change_chat_tab(dialog, null);
 
