@@ -1497,6 +1497,9 @@ class GameProxy(proxy.ReverseProxyResource):
         # check for signed_request (either sent as POST arg or GET query string)
         if 'signed_request' in request.args:
             visitor.raw_signed_request = request.args['signed_request'][-1]
+        elif 'spin_signed_request' in request.args:
+            visitor.raw_signed_request = request.args['spin_signed_request'][-1]
+
         elif (not SpinConfig.config.get('enable_facebook',0)) and (not SpinConfig.config.get('secure_mode',0)):
             # Facebook not enabled, use fake test user
 
@@ -1558,6 +1561,10 @@ class GameProxy(proxy.ReverseProxyResource):
 
                 if 'oauth_token' in signed_request:
                     visitor.oauth_token = signed_request['oauth_token']
+
+                # accept raw oauth_token from client flow (?)
+                elif (not visitor.oauth_token) and ('spin_oauth_token' in request.args):
+                    visitor.oauth_token = request.args['spin_oauth_token'][-1]
 
                 else:
                     # don't reset?
