@@ -36726,6 +36726,9 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
     if('understood_button_xy' in _tip) {
         dialog.widgets['ok_button'].xy = _tip['understood_button_xy'];
     }
+    if('understood_button_dimensions' in _tip) {
+        dialog.widgets['ok_button'].wh = vec_copy(_tip['understood_button_dimensions']);
+    }
     if('understood_button_ui_name' in _tip) {
         dialog.widgets['ok_button'].str = _tip['understood_button_ui_name'];
     }
