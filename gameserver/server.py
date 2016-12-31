@@ -22727,7 +22727,13 @@ class GAMEAPI(resource.Resource):
 
             # note: free and charge scans reset the timer. Paid do not.
             if source != 'paid':
-                session.player.cooldown_trigger('lottery_free', gamedata.get('lottery_free_interval', 86400))
+                interval = gamedata.get('lottery_free_interval', 86400)
+                origin = session.player.get_any_abtest_value('lottery_free_origin', gamedata.get('lottery_free_origin',-1))
+                if origin > 0: # periodic reset at fixed time each day
+                    duration = interval - ((session.player.get_absolute_time() - origin) % interval)
+                else:
+                    duration = interval
+                session.player.cooldown_trigger('lottery_free', duration)
                 retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
             # deduct resources
