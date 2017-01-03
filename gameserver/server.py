@@ -1819,7 +1819,7 @@ class User:
 
     def retrieve_bh_info(self, session, retmsg):
         if (None not in (self.bh_username,)) and \
-           ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', 14400)):
+           ((server_time - self.bh_hit_time) < gamedata['server'].get('battlehouse_cache_lifetime', -1)):
             # use cached data
             return defer.succeed(True)
 
