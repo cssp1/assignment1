@@ -598,6 +598,7 @@
 
     "lottery_reseed_cooldown": 900, // reseed lottery on a long cooldown, to avoid cheating by waiting for a good slate before spinning
     "lottery_free_interval": 86400, // how often you get a free lottery scan
+    "lottery_free_origin": 1337274000, // reset lottery at same time each day
 
     //    "lottery_available_during_scanner_upgrade": false,
     //    "lottery_available_during_scanner_repair": false,
