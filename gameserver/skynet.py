@@ -2752,7 +2752,10 @@ if __name__ == '__main__':
         if len(adgroup_list) < 1:
             sys.stderr.write('WARNING: did not find any current adgroups to record!\n')
         if count == 0:
-            sys.stderr.write('WARNING: did not record any ads with clicks, impressions, or spend!\n')
+            # alarm that we saw no data, so something might be wrong
+            # but, don't sound this constantly since ads might not be on in the first place
+            if (time_now % 86400) < 7200:
+                sys.stderr.write('WARNING: did not record any ads with clicks, impressions, or spend!\n')
 
     elif mode == 'adcreatives-pull':
         db.fb_adcreatives.drop()
