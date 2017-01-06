@@ -166,6 +166,9 @@ def make_token_request(config, game_id, frame_platform,
     if user_email:
         body_json['user']['email'] = { 'value': user_email }
 
+    body_json['user']['name'] = {'value': user_email or ' ' # what to show in the corner of the GUI
+                                 }
+
     return 'https://api.xsolla.com/merchant/merchants/%s/token' % config['xsolla_merchant_id'], 'POST', make_headers(config), SpinJSON.dumps(body_json)
 
 if __name__ == '__main__':
