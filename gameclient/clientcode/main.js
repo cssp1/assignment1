@@ -12902,7 +12902,8 @@ function update_desktop_dialogs() {
         dialog.widgets['user_abtest_message'].show = (player.tutorial_state == "COMPLETE" &&
                                                       !(player.quest_tracked && player.quest_tracked['ui_step']) &&
                                                       !session.has_attacked &&
-                                                      !session.incoming_attack_pending());
+                                                      !session.incoming_attack_pending() &&
+                                                      !anon_mode);
         dialog.widgets['user_abtest_message'].str = eval_cond_or_literal(player.get_any_abtest_value('ui_user_abtest_message', gamedata['strings']['ui_user_abtest_message'] || null), player, null) || null;
 
         dialog.widgets['edit_mode_message'].show = !!player.is_cheater;
