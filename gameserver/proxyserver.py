@@ -1031,7 +1031,9 @@ class GameProxy(proxy.ReverseProxyResource):
                 return self.index_visit_login_spam()
 
         # check for overload condition
-        if control_async_http.num_on_wire() >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',100):
+        on_wire = control_async_http.num_on_wire()
+        if on_wire >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',100):
+            raw_log.event(proxy_time, 'server_overload with %d on AsyncHTTP_CONTROLAPI wire' % (on_wire,))
             return self.index_visit_server_overload()
 
         if verbose() >= 2:
@@ -2125,6 +2127,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 if not success: # CONTROLAPI call failed
                     if verbose(): print 'invalidate: CONTROLAPI failure on server %s user %d session %s' % (prev_session.gameserver_name, session.user_id, prev_session.session_id)
                     session_load.remove(session.gameserver_name, session.session_id)
+                    raw_log.event(proxy_time, 'server_overload due to CONTROLAPI termination failure on server %s user %d session %s' % (prev_session.gameserver_name, session.user_id, prev_session.session_id))
                     ret = self.index_visit_server_overload()
                 else:
                     if not is_latest:
