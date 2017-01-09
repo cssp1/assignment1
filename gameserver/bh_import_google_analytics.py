@@ -21,6 +21,7 @@ def bh_summary_schema(sql_util):
                        ('pageviews', 'INT8 NOT NULL'),
                        ('sessions', 'INT8 NOT NULL'),
                        ('new_users', 'INT8 NOT NULL'),
+                       ('dau', 'INT8 NOT NULL'),
                        ],
             'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
             }
@@ -113,7 +114,8 @@ def get_report(analytics, day_start, dt, list_of_metrics, list_of_dimensions = N
         return [dict((met, int(row['metrics'][0]['values'][i])) for i, met in enumerate(list_of_metrics)) for row in rows]
 
 def get_summary_report(analytics, day_start, dt):
-    report = get_report(analytics, day_start, dt, ['ga:pageviews','ga:sessions','ga:newUsers'])
+    assert dt == 86400 # ga:newUsers requires one-day query
+    report = get_report(analytics, day_start, dt, ['ga:pageviews','ga:sessions','ga:newUsers','ga:1dayUsers'], ['ga:date'])
     return report
 def get_detail_report(analytics, day_start, dt):
     report = get_report(analytics, day_start, dt, ['ga:pageviews'], ['ga:fullReferrer', 'ga:hostname', 'ga:pagePath'])
@@ -193,9 +195,9 @@ if __name__ == '__main__':
         if table == bh_summary_table:
             report = get_summary_report(analytics, day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
-                            "("+sql_util.sym(interval)+",pageviews,sessions,new_users) " + \
-                            "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers']) for row in report))
+                            "("+sql_util.sym(interval)+",pageviews,sessions,new_users,dau) " + \
+                            "VALUES(%s,%s,%s,%s,%s)",
+                            ((day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers'], row['ga:1dayUsers']) for row in report))
 
         elif table == bh_detail_table:
             report = get_detail_report(analytics, day_start, dt)
