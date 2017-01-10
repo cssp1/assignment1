@@ -386,6 +386,9 @@ def get_tier_summary(building_names, tech_names):
     summary['new_buildings'][0] = [['N/A']]
 
     for name in tech_names:
+        # don't count special units
+        if name.startswith('special_'): continue
+
         data = gamedata['tech'][name]
         max_level = get_max_level(data)
         level = 0
@@ -444,11 +447,15 @@ def get_tier_requirement(pred, verbose = False):
             ret = max(ret, get_tier_requirement(spec['requires'][other_level-1], verbose = verbose))
         if verbose:
             print pred['tech'], 'level', pred['min_level'], 'at', ret, spec['requires'][other_level-1]
+    elif pred['predicate'] == 'LIBRARY':
+        return get_tier_requirement(gamedata['predicate_library'][pred['name']], verbose = verbose)
     elif pred['predicate'] == 'AND':
         for sub in pred['subpredicates']:
             ret = max(ret, get_tier_requirement(sub, verbose = verbose))
     elif pred['predicate'] == 'ALWAYS_TRUE':
         pass
+    elif pred['predicate'] == 'PLAYER_HISTORY':
+        pass # ignore this
     else:
         raise Exception('unhandled predicate %r' % pred)
     return ret
@@ -526,6 +533,7 @@ if __name__ == '__main__':
                 'spells': SpinConfig.load(args[3], stripped = True), # weapons only
                 'resources': SpinConfig.load(args[4]),
                 'store': SpinJSON.load(open(args[5])),
+                'predicate_library': SpinConfig.load(args[6]),
                 'townhall': tier_building
                 }
 
