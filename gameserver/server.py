@@ -25951,7 +25951,7 @@ class GAMEAPI(resource.Resource):
         playtime = logout_time - session.login_time
 
         # close final session
-        session.player.history['sessions'][-1][1] = server_time # XXX maybe should use logout_time here?
+        session.player.history['sessions'][-1][1] = logout_time
 
         metric_event_coded(session.user.user_id, '0900_logged_out',
                            {'method': method,
