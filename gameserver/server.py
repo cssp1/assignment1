@@ -13221,6 +13221,8 @@ class LivePlayer(Player):
             reason += ['%s - stayed logged in for %d (more than %d) out of the last %d hours' % (self.lockout_message, continuous_time/3600, CONTINUOUS_LIMIT/3600, CONTINUOUS_RANGE/3600)]
         elif (continuous_time >= CONTINUOUS_WARN) and (not pardoned):
             abuse_warning_msg += [["LOGIN_ABUSE_WARNING", continuous_time + settings['continuous_warn_fudge'], CONTINUOUS_LIMIT + settings['continuous_warn_fudge'], CONTINUOUS_RANGE]]
+            if settings.get('log_detail',0) >= 2:
+                gamesite.exception_log.event(server_time, 'LOGIN_ABUSE_WARNING user %d continuous_time %d cur_session_length %d' % (self.user_id, continuous_time, cur_session_length))
 
         if lockout:
             self.lockout_count += 1
@@ -25950,6 +25952,11 @@ class GAMEAPI(resource.Resource):
 
         # close final session
         session.player.history['sessions'][-1][1] = server_time # XXX maybe should use logout_time here?
+
+        metric_event_coded(session.user.user_id, '0900_logged_out',
+                           {'method': method,
+                            'playtime': playtime,
+                            'last_active_time': session.last_active_time})
 
         # write MongoDB events
         if gamesite.nosql_client and gamedata['server'].get('log_dau_in_nosql', True):
