@@ -173,51 +173,52 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     }
 
     if('achievement_keys' in hack) {
-        dialog.widgets['achievements_text'].show = 1;
-
-        var text = dialog.data['widgets']['achievements_text']['ui_name_achievements'];
-
         var total_complete = Showcase.count_achievements(hack['achievement_keys']);
-        text = text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
 
-        // find an achievement containing these keys so that we can link to it (preferring incomplete ones)
-        var achievement = null;
-        for (var name in gamedata['achievements']) {
-            var ach = gamedata['achievements'][name];
-            var cat = gamedata['achievement_categories'][ach['category']];
+        if(total_complete[0] >= 1) { // only continue if there is >=1 possible achievement to display
+            dialog.widgets['achievements_text'].show = 1;
+            var text = dialog.data['widgets']['achievements_text']['ui_name_achievements'];
+            text = text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
 
-            if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player, null)) { continue; }
-            if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player, null)) { continue; }
-            if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player, null)) { continue; }
-            if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player, null)) { continue; }
+            // find an achievement containing these keys so that we can link to it (preferring incomplete ones)
+            var achievement = null;
+            for (var name in gamedata['achievements']) {
+                var ach = gamedata['achievements'][name];
+                var cat = gamedata['achievement_categories'][ach['category']];
 
-            if(Showcase.predicate_reads_keys(ach['goal'], hack['achievement_keys'])) {
-                if (!goog.object.containsKey(player.achievements, name)) {
-                    // find the first incomplete achievement
-                    achievement = ach;
-                    break;
-                } else if (achievement == null) {
-                    // or fall back to the first completed one if no incomplete ones are found
-                    achievement = ach;
-                }
-            }
-        }
+                if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player, null)) { continue; }
+                if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player, null)) { continue; }
+                if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player, null)) { continue; }
+                if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player, null)) { continue; }
 
-        var bbcode_click_handler = {
-            'achievements': {
-                'onclick': function() {
-                    return function() {
-                        if (achievement != null) {
-                            PlayerInfoDialog.invoke(session.user_id, function(dialog) {
-                                PlayerInfoDialog.invoke_achievements_tab(dialog, achievement['category'], achievement['name']);
-                            });
-                        }
+                if(Showcase.predicate_reads_keys(ach['goal'], hack['achievement_keys'])) {
+                    if (!goog.object.containsKey(player.achievements, name)) {
+                        // find the first incomplete achievement
+                        achievement = ach;
+                        break;
+                    } else if (achievement == null) {
+                        // or fall back to the first completed one if no incomplete ones are found
+                        achievement = ach;
                     }
                 }
             }
-        };
 
-        dialog.widgets['achievements_text'].set_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handler));
+            var bbcode_click_handler = {
+                'achievements': {
+                    'onclick': function() {
+                        return function() {
+                            if (achievement != null) {
+                                PlayerInfoDialog.invoke(session.user_id, function(dialog) {
+                                    PlayerInfoDialog.invoke_achievements_tab(dialog, achievement['category'], achievement['name']);
+                                });
+                            }
+                        }
+                    }
+                }
+            };
+
+            dialog.widgets['achievements_text'].set_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handler));
+        }
     }
 
     if('conquest_key' in hack) {
