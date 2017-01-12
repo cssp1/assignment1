@@ -36312,7 +36312,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                         if(difficulty) {
                             show_difficulty = true;
                             dialog.widgets['row_ai_difficulty'+row].str = dialog.data['widgets']['row_ai_difficulty']['ui_name_'+difficulty];
-                            var COLOR_MAP = {'obsolete': SPUI.disabled_text_color,
+                            var COLOR_MAP = {'obsolete': SPUI.disabled_good_text_color,
                                              'easy': SPUI.good_text_color,
                                              'medium': SPUI.warning_text_color,
                                              'hard': SPUI.error_text_color,

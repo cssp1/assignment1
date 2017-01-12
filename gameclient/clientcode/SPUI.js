@@ -231,6 +231,7 @@ SPUI.disabled_text_color = new SPUI.Color(0.4,0.4,0.4,1);
 SPUI.error_text_color = new SPUI.Color(1,0,0,1);
 SPUI.warning_text_color = new SPUI.Color(1,0.33,0,1);
 SPUI.good_text_color = new SPUI.Color(0.2,1,0.2,1);
+SPUI.disabled_good_text_color = new SPUI.Color(0.1,0.5,0.1,1);
 SPUI.modal_bg_color = new SPUI.Color(0,0,0,0.5);
 
 // Element
