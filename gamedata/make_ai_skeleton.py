@@ -515,7 +515,11 @@ def generate_showcase_consequent(data, fd):
         # LOGIN_SHOWCASE
         # make "login" version - delete random items, add NEW THIS WEEK text
         # note: this adds the extra_key_suffix to the consequent name since the tip name should be changed for each event release
-        tip_name = 'ai_%s%s%s_login_showcase' % (data['event_name'], data['key_suffix'][diff], data['extra_key_suffix'][diff])
+        if 'extra_key_suffix' in data:
+            extra_key_suffix = data['extra_key_suffix'][diff]
+        else:
+            extra_key_suffix = ''
+        tip_name = 'ai_%s%s%s_login_showcase' % (data['event_name'], data['key_suffix'][diff], extra_key_suffix)
         fd.write('"%s": ' % tip_name)
         login_showcase = copy.deepcopy(showcase)
         for FIELD in ('ui_random_rewards_text','feature_random_items','feature_random_item_count','corner_token_mode'):
@@ -1025,7 +1029,7 @@ if __name__ == '__main__':
 
             ui_priority = data['map_ui_priority'][diff]
             default_ui_priority = {'mf':300}.get(game_id,100)
-            if ui_priority != default_ui_priority:
+            if game_id != 'fs' and (ui_priority != default_ui_priority):
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_ui_priority))
 
             if len(data['difficulties']) > 1:
@@ -1116,7 +1120,10 @@ if __name__ == '__main__':
                 if is_first_base:
                     # first base in series
 
-                    show_pred['subpredicates'] += [{ "predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname}]}]
+                    if data.get('repeatable'):
+                        show_pred['subpredicates'] += [{"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": 0}]
+                    else:
+                        show_pred['subpredicates'] += [{ "predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname}]}]
 
                     if diff == 'Normal':
                         show_pred['subpredicates'] += [
@@ -1242,7 +1249,7 @@ if __name__ == '__main__':
 
                 # get on_visit cutscene consequents
                 on_visit_cutscene = None
-                if cutscenes:
+                if cutscenes and cutscenes[i]:
                     on_visit_cutscene = cutscenes[i].get('on_visit', None)
 
                 speaker_msg = []
@@ -1424,11 +1431,16 @@ if __name__ == '__main__':
                             ]
 
                 elif i == (data['bases_per_difficulty']-1):
+                    # final base
                     completion['subconsequents'] += [
                         { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_times_completed", "method": "increment", "value": 1 },
                         ]
                     if ('extra_key_suffix' in data):
                         completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_times_completed", "method": "increment", "value": 1 }]
+
+                    if data.get('repeatable'):
+                        # reset progres_now back to zero
+                        completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "set", "value": 0 }]
 
                     if speedrun_aura:
                         if_i_win = [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_speedrun", "method": "max", "value": 1 },]
@@ -1460,7 +1472,7 @@ if __name__ == '__main__':
 
                 # get completion cutscene consequents
                 completion_cutscene = []
-                if cutscenes:
+                if cutscenes and cutscenes[i]:
                     completion_cutscene += cutscenes[i].get('completion', [])
 
                 # append auto_cutscenes after any manually-defined cutscenes
