@@ -60,6 +60,7 @@ echo "SETUP(remote): mongo setup done!"
 
 echo "MISSING:"
 echo "/etc/sysconfig/network hostname."
+echo "SWAP SPACE - always necessary."
 echo "mongodb setup:"
 echo "    Partition mongodb filesystems - leave 10% space unpartitioned if SSD"
 echo "    REFORMAT mongodb filesystems to ext4"
