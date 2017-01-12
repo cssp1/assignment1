@@ -1907,6 +1907,12 @@ class User:
     @inlineCallbacks
     def accept_bh_invite(self, session, invite_code, is_acquisition):
         assert self.bh_auth_token
+
+        # sometimes invite codes get scrambled when the URL is appended with junk.
+        # e.g. "12345678https://www.battlehouse..."
+        # clear that out here.
+        invite_code = re.compile('http.*').sub('', invite_code)
+
         url = SpinConfig.config['battlehouse_api_path']+ '/invite_accept?' + \
               urllib.urlencode({'service': SpinConfig.game(),
                                 'code': invite_code,
