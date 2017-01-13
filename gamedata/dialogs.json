@@ -2658,7 +2658,7 @@
                              "transparent_to_mouse": false },
             "coverup_queue": { "show": 0, "kind": "SolidRect", "xy": [285,256], "dimensions": [428,150], "color": [0.0354,0.0517,0.0797,1] },
             "click_to_produce_arrow": { "show": 0, "kind": "StaticImage", "xy": [293,120], "dimensions": [69,46], "asset": "tutorial_arrow_left" },
-            "click_to_produce": { "show": 0, "kind": "TextField", "xy":[292,120], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "Click on unit to %VERB" },
+            "click_to_produce": { "show": 0, "kind": "TextField", "xy":[292,110], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "Click unit to %VERB\n(Click more than once to queue)" },
             "click_to_unlock": { "show": 0, "kind": "TextField", "xy":[292,287], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "This unit is locked" },
             "click_to_unlock_button": { "show": 0, "kind": "ActionButton", "xy":[430,343], "dimensions": [134,28], "text_size": 13, "text_style": "bold", "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Unlock" }
         }
