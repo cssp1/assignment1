@@ -2605,7 +2605,10 @@
                                         "full_color": [0.189,0.710,0.905,1],
                                         "empty_color": [0.3,0.3,0.3,1] },
             "in_production_time": { "kind": "TextField", "xy": [296,349], "dimensions": [103,17], "text_size": 13,
-                                    "text_hjustify": "left", "text_style": "bold", "ui_name": "" },
+                                    "text_hjustify": "left", "text_style": "bold" },
+            "in_production_level": { "show": 0, "kind": "TextField", "xy": [296,284], "dimensions": [103,17], "text_size": 13,
+                                     "text_hjustify": "left", "ui_name": "L%d" },
+
             "in_production_cancel": { "kind": "ActionButton", "xy": [382,270], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1},
 
             // manufacturing queue
@@ -2623,6 +2626,10 @@
             "queue_counter": { "kind": "ActionButton", "xy": [447,307], "dimensions": [24,19],
                                "text_size": 13, "text_style": "bold",
                                "array": [4,1], "array_offset": [64,0] },
+            "queue_level": { "show": 0, "kind": "ActionButton", "xy": [447,272], "dimensions": [24,19],
+                             "text_size": 13, "ui_name": "L%d", "drop_shadow": 1,
+                             "array": [4,1], "array_offset": [64,0] },
+
             "queue_cancel": { "kind": "ActionButton", "xy": [483,272], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                               "array": [4,1], "array_offset": [64,0] },
 
@@ -7014,7 +7021,7 @@
             "grid_health_bg": {"kind": "SolidRect", "xy":[58,133], "dimensions":[54,10], "color": [0.034,0.05,0.078,1], "bevel": 2,
                                "outline_color": [0,0,0,1], "outline_width": 0.3, "array": [10,2], "array_offset": [63,70] },
 
-            "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
+            "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "%s\nLevel %cur of %max", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
             "grid_health": { "array": [10,2], "array_offset": [63,70], "kind": "ProgressBar", "xy": [61, 135], "dimensions": [48, 6],
                              "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
             "grid_wrench": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [86,105], "dimensions": [24,24], "asset_active": "repair_wrench_green", "asset_queued": "repair_wrench_gray" },

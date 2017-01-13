@@ -16960,7 +16960,7 @@ function invoke_recycle_dialog(obj) {
         spec = obj.spec; level = obj.level; hp = obj.hp; max_hp = obj.max_hp;
     }
 
-    dialog.widgets['title'].str = gamedata['spells']['RECYCLE_UNIT']['ui_prompt'].replace('%d', spec['ui_name']);
+    dialog.widgets['title'].str = gamedata['spells']['RECYCLE_UNIT']['ui_prompt'].replace('%d', spec['ui_name']).replace('%level', pretty_print_number(level));
     dialog.widgets['ok_button'].str = gamedata['spells']['RECYCLE_UNIT']['ui_name'];
     dialog.widgets['tip_text'].str = dialog.data['widgets']['tip_text']['ui_name'].replace('%s', gamedata['spells']['RECYCLE_UNIT']['ui_name']);
 
@@ -31339,7 +31339,7 @@ function update_repair_control(dialog) {
             }
 
             dialog.widgets['grid'+coord].asset = get_leveled_quantity(spec['art_asset'], level);
-            dialog.widgets['grid'+coord].tooltip.str = spec['ui_name'];
+            dialog.widgets['grid'+coord].tooltip.str = dialog.data['widgets']['grid']['ui_tooltip'].replace('%s', spec['ui_name']).replace('%cur', pretty_print_number(level)).replace('%max', pretty_print_number(get_max_ui_level(spec)));
             dialog.widgets['grid'+coord].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
             dialog.widgets['grid_health'+coord].show = (hp != max_hp) && (hp>0);
             dialog.widgets['grid_health'+coord].progress = repair_progress;
@@ -32343,6 +32343,7 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['in_production_time'].show =
         dialog.widgets['in_production_progress'].show =
         dialog.widgets['in_production_cancel'].show = (builder && manuf_queue.length > 0);
+    dialog.widgets['in_production_level'].show = false;
 
     if(builder && manuf_queue.length > 0) {
         var item = manuf_queue[0];
@@ -32361,6 +32362,13 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['in_production_cancel'].onclick = (function(b,x,n) { return function() {
             cancel_manuf_item(b,x,n); }; })(builder, 0, item['spec_name']);
         dialog.widgets['in_production_cancel'].state = 'normal';
+
+        if('level' in item &&
+           ('update_unit_levels_on_tech_upgrade' in gamedata) &&
+           !gamedata['update_unit_levels_on_tech_upgrade']) {
+            dialog.widgets['in_production_level'].show = true;
+            dialog.widgets['in_production_level'].str = dialog.data['widgets']['in_production_level']['ui_name'].replace('%d', pretty_print_number(item['level']));
+        }
     }
 
     // fill in production queue display
@@ -32368,16 +32376,18 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['queue'+box.toString()].show =
             dialog.widgets['queue_counter_bg'+box.toString()].show =
             dialog.widgets['queue_counter'+box.toString()].show =
+            dialog.widgets['queue_level'+box.toString()].show =
             dialog.widgets['queue_cancel'+box.toString()].show = false;
     }
 
     var box = -1;
     var kind = null;
+    var last_level = -1;
     var counters = [0,0,0,0];
     if(builder) {
         for(var i = 1; i < manuf_queue.length; i++) {
             var item = manuf_queue[i];
-            if(item['spec_name'] != kind) {
+            if(item['spec_name'] != kind || (item['level']||-1) != last_level) {
                 // start a new box
                 box += 1;
                 if(box >= 4) {
@@ -32385,6 +32395,7 @@ function update_manufacture_dialog(dialog) {
                     break;
                 }
                 kind = item['spec_name'];
+                last_level = item['level'] || -1;
                 dialog.widgets['queue'+box.toString()].show = true;
                 dialog.widgets['queue'+box.toString()].bg_image = get_leveled_quantity(gamedata['units'][kind]['art_asset'], item['level']);
                 dialog.widgets['queue'+box.toString()].alpha = (gamedata['units'][kind]['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
@@ -32393,6 +32404,15 @@ function update_manufacture_dialog(dialog) {
                 dialog.widgets['queue_cancel'+box.toString()].show = true;
                 dialog.widgets['queue_cancel'+box.toString()].state = 'normal';
                 dialog.widgets['queue_cancel'+box.toString()].onclick = (function(b,x,n) { return function() { cancel_manuf_item(b,x,n); }; })(builder, i, kind);
+
+
+                if('level' in item &&
+                   ('update_unit_levels_on_tech_upgrade' in gamedata) &&
+                   !gamedata['update_unit_levels_on_tech_upgrade']) {
+                    dialog.widgets['queue_level'+box.toString()].show = true;
+                    dialog.widgets['queue_level'+box.toString()].str = dialog.data['widgets']['queue_level']['ui_name'].replace('%d', pretty_print_number(item['level']));
+                }
+
                 counters[box] = 1;
             } else {
                 counters[box] += 1;
