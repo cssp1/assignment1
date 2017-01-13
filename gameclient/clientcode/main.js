@@ -41943,6 +41943,13 @@ function update_upgrade_dialog(dialog) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',tech['ui_name']).replace('%d',max_level.toString());
         } else {
+            if(('update_unit_levels_on_tech_upgrade' in gamedata) &&
+               !gamedata['update_unit_levels_on_tech_upgrade']) {
+                // call this "Research" instead of "Upgrade" when the new level isn't applied to existing units
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_research'];
+            } else {
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name'];
+            }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
         }
     } else {

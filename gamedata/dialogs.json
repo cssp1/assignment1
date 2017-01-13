@@ -2676,6 +2676,7 @@
             "title_bold": { "kind": "TextField", "xy": [30,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
                             "text_hjustify": "center",
                             "ui_name": "Upgrade",
+                            "ui_name_research": "Research",
                             "ui_name_unlock": "Unlock",
                             "ui_name_stats": "Stats" },
 
