@@ -391,7 +391,8 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             if(loot === null) {
                 return [0, 0];
             } else if('spec' in loot) {
-                return [1, 1];
+                var stack = ('stack' in loot ? loot['stack'] : 1);
+                return [stack, stack];
             } else if('multi' in loot) {
                 var ret = [0, 0];
 
@@ -519,11 +520,13 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
                         if(progression_item.count[0] == progression_item.count[1]) {
                             // this level drops a set number of items
-                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_constant'].replace('%d', progression_item.count[0]);
+                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_constant']
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[0]));
                         } else {
                             // this level can drop a variable number of items
-                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_range'].replace('%d', progression_item.count[0])
-                                                                                                               .replace('%d', progression_item.count[1]);
+                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_range']
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[0]))
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[1]));
                         }
                     }
                 }
