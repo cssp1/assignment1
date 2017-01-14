@@ -1538,8 +1538,12 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
             var ls = [];
             if(template['ui_tokens2']) {
                 var spec = ItemDisplay.get_inventory_item_spec(template['ui_tokens2']['spec']);
-                var thousands = template['ui_tokens2']['stack']/1000.0;
-                ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
+                if(template['ui_tokens2']['stack'] >= 500) {
+                    var thousands = template['ui_tokens2']['stack']/1000.0;
+                    ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
+                } else {
+                    ls.push(pretty_print_number(template['ui_tokens2']['stack'])+'x '+ItemDisplay.get_inventory_item_ui_name(spec));
+                }
             }
             if(template['kill_points']) {
                 var points = template['kill_points'];
@@ -2520,8 +2524,12 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 var ls = [];
                 if(template['ui_tokens2']) {
                     var spec = ItemDisplay.get_inventory_item_spec(template['ui_tokens2']['spec']);
-                    var thousands = template['ui_tokens2']['stack']/1000.0;
-                    ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
+                    if(template['ui_tokens2']['stack'] >= 500) {
+                        var thousands = template['ui_tokens2']['stack']/1000.0;
+                        ls.push(thousands.toFixed(1)+'k '+ItemDisplay.get_inventory_item_ui_name(spec));
+                    } else {
+                        ls.push(pretty_print_number(template['ui_tokens2']['stack'])+'x '+ItemDisplay.get_inventory_item_ui_name(spec));
+                    }
                 }
                 if(template['kill_points']) {
                     var points = template['kill_points'];
