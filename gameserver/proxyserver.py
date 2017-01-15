@@ -1497,10 +1497,10 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_fb(self, request, visitor):
 
         # check for signed_request (either sent as POST arg or GET query string)
-        if 'signed_request' in request.args:
-            visitor.raw_signed_request = request.args['signed_request'][-1]
-        elif 'spin_signed_request' in request.args:
+        if 'spin_signed_request' in request.args:
             visitor.raw_signed_request = request.args['spin_signed_request'][-1]
+        elif 'signed_request' in request.args:
+            visitor.raw_signed_request = request.args['signed_request'][-1]
 
         elif (not SpinConfig.config.get('enable_facebook',0)) and (not SpinConfig.config.get('secure_mode',0)):
             # Facebook not enabled, use fake test user
