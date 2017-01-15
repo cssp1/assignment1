@@ -60,6 +60,7 @@ import SpinSSL
 import SpinFacebook
 import SpinKongregate
 import SpinXsolla
+import SpinAtomFeed
 import SpinGoogleAuth
 import SpinHTTP
 import SpinConfig
@@ -2983,6 +2984,7 @@ class PlayerTable:
               # ('unlocked_titles', None, None), # dictionary of unlocked titles
               ('facebook_permissions', None, None), # needs to be in player rather than user because it is app-specific
               ('last_fb_notification_time', None, None),
+              ('last_bh_blog_feed_seen', None, None),
               ('fbpayments_inflight', None, None),
               ('player_preferences', None, None),
               ('chat_seen', None, None),
@@ -8667,6 +8669,7 @@ class Player(AbstractPlayer):
         self.known_alt_accounts = {} # dictionary mapping str(user_id) -> {'logins':1234, 'attacks':1234}
         self.facebook_permissions = None
         self.last_fb_notification_time = -1
+        self.last_bh_blog_feed_seen = -1
         self.fbpayments_inflight = {} # dictionary mapping request_id -> {'time':12345,'request_id':'abcd',... (see "FBPAYMENT_*" message handlers)}
         self.player_preferences = None
         self.chat_seen = {}
@@ -17665,6 +17668,8 @@ class GAMEAPI(resource.Resource):
     def __init__(self):
         resource.Resource.__init__(self)
         self.quarry_query_cache = {}
+        self.bh_blog_feed_cache = None
+        self.bh_blog_feed_time = -1
         self.deferred_sessions = set() # sessions that have pending deferred traffic that needs to be sent out
         self.deferred_session_flusher = None # IDelayedCall for flushing the deferred sessions
 
@@ -23902,6 +23907,37 @@ class GAMEAPI(resource.Resource):
 
         return ret
 
+    def add_bh_blog_feed_to_mail(self, session):
+        feed = gamesite.gameapi.bh_blog_feed_cache
+        if not feed: return
+        if 'bh_blog_mail' not in gamedata['strings']: return
+        if 'bh_blog_feed_to_mail_enabled_if' not in gamedata: return
+        if (not Predicates.read_predicate(gamedata['bh_blog_feed_to_mail_enabled_if']).is_satisfied(session.player, None)): return
+
+        latest_time = -1 # time of latest entry, to update player seen counter
+
+        for entry in feed.entries:
+
+            # ignore entries created before this system was enabled
+            if entry.published_time < gamedata.get('bh_blog_feed_start_time',-1):
+                continue
+
+            latest_time = max(latest_time, entry.published_time)
+            if entry.published_time > session.player.last_bh_blog_feed_seen:
+                # add it!
+                time_struct = time.gmtime(entry.published_time)
+                session.player.mailbox_append(
+                    session.player.make_system_mail(
+                    gamedata['strings']['bh_blog_mail'],
+                    replacements = {'%TITLE': entry.title,
+                                    '%LINK_URL': entry.link_url,
+                                    '%DAY': time.strftime('%d %b %Y', time_struct),
+                                    '%TIME': time.strftime('%H:%S', time_struct)},
+                    sent_time = entry.published_time
+                    ))
+
+        session.player.last_bh_blog_feed_seen = latest_time
+
     def do_level_up(self, session, retmsg, arg):
         want_level = int(arg[1])
         old_level = session.player.resources.player_level
@@ -25793,6 +25829,9 @@ class GAMEAPI(resource.Resource):
         # accept any queued messages the user has received
         mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
         show_battle_history = mail_stat and mail_stat.get('was_attacked', False)
+
+        # add new BH blog feed entries to mailbox
+        self.add_bh_blog_feed_to_mail(session)
 
         # send alliance state
         retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
@@ -29709,6 +29748,27 @@ class GAMEAPI(resource.Resource):
                                                                'server': spin_server_name },
                                                      }, '', log = False)
 
+    # this is async
+    @inlineCallbacks
+    def update_bh_blog_feed(self):
+        if 'bh_blog_mail' not in gamedata['strings']:
+            returnValue(None)
+        if self.bh_blog_feed_time >= server_time - 5*60: # cache is recent
+            returnValue(self.bh_blog_feed_cache)
+
+        self.bh_blog_feed_time = server_time
+        self.bh_blog_feed_cache = None
+
+        try:
+            response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(
+                server_time, 'https://www.battlehouse.com/feed/atom/')
+            self.bh_blog_feed_cache = SpinAtomFeed.get_feed(game_id, gamedata['strings']['game_name'], response_raw)
+        except BaseException as e:
+            gamesite.exception_log.event(server_time, 'error fetching battlehouse.com news feed: %r' % e)
+            returnValue(None)
+
+        returnValue(self.bh_blog_feed_cache)
+
     def handle_protocol_error(self, session, retmsg, arg):
         # called when there is a problem with the AJAX message the client sent
         # records this to the exceptions log to pick up hacking/fuzzing attempts
@@ -30459,6 +30519,8 @@ class GameSite(server.Site):
             # send proxy session keepalives
             gamesite.nosql_client.session_keepalive_batch([session2.session_id for session2 in lock_keepalive_sessions], reason='bgfunc')
 
+        # kick off update of BH blog feed
+        gamesite.gameapi.update_bh_blog_feed()
 
         # hand out pending mail to players
         for i in xrange(len(lock_keepalive_sessions)):
