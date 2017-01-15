@@ -12500,13 +12500,21 @@ class Player(AbstractPlayer):
             # nasty things happen when callers pass in references to gamedata (e.g. item tables get mutated)
             # so be safe by copying everything
             msg = copy.deepcopy(msg)
-        if 'time' not in msg: msg['time'] = server_time # ensure a (send) "time" field is prevent
         msg['received_time'] = server_time
-        self.mailbox.append(msg)
+
+        if 'time' in msg:
+            # message has a defined sending time: insert in sorted position
+            time_list = [mail.get('time', server_time) for mail in self.mailbox]
+            position = bisect.bisect_left(time_list, msg['time'])
+            self.mailbox.insert(position, msg)
+        else:
+            # ensure a (send) "time" field is present, then stick it on the end
+            msg['time'] = server_time
+            self.mailbox.append(msg)
 
     # ugly API, needs rework
     def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, to_user_id_list = None,
-                         extra_props = None,
+                         extra_props = None, sent_time = None,
                          replace_s = '', replace_level = '', replace_time = '', replace_day = '', replacements = None):
 
         if to_user_id is None and to_user_id_list is None: to_user_id = self.user_id
@@ -12523,6 +12531,8 @@ class Player(AbstractPlayer):
         ret = {'type':'mail',
                'msg_id': generate_mail_id(),
                'to': to_user_id_list if to_user_id_list is not None else [to_user_id]}
+        if sent_time:
+            ret['time'] = sent_time
 
         for src_key, dst_key in (('ui_from','from_name'), ('ui_subject','subject'), ('ui_body','body')):
             ret[dst_key] = data[src_key].replace('%s',replace_s).replace('%level',replace_level).replace('%time',replace_time).replace('%day',replace_day)
