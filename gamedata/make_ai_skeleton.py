@@ -1597,6 +1597,8 @@ if __name__ == '__main__':
                                 '--tier=%d' % (data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base']),
                                 '--ui-name=%s %s L%d' % (data['event_name'], diff, i+1),
                                 base_file_path]
+                        if 'show_off_unit_in_bases' in data:
+                            args.insert(len(args)-1, '--show-off-unit=%s' % data['show_off_unit_in_bases'])
                         #sys.stderr.write('\n'.join(args) + '\n')
                         subprocess.check_call(args)
 
