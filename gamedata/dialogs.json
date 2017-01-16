@@ -8252,8 +8252,8 @@
             "progression_rewards": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [243,130], "dimensions": [50,50],
                                      "array": [8,1], "array_offset": [-1,0], "array_max_dimensions": [476,121], "blink_period": 3, "blink_offset": 0.06 },
 
-            "progression_rewards_count": { "show": 0, "kind": "TextField", "xy": [243,132], "dimensions": [46,19], "text_size": 17, "drop_shadow": 1,
-                                           "text_style": "thick", "text_hjustify": "right",
+            "progression_rewards_count": { "show": 0, "kind": "TextField", "xy": [243,157], "dimensions": [46,19], "text_size": 17, "drop_shadow": 1,
+                                           "text_style": "bold", "text_hjustify": "right",
                                            "ui_name_constant": "x%d", "ui_name_range": "x%d-%d",
                                            "array": [8,1], "array_offset": [0,121], "array_max_dimensions": [476,121]},
 
