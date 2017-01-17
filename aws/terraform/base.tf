@@ -22,9 +22,6 @@ variable "amis" {
     us-east-1 = "ami-a4827dc9" # Amazon Linux AMI 2016.03.2 HVM (SSD) EBS-Backed 64-bit
   }
 }
-variable "ssh_sources" {
-  description = "CIDR ranges that should be allowed to SSH in. Comma-separated list."
-}
 variable "key_pair_name" {
   description = "SSH key pair for setting up instances"
 }
