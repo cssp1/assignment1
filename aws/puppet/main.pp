@@ -1,2 +1,0 @@
-include spin_preferences
-include spin_ec2
