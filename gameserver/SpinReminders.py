@@ -6,7 +6,8 @@
 
 # utility for sending out reminders via email or hipchat, used by dev_reminders.py and report_slow_mysql.py
 
-import smtplib, urllib, urllib2, getpass, os, time
+import smtplib, urllib, getpass, os, time
+import requests
 from email.mime.text import MIMEText
 from email.header import Header
 import SpinJSON
@@ -32,10 +33,8 @@ def send_reminder_hipchat(room, ats, subject, body):
     token = os.getenv('HIPCHAT_TOKEN') or open(os.path.join(os.getenv('HOME'), '.ssh', 'hipchat.token')).read().strip()
     url = "https://api.hipchat.com/v2/room/%s/notification?auth_token=%s" % (room, token)
     req_body = SpinJSON.dumps({'message':', '.join(ats) + ' ' + subject + ': ' + body[:2500], 'message_format':'text'})
-    req = urllib2.Request(url)
-    req.add_header('Content-Type', 'application/json')
-    req.add_data(req_body)
-    urllib2.urlopen(req).read()
+    requests.post(url, headers = {'Content-Type': 'application/json'},
+                  data = req_body).raise_for_status()
 
 def send_reminder_slack(sender_name, channel, ats, subject, body):
     token = os.getenv('SLACK_TOKEN') or SpinConfig.config.get('slack_token','') or open(os.path.join(os.getenv('HOME'), '.ssh', 'slack.token')).read().strip()
@@ -43,10 +42,8 @@ def send_reminder_slack(sender_name, channel, ats, subject, body):
     MAXLEN = 2500
     ellipsis = '\n... (and more)' if len(body) > MAXLEN else ''
     req_body = SpinJSON.dumps({'username':sender_name.lower(), 'channel':channel, 'text':', '.join(ats) + ' ' + subject + ': ' + body[:MAXLEN] + ellipsis})
-    req = urllib2.Request(url)
-    req.add_header('Content-Type', 'application/json')
-    req.add_data(req_body)
-    urllib2.urlopen(req).read()
+    requests.post(url, headers = {'Content-Type': 'application/json'},
+                  data = req_body).raise_for_status()
 
 def send_reminder_mattermost(sender_name, channel, ats, subject, body):
     webhook_url = os.getenv('MATTERMOST_WEBHOOK_URL') or SpinConfig.config.get('mattermost_webhook_url','') or open(os.path.join(os.getenv('HOME'), '.ssh', 'mattermost-webhook-url')).read().strip()
@@ -57,10 +54,9 @@ def send_reminder_mattermost(sender_name, channel, ats, subject, body):
     if channel:
         req_json['channel'] = channel
     req_body = SpinJSON.dumps(req_json)
-    req = urllib2.Request(webhook_url)
-    #req.add_header('Content-Type', 'application/json')
-    req.add_data(urllib.urlencode({'payload':req_body}))
-    urllib2.urlopen(req).read()
+    requests.post(webhook_url, headers = {'Content-Type': 'application/json'},
+                  data = req_body
+                  ).raise_for_status()
 
 def send_reminder_amazon_sns(region, topic_arn, subject, body):
     if not region:
