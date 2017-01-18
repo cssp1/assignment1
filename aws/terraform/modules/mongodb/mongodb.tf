@@ -53,8 +53,16 @@ resource "aws_iam_instance_profile" "mongodb" {
 
 resource "aws_instance" "mongodb" {
   count = 1
-  ami = "${var.ami}"
-  instance_type = "t2.micro"
+
+  # Amazon Linux AMI 2016.09.1 
+  # HVM EBS-Backed
+  ami = "ami-9be6f38c"
+  # HVM Instance Store
+  # ami = "ami-24e7f233"
+
+  # production: m4.large? t2.large?
+  # testing: t2.medium?
+  instance_type = "t2.medium"
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.mongodb.name}"
   subnet_id = "${var.subnet_id}"
@@ -64,15 +72,23 @@ resource "aws_instance" "mongodb" {
   depends_on = ["aws_iam_role_policy.mongodb"]
   tags = { 
     Name = "${var.sitename}-mongodb-${count.index}"
-    spin_role = "prod-mongodb"
+    spin_role = "prod-mongo"
     Terraform = "true"
+  }
+
+  ebs_block_device = {
+    device_name = "/dev/sdz"
+    volume_type = "io1"
+    # BFM 4.4G, TR 66G
+    volume_size = 10
+    iops = 100
   }
 
   user_data = <<EOF
 ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
- - echo "include bh_mongodb" >> /etc/puppet/main.pp
+ - echo "include spin_mongodb" >> /etc/puppet/main.pp
  - puppet apply /etc/puppet/main.pp
 EOF
 }
