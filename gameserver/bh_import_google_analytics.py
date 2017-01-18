@@ -44,6 +44,7 @@ def bh_login_campaign_summary_schema(sql_util):
     return {'fields': [('day', 'INT8 NOT NULL'),
                        ('event_name', 'VARCHAR(1024) NOT NULL'),
                        ('event_data', 'VARCHAR(1024)'),
+                       ('campaign_name', 'VARCHAR(1024)'),
                        ('campaign_source', 'VARCHAR(1024)'),
                        ('campaign_id', 'VARCHAR(1024)'),
                        ('count', 'INT4 NOT NULL'),
@@ -223,13 +224,14 @@ if __name__ == '__main__':
                               row['ga:totalEvents']) for row in report))
         elif table == bh_login_campaign_summary_table:
             report = get_event_report(analytics, ["bhlogin"], day_start, dt,
-                                      extra_dimensions = ['ga:source', 'ga:campaignCode'])
+                                      extra_dimensions = ['ga:campaign', 'ga:source', 'ga:campaignCode'])
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
-                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_source,campaign_id,count) " + \
-                            "VALUES(%s,%s,%s,%s,%s,%s)",
+                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
+                            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
                             ((day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
+                              row.get('ga:campaign',None),
                               row.get('ga:source',None),
                               row.get('ga:campaignCode',None),
                               row['ga:totalEvents']) for row in report))
