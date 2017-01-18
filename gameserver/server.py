@@ -14574,6 +14574,8 @@ def get_acquisition_data_from_url(url, user_id):
             ret['useless'] = 1 # app-to-user notification - already acquired
     elif q.has_key('is_arcade') and q['is_arcade'][0] == '1':
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'facebook_arcade' }
+    elif q.has_key('gclid'):
+        ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'google' }
     elif q.has_key('spin_promo_code'):
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'promo_code' }
     elif q.has_key('ref'):
