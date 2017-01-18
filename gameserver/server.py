@@ -27236,9 +27236,9 @@ class GAMEAPI(resource.Resource):
                                                                      case_sensitive = True,
                                                                      reason = 'SEARCH_PLAYER_CACHE')
                 end_time = time.time()
-                if end_time - start_time >= gamedata['server'].get('player_cache_search_slow_threshold', 4.0):
-                    gamesite.exception_log.event(server_time, 'slow player_cache_search(): terms = %r, limit = %r, match_mode = %r, name_field = \'ui_name_searchable\', case_sensitive = True' % \
-                                                 (search_terms.lower(), gamedata['search_player_list_limit'], gamedata['search_player_match_mode']))
+                if end_time - start_time >= gamedata['server'].get('player_cache_search_slow_threshold', 5.0):
+                    gamesite.exception_log.event(server_time, 'slow player_cache_search(): terms = %r, limit = %r, match_mode = %r, name_field = \'ui_name_searchable\', case_sensitive = True, time = %.1f ms' % \
+                                                 (search_terms.lower(), gamedata['search_player_list_limit'], gamedata['search_player_match_mode'], (end_time-start_time)*1000.0))
 
             pcache_data = self.do_query_player_cache(session, user_ids, reason = 'SEARCH_PLAYER_CACHE') if user_ids else []
             retmsg.append(["SEARCH_PLAYER_CACHE_RESULT", user_ids, pcache_data, tag])
