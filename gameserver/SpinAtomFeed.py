@@ -50,13 +50,12 @@ class AtomFeed(object):
     def __init__(self, raw_bytes, entry_filter = None):
         self.entries = []
         root = ET.fromstring(raw_bytes)
-        ns = {'atom': 'http://www.w3.org/2005/Atom'}
 
-        for entry in root.findall('atom:entry', ns):
-            published_time = parse_time(entry.find('atom:published', ns).text)
-            title = html_unescape(entry.find('atom:title', ns).text)
-            body = html_unescape(entry.find('atom:content', ns).text)
-            link_url = html_unescape(entry.find('atom:link', ns).get('href'))
+        for entry in root.findall('{http://www.w3.org/2005/Atom}entry'):
+            published_time = parse_time(entry.find('{http://www.w3.org/2005/Atom}published').text)
+            title = html_unescape(entry.find('{http://www.w3.org/2005/Atom}title').text)
+            body = html_unescape(entry.find('{http://www.w3.org/2005/Atom}content').text)
+            link_url = html_unescape(entry.find('{http://www.w3.org/2005/Atom}link').get('href'))
             entry_obj = AtomEntry(published_time, title, body, link_url)
             if entry_filter and (not entry_filter.allow(entry_obj)):
                 continue
