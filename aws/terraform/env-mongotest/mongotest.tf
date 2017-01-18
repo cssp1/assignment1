@@ -1,7 +1,7 @@
 variable "mongodb_root_password" {}
 variable "vpc_id" {}
-variable "subnet_id" {}
-variable "availability_zone" {}
+variable "availability_zones" {}
+variable "subnet_ids" {}
 variable "ssh_access_security_group_id" {}
 variable "mongodb_security_group_id" {}
 
@@ -9,10 +9,11 @@ module "mongodb" {
   source = "../modules/mongodb"
 
   vpc_id = "${var.vpc_id}"
-  subnet_id = "${var.subnet_id}"
-  availability_zone = "${var.availability_zone}"
+  subnet_ids = "${var.subnet_ids}"
+  availability_zones = "${var.availability_zones}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
+  extra_backups_bucket = "${var.extra_backups_bucket}"
   region = "${var.region}"
   key_pair_name = "${var.key_pair_name}"
   cloud_config_boilerplate_rendered = "${module.cloud_config.boilerplate_rendered}"

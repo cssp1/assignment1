@@ -37,7 +37,7 @@ resource "aws_iam_role_policy" "mongodb" {
     },
     { "Effect": "Allow",
       "Action": ["s3:ListBucket","s3:GetObject","s3:HeadObject"],
-      "Resource": ["arn:aws:s3:::${var.extra_sitename}-mongodb-backups*"]
+      "Resource": ["arn:aws:s3:::${var.extra_backups_bucket}*"]
     }
   ]
 }
@@ -52,7 +52,7 @@ resource "aws_iam_instance_profile" "mongodb" {
 # EC2 instance
 
 resource "aws_instance" "mongodb" {
-  count = 1
+  count = 3
 
   # Amazon Linux AMI 2016.09.1 
   # HVM EBS-Backed
@@ -65,7 +65,7 @@ resource "aws_instance" "mongodb" {
   instance_type = "t2.medium"
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.mongodb.name}"
-  subnet_id = "${var.subnet_id}"
+  subnet_id = "${element(split(",", var.subnet_ids), count.index)}"
   vpc_security_group_ids = ["${var.mongodb_security_group_id}",
                             "${var.ssh_access_security_group_id}"]
   key_name = "${var.key_pair_name}"
@@ -88,7 +88,18 @@ resource "aws_instance" "mongodb" {
 ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_replica_set_name=${var.sitename}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_replica_set_serial=${count.index}" >> /etc/facter/facts.d/terraform.txt
  - echo "include spin_mongodb" >> /etc/puppet/main.pp
  - puppet apply /etc/puppet/main.pp
 EOF
+}
+
+resource "cloudflare_record" "cf_mongodb" {
+  count = 3
+  domain = "${var.sitedomain}"
+  name = "${var.sitename}-mongodb-${count.index}"
+  value = "${element(aws_instance.mongodb.*.public_dns, count.index)}"
+  type = "CNAME"
+  proxied = false
 }

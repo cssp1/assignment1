@@ -8,8 +8,8 @@ variable "enable_backups" {
   description = "Whether to perform daily backups to S3, for production databases"
   default = false
 }
-variable "extra_sitename" {
-  description = "Sitename whose backup buckets should be read-only accessible"
+variable "extra_backups_bucket" {
+  description = "An extra S3 bucket for backups that should be read-only accessible (for sharing data between production and test)"
   default = "example"
 }
 variable "region" {
@@ -51,6 +51,11 @@ variable "cloudflare_token" {
 
 provider "aws" {
   region = "${var.region}"
+}
+
+provider "cloudflare" {
+  email = "${var.cloudflare_email}"
+  token = "${var.cloudflare_token}"
 }
 
 module "cloud_config" {
