@@ -7402,6 +7402,7 @@ class Building(MapBlockingGameObject):
     def affects_player_stattab(self):
         return self.spec.manufacture_category or self.spec.provides_space or self.spec.provides_squad_space or \
                self.spec.provides_total_space or \
+               self.spec.permanent_modstats or \
                self.spec.raid_range_pvp or self.spec.raid_range_pve or \
                self.spec.provides_deployed_squads or self.spec.provides_deployed_raids or \
                self.is_producer() or self.spec.provides_foremen
