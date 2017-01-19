@@ -41,7 +41,7 @@ class AsyncHTTPRequester(object):
     CALLBACK_FULL = 'full'
 
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors):
             self.method = method
             self.url = url
             self.headers = headers
@@ -54,6 +54,7 @@ class AsyncHTTPRequester(object):
             self.fire_time = qtime
             self.max_tries = max_tries
             self.callback_type = callback_type
+            self.accept_http_errors = accept_http_errors
             self.tries = 1
         def __hash__(self): return hash((self.url, self.method, self.fire_time, self.callback))
         def __repr__(self): return self.method + ' ' + self.url
@@ -127,7 +128,7 @@ class AsyncHTTPRequester(object):
             cb()
 
     # wrapper for queue_request that returns a Deferred
-    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
         d = twisted.internet.defer.Deferred()
 
         if callback_type == self.CALLBACK_BODY_ONLY:
@@ -141,10 +142,11 @@ class AsyncHTTPRequester(object):
 
         self.queue_request(qtime, url, success_cb, method=method, headers=headers, postdata=postdata,
                            error_callback = error_cb,
-                           preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type)
+                           preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type,
+                           accept_http_errors=accept_http_errors)
         return d
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -175,7 +177,7 @@ class AsyncHTTPRequester(object):
                     headers = {}
                 headers['Content-Type'] = 'application/x-www-form-urlencoded'
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -306,6 +308,9 @@ class AsyncHTTPRequester(object):
             elif http_code == 204:
                 # 204 is not actually an error, just an empty body
                 return self.on_response('', getter, request)
+            elif request.accept_http_errors:
+                # pass through HTTP error responses without raising an exception
+                return self.on_response(reason.value.response, getter, request)
 
         self.on_wire.remove(request)
 
