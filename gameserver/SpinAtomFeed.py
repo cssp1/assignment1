@@ -52,6 +52,13 @@ class AtomFeed(object):
         root = ET.fromstring(raw_bytes)
 
         for entry in root.findall('{http://www.w3.org/2005/Atom}entry'):
+            skip = False
+            for category in entry.findall('{http://www.w3.org/2005/Atom}category'):
+                category_term = category.get('term')
+                if category_term in ('not-in-game', 'Not In Game'):
+                    skip = True
+                    break
+            if skip: continue
             published_time = parse_time(entry.find('{http://www.w3.org/2005/Atom}published').text)
             title = html_unescape(entry.find('{http://www.w3.org/2005/Atom}title').text)
             body = html_unescape(entry.find('{http://www.w3.org/2005/Atom}content').text)
