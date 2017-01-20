@@ -8612,6 +8612,7 @@ class Player(AbstractPlayer):
 
         # override of current_event time, for debugging purposes
         self.event_time_override = None
+        self.force_motd = False # force daily message, regardless of last_motd time (from query string)
 
         # for debugging purposes
         self.ladder_rival_override = None
@@ -13348,6 +13349,8 @@ class LivePlayer(Player):
                 self.travel_override = True
             if ('leaderboard_override' in q):
                 self.leaderboard_override = q['leaderboard_override'][0]
+            if ('force_motd' in q):
+                self.force_motd = True
 
     # update the player's membership in any ongoing A/B tests
     # called once per login
@@ -25865,7 +25868,8 @@ class GAMEAPI(resource.Resource):
             # check if player is due for various popups
             force_time = session.player.get_any_abtest_value('motd_refresh_time', gamedata['server']['message_of_the_day'].get('refresh_time',-1))
             if ((server_time - session.player.last_motd) > gamedata['client']['motd_interval']) or \
-               (session.player.last_motd < force_time):
+               (session.player.last_motd < force_time) or \
+               session.player.force_motd:
                 session.player.last_motd = server_time
                 session.player.get_daily_tips(session, retmsg)
 
