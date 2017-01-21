@@ -14208,7 +14208,10 @@ class LivePlayer(Player):
 
                 old_is_ladder = gamedata['regions'][old_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
                 new_is_ladder = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('ladder_pvp', gamedata.get('ladder_pvp', False))
-                if old_is_ladder and (not new_is_ladder) and gamedata['matchmaking']['zero_points_on_ladder_exit']:
+                new_zero_points = self.my_home.base_region and gamedata['regions'][self.my_home.base_region].get('zero_points_on_entry', False)
+
+                if (old_is_ladder and (not new_is_ladder) and gamedata['matchmaking']['zero_points_on_ladder_exit']) or \
+                   new_zero_points:
                     # switching out of ladder - reset scores
                     ladder_reset = True
                     self.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'change_region')
@@ -25895,6 +25898,12 @@ class GAMEAPI(resource.Resource):
 
         if session.player.is_on_map():
             assert session.player.home_region and (session.player.my_home.base_region == session.player.home_region)
+
+            # if we're in a region that zeros out trophy points, ensure we're at zero here.
+            if session.player.home_region in gamedata['regions'] and \
+               gamedata['regions'][session.player.home_region].get('zero_points_on_entry', False) and \
+               session.player.ladder_points() != gamedata['trophy_floor']['pvp']:
+                session.player.modify_scores({'trophies_pvp':gamedata['trophy_floor']['pvp']}, method='=', reason = 'zero_points_on_entry_login')
 
             # ping the map to update login status for the player's home base (sends broadcast of lock acquire)
             if not session.player_base_lock:

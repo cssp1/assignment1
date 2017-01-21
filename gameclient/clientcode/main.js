@@ -22772,6 +22772,10 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
                 var new_is_ladder = !!(gamedata['regions'][_id]['ladder_pvp']);
                 var ladder_reset = (old_is_ladder && !new_is_ladder) && gamedata['matchmaking']['zero_points_on_ladder_exit'];
 
+                var old_is_pvp = !(session.region.data && session.region.data['zero_points_on_entry']);
+                var new_is_pvp = !(gamedata['regions'][_id]['zero_points_on_entry']);
+                if(old_is_pvp && !new_is_pvp) { ladder_reset = true; }
+
                 var msg = gamedata['strings']['change_region_confirm' + (within_region ? '_within_region' : (ladder_reset ? '_ladder_reset': '' ))];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', gamedata['regions'][_id]['ui_name']),
                                             msg['ui_description'].replace('%s', gamedata['regions'][_id]['ui_name'])+'\n\n'+gamedata['strings']['regional_map']['change_region_feature_info'].replace('%NAME',gamedata['regions'][_id]['ui_name']).replace('%DESCR',gamedata['regions'][_id]['ui_description_long']),
