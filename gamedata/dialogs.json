@@ -249,7 +249,7 @@
             "title_research":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Laboratory Is Busy" },
             "title_enhance":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
-                                 "ui_name": "Building Is Busy" },
+                                "ui_name": "Building Is Busy" },
             "title_crafting":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Building Is Busy" },
             "title_removing":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
@@ -9738,14 +9738,14 @@
             "next_sunken": {"kind": "StaticImage", "xy":[299,108], "dimensions":[214,248], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "next_label": { "kind": "TextField", "xy": [299,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Next: Trainee #%d" },
             "next_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [321,157], "dimensions": [50,50],
-                           "array": [3,2], "array_offset":[60,70] },
+                            "array": [3,2], "array_offset":[60,70] },
             "next_description": { "kind": "TextField", "xy": [317,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Rewards you will earn when your next trainee reaches %req" },
+                                  "ui_name": "Rewards you will earn when your next trainee reaches %req" },
             "bonus_label": { "kind": "TextField", "xy": [510,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Trainee #%d Bonus" },
             "bonus_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [528,157], "dimensions": [50,50],
                              "array": [3,2], "array_offset":[60,70] },
             "bonus_description": { "kind": "TextField", "xy": [528,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Recruit %more more trainees for this powerful bonus!" }
+                                   "ui_name": "Recruit %more more trainees for this powerful bonus!" }
         }
     },
 
@@ -9809,7 +9809,7 @@
                        "text_hjustify": "left", "ui_name": "Mentorship Rewards" },
 
             "invite_tab_button": { "kind": "ActionButton", "xy": [418,15],  "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "menu_button_136px", "ui_name": "Your Rewards" },
+                                   "bg_image": "menu_button_136px", "ui_name": "Your Rewards" },
             "gifts_tab_button": { "kind": "ActionButton", "xy": [556,15], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                   "bg_image": "menu_button_136px", "ui_name": "Daily Gifts" },
             "gifts_jewel": { "kind": "Dialog", "xy": [672,13], "dimensions": [17,14], "dialog": "notification_jewel" },
