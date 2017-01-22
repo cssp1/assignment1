@@ -152,7 +152,7 @@ class PlayerPortraits(object):
                     # if fetch fails, record error and return unknown portrait
                     def on_error(f, self, target_platform):
                         func = self.log_exception_func_map.get(target_platform, self.log_exception_func_map['default'])
-                        func('PlayerPortrait get() error: '+f.getTraceback().strip())
+                        func('PlayerPortrait get() error: '+f.getTraceback().strip()+'\n'+f.getErrorMessage().strip())
                         return (False, 'image/png', unknown_person_portrait_50x50_png)
                     ret.addErrback(on_error, self, target_platform)
                     return ret
