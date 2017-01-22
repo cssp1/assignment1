@@ -489,8 +489,8 @@ def update_server_time():
 
 # utilities for inserting into Deferred callback chains
 def _report_deferred_failure(fail, session):
-    gamesite.exception_log.event(server_time, 'async exception on player %d: %s' % \
-                                 (session.user.user_id, fail.getTraceback().strip()))
+    gamesite.exception_log.event(server_time, 'async exception on player %d: %s\n%s' % \
+                                 (session.user.user_id, fail.getTraceback().strip(), fail.getErrorMessage().strip()))
 def report_and_reraise_deferred_failure(fail, session):
     _report_deferred_failure(fail, session)
     return fail
