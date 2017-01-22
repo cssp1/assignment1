@@ -16,7 +16,7 @@ from SkynetLib import spin_targets, bid_coeff, \
      encode_one_param, encode_params, decode_params, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
      decode_adgroup_name, adgroup_name_is_bad, make_variable_regexp, adgroup_dtgt_filter_query, mongo_enc
 from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL, \
-     BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
+     BATTLEHOUSE_APP_ID, BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
 
 HTTPLIB = 'requests'
 if HTTPLIB == 'requests':
@@ -1796,6 +1796,10 @@ def adgroup_targeting(db, tgt):
         # exclude people connected to the game already
         ret['excluded_connections'] = [{'id':game_data['app_id']}]
 
+        # for links going to battlehouse.com, exclude people already using its Facebook login
+        if tgt.get('destination') == 'bh_com':
+            ret['excluded_connections'].append({'id':BATTLEHOUSE_APP_ID})
+
         # optionally also exclude a custom audience containing the entire player base
         if tgt.get('exclude_player_audience',True) and game_data.get('exclude_player_audience',None):
             if 'excluded_custom_audiences' not in ret: ret['excluded_custom_audiences'] = []
@@ -1811,7 +1815,7 @@ def adgroup_targeting(db, tgt):
 def reachestimate_tgt(tgt):
     # strip out the parts of tgt that don't apply to the reach estimate
     reach_tgt = tgt.copy()
-    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','destination','version'):
+    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','version'):
         if FIELD in reach_tgt: del reach_tgt[FIELD]
     return reach_tgt
 
