@@ -2480,10 +2480,10 @@ if __name__ == '__main__':
 
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
                                                         'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
-                                                        'recache-alliance-scores', 'test'])
+                                                        'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
     send_prizes = False
@@ -2496,6 +2496,7 @@ if __name__ == '__main__':
     spend_week = None
     time_now = int(time.time())
     maint_region = None
+    config_name = None
 
     for key, val in opts:
         if key == '--reset': mode = 'reset'
@@ -2538,6 +2539,8 @@ if __name__ == '__main__':
         elif key == '--spend-week': spend_week = int(val)
         elif key == '--recache-alliance-scores': mode = 'recache-alliance-scores'
         elif key == '--test': mode = 'test'
+        elif key == '--benchmark': mode = 'benchmark'
+        elif key == '--config-name': config_name = val
         elif key == '-g' or key == '--game-id':
             game_instance = val
 
@@ -2551,10 +2554,11 @@ if __name__ == '__main__':
         print '    --recache-alliance-scores --week N --season S  Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
+        print '    --benchmark                Run MongoDB benchmark'
         print '    --test                     Run regression test code (DESTROYS DATA)'
         sys.exit(1)
 
-    client = NoSQLClient(SpinConfig.get_mongodb_config(game_instance))
+    client = NoSQLClient(SpinConfig.get_mongodb_config(config_name or game_instance))
     client.set_time(time_now)
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
@@ -2770,6 +2774,20 @@ if __name__ == '__main__':
                 for cmd in commands:
                     subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
                 print "PRIZES ALL SENT OK"
+
+
+    elif mode == 'benchmark':
+        # micro-benchmark to check worst-case impact of network latency
+        # make many small reads that involve a round trip
+        tbl = client._table('zzz_benchmark')
+        n_iterations = 5000
+        start_time = time.time()
+        for i in xrange(n_iterations):
+            unused = list(tbl.find({'_id':random.randint(80000000,90000000)},
+                                   {'_id':1,'ui_name':1,'player_level':1}))
+        end_time = time.time()
+        print '%d iterations, %.2f ms per iteration' % \
+              (n_iterations, 1000.0*(end_time - start_time)/(n_iterations))
 
     elif mode == 'test':
         print 'TEST'
