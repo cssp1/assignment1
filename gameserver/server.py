@@ -14907,7 +14907,174 @@ class OGPAPI(resource.Resource):
 
 OGPAPI_instance = OGPAPI()
 
-# small interface used by the proxy server to communicate with us
+# REST interface for stat queries like leaderboard
+class STATSAPI(resource.Resource):
+    isLeaf = True
+    def __init__(self, gameapi):
+        resource.Resource.__init__(self)
+        self.gameapi = gameapi
+    def render_POST(self, request): return self.render_GET(request)
+    def render_GET(self, request):
+        update_server_time()
+        auth = SpinHTTP.get_twisted_header(request, 'Authorization')
+        if not auth or (not auth.startswith('Bearer ')) or \
+           (auth.split(' ')[1] != SpinConfig.config['stats_api_secret']):
+            request.setResponseCode(http.BAD_REQUEST)
+            return u'{"error":"Unauthorized"}\n'.encode('utf-8')
+
+        if 'method' not in request.args:
+            request.setResponseCode(http.BAD_REQUEST)
+            return u'{"error":"Missing method"}\n'.encode('utf-8')
+
+        method = request.args['method'][0].decode('utf-8')
+
+        try:
+            with admin_stats.latency_measurer('STATSAPI(ALL)'):
+                with admin_stats.latency_measurer('STATSAPI(%s)' % method):
+                    ret = self.do_render(method, dict((k, v[0]) for k,v in request.args.iteritems()))
+
+        except BaseException:
+            gamesite.exception_log.event(server_time, 'STATSAPI method=%s error:\n%s' % (method, traceback.format_exc()))
+            request.setResponseCode(http.INTERNAL_SERVER_ERROR)
+            ret = u'{"error":"Internal server error"}\n'
+
+        return ret.encode('utf-8')
+
+    def do_render(self, method, args):
+        assert method == 'leaderboard'
+        ret = {'game_id': gamedata['game_id'],
+               'ui_game_name': SpinConfig.config['proxyserver'].get('fbexternalhit_title',
+                                                                    gamedata['strings']['game_name']),
+               'season_ui_offset': gamedata['matchmaking'].get('season_ui_offset',0),
+               'update_time': server_time,
+               'categories': []
+               }
+
+        cur_day = SpinConfig.get_pvp_day(gamedata['matchmaking']['week_origin'], server_time)
+        cur_week = SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], server_time)
+        cur_season = SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], server_time)
+
+        if 'time_scope' not in args:
+            args['time_scope'] = Scores2.FREQ_SEASON
+
+        if args['time_scope'] == Scores2.FREQ_ALL:
+            time_scope = Scores2.FREQ_ALL
+            time_loc = 0
+        elif args['time_scope'] == Scores2.FREQ_WEEK:
+            time_scope = Scores2.FREQ_WEEK
+            if 'time_loc' in args:
+                time_loc = int(args['time_loc'])
+            else:
+                time_loc = cur_week
+        elif args['time_scope'] == Scores2.FREQ_SEASON:
+            time_scope = Scores2.FREQ_SEASON
+            if 'time_loc' in args:
+                time_loc = int(args['time_loc'])
+            else:
+                time_loc = cur_season
+        elif args['time_scope'] == Scores2.FREQ_DAY:
+            time_scope = Scores2.FREQ_DAY
+            if 'time_loc' in args:
+                time_loc = int(args['time_loc'])
+            else:
+                time_loc = cur_day
+        else:
+            raise Exception('unknown time_scope %r' % args['time_scope'])
+
+        if 'space_scope' not in args:
+            args['space_scope'] = Scores2.SPACE_ALL
+            args['space_loc'] = Scores2.SPACE_ALL_LOC
+
+        if args['space_scope'] == Scores2.SPACE_ALL:
+            space_scope = Scores2.SPACE_ALL
+            space_loc = Scores2.SPACE_ALL_LOC
+        elif args['space_scope'] == Scores2.SPACE_CONTINENT:
+            space_scope = Scores2.SPACE_CONTINENT
+            space_loc = args['space_loc']
+            assert space_loc in gamedata['continents']
+        elif args['space_scope'] == Scores2.SPACE_REGION:
+            space_scope = Scores2.SPACE_REGION
+            space_loc = args['space_loc']
+            assert space_loc in gamedata['regions']
+        else:
+            raise Exception('unknown space_scope %r' % args['space_scope'])
+
+        # batch all score queries
+        score_addr_list = []
+
+        for stat_name, stat_data in gamedata['strings']['leaderboard']['categories'].iteritems():
+            if stat_name in ('time_in_game', 'account_age', 'quarry_resources'): continue
+            if stat_data.get('statistics_show_if',None) != {'predicate':'ALWAYS_TRUE'}:
+                continue
+
+            cat = {'stat_name': stat_name,
+                   'ui_stat_name': stat_data['title'],
+                   'ui_stat_description': stat_data['description'],
+                   'time_scope': time_scope, 'time_loc': time_loc,
+                   'space_scope': space_scope, 'space_loc': space_loc,
+                   'leaders': None,
+                   }
+
+            if space_scope == Scores2.SPACE_CONTINENT:
+                cat['ui_space_loc'] = gamedata['continents'][space_loc]['ui_name']
+            elif space_scope == Scores2.SPACE_REGION:
+                cat['ui_space_loc'] = gamedata['regions'][space_loc]['ui_name']
+
+            ret['categories'].append(cat)
+            query_addr = (stat_name, Scores2.make_point(time_scope, time_loc, space_scope, space_loc))
+            score_addr_list.append(query_addr)
+
+        if score_addr_list:
+            for cat, result in zip( \
+                ret['categories'],
+                gamesite.mongo_scores2_client.player_scores2_get_leaders(score_addr_list,
+                                                                         10, reason = 'STATSAPI')):
+                cat['leaders'] = result
+
+
+        # to minimize the number of player/alliance queries, batch them all at once
+        seen_player_ids = set()
+        for cat in ret['categories']:
+            if cat['leaders']:
+                for entry in cat['leaders']:
+                    seen_player_ids.add(entry['user_id'])
+
+        if seen_player_ids:
+            # decorate results with player cache properties
+            seen_player_id_list = list(seen_player_ids)
+            player_info_by_id = dict(zip( \
+                seen_player_id_list,
+                self.gameapi.do_query_player_cache(None, seen_player_id_list,
+                                                   fields = ['ui_name','player_level','alliance_id'],
+                                                   get_trophies = False, reason = 'STATSAPI')))
+
+            seen_alliances = set()
+            for cat in ret['categories']:
+                if cat['leaders']:
+                    for entry in cat['leaders']:
+                        player_info = player_info_by_id.get(entry['user_id'], None)
+                        if player_info:
+                            entry.update(player_info)
+                            if player_info.get('alliance_id',-1) > 0:
+                                seen_alliances.add(player_info['alliance_id'])
+
+            if seen_alliances:
+                seen_alliance_list = list(seen_alliances)
+                alinfo_by_id = dict(zip( \
+                    seen_alliance_list,
+                    gamesite.sql_client.get_alliance_info(seen_alliance_list, reason = 'STATSAPI')))
+
+                for cat in ret['categories']:
+                    if cat['leaders']:
+                        for entry in cat['leaders']:
+                            if entry.get('alliance_id',-1) > 0:
+                                al = alinfo_by_id.get(entry['alliance_id'], None)
+                                if al:
+                                    entry['alliance_chat_tag'] = al.get('chat_tag', None)
+
+        return SpinJSON.dumps({'result':ret}, newline=True, pretty=False)
+
+# REST interface used by proxyserver, PCHECK, and other game servers to communicate with us
 class CONTROLAPI(resource.Resource):
     isLeaf = True
     def __init__(self, gameapi):
@@ -31034,6 +31201,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     gameapi = GAMEAPI()
     controlapi = CONTROLAPI(gameapi)
+    statsapi = STATSAPI(gameapi)
     trialpayapi = TRIALPAYAPI(gameapi)
     xsapi = XSAPI(gamedata)
 
@@ -31043,6 +31211,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
     root.putChild("XSAPI",xsapi)
     root.putChild("KGAPI",KGAPI(gameapi))
     root.putChild("CONTROLAPI",controlapi)
+    root.putChild("STATSAPI",statsapi)
     root.putChild("OGPAPI",OGPAPI_instance)
     root.putChild("ADMIN",ADMINAPI_instance)
     if config.game_ws_port > 0 or config.game_wss_port > 0:

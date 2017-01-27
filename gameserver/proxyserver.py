@@ -639,6 +639,9 @@ visitor_table = {}
 def controlapi_url(gameserver_host, gameserver_port):
     return 'http://%s:%d/CONTROLAPI' % (gameserver_host, gameserver_port)
 
+def statsapi_url(gameserver_host, gameserver_port):
+    return 'http://%s:%d/STATSAPI' % (gameserver_host, gameserver_port)
+
 def controlapi_handle(request):
     if 'secret' not in request.args or request.args['secret'][-1] != SpinConfig.config['proxy_api_secret'] or 'method' not in request.args:
         raise Exception('unauthorized')
@@ -820,6 +823,62 @@ def controlapi_queue_poll():
             d.addErrback(unlock_and_pass_error, entry)
             d.addCallback(unlock_check, dummy_request, entry)
 
+
+@defer.inlineCallbacks
+def statsapi_handle(request):
+    """ simple forwarding for STATSAPI requests """
+    try:
+        ret = yield do_statsapi_handle(request)
+
+    except BaseException:
+        exception_log.event(proxy_time, 'proxyserver: STATSAPI error on %s:\n%s' % \
+                            (log_request(request), traceback.format_exc()))
+        raise
+
+    defer.returnValue(ret)
+
+@defer.inlineCallbacks
+def do_statsapi_handle(request):
+    auth = SpinHTTP.get_twisted_header(request, 'Authorization')
+    if not auth or (not auth.startswith('Bearer ')) or \
+       (auth.split(' ')[1] != SpinConfig.config['stats_api_secret']):
+        request.setResponseCode(http.BAD_REQUEST)
+        defer.returnValue(u'{"error":"Unauthorized"}\n'.encode('utf-8'))
+
+    fwd = get_any_game_server()
+    if not fwd:
+        SpinHTTP.set_service_unavailable(request)
+        defer.returnValue(SpinHTTP.service_unavailable_response_body.encode('utf-8'))
+
+    # prepare everything we need to forward the request
+    headers = request.getAllHeaders()
+    headers.update(make_proxy_headers(request))
+    postdata = request.content.read()
+    if request.args:
+        url_qs = '?' + ('&'.join([k+'='+urllib.quote_plus(v) for k in request.args for v in request.args[k]]))
+    else:
+        url_qs = ''
+    final_url = statsapi_url(fwd[0], fwd[1]) + url_qs
+
+    resp_body, resp_headers, resp_status = \
+                 yield control_async_http.queue_request_deferred(proxy_time,
+                                                                 final_url,
+                                                                 headers = headers,
+                                                                 postdata = postdata,
+                                                                 method = 'GET',
+                                                                 callback_type = control_async_http.CALLBACK_FULL,
+                                                                 accept_http_errors = True)
+
+    update_time()
+
+    if resp_headers:
+        for k, v in resp_headers.iteritems():
+            # translate from multi-valued headers to single-valued headers, keeping only the last one
+            assert isinstance(v, list)
+            request.setHeader(k,v[-1])
+
+    request.setResponseCode(int(resp_status))
+    defer.returnValue(resp_body or u''.encode('utf-8'))
 
 # Currently active GAMEAPI sessions
 
@@ -2472,6 +2531,11 @@ class GameProxy(proxy.ReverseProxyResource):
             d.addCallback(SpinHTTP.complete_deferred_request, request)
             return twisted.web.server.NOT_DONE_YET
 
+        elif self.path == '/STATSAPI':
+            d = statsapi_handle(request)
+            d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
+            return twisted.web.server.NOT_DONE_YET
+
         elif self.path == '/KGAPI':
             #exception_log.event(proxy_time, 'KGAPI call: '+repr(request.args))
             request_data = SpinKongregate.parse_signed_request(request.args['signed_request'][-1], SpinConfig.config['kongregate_api_key'])
@@ -2761,7 +2825,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'bh')
             elif self.path == '/MMROOT':
                 ret = self.render_ROOT(request, frame_platform = 'mm')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -3161,7 +3225,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
