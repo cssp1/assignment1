@@ -14927,11 +14927,22 @@ class STATSAPI(resource.Resource):
             return u'{"error":"Missing method"}\n'.encode('utf-8')
 
         method = request.args['method'][0].decode('utf-8')
+        if method == 'leaderboard':
+            func = self.render_leaderboard
+        elif method == 'player':
+            func = self.render_player
+        elif method == 'alliance':
+            func = self.render_alliance
+        else:
+            request.setResponseCode(http.BAD_REQUEST)
+            return u'{"error":"Unknown method"}\n'.encode('utf-8')
+
+        func_args = dict((k, v[0]) for k,v in request.args.iteritems())
 
         try:
             with admin_stats.latency_measurer('STATSAPI(ALL)'):
                 with admin_stats.latency_measurer('STATSAPI(%s)' % method):
-                    ret = self.do_render(method, dict((k, v[0]) for k,v in request.args.iteritems()))
+                    ret = func(func_args)
 
         except BaseException:
             gamesite.exception_log.event(server_time, 'STATSAPI method=%s error:\n%s' % (method, traceback.format_exc()))
@@ -14940,8 +14951,62 @@ class STATSAPI(resource.Resource):
 
         return ret.encode('utf-8')
 
-    def do_render(self, method, args):
-        assert method == 'leaderboard'
+    def render_player(self, args):
+        player_id = int(args.get('player_id', -1))
+        player_info = self.gameapi.do_query_player_cache(None, [player_id],
+                                                         fields = ['ui_name', 'player_level','alliance_id'],
+                                                         get_trophies = True,
+                                                         reason = 'STATSAPI(player)')[0]
+        if not player_info:
+            ret = {'error': 'Player %r not found' % player_id}
+        else:
+            alliance_info = None
+            alliance_id = player_info.get('alliance_id', -1)
+            if alliance_id > 0:
+                alinfo = gamesite.sql_client.get_alliance_info([alliance_id],
+                                                               reason = 'STATSAPI(player)')[0]
+                if alinfo:
+                    alliance_info = {'alliance_id': alliance_id,
+                                     'logo': alinfo.get('logo'),
+                                     'chat_tag': alinfo.get('chat_tag'),
+                                     'ui_name': alinfo.get('ui_name')}
+
+            ret = {'result': {'player': player_info,
+                              'alliance': alliance_info}}
+
+        return SpinJSON.dumps(ret, newline=True, pretty=False)
+
+    def render_alliance(self, args):
+        alliance_id = int(args.get('alliance_id', -1))
+        alinfo = gamesite.sql_client.get_alliance_info([alliance_id],
+                                                       reason = 'STATSAPI(alliance)')[0]
+        if not alinfo:
+            ret = {'error': '%s %r not found' % (gamedata['strings']['alliance'], alliance_id)}
+        else:
+            members = gamesite.sql_client.get_alliance_members(alliance_id, reason = 'STATSAPI(alliance)')
+            # XXX could get scores here
+
+            pcache_data = self.gameapi.do_query_player_cache(None, [m['user_id'] for m in members],
+                                                             fields = ['ui_name', 'player_level'],
+                                                             get_trophies = True,
+                                                             reason = 'STATSAPI(alliance)')
+            pcache_data = filter(lambda x: bool(x), pcache_data) # throw out null entries
+            for i in xrange(len(pcache_data)):
+                r = pcache_data[i]
+                if r:
+                    # fill in alliance_id
+                    r['alliance_id'] = alliance_id
+
+            FIELDS = ('alliance_id', 'logo', 'chat_tag', 'ui_name', 'ui_description',
+                      'join_type', 'num_members', 'creation_time', 'continent')
+
+            ret = {'result': {'ui_alliance': gamedata['strings']['alliance'],
+                              'alliance': dict((field, alinfo.get(field)) for field in FIELDS),
+                              'members': pcache_data}}
+
+        return SpinJSON.dumps(ret, newline=True, pretty=False)
+
+    def render_leaderboard(self, args):
         ret = {'game_id': gamedata['game_id'],
                'ui_game_name': SpinConfig.config['proxyserver'].get('fbexternalhit_title',
                                                                     gamedata['strings']['game_name']),
@@ -15046,7 +15111,7 @@ class STATSAPI(resource.Resource):
                 seen_player_id_list,
                 self.gameapi.do_query_player_cache(None, seen_player_id_list,
                                                    fields = ['ui_name','player_level','alliance_id'],
-                                                   get_trophies = False, reason = 'STATSAPI')))
+                                                   get_trophies = False, reason = 'STATSAPI(leaderboard)')))
 
             seen_alliances = set()
             for cat in ret['categories']:
@@ -15062,7 +15127,7 @@ class STATSAPI(resource.Resource):
                 seen_alliance_list = list(seen_alliances)
                 alinfo_by_id = dict(zip( \
                     seen_alliance_list,
-                    gamesite.sql_client.get_alliance_info(seen_alliance_list, reason = 'STATSAPI')))
+                    gamesite.sql_client.get_alliance_info(seen_alliance_list, reason = 'STATSAPI(leaderboard)')))
 
                 for cat in ret['categories']:
                     if cat['leaders']:

@@ -2191,7 +2191,7 @@ class NoSQLClient (object):
 
     @classmethod
     def alliance_query_fields(cls, member_access):
-        FIELDS = ['ui_name', 'ui_description', 'chat_tag', 'join_type', 'founder_id', 'leader_id', 'logo', 'num_members_cache', 'continent']
+        FIELDS = ['ui_name', 'ui_description', 'chat_tag', 'join_type', 'founder_id', 'leader_id', 'logo', 'num_members_cache', 'continent', 'creation_time']
         if member_access: FIELDS += ['chat_motd']
         return dict(((field,1) for field in FIELDS))
 
