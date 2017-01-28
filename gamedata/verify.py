@@ -74,11 +74,6 @@ def check_url(url, reason):
             error |= check_url(u, reason = reason)
         return error
 
-    if not url.startswith('//'):
-        if 'on.fb.me' in url:
-            pass # XXX unfortuantely this breaks tons of links - we have to find an HTTPS substitute
-        else:
-            error |= 1; print '%s: URL "%s" needs to be protocol-relative (starts with // not http://)' % (reason, url)
     if 'on.fb.me' in url:
         if (not url.startswith('http://')):
             error |= 1; print '%s: URL "%s" to on.fb.me must use http:// because HTTPS is not supported' % (reason, url)
