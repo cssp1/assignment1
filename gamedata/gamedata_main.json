@@ -954,6 +954,19 @@
     // instantly invite this many of the top friends instead of showing selector (like Throne Rush)
     "fb_friend_invite_v2_instant": 0,
 
+    // list of Facebook objects whose "Like" status we want to know upon login
+    // since these are fetched asynchronously on first login, they aren't reliably present on first login.
+    // if unknown, we assume the object is NOT "Liked".
+    "fb_likes_preload": [
+        "1479826965653258", // Battlehouse Inc. fan page
+        "235938246460875", // MF fan page
+        "141835099310946", // TR fan page
+        "633274570056000", // MF2 fan page
+        "1436033100000042", // BFM fan page
+        "653216284776703", // SG fan page
+        "1505053499760404" // DV fan page
+    ],
+
     // CURRENCY DISPLAY DATA
     // NOTE! This has nothing at all to do with the actual ordering/payments code!
     // This data is ONLY used for the purpose of displaying currency amounts in the GUI.

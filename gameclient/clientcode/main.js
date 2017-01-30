@@ -45848,6 +45848,7 @@ function handle_server_message(data) {
         player.chat_seen = data[21];
         player.is_chat_mod = data[22];
         var daily_banner = data[23];
+        var fb_likes_preload = data[24];
 
         ChatFilter.init(gamedata['client']['chat_filter']);
 
@@ -45925,6 +45926,10 @@ function handle_server_message(data) {
         }
 
         PlayerCache.init(gamedata['client']['player_cache']);
+
+        if(fb_likes_preload) {
+            SPFB.preload_likes(fb_likes_preload);
+        }
 
         var need_reflow = false;
 

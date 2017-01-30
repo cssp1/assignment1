@@ -2775,6 +2775,17 @@ class User:
                                                                                                                                     'spec': spec_name})
                                                               })
 
+    # called on login to transmit some important like/not-like stus to the client immediately
+    # note: we use stale data from the last session here
+    def get_fb_likes_preload(self):
+        likes = None
+        if gamedata.get('fb_likes_preload') and (self.facebook_likes is not None):
+            likes = dict((id, 0) for id in gamedata['fb_likes_preload'])
+            for entry in self.facebook_likes:
+                if entry['id'] in likes:
+                    likes[entry['id']] = 1
+        return likes
+
     # try to obtain the user's Facebook profile, friends and likes
     # this is cached in user_table; if the cache is empty or stale,
     # send asynchronous HTTP requests to Facebook to get the data
@@ -25975,7 +25986,8 @@ class GAMEAPI(resource.Resource):
                        session.player.creation_time,
                        session.player.chat_seen,
                        session.user.is_chat_mod(),
-                       session.player.get_daily_banner(session, retmsg)
+                       session.player.get_daily_banner(session, retmsg),
+                       session.user.get_fb_likes_preload(),
                        ])
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])

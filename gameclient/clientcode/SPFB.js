@@ -156,7 +156,8 @@ SPFB.AppEvents.logEvent = function(name, value, params) {
     and apply any "fb-like" div elements
     @param {HTMLElement=} element */
 SPFB.XFBML_parse = function(element) {
-    if(spin_frame_platform == 'fb' || (spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id)) {
+    if((spin_frame_platform == 'fb' && spin_facebook_enabled) ||
+       (spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id)) {
         if(typeof FB === 'undefined' || typeof FB.XFBML == 'undefined') {
             // note: calls back into main.js
             invoke_timeout_message('0650_client_died_from_facebook_api_error', {'method':'XFBML_parse'}, {});
@@ -205,11 +206,21 @@ SPFB.versioned_graph_endpoint = function(feature, path) {
 SPFB.likes_cache = {};
 SPFB.on_likes_cache_update = null;
 
-/** @constructor @struct */
-SPFB.CachedLike = function(id) {
+/** @constructor @struct
+    @param {string} id
+    @param {string=} init_state */
+SPFB.CachedLike = function(id, init_state) {
     this.id = id;
-    this.state = 'unknown';
+    this.state = init_state || 'unknown';
     this.time = client_time;
+};
+
+/** Initialize the cache with data provided by the server on login
+    @param {Object<string,number>} data} */
+SPFB.preload_likes = function(data) {
+    for(var id in data) {
+        SPFB.likes_cache[id] = new SPFB.CachedLike(id, data[id] ? 'likes' : 'does_not_like');
+    }
 };
 
 SPFB.invalidate_likes_cache = function(on_update) {
@@ -248,6 +259,7 @@ SPFB.likes = function(id) {
             //console.log('LIKE RESPONSE '+_entry.id+' = '+_entry.state);
             if(SPFB.on_likes_cache_update) { SPFB.on_likes_cache_update(); }
         }; })(entry));
+        return false; // for now
     }
 };
 
