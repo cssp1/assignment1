@@ -152,6 +152,21 @@ SPFB.AppEvents.logEvent = function(name, value, params) {
     return FB.AppEvents.logEvent(n, value, props);
 };
 
+/** Call this to go through the DOM (a specific element's children or the whole DOM)
+    and apply any "fb-like" div elements
+    @param {HTMLElement=} element */
+SPFB.XFBML_parse = function(element) {
+    if(spin_frame_platform == 'fb' || (spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id)) {
+        if(typeof FB === 'undefined' || typeof FB.XFBML == 'undefined') {
+            // note: calls back into main.js
+            invoke_timeout_message('0650_client_died_from_facebook_api_error', {'method':'XFBML_parse'}, {});
+            return;
+        }
+        return FB.XFBML.parse(element || null);
+    }
+};
+
+
 // All URL calls to graph.facebook.com should use these functions in order to support version configuration:
 // please keep in sync with gameserver/SpinFacebook.py
 

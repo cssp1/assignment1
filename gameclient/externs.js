@@ -114,6 +114,9 @@ var FB = {
         "EventNames": function() {},
         "ParameterNames": function() {}
     },
+    "XFBML": {
+        "parse": function() {}
+    },
     "Canvas": {
         "setSize": function() {},
         "setAutoGrow": function() {},

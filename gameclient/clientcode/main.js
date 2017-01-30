@@ -45939,11 +45939,15 @@ function handle_server_message(data) {
         }
 
         // fill the footer linkbar
-        var bar = document.getElementById('spin_footer_linkbar_content');
+        var bar = /** @type {HTMLElement} */ (document.getElementById('spin_footer_linkbar_content'));
         if(bar) {
             var inner = eval_cond_or_literal(player.get_any_abtest_value('footer_linkbar_content', gamedata['strings']['footer_linkbar_content'] || null), player, null);
             if(inner) {
                 bar.innerHTML = url_put_info(inner, session.user_id, money_spent);
+                // update "Like" button, if present
+                if(inner.indexOf('class="fb-') >= 0) {
+                    SPFB.XFBML_parse(bar);
+                }
             }
         }
 
