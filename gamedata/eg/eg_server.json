@@ -17,7 +17,7 @@
     "session_signature_time_tolerance": 300, // how many seconds out of date a session signature is allowed to be
     // (this also controls for how long the gameserver remembers session invalidations sent from proxyserver to CONTROLAPI)
 
-    "facebook_cache_lifetime": 600, // cache friends/likes for 10min
+    "facebook_cache_lifetime": 60, // cache friends/likes for 1min
     "bg_task_interval": 20, // run server background tasks every 20sec
 
     "log_async_io": false, // log all async I/O traffic
