@@ -70,6 +70,8 @@ var spin_battlehouse_user;
 var spin_battlehouse_api_path;
 /** @type {string} */
 var spin_battlehouse_access_token;
+/** @type {string} */
+var spin_battlehouse_fb_app_id;
 /** @type {boolean} */
 var spin_facebook_enabled;
 /** @type {string} */

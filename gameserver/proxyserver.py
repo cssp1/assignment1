@@ -210,7 +210,7 @@ def reload_static_includes():
     global static_includes
     STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'index_body_bh.html', 'index_body_mm.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html', 'BattlehouseSDK.js',
+                            'FacebookSDK.js', 'FacebookSDK_Battlehouse.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html', 'BattlehouseSDK.js',
                             'XsollaSDK.min.js']
     new_includes = dict([(basename, open('../gameclient/'+basename).read().decode('utf-8')) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
@@ -2406,6 +2406,12 @@ class GameProxy(proxy.ReverseProxyResource):
         assert visitor.auth_token() is not None
         assert extra_data is not None
 
+        facebook_sdk = ''
+        if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)):
+            facebook_sdk = get_static_include('FacebookSDK.js')
+        elif visitor.frame_platform == 'bh' and SpinConfig.config.get('battlehouse_fb_app_id'):
+            facebook_sdk = get_static_include('FacebookSDK_Battlehouse.js')
+
         replacements = self.get_fb_global_variables(request, visitor)
         replacements.update({
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
@@ -2450,12 +2456,14 @@ class GameProxy(proxy.ReverseProxyResource):
             '$LOAD_GAME_CODE$': load_game_code,
             '$ONLOAD$': string.join(onload,' '),
 
-            '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
+            '$FACEBOOK_SDK$': facebook_sdk,
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
             '$BATTLEHOUSE_SDK$': get_static_include('BattlehouseSDK.js').replace('$BH_LOGIN_PATH$',SpinConfig.config['battlehouse_api_path']) if (visitor.frame_platform == 'bh' and SpinConfig.config.get('enable_battlehouse',0)) else '',
+            '$BATTLEHOUSE_FB_APP_ID$': SpinConfig.config.get('battlehouse_fb_app_id',''),
+
             # XXX use an out-of-line cacheable compressed file
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.min.js') if (SpinConfig.config.get('enable_xsolla',0) and visitor.frame_platform in ('ag','bh','mm')) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
