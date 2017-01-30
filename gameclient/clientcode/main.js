@@ -10455,7 +10455,7 @@ function linkbar_put_id(user_id) {
     if(user_id <= 0) { return; }
     var bar = document.getElementById('spin_footer_linkbar_id');
     if(!bar) { return; }
-    bar.innerHTML = 'Your Player ID: <b>'+user_id.toString()+'</b>&nbsp;&nbsp;&nbsp;';
+    bar.innerHTML = 'Player ID: <b>'+user_id.toString()+'</b>&nbsp;&nbsp;&nbsp;';
 }
 
 // replace __USER_ID__/__ISSUE_ID__ in URL paths (or any string) with the player's actual user_id and camouflaged money_spent amount
