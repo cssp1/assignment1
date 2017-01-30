@@ -9716,7 +9716,7 @@
                         "ui_name_after_mobile": "Copied! Use Paste to share"
                       },
 
-            "fb_share_button": { "kind": "ActionButton", "xy": [43,122], "dimensions": [250, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_offset": [10,0], "text_style": "bold", "ui_name": "Share on Facebook", "ui_description": "Accept my invite to earn free %gamebucks plus daily gifts"},
+            "fb_share_button": { "kind": "ActionButton", "xy": [43,122], "dimensions": [250, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_offset": [10,0], "text_style": "bold", "ui_name": "Share on Facebook", "ui_description": "Click to accept my game invite. We'll both earn free %gamebucks plus daily gifts!"},
             "fb_share_icon": { "kind": "StaticImage", "xy":[55,129], "dimensions":[32,32], "asset": "facebook_icon"},
 
             "ok_button": { "kind": "ActionButton", "xy": [460,199], "dimensions": [134, 32], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
