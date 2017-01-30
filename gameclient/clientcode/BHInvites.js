@@ -45,12 +45,43 @@ BHInvites.do_invoke_invite_code_dialog = function(code, url) {
         dialog.widgets['copied'].onclick = function(w) {
             var dialog = w.parent;
             SPUI.copy_text_to_clipboard(dialog.user_data['url']);
-            dialog.widgets['copied'].str = dialog.data['widgets']['copied']['ui_name_after'];
+            dialog.widgets['copied'].str = dialog.data['widgets']['copied'][(screen.width < 768 ? 'ui_name_after_mobile' : 'ui_name_after')];
             if(!dialog.user_data['metric_sent']) {
                 dialog.user_data['metric_sent'] = true;
                 metric_event('7102_invite_friends_ingame_bh_link_copied', {'sum': player.get_denormalized_summary_props('brief')});
             }
         };
+
+    dialog.widgets['fb_share_button'].show =
+        dialog.widgets['fb_share_icon'].show = !!spin_battlehouse_fb_app_id;
+
+    if(spin_battlehouse_fb_app_id) {
+        dialog.widgets['fb_share_button'].onclick = function(w) {
+            metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief')});
+            var ui_quote = w.data['ui_description'].replace('%gamebucks', Store.gamebucks_ui_name());
+
+            // if Facebook SDK is loaded, use that
+            if(FB) {
+                FB.ui({
+                    'method': 'share',
+                    'href': url,
+                    'quote': ui_quote,
+                    'mobile_iframe': (screen.width < 768) // detect mobile?
+                }, function(response){ console.log(response); });
+            } else {
+                // iframe doesn't require Facebook SDK
+                var fb_share_url = 'https://www.facebook.com/dialog/share' +
+                    '?app_id='+spin_battlehouse_fb_app_id+
+                    '&display=iframe'+
+                    '&quote='+encodeURIComponent(ui_quote)+
+                    '&href='+encodeURIComponent(url);
+//            '&redirect_uri='+encodeURIComponent('https://www.battlehouse.com/');
+
+                var handle = window.open(fb_share_url, w.data['ui_name'], 'width=600,height=425');
+                if(handle && handle.focus) { handle.focus(); }
+            }
+        };
+    }
 
     install_child_dialog(dialog);
     dialog.auto_center();

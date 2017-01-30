@@ -9693,26 +9693,33 @@
     },
 
     "bh_invite_code_dialog": {
-        "dimensions": [636, 214],
+        "dimensions": [636, 245],
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,220], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,130], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,245], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,155], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "close_button": { "kind": "ActionButton", "xy": [608,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [8,48], "dimensions": [620,18],
-                             "text_hjustify": "center", "text_size": 17,
-                             "ui_name": "↓ Here is your invite link ↓"
+            "description": { "kind": "TextField", "xy": [8,46], "dimensions": [620,18],
+                             "text_hjustify": "center", "text_size": 17, "text_style": "normal",
+                             "ui_name": "Here is your invite link:"
                            },
-            "link": { "kind": "ActionButton", "xy": [8,86], "dimensions": [620,18],
+            "link": { "kind": "ActionButton", "xy": [8,82], "dimensions": [620,18],
                       "text_hjustify": "center", "text_size": 17, "text_color": [1,1,0],
                       "ui_name": "https://www.battlehouse.com/play/refitskier/?bh_invite=3184818234823"
                     },
-            "copied": { "kind": "ActionButton", "xy": [0,119], "dimensions": [620,18],
-                        "text_hjustify": "center", "text_size": 15, "text_color": [0.8,0.8,0.8],
-                        "ui_name": "↑ Click to copy link ↑",
-                        "ui_name_after": "Link copied to clipboard! Use Ctrl-V to paste elsewhere."
+            "copied": { "kind": "ActionButton", "xy": [343,122], "dimensions": [250,44],
+                        "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                        "text_hjustify": "center", "text_vjustify": "center",
+                        "text_size": 13, "text_style": "bold",
+                        "ui_name": "Copy to clipboard",
+                        "ui_name_after": "Copied! Use Ctrl-V to paste",
+                        "ui_name_after_mobile": "Copied! Use Paste to share"
                       },
-            "ok_button": { "kind": "ActionButton", "xy": [488,175], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
+
+            "fb_share_button": { "kind": "ActionButton", "xy": [43,122], "dimensions": [250, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_offset": [10,0], "text_style": "bold", "ui_name": "Share on Facebook", "ui_description": "Accept my invite to earn free %gamebucks plus daily gifts"},
+            "fb_share_icon": { "kind": "StaticImage", "xy":[55,129], "dimensions":[32,32], "asset": "facebook_icon"},
+
+            "ok_button": { "kind": "ActionButton", "xy": [460,199], "dimensions": [134, 32], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
         }
     },
 
