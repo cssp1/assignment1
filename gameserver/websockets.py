@@ -34,6 +34,7 @@ from struct import pack, unpack
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.resource import IResource
+import twisted.web.http
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet.address import IPv4Address
 from zope.interface import implements
@@ -544,6 +545,14 @@ class WebSocketsResource(object):
             protocol.codec = codec
 
         protocol.dumb_pong = dumb_pong
+
+        # prevent Twisted from going into chunked mode and adding "Content-Encoding: chunked" header,
+        # which doesn't seem to be correct for WebSockets
+        # (and breaks CloudFlare)
+        twisted.web.http.NO_BODY_CODES = (204, 304, 101)
+
+        # prevent Twisted from returning a "Content-Type" header, which breaks CloudFlare WebSockets
+        request.defaultContentType = None
 
         # Provoke request into flushing headers and finishing the handshake.
         request.write("")
