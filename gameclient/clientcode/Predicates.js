@@ -1378,11 +1378,19 @@ FacebookAppNamespacePredicate.prototype.is_satisfied = function(player, qdata) {
 function ClientFacebookLikesPredicate(data) {
     goog.base(this, data);
     this.id = data['id'];
+    // return value to assume if the data seems unreliable
+    this.assume_default = (!!data['default']) || false;
 }
 goog.inherits(ClientFacebookLikesPredicate, Predicate);
 ClientFacebookLikesPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!spin_facebook_enabled || spin_frame_platform != 'fb') { return false; }
-    return SPFB.likes(this.id);
+    var result = SPFB.likes(this.id);
+    if(result.reliable) {
+        return result.likes_it;
+    } else {
+        // note: likes_it will always be false here
+        return this.assume_default;
+    }
 };
 
 /** @constructor @struct

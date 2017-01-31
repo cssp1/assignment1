@@ -203,9 +203,6 @@ SPFB.versioned_graph_endpoint = function(feature, path) {
     return 'https://graph.facebook.com/'+SPFB.api_version_string(feature)+path;
 };
 
-SPFB.likes_cache = {};
-SPFB.on_likes_cache_update = null;
-
 /** @constructor @struct
     @param {string} id
     @param {string=} init_state */
@@ -215,11 +212,24 @@ SPFB.CachedLike = function(id, init_state) {
     this.time = client_time;
 };
 
+/** @type {Object<string, !SPFB.CachedLike>} */
+SPFB.likes_cache = {};
+SPFB.on_likes_cache_update = null;
+
+/** @type {boolean} whether we think we're likely to have accurate "likes" data for this player */
+SPFB.likes_are_reliable = false;
+
 /** Initialize the cache with data provided by the server on login
-    @param {Object<string,number>} data} */
+    @param {Object<string,number>} data|null} */
 SPFB.preload_likes = function(data) {
-    for(var id in data) {
-        SPFB.likes_cache[id] = new SPFB.CachedLike(id, data[id] ? 'likes' : 'does_not_like');
+    if(data === null) {
+        // user privacy setting makes "like" status unreliable
+        return;
+    } else {
+        SPFB.likes_are_reliable = true;
+        for(var id in data) {
+            SPFB.likes_cache[id] = new SPFB.CachedLike(id, data[id] ? 'likes' : 'does_not_like');
+        }
     }
 };
 
@@ -233,6 +243,9 @@ SPFB.invalidate_likes_cache = function(on_update) {
     }
 };
 
+/** @param {string} id of the Facebook object
+    @return {{likes_it: boolean,
+              reliable: boolean}} */
 SPFB.likes = function(id) {
     var entry;
     if(id in SPFB.likes_cache) {
@@ -243,10 +256,14 @@ SPFB.likes = function(id) {
     }
 
     if(entry.state == 'likes') {
-        return true;
+        // positives are always reliable
+        return {likes_it: true, reliable: true};
+    } else if(entry.state == 'does_not_like') {
+        // negatives might be reliable, if we've seen other likes from this person
+        return {likes_it: false, reliable: SPFB.likes_are_reliable};
     } else if(entry.state == 'pending') {
-        return false;
-    } else if(entry.state == 'unknown') {
+        return {likes_it: false, reliable: false};
+    } else /* if(entry.state == 'unknown') */ {
         entry.state = 'pending';
         //console.log('LIKE REQUEST '+id);
         SPFB.api('/me/likes/'+id, (function (_entry) { return function(response) {
@@ -259,7 +276,7 @@ SPFB.likes = function(id) {
             //console.log('LIKE RESPONSE '+_entry.id+' = '+_entry.state);
             if(SPFB.on_likes_cache_update) { SPFB.on_likes_cache_update(); }
         }; })(entry));
-        return false; // for now
+        return {likes_it: false, reliable: false};
     }
 };
 

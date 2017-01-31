@@ -45927,9 +45927,7 @@ function handle_server_message(data) {
 
         PlayerCache.init(gamedata['client']['player_cache']);
 
-        if(fb_likes_preload) {
-            SPFB.preload_likes(fb_likes_preload);
-        }
+        SPFB.preload_likes(fb_likes_preload);
 
         var need_reflow = false;
 

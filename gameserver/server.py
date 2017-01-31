@@ -2779,7 +2779,11 @@ class User:
     # note: we use stale data from the last session here
     def get_fb_likes_preload(self):
         likes = None
-        if gamedata.get('fb_likes_preload') and (self.facebook_likes is not None):
+        if gamedata.get('fb_likes_preload') and \
+           (self.facebook_likes is not None) and \
+           (len(self.facebook_likes) >= 1):
+            # note: some Facebook users have privacy settings on their Likes, such
+            # that no data will ever be returned. In this case, return None instead of a dictionary.
             likes = dict((id, 0) for id in gamedata['fb_likes_preload'])
             for entry in self.facebook_likes:
                 if entry['id'] in likes:
