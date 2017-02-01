@@ -14705,6 +14705,8 @@ class OGPAPI(resource.Resource):
         ret = '<!DOCTYPE html>\n<html>\n'
         type = request.args['type'][0]
 
+        req_frame_platform = request.args['frame_platform'][0] if 'frame_platform' in request.args else 'fb'
+
         admin_stats.ogpapi_calls_by_type[type] = admin_stats.ogpapi_calls_by_type.get(type,0) + 1
 
         # order of precedence:
@@ -14872,7 +14874,14 @@ class OGPAPI(resource.Resource):
 
         ns = SpinConfig.config['facebook_app_namespace']
         ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
-        ret += '<meta property="fb:app_id" content="%s" />\n' % SpinConfig.config['facebook_app_id']
+
+        if req_frame_platform == 'bh':
+            meta_fb_app_id = SpinConfig.config['battlehouse_fb_app_id']
+        else:
+            meta_fb_app_id = SpinConfig.config['facebook_app_id']
+
+        ret += '<meta property="fb:app_id" content="%s" />\n' % meta_fb_app_id
+
         ret += '<meta property="og:type"   content="%s" />\n' % (my_og_type if my_og_type else '%s:%s' % (ns, type))
         #ret += '<meta property="og:url"    content="http://apps.facebook.com/%s?spin_campaign=open_graph" />\n' % (SpinConfig.config['facebook_app_namespace'])
         ret += '<meta property="og:url"    content="%s" />\n' % my_url
@@ -14918,8 +14927,14 @@ class OGPAPI(resource.Resource):
             game_qs += '&spin_ref_user_id='+my_spin_ref_user_id
         if my_spin_link_qs:
             game_qs += '&'+urllib.urlencode(my_spin_link_qs)
-        ret += '</head>\n<body onload="top.location.href = \'//apps.facebook.com/%s/?%s\';"></body>\n</html>' % \
-               (SpinConfig.config['facebook_app_namespace'], game_qs)
+
+        if req_frame_platform == 'bh':
+            game_url = 'https://www.battlehouse.com/play/'+SpinConfig.config['battlehouse_app_namespace']
+        else:
+            game_url = 'https://apps.facebook.com/'+SpinConfig.config['facebook_app_namespace']+'/';
+
+        ret += '</head>\n<body onload="top.location.href = \'%s?%s\';"></body>\n</html>' % \
+               (game_url, game_qs)
         return ret.encode('utf-8')
 
 OGPAPI_instance = OGPAPI()
