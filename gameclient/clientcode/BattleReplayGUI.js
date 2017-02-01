@@ -49,7 +49,7 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
     }
 
     // FB share button
-    if(link_qs && spin_frame_platform === 'fb') {
+    if(link_qs && FBShare.supported()) {
         dialog.widgets['fb_share_button'].show =
             dialog.widgets['fb_share_icon'].show = true;
         dialog.widgets['fb_share_button'].onclick = function(w) {

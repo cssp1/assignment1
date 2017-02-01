@@ -54,6 +54,7 @@ var spin_session_data;
 /** @type {boolean} */
 var spin_secure_mode;
 var spin_kissmetrics_enabled;
+/** @type {string} */
 var spin_frame_platform;
 var spin_social_id;
 /** @type {boolean} */

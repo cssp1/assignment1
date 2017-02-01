@@ -16,6 +16,7 @@ goog.require('goog.array');
 goog.require('SPUI');
 goog.require('ItemDisplay');
 goog.require('LootTable');
+goog.require('FBShare');
 
 /** Obtain and display the invite code to send to others */
 BHInvites.invoke_invite_code_dialog = function() {
@@ -53,33 +54,18 @@ BHInvites.do_invoke_invite_code_dialog = function(code, url) {
         };
 
     dialog.widgets['fb_share_button'].show =
-        dialog.widgets['fb_share_icon'].show = !!spin_battlehouse_fb_app_id;
+        dialog.widgets['fb_share_icon'].show = FBShare.supported();
 
-    if(spin_battlehouse_fb_app_id) {
+    if(FBShare.supported()) {
         dialog.widgets['fb_share_button'].onclick = function(w) {
+            var dialog = w.parent;
+            var url = /** string */ (dialog.user_data['url']);
             metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief')});
             var ui_quote = w.data['ui_description'].replace('%gamebucks', Store.gamebucks_ui_name());
 
-            // if Facebook SDK is loaded, use that
-            if(FB) {
-                FB.ui({
-                    'method': 'share',
-                    'href': url,
-                    'quote': ui_quote,
-                    'mobile_iframe': (screen.width < 768) // detect mobile?
-                }, function(response){ console.log(response); });
-            } else {
-                // iframe doesn't require Facebook SDK
-                var fb_share_url = 'https://www.facebook.com/dialog/share' +
-                    '?app_id='+spin_battlehouse_fb_app_id+
-                    '&display=iframe'+
-                    '&quote='+encodeURIComponent(ui_quote)+
-                    '&href='+encodeURIComponent(url);
-//            '&redirect_uri='+encodeURIComponent('https://www.battlehouse.com/');
-
-                var handle = window.open(fb_share_url, w.data['ui_name'], 'width=600,height=425');
-                if(handle && handle.focus) { handle.focus(); }
-            }
+            FBShare.invoke({ref: 'bh_invite',
+                            url: url,
+                            message: ui_quote});
         };
     }
 
