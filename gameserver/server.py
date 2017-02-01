@@ -14873,7 +14873,11 @@ class OGPAPI(resource.Resource):
         else:
             raise Exception('unknown type "%s"' % type)
 
-        ns = SpinConfig.config['facebook_app_namespace']
+        if req_frame_platform == 'bh':
+            ns = 'battlehouse'
+        else:
+            ns = SpinConfig.config['facebook_app_namespace']
+
         ret += '<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# %s: http://ogp.me/ns/fb/%s#%s">\n' % (ns, ns, my_extra_prefix)
 
         if req_frame_platform == 'bh':
