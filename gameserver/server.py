@@ -14666,6 +14666,7 @@ def parse_canvas_oversample(v):
 # Facebook Open Graph object endpoint
 class OGPAPI(resource.Resource):
     isLeaf = True
+    image_dimensions_re = re.compile(r'^.*([^0-9]+)([0-9]+)x([0-9]+).(jpg|png)')
 
     @classmethod
     def object_type(cls, name):
@@ -14911,7 +14912,14 @@ class OGPAPI(resource.Resource):
             else:
                 image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
 
-        ret += '<meta property="og:image"  content="%s" />\n' % image_url
+        # note: Facebook crawler seems to do better with non-https image URLs
+        ret += '<meta property="og:image"  content="%s" />\n' % image_url.replace('https://','http://')
+
+        # add image dimensions if we can figure them out from the filename
+        dim_match = self.image_dimensions_re.match(image_url)
+        if dim_match:
+            ret += '<meta property="og:image:width"  content="%s" />\n' % (dim_match.group(2))
+            ret += '<meta property="og:image:height"  content="%s" />\n' % (dim_match.group(3))
 
         for key, val in extra_props.iteritems():
             ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
