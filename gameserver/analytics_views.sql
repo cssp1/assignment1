@@ -102,6 +102,7 @@ BEGIN
            RETURN 'Armor Games';
         ELSEIF frame_platform = 'bh' THEN
        RETURN CASE camp
+       WHEN 'bh_invite' THEN 'BH Invite'
        WHEN 'google' THEN 'BH Google Paid'
        WHEN '7124_GG' THEN 'BH Google Paid'
        WHEN '7120_SRD' THEN 'BH FB Paid'

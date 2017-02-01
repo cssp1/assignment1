@@ -14580,6 +14580,8 @@ def get_acquisition_data_from_url(url, user_id):
 
     elif q.has_key('campaign'):
         ret = {'type':'ad_click', 'url': url, 'campaign_name':q['campaign'][0]}
+    elif q.has_key('bh_invite'):
+        ret = {'type':'ad_click', 'url': url, 'campaign_name':'bh_invite'}
     elif q.has_key('spin_ref'):
         ret = {'type':q['spin_ref'][0], 'url': url}
         if q.has_key('spin_ref_user_id'):
