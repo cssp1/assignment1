@@ -581,7 +581,9 @@ class BHVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.battlehouse_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.battlehouse.com/') # punt :(
+        self.game_container = 'https://www.battlehouse.com/play/' + \
+                              SpinConfig.config['battlehouse_app_namespace']
+        # don't add any campaign/invite params here
 
     # XXXXXXBH this might break the OAuth redirect to have extra parameters in the query string?
     def canvas_url(self):
