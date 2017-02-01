@@ -14,6 +14,7 @@
 import SpinJSON
 import SpinConfig
 import random
+import math
 #import copy
 from Region import Region
 import SpinNoSQLLockManager
@@ -22,6 +23,11 @@ from Raid import recall_squad, RecallSquadException, \
      calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
 from Predicates import read_predicate
+
+def get_leveled_quantity(qty, level): # XXX duplicate
+    if type(qty) == list:
+        return qty[level-1]
+    return qty
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -124,6 +130,16 @@ class Handler(object):
         json_user.clear(); json_user.update(new_json_user)
         json_player.clear(); json_player.update(new_json_player)
 
+        return ret
+
+    def get_denormalized_summary_props_offline(self, user, player):
+        ret = {'cc': player['history'].get(self.gamedata['townhall']+'_level',1),
+               'plat': user.get('frame_platform','fb'),
+               'rcpt': player['history'].get('money_spent', 0),
+               'ct': user.get('country','unknown'),
+               'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
+        if user.get('developer'):
+            ret['developer'] = 1
         return ret
 
 class HandleGetRaw(Handler):
@@ -682,6 +698,64 @@ class HandleSquadDockUnits(Handler):
         for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
             if FIELD in squad: del squad[FIELD]
 
+        return ReturnValue(result = 'ok')
+
+class HandleRepairBase(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+    def do_exec_online(self, session, retmsg): return ReturnValue(result = 'ok') # no-op
+    def do_exec_offline(self, user, player):
+        # do building repairs
+
+        # calculate total resource storage space
+        res_storage = dict((resname, 0) for resname in self.gamedata['resources'])
+        # for metrics purposes, record how much resources we add
+        res_added = dict((resname, 0) for resname in self.gamedata['resources'])
+
+        for obj in player['my_base']:
+            for FIELD in ('hp', 'hp_ratio', 'repair_finish_time', 'disarmed'):
+                if FIELD in obj:
+                    del obj[FIELD]
+
+            # fill harvesters with some resources
+            level = obj.get('level', 1)
+            spec = None
+            if obj['spec'] in self.gamedata['buildings']:
+                spec = self.gamedata['buildings'][obj['spec']]
+            if spec:
+                for resname in self.gamedata['resources']:
+                    if 'produces_'+resname in spec:
+                        max_cap = get_leveled_quantity(spec['production_capacity'], level)
+                        amount_to_add = int(random.random() * max_cap) - obj.get('contents',0)
+                        if amount_to_add > 0:
+                            obj['contents'] += amount_to_add
+                            res_added[resname] += amount_to_add
+                    if 'storage_'+resname in spec:
+                        res_storage[resname] += get_leveled_quantity(spec['storage_'+resname], level)
+
+        player['unit_repair_queue'] = []
+
+        # fill resource storage
+        fullness = math.pow(random.random(), 2.0)
+        for resname in self.gamedata['resources']:
+            max_cap = res_storage[resname]
+            if max_cap > 0:
+                amount_to_add = int(fullness * max_cap) - player['resources'].get(resname,0)
+                if amount_to_add > 0:
+                    player['resources'][resname] += amount_to_add
+                    res_added[resname] += amount_to_add
+
+        # record resource generation for economy metrics
+        summary_props = self.get_denormalized_summary_props_offline(user, player)
+        self.gamesite.admin_stats.econ_flow(self.user_id, summary_props, 'external', 'repair_base', res_added)
+
+        # update the player cache entry
+        cache_props = {'base_damage': 0, # so that base won't show as crater
+                       'base_repair_time': -1,
+                       'last_login_time': self.time_now, # so that maptool won't purge the map
+                       'last_defense_time': self.time_now - random.randint(1,10) * 86400 # for "Last defended..."
+                       }
+        self.gamesite.pcache_client.player_cache_update(self.user_id, cache_props, reason = 'repair_base')
         return ReturnValue(result = 'ok')
 
 class HandleResolveHomeRaid(Handler):
@@ -1690,16 +1764,6 @@ class HandleSendNotification(Handler):
 
         return ReturnValue(result = 'ok')
 
-    def get_denormalized_summary_props_offline(self, user, player):
-        ret = {'cc': player['history'].get(self.gamedata['townhall']+'_level',1),
-               'plat': user.get('frame_platform','fb'),
-               'rcpt': player['history'].get('money_spent', 0),
-               'ct': user.get('country','unknown'),
-               'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
-        if user.get('developer'):
-            ret['developer'] = 1
-        return ret
-
 class HandleApplyAllianceLeavePointLoss(Handler):
     def __init__(self, *pargs, **pkwargs):
         Handler.__init__(self, *pargs, **pkwargs)
@@ -1807,6 +1871,7 @@ methods = {
     'give_item': HandleGiveItem,
     'send_message': HandleSendMessage,
     'squad_dock_units': HandleSquadDockUnits,
+    'repair_base': HandleRepairBase,
     'resolve_home_raid': HandleResolveHomeRaid,
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,
