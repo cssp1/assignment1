@@ -18,65 +18,6 @@ goog.require('ItemDisplay');
 goog.require('LootTable');
 goog.require('FBShare');
 
-/** Obtain and display the invite code to send to others */
-BHInvites.invoke_invite_code_dialog = function() {
-    // lock GUI and retrieve code
-    var locker = invoke_ui_locker_until_closed();
-    BHSDK.bh_invite_code_get(gamedata['game_id'], (function (_locker) { return function(result) {
-        close_dialog(_locker);
-        BHInvites.do_invoke_invite_code_dialog(result['code'], result['url']);
-    }; })(locker));
-};
-
-/** Display the invite code
-    @param {string} code
-    @param {string} url */
-BHInvites.do_invoke_invite_code_dialog = function(code, url) {
-    var dialog = new SPUI.Dialog(gamedata['dialogs']['bh_invite_code_dialog']);
-    dialog.user_data['dialog'] = 'bh_invite_code_dialog';
-    dialog.user_data['url'] = url;
-    dialog.user_data['metric_sent'] = false;
-    dialog.widgets['close_button'].onclick =
-        dialog.widgets['ok_button'].onclick = close_parent_dialog;
-
-    // strip prefix on visible URL to shorten it
-    var ui_url = url.replace('http://','').replace('https://','');
-    dialog.widgets['link'].str = ui_url;
-    dialog.widgets['link'].onclick =
-        dialog.widgets['copied'].onclick = function(w) {
-            var dialog = w.parent;
-            SPUI.copy_text_to_clipboard(dialog.user_data['url']);
-            dialog.widgets['copied'].str = dialog.data['widgets']['copied'][(screen.width < 768 ? 'ui_name_after_mobile' : 'ui_name_after')];
-            if(!dialog.user_data['metric_sent']) {
-                dialog.user_data['metric_sent'] = true;
-                metric_event('7102_invite_friends_ingame_bh_link_copied', {'sum': player.get_denormalized_summary_props('brief')});
-            }
-        };
-
-    dialog.widgets['fb_share_button'].show =
-        dialog.widgets['fb_share_icon'].show = FBShare.supported();
-
-    if(FBShare.supported()) {
-        dialog.widgets['fb_share_button'].onclick = function(w) {
-            var dialog = w.parent;
-            var url = /** string */ (dialog.user_data['url']);
-            metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief')});
-            var ui_quote = w.data['ui_description'].replace('%gamebucks', Store.gamebucks_ui_name());
-
-            FBShare.invoke({ref: 'bh_invite',
-                            url: url,
-                            message: ui_quote});
-        };
-    }
-
-    install_child_dialog(dialog);
-    dialog.auto_center();
-    dialog.modal = true;
-
-    return dialog;
-};
-
-
 BHInvites.invoke_invite_friends_dialog = function(reason) {
     metric_event('7101_invite_friends_ingame_prompt', {'method': reason,
                                                        'sum': player.get_denormalized_summary_props('brief')});
@@ -158,13 +99,13 @@ BHInvites.invite_dialog_change_tab = function(dialog, tabname) {
     dialog.widgets['gifts_tab_button'].state = (tabname == 'gifts' ? 'active': 'normal');
     dialog.widgets['invite_tab'].show = (tabname == 'invite');
     dialog.widgets['gifts_tab'].show = (tabname == 'gifts');
+    dialog.default_button = (tabname == 'invite' ? dialog.widgets['invite_tab'].widgets['fb_share_button'] :
+                             dialog.widgets['gifts_tab'].widgets['send_all_button']);
 };
 
 BHInvites.init_invite_tab = function(dialog, mentor, trainee_list) {
     dialog.widgets['subtitle'].str = dialog.data['widgets']['subtitle']['ui_name'].replace('%game', gamedata['strings']['game_name']);
-    dialog.widgets['get_link_button'].onclick = function(w) {
-        BHInvites.invoke_invite_code_dialog();
-    }
+
     var n_complete = player.history['bh_invite_trainee_count'] || 0;
     // 1-based index of the next trainee that would come in
     var n_next = n_complete + 1;
@@ -188,6 +129,44 @@ BHInvites.init_invite_tab = function(dialog, mentor, trainee_list) {
         dialog.widgets['bonus_label'].show =
             dialog.widgets['bonus_description'].show = false;
     }
+
+    // begin async fetch of invite code
+    BHSDK.bh_invite_code_get(gamedata['game_id'], (function (_dialog) { return function(result) {
+        var dialog = _dialog;
+        var code = result['code'];
+        var url = result['url'];
+        dialog.user_data['url'] = url;
+        dialog.user_data['metric_sent'] = false;
+
+        dialog.widgets['loading_spinner'].show = false;
+
+        dialog.widgets['copy_link_button'].show = true;
+        dialog.widgets['copy_link_button'].onclick = function(w) {
+            var dialog = w.parent;
+            SPUI.copy_text_to_clipboard(dialog.user_data['url']);
+            if(!dialog.user_data['metric_sent']) {
+                dialog.user_data['metric_sent'] = true;
+                metric_event('7102_invite_friends_ingame_bh_link_copied', {'sum': player.get_denormalized_summary_props('brief')});
+            }
+            window.alert(w.data['ui_message'].replace('%url', dialog.user_data['url']));
+        };
+
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = FBShare.supported();
+
+        if(FBShare.supported()) {
+            dialog.widgets['fb_share_button'].onclick = function(w) {
+                var dialog = w.parent;
+                var url = /** string */ (dialog.user_data['url']);
+                metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief')});
+                var ui_quote = w.data['ui_description'].replace('%gamebucks', Store.gamebucks_ui_name());
+
+                FBShare.invoke({ref: 'bh_invite',
+                                url: url,
+                                message: ui_quote});
+            };
+        }
+    }; })(dialog));
 };
 
 BHInvites.init_gifts_tab = function(dialog, mentor, trainee_list) {

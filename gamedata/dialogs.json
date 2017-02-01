@@ -9693,37 +9693,6 @@
         }
     },
 
-    "bh_invite_code_dialog": {
-        "dimensions": [636, 245],
-        "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,245], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,155], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
-
-            "close_button": { "kind": "ActionButton", "xy": [608,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [8,46], "dimensions": [620,18],
-                             "text_hjustify": "center", "text_size": 17, "text_style": "normal",
-                             "ui_name": "Here is your invite link:"
-                           },
-            "link": { "kind": "ActionButton", "xy": [8,82], "dimensions": [620,18],
-                      "text_hjustify": "center", "text_size": 17, "text_color": [1,1,0],
-                      "ui_name": "https://www.battlehouse.com/play/refitskier/?bh_invite=3184818234823"
-                    },
-            "copied": { "kind": "ActionButton", "xy": [343,122], "dimensions": [250,44],
-                        "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
-                        "text_hjustify": "center", "text_vjustify": "center",
-                        "text_size": 13, "text_style": "bold",
-                        "ui_name": "Copy to clipboard",
-                        "ui_name_after": "Copied! Use Ctrl-V to paste",
-                        "ui_name_after_mobile": "Copied! Use Paste to share"
-                      },
-
-            "fb_share_button": { "kind": "ActionButton", "xy": [43,122], "dimensions": [250, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_offset": [10,0], "text_style": "bold", "ui_name": "Share on Facebook", "ui_description": "Click to accept my game invite. We'll both earn free %gamebucks plus daily gifts!"},
-            "fb_share_icon": { "kind": "StaticImage", "xy":[55,129], "dimensions":[32,32], "asset": "facebook_icon"},
-
-            "ok_button": { "kind": "ActionButton", "xy": [460,199], "dimensions": [134, 32], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
-        }
-    },
-
     "bh_invite_dialog_invite_tab": {
         "dimensions": [736,423],
         "clip_children": 0,
@@ -9738,10 +9707,21 @@
             "instructions_label": { "kind": "TextField", "xy": [36,115], "dimensions": [460,33], "text_hjustify": "left", "text_style": "bold", "text_size": 15, "ui_name": "Instructions" },
 
             "instructions": { "kind": "TextField", "xy": [36,155], "dimensions": [246,200], "text_hjustify": "left", "text_vjustify": "top", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Click \"Get Invite Link\" to see your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
-            "get_link_button": { "kind": "ActionButton", "xy": [60,294], "dimensions": [198,38],
-                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                 "ui_name": "Get Invite Link", "text_size": 15, "text_style": "bold"},
+                              "ui_name": "Click below to get your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
+
+            "copy_link_button": { "show": 0, "kind": "ActionButton", "xy": [41,338], "dimensions": [230,44],
+                                  "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                                  "text_hjustify": "center", "text_vjustify": "center",
+                                  "text_size": 13, "text_style": "bold",
+                                  "ui_name": "Copy Invite Link",
+                                  "ui_message": "Copied!\n\nUse Ctrl-V or Paste to share this link:\n\n%url"
+                                },
+
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [41,274], "dimensions": [230, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Share Invite Link", "ui_description": "Click to start your battle training. We'll both earn free %gamebucks plus daily gifts!"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[50,281], "dimensions":[32,32], "asset": "facebook_icon"},
+
+            // for async BH invite code retrieval
+            "loading_spinner": { "kind": "StaticImage", "xy":[145,288], "dimensions":[16,16], "asset":"loading_spinner"},
 
             "next_sunken": {"kind": "StaticImage", "xy":[299,108], "dimensions":[214,248], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "next_label": { "kind": "TextField", "xy": [299,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Next: Trainee #%d" },
