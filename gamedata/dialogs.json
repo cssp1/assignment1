@@ -8828,11 +8828,11 @@
     },
 
     "replay_overlay_dialog": {
-        "dimensions": [436, 122],
+        "dimensions": [436, 124],
         "clip_children": 0, "transparent_to_mouse": 1,
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[436,122], "asset": "tooltip_bg", "bg_image_resizable": 1 },
-            "valentina": { "kind": "StaticImage", "xy": [8,9], "dimensions": [72,72], "clip_to": [12,11,65,67], "asset": "valentina_72x72" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[436,124], "asset": "tooltip_bg", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [8,7], "dimensions": [72,72], "clip_to": [12,9,65,67], "asset": "valentina_72x72" },
             "close_button": { "kind": "ActionButton", "xy": [411,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "RichTextField", "xy": [93,14], "dimensions": [313,68], "clip_to": [93,14,313,68],
                              "text_hjustify": "left",  "text_size": 15,
@@ -8840,8 +8840,9 @@
                              //"ui_name": "Replay: %attacker vs %defender\nTime %cur_time of %total_time. Click \"X\" to exit."
                              "ui_name": "Replay: %attacker vs %defender\nTime step %cur_tick of %num_ticks. Click \"X\" to exit."
                            },
-            "share_button": { "kind": "ActionButton", "xy": [150,83], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
-            "get_link_button": { "kind": "ActionButton", "xy": [290,83], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Get Link"}
+            "fb_share_button": { "kind": "ActionButton", "xy": [124,78], "dimensions": [140, 39], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "kind": "StaticImage", "xy":[130,83], "dimensions":[32,32], "asset": "facebook_icon"},
+            "get_link_button": { "kind": "ActionButton", "xy": [284,78], "dimensions": [140, 39], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Get Link"}
         }
     },
 

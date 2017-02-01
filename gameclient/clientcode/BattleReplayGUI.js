@@ -50,8 +50,9 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
 
     // FB share button
     if(link_qs && spin_frame_platform === 'fb') {
-        dialog.widgets['share_button'].show = true;
-        dialog.widgets['share_button'].onclick = function(w) {
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = true;
+        dialog.widgets['fb_share_button'].onclick = function(w) {
             var dialog = w.parent;
             FBShare.invoke({link_qs: dialog.user_data['link_qs'],
                             name: gamedata['virals']['replay']['ui_post_headline']
@@ -61,7 +62,8 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
                            });
         };
     } else {
-        dialog.widgets['share_button'].show = false;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = false;
     }
 
     dialog.ondraw = BattleReplayGUI.update;
