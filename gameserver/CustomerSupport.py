@@ -752,7 +752,7 @@ class HandleRepairBase(Handler):
         # update the player cache entry
         cache_props = {'base_damage': 0, # so that base won't show as crater
                        'base_repair_time': -1,
-                       'last_login_time': self.time_now, # so that maptool won't purge the map
+                       #'last_login_time': self.time_now, # so that maptool won't purge the map
                        'last_defense_time': self.time_now - random.randint(1,10) * 86400 # for "Last defended..."
                        }
         self.gamesite.pcache_client.player_cache_update(self.user_id, cache_props, reason = 'repair_base')

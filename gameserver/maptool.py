@@ -1652,16 +1652,20 @@ def abandon_quarries_and_remove_player_from_map(db, lock_manager, region_id, use
 
     return True
 
-def weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = False, dry_run = True):
+def weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = False, dry_run = True):
     map_cache = get_existing_map_by_type(db, region_id, 'home')
     if verbose: print len(map_cache), 'players on the map'
     player_ids = sorted([feature['base_landlord_id'] for feature in map_cache.itervalues()])
-    result = nosql_client.player_cache_lookup_batch(player_ids, fields = ['last_login_time'])
+    result = nosql_client.player_cache_lookup_batch(player_ids,
+                                                    fields = ['last_login_time','last_reseed_time','base_damage',
+                                                              gamedata['townhall']+'_level'])
     player_info = {}
     for i in xrange(len(player_ids)):
         player_info[player_ids[i]] = {'user_id': player_ids[i], 'feature': map_cache['h'+str(player_ids[i])], 'pcache': result[i]}
 
     churn_list = []
+    alive_by_townhall_level = dict()
+
     for entry in player_info.itervalues():
         if entry['pcache'] is None: entry['pcache'] = {}
         if ('last_login_time' not in entry['pcache']):
@@ -1675,11 +1679,60 @@ def weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarr
                 entry['pcache']['last_login_time'] = -1 # was probably weeded by clean_player_cache.py
 
         if (time_now - entry['pcache']['last_login_time'] > threshold_days*24*60*60):
+            # unconditionally remove from map
             churn_list.append(entry)
+        else:
+            th = entry['pcache'].get(gamedata['townhall']+'_level', -1)
+            if th >= 1:
+                if th not in alive_by_townhall_level: alive_by_townhall_level[th] = []
+                alive_by_townhall_level[th].append(entry)
 
     if verbose: print len(map_cache) - len(churn_list), 'are still active'
     if verbose or churn_list:
         print len(churn_list), 'have not logged in for at least', threshold_days, 'days'
+
+    if repair_days > 0 and repair_pct > 0:
+        repair_list = []
+
+        # for each townhall level, compute total # of bases and total # of damaged bases
+        for th in sorted(alive_by_townhall_level.keys()):
+            total_bases = 0
+            damaged_bases = 0
+            repair_candidates = []
+
+            for entry in alive_by_townhall_level[th]:
+                total_bases += 1
+                if entry['pcache'].get('base_damage',0) >= 0.01:
+                    damaged_bases += 1
+                    # repair candidate IF no logins for repair_days AND wasn't reseeded very recently
+                    if (time_now - entry['pcache']['last_login_time'] > repair_days * 24*60*60) and \
+                       (time_now - entry['pcache'].get('last_reseed_time', -1) >= 2 * 24*60*60):
+                        repair_candidates.append(entry)
+
+            print 'townhall_level', th, ':', damaged_bases, 'of', total_bases, \
+                  'home bases are damaged (%.0f%%).' % (float(100*damaged_bases)/total_bases), \
+                  len(repair_candidates), 'repair candidates.',
+
+            random.shuffle(repair_candidates)
+            n_to_repair = 0
+
+            while len(repair_candidates) > 0 and \
+               float(damaged_bases) / float(total_bases) >= repair_pct:
+                repair_list.append(repair_candidates.pop())
+                damaged_bases -= 1
+                n_to_repair += 1
+
+            if n_to_repair > 0:
+                print 'Will repair', n_to_repair, 'bases, leaving %.0f%% damaged' % (float(100*damaged_bases)/total_bases)
+            else:
+                print 'No bases to repair.'
+
+        if len(repair_list) > 0:
+            print 'repairing', len(repair_list), 'bases...'
+            for entry in repair_list:
+                if not dry_run:
+                    do_CONTROLAPI({'user_id': entry['user_id'], 'method': 'repair_base'})
+                    nosql_client.player_cache_update(entry['user_id'], {'last_reseed_time': time_now})
 
     for entry in churn_list:
         abandon_quarries_and_remove_player_from_map(db, lock_manager, region_id, entry['user_id'], home_feature = entry['feature'],
@@ -1733,7 +1786,7 @@ def weed_orphan_objects(db, lock_manager, region_id, dry_run = True):
             print num
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=',
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=', 'repair-days=', 'repair-pct=',
                                                        'score-week=', 'event-time-override=', 'quiet',
                                                        'force-rotation', 'skip-quarry-owners', 'yes-i-am-sure'])
     if len(args) < 3:
@@ -1753,6 +1806,8 @@ if __name__ == '__main__':
         print '    --dry-run              Print what changes would be made, but do not make them'
         print '    --throttle SEC         Pause SEC seconds between base manipulations to avoid overloading server'
         print '    --threshold-days NUM   For "weed" action, remove players from map if they have not logged in for at least NUM days (default: 30)'
+        print '    --repair-days NUM      For "weed" action, repair damaged bases that have not logged in for at least NUM days (default: -1)'
+        print '    --repair-pct NUM       For "weed" action, try to leave no more than this percent of bases damaged'
         print '    --base-id ID           Only apply changes to this one base'
         print '    --user-id ID           Only apply changes to this one user'
         print '    --score-week WEEK      Choose week for scores display'
@@ -1774,6 +1829,8 @@ if __name__ == '__main__':
     user_id = None
     yes_i_am_sure = False
     threshold_days = 30
+    repair_days = -1
+    repair_pct = -1
     skip_quarry_owners = False
     event_time_override = None
     force_rotation = False
@@ -1790,6 +1847,10 @@ if __name__ == '__main__':
             user_id = int(val)
         elif key == '--threshold-days':
             threshold_days = int(val)
+        elif key == '--repair-days':
+            repair_days = int(val)
+        elif key == '--repair-pct':
+            repair_pct = float(val)
         elif key == '--score-week':
             score_week = int(val)
         elif key == '--skip-quarry-owners':
@@ -1865,7 +1926,7 @@ if __name__ == '__main__':
 
                 # 30. weed churned players
                 print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
-                weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
+                weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
 
                 # 40. weed orphaned squads
                 print "%s: weeding orphan squads..." % region_id
@@ -1910,7 +1971,7 @@ if __name__ == '__main__':
                 else:
                     print 'this is a very destructive operation, add --yes-i-am-sure if you want to proceed!'
             elif action == 'weed':
-                weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
+                weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
             else:
                 print 'unknown action '+action
         elif base_type == 'squad':
