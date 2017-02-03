@@ -365,6 +365,16 @@ InviteFriendsPromptConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function BHBookmarkPromptConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(BHBookmarkPromptConsequent, Consequent);
+BHBookmarkPromptConsequent.prototype.execute = function(state) {
+    BHSDK.bh_popup_show_how_to_bookmark();
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function FacebookPermissionsPromptConsequent(data) {
     // Ask for new facebook permissions. Do nothing if the player has already granted these permissions.
     goog.base(this, data);
@@ -885,6 +895,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_TOP_ALLIANCES_DIALOG') { return new InvokeTopAlliancesDialogConsequent(data); }
     else if(kind === 'INVOKE_INVENTORY_DIALOG') { return new InvokeInventoryDialogConsequent(data); }
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
+    else if(kind === 'BH_BOOKMARK_PROMPT') { return new BHBookmarkPromptConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }

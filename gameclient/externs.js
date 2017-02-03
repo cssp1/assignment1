@@ -15,7 +15,8 @@ var BHSDK = {
         @param {function({code: string, url: string}): null} cb */
     "bh_invite_code_get": function(service, cb) {},
     /** @param {{ui_subject: string, ui_body: string}} params */
-    "bh_popup_message": function(params) {}
+    "bh_popup_message": function(params) {},
+    "bh_popup_show_how_to_bookmark": function() {}
 };
 
 // Global variables that are sent to the client by our proxyserver via proxy_index.html template replacements
