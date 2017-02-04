@@ -492,22 +492,22 @@ if __name__ == '__main__':
         if user.get('ag_id', None):
             print fmt % ('Armor Games ID:', '"'+str(user['ag_id'])+'"')
         if user.get('ag_username', None):
-            print fmt % ('Armor Games Name:', '"'+str(user['ag_username'])+'"')
+            print fmt % ('Armor Games Name:', '"'+user['ag_username']+'"')
 
         if user.get('kg_id', None):
             print fmt % ('Kongregate ID:', '"'+str(user['kg_id'])+'"')
         if user.get('kg_username', None):
-            print fmt % ('Kongregate Name:', '"'+str(user['kg_username'])+'"')
+            print fmt % ('Kongregate Name:', '"'+user['kg_username']+'"')
 
         if user.get('bh_id', None):
             print fmt % ('Battlehouse ID:', '"'+str(user['bh_id'])+'"')
         if user.get('bh_username', None):
-            print fmt % ('Battlehouse Name:', '"'+str(user['bh_username'])+'"')
+            print fmt % ('Battlehouse Name:', '"'+user['bh_username']+'"')
 
         if user.get('mm_id', None):
             print fmt % ('Mattermost ID:', '"'+str(user['mm_id'])+'"')
         if user.get('mm_username', None):
-            print fmt % ('Mattermost Name:', '"'+str(user['mm_username'])+'"')
+            print fmt % ('Mattermost Name:', '"'+user['mm_username']+'"')
 
         if user.get('facebook_id', None):
             print fmt % ('Facebook ID:', '"'+str(user['facebook_id'])+'"')
