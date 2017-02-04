@@ -23596,7 +23596,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
     def send_offline_notification(self, to_user_id, to_social_id, text, sp_ref, fb_ref, summary_props,
-                                  replacements = None):
+                                  replacements = None, mirror_to_facebook = False):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
@@ -23605,7 +23605,7 @@ class GAMEAPI(resource.Resource):
             sent = self.send_offline_notification_fb(to_user_id, to_social_id[2:], message)
         elif to_social_id.startswith('bh'):
             message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'bh')
-            sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message)
+            sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message, mirror_to_facebook = mirror_to_facebook)
         else:
             sent = False
 
@@ -23662,7 +23662,7 @@ class GAMEAPI(resource.Resource):
                     text = text.replace(k, v)
             return text
 
-    def send_offline_notification_bh(self, to_user_id, to_bh_id, message):
+    def send_offline_notification_bh(self, to_user_id, to_bh_id, message, mirror_to_facebook = False):
         params = {'service': SpinConfig.game(),
                   'ui_subject': message.ui_subject.encode('utf-8'),
                   'ui_headline': message.ui_headline.encode('utf-8'),
@@ -23671,6 +23671,8 @@ class GAMEAPI(resource.Resource):
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
                   'tags': SpinConfig.game()+'_'+message.fb_ref,
                   }
+        if mirror_to_facebook:
+            params['facebook'] = '1'
 
         url = SpinConfig.config['battlehouse_api_path'] + '/user/' + to_bh_id + '/notify'
 

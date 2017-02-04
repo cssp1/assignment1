@@ -424,6 +424,11 @@ class Sender(object):
                                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
                                   'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
                                   }
+
+                        # XXX temporary A/B test
+                        if player['abtests'].get('T324_bh_fb_notifications', None) == 'on':
+                            params['facebook'] = '1'
+
                     else:
                         raise Exception('unexpected frame_platform %r' % frame_platform)
 
