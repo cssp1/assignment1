@@ -728,7 +728,7 @@ class HandleRepairBase(Handler):
                         max_cap = get_leveled_quantity(spec['production_capacity'], level)
                         amount_to_add = int(random.random() * max_cap) - obj.get('contents',0)
                         if amount_to_add > 0:
-                            obj['contents'] += amount_to_add
+                            obj['contents'] = obj.get('contents',0) + amount_to_add
                             res_added[resname] += amount_to_add
                     if 'storage_'+resname in spec:
                         res_storage[resname] += get_leveled_quantity(spec['storage_'+resname], level)
@@ -742,7 +742,7 @@ class HandleRepairBase(Handler):
             if max_cap > 0:
                 amount_to_add = int(fullness * max_cap) - player['resources'].get(resname,0)
                 if amount_to_add > 0:
-                    player['resources'][resname] += amount_to_add
+                    player['resources'][resname] = player['resources'].get(resname,0) + amount_to_add
                     res_added[resname] += amount_to_add
 
         # record resource generation for economy metrics
