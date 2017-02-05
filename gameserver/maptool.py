@@ -1925,7 +1925,7 @@ if __name__ == '__main__':
                 weed_expired_bases(db, lock_manager, region_id, ['hive','quarry','raid'], dry_run=dry_run)
 
                 # 30. weed churned players
-                print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
+                print "%s: weeding players churned for more than %d days, repairing to %f if churned for more than %d days..." % (region_id, threshold_days, repair_pct, repair_days)
                 weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
 
                 # 40. weed orphaned squads
