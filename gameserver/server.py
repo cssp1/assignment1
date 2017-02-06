@@ -24793,13 +24793,16 @@ class GAMEAPI(resource.Resource):
 
         if owning_player:
             owning_player.unit_repair_cancel(obj)
+
+        obj.hp = 0
+
+        if owning_player:
             if is_home_object:
                 owning_player.home_base_remove(obj)
                 if can_resurrect:
                     # add back as zombie unit
                     # NOTE! does not participate in the current session, it will be sent to the client on the NEXT session change!
                     # unless it's a home attack!
-                    obj.hp = 0
                     owning_player.home_base_add(obj)
                     if session.home_base and gamedata.get('enable_defending_units',True):
                         session.add_object(obj)
@@ -24820,7 +24823,6 @@ class GAMEAPI(resource.Resource):
             if not can_resurrect:
                 gamesite.nosql_client.drop_mobile_object_by_id(session.viewing_base.base_region, obj.obj_id, reason='DSTROY_OBJECT')
             else:
-                obj.hp = 0
                 nosql_state = obj.persist_state(nosql = True)
                 nosql_state['base_id'] = owning_player.squad_base_id(squad_id)
                 if gamedata['server'].get('log_nosql',0) >= 3:
@@ -24839,7 +24841,10 @@ class GAMEAPI(resource.Resource):
 
         # client initiated the removal - do not send OBJECT_REMOVED
 
-        if session.damage_log: session.damage_log.record(obj) # record immediately since it may leave the session and/or bases
+        if session.damage_log:
+            # NOTE: obj.hp must be set to zero before here!
+            # record immediately since it may leave the session and/or bases
+            session.damage_log.record(obj)
 
         if not was_zombie:
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
