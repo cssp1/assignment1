@@ -227,15 +227,19 @@ FACEBOOK_CAMPAIGN_MAP = {
     'bgl_featured': 'facebook_free', # this is a new source for special features that Facebook runs for us manually
 
     # game-sourced viral acquisition
+    'sp_game_viral': 'game_viral',
     'achievement_brag': 'game_viral',
     'appcenter_request': 'game_viral',
     'cheeve': 'game_viral',
     'facebook_app_request': 'game_viral',
     'facebook_friend_invite': 'game_viral',
     'facebook_message': 'game_viral',
-    'fbpage': 'game_viral', # not sure on this one
-    'fbpage_button': 'game_viral', # not sure on this one
-    'fbpage_gameinfo': 'game_viral', # not sure on this one
+    'fanpage': 'fb_page',
+    'fb_page_promo_code': 'fb_page',
+    'fb_page_call_to_action': 'fb_page',
+    'fbpage': 'fb_page',
+    'fbpage_button': 'fb_page',
+    'fbpage_gameinfo': 'fb_page',
     'feed': 'game_viral',
     'feed_achievement': 'game_viral',
     'feed_aggregated': 'game_viral',
@@ -248,11 +252,12 @@ FACEBOOK_CAMPAIGN_MAP = {
     'feed_playing': 'game_viral',
     'feed_thanks': 'game_viral',
     'notification': 'game_viral',
-    'promo_code': 'game_viral',
+    'promo_code': 'fb_page',
     'request': 'game_viral',
     'reminders': 'game_viral', # this is a reminder *about* a request
-    'search': 'game_viral',
+    'search': 'fb_page',
     'stats_share': 'game_viral',
+    'replay': 'game_viral',
     'timeline': 'game_viral',
     'timeline_collection': 'game_viral',
     'timeline_og': 'game_viral',

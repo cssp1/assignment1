@@ -114,6 +114,7 @@ BEGIN
            -- otherwise, map to 'paid'
            RETURN (CASE (SELECT remap_facebook_campaigns(camp))
            WHEN 'facebook_free' THEN 'FB Free (Facebook)'
+           WHEN 'fb_page' THEN 'FB Free (Fan Page)'
            WHEN 'game_viral' THEN 'FB Free (Game Viral)'
            WHEN 'cross_promo' THEN 'Cross Promo (Paid)' -- legacy data
            WHEN 'cross_promo_paid' THEN 'Cross Promo (Paid)'
