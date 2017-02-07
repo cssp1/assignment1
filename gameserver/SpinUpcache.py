@@ -240,6 +240,7 @@ FACEBOOK_CAMPAIGN_MAP = {
     'fbpage': 'fb_page',
     'fbpage_button': 'fb_page',
     'fbpage_gameinfo': 'fb_page',
+    '7125_BH_post': 'fb_page',
     'feed': 'game_viral',
     'feed_achievement': 'game_viral',
     'feed_aggregated': 'game_viral',
