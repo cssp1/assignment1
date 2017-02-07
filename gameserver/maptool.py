@@ -1819,6 +1819,22 @@ if __name__ == '__main__':
         sys.exit(1)
 
     region_id = args[0]
+
+    if region_id not in gamedata['regions']:
+        sys.stderr.write('region not found: %s\n' % region_id)
+        sys.exit(1)
+
+    if gamedata['regions'][region_id].get('storage','basedb') != 'nosql':
+        print "%s: basedb (non nosql) regions are not supported anymore" % region_id
+        sys.exit(1)
+
+    def get_region_variable(key, default_value):
+        if key in gamedata['regions'][region_id]:
+            return gamedata['regions'][region_id][key]
+        if key in gamedata['territory']:
+            return gamedata['territory'][key]
+        return default_value
+
     base_type = {'hives':'hive','hive':'hive',
                  'quarries':'quarry','quarry':'quarry',
                  'raids':'raid','raid':'raid',
@@ -1828,9 +1844,9 @@ if __name__ == '__main__':
     base_id = None
     user_id = None
     yes_i_am_sure = False
-    threshold_days = 30
-    repair_days = -1
-    repair_pct = -1
+    threshold_days = get_region_variable('weed_churned_players_after', 30*86400)/86400.0
+    repair_days = get_region_variable('repair_churned_players_after', -1)/86400.0
+    repair_pct = get_region_variable('repair_churned_players_leave_damaged_pct', -1)
     skip_quarry_owners = False
     event_time_override = None
     force_rotation = False
@@ -1863,14 +1879,6 @@ if __name__ == '__main__':
             event_time_override = int(val)
         elif key == '-q' or key == '--quiet':
             verbose = False
-
-    if region_id not in gamedata['regions']:
-        sys.stderr.write('region not found: %s\n' % region_id)
-        sys.exit(1)
-
-    if gamedata['regions'][region_id].get('storage','basedb') != 'nosql':
-        print "%s: basedb (non nosql) regions are not supported anymore" % region_id
-        sys.exit(1)
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
                                          map_update_hook = broadcast_map_update,
