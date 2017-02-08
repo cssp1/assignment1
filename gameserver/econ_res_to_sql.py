@@ -212,7 +212,7 @@ if __name__ == '__main__':
 
         if do_prune:
             # drop old data
-            KEEP_DAYS = 1.0
+            KEEP_DAYS = {'fs': 30.0}.get(game_id, 1.0)
             old_limit = time_now - int(KEEP_DAYS * 86400)
 
             if affected_days: # don't delete any data from days that affected the summary we just made
