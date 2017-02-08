@@ -8,9 +8,7 @@
 # and an AsyncHTTPRequester to manage the game server's storage of player portraits.
 
 from twisted.internet import defer
-from twisted.python import failure
 from twisted.web.server import NOT_DONE_YET
-from string import strip
 import functools
 import urllib
 import re
@@ -115,7 +113,7 @@ class PlayerPortraits(object):
             last_modified = SpinHTTP.parse_http_time(headers['last-modified'][-1]) if 'last-modified' in headers else None
             self.db_client.player_portrait_add(user_id, bytes(body), time_now, content_type, expires, last_modified)
             d.callback((True, content_type, bytes(body)))
-        except Exception as e:
+        except Exception:
             d.errback()
             return
 
