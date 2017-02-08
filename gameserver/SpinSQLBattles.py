@@ -3,6 +3,15 @@
 # Async PostgreSQL battle history query interface
 # makes use of tables loaded by battles_to_psql.py
 
+# note: Postgres sometimes pessimizes the "get_async" query
+# by doing a full index scan on "time" instead of using the player_id/time indexes.
+# To fix this, "SET random_page_cost TO 1;"
+# or to make default for entire database, as root:
+# "ALTER DATABASE game_battles SET random_page_cost TO 1;"
+
+# (this lowers random_page_cost to the same value as seq_page_cost, telling Postgres
+# that it's probably OK to use the sparser player_id/time index).
+
 import SpinSQLUtil
 import SpinJSON
 
