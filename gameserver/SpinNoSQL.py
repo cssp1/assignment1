@@ -1494,11 +1494,13 @@ class NoSQLClient (object):
             row['data'] = bytes(row['data'])
         return row
 
+    player_portrait_max_size = 64*1024 # 64KB max
+
     def player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified, reason=''):
         return self.instrument('player_portrait_add(%s)'%reason, self._player_portrait_add, (user_id, data, retrieved, content_type, expires, last_modified))
     def _player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified):
         assert isinstance(data, bytes)
-        assert len(data) < 64*1024 # 64KB max
+        assert len(data) <= self.player_portrait_max_size
         binary_data = bson.Binary(data)
         if content_type is not None:
             content_type = unicode(content_type)
