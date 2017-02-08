@@ -116,7 +116,7 @@ class PlayerPortraits(object):
             self.db_client.player_portrait_add(user_id, bytes(body), time_now, content_type, expires, last_modified)
             d.callback((True, content_type, bytes(body)))
         except Exception as e:
-            d.errback(failure.Failure(e))
+            d.errback()
             return
 
     def get(self, time_now, user_id,
