@@ -84,7 +84,7 @@ class PlayerPortraits(object):
         try:
             if int(status) != 200:
                 # log this error as per-frame-platform since it's going to be common on Facebook - don't pollute main log
-                if frame_platform == 'bh' and int(status) == 502:
+                if frame_platform == 'bh' and int(status) in (404,502):
                     # don't bother logging BHLogin portrait retrieval failures
                     pass
                 else:
