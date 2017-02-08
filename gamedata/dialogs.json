@@ -3132,7 +3132,8 @@
 
             "selected_row": { "kind": "StaticImage", "xy": [45,77], "dimensions": [219,28], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1 },
 
-            "row": { "kind": "ActionButton", "xy": [75,81], "dimensions": [186,24], "text_hjustify": "left", "text_size": 13,
+            "row": { "kind": "ActionButton", "xy": [75,81], "dimensions": [186,24],
+                     "clip_to": [75,81,186,24], "text_hjustify": "left", "text_size": 13,
                      "mouseover_sound": 1, "ui_name": "Mission", "array": [1,11], "array_offset": [0,26], "max_len": 24 },
             "row_icon": { "kind": "StaticImage", "xy": [52,85], "dimensions": [14,14], "asset": "ok_icon",
                           "array": [1,11], "array_offset": [0,26] },
@@ -3144,10 +3145,11 @@
             "attach_rect": { "kind": "SolidRect", "xy": [289,296], "dimensions": [404,105], "color": [0,0,0,0.5], "bevel": 3 },
 
             "from_label": { "kind": "TextField", "xy": [298,80], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "From:" },
-            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13,
+            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [304,17], "text_hjustify": "left", "text_size": 13,
                            "clip_to": [361,80,294,21] },
             "subj_label": { "kind": "TextField", "xy": [298,97], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "Subject:" },
-            "subj_name": { "kind": "TextField", "xy": [361,97], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
+            "subj_name": { "kind": "TextField", "xy": [361,97], "dimensions": [304,17],
+                           "clip_to": [361,97,304,21], "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
 
             "delete_button": { "kind": "ActionButton", "xy":[665,88], "dimensions":[19,19], "push_bg_image":1, "bg_image": "delete_mail_button",
                                "ui_tooltip": "Delete message", "tooltip_delay": 0 },
