@@ -1127,7 +1127,7 @@ if __name__ == '__main__':
                         # either cooldown is inactive
                         {"predicate": "COOLDOWN_INACTIVE", "name": instance_cdname},
                         # OR it's active and progress_now is zero
-                        {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": 0}
+                        {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
                         ]}]
 
                     if diff == 'Normal':
@@ -1334,6 +1334,13 @@ if __name__ == '__main__':
 
                 attack_pred = None
                 trophy_pred = None
+
+                if is_first_base and game_id != 'fs': # XXX enable for FS with difficulty nerf
+                    # start the cooldown on attack of first level, and (re)initialize progress_now
+                    attack_pred = {"consequent": "AND", "subconsequents": [
+                        { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },
+                        { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "set", "value": i }
+                        ]}
 
                 # add "attempted" progress key
                 attempt_pred = { "consequent": "AND", "subconsequents": [
