@@ -1105,7 +1105,7 @@ if __name__ == '__main__':
                 if game_id != 'fs':
                     json.append(('auto_level',1))
 
-                for FIELD in ('ui_info_url', 'analytics_tag'):
+                for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
                     if FIELD in data: json.append((FIELD, data[FIELD]))
 
                 if is_first_base:
@@ -1680,7 +1680,7 @@ if __name__ == '__main__':
             if 'villain_map_portrait' in data:
                 json += [("map_portrait", data['villain_map_portrait'][diff])]
 
-            for FIELD in ('ui_info_url', 'analytics_tag'):
+            for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
                 if FIELD in data: json.append((FIELD, data[FIELD]))
 
             assert unskipped_count == num_unskipped_bases

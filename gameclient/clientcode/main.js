@@ -35929,7 +35929,7 @@ function update_map_dialog(dialog) {
                     if('ui_instance_cooldown' in base) {
                         var togo = player.cooldown_togo(base['ui_instance_cooldown']);
                         if(togo > 0) {
-                            attackability_str = dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown'].replace('%s', pretty_print_time(togo));
+                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo));
                             attackability_col = dialog.data['widgets']['row_attackability']['text_color_resets_inprogress'];
                         }
                     }
