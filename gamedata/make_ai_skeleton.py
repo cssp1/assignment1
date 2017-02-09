@@ -1123,10 +1123,12 @@ if __name__ == '__main__':
                 if is_first_base:
                     # first base in series
 
-                    if data.get('repeatable'):
-                        show_pred['subpredicates'] += [{"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": 0}]
-                    else:
-                        show_pred['subpredicates'] += [{ "predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname}]}]
+                    show_pred['subpredicates'] += [{"predicate": "OR", "subpredicates": [
+                        # either cooldown is inactive
+                        {"predicate": "COOLDOWN_INACTIVE", "name": instance_cdname},
+                        # OR it's active and progress_now is zero
+                        {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": 0}
+                        ]}]
 
                     if diff == 'Normal':
                         show_pred['subpredicates'] += [
@@ -1397,7 +1399,7 @@ if __name__ == '__main__':
                 if visit_pred:
                     json += [("on_visit", visit_pred)]
 
-                if kind == 'ai_attack' and attack_pred:
+                if attack_pred:
                     json += [('on_attack', attack_pred)]
 
                 completion = { "consequent": "AND", "subconsequents": [] }
