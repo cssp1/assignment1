@@ -249,19 +249,22 @@ class TechTable(Table):
 
         Table.__init__(self, ui_name, data, tiers = tiers, tier_data = tier_data)
 
+class ResourceValuation(object):
+    def __init__(self):
+        # get implied relative value of resources
+        cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
+                                  for resname in gamedata['resources'])
+        self.relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
+                                 for resname in gamedata['resources'])
+        self.res_internal_weight = gamedata['store']['resource_internal_weight']
+
+    def unsplit_res(self,amounts):
+        return sum((self.relative_res[resname]*amounts[resname]*self.res_internal_weight[resname] for resname in amounts), 0)
+
+
 def get_tier_summary(building_names, tech_names):
     n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
-
-
-    # get implied relative value of resources
-    cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
-                         for resname in gamedata['resources'])
-    relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
-                        for resname in gamedata['resources'])
-    res_internal_weight = gamedata['store']['resource_internal_weight']
-
-    def unsplit_res(amounts):
-        return sum((relative_res[resname]*amounts[resname]*res_internal_weight[resname] for resname in amounts), 0)
+    resval = ResourceValuation()
 
     summary = {'power_consumed':[0]*n_tiers,
                'power_produced':[0]*n_tiers,
@@ -333,7 +336,7 @@ def get_tier_summary(building_names, tech_names):
                 # note: doesn't count the L1-N upgrades when limit increases
                 summary['building_upgrade_num'][tier-1] += 1
 
-                upgrade_res_this_tier += unsplit_res(dict((res,
+                upgrade_res_this_tier += resval.unsplit_res(dict((res,
                                                            data['build_cost_'+res][level-1] if 'build_cost_'+res in data else 0) for res in gamedata['resources']))
 
                 # convert seconds to days
@@ -371,8 +374,8 @@ def get_tier_summary(building_names, tech_names):
             summary['building_upgrade_days'][tier-1] += limit * upgrade_days_this_tier
             summary['power_consumed'][tier-1] += limit * power_consumed_this_tier
             summary['power_produced'][tier-1] += limit * power_produced_this_tier
-            summary['harvest_rate_daily'][tier-1] += limit * unsplit_res(harvest_rate_daily_this_tier)
-            summary['storage'][tier-1] += limit * unsplit_res(storage_this_tier)
+            summary['harvest_rate_daily'][tier-1] += limit * resval.unsplit_res(harvest_rate_daily_this_tier)
+            summary['storage'][tier-1] += limit * resval.unsplit_res(storage_this_tier)
             for res in gamedata['resources']:
                 summary['storage_'+res][tier-1] += limit * storage_this_tier[res]
             # note: all repair happens in parallel
@@ -415,7 +418,7 @@ def get_tier_summary(building_names, tech_names):
 
                 summary['tech_upgrade_num'][tier-1] += 1
 
-                upgrade_res_this_tier += unsplit_res(dict((res,
+                upgrade_res_this_tier += resval.unsplit_res(dict((res,
                                                            data['cost_'+res][level-1] if 'cost_'+res in data else 0) for res in gamedata['resources']))
 
 
@@ -426,6 +429,11 @@ def get_tier_summary(building_names, tech_names):
             summary['tech_upgrade_days'][tier-1] += upgrade_days_this_tier
 
     return summary
+
+def get_resource_summary(n_tiers):
+    resval = ResourceValuation()
+
+    return dict((resname, [resval.unsplit_res(dict([(resname,1)])) for tier in range(1, n_tiers+1)]) for resname in gamedata['resources'])
 
 # return the minimum tier you must be at to satisfy a given predicate
 def get_tier_requirement(pred, verbose = False):
@@ -561,13 +569,16 @@ if __name__ == '__main__':
     # get list of techs to process
     tech_names = sorted(gamedata['tech'].keys(), key=natural_sort_key)
 
-    table_list = [BuildingTable(name, gamedata['buildings'][name]) for name in building_names] + \
-                 [TechTable(name, gamedata['tech'][name]) for name in tech_names]
+    table_list = []
+
+    table_list += [BuildingTable(name, gamedata['buildings'][name]) for name in building_names] + \
+                  [TechTable(name, gamedata['tech'][name]) for name in tech_names]
 
     if gamedata['townhall']:
         # add summary data
         summary_data = get_tier_summary(building_names, tech_names)
         n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
+        table_list = [Table('Resource Exchange Rate', {}, range(1, n_tiers+1), get_resource_summary(n_tiers)),] + table_list
         table_list = [Table('SUMMARY', {}, range(1, n_tiers+1), summary_data),] + table_list
 
     PageOfTables(table_list).as_html(out_fd)
