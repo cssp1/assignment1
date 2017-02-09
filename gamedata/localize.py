@@ -54,24 +54,31 @@ def get_strings(path, data, filter = None, is_strings_json = False):
     ret = []
     if type(data) is list:
         for item in data:
-            ret += get_strings(path+'[]', item, filter = filter, is_strings_json = is_strings_json)
-    else:
-        assert is_dictlike(data)
+            if item:
+                ret += get_strings(path+'[]', item, filter = filter, is_strings_json = is_strings_json)
+    elif is_dictlike(data):
         if 'predicate' in data: return ret # skip predicates
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 ret += get_strings(path+'/'+k, v, filter = filter, is_strings_json = is_strings_json)
-            elif is_strings_json and isinstance(v, list) and len(v) >= 1 and isinstance(v[0], basestring) and \
+            elif (k in ('ui_congrats',) or is_strings_json) and \
+                 isinstance(v, list) and len(v) >= 1 and \
+                 isinstance(v[0], basestring) and \
                  (k not in ('damage_vs_qualities','periods')):
                 for item in v:
                     ret.append((item, path+'/'+k+'[]'))
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny')):
                     ret.append((v, path+'/'+k))
+#    elif type(data) in (int, float): # shouldn't need this check
+#        return ret
+    else:
+        raise Exception('unhandled thing at %s: %r' % (path, data))
+
     return ret
 
 # parts of gamedata that need their ui_whatever things translated
-TRANSLATE_CATEGORIES = ('dialogs','resources','spells','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions')
+TRANSLATE_CATEGORIES = ('dialogs','resources','spells','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions','crafting')
 
 def do_extract(gamedata, outfile, verbose = True):
     if verbose: print >>sys.stderr, "read gamedata game_id", gamedata['game_id'], "built", gamedata['gamedata_build_info']['date']
