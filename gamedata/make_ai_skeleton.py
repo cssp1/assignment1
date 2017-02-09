@@ -1335,7 +1335,7 @@ if __name__ == '__main__':
                 attack_pred = None
                 trophy_pred = None
 
-                if is_first_base and game_id != 'fs': # XXX enable for FS with difficulty nerf
+                if is_first_base:
                     # start the cooldown on attack of first level, and (re)initialize progress_now
                     attack_pred = {"consequent": "AND", "subconsequents": [
                         { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },
