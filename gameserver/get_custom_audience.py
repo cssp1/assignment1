@@ -44,6 +44,7 @@ def do_slave(input):
         for i, aud in enumerate(auds):
             min_spend = aud['min_spend']
             churned_for_days = aud['churned_for_days']
+            played_within_days = aud.get('played_within_days', -1)
             fd = fds[i]
 
             net_spend = user.get('money_spent',0) - user.get('money_refunded',0)
@@ -56,16 +57,21 @@ def do_slave(input):
                 continue
 
             lapsed = -1
-            if churned_for_days > 0:
+            if churned_for_days > 0 or played_within_days > 0:
                 if 'sessions' not in user or len(user['sessions']) < 2:
                     if verbose: print >> sys.stderr, user['user_id'], '<2 sessions'
                     continue
 
                 last_login_time = max(user['sessions'][-1][0], user['sessions'][-2][0])
                 lapsed = time_now - last_login_time
-                if lapsed < churned_for_days*24*60*60:
-                    if verbose: print >> sys.stderr, user['user_id'], 'logged in recently'
-                    continue
+                if churned_for_days > 0:
+                    if lapsed < churned_for_days*24*60*60:
+                        if verbose: print >> sys.stderr, user['user_id'], 'logged in recently'
+                        continue
+                if played_within_days > 0:
+                    if lapsed > played_within_days*24*60*60:
+                        if verbose: print >> sys.stderr, user['user_id'], 'did not play recently'
+                        continue
 
             if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
             print >> fd, user['facebook_id']
@@ -104,16 +110,19 @@ if __name__ == '__main__':
         def auds_for_game(gid):
             ret = [{'game_id':gid, 'aud':'p10-c10', 'min_spend':10, 'churned_for_days':10},
                    {'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
+                   {'game_id':gid, 'aud':'p10-c90', 'min_spend':10, 'churned_for_days':90},
                    {'game_id':gid, 'aud':'p10', 'min_spend':10, 'churned_for_days':-1},
                    ]
-            if gid in ('dv',):
+            if gid in ('dv','tr','fs',):
                 ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
+            if gid in ('dv','tr',):
+                ret.append({'game_id':gid, 'aud':'a60', 'min_spend':-1, 'churned_for_days':-1, 'played_within_days': 60})
             if 0:
                 for country in ('us','ca','gb','au','nz','dk','nl','no','se'):
                     ret.append({'game_id':gid, 'aud':'p10-n%s' % country, 'min_spend':10, 'churned_for_days':-1, 'country':country})
             return ret
         auds = []
-        for gid in ('mf','tr','mf2','bfm','sg','dv'):
+        for gid in ('mf','tr','mf2','bfm','sg','dv','fs'):
             auds += auds_for_game(gid)
 
     else:
