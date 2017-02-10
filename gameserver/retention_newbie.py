@@ -425,8 +425,8 @@ class Sender(object):
                                   'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
                                   }
 
-                        # XXX temporary A/B test
-                        if player['abtests'].get('T324_bh_fb_notifications', None) == 'on':
+                        # temporary A/B test (with promising results)
+                        if player['abtests'].get('T324_bh_fb_notifications', 'on') == 'on':
                             params['facebook'] = '1'
 
                     else:

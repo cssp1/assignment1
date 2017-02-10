@@ -1687,9 +1687,9 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        # XXX temporary A/B test
+        # temporary A/B test (with promising results)
         mirror_to_facebook = (session.user.frame_platform == 'bh' and \
-                              session.player.abtests.get('T324_bh_fb_notifications', None) == 'on')
+                              session.player.abtests.get('T324_bh_fb_notifications', 'on') == 'on')
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
                                                            session.player.get_denormalized_summary_props('brief'),
@@ -1753,9 +1753,9 @@ class HandleSendNotification(Handler):
             assert self.ref_override
             fb_ref = self.ref_override
 
-        # XXX temporary A/B test
+        # temporary A/B test (with promising results)
         mirror_to_facebook = (user.get('frame_platform') == 'bh' and \
-                              player['abtests'].get('T324_bh_fb_notifications', None) == 'on')
+                              player['abtests'].get('T324_bh_fb_notifications', 'on') == 'on')
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
                                                            self.get_denormalized_summary_props_offline(user, player),
