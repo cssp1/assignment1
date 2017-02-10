@@ -1818,6 +1818,10 @@ def adgroup_targeting(db, tgt):
         if 'excluded_custom_audiences' not in ret: ret['excluded_custom_audiences'] = []
         ret['excluded_custom_audiences'].append(format_custom_audience(db, game_data['ad_account_id'], aud))
 
+    if tgt.get('exclude_game_connections',None) == 'ALL':
+        if 'excluded_connections' not in ret: ret['excluded_connections'] = []
+        ret['excluded_connections'] += [{'id': gd['app_id']} for gd in GAMES.itervalues()]
+
     return ret
 
 def reachestimate_tgt(tgt):
