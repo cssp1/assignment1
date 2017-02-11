@@ -18317,6 +18317,7 @@ class GAMEAPI(resource.Resource):
 
                         if protection_based_on == 'ladder_battle':
                             prot_time = ladder_prot_time
+                            damage = base_damage
                         else:
                             if protection_based_on == 'storage_only':
                                 damage = storage_damage
