@@ -2283,7 +2283,7 @@
                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0, "fixed_tooltip_offset": [250,73] },
 
             "resource_power_icon": { "kind": "StaticImage", "xy": [250,72], "dimensions": [21,21], "asset": "resource_icon_power" },
-            "cost_power": { "kind": "TextField", "xy": [250,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+            "cost_power": { "kind": "TextField", "xy": [250,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
                             "ui_tooltip": "%AFTER power needed after mounting\n%DURING power needed during mounting process\n(Current weapon power usage: %CUR)",
                             "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0, "fixed_tooltip_offset": [250,102] },
 
@@ -2801,8 +2801,8 @@
 
             "resource_power_button": { "kind": "ActionButton", "xy": [543,161], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
             "resource_power_icon": { "kind": "StaticImage", "xy": [578,160], "dimensions": [21,21], "asset": "resource_icon_power" },
-            "cost_power": { "kind": "TextField", "xy": [578,160], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx",
-                            "ui_tooltip": "Shows power needed after upgrade\nCurrent power usage: %CUR\nPower needed during upgrade: %DURING",
+            "cost_power": { "kind": "TextField", "xy": [578,160], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
+                            "ui_tooltip": "Current power usage: %CUR\nPower needed during upgrade: %DURING\nPower needed after upgrade: %AFTER",
                             "ui_tooltip_maxlevel": "Power needed",
                             "tooltip_delay": 0, "fixed_tooltip_offset": [500,194], "fixed_tooltip_offset_maxlevel": [590,194]
                           },

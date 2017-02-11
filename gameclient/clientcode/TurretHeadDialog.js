@@ -382,7 +382,15 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_power)).replace('%AFTER', pretty_print_number(new_power)).replace('%DURING', pretty_print_number(during_power));
 
-            dialog.widgets['cost_power'].str = pretty_print_number(new_power);
+            var ui_delta;
+            if(new_power > old_power) {
+                ui_delta = '+' + pretty_print_number(new_power - old_power);
+            } else if(new_power < old_power) {
+                ui_delta = '-' + pretty_print_number(old_power - new_power);
+            } else {
+                ui_delta = '+0';
+            }
+            dialog.widgets['cost_power'].str = dialog.data['widgets']['cost_power']['ui_name'].replace('%AFTER', pretty_print_number(new_power)).replace('%DELTA', ui_delta);
 
             if((session.viewing_base.power_state[1] + new_power - old_power) > session.viewing_base.power_state[0]) {
                 dialog.widgets['cost_power'].text_color = SPUI.error_text_color;

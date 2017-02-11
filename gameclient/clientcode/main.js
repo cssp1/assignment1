@@ -42117,10 +42117,18 @@ function update_upgrade_dialog(dialog) {
             var old_cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level);
             cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level+1);
 
-            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1))) : null);
+            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%AFTER', pretty_print_number(cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1))) : null);
             dialog.widgets['cost_power'].fixed_tooltip_offset = dialog.data['widgets']['cost_power']['fixed_tooltip_offset'];
 
-            dialog.widgets['cost_power'].str = pretty_print_number(cost);
+            var ui_delta;
+            if(cost > old_cost) {
+                ui_delta = '+' + pretty_print_number(cost-old_cost);
+            } else if(cost < old_cost) {
+                ui_delta = '-' + pretty_print_number(old_cost - cost);
+            } else {
+                ui_delta = '+0';
+            }
+            dialog.widgets['cost_power'].str = dialog.data['widgets']['cost_power']['ui_name'].replace('%AFTER', pretty_print_number(cost)).replace('%DELTA', ui_delta);
 
             // do not display energy text in red for central computer upgrades, because they allow more plants to be built
             if((unit.spec['name'] != gamedata['townhall']) &&
