@@ -518,7 +518,7 @@ def decode_bid_type(c):
 def encode_bid_type(t):
     return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
 
-def adgroup_get_bid(adgroup): return adgroup['bid_amount']
+def adgroup_get_bid(adgroup): return adgroup.get('bid_amount', None)
 
 def adgroup_encode_bid(tgt, bid):
     game_id = tgt.get('game', 'tr')
