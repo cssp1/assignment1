@@ -10148,6 +10148,16 @@ function flush_message_queue(force, my_timeout) {
             };
             var on_websocket_message = function(event) {
                 on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
+
+                // Chrome throttles JavaScript timers in background tabs,
+                // but does allow WebSocket message processing - so use this as a chance to send keepalive ping.
+                if(the_websocket && gamedata['client']['websocket_keepalive_interval'] > 0 &&
+                   (client_time - last_websocket_keepalive > gamedata['client']['websocket_keepalive_interval'])) {
+                    last_chat_ping = client_time;
+                    last_websocket_keepalive = client_time;
+                    send_to_server.func(["PING_CHAT", player.chat_seen, 'websocket_keepalive_message']);
+                    flush_message_queue(true);
+                }
             };
 
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
