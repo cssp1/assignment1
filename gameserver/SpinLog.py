@@ -429,6 +429,7 @@ def ClientTroubleLogFilter(child):
                                          '0640_client_died_from_ajax_recv_failure',
                                          '0641_client_died_from_ws_connect_timeout',
                                          '0642_client_died_from_ws_xmit_failure',
+                                         '0643_client_died_from_ws_shutdown',
                                          '0645_direct_ws_failure_falling_back_to_proxy',
                                          '0649_client_died_from_ws_unknown_failure',
                                          '0650_client_died_from_facebook_api_error',

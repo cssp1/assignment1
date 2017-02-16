@@ -10140,7 +10140,7 @@ function flush_message_queue(force, my_timeout) {
                 if(client_state !== client_states.TIMED_OUT) {
                     //invoke_timeout_message('0600_client_idle_timeout', {}, {});
                     var s = gamedata['errors']['UNKNOWN_SESSION'];
-                    invoke_timeout_message('0601_client_died_from_unknown_session', {},
+                    invoke_timeout_message('0643_client_died_from_ws_shutdown', {'method': event.data},
                                            {'ui_title': s['ui_title'], 'ui_description': s['ui_name'], 'ui_button': s['ui_button'],
                                             'dialog': s['dialog'] || null});
                 }
