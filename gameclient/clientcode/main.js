@@ -48116,6 +48116,9 @@ function handle_server_message(data) {
         } else if(name == "UNKNOWN_SESSION") {
             // non-reportable error, because it can happen right after an idle kick
             invoke_timeout_message('0601_client_died_from_unknown_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '601'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
+        } else if(name == "KILL_SESSION") {
+            // non-reportable, since it's usually caused by the player logging in simultaneously
+            invoke_timeout_message('0602_client_died_from_killed_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '602'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
         } else if(name == "IDLE_KICK") {
             invoke_timeout_message('0600_client_idle_timeout', {}, {});
         } else if(name == "MAINT_KICK") {

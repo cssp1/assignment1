@@ -15219,6 +15219,8 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
+        if not session.logout_in_progress:
+            session.send([["ERROR", "KILL_SESSION"]], flush_now = True)
         d = self.gameapi.log_out_async(session, 'forced_relog')
         d.addCallback(lambda _, session=session: ascdebug('kill_session %d %s async end' % (session.user.user_id, session.session_id)))
         d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
