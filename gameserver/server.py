@@ -4239,7 +4239,7 @@ class Session(object):
                            retmsg = retmsg)
         gamesite.chat_mgr.join(self, self.region_chat_channel)
 
-    def shutdown(self):
+    def shutdown(self, method):
         self.prune_attack_replay_receivers(True)
 
         if self.region_chat_channel:
@@ -4266,6 +4266,8 @@ class Session(object):
             gamesite.gameapi.complete_longpoll(request, self)
             if isinstance(request, WSFakeRequest): # XXXXXX nasty hack
                 # shut down the connection here so that it won't stick around until the full timeout
+                if gamedata['server'].get('log_websocket_events',0) >= 2:
+                    gamesite.exception_log.event(server_time, 'Closing WebSocket due to session shutdown for %r: %s' % (method, request.proto.peer_ip))
                 request.close_connection_aggressively()
 
         # unlock the player's personal state
@@ -26272,7 +26274,7 @@ class GAMEAPI(resource.Resource):
         session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
 
         # then session.shutdown
-        session.logout_d.addCallback(lambda _, session=session: session.shutdown())
+        session.logout_d.addCallback(lambda _, session=session, method=method: session.shutdown(method))
         session.logout_d.addErrback(report_and_absorb_deferred_failure, session)
 
         # then the flush happens...
@@ -30839,6 +30841,8 @@ class GameSite(server.Site):
             assert isinstance(client, self.GameProtocol) or isinstance(client, WS_GAMEAPI_Protocol) # duck typed :P
             last_activity = max(client.connect_time, client.last_request_time)
             if server_time - last_activity > gamedata['server']['http_connection_timeout']:
+                if isinstance(client, WS_GAMEAPI_Protocol) and gamedata['server'].get('log_websocket_events',0) >= 2:
+                    gamesite.exception_log.event(server_time, 'Closing WebSocket due to http_connection_timeout: %s' % client.peer_ip)
                 client.close_connection_aggressively()
 
     def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
