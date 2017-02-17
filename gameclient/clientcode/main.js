@@ -45780,7 +45780,10 @@ function recv_message_bundle(serial, clock, messages, kind) {
         handle_server_message_bundle(-1, {'messages':messages, 'kind':'error'});
         return -1;
     }
-    if(serial in ajax_recv_buffer) { throw Error('duplicated server serial '+serial.toString()); }
+    if(serial in ajax_recv_buffer || serial < ajax_next_serial) {
+        // discard retransmission of something we already saw
+        return 0;
+    }
     ajax_recv_buffer[serial] = {'messages':messages, 'kind':kind};
     process_recv_buffer();
     return 0;

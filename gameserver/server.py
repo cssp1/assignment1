@@ -25081,37 +25081,38 @@ class GAMEAPI(resource.Resource):
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
+        # not CLIENT_HELLO...
+
+        session = get_session_by_session_id(session_id)
+        if not session:
+            http_request.setHeader('Connection', 'close') # stop keepalive
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
+
+        # after this point, session is guaranteed to be valid
+
+        if keepalive:
+            session.last_active_time = server_time
+
+        if arg[0][0] == "LONGPOLL":
+            assert len(arg) == 1 and len(arg[0]) == 1
+            return self.handle_longpoll(http_request, session)
+
+        # compare serial number of incoming message vs. the next expected serial number
+        if (serial < session.incoming_serial):
+            # discard retransmission
+            pass
         else:
-            session = get_session_by_session_id(session_id)
-            if not session:
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
+            session.message_buffer.append([serial, arg])
 
-            # after this point, session is guaranteed to be valid
+        if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
+            # client is too far ahead of us
+            if not session.lagged_out:
+                session.lagged_out = True
+                metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
+                                                                             'country': session.user.country })
+            http_request.setHeader('Connection', 'close') # stop keepalive
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
 
-            if keepalive:
-                session.last_active_time = server_time
-
-            if arg[0][0] == "LONGPOLL":
-                assert len(arg) == 1 and len(arg[0]) == 1
-                return self.handle_longpoll(http_request, session)
-
-            # compare serial number of incoming message vs. the next expected serial number
-            if (serial < session.incoming_serial):
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
-
-            if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
-                # client is too far ahead of us
-                if not session.lagged_out:
-                    session.lagged_out = True
-                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
-                                                                                 'country': session.user.country })
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
-
-        session.message_buffer.append([serial, arg])
-        #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
 
         if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
             # park this request as the longpoll request so we have something to write the client back on
