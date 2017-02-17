@@ -25302,34 +25302,22 @@ class GAMEAPI(resource.Resource):
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
             request.setHeader('Connection', 'close') # stop keepalive
             request.write(r)
+            request.finish()
+            return
 
-        else:
-            # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
-            if gamesite.raw_log:
-                client_str = 'sid %s' % pretty_print_session(session.session_id)
-                log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
+        # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
+        if gamesite.raw_log:
+            client_str = 'sid %s' % pretty_print_session(session.session_id)
+            log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
 
-            msg = session.outgoing_messages[:]
-            del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
-
-            if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
-                msg.append(["NOMESSAGE"])
-
-            if len(msg) > 0:
-                r = SpinJSON.dumps({'serial': session.outgoing_serial,
-                                    'ack': session.incoming_serial-1,
-                                    'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                    'msg': msg})
-                session.outgoing_serial += 1
-                request.write(r)
-
-        request.finish()
+        self.put_on_wire(session, request, False)
 
     def complete_longpoll(self, request, session):
-        # works for both standard HTTP request and WSFakeRequest
-
         if hasattr(request, '_disconnected') and request._disconnected: return
+        self.put_on_wire(session, request, True)
 
+    def put_on_wire(self, session, request, is_longpoll):
+        # works for both standard HTTP request and WSFakeRequest
         msg = session.outgoing_messages[:]
         del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
@@ -25337,10 +25325,13 @@ class GAMEAPI(resource.Resource):
             msg.append(["NOMESSAGE"])
 
         if len(msg) > 0:
-            r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
-                                'ack': session.incoming_serial-1,
-                                'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                'msg': msg})
+            contents = {'serial': session.outgoing_serial,
+                        'ack': session.incoming_serial-1,
+                        'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                        'msg': msg}
+            if is_longpoll:
+                contents['longpoll'] = 1
+            r = SpinJSON.dumps(contents)
             session.outgoing_serial += 1
             request.write(r)
 
