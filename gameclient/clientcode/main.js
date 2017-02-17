@@ -45800,7 +45800,7 @@ function process_recv_buffer() {
     }
 
     if(goog.object.getCount(ajax_recv_buffer) >= gamedata['client']['ajax_message_buffer']) {
-        return invoke_timeout_message('0621_client_died_from_downstream_lag', {}, {});
+        return invoke_timeout_message('0621_client_died_from_downstream_lag', {'method': 'client'}, {});
     }
 }
 
@@ -48130,8 +48130,10 @@ function handle_server_message(data) {
             invoke_timeout_message('0611_client_died_from_maint_kick', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
         } else if(name == "SERVER_EXCEPTION") {
             invoke_timeout_message('0610_client_died_from_server_exception', {}, {});
-        } else if(name == "TOO_LAGGED") {
-            invoke_timeout_message('0622_client_died_from_upstream_lag', {}, {});
+        } else if(name == "TOO_LAGGED_UPSTREAM") {
+            invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'server'}, {});
+        } else if(name == "TOO_LAGGED_DOWNSTREAM") {
+            invoke_timeout_message('0621_client_died_from_downstream_lag', {'method': 'server'}, {});
         } else if(name == "POWER_LIMIT") {
             var s = gamedata['strings']['requirements_help']['power']['unknown'];
             invoke_message_dialog(s['ui_title'], s['ui_description']);
