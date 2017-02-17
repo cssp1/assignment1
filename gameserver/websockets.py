@@ -321,6 +321,8 @@ class WebSocketsProtocol(ProtocolWrapper):
                     pong_data = ""
 
                 self.transport.write(make_hybi07_frame(pong_data, opcode=PONG)) # DJM - this used to say make_hybi07_packet() but there is no definition for that!
+            elif opcode == PONG:
+                pass # log.err("PONG! %r" % (self.spin_peer_addr,))
 
     def sendFrames(self):
         # DJM - this shouldn't happen
@@ -339,6 +341,10 @@ class WebSocketsProtocol(ProtocolWrapper):
             packet = make_hybi07_frame(frame)
             self.transport.write(packet)
         self.pending_frames = []
+
+    def sendPing(self):
+        # log.err("PING! %r" % (self.spin_peer_addr,))
+        self.transport.write(make_hybi07_frame("", opcode=PING))
 
     def dataReceived(self, data):
         self.buf += data

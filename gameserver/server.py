@@ -30846,6 +30846,13 @@ class GameSite(server.Site):
                     gamesite.exception_log.event(server_time, 'Closing WebSocket due to http_connection_timeout: %s' % client.peer_ip)
                 client.close_connection_aggressively()
 
+            # send WebSocket pings periodically to avoid timeouts along the proxy chain
+            if isinstance(client, WS_GAMEAPI_Protocol):
+                if client.last_xmit_time > 0 and \
+                   server_time - client.last_xmit_time > gamedata['server']['http_connection_timeout']//2:
+                    client.last_xmit_time = server_time
+                    client.transport.sendPing()
+
     def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
         host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
         port = SpinConfig.config['proxyserver']['external_http_port']
@@ -30927,14 +30934,21 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.last_request_repr = '' # for debugging only
         self.last_request_time = -1
 
+        # really this should track the time we last sent bytes to the client,
+        # but it's hard to reach down into Twisted to grab that info,
+        # so let's just use it as the last *ping* xmit time
+        self.last_xmit_time = -1
+
     def connectionMade(self):
         self.connected = True
         self.connect_time = int(time.time())
+        self.last_xmit_time = self.connect_time
         gamesite.gotClient(self) # XXX not sure how to get a reference to the "site" here
 
     def connectionLost(self, reason):
         self.connected = False
         self.connect_time = -1
+        self.last_xmit_time = -1
         if self.close_connection_watchdog:
             self.close_connection_watchdog.cancel()
             self.close_connection_watchdog = None
