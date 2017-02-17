@@ -47,8 +47,8 @@ SPWebsocket.SPWebsocket.prototype.connect = function() {
 SPWebsocket.SPWebsocket.prototype.close = function() {
     if(this.socket) {
         if(this.socket_state != SPWebsocket.SocketState.CLOSING) {
-            this.socket.close();
             this.socket_state = SPWebsocket.SocketState.CLOSING;
+            this.socket.close();
         }
     }
     if(this.connect_watchdog) {
