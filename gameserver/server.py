@@ -4266,8 +4266,9 @@ class Session(object):
             gamesite.gameapi.complete_longpoll(request, self)
             if isinstance(request, WSFakeRequest): # XXXXXX nasty hack
                 # shut down the connection here so that it won't stick around until the full timeout
-                if gamedata['server'].get('log_websocket_events',0) >= 2:
-                    gamesite.exception_log.event(server_time, 'Closing WebSocket due to session shutdown for %r: %s' % (method, request.proto.peer_ip))
+
+                if method != 'onunload' and gamedata['server'].get('log_websocket_events',0) >= 2:
+                    gamesite.exception_log.event(server_time, 'Closing WebSocket during session shutdown for %r: %s' % (method, request.proto.peer_ip))
                 request.close_connection_aggressively()
 
         # unlock the player's personal state
