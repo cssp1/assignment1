@@ -3813,6 +3813,7 @@ class Session(object):
         # these are set once at initialization
         self.session_id = session_id
         self.incoming_serial = 0
+        self.incoming_acked = 0 # last serial we told the client we acked
         self.outgoing_serial = 0
         self.user = user
         self.user.active_session = self
@@ -25331,7 +25332,11 @@ class GAMEAPI(resource.Resource):
         msg = session.outgoing_messages[:]
         del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
-        if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
+        if len(msg) == 0 and \
+           (not isinstance(request, WSFakeRequest) or \
+            (session.incoming_serial - session.incoming_acked >= gamedata['server']['session_message_buffer']//2)):
+            # HTTP requests always need a response
+            # WS requests don't, but still respond with an "ack" occasionally to keep client retrans buffer size down
             msg.append(["NOMESSAGE"])
 
         if len(msg) > 0:
@@ -25343,6 +25348,7 @@ class GAMEAPI(resource.Resource):
                 contents['longpoll'] = 1
             r = SpinJSON.dumps(contents)
 
+            session.incoming_acked = session.incoming_serial-1
             session.retrans_buffer.append([session.outgoing_serial, msg])
             session.outgoing_serial += 1
 
@@ -27357,8 +27363,8 @@ class GAMEAPI(resource.Resource):
             session.player.travel_begin(destination, travel_time)
             retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
 
-        elif arg[0] == "PING_MAP":
-            # this is just to collect deferred messages
+        elif arg[0] == "PING_MAP" or arg[0] == "PING":
+            # this is just to collect deferred messages and update the ack
             pass
 
         elif arg[0] == "PING_CHAT":

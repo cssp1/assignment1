@@ -1152,7 +1152,7 @@ function AJAXMessageQueue() {
     this.queue = [];
     this.serial = -1;
     this.recv_progress = -1; // UNRELIABLE indication of progress receiving the response to this message bundle (-1 if unknown)
-}
+};
 AJAXMessageQueue.prototype.push = function(msg) {
     this.queue.push(msg);
 };
@@ -1175,6 +1175,22 @@ ServerSender.prototype.func = function(msg) {
     message_queue.push(msg);
 };
 var send_to_server = new ServerSender();
+
+/** @constructor */
+function RetransBuffer() {
+    this.buf = [];
+};
+RetransBuffer.prototype.append = function(serial, msg) {
+    this.buf.push([serial, msg]);
+};
+RetransBuffer.prototype.trim = function(ack) {
+    while(this.buf.length > 0 && this.buf[0][0] <= ack) {
+        this.buf.shift();
+    }
+};
+RetransBuffer.prototype.length = function() { return this.buf.length; };
+
+var retrans_buffer = new RetransBuffer();
 
 // general-purpose mechanism for waiting for the server to acknowledge all actions submitted up to now
 /** @constructor @struct */
@@ -10070,6 +10086,7 @@ function flush_message_queue(force, my_timeout) {
             // message is automatic, do not keepalive
             data_dict['nokeepalive'] = 1;
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         var data_str = JSON.stringify(data_dict);
         message_queue.serial = message_serial;
@@ -10181,6 +10198,7 @@ function flush_message_queue(force, my_timeout) {
             // message is automatic, do not keepalive
             msg += '&nokeepalive=1';
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         last_ajax_serial = message_serial;
         last_ajax_xmit_time = client_time;
@@ -10220,6 +10238,11 @@ function flush_message_queue(force, my_timeout) {
         window.setTimeout(send_it, Math.floor(1000*inject_lag));
     } else {
         send_it();
+    }
+
+    retrans_buffer.append(message_serial, message_queue.queue);
+    if(retrans_buffer.length() >= gamedata['client']['ajax_message_buffer']) {
+        invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'client'}, {});
     }
 
     message_queue = new AJAXMessageQueue();
@@ -45753,6 +45776,7 @@ function on_ajax_goog(event) {
 
 var ajax_recv_buffer = {};
 var ajax_next_serial = 0;
+var ajax_last_ack = 0; // last ack we sent back to the server
 
 function on_ajax(response, kind) {
     var from_server = JSON.parse(response);
@@ -45764,6 +45788,17 @@ function on_ajax(response, kind) {
     var serial = from_server['serial'];
     var clock = from_server['clock'];
     var messages = from_server['msg'];
+
+    if('ack' in from_server) {
+        retrans_buffer.trim(from_server['ack']);
+
+        // if we haven't sent an ack to the server in a long time,
+        // send something back to keep the server's retrans buffer size down
+        if(message_queue.length() < 1 &&
+           2*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
+            send_to_server.func(["PING"]);
+        }
+    }
 
     return recv_message_bundle(serial, clock, messages, kind);
 }
