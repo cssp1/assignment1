@@ -25323,6 +25323,7 @@ class GAMEAPI(resource.Resource):
 
             if len(msg) > 0:
                 r = SpinJSON.dumps({'serial': session.outgoing_serial,
+                                    'ack': session.incoming_serial-1,
                                     'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
                                     'msg': msg})
                 session.outgoing_serial += 1
@@ -25343,6 +25344,7 @@ class GAMEAPI(resource.Resource):
 
         if len(msg) > 0:
             r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
+                                'ack': session.incoming_serial-1,
                                 'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
                                 'msg': msg})
             session.outgoing_serial += 1

@@ -10064,6 +10064,7 @@ function flush_message_queue(force, my_timeout) {
         // Websockets
         var data_dict = {'myarg': message_queue.queue, // NOT stringified internally
                          'serial': message_serial,
+                         'ack': ajax_next_serial - 1,
                          'session': session.session_id};
         if(!keepalive) {
             // message is automatic, do not keepalive
@@ -10174,6 +10175,7 @@ function flush_message_queue(force, my_timeout) {
         var msg = 'myarg='+encodeURIComponent(JSON.stringify(message_queue.queue));
         message_queue.serial = message_serial;
         msg += '&serial='+message_serial.toString();
+        msg += '&ack='+(ajax_next_serial-1).toString();
         msg += '&session='+session.session_id.toString();
         if(!keepalive) {
             // message is automatic, do not keepalive
