@@ -110,16 +110,19 @@ SPWebsocket.SPWebsocket.prototype.on_message = function(event) {
     this.target.dispatchEvent({type: 'message', data: event_data});
 };
 
-SPWebsocket.SPWebsocket.prototype.on_close = function(event) {
+/** @param {!Event} _event */
+SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
+    var event = /** @type {!CloseEvent} */ (_event);
     if(this.socket) {
         // if it wasn't us closing the connection, then this represents some kind of failure (server-side close)
         if(this.socket_state != SPWebsocket.SocketState.CLOSING) {
             this.socket_state = SPWebsocket.SocketState.CLOSED;
-            var ui_code = event.code || 'unknown';
+            var ui_code = (event.code || 0).toString();
             var ui_reason = event.reason || 'unknown';
-            var ui_was_clean = (event.wasClean !== undefined ? (event.wasClean ? 'clean': 'not_clean') : 'unknown');
-            var ui_reason = 'server:'+ui_code+':'+ui_reason+':'+ui_was_clean;
-            this.target.dispatchEvent({type: 'shutdown', data: ui_reason});
+            var was_clean = event.wasClean;
+            var ui_was_clean = (was_clean !== undefined ? (was_clean ? 'clean': 'not_clean') : 'unknown');
+            var ui_method = 'server:'+ui_code+':'+ui_reason+':'+ui_was_clean;
+            this.target.dispatchEvent({type: 'shutdown', data: ui_method});
         }
 
         // leave it in FAILED state if it's failed previously

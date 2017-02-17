@@ -694,6 +694,19 @@ Event.prototype.MSPOINTER_TYPE_TOUCH = function() {};
 Event.prototype.MSPOINTER_TYPE_MOUSE = function() {};
 Event.prototype.MSPOINTER_TYPE_PEN = function() {};
 
+// WebSocket API
+
+//
+/**
+ * @constructor
+ * @extends Event
+ */
+var CloseEvent = function() {};
+/** @type {number|undefined} */
+CloseEvent.prototype.code;
+/** @type {boolean|undefined} */
+CloseEvent.prototype.wasClean;
+
 // Fix old Google Closure Library incompatibility with more recent Closure Compilers
 
 /** @typedef {XMLHttpRequest} */
