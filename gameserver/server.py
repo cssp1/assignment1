@@ -3826,9 +3826,9 @@ class Session(object):
         # for ADMIN purposes only, keep track of the last messages sent
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
-        # list of incoming bundles of game messages ([serial, messsages])
+        # dict of incoming bundles of game messages {serial: messsages}
         # being held because earlier messages haven't been received or completely handled yet
-        self.message_buffer = [] # XXXXXX rename to incoming_messages
+        self.message_buffer = {}
         self.lagged_out = False
 
         # Maintain a list of Deferreds we are waiting on during async message handling.
@@ -25098,11 +25098,11 @@ class GAMEAPI(resource.Resource):
             return self.handle_longpoll(http_request, session)
 
         # compare serial number of incoming message vs. the next expected serial number
-        if (serial < session.incoming_serial):
+        if (serial < session.incoming_serial) or (serial in session.message_buffer):
             # discard retransmission
             pass
         else:
-            session.message_buffer.append([serial, arg])
+            session.message_buffer[serial] = arg
 
         if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
             # client is too far ahead of us
@@ -25130,10 +25130,9 @@ class GAMEAPI(resource.Resource):
 
     def handle_message_buffer(self, session, retmsg):
         # look through the message buffer for a processable message bundle
-        i = 0
         start_time = -1
 
-        while i < len(session.message_buffer):
+        while session.incoming_serial in session.message_buffer:
             if session.is_async():
                 # prevent re-entry of handle_message_buffer() on a subsequent client message while an async request is still happening
                 # the client will get its answer from complete_deferred_message after the async request completes
@@ -25143,70 +25142,65 @@ class GAMEAPI(resource.Resource):
             if session.logout_in_progress: # allow no further message processing after logout begins
                 break
 
-            if session.message_buffer[i][0] == session.incoming_serial:
+            # ok, we got the next expected message bundle
+            serial_arg = session.message_buffer[session.incoming_serial]
 
-                # ok, we got the next expected message bundle
-                serial_arg = session.message_buffer[i]
+            # process as many messages as we can in this budle
+            # for each message in the bundle
+            while len(serial_arg) > 0:
+                # pull the message off the queue
+                # (throughout this entire function, we leave the session in a valid state, in case
+                # we have to go asynchronous and come back later)
+                msg = serial_arg.pop(0)
 
-                # process as many messages as we can in this budle
-                # for each message in the bundle
-                while len(serial_arg[1]) > 0:
-                    # pull the message off the queue
-                    # (throughout this entire function, we leave the session in a valid state, in case
-                    # we have to go asynchronous and come back later)
-                    msg = serial_arg[1].pop(0)
+                if msg[0] == "CAST_SPELL":
+                    latency_tag = msg[0] + '('+msg[2]+')'
+                elif msg[0] == "INVENTORY_USE":
+                    latency_tag = msg[0] + '('+msg[2]['spec']+')'
+                elif msg[0] == "LOOT_BUFFER_TAKE":
+                    latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
+                elif 0 and msg[0] == "QUARRY_QUERY":
+                    latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
+                else:
+                    latency_tag = msg[0]
 
-                    if msg[0] == "CAST_SPELL":
-                        latency_tag = msg[0] + '('+msg[2]+')'
-                    elif msg[0] == "INVENTORY_USE":
-                        latency_tag = msg[0] + '('+msg[2]['spec']+')'
-                    elif msg[0] == "LOOT_BUFFER_TAKE":
-                        latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
-                    elif 0 and msg[0] == "QUARRY_QUERY":
-                        latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
-                    else:
-                        latency_tag = msg[0]
+                session.debug_log_action(latency_tag)
 
-                    session.debug_log_action(latency_tag)
+                try:
+                    if start_time < 0: start_time = time.time()
 
-                    try:
-                        if start_time < 0: start_time = time.time()
+                    go_async = self.handle_message_guts(session, msg, retmsg)
 
-                        go_async = self.handle_message_guts(session, msg, retmsg)
-
-                        end_time = time.time()
+                    end_time = time.time()
 
 
-                        admin_stats.record_latency(latency_tag, end_time-start_time)
-                        start_time = end_time # ends up including the list-processing stuff below in the next message, but that should be fast
+                    admin_stats.record_latency(latency_tag, end_time-start_time)
+                    start_time = end_time # ends up including the list-processing stuff below in the next message, but that should be fast
 
-                        if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
-                                                       'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
-                                                       'REPORT_METRIC'):
-                            session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
+                    if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
+                                                   'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
+                                                   'REPORT_METRIC'):
+                        session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
 
-                        if go_async:
-                            assert isinstance(go_async, defer.Deferred)
-                            if not deferred_is_finished(go_async):
-                                # go asynchronous, breaking out of message processing here
-                                if (not session.logout_in_progress) and (go_async not in session.async_ds):
-                                    gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
-                                    session.start_async_request(go_async)
-                                return
+                    if go_async:
+                        assert isinstance(go_async, defer.Deferred)
+                        if not deferred_is_finished(go_async):
+                            # go asynchronous, breaking out of message processing here
+                            if (not session.logout_in_progress) and (go_async not in session.async_ds):
+                                gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
+                                session.start_async_request(go_async)
+                            return
 
-                    except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
-                        retmsg.append(["ERROR", "SERVER_EXCEPTION"])
-                        break
+                except Exception:
+                    gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
+                    retmsg.append(["ERROR", "SERVER_EXCEPTION"])
+                    break
 
-                if len(serial_arg[1]) == 0:
-                    # processed one complete bundle. Advance to next.
-                    session.message_buffer.pop(i)
-                    session.incoming_serial += 1
+            if len(serial_arg) == 0:
+                # processed one complete bundle. Advance to next.
+                del session.message_buffer[session.incoming_serial]
+                session.incoming_serial += 1
 
-                i = 0
-            else:
-                i += 1
 
     # we're about to send a response to the client. Run any pending batched actions.
     @admin_stats.measure_latency('run_deferred_actions')
