@@ -3831,6 +3831,10 @@ class Session(object):
         self.message_buffer = {}
         self.lagged_out = False
 
+        # array of outgoing bundles of game messages [[serial, message]]
+        # stored for retransmission in case the client disconnects
+        self.retrans_buffer = []
+
         # Maintain a list of Deferreds we are waiting on during async message handling.
         self.async_ds = []
         self.async_ds_watchdog = None # IDelayedCall to detect async_ds getting "stuck"
@@ -25093,6 +25097,12 @@ class GAMEAPI(resource.Resource):
         if keepalive:
             session.last_active_time = server_time
 
+        if 'ack' in args_dict:
+            # trim retrans buffer
+            ack = int(args_dict["ack"])
+            while len(session.retrans_buffer) > 0 and session.retrans_buffer[0][0] <= ack:
+                session.retrans_buffer.pop(0)
+
         if arg[0][0] == "LONGPOLL":
             assert len(arg) == 1 and len(arg[0]) == 1
             return self.handle_longpoll(http_request, session)
@@ -25111,7 +25121,7 @@ class GAMEAPI(resource.Resource):
                 metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
-            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
 
 
         if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
@@ -25332,8 +25342,20 @@ class GAMEAPI(resource.Resource):
             if is_longpoll:
                 contents['longpoll'] = 1
             r = SpinJSON.dumps(contents)
+
+            session.retrans_buffer.append([session.outgoing_serial, msg])
             session.outgoing_serial += 1
-            request.write(r)
+
+            if len(session.retrans_buffer) >= gamedata['server']['session_message_buffer']:
+                # client hasn't acked enough
+                if not session.lagged_out:
+                    session.lagged_out = True
+                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
+                                                                                 'country': session.user.country })
+                request.setHeader('Connection', 'close') # stop keepalive
+                request.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]}))
+            else:
+                request.write(r)
 
         request.finish()
 
