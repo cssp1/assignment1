@@ -10194,6 +10194,14 @@ function flush_message_queue(force, my_timeout) {
                 });
                 send_to_server.func(["RECONNECT"]);
                 flush_message_queue(true);
+
+                var props = add_demographics({'user_id':spin_user_id,
+                                              'len':the_websocket.retry_count,
+                                              'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                              'since_pageload': client_time - spin_pageload_begin,
+                                              'connection': gameapi_connection_method()
+                                             });
+                SPLWMetrics.send_event(spin_metrics_anon_id, '0623_client_reconnected', props);
             };
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
             goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
