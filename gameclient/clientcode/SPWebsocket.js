@@ -35,7 +35,8 @@ SPWebsocket.SPWebsocket = function(url, connect_timeout, msg_timeout, enable_rec
     this.msg_watchdog = null;
     this.msg_time = -1;
     this.to_send = [];
-    this.retry_count = 0;
+    this.retry_count = 0; // count reconnection attempts
+    this.recv_count = 0; // count received packets
 };
 SPWebsocket.SPWebsocket.prototype.connect = function() {
     if(this.socket) { throw Error('invalid state for connect()'); }
@@ -133,6 +134,7 @@ SPWebsocket.SPWebsocket.prototype.on_open_timeout = function() {
     @suppress {reportUnknownTypes} Closure don't like the ambiguous type of event.data - maybe outdated externs */
 SPWebsocket.SPWebsocket.prototype.on_message = function(event) {
     if(!this.socket || this.socket_state != SPWebsocket.SocketState.CONNECTED) { throw Error('invalid state for onmessage()'); }
+    this.recv_count += 1;
     var event_data = /** @type {string} */ (event.data);
     this.target.dispatchEvent({type: 'message', data: event_data});
 };
@@ -141,6 +143,13 @@ SPWebsocket.SPWebsocket.prototype.on_message = function(event) {
     @param {!CloseEvent} event
     @return {boolean} if we should attempt to reconnect */
 SPWebsocket.SPWebsocket.prototype.close_event_is_recoverable = function(event) {
+    if(this.recv_count < 1) {
+        // if we never successfully got any data from the server,
+        // then this is probably a client-side issue, like the browser
+        // denying the connection. Let it fail immediately instead of retrying.
+        return false;
+    }
+
     if(event.code == 1001) {
         return true; // proxy needs to restart
     } else if(event.code === 1005 || event.code === 1006) {
@@ -170,7 +179,7 @@ SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
             var ui_reason = event.reason || 'unknown';
             var was_clean = event.wasClean;
             var ui_was_clean = (was_clean !== undefined ? (was_clean ? 'clean': 'not_clean') : 'unknown');
-            var ui_method = 'server:'+ui_code+':'+ui_reason+':'+ui_was_clean;
+            var ui_method = 'server:'+ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
             this.target.dispatchEvent({type: 'shutdown', data: ui_method});
         }
 
