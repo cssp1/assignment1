@@ -15532,6 +15532,13 @@ class CONTROLAPI(resource.Resource):
         gamesite.nosql_init()
     def handle_nosql_off(self, request):
         gamesite.nosql_shutdown()
+    def handle_fail_websockets(self, request):
+        # for testing WebSocket interruption
+        for session in session_table.itervalues():
+            if isinstance(session.longpoll_request, WSFakeRequest):
+                session.longpoll_request.proto.close_connection_aggressively(True)
+                session.longpoll_request = None
+
     def handle_maint_kick(self, request):
         return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
