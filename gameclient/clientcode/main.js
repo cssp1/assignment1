@@ -48380,6 +48380,11 @@ function invoke_timeout_message(event_name, props, options) {
         client_state = client_states.TIMED_OUT;
     }
 
+    // tell websocket not to try reconnecting
+    if(the_websocket) {
+        the_websocket.enable_reconnect = 0;
+    }
+
     if(!options['continue_graphics']) {
         // scale back on CPU usage after client dies
         FRAME_RATE_CAP = 1;
