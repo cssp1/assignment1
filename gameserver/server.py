@@ -31081,7 +31081,7 @@ class AdminResource(resource.Resource):
                     return str(auth_info['error'])
 
         ret = u'<html><head><title>Admin</title>'
-        ret += '<style type="text/css">body {font-family:serif; font-size: 100%;} td { font-size: 1.0em; padding: 1px;}</style>'
+        ret += '<style type="text/css">body {font-family:serif; font-size: 100%;} thead {background: #aaa;} .sessions tbody { font-family: monospace; } td { font-size: 1.0em; padding: 1px;}</style>'
         ret += '</head><body>'
 
         #ret += self.revenue_image()
@@ -31133,7 +31133,7 @@ class AdminResource(resource.Resource):
 
         ret += '<hr>'
         ret += '<b>'+str(len(session_table)) +' active session(s):</b><p>'
-        ret += '<table border="1" cellspacing="1">'
+        ret += '<table border="1" cellspacing="1" class="sessions">'
 
         def make_red(text):
             return '<font color="#ff0000">'+text+'</font>'
@@ -31146,7 +31146,7 @@ class AdminResource(resource.Resource):
             link = urllib.urlencode(props)
             return '<a href="?%s">%s</a>' % (link, text)
 
-        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Async</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
+        ret += '<thead><tr><th>User</th><th>Name</th><th>'+make_sortlink('Level', request, 'level')+'</th><th>Country</th><th>Age</th><th>'+make_sortlink('IP', request, 'ip')+'</th><th>RetransBuf</th>'+'<th>Campaign</th><th>'+make_sortlink('Acct Age', request, 'acct_age')+'</th><th>'+make_sortlink('Session Length', request, 'session_length')+'</th><th>Async</th><th>Idle For</th><th>Last Actions (sec ago)</th><th>Tut</th><th>&#35;PvE</th><th>&#35;PvP</th><th>Protect</th><th>Where</th><th>Logins</th><th>Alloy Bal.</th><th>'+make_sortlink('Lifetime Receipts', request, 'default')+'</th></tr></thead><tbody>'
 
         # sort by money spent, then player level
         sort_by = request.args['sort'][0] if ('sort' in request.args) else 'default'
@@ -31180,6 +31180,8 @@ class AdminResource(resource.Resource):
             years_old = str(years_old) if years_old > 0 else '?'
 
             ip_addr = str(session.user.last_login_ip)
+            retrans_info = '%d' % len(session.retrans_buffer)
+
             campaign = session.user.acquisition_campaign
             if campaign is None:
                 campaign = 'unknown'
@@ -31243,9 +31245,9 @@ class AdminResource(resource.Resource):
                 spend = '<b>$%.2f</b>' % spend
             else:
                 spend = '$%.2f' % spend
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,retrans_info,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
 
-        ret += '</table><p>'
+        ret += '</tbody></table><p>'
 
         ret += '<hr><b>Campaign Data</b><p>'
         ret += admin_stats.get_campaigns()

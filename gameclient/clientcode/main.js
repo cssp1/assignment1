@@ -50969,8 +50969,9 @@ function do_draw() {
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
                 lines.push('Combat tick: '+session.get_real_world().combat_engine.cur_tick.get().toString());
+                lines.push('Retransmit buffer size: '+retrans_buffer.length().toFixed(0));
                 ctx.save();
-                var fsize = 21;
+                var fsize = 10;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();
                 goog.array.forEach(lines, function(line, y) {
                     ctx.fillText(line, origin[0], origin[1] + 18 + (fsize+6) * y);
