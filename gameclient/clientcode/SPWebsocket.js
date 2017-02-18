@@ -179,7 +179,7 @@ SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
             var ui_reason = event.reason || 'unknown';
             var was_clean = event.wasClean;
             var ui_was_clean = (was_clean !== undefined ? (was_clean ? 'clean': 'not_clean') : 'unknown');
-            var ui_method = 'server:'+ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
+            var ui_method = ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
             this.target.dispatchEvent({type: 'shutdown', data: ui_method});
         }
 
