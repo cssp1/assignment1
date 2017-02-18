@@ -10194,14 +10194,6 @@ function flush_message_queue(force, my_timeout) {
                 });
                 send_to_server.func(["RECONNECT"]);
                 flush_message_queue(true);
-
-                var props = add_demographics({'user_id':spin_user_id,
-                                              'len':the_websocket.retry_count,
-                                              'since_connect': (session.connected() ? client_time - session.connect_time : -1),
-                                              'since_pageload': client_time - spin_pageload_begin,
-                                              'connection': gameapi_connection_method()
-                                             });
-                SPLWMetrics.send_event(spin_metrics_anon_id, '0623_client_reconnected', props);
             };
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
             goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
@@ -47974,6 +47966,16 @@ function handle_server_message(data) {
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});
+    } else if(msg == "RECONNECT_COMPLETE") {
+        // wait until the server responds to record 0623_client_reconnected
+        // (the session might have gone invalid)
+        var props = add_demographics({'user_id':spin_user_id,
+                                      'len':(the_websocket ? the_websocket.retry_count : -1),
+                                      'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                      'since_pageload': client_time - spin_pageload_begin,
+                                      'connection': gameapi_connection_method()
+                                     });
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0623_client_reconnected', props);
     } else if(msg == "IDLE_CHECK") {
         invoke_idle_check_dialog(data[1]);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {

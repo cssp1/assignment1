@@ -27391,6 +27391,7 @@ class GAMEAPI(resource.Resource):
                                               'clock': server_time,
                                               'msg': msg}))
             session.incoming_acked = session.incoming_serial-1
+            retmsg.append(["RECONNECT_COMPLETE"])
 
         elif arg[0] == "PING_CHAT":
             # client tells us the timestamps of last seen messages
