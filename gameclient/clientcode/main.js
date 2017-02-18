@@ -10098,7 +10098,13 @@ function flush_message_queue(force, my_timeout) {
         last_websocket_xmit_len = data_str.length;
 
         if(!the_websocket) {
-            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay'], player.get_any_abtest_value('enable_websocket_reconnect', gamedata['client']['enable_websocket_reconnect']));
+            var enable_reconnect = (get_query_string('enable_websocket_reconnect') === '1' ||
+                                    player.get_any_abtest_value('enable_websocket_reconnect',
+                                                                gamedata['client']['enable_websocket_reconnect']));
+            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(),
+                                                        ajax_config['message_timeout_hello'],
+                                                        ajax_config['message_timeout_gameplay'],
+                                                        enable_reconnect);
             var on_websocket_error = function(event) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();
