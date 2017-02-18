@@ -256,7 +256,7 @@ def transform_deployment_buffer(m, buf):
         newbuf = buf
     return newbuf
 
-def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0,0]):
+def spawn_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0,0], auto_level = True):
     ret = []
     powerplants = []
     for src in objlist:
@@ -282,21 +282,24 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
         if 'provides_power' in spec:
             powerplants.append(dst)
 
-        level = src.get('force_level', -1)
-        if level <= 0:
-            # auto-compute level by table
-            if 'ai_bases' not in gamedata:
-                gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
+        if auto_level:
+            level = src.get('force_level', -1)
+            if level <= 0:
+                # auto-compute level by table
+                if 'ai_bases' not in gamedata:
+                    gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
 
-            if spec['name'] in gamedata['ai_bases']['auto_level']:
-                ls = gamedata['ai_bases']['auto_level'][spec['name']]
-                index = min(max(owner_level-1, 0), len(ls)-1)
-                level = ls[index]
-            else:
-                level = 1
+                if spec['name'] in gamedata['ai_bases']['auto_level']:
+                    ls = gamedata['ai_bases']['auto_level'][spec['name']]
+                    index = min(max(owner_level-1, 0), len(ls)-1)
+                    level = ls[index]
+                else:
+                    level = 1
 
-            if spec['kind'] == 'mobile':
-                level = max(level, owner_tech.get(spec['level_determined_by_tech'],1))
+                if spec['kind'] == 'mobile':
+                    level = max(level, owner_tech.get(spec['level_determined_by_tech'],1))
+        else:
+            level = src.get('level', 1)
 
         dst['level'] = level
         ret.append(dst)
@@ -1111,8 +1114,8 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     base_data['base_generation'] = 0
 
     nosql_id_generator.set_time(int(time.time()))
-
-    base_data['my_base'] = auto_level_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech, xform)
+    base_data['my_base'] = spawn_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech,
+                                              xform = xform, auto_level = template.get('auto_level', True))
     if template.get('randomize_defenses',False):
         AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
@@ -1334,7 +1337,8 @@ def spawn_raid(raids, map_cache, db, lock_manager, region_id, id_num, name_idx, 
 
     nosql_id_generator.set_time(int(time.time()))
 
-    base_data['my_base'] = auto_level_hive_objects(template.get('buildings',[]) + template.get('units',[]), 1, {})
+    base_data['my_base'] = spawn_hive_objects(template.get('buildings',[]) + template.get('units',[]), 1, {},
+                                              auto_level = template.get('auto_level', True))
     #if template.get('randomize_defenses',False):
     #    AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
