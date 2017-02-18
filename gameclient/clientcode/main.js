@@ -50967,7 +50967,7 @@ function do_draw() {
             var origin = [5, canvas_height-30];
             var btm = desktop_dialogs['desktop_bottom'];
             if(btm) {
-                origin = [btm.xy[0]+10, btm.xy[1]-33];
+                origin = [btm.xy[0]+10, btm.xy[1]- (session.home_base ? 33 : 120)];
             }
             // draw nonessential art download progress (only for first minute though)
             if(client_art_state != client_art_states.DONE && (player.is_developer() || (client_time - session.connect_time < 60.0))) {
@@ -50984,9 +50984,9 @@ function do_draw() {
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
                 lines.push('Combat tick: '+session.get_real_world().combat_engine.cur_tick.get().toString());
-                lines.push('Retransmit buffer size: '+retrans_buffer.length().toFixed(0));
+                lines.push('Retransmit buffer size: client '+retrans_buffer.length().toFixed(0)+'/'+gamedata['client']['ajax_message_buffer'].toFixed(0)+' server est '+(ajax_next_serial - 2 - ajax_last_ack).toFixed(0));
                 ctx.save();
-                var fsize = 10;
+                var fsize = 13;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();
                 goog.array.forEach(lines, function(line, y) {
                     ctx.fillText(line, origin[0], origin[1] + 18 + (fsize+6) * y);
