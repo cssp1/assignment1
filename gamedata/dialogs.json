@@ -827,6 +827,11 @@
             "user_abtest_message": { "kind": "TextField", "xy": [250,61], "dimensions": [360,21], "drop_shadow": 1,
                                      "text_color": [1,0.5,0,1], "text_size": 13, "text_hjustify": "center" },
 
+            // mutually exclusive with user_abtest_message
+            "network_trouble_message": { "kind": "TextField", "xy": [201,81], "dimensions": [360,21], "drop_shadow": 1,
+                                         "text_color": [1,0,0,1], "text_size": 13, "text_hjustify": "center",
+                                         "ui_name": "Network trouble! Trying to reconnect..." },
+
             "edit_mode_message": { "show": 0, "kind": "TextField", "xy": [4,200], "dimensions": [136,32], "drop_shadow": 1,
                                    "ui_name": "DEV Edit Mode",
                                    "text_color": [1,0.5,0,1], "text_size": 17, "text_hjustify": "center" },
@@ -982,6 +987,11 @@
             "reset_time_icon": { "kind": "StaticImage", "xy": [325,69], "dimensions": [21,21], "asset": "resource_icon_reset_time" },
             "reset_time_amount": { "kind": "TextField", "xy": [356,69], "dimensions": [75,21], "ui_name": "xxm xxs", "text_size": 13,
                                    "text_hjustify": "center" },
+
+            "network_trouble_message": { "kind": "TextField", "xy": [201,81], "dimensions": [360,21], "drop_shadow": 1,
+                                         "text_color": [1,0,0,1], "text_size": 13, "text_hjustify": "center",
+                                         "ui_name": "Network trouble! Trying to reconnect..." },
+
             "edit_mode_micro_message": { "show": 0, "kind": "TextField", "xy": [245,100], "dimensions": [370,21], "drop_shadow": 1,
                                          "ui_name": "You are in DEV Edit Mode - unit micro ENABLED for testing purposes!",
                                          "text_color": [1,0,0,1], "text_size": 17, "text_hjustify": "center" }

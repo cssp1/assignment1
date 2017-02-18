@@ -10098,7 +10098,7 @@ function flush_message_queue(force, my_timeout) {
         last_websocket_xmit_len = data_str.length;
 
         if(!the_websocket) {
-            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay']);
+            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay'], player.get_any_abtest_value('enable_websocket_reconnect', gamedata['client']['enable_websocket_reconnect']));
             var on_websocket_error = function(event) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();
@@ -10177,10 +10177,22 @@ function flush_message_queue(force, my_timeout) {
                     flush_message_queue(true);
                 }
             };
-
+            var on_websocket_reconnect = function(event) {
+                console.log('WebSocket reconnected. Retransmitting '+retrans_buffer.length().toString()+' messages.');
+                goog.array.forEach(retrans_buffer.buf, function(serial_msg) {
+                    the_websocket.send(JSON.stringify({'myarg': serial_msg[1],
+                                                       'serial': serial_msg[0],
+                                                       'ack': ajax_next_serial - 1,
+                                                       'session': session.session_id}));
+                    ajax_last_ack = ajax_next_serial - 1;
+                });
+                send_to_server.func(["RECONNECT"]);
+                flush_message_queue(true);
+            };
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
             goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
             goog.events.listen(the_websocket.target, 'message', on_websocket_message);
+            goog.events.listen(the_websocket.target, 'reconnect', on_websocket_reconnect);
 
             the_websocket.connect();
         }
@@ -12922,6 +12934,8 @@ function update_desktop_dialogs() {
     var show_evil_valentina = false;
     var show_regional_event_info = false;
 
+    dialog.widgets['network_trouble_message'].show = (the_websocket && the_websocket.is_reconnecting());
+
     if(session.home_base) {
         dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
         dialog.widgets['keyboard_shortcuts_jewel'].user_data['count'] = player.check_feature_use('keyboard_shortcuts_list') ? 0 : 1;
@@ -12934,7 +12948,8 @@ function update_desktop_dialogs() {
             dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.get_draw_world().base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
         }
 
-        dialog.widgets['user_abtest_message'].show = (player.tutorial_state == "COMPLETE" &&
+        dialog.widgets['user_abtest_message'].show = !dialog.widgets['network_trouble_message'].show &&
+                                                      (player.tutorial_state == "COMPLETE" &&
                                                       !(player.quest_tracked && player.quest_tracked['ui_step']) &&
                                                       !session.has_attacked &&
                                                       !session.incoming_attack_pending() &&

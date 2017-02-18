@@ -25126,8 +25126,14 @@ class GAMEAPI(resource.Resource):
 
 
         if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
-            # park this request as the longpoll request so we have something to write the client back on
-            if session.longpoll_request is None:
+            # XXXXXX nasty hack - remember the WebSocket we should use to talk back to the client
+            if ((session.longpoll_request is None) or \
+                (not isinstance(session.longpoll_request, WSFakeRequest)) or \
+                (http_request.proto is not session.longpoll_request.proto)):
+                # park this request as the longpoll request so we have something to write the client back on
+                if session.longpoll_request:
+                    if isinstance(session.longpoll_request, WSFakeRequest):
+                        session.longpoll_request.close_connection_aggressively()
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
@@ -27366,6 +27372,18 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "PING_MAP" or arg[0] == "PING":
             # this is just to collect deferred messages and update the ack
             pass
+        elif arg[0] == "RECONNECT":
+            # retransmit messages the client hadn't acked yet
+            request = session.longpoll_request # grab the current connection
+            assert request
+            assert isinstance(request, WSFakeRequest)
+
+            for serial, msg in session.retrans_buffer:
+                request.write(SpinJSON.dumps({'serial': serial,
+                                              'ack': session.incoming_serial-1,
+                                              'clock': server_time,
+                                              'msg': msg}))
+            session.incoming_acked = session.incoming_serial-1
 
         elif arg[0] == "PING_CHAT":
             # client tells us the timestamps of last seen messages
