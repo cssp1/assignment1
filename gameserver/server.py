@@ -25126,7 +25126,9 @@ class GAMEAPI(resource.Resource):
             # client is too far ahead of us
             if not session.lagged_out:
                 session.lagged_out = True
-                metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
+                metric_event_coded(session.user.user_id, '0955_lagged_out', {'method': 'message_buffer',
+                                                                             'len': len(session.message_buffer),
+                                                                             'ip': session.user.last_login_ip,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
@@ -25369,7 +25371,9 @@ class GAMEAPI(resource.Resource):
                 # client hasn't acked enough
                 if not session.lagged_out:
                     session.lagged_out = True
-                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
+                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':'retrans_buffer',
+                                                                                 'len': len(session.retrans_buffer),
+                                                                                 'ip': session.user.last_login_ip,
                                                                                  'country': session.user.country })
                 request.setHeader('Connection', 'close') # stop keepalive
                 request.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]}))
