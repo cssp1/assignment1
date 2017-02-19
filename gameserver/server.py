@@ -25130,6 +25130,10 @@ class GAMEAPI(resource.Resource):
                                                                              'len': len(session.message_buffer),
                                                                              'idle_for': server_time - session.last_active_time,
                                                                              'ip': session.user.last_login_ip,
+                                                                             'browser_OS': session.user.browser_os,
+                                                                             'browser_name': session.user.browser_name,
+                                                                             'browser_version': session.user.browser_version,
+                                                                             'browser_hardware': session.user.browser_hardware,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
@@ -25376,6 +25380,10 @@ class GAMEAPI(resource.Resource):
                                                                                  'len': len(session.retrans_buffer),
                                                                                  'idle_for': server_time - session.last_active_time,
                                                                                  'ip': session.user.last_login_ip,
+                                                                                 'browser_OS': session.user.browser_os,
+                                                                                 'browser_name': session.user.browser_name,
+                                                                                 'browser_version': session.user.browser_version,
+                                                                                 'browser_hardware': session.user.browser_hardware,
                                                                                  'country': session.user.country })
                 request.setHeader('Connection', 'close') # stop keepalive
                 request.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]}))
