@@ -25385,6 +25385,7 @@ class GAMEAPI(resource.Resource):
                                                                                  'browser_version': session.user.browser_version,
                                                                                  'browser_hardware': session.user.browser_hardware,
                                                                                  'country': session.user.country })
+                    reactor.callLater(0, self.log_out_async, session, 'timeout')
                 request.setHeader('Connection', 'close') # stop keepalive
                 request.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]}))
             else:
