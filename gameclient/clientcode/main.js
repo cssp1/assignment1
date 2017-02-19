@@ -45809,6 +45809,7 @@ function on_ajax(response, kind) {
     var serial = from_server['serial'];
     var clock = from_server['clock'];
     var messages = from_server['msg'];
+    var do_flush = false;
 
     if('ack' in from_server) {
         retrans_buffer.trim(from_server['ack']);
@@ -45818,10 +45819,18 @@ function on_ajax(response, kind) {
         if(message_queue.length() < 1 &&
            3*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
             send_to_server.func(["PING"]);
+            // ensure that we transmit something, do not rely on window timer since it might be throttled by browser
+            do_flush = true;
         }
     }
 
-    return recv_message_bundle(serial, clock, messages, kind);
+    ret = recv_message_bundle(serial, clock, messages, kind);
+
+    if(do_flush) {
+        flush_message_queue(true);
+    }
+
+    return ret;
 }
 
 function recv_message_bundle(serial, clock, messages, kind) {
