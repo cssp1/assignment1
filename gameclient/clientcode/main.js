@@ -45816,7 +45816,7 @@ function on_ajax(response, kind) {
         // if we haven't sent an ack to the server in a long time,
         // send something back to keep the server's retrans buffer size down
         if(message_queue.length() < 1 &&
-           2*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
+           3*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
             send_to_server.func(["PING"]);
         }
     }
