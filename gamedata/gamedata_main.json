@@ -404,7 +404,7 @@
         "global_audio_volume": 0.36,
 
         "enable_websockets": 1, // use websockets by default, if browser supports them
-        "enable_websocket_reconnect": 0, // flag to turn on reconnection attempts
+        "enable_websocket_reconnect": 1, // flag to turn on reconnection attempts
 
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
