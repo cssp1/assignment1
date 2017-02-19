@@ -45824,7 +45824,7 @@ function on_ajax(response, kind) {
         }
     }
 
-    ret = recv_message_bundle(serial, clock, messages, kind);
+    var ret = recv_message_bundle(serial, clock, messages, kind);
 
     if(do_flush) {
         flush_message_queue(true);
