@@ -47970,6 +47970,7 @@ function handle_server_message(data) {
         // wait until the server responds to record 0623_client_reconnected
         // (the session might have gone invalid)
         var props = add_demographics({'user_id':spin_user_id,
+                                      'method':(the_websocket ? the_websocket.last_close_ui_method : 'no websocket'),
                                       'len':(the_websocket ? the_websocket.retry_count : -1),
                                       'since_connect': (session.connected() ? client_time - session.connect_time : -1),
                                       'since_pageload': client_time - spin_pageload_begin,

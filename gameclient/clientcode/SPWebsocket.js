@@ -37,6 +37,8 @@ SPWebsocket.SPWebsocket = function(url, connect_timeout, msg_timeout, enable_rec
     this.to_send = [];
     this.retry_count = 0; // count reconnection attempts
     this.recv_count = 0; // count received packets
+    /** @type {string|null} */
+    this.last_close_ui_method = null; // debug info about last close event, for use after reconnect
 };
 SPWebsocket.SPWebsocket.prototype.connect = function() {
     if(this.socket) { throw Error('invalid state for connect()'); }
@@ -168,6 +170,14 @@ SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
         if(this.socket_state != SPWebsocket.SocketState.CLOSING) {
             this.socket_state = SPWebsocket.SocketState.CLOSED;
 
+            // gather info about the event
+            var ui_code = (event.code || 0).toString();
+            var ui_reason = event.reason || 'unknown';
+            var was_clean = event.wasClean;
+            var ui_was_clean = (was_clean !== undefined ? (was_clean ? 'clean': 'not_clean') : 'unknown');
+            var ui_method = ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
+            this.last_close_ui_method = ui_method;
+
             if(this.enable_reconnect && this.close_event_is_recoverable(event)) {
                 this.retry_count += 1;
                 this.clear_socket();
@@ -175,11 +185,6 @@ SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
                 return;
             }
 
-            var ui_code = (event.code || 0).toString();
-            var ui_reason = event.reason || 'unknown';
-            var was_clean = event.wasClean;
-            var ui_was_clean = (was_clean !== undefined ? (was_clean ? 'clean': 'not_clean') : 'unknown');
-            var ui_method = ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
             this.target.dispatchEvent({type: 'shutdown', data: ui_method});
         }
 
