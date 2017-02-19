@@ -10260,7 +10260,7 @@ function flush_message_queue(force, my_timeout) {
 
     retrans_buffer.append(message_serial, message_queue.queue);
     if(retrans_buffer.length() >= gamedata['client']['ajax_message_buffer']) {
-        invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'client'}, {});
+        invoke_timeout_message('0624_client_retrans_buffer_overflow', {'len': retrans_buffer.length()}, {});
     }
 
     message_queue = new AJAXMessageQueue();
@@ -45856,7 +45856,7 @@ function process_recv_buffer() {
     }
 
     if(goog.object.getCount(ajax_recv_buffer) >= gamedata['client']['ajax_message_buffer']) {
-        return invoke_timeout_message('0621_client_died_from_downstream_lag', {'method': 'client'}, {});
+        return invoke_timeout_message('0625_client_recv_buffer_overflow', {'len': goog.object.getCount(ajax_recv_buffer)}, {});
     }
 }
 

@@ -426,6 +426,10 @@ def ClientTroubleLogFilter(child):
                                          #'0622_client_died_from_upstream_lag',
 
                                          '0623_client_reconnected',
+
+                                         '0624_client_retrans_buffer_overflow',
+                                         '0625_client_recv_buffer_overflow',
+
                                          '0630_client_died_from_ajax_xmit_failure',
                                          '0631_direct_ajax_failure_falling_back_to_proxy',
                                          '0635_client_died_from_ajax_xmit_timeout',
