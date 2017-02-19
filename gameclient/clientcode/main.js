@@ -28859,8 +28859,6 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
                     for(var j = 0; j < d.data['widgets']['join_type_choice']['array'][0]; j++) {
                         d.widgets['join_type_choice'+j.toString()].state = (d.data['widgets']['join_type_choice']['join_types'][j] == d.user_data['join_type'] ? 'active' : 'normal');
                     }
-                    // enable "edit/create" button
-                    alliance_list_create_tab_update_create_button(d);
                 }; })(i);
             }
 
@@ -28872,7 +28870,9 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
         d.widgets['logo'].asset = get_alliance_logo_asset(d.user_data['logo'] || null);
 
         SPUI.set_keyboard_focus(d.widgets['name_input']);
-        alliance_list_create_tab_update_create_button(d);
+        d.ondraw = function(d) {
+            alliance_list_create_tab_update_create_button(d);
+        };
 
     } else if(newtab == 'info') {
         var d = dialog.widgets['info_tab'];
