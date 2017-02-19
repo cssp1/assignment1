@@ -217,6 +217,7 @@
                              "ui_name_upgrade": "Are you sure you want to cancel this upgrade?\nOnly half of your resources will be returned.",
                              "ui_name_research": "Are you sure you want to cancel this research?\nOnly half of your resources will be returned.",
                              "ui_name_crafting": "Are you sure you want to cancel production?\nOnly half of your resources will be returned.",
+                             "ui_name_crafting_turret_head": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
                              "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress."
                            },
             "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
@@ -224,6 +225,7 @@
                            "ui_name_upgrade": "Cancel Upgrade",
                            "ui_name_research": "Cancel Research",
                            "ui_name_crafting": "Cancel Work",
+                           "ui_name_crafting_turret_head": "Destroy Weapon",
                            "ui_name_fishing": "Cancel Dispatch" }
         }
     },
