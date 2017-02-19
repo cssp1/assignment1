@@ -28012,6 +28012,8 @@ class GAMEAPI(resource.Resource):
                         session.player.history['alliance_first_join_time'] = server_time
                         session.player.history['alliance_first_join_created'] = 0
                     session.increment_player_metric('alliances_joined', 1, time_series = False)
+                    session.deferred_history_update = True
+
                     metric_event_coded(session.user.user_id, '4610_alliance_member_joined', {'alliance_id': new_alliance_info['id'], 'role': gamesite.sql_client.ROLE_DEFAULT,
                                                                                              'sum':session.player.get_denormalized_summary_props('brief')})
                     metric_event_coded(session.user.user_id, '4602_alliance_num_members_updated', {'alliance_id': new_alliance_info['id'], 'num_members_cache': new_alliance_info['num_members']})
@@ -29522,6 +29524,8 @@ class GAMEAPI(resource.Resource):
                                     session.player.history['alliance_first_join_time'] = server_time
                                     session.player.history['alliance_first_join_created'] = 1
                                 session.increment_player_metric('alliances_joined', 1, time_series = False)
+                                session.deferred_history_update = True
+
                                 metric_event_coded(session.user.user_id, '4610_alliance_member_joined', {'alliance_id': new_id, 'role': gamesite.sql_client.ROLE_LEADER,
                                                                                                          'sum':session.player.get_denormalized_summary_props('brief')})
 

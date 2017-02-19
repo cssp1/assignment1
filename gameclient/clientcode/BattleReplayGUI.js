@@ -38,10 +38,11 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
             var link_url = dialog.user_data['link_url'];
             var s = gamedata['strings']['copy_replay_link_success'];
             SPUI.copy_text_to_clipboard(link_url);
-            invoke_child_message_dialog(s['ui_title'],
-                                        s['ui_description'].replace('%URL', link_url)
-                                       // {'dialog': 'message_dialog_big'}
-                                       );
+            var child = invoke_child_message_dialog(s['ui_title'],
+                                                    s['ui_description'].replace('%URL', link_url)
+                                                    // {'dialog': 'message_dialog_big'}
+                                                   );
+            child.xy = vec_add(child.xy, [0,100]);
             return;
         };
     } else {
@@ -74,7 +75,7 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
 BattleReplayGUI.update = function(dialog) {
     var replay_player = dialog.user_data['player'];
     dialog.xy = [Math.floor((SPUI.canvas_width - dialog.wh[0])/2),
-                 Math.max(15, Math.floor(0.05*SPUI.canvas_height))];
+                 Math.max(10, Math.floor(0.04*SPUI.canvas_height))];
     // update description text
     var total_seconds = Math.max(replay_player.num_ticks()-1, 1) * TICK_INTERVAL;
     var total_minutes = Math.floor(total_seconds/60.0);
