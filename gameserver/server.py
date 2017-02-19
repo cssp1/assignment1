@@ -25128,6 +25128,7 @@ class GAMEAPI(resource.Resource):
                 session.lagged_out = True
                 metric_event_coded(session.user.user_id, '0955_lagged_out', {'method': 'message_buffer',
                                                                              'len': len(session.message_buffer),
+                                                                             'idle_for': server_time - session.last_active_time,
                                                                              'ip': session.user.last_login_ip,
                                                                              'country': session.user.country })
             http_request.setHeader('Connection', 'close') # stop keepalive
@@ -25373,6 +25374,7 @@ class GAMEAPI(resource.Resource):
                     session.lagged_out = True
                     metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':'retrans_buffer',
                                                                                  'len': len(session.retrans_buffer),
+                                                                                 'idle_for': server_time - session.last_active_time,
                                                                                  'ip': session.user.last_login_ip,
                                                                                  'country': session.user.country })
                 request.setHeader('Connection', 'close') # stop keepalive
