@@ -49044,6 +49044,15 @@ function create_mouse_tooltip() {
                         var max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
+
+                    // low power on turret emplacements with heads
+                    var powerfac = obj.combat_power_factor(world.base);
+                    if(powerfac < 1) {
+                        var ui_power_warning = gamedata['strings']['cursors']['low_power_turret']
+                            .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                        str.push(ui_power_warning);
+                    }
+
                     str.push('---'); // separator between head and emplacement
                 }
             }
@@ -49053,6 +49062,17 @@ function create_mouse_tooltip() {
                 nameline += ' '+session.minefield_tags_by_obj_id[obj.id];
             }
             str.push(nameline);
+
+            if(obj.team === 'player' && obj.is_building() && obj.is_shooter() && !obj.is_minefield() && !obj.is_emplacement()) {
+                // low power on ordinary turrets
+                var powerfac = obj.combat_power_factor(world.base);
+                if(powerfac < 1) {
+                    var ui_power_warning = gamedata['strings']['cursors']['low_power_turret']
+                        .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                    str.push(ui_power_warning);
+                }
+            }
+
             if((obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']]) && (obj.get_max_ui_level() > 1)) {
                 var max_level = obj.get_max_ui_level();
                 str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', obj.level.toString()).replace('%max', max_level.toString()));
@@ -49093,6 +49113,14 @@ function create_mouse_tooltip() {
                 if(obj.is_upgrading() || obj.is_enhancing()) {
                     str.push(gamedata['strings']['cursors']['upgrading']);
                 } else if(obj.team === 'player') {
+                    // low power on harvesters
+                    var powerfac = world.base.power_factor();
+                    if(powerfac < 1) {
+                        var ui_power_warning = gamedata['strings']['cursors']['low_power_harvester']
+                            .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                        str.push(ui_power_warning);
+                    }
+
                     var contents = obj.interpolate_contents();
                     var ui_contents = pretty_print_number(Math.floor(contents));
                     if(obj.produce_rate > 0 && obj.produce_rate < 1000 && contents < 10) {

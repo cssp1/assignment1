@@ -358,6 +358,8 @@
         "upgrading": "Upgrading",
         "removing": "Removing",
         "damaged": "Damaged",
+        "low_power_harvester": "Low Power! Gathering at %d% of normal rate", // for mouseover tooltip
+        "low_power_turret": "Low Power! Firing at %d% of normal rate", // for mouseover tooltip
         "researching": "%tech Level %d",
         "fullness": "%pct% full",
         "mod_types": { // obsolete
