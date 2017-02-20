@@ -88,7 +88,7 @@ if __name__ == '__main__':
 
         # find most recent already-converted action
         start_time = -1
-        end_time = time_now - 600  # skip entries too close to "now" to ensure all events for a given second have all arrived
+        end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
         cur.execute("SELECT time FROM "+sql_util.sym(client_trouble_table)+" ORDER BY time DESC LIMIT 1")
         rows = cur.fetchall()
