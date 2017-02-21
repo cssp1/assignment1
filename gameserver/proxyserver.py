@@ -90,6 +90,8 @@ proxy_launch_time = proxy_time
 
 const_one_year = 60*60*24*365
 
+image_dimensions_re = re.compile(r'^.*([^0-9]+)([0-9]+)x([0-9]+).(jpg|png|gif|mp4|webm)')
+
 fb_async_http = None
 if SpinConfig.config.get('enable_facebook', 0):
     config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Facebook', {})
@@ -1643,9 +1645,26 @@ class GameProxy(proxy.ReverseProxyResource):
 
         if (not visitor.raw_signed_request):
             if SpinHTTP.get_twisted_header(request,'user-agent').startswith('facebookexternalhit'):
+
+                if SpinConfig.config['proxyserver'].get('fbexternalhit_video'):
+                    video_url = SpinConfig.config['proxyserver']['fbexternalhit_video']
+                    dim_match = image_dimensions_re.match(image_url)
+                    if dim_match:
+                        video_width, video_height = int(dim_match.group(2)), int(dim_match.group(3))
+                    else:
+                        video_width, video_height = 1280, 720 # default
+                    video_block = '''
+<meta property="og:video" content="%s" />
+<meta property="og:video:type" content="video/mp4" />
+<meta property="og:video:width" content="%d" />
+<meta property="og:video:height" content="%d" />''' % (video_url, video_width, video_height)
+                else:
+                    video_block = ''
+
                 replacements = {
-                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit TItle'),
+                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit Title'),
                     '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+                    '$FBEXTERNALHIT_VIDEO_BLOCK$': video_block,
                     '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
                     }
                 expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))

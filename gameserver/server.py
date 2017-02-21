@@ -14674,7 +14674,7 @@ def parse_canvas_oversample(v):
 # Facebook Open Graph object endpoint
 class OGPAPI(resource.Resource):
     isLeaf = True
-    image_dimensions_re = re.compile(r'^.*([^0-9]+)([0-9]+)x([0-9]+).(jpg|png)')
+    image_dimensions_re = re.compile(r'^.*([^0-9]+)([0-9]+)x([0-9]+).(jpg|png|gif|mp4|webm)')
 
     @classmethod
     def object_type(cls, name):
