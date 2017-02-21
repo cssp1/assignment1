@@ -14721,6 +14721,7 @@ class OGPAPI(resource.Resource):
         # order of precedence:
         # image_url > art_asset_file > art_asset_s3
         image_url = None
+        video_url = None
         art_asset_file = None
         art_asset_s3 = None
         my_extra_prefix = ''
@@ -14923,6 +14924,8 @@ class OGPAPI(resource.Resource):
                 image_url = 'http://s3.amazonaws.com/'+gamedata['public_s3_bucket']+'/facebook_assets/%s' % art_asset_s3
             else:
                 image_url = SpinConfig.config['proxyserver'].get('fbexternalhit_image', '')
+                if not video_url:
+                    video_url = SpinConfig.config['proxyserver'].get('fbexternalhit_video', '')
 
         # note: Facebook crawler seems to do better with non-https image URLs
         ret += '<meta property="og:image"  content="%s" />\n' % image_url.replace('https://','http://')
@@ -14932,6 +14935,18 @@ class OGPAPI(resource.Resource):
         if dim_match:
             ret += '<meta property="og:image:width"  content="%s" />\n' % (dim_match.group(2))
             ret += '<meta property="og:image:height"  content="%s" />\n' % (dim_match.group(3))
+
+        if video_url:
+            # HTTPS is preferred for videos
+            ret += '<meta property="og:video" content="%s" />\n' % video_url
+            ret += '<meta property="og:video:type" content="video/mp4" />\n'
+            dim_match = self.image_dimensions_re.match(video_url)
+            if dim_match:
+                video_width, video_height = int(dim_match.group(2)), int(dim_match.group(3))
+            else:
+                video_width, video_height = 1280, 720 # default
+            ret += '<meta property="og:video:width" content="%d" />\n' % video_width
+            ret += '<meta property="og:video:height" content="%d" />\n' % video_height
 
         for key, val in extra_props.iteritems():
             ret += '<meta property="%s:%s"  content="%s" />\n' % (ns, key, cgi_escape(str(val),True))
