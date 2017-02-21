@@ -1648,7 +1648,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
                 if SpinConfig.config['proxyserver'].get('fbexternalhit_video'):
                     video_url = SpinConfig.config['proxyserver']['fbexternalhit_video']
-                    dim_match = image_dimensions_re.match(image_url)
+                    dim_match = image_dimensions_re.match(video_url)
                     if dim_match:
                         video_width, video_height = int(dim_match.group(2)), int(dim_match.group(3))
                     else:
