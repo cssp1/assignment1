@@ -3813,6 +3813,7 @@ class Session(object):
         # these are set once at initialization
         self.session_id = session_id
         self.incoming_serial = 0
+        self.incoming_acked = 0 # last serial we told the client we acked
         self.outgoing_serial = 0
         self.user = user
         self.user.active_session = self
@@ -3826,10 +3827,14 @@ class Session(object):
         # for ADMIN purposes only, keep track of the last messages sent
         self.last_action = collections.deque([], gamedata['server']['ADMIN']['last_action_buf'])
 
-        # list of incoming bundles of game messages ([serial, messsages])
+        # dict of incoming bundles of game messages {serial: messsages}
         # being held because earlier messages haven't been received or completely handled yet
-        self.message_buffer = [] # XXXXXX rename to incoming_messages
+        self.message_buffer = {}
         self.lagged_out = False
+
+        # array of outgoing bundles of game messages [[serial, message]]
+        # stored for retransmission in case the client disconnects
+        self.retrans_buffer = []
 
         # Maintain a list of Deferreds we are waiting on during async message handling.
         self.async_ds = []
@@ -15219,6 +15224,8 @@ class CONTROLAPI(resource.Resource):
 
     def kill_session(self, request, session, body = None):
         if not body: body = 'ok\n'
+        if not session.logout_in_progress:
+            session.send([["ERROR", "KILL_SESSION"]], flush_now = True)
         d = self.gameapi.log_out_async(session, 'forced_relog')
         d.addCallback(lambda _, session=session: ascdebug('kill_session %d %s async end' % (session.user.user_id, session.session_id)))
         d.addCallback(lambda _, body=body, request=request: SpinHTTP.complete_deferred_request(body, request))
@@ -15525,6 +15532,13 @@ class CONTROLAPI(resource.Resource):
         gamesite.nosql_init()
     def handle_nosql_off(self, request):
         gamesite.nosql_shutdown()
+    def handle_fail_websockets(self, request):
+        # for testing WebSocket interruption
+        for session in session_table.itervalues():
+            if isinstance(session.longpoll_request, WSFakeRequest):
+                session.longpoll_request.proto.close_connection_aggressively(True)
+                session.longpoll_request = None
+
     def handle_maint_kick(self, request):
         return SpinJSON.dumps({'result': gamesite.start_maint_kick()}, newline=True)
     def handle_panic_kick(self, request):
@@ -25079,41 +25093,61 @@ class GAMEAPI(resource.Resource):
             http_request.setHeader('Connection', 'close') # stop keepalive
             return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
 
+        # not CLIENT_HELLO...
+
+        session = get_session_by_session_id(session_id)
+        if not session:
+            http_request.setHeader('Connection', 'close') # stop keepalive
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
+
+        # after this point, session is guaranteed to be valid
+
+        if keepalive:
+            session.last_active_time = server_time
+
+        if 'ack' in args_dict:
+            # trim retrans buffer
+            ack = int(args_dict["ack"])
+            while len(session.retrans_buffer) > 0 and session.retrans_buffer[0][0] <= ack:
+                session.retrans_buffer.pop(0)
+
+        if arg[0][0] == "LONGPOLL":
+            assert len(arg) == 1 and len(arg[0]) == 1
+            return self.handle_longpoll(http_request, session)
+
+        # compare serial number of incoming message vs. the next expected serial number
+        if (serial < session.incoming_serial) or (serial in session.message_buffer):
+            # discard retransmission
+            pass
         else:
-            session = get_session_by_session_id(session_id)
-            if not session:
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "UNKNOWN_SESSION"]]})
+            session.message_buffer[serial] = arg
 
-            # after this point, session is guaranteed to be valid
+        if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
+            # client is too far ahead of us
+            if not session.lagged_out:
+                session.lagged_out = True
+                metric_event_coded(session.user.user_id, '0955_lagged_out', {'method': 'message_buffer',
+                                                                             'len': len(session.message_buffer),
+                                                                             'idle_for': server_time - session.last_active_time,
+                                                                             'ip': session.user.last_login_ip,
+                                                                             'browser_OS': session.user.browser_os,
+                                                                             'browser_name': session.user.browser_name,
+                                                                             'browser_version': session.user.browser_version,
+                                                                             'browser_hardware': session.user.browser_hardware,
+                                                                             'country': session.user.country })
+            http_request.setHeader('Connection', 'close') # stop keepalive
+            return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]})
 
-            if keepalive:
-                session.last_active_time = server_time
-
-            if arg[0][0] == "LONGPOLL":
-                assert len(arg) == 1 and len(arg[0]) == 1
-                return self.handle_longpoll(http_request, session)
-
-            # compare serial number of incoming message vs. the next expected serial number
-            if (serial < session.incoming_serial):
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]})
-
-            if len(session.message_buffer) >= gamedata['server']['session_message_buffer']:
-                # client is too far ahead of us
-                if not session.lagged_out:
-                    session.lagged_out = True
-                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':str(len(session.message_buffer)),
-                                                                                 'country': session.user.country })
-                http_request.setHeader('Connection', 'close') # stop keepalive
-                return SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED"]]})
-
-        session.message_buffer.append([serial, arg])
-        #if len(session.message_buffer) > 1: print 'client stream is lagging by %d AJAX requests' % len(session.message_buffer)
 
         if isinstance(http_request, WSFakeRequest): # XXXXXX nasty hack
-            # park this request as the longpoll request so we have something to write the client back on
-            if session.longpoll_request is None:
+            # XXXXXX nasty hack - remember the WebSocket we should use to talk back to the client
+            if ((session.longpoll_request is None) or \
+                (not isinstance(session.longpoll_request, WSFakeRequest)) or \
+                (http_request.proto is not session.longpoll_request.proto)):
+                # park this request as the longpoll request so we have something to write the client back on
+                if session.longpoll_request:
+                    if isinstance(session.longpoll_request, WSFakeRequest):
+                        session.longpoll_request.close_connection_aggressively()
                 session.longpoll_request = http_request
                 session.longpoll_request_time = -1 # no need to force a keepalive, and reuse this request multiple times
 
@@ -25127,10 +25161,9 @@ class GAMEAPI(resource.Resource):
 
     def handle_message_buffer(self, session, retmsg):
         # look through the message buffer for a processable message bundle
-        i = 0
         start_time = -1
 
-        while i < len(session.message_buffer):
+        while session.incoming_serial in session.message_buffer:
             if session.is_async():
                 # prevent re-entry of handle_message_buffer() on a subsequent client message while an async request is still happening
                 # the client will get its answer from complete_deferred_message after the async request completes
@@ -25140,70 +25173,65 @@ class GAMEAPI(resource.Resource):
             if session.logout_in_progress: # allow no further message processing after logout begins
                 break
 
-            if session.message_buffer[i][0] == session.incoming_serial:
+            # ok, we got the next expected message bundle
+            serial_arg = session.message_buffer[session.incoming_serial]
 
-                # ok, we got the next expected message bundle
-                serial_arg = session.message_buffer[i]
+            # process as many messages as we can in this budle
+            # for each message in the bundle
+            while len(serial_arg) > 0:
+                # pull the message off the queue
+                # (throughout this entire function, we leave the session in a valid state, in case
+                # we have to go asynchronous and come back later)
+                msg = serial_arg.pop(0)
 
-                # process as many messages as we can in this budle
-                # for each message in the bundle
-                while len(serial_arg[1]) > 0:
-                    # pull the message off the queue
-                    # (throughout this entire function, we leave the session in a valid state, in case
-                    # we have to go asynchronous and come back later)
-                    msg = serial_arg[1].pop(0)
+                if msg[0] == "CAST_SPELL":
+                    latency_tag = msg[0] + '('+msg[2]+')'
+                elif msg[0] == "INVENTORY_USE":
+                    latency_tag = msg[0] + '('+msg[2]['spec']+')'
+                elif msg[0] == "LOOT_BUFFER_TAKE":
+                    latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
+                elif 0 and msg[0] == "QUARRY_QUERY":
+                    latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
+                else:
+                    latency_tag = msg[0]
 
-                    if msg[0] == "CAST_SPELL":
-                        latency_tag = msg[0] + '('+msg[2]+')'
-                    elif msg[0] == "INVENTORY_USE":
-                        latency_tag = msg[0] + '('+msg[2]['spec']+')'
-                    elif msg[0] == "LOOT_BUFFER_TAKE":
-                        latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
-                    elif 0 and msg[0] == "QUARRY_QUERY":
-                        latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
-                    else:
-                        latency_tag = msg[0]
+                session.debug_log_action(latency_tag)
 
-                    session.debug_log_action(latency_tag)
+                try:
+                    if start_time < 0: start_time = time.time()
 
-                    try:
-                        if start_time < 0: start_time = time.time()
+                    go_async = self.handle_message_guts(session, msg, retmsg)
 
-                        go_async = self.handle_message_guts(session, msg, retmsg)
-
-                        end_time = time.time()
+                    end_time = time.time()
 
 
-                        admin_stats.record_latency(latency_tag, end_time-start_time)
-                        start_time = end_time # ends up including the list-processing stuff below in the next message, but that should be fast
+                    admin_stats.record_latency(latency_tag, end_time-start_time)
+                    start_time = end_time # ends up including the list-processing stuff below in the next message, but that should be fast
 
-                        if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
-                                                       'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
-                                                       'REPORT_METRIC'):
-                            session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
+                    if True or latency_tag not in ('PING_PLAYER', 'PLAYER_STATE_QUERY',
+                                                   'UNIT_REPAIR_TICK', 'OBJECT_COMBAT_UPDATES',
+                                                   'REPORT_METRIC'):
+                        session.last_action.append({'tag':latency_tag, 'time':server_time, 'keepalive':session.last_active_time == server_time})
 
-                        if go_async:
-                            assert isinstance(go_async, defer.Deferred)
-                            if not deferred_is_finished(go_async):
-                                # go asynchronous, breaking out of message processing here
-                                if (not session.logout_in_progress) and (go_async not in session.async_ds):
-                                    gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
-                                    session.start_async_request(go_async)
-                                return
+                    if go_async:
+                        assert isinstance(go_async, defer.Deferred)
+                        if not deferred_is_finished(go_async):
+                            # go asynchronous, breaking out of message processing here
+                            if (not session.logout_in_progress) and (go_async not in session.async_ds):
+                                gamesite.exception_log.event(server_time, 'handle_message_guts did not install async_d: %s' % (latency_tag))
+                                session.start_async_request(go_async)
+                            return
 
-                    except Exception:
-                        gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
-                        retmsg.append(["ERROR", "SERVER_EXCEPTION"])
-                        break
+                except Exception:
+                    gamesite.exception_log.event(server_time, 'handle_message_guts exception %s msg %s: %s' % (session.dump_exception_state(), latency_tag, traceback.format_exc().strip())) # OK
+                    retmsg.append(["ERROR", "SERVER_EXCEPTION"])
+                    break
 
-                if len(serial_arg[1]) == 0:
-                    # processed one complete bundle. Advance to next.
-                    session.message_buffer.pop(i)
-                    session.incoming_serial += 1
+            if len(serial_arg) == 0:
+                # processed one complete bundle. Advance to next.
+                del session.message_buffer[session.incoming_serial]
+                session.incoming_serial += 1
 
-                i = 0
-            else:
-                i += 1
 
     # we're about to send a response to the client. Run any pending batched actions.
     @admin_stats.measure_latency('run_deferred_actions')
@@ -25305,45 +25333,63 @@ class GAMEAPI(resource.Resource):
             r = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': retmsg})
             request.setHeader('Connection', 'close') # stop keepalive
             request.write(r)
+            request.finish()
+            return
 
-        else:
-            # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
-            if gamesite.raw_log:
-                client_str = 'sid %s' % pretty_print_session(session.session_id)
-                log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
+        # note: IGNORE retmsg here - all traffic is on session.outgoing_messages
+        if gamesite.raw_log:
+            client_str = 'sid %s' % pretty_print_session(session.session_id)
+            log.msg(('to   client (%s:%d): ' % (client_str, session.outgoing_serial))+repr(retmsg))
 
-            msg = session.outgoing_messages[:]
-            del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
-
-            if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
-                msg.append(["NOMESSAGE"])
-
-            if len(msg) > 0:
-                r = SpinJSON.dumps({'serial': session.outgoing_serial,
-                                    'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                    'msg': msg})
-                session.outgoing_serial += 1
-                request.write(r)
-
-        request.finish()
+        self.put_on_wire(session, request, False)
 
     def complete_longpoll(self, request, session):
-        # works for both standard HTTP request and WSFakeRequest
-
         if hasattr(request, '_disconnected') and request._disconnected: return
+        self.put_on_wire(session, request, True)
 
+    def put_on_wire(self, session, request, is_longpoll):
+        # works for both standard HTTP request and WSFakeRequest
         msg = session.outgoing_messages[:]
         del session.outgoing_messages[:] # note: do not create a new array, since in-flight async requests may reference it
 
-        if len(msg) == 0 and not isinstance(request, WSFakeRequest): # must send something in HTTP response, but not websocket
+        if len(msg) == 0 and \
+           (not isinstance(request, WSFakeRequest) or \
+            (session.incoming_serial - session.incoming_acked >= gamedata['server']['session_message_buffer']//2)):
+            # HTTP requests always need a response
+            # WS requests don't, but still respond with an "ack" occasionally to keep client retrans buffer size down
             msg.append(["NOMESSAGE"])
 
         if len(msg) > 0:
-            r = SpinJSON.dumps({'serial': session.outgoing_serial, 'longpoll':1,
-                                'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
-                                'msg': msg})
+            contents = {'serial': session.outgoing_serial,
+                        'ack': session.incoming_serial-1,
+                        'clock': time.time() if gamedata['server'].get('send_high_precision_time',True) else server_time,
+                        'msg': msg}
+            if is_longpoll:
+                contents['longpoll'] = 1
+            r = SpinJSON.dumps(contents)
+
+            session.incoming_acked = session.incoming_serial-1
+            session.retrans_buffer.append([session.outgoing_serial, msg])
             session.outgoing_serial += 1
-            request.write(r)
+
+            if len(session.retrans_buffer) >= gamedata['server']['session_message_buffer']:
+                # client hasn't acked enough
+                if not session.lagged_out:
+                    session.lagged_out = True
+                    metric_event_coded(session.user.user_id, '0955_lagged_out', {'method':'retrans_buffer',
+                                                                                 'len': len(session.retrans_buffer),
+                                                                                 'idle_for': server_time - session.last_active_time,
+                                                                                 'ip': session.user.last_login_ip,
+                                                                                 'browser_OS': session.user.browser_os,
+                                                                                 'browser_name': session.user.browser_name,
+                                                                                 'browser_version': session.user.browser_version,
+                                                                                 'browser_hardware': session.user.browser_hardware,
+                                                                                 'country': session.user.country })
+                    reactor.callLater(0, self.log_out_async, session, 'timeout')
+                request.setHeader('Connection', 'close') # stop keepalive
+                request.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "TOO_LAGGED_DOWNSTREAM"]]}))
+            else:
+                request.write(r)
 
         request.finish()
 
@@ -27345,9 +27391,22 @@ class GAMEAPI(resource.Resource):
             session.player.travel_begin(destination, travel_time)
             retmsg.append(["PLAYER_TRAVEL_UPDATE", session.player.travel_state])
 
-        elif arg[0] == "PING_MAP":
-            # this is just to collect deferred messages
+        elif arg[0] == "PING_MAP" or arg[0] == "PING":
+            # this is just to collect deferred messages and update the ack
             pass
+        elif arg[0] == "RECONNECT":
+            # retransmit messages the client hadn't acked yet
+            request = session.longpoll_request # grab the current connection
+            assert request
+            assert isinstance(request, WSFakeRequest)
+
+            for serial, msg in session.retrans_buffer:
+                request.write(SpinJSON.dumps({'serial': serial,
+                                              'ack': session.incoming_serial-1,
+                                              'clock': server_time,
+                                              'msg': msg}))
+            session.incoming_acked = session.incoming_serial-1
+            retmsg.append(["RECONNECT_COMPLETE"])
 
         elif arg[0] == "PING_CHAT":
             # client tells us the timestamps of last seen messages
@@ -31067,7 +31126,7 @@ class AdminResource(resource.Resource):
                     return str(auth_info['error'])
 
         ret = u'<html><head><title>Admin</title>'
-        ret += '<style type="text/css">body {font-family:serif; font-size: 100%;} td { font-size: 1.0em; padding: 1px;}</style>'
+        ret += '<style type="text/css">body {font-family:serif; font-size: 100%;} thead {background: #aaa;} .sessions tbody { font-family: monospace; } td { font-size: 1.0em; padding: 1px;}</style>'
         ret += '</head><body>'
 
         #ret += self.revenue_image()
@@ -31119,7 +31178,7 @@ class AdminResource(resource.Resource):
 
         ret += '<hr>'
         ret += '<b>'+str(len(session_table)) +' active session(s):</b><p>'
-        ret += '<table border="1" cellspacing="1">'
+        ret += '<table border="1" cellspacing="1" class="sessions">'
 
         def make_red(text):
             return '<font color="#ff0000">'+text+'</font>'
@@ -31132,7 +31191,7 @@ class AdminResource(resource.Resource):
             link = urllib.urlencode(props)
             return '<a href="?%s">%s</a>' % (link, text)
 
-        ret += '<tr><td>User</td><td>Name</td><td>'+make_sortlink('Level', request, 'level')+'</td><td>Country</td><td>Age</td><td>'+make_sortlink('IP', request, 'ip')+'</td><td>Campaign</td><td>'+make_sortlink('Acct Age', request, 'acct_age')+'</td><td>'+make_sortlink('Session Length', request, 'session_length')+'</td><td>Async</td><td>Idle For</td><td>Last Actions (sec ago)</td><td>Tut</td><td>&#35;PvE</td><td>&#35;PvP</td><td>Protect</td><td>Where</td><td>Logins</td><td>Alloy Bal.</td><td>'+make_sortlink('Lifetime Receipts', request, 'default')+'</td></tr>'
+        ret += '<thead><tr><th>User</th><th>Name</th><th>'+make_sortlink('Level', request, 'level')+'</th><th>Country</th><th>Age</th><th>'+make_sortlink('IP', request, 'ip')+'</th><th>RetransBuf</th>'+'<th>Campaign</th><th>'+make_sortlink('Acct Age', request, 'acct_age')+'</th><th>'+make_sortlink('Session Length', request, 'session_length')+'</th><th>Async</th><th>Idle For</th><th>Last Actions (sec ago)</th><th>Tut</th><th>&#35;PvE</th><th>&#35;PvP</th><th>Protect</th><th>Where</th><th>Logins</th><th>Alloy Bal.</th><th>'+make_sortlink('Lifetime Receipts', request, 'default')+'</th></tr></thead><tbody>'
 
         # sort by money spent, then player level
         sort_by = request.args['sort'][0] if ('sort' in request.args) else 'default'
@@ -31166,6 +31225,8 @@ class AdminResource(resource.Resource):
             years_old = str(years_old) if years_old > 0 else '?'
 
             ip_addr = str(session.user.last_login_ip)
+            retrans_info = '%d' % len(session.retrans_buffer)
+
             campaign = session.user.acquisition_campaign
             if campaign is None:
                 campaign = 'unknown'
@@ -31229,9 +31290,9 @@ class AdminResource(resource.Resource):
                 spend = '<b>$%.2f</b>' % spend
             else:
                 spend = '$%.2f' % spend
-            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
+            ret += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>' % (user_link,name,str(session.player.resources.player_level),country,years_old,ip_addr,retrans_info,campaign,acct_age,active,async,last_active,action,tutorial,pve,pvp,protect,battle,session.player.history.get('logged_in_times',0),session.player.resources.gamebucks,spend)
 
-        ret += '</table><p>'
+        ret += '</tbody></table><p>'
 
         ret += '<hr><b>Campaign Data</b><p>'
         ret += admin_stats.get_campaigns()

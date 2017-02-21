@@ -1152,7 +1152,7 @@ function AJAXMessageQueue() {
     this.queue = [];
     this.serial = -1;
     this.recv_progress = -1; // UNRELIABLE indication of progress receiving the response to this message bundle (-1 if unknown)
-}
+};
 AJAXMessageQueue.prototype.push = function(msg) {
     this.queue.push(msg);
 };
@@ -1175,6 +1175,22 @@ ServerSender.prototype.func = function(msg) {
     message_queue.push(msg);
 };
 var send_to_server = new ServerSender();
+
+/** @constructor */
+function RetransBuffer() {
+    this.buf = [];
+};
+RetransBuffer.prototype.append = function(serial, msg) {
+    this.buf.push([serial, msg]);
+};
+RetransBuffer.prototype.trim = function(ack) {
+    while(this.buf.length > 0 && this.buf[0][0] <= ack) {
+        this.buf.shift();
+    }
+};
+RetransBuffer.prototype.length = function() { return this.buf.length; };
+
+var retrans_buffer = new RetransBuffer();
 
 // general-purpose mechanism for waiting for the server to acknowledge all actions submitted up to now
 /** @constructor @struct */
@@ -10064,11 +10080,13 @@ function flush_message_queue(force, my_timeout) {
         // Websockets
         var data_dict = {'myarg': message_queue.queue, // NOT stringified internally
                          'serial': message_serial,
+                         'ack': ajax_next_serial - 1,
                          'session': session.session_id};
         if(!keepalive) {
             // message is automatic, do not keepalive
             data_dict['nokeepalive'] = 1;
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         var data_str = JSON.stringify(data_dict);
         message_queue.serial = message_serial;
@@ -10080,7 +10098,13 @@ function flush_message_queue(force, my_timeout) {
         last_websocket_xmit_len = data_str.length;
 
         if(!the_websocket) {
-            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay']);
+            var enable_reconnect = (get_query_string('enable_websocket_reconnect') === '1' ||
+                                    player.get_any_abtest_value('enable_websocket_reconnect',
+                                                                gamedata['client']['enable_websocket_reconnect']));
+            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(),
+                                                        ajax_config['message_timeout_hello'],
+                                                        ajax_config['message_timeout_gameplay'],
+                                                        enable_reconnect);
             var on_websocket_error = function(event) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();
@@ -10159,10 +10183,22 @@ function flush_message_queue(force, my_timeout) {
                     flush_message_queue(true);
                 }
             };
-
+            var on_websocket_reconnect = function(event) {
+                console.log('WebSocket reconnected. Retransmitting '+retrans_buffer.length().toString()+' messages.');
+                goog.array.forEach(retrans_buffer.buf, function(serial_msg) {
+                    the_websocket.send(JSON.stringify({'myarg': serial_msg[1],
+                                                       'serial': serial_msg[0],
+                                                       'ack': ajax_next_serial - 1,
+                                                       'session': session.session_id}));
+                    ajax_last_ack = ajax_next_serial - 1;
+                });
+                send_to_server.func(["RECONNECT"]);
+                flush_message_queue(true);
+            };
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
             goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
             goog.events.listen(the_websocket.target, 'message', on_websocket_message);
+            goog.events.listen(the_websocket.target, 'reconnect', on_websocket_reconnect);
 
             the_websocket.connect();
         }
@@ -10174,11 +10210,13 @@ function flush_message_queue(force, my_timeout) {
         var msg = 'myarg='+encodeURIComponent(JSON.stringify(message_queue.queue));
         message_queue.serial = message_serial;
         msg += '&serial='+message_serial.toString();
+        msg += '&ack='+(ajax_next_serial-1).toString();
         msg += '&session='+session.session_id.toString();
         if(!keepalive) {
             // message is automatic, do not keepalive
             msg += '&nokeepalive=1';
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         last_ajax_serial = message_serial;
         last_ajax_xmit_time = client_time;
@@ -10218,6 +10256,11 @@ function flush_message_queue(force, my_timeout) {
         window.setTimeout(send_it, Math.floor(1000*inject_lag));
     } else {
         send_it();
+    }
+
+    retrans_buffer.append(message_serial, message_queue.queue);
+    if(retrans_buffer.length() >= gamedata['client']['ajax_message_buffer']) {
+        invoke_timeout_message('0624_client_retrans_buffer_overflow', {'len': retrans_buffer.length()}, {});
     }
 
     message_queue = new AJAXMessageQueue();
@@ -12897,6 +12940,8 @@ function update_desktop_dialogs() {
     var show_evil_valentina = false;
     var show_regional_event_info = false;
 
+    dialog.widgets['network_trouble_message'].show = (the_websocket && the_websocket.is_reconnecting());
+
     if(session.home_base) {
         dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
         dialog.widgets['keyboard_shortcuts_jewel'].user_data['count'] = player.check_feature_use('keyboard_shortcuts_list') ? 0 : 1;
@@ -12909,7 +12954,8 @@ function update_desktop_dialogs() {
             dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.get_draw_world().base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
         }
 
-        dialog.widgets['user_abtest_message'].show = (player.tutorial_state == "COMPLETE" &&
+        dialog.widgets['user_abtest_message'].show = !dialog.widgets['network_trouble_message'].show &&
+                                                      (player.tutorial_state == "COMPLETE" &&
                                                       !(player.quest_tracked && player.quest_tracked['ui_step']) &&
                                                       !session.has_attacked &&
                                                       !session.incoming_attack_pending() &&
@@ -45751,6 +45797,7 @@ function on_ajax_goog(event) {
 
 var ajax_recv_buffer = {};
 var ajax_next_serial = 0;
+var ajax_last_ack = 0; // last ack we sent back to the server
 
 function on_ajax(response, kind) {
     var from_server = JSON.parse(response);
@@ -45762,8 +45809,28 @@ function on_ajax(response, kind) {
     var serial = from_server['serial'];
     var clock = from_server['clock'];
     var messages = from_server['msg'];
+    var do_flush = false;
 
-    return recv_message_bundle(serial, clock, messages, kind);
+    if('ack' in from_server) {
+        retrans_buffer.trim(from_server['ack']);
+
+        // if we haven't sent an ack to the server in a long time,
+        // send something back to keep the server's retrans buffer size down
+        if(message_queue.length() < 1 &&
+           3*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
+            send_to_server.func(["PING"]);
+            // ensure that we transmit something, do not rely on window timer since it might be throttled by browser
+            do_flush = true;
+        }
+    }
+
+    var ret = recv_message_bundle(serial, clock, messages, kind);
+
+    if(do_flush) {
+        flush_message_queue(true);
+    }
+
+    return ret;
 }
 
 function recv_message_bundle(serial, clock, messages, kind) {
@@ -45780,7 +45847,10 @@ function recv_message_bundle(serial, clock, messages, kind) {
         handle_server_message_bundle(-1, {'messages':messages, 'kind':'error'});
         return -1;
     }
-    if(serial in ajax_recv_buffer) { throw Error('duplicated server serial '+serial.toString()); }
+    if(serial in ajax_recv_buffer || serial < ajax_next_serial) {
+        // discard retransmission of something we already saw
+        return 0;
+    }
     ajax_recv_buffer[serial] = {'messages':messages, 'kind':kind};
     process_recv_buffer();
     return 0;
@@ -45795,7 +45865,7 @@ function process_recv_buffer() {
     }
 
     if(goog.object.getCount(ajax_recv_buffer) >= gamedata['client']['ajax_message_buffer']) {
-        return invoke_timeout_message('0621_client_died_from_downstream_lag', {}, {});
+        return invoke_timeout_message('0625_client_recv_buffer_overflow', {'len': goog.object.getCount(ajax_recv_buffer)}, {});
     }
 }
 
@@ -47905,6 +47975,17 @@ function handle_server_message(data) {
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});
+    } else if(msg == "RECONNECT_COMPLETE") {
+        // wait until the server responds to record 0623_client_reconnected
+        // (the session might have gone invalid)
+        var props = add_demographics({'user_id':spin_user_id,
+                                      'method':(the_websocket ? the_websocket.last_close_ui_method : 'no websocket'),
+                                      'len':(the_websocket ? the_websocket.retry_count : -1),
+                                      'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                      'since_pageload': client_time - spin_pageload_begin,
+                                      'connection': gameapi_connection_method()
+                                     });
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0623_client_reconnected', props);
     } else if(msg == "IDLE_CHECK") {
         invoke_idle_check_dialog(data[1]);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {
@@ -48116,14 +48197,19 @@ function handle_server_message(data) {
         } else if(name == "UNKNOWN_SESSION") {
             // non-reportable error, because it can happen right after an idle kick
             invoke_timeout_message('0601_client_died_from_unknown_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '601'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
+        } else if(name == "KILL_SESSION") {
+            // non-reportable, since it's usually caused by the player logging in simultaneously
+            invoke_timeout_message('0602_client_died_from_killed_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '602'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
         } else if(name == "IDLE_KICK") {
             invoke_timeout_message('0600_client_idle_timeout', {}, {});
         } else if(name == "MAINT_KICK") {
             invoke_timeout_message('0611_client_died_from_maint_kick', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
         } else if(name == "SERVER_EXCEPTION") {
             invoke_timeout_message('0610_client_died_from_server_exception', {}, {});
-        } else if(name == "TOO_LAGGED") {
-            invoke_timeout_message('0622_client_died_from_upstream_lag', {}, {});
+        } else if(name == "TOO_LAGGED_UPSTREAM") {
+            invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'server'}, {});
+        } else if(name == "TOO_LAGGED_DOWNSTREAM") {
+            invoke_timeout_message('0621_client_died_from_downstream_lag', {'method': 'server'}, {});
         } else if(name == "POWER_LIMIT") {
             var s = gamedata['strings']['requirements_help']['power']['unknown'];
             invoke_message_dialog(s['ui_title'], s['ui_description']);
@@ -48304,6 +48390,11 @@ function invoke_timeout_message(event_name, props, options) {
         client_state = client_states.UNABLE_TO_LOGIN;
     } else if(client_state != client_states.UNABLE_TO_LOGIN) {
         client_state = client_states.TIMED_OUT;
+    }
+
+    // tell websocket not to try reconnecting
+    if(the_websocket) {
+        the_websocket.enable_reconnect = 0;
     }
 
     if(!options['continue_graphics']) {
@@ -50935,7 +51026,7 @@ function do_draw() {
             var origin = [5, canvas_height-30];
             var btm = desktop_dialogs['desktop_bottom'];
             if(btm) {
-                origin = [btm.xy[0]+10, btm.xy[1]-33];
+                origin = [btm.xy[0]+10, btm.xy[1]- (session.home_base ? 33 : 120)];
             }
             // draw nonessential art download progress (only for first minute though)
             if(client_art_state != client_art_states.DONE && (player.is_developer() || (client_time - session.connect_time < 60.0))) {
@@ -50952,8 +51043,9 @@ function do_draw() {
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
                 lines.push('Combat tick: '+session.get_real_world().combat_engine.cur_tick.get().toString());
+                lines.push('Retransmit buffer size: client '+retrans_buffer.length().toFixed(0)+'/'+gamedata['client']['ajax_message_buffer'].toFixed(0)+' server est '+(ajax_next_serial - 2 - ajax_last_ack).toFixed(0));
                 ctx.save();
-                var fsize = 21;
+                var fsize = 13;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();
                 goog.array.forEach(lines, function(line, y) {
                     ctx.fillText(line, origin[0], origin[1] + 18 + (fsize+6) * y);

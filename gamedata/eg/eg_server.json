@@ -49,7 +49,7 @@
     // the session or proxy timeout
     "http_connection_timeout": 300,
 
-    "session_message_buffer": 20, // number of out-of-order client AJAX requests to buffer before giving up due to lag/packet loss
+    "session_message_buffer": 50, // number of out-of-order client AJAX requests to buffer before giving up due to lag/packet loss
     "ajax_longpoll_wait": 20, // how many seconds to park a longpoll request before returning it empty
 
     "sprobe": {

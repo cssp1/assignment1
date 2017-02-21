@@ -420,8 +420,16 @@ def FBOpenGraphLogFilter(child):
                                   ])
 def ClientTroubleLogFilter(child):
     return JSONLogFilter(child, allow = ['0620_client_died_from_client_lag',
-                                         '0621_client_died_from_downstream_lag',
-                                         '0622_client_died_from_upstream_lag',
+
+                                         # These two are redundant with server-side 0955_lagged_out event
+                                         #'0621_client_died_from_downstream_lag',
+                                         #'0622_client_died_from_upstream_lag',
+
+                                         '0623_client_reconnected',
+
+                                         '0624_client_retrans_buffer_overflow',
+                                         '0625_client_recv_buffer_overflow',
+
                                          '0630_client_died_from_ajax_xmit_failure',
                                          '0631_direct_ajax_failure_falling_back_to_proxy',
                                          '0635_client_died_from_ajax_xmit_timeout',
