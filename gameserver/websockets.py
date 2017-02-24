@@ -41,6 +41,7 @@ from zope.interface import implements
 
 import BrowserDetect
 import SpinHTTP
+import binascii
 
 import twisted.web.error, twisted.web.resource # DJM
 # handle different Twisted versions that moved NoResource around
@@ -56,6 +57,14 @@ class WSException(Exception):
     If this class escapes txWS, then something stupid happened in multiple
     places.
     """
+    def __init__(self, reason, raw_data = None):
+        Exception.__init__(self, reason)
+        self.raw_data = raw_data
+    def __str__(self):
+        ret = Exception.__str__(self)
+        if self.raw_data:
+            ret += (' Hex data (len %d):\n' % len(self.raw_data)) + binascii.hexlify(self.raw_data[:100]) + '...'
+        return ret
 
 # Control frame specifiers. Some versions of WS have control signals sent
 # in-band. Adorable, right?
@@ -179,7 +188,7 @@ def parse_hybi07_frames(buf):
         # Check if any of the reserved flags are set.
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
-            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header)
+            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header, raw_data = buf[start:])
             frames.append(("", CLOSE, fin))
             return frames, buf
 
@@ -189,7 +198,7 @@ def parse_hybi07_frames(buf):
         try:
             opcode = opcode_types[opcode]
         except KeyError:
-            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode)
+            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode, raw_data = buf[start:])
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -280,10 +289,10 @@ class WebSocketsProtocol(ProtocolWrapper):
 
         try:
             frames, self.buf = parse_hybi07_frames(self.buf)
-        except WSException:
+        except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
-            log.err(_why = 'while communicating with '+str(self.spin_peer_addr))
+            log.err(e, _why = 'WSException while communicating with '+str(self.spin_peer_addr))
             self.loseConnection()
             return
 
