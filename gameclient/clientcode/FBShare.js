@@ -102,7 +102,7 @@ FBShare.invoke_share = function(options) {
                );
     } else if(spin_frame_platform == 'bh' && spin_battlehouse_fb_app_id) {
             // if Facebook SDK is loaded, use that
-            if(FB) {
+            if(window['FB']) {
                 var fb_ui_params = {
                     'method': 'share',
                     'href': url,
