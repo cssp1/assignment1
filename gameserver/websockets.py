@@ -277,10 +277,11 @@ class WebSocketsProtocol(ProtocolWrapper):
 
     # capture the peer address here since parsing it from a proxied HTTP request is complex
     # (see calls to SpinHTTP.* below) and we don't want to repeat that work.
-    def __init__(self, factory, wrappedProtocol, spin_peer_addr = None):
+    def __init__(self, factory, wrappedProtocol, spin_peer_addr = None, spin_headers = None):
         ProtocolWrapper.__init__(self, factory, wrappedProtocol)
         self.pending_frames = []
         self.spin_peer_addr = spin_peer_addr
+        self.spin_headers = spin_headers
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -296,7 +297,8 @@ class WebSocketsProtocol(ProtocolWrapper):
         except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
-            log.err(e, _why = 'WSException while communicating with '+str(self.spin_peer_addr))
+            log.err(e, _why = 'WSException while communicating with %s with headers %r' % \
+                    (self.spin_peer_addr, self.spin_headers))
             self.loseConnection()
             return
 
@@ -435,9 +437,9 @@ class WebSocketsFactory(WrappingFactory):
 
     protocol = WebSocketsProtocol
 
-    # pass extra addr parameter to WebsocketsProtocol to remember the peer address
-    def buildProtocol(self, addr):
-        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr)
+    # pass extra addr parameter to WebsocketsProtocol to remember the peer address and headers
+    def buildProtocol(self, addr, headers):
+        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr, spin_headers = headers)
 
 class WebSocketsResource(object):
     """
@@ -558,9 +560,13 @@ class WebSocketsResource(object):
             peer_port = request.transport.getPeer().port
         peer = IPv4Address('TCP', peer_ip, peer_port)
 
+        # DJM - for debugging only, remember the websocket headers that were sent with the request
+        headers = dict((k, v) for k, v in request.requestHeaders.getAllRawHeaders() \
+                       if k.startswith('Sec-Websocket-') or k == 'User-Agent')
+
         # Create the protocol. This could fail, in which case we deliver an
         # error status. Status 502 was decreed by glyph; blame him.
-        protocol = self._factory.buildProtocol(peer)
+        protocol = self._factory.buildProtocol(peer, headers)
         if not protocol:
             request.setResponseCode(502)
             return ""
