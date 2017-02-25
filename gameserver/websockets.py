@@ -295,11 +295,14 @@ class WebSocketsProtocol(ProtocolWrapper):
         frames = []
 
         try:
+            newstart = 0
+
             for frame, newstart in parse_hybi07_frames(self.buf):
                 frames.append(frame)
                 self.debug_frames.append(frame)
 
-            self.buf = self.buf[newstart:]
+            if newstart > 0:
+                self.buf = self.buf[newstart:]
 
         except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
