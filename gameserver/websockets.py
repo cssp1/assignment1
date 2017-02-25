@@ -271,6 +271,10 @@ class WebSocketsProtocol(ProtocolWrapper):
     codec = None
     dumb_pong = False # temporary hack to work around Chrome v39+ Websockets code that doesn't like to receive data with a PONG
 
+    # DJM - for returning something in the Close frame
+    close_code = None
+    close_reason = ""
+
     # capture the peer address here since parsing it from a proxied HTTP request is complex
     # (see calls to SpinHTTP.* below) and we don't want to repeat that work.
     def __init__(self, factory, wrappedProtocol, spin_peer_addr = None):
@@ -403,7 +407,11 @@ class WebSocketsProtocol(ProtocolWrapper):
         # Send a closing frame. It's only polite. (And might keep the browser
         # from hanging.)
         if not self.disconnecting:
-            frame = make_hybi07_frame("", opcode=CLOSE)
+            if self.close_code:
+                body = "%s%s" % (pack(">H", self.close_code), self.close_reason)
+            else:
+                body = ""
+            frame = make_hybi07_frame(body, opcode=CLOSE)
             self.transport.write(frame)
 
             ProtocolWrapper.loseConnection(self)
