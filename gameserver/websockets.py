@@ -299,6 +299,8 @@ class WebSocketsProtocol(ProtocolWrapper):
             # DJM - for debugging, include the peer address we were talking to
             log.err(e, _why = 'WSException while communicating with %s with headers %r' % \
                     (self.spin_peer_addr, self.spin_headers))
+            self.close_code = 1002 # protocol error
+            self.close_reason = e.args[0]
             self.loseConnection()
             return
 
