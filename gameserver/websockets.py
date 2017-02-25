@@ -30,6 +30,7 @@ factory.
 from base64 import b64encode, b64decode
 from hashlib import sha1
 from struct import pack, unpack
+from collections import deque
 
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
@@ -62,7 +63,7 @@ class WSException(Exception):
         self.raw_data = raw_data
     def __str__(self):
         ret = Exception.__str__(self)
-        if self.raw_data:
+        if 0: # self.raw_data:
             ret += (' Hex data (len %d):\n' % len(self.raw_data)) + binascii.hexlify(self.raw_data[:100]) + '...'
         return ret
 
@@ -171,7 +172,6 @@ def parse_hybi07_frames(buf):
     """
 
     start = 0
-    frames = []
 
     while True:
         # If there's not at least two bytes in the buffer, bail.
@@ -189,8 +189,6 @@ def parse_hybi07_frames(buf):
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
             raise WSException("Reserved flag in HyBi-07 frame (%d)" % header, raw_data = buf[start:])
-            frames.append(("", CLOSE, fin))
-            return frames, buf
 
         # Get the opcode, and translate it to a local enum which we actually
         # care about.
@@ -255,10 +253,8 @@ def parse_hybi07_frames(buf):
                 # No reason given; use generic data.
                 data = 1000, "No reason given"
 
-        frames.append((opcode, data, fin))
         start += offset + length
-
-    return frames, buf[start:]
+        yield (opcode, data, fin), start
 
 class WebSocketsProtocol(ProtocolWrapper):
     """
@@ -283,6 +279,10 @@ class WebSocketsProtocol(ProtocolWrapper):
         self.spin_peer_addr = spin_peer_addr
         self.spin_headers = spin_headers
 
+        # list of last couple of frames parsed, for debugging only
+        self.debug_frames = deque([], 5)
+
+
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
         log.msg("Opening connection with %s" % self.transport.getPeer())
@@ -292,13 +292,21 @@ class WebSocketsProtocol(ProtocolWrapper):
         Find frames in incoming data and pass them to the underlying protocol.
         """
 
+        frames = []
+
         try:
-            frames, self.buf = parse_hybi07_frames(self.buf)
+            for frame, newstart in parse_hybi07_frames(self.buf):
+                frames.append(frame)
+                self.debug_frames.append(frame)
+
+            self.buf = self.buf[newstart:]
+
         except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
-            log.err(e, _why = 'WSException while communicating with %s with headers %r' % \
-                    (self.spin_peer_addr, self.spin_headers))
+            log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s' % \
+                    (self.spin_peer_addr, self.spin_headers,
+                     '\n'.join(map(repr, self.debug_frames))))
             self.close_code = 1002 # protocol error
             self.close_reason = e.args[0]
             self.loseConnection()
