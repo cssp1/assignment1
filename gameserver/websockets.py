@@ -31,6 +31,7 @@ from base64 import b64encode, b64decode
 from hashlib import sha1
 from struct import pack, unpack
 from collections import deque
+import time
 
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
@@ -192,11 +193,11 @@ def parse_hybi07_frames(buf):
 
         # Get the opcode, and translate it to a local enum which we actually
         # care about.
-        opcode = header & 0xf
+        raw_opcode = header & 0xf
         try:
-            opcode = opcode_types[opcode]
+            opcode = opcode_types[raw_opcode]
         except KeyError:
-            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode, raw_data = buf[start:])
+            raise WSException("Unknown opcode %d in HyBi-07 frame" % raw_opcode, raw_data = buf[start:])
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -236,6 +237,8 @@ def parse_hybi07_frames(buf):
 
             key = buf[start + offset:start + offset + 4]
             offset += 4
+        else:
+            key = None
 
         if len(buf) - (start + offset) < length:
             break
@@ -254,7 +257,7 @@ def parse_hybi07_frames(buf):
                 data = 1000, "No reason given"
 
         start += offset + length
-        yield (opcode, data, fin), start
+        yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, key, data), start
 
 class WebSocketsProtocol(ProtocolWrapper):
     """
@@ -282,6 +285,18 @@ class WebSocketsProtocol(ProtocolWrapper):
         # list of last couple of frames parsed, for debugging only
         self.debug_frames = deque([], 5)
 
+    def dump_debug_frames(self):
+        return '\n'.join(map(self.dump_debug_frame, self.debug_frames))
+    def dump_debug_frame(self, debug_frame):
+        parse_time, frame = debug_frame
+        opcode, raw_opcode, fin, masked, length, buffered_length, key, data = frame
+        if len(data) < 100:
+            ui_data = data
+        else:
+            # abbreviate the data
+            ui_data = data[0:16] + '...' + data[-16:]
+        return '%.7f opcode %3d fin %d len %d buffered %d data %r' % \
+               (parse_time, raw_opcode, 1 if fin else 0, length, buffered_length, ui_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -299,7 +314,7 @@ class WebSocketsProtocol(ProtocolWrapper):
 
             for frame, newstart in parse_hybi07_frames(self.buf):
                 frames.append(frame)
-                self.debug_frames.append(frame)
+                self.debug_frames.append((time.time(), frame))
 
             if newstart > 0:
                 self.buf = self.buf[newstart:]
@@ -307,16 +322,15 @@ class WebSocketsProtocol(ProtocolWrapper):
         except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
-            log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s' % \
-                    (self.spin_peer_addr, self.spin_headers,
-                     '\n'.join(map(repr, self.debug_frames))))
+            log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s\n%.7f (exception)' % \
+                    (self.spin_peer_addr, self.spin_headers, self.dump_debug_frames(), time.time()))
             self.close_code = 1002 # protocol error
             self.close_reason = e.args[0]
             self.loseConnection()
             return
 
         for frame in frames:
-            opcode, data, fin = frame
+            opcode, _0, fin, _1, _2, _3, _4, data = frame
             if opcode == NORMAL:
                 # Business as usual. Decode the frame, if we have a decoder.
                 if self.codec:
