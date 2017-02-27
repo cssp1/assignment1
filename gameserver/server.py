@@ -12942,11 +12942,15 @@ class LivePlayer(Player):
                         dest = existing
                         break
             if dest:
-                dest['stack'] = dest.get('stack',1) + 1
+                assert dest.get('stack',1) >= 1
+                to_add = min(stack, max_stack - dest.get('stack',1))
+                #gamesite.exception_log.event(server_time, 'stack %d max_stack %d to_add %d join existing stack %r' % \
+                #                             (stack, max_stack, to_add, dest))
+                assert to_add > 0
+                dest['stack'] = dest.get('stack',1) + to_add
                 if undiscardable: dest['undiscardable'] = 1
-                stack -= 1
-                count += 1
-                #gamesite.exception_log.event(server_time, 'join existing stack '+repr(dest))
+                stack -= to_add
+                count += to_add
                 continue
 
             if fungible:
