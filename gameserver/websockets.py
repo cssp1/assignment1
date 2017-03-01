@@ -257,7 +257,8 @@ def parse_hybi07_frames(buf):
                 data = 1000, "No reason given"
 
         start += offset + length
-        yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, key, data), start
+        future_data = buf[start:] # for debugging only
+        yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, future_data, key, data), start
 
 class WebSocketsProtocol(ProtocolWrapper):
     """
@@ -289,14 +290,19 @@ class WebSocketsProtocol(ProtocolWrapper):
         return '\n'.join(map(self.dump_debug_frame, self.debug_frames))
     def dump_debug_frame(self, debug_frame):
         parse_time, frame = debug_frame
-        opcode, raw_opcode, fin, masked, length, buffered_length, key, data = frame
+        opcode, raw_opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
         if len(data) < 100:
             ui_data = data
         else:
             # abbreviate the data
             ui_data = data[0:16] + '...' + data[-16:]
-        return '%.7f opcode %3d fin %d len %d buffered %d data %r' % \
-               (parse_time, raw_opcode, 1 if fin else 0, length, buffered_length, ui_data)
+        if len(buffered_data) < 100:
+            ui_buffered_data = buffered_data
+        else:
+            # abbreviate
+            ui_buffered_data =  buffered_data[0:16] + '...' + buffered_data[-16:]
+        return '%.7f opcode %3d fin %d len %d buffered %d data %r buf %r' % \
+               (parse_time, raw_opcode, 1 if fin else 0, length, buffered_length, ui_data, ui_buffered_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -330,7 +336,7 @@ class WebSocketsProtocol(ProtocolWrapper):
             return
 
         for frame in frames:
-            opcode, _0, fin, _1, _2, _3, _4, data = frame
+            opcode, _0, fin, _1, _2, _3, _4, _5, data = frame
             if opcode == NORMAL:
                 # Business as usual. Decode the frame, if we have a decoder.
                 if self.codec:
