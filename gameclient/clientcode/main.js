@@ -11475,8 +11475,8 @@ function update_friend_bar(dialog) {
             var w = dialog.widgets['add_friend_button'+row.toString()];
             if(w.show && w.state !== 'disabled' && 'text_color_emphasis' in w.data) {
                 var period = 10.0, duration = 0.3, offset = row * 0.1;
-                var t = ((client_time-offset) % period);
-                var col_v = (t < duration ? w.data['text_color_emphasis'] : w.data['text_color']);
+                var anim_t = ((client_time-offset) % period);
+                var col_v = (anim_t < duration ? w.data['text_color_emphasis'] : w.data['text_color']);
                 w.text_color = SPUI.make_colorv(col_v);
             }
         }
