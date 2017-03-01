@@ -5424,30 +5424,39 @@
             "sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_153x315"},
             "sidebar_splash":{"kind":"StaticImage","xy":[14,17],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
-            // note: this text is over-ridden by values from tutorial.json
-            "title":  { "kind": "TextField", "xy": [181,23], "dimensions": [300, 35], "text_style": "thick", "text_size": 17, "text_hjustify": "left" },
-            "description": { "kind": "TextField", "xy": [181,57], "dimensions": [300,160], "text_size": 13, "text_leading": 16, "text_hjustify": "left",
-                             "text_vjustify": "top" },
+            "title":  { "kind": "TextField", "xy": [181,23], "dimensions": [300, 25], "text_style": "thick", "text_size": 17, "text_hjustify": "left",
+                        "ui_name": "Battle with Friends in %game" },
 
-            "friend_icon0": { "kind": "FriendIcon", "xy": [191, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon1": { "kind": "FriendIcon", "xy": [245, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon2": { "kind": "FriendIcon", "xy": [299, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon3": { "kind": "FriendIcon", "xy": [353, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon4": { "kind": "FriendIcon", "xy": [407, 163], "dimensions": [50,73], "state": "disabled" },
+            "value_prop": { "kind": "TextField", "xy": [181,57], "dimensions": [290,160], "text_size": 15,
+                            "text_vjustify": "top", "text_hjustify": "left",
+                            "ui_name": "Build your armies together, and fight to control the land!",
+                            "ui_name_bh": "Recruit trainees to earn exclusive bonus items and free daily gifts!"
+                          },
+
+            "friend_icon": { "kind": "FriendIcon", "xy": [191, 146], "dimensions": [50,73], "state": "disabled",
+                             "array": [5,1], "array_offset": [54, 0] },
+
+            "social_proof": { "kind": "TextField", "xy": [193,223], "dimensions": [262,160], "text_size": 13,
+                              "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.5,0.5,0.5],
+                              "ui_name_has_no_friends": "You're the first of your friends to play %game",
+                              "ui_name_has_one_friend": "%s also plays %game",
+                              "ui_name_has_two_friends": "%s and %d other friend also play %game",
+                              "ui_name_has_many_friends": "%s and %d other friends also play %game"
+                            },
 
             "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
             // "ok_button" and "fb_share_button/icon" are mutually exclusive
-            "ok_button": { "kind": "ActionButton", "xy": [230,265], "dimensions": [200,40],
+            "ok_button": { "kind": "ActionButton", "xy": [230,275], "dimensions": [200,40],
                            "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                            "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends",
                            "ui_name_bh": "More Info" },
-            "fb_share_button": { "kind": "ActionButton", "xy": [230,265], "dimensions": [200,40],
+            "fb_share_button": { "kind": "ActionButton", "xy": [230,275], "dimensions": [200,40],
                                  "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                  "text_offset": [10,0],
                                  "text_size": 13, "text_style": "bold", "ui_name": "Share Game"
                                },
-            "fb_share_icon": { "kind": "StaticImage", "xy":[240,270], "dimensions":[32,32], "asset": "facebook_icon"}
+            "fb_share_icon": { "kind": "StaticImage", "xy":[240,280], "dimensions":[32,32], "asset": "facebook_icon"}
         }
     },
 

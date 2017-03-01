@@ -19221,13 +19221,22 @@ function tutorial_step_repair_message(data) {
 
 // note: this is used for both the tutorial step and the on-login invite friends prompt
 function setup_invite_friends_prompt(dialog, reason) {
-    var tut_data = gamedata['tutorial']['congratulations_message'];
-
-    dialog.widgets['title'].str = tut_data['ui_viral_title'];
     dialog.user_data['invite_friends_reason'] = reason;
 
+    dialog.widgets['title'].set_text_with_linebreaking_and_shrink_font_to_fit(dialog.data['widgets']['title']['ui_name'].replace('%game', gamedata['strings']['game_name']));
+
+    /** @type {string} */
+    var value_prop;
+    // customize text per platform
+    if('ui_name_'+spin_frame_platform in dialog.data['widgets']['value_prop']) {
+        value_prop = dialog.data['widgets']['value_prop']['ui_name_'+spin_frame_platform];
+    } else {
+        value_prop = dialog.data['widgets']['value_prop']['ui_name'];
+    }
+    dialog.widgets['value_prop'].set_text_with_linebreaking(value_prop.replace('%game', gamedata['strings']['game_name']));
+
     var num_friends = 0;
-    var friend_name = null;
+    var friend_name = '';
 
     for(var i = 0; i < player.friends.length; i++) {
         var friend = player.friends[i];
@@ -19239,24 +19248,19 @@ function setup_invite_friends_prompt(dialog, reason) {
         }
     }
 
-    var descr = '';
+    var proof = '';
+
     if(num_friends < 1) {
-        // customize text per platform
-        if('ui_description_has_no_friends_'+spin_frame_platform in tut_data) {
-            descr += tut_data['ui_description_has_no_friends_'+spin_frame_platform];
-        } else {
-            descr += tut_data['ui_description_has_no_friends'];
-        }
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_no_friends'];
     } else if(num_friends < 2) {
-        descr += tut_data['ui_description_has_one_friend'].replace('%s', friend_name);
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_one_friend'];
     } else if(num_friends < 3) {
-        descr += tut_data['ui_description_has_two_friends'].replace('%s', friend_name).replace('%d', (num_friends-1).toFixed(0));
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_two_friends'];
     } else {
-        descr += tut_data['ui_description_has_many_friends'].replace('%s', friend_name).replace('%d', (num_friends-1).toFixed(0));
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_many_friends'];
     }
 
-    dialog.widgets['description'].str += descr;
-    dialog.widgets['description'].set_text_with_linebreaking(dialog.widgets['description'].str);
+    dialog.widgets['social_proof'].set_text_with_linebreaking(proof.replace('%game', gamedata['strings']['game_name']).replace('%s', friend_name).replace('%d', pretty_print_number(num_friends-1)));
 
     // fill in friend widgets
     var row = 0;
@@ -19344,9 +19348,6 @@ function tutorial_step_congratulations(data) {
     tutorial_root.add(dialog);
 
     dialog.auto_center();
-
-    dialog.widgets['title'].str = data['ui_name'];
-    dialog.widgets['description'].str = data['ui_description'];
 
     setup_invite_friends_prompt(dialog, 'tutorial_step_congratulations');
 
