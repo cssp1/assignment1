@@ -19302,6 +19302,7 @@ function setup_invite_friends_prompt(dialog, reason) {
             dialog.widgets['fb_share_icon'].show = true;
         dialog.default_button = dialog.widgets['fb_share_button'];
         dialog.widgets['fb_share_button'].onclick = function() {
+            invite_friends_dialog_shown_this_session = true; // stop the "+Add" button flashing
             change_selection(null);
             metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief'), 'method': 'share_invite'});
             FBShare.invoke({name: gamedata['virals']['invite_friends']['ui_post_message'],
