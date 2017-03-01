@@ -5447,16 +5447,16 @@
             "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
             // "ok_button" and "fb_share_button/icon" are mutually exclusive
-            "ok_button": { "kind": "ActionButton", "xy": [230,275], "dimensions": [200,40],
+            "ok_button": { "kind": "ActionButton", "xy": [230,268], "dimensions": [200,40],
                            "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                            "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends",
                            "ui_name_bh": "More Info" },
-            "fb_share_button": { "kind": "ActionButton", "xy": [230,275], "dimensions": [200,40],
+            "fb_share_button": { "kind": "ActionButton", "xy": [230,268], "dimensions": [200,40],
                                  "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                  "text_offset": [10,0],
                                  "text_size": 13, "text_style": "bold", "ui_name": "Share Game"
                                },
-            "fb_share_icon": { "kind": "StaticImage", "xy":[240,280], "dimensions":[32,32], "asset": "facebook_icon"}
+            "fb_share_icon": { "kind": "StaticImage", "xy":[240,273], "dimensions":[32,32], "asset": "facebook_icon"}
         }
     },
 

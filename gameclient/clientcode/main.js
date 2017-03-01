@@ -11468,6 +11468,19 @@ function update_friend_bar(dialog) {
     var base_xy_min = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy_minimized']);
     dialog.xy = vec_floor(vec_lerp(dialog.user_data['maximized'] ? base_xy_min : base_xy_max,
                                    dialog.user_data['maximized'] ? base_xy_max : base_xy_min, t));
+
+    // flashing "+Add" button row
+    if(player.get_townhall_level() < 5 && !invite_friends_dialog_shown_this_session) {
+        for(var row = 0; row < dialog.data['widgets']['add_friend_button']['array'][0]; row++) {
+            var w = dialog.widgets['add_friend_button'+row.toString()];
+            if(w.show && w.state !== 'disabled' && 'text_color_emphasis' in w.data) {
+                var period = 10.0, duration = 0.3, offset = row * 0.1;
+                var t = ((client_time-offset) % period);
+                var col_v = (t < duration ? w.data['text_color_emphasis'] : w.data['text_color']);
+                w.text_color = SPUI.make_colorv(col_v);
+            }
+        }
+    }
 }
 
 function invoke_player_portrait_dialog() {
@@ -17296,7 +17309,12 @@ function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name
                     ref:'feed_thanks'});
 };
 
+// to stop the flashing "+Add" buttons
+var invite_friends_dialog_shown_this_session = false;
+
 function invoke_invite_friends_dialog(reason) {
+    invite_friends_dialog_shown_this_session = true;
+
     if(spin_frame_platform == 'kg') {
         if(!spin_kongregate_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
         SPKongregate.showInvitationBox({'content': gamedata['virals']['invite_friends']['ui_post_message'],
