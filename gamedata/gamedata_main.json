@@ -49,6 +49,10 @@
             {"predicate": "FRAME_PLATFORM", "platform":"bh"}
         ]},
 
+        // skip friend selector and just offer to share a "Join the game" link.
+        // NOTE: only works on frame_platform "fb"
+        "invite_prompt_direct_share": {"predicate": "ANY_ABTEST", "key": "invite_prompt_direct_share", "value": 1},
+
         // true if friend bar should be shown at bottom of screen
         "friend_bar_enabled": {"predicate": "OR", "subpredicates" :[
             {"predicate": "FRAME_PLATFORM", "platform":"fb"},

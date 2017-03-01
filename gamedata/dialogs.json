@@ -5419,7 +5419,6 @@
     "tutorial_congratulations": {
         // also used for on-login friend invite prompt
         "dimensions": [487, 337],
-        "default_button": "ok_button",
         "widgets": {
             "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[487,337],"asset":"dialog_resizable","bg_image_resizable":1},
             "sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_153x315"},
@@ -5438,8 +5437,17 @@
 
             "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
-            "ok_button": { "kind": "ActionButton", "xy": [257,278], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends", "ui_name_bh": "More Info" }
+            // "ok_button" and "fb_share_button/icon" are mutually exclusive
+            "ok_button": { "kind": "ActionButton", "xy": [230,265], "dimensions": [200,40],
+                           "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                           "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends",
+                           "ui_name_bh": "More Info" },
+            "fb_share_button": { "kind": "ActionButton", "xy": [230,265], "dimensions": [200,40],
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "text_offset": [10,0],
+                                 "text_size": 13, "text_style": "bold", "ui_name": "Share Game"
+                               },
+            "fb_share_icon": { "kind": "StaticImage", "xy":[240,270], "dimensions":[32,32], "asset": "facebook_icon"}
         }
     },
 

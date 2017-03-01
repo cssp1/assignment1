@@ -359,6 +359,7 @@ InviteFriendsPromptConsequent.prototype.execute = function(state) {
     // hack - copy code from tutorial_step_congratulations
     if(this.show_arrow) {
         make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+        make_tutorial_arrow_for_button('tutorial_congratulations', 'fb_share_button', 'up');
     }
     GameArt.play_canned_sound('conquer_sound');
 };

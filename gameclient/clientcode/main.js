@@ -19268,18 +19268,43 @@ function setup_invite_friends_prompt(dialog, reason) {
         row++;
     }
 
-    if('ui_name_'+spin_frame_platform in dialog.widgets['ok_button'].data) {
-        dialog.widgets['ok_button'].str = dialog.widgets['ok_button'].data['ui_name_'+spin_frame_platform];
-    }
-    dialog.widgets['ok_button'].onclick = function(w) {
-        var reason = w.parent.user_data['invite_friends_reason'];
-        change_selection(null);
-        if(player.tutorial_state === 'congratulations_message' || !friend_invites_enabled()) {
-            advance_tutorial();
-        } else {
-            invoke_invite_friends_dialog(reason);
+    // "direct_share" means we'll skip friend selector / membership rewards
+    // and just offer to share a "join the game" link.
+
+    var direct_share = (spin_frame_platform == 'fb' && FBShare.supported() &&
+                        read_predicate(gamedata['client']['invite_prompt_direct_share']).is_satisfied(player));
+
+    if(direct_share) {
+        dialog.widgets['ok_button'].show = false;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = true;
+        dialog.default_button = dialog.widgets['fb_share_button'];
+        dialog.widgets['fb_share_button'].onclick = function() {
+            change_selection(null);
+            metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief'), 'method': 'share_invite'});
+            FBShare.invoke({name: gamedata['virals']['invite_friends']['ui_post_message'],
+                            description: gamedata['virals']['ui_post_description'],
+                            link_qs: {'spin_campaign': 'share_invite'},
+                            ref: 'share_invite'});
+        };
+    } else {
+        dialog.widgets['ok_button'].show = true;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = false;
+        dialog.default_button = dialog.widgets['ok_button'];
+        if('ui_name_'+spin_frame_platform in dialog.widgets['ok_button'].data) {
+            dialog.widgets['ok_button'].str = dialog.widgets['ok_button'].data['ui_name_'+spin_frame_platform];
         }
-   };
+
+        dialog.widgets['ok_button'].onclick = function(w) {
+            // note: there used to be a special case here for the rails tutorial,
+            // but it's no longer relevant because the invite prompt was moved
+            // into the new quest-based tutorial system.
+            var reason = w.parent.user_data['invite_friends_reason'];
+            change_selection(null);
+            invoke_invite_friends_dialog(reason);
+        };
+    }
 }
 
 function invoke_invite_friends_prompt() {
@@ -19335,6 +19360,7 @@ function tutorial_step_congratulations(data) {
     }, 20000);
 
     make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+    make_tutorial_arrow_for_button('tutorial_congratulations', 'fb_share_button', 'up');
 
     GameArt.play_canned_sound('conquer_sound');
 }
