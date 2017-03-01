@@ -7143,7 +7143,7 @@ player.init_abtests = function(test_data) {
         if(test_name in gamedata['abtests'] && gamedata['abtests'][test_name]['active'] && (group in gamedata['abtests'][test_name]['groups'])) {
             var data = gamedata['abtests'][test_name]['groups'][group];
             if(data['patches_client_gamedata']) {
-                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'enhancements', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial'];
+                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'enhancements', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial','virals'];
                 for(var i = 0; i < kinds.length; i++) {
                     var kind = kinds[i];
                     if(kind in data) {
