@@ -277,7 +277,13 @@ class Sender(object):
                 print >> self.msg_fd, '(player_cache says) has already been notified since last login, and is not in critical window'
                 return
 
-        player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
+        try:
+            player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
+
+        except SpinS3.S3404Exception:
+            # missing playerdb - might be due to an S3 failure
+            print >> self.msg_fd, '(playerDB data missing)'
+            return
 
 #        if (player['abtests'].get("T125_newbie_notification", None) == "control"):
 #            print >> self.msg_fd, '(player says) in non-notification control group'
