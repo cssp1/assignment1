@@ -11154,7 +11154,17 @@ function init_desktop_dialogs() {
             dialog.widgets['map_button'].onclick = function() { invoke_map_dialog(null); };
             dialog.widgets['store_button'].onclick = function(w) { invoke_store(); };
 
-            var do_add_friend = function() { change_selection(null); invoke_invite_friends_dialog('friend_bar'); }
+            var do_add_friend = function() {
+                change_selection(null);
+                if(spin_frame_platform == 'bh') {
+                    // on battlehouse, go directly to Membership Rewards
+                    invoke_invite_friends_dialog('friend_bar');
+                } else {
+                    // on FB etc, show prompt first
+                    invoke_invite_friends_prompt();
+                }
+            }
+
             for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
                 dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].onclick = do_add_friend;
             }
