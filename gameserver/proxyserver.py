@@ -2383,11 +2383,13 @@ class GameProxy(proxy.ReverseProxyResource):
         if session.ip == '10.181.117.67': # bad CloudFlare IP
             possible_alts = []
         else:
-            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
+            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', 3600)
             if stickiness > 0: # use new persistent record
-                db_client.ip_hit_record(session.ip, session.user_id)
-                possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
+                ip_key = SpinHTTP.ip_matching_key(session.ip)
+                db_client.ip_hit_record(ip_key, session.user_id)
+                possible_alts = db_client.ip_hits_get(ip_key, since = proxy_time - stickiness, exclude_user_id = session.user_id)
             else: # old instantaneous-only approach
+                # note: won't detect IPv6 alts with different addresses within a /64!
                 possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
 
         if possible_alts:
