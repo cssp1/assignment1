@@ -11161,7 +11161,7 @@ function init_desktop_dialogs() {
                     invoke_invite_friends_dialog('friend_bar');
                 } else {
                     // on FB etc, show prompt first
-                    invoke_invite_friends_prompt();
+                    invoke_invite_friends_prompt('friend_bar');
                 }
             }
 
@@ -19330,7 +19330,7 @@ function setup_invite_friends_prompt(dialog, reason) {
     }
 }
 
-function invoke_invite_friends_prompt() {
+function invoke_invite_friends_prompt(reason) {
     if(!friend_invites_enabled()) { return null; }
 
     change_selection(null);
@@ -19343,7 +19343,7 @@ function invoke_invite_friends_prompt() {
     dialog.modal = true;
     dialog.auto_center();
 
-    setup_invite_friends_prompt(dialog, 'invite_friends_prompt');
+    setup_invite_friends_prompt(dialog, reason);
 
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
     if(!read_predicate(gamedata['client']['invite_prompt_closeable']).is_satisfied(player)) {
@@ -47253,7 +47253,7 @@ function handle_server_message(data) {
         }
     } else if(msg == "INVITE_FRIENDS_PROMPT") {
         if(read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null)) {
-            notification_queue.push(invoke_invite_friends_prompt);
+            notification_queue.push(function() { invoke_invite_friends_prompt('from_server'); });
         }
     } else if(msg == "YOU_WERE_ATTACKED") {
         var recent_attacks = data[1];

@@ -350,10 +350,11 @@ function InviteFriendsPromptConsequent(data) {
     goog.base(this, data);
     this.show_close_button = ('show_close_button' in data ? data['show_close_button'] : true);
     this.show_arrow = ('show_arrow' in data ? data['show_arrow'] : true);
+    this.reason = ('reason' in data ? data['reason'] : 'client_consequent');
 }
 goog.inherits(InviteFriendsPromptConsequent, Consequent);
 InviteFriendsPromptConsequent.prototype.execute = function(state) {
-    var dialog = invoke_invite_friends_prompt();
+    var dialog = invoke_invite_friends_prompt(this.reason);
     if(!dialog) { return; }
     dialog.widgets['close_button'].show = this.show_close_button;
     // hack - copy code from tutorial_step_congratulations
