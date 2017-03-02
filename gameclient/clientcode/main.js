@@ -44899,6 +44899,14 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         return false;
     }
 
+    if(currency == 'fbcredits' || currency == 'kgcredits' ||
+       currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0) {
+        player.record_client_history('purchase_inits', 1);
+        if((player.history['money_spent'] || 0) <= 0) {
+            player.record_client_history('purchase_inits_preftd', 1);
+        }
+    }
+
     if(currency == 'fbcredits') {
         if(!no_clear) { change_selection(null); }
         Store.place_fbcredits_order(price, unit_id, spellname, spellarg, cb);
