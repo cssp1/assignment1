@@ -17750,7 +17750,7 @@ function invoke_level_up_dialog() {
     if(friend_invites_enabled()) {
         dialog.widgets['spam_button_invite'].onclick = function() {
             change_selection(null);
-            invoke_invite_friends_dialog('level_up_dialog');
+            invoke_invite_friends_prompt('level_up_dialog');
         };
 
         // show "Inform Earth" for level 2 (on Facebook), and "Invite Friends" for level 3 and beyond

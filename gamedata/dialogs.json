@@ -5454,7 +5454,7 @@
             "fb_share_button": { "kind": "ActionButton", "xy": [230,268], "dimensions": [200,40],
                                  "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                                  "text_offset": [10,0],
-                                 "text_size": 13, "text_style": "bold", "ui_name": "Share Game"
+                                 "text_size": 13, "text_style": "bold", "ui_name": "Share Game Invite"
                                },
             "fb_share_icon": { "kind": "StaticImage", "xy":[240,273], "dimensions":[32,32], "asset": "facebook_icon"}
         }
