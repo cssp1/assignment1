@@ -68,7 +68,7 @@ SPFB.watchdog_func = function() {
         // SDK loaded okay
         return;
     }
-    metric_event('0653_facebook_api_failed_to_load', add_demographics({}));
+    metric_event('0653_facebook_api_failed_to_load', add_demographics({'method':'watchdog'}));
 
     // show a GUI message, but don't crash the client
     notification_queue.push(function() {
@@ -84,6 +84,8 @@ SPFB.ui = function(props, callback) {
 
     // for critical UIs like payments, show error immediately
     if(typeof FB === 'undefined' && goog.array.contains(['pay','fbpromotion'], props['method'])) {
+        metric_event('0653_facebook_api_failed_to_load', add_demographics({'method':props['method']}));
+
         var msg = gamedata['errors']['FACEBOOK_SDK_FAILED_TO_LOAD'];
         invoke_child_message_dialog(msg['ui_title'], msg['ui_name'],
                                     {'dialog': msg['dialog']});
