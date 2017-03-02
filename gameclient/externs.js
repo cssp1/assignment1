@@ -83,6 +83,14 @@ var spin_facebook_signed_request;
 var spin_facebook_oauth_token;
 var spin_facebook_login_permissions;
 var spin_facebook_api_versions;
+
+// VVV specific to FacebookSDK.js VVV
+/** @type {!Array<function()>} */
+var spin_facebook_sdk_on_init_callbacks;
+/** @type {boolean} */
+var spin_facebook_sdk_loaded;
+// ^^^ specific to FacebookSDK.js ^^^
+
 var spin_art_protocol;
 var spin_art_path;
 var spin_unsupported_browser_landing;

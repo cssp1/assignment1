@@ -46071,6 +46071,10 @@ function handle_server_message(data) {
 
         PlayerCache.init(gamedata['client']['player_cache']);
 
+        if(spin_frame_platform == 'fb' && spin_facebook_enabled) {
+            SPFB.init_watchdog();
+        }
+
         SPFB.preload_likes(fb_likes_preload);
 
         var need_reflow = false;
