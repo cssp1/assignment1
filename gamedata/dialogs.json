@@ -7977,6 +7977,8 @@
                         "asset_rarity4": "dialog_glow_thin_legendary",
                         "bg_image_resizable": 1, "composite_mode": "lighter",
                         "transform": [0.5,0,0,0.5,0,0] },
+            "icon_slot": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_slot",
+                           "transform": [0.5,0,0,0.5,0,0] },
             "icon": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_unknown",
                       "transform": [0.5,0,0,0.5,0,0] },
             "icon_frame": { "kind": "SolidRect", "xy": [5,2], "dimensions": [25,25],
