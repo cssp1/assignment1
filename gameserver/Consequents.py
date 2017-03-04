@@ -343,8 +343,9 @@ class RemoveAuraConsequent(Consequent):
         Consequent.__init__(self, data)
         self.name = data['aura_name']
         self.remove_stack = data.get('remove_stack',-1)
+        self.match_data = data.get('match_data', None)
     def execute(self, session, player, retmsg, context=None):
-        session.player.remove_aura(session, retmsg, self.name, remove_stack = self.remove_stack, force = True)
+        session.player.remove_aura(session, retmsg, self.name, remove_stack = self.remove_stack, force = True, data = self.match_data)
 
 class CooldownTriggerConsequent(Consequent):
     def __init__(self, data):
