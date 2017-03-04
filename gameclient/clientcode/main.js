@@ -39177,7 +39177,7 @@ function update_buy_gamebucks_sku23(dialog) {
     }
 }
 
-// return list of attachments, not including bonus gamebucks
+// return list of attachments, not including bonus gamebucks that come from nominal vs. actual quantity
 function buy_gamebucks_sku2_item_list(spell, spellarg) {
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
         return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
@@ -39298,13 +39298,18 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_a
 
     // special case for bonus gamebucks - add a virtual "gamebucks" item
     if('nominal_quantity' in spell && spell['nominal_quantity'] < spell['quantity']) {
-        var bonus_pct = 100.0*(spell['quantity']-spell['nominal_quantity'])/spell['nominal_quantity'];
+        item_list.push({'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']});
+    };
+    item_list = collapse_item_list(item_list.concat(buy_gamebucks_sku2_item_list(spell, spellarg)));
+
+    if(item_list.length >= 1 && item_list[0]['spec'] == 'gamebucks') {
+        // add UI text for the "bonus" gamebucks
+        var item = item_list[0];
+        var stack = ('stack' in item ? item['stack'] : 1);
+        var bonus_pct = 100.0*stack/spell['nominal_quantity'];
         var bonus_pct_str = Math.max(Math.floor(bonus_pct), 1).toFixed(0);
-        item_list.push({'spec': 'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity'],
-                        'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%pct', bonus_pct_str).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
-                       });
+        item['ui_name'] = dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(stack)).replace('%pct', bonus_pct_str).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
     }
-    item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
     update_buy_gamebucks_or_store_sku_attachments(dialog, item_list, enable_attachment_pulsing);
     return item_list;
 };
