@@ -7954,7 +7954,7 @@
 
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,57], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[16,242], [33,225], [57,225], [16,264]] },
-            "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,258], "dimensions": [20,100], "color": [1,1,1,1],
+            "sale_label": { "show": 0, "kind": "TextField", "xy": [27,255], "dimensions": [20,100], "color": [1,1,1,1],
                             "text_style": "bold", "text_size": 12, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
 
             "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,282], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
