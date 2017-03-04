@@ -12,6 +12,7 @@ import SpinConfig
 import SpinJSON
 import SpinS3
 import ControlAPI
+from SpinHTTP import private_ip_re
 
 def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
 
@@ -638,6 +639,8 @@ if __name__ == '__main__':
             print fmt % ('Known alt accounts:', '')
             for s_other_id in sorted(player['known_alt_accounts'].iterkeys(), key = int):
                 entry = player['known_alt_accounts'][s_other_id]
+                if private_ip_re.match(entry.get('last_ip', 'Unknown')):
+                    continue # invalid entry
                 if entry.get('logins',1) == 0:
                     continue # ignore
                 elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
