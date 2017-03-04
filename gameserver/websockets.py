@@ -286,21 +286,22 @@ class WebSocketsProtocol(ProtocolWrapper):
         # list of last couple of frames parsed, for debugging only
         self.debug_frames = deque([], 5)
 
-    def dump_debug_frames(self):
-        return '\n'.join(map(self.dump_debug_frame, self.debug_frames))
-    def dump_debug_frame(self, debug_frame):
+    def dump_debug_frames(self, abbreviate = True):
+        return '\n'.join(self.dump_debug_frame(x, abbreviate) for x in self.debug_frames)
+    def dump_debug_frame(self, debug_frame, abbreviate):
         parse_time, frame = debug_frame
         opcode, raw_opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
-        if len(data) < 100:
-            ui_data = data
-        else:
+        if abbreviate and len(data) > 100:
             # abbreviate the data
             ui_data = data[0:16] + '...' + data[-16:]
-        if len(buffered_data) < 100:
-            ui_buffered_data = buffered_data
         else:
-            # abbreviate
+            ui_data = data
+
+        if abbreviate and len(buffered_data) > 100:
             ui_buffered_data =  buffered_data[0:16] + '...' + buffered_data[-16:]
+        else:
+            ui_buffered_data = buffered_data
+
         return '%.7f opcode %3d fin %d len %d buffered %d data %r buf %r' % \
                (parse_time, raw_opcode, 1 if fin else 0, length, buffered_length, ui_data, ui_buffered_data)
 
@@ -330,6 +331,13 @@ class WebSocketsProtocol(ProtocolWrapper):
             # DJM - for debugging, include the peer address we were talking to
             log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s\n%.7f (exception)' % \
                     (self.spin_peer_addr, self.spin_headers, self.dump_debug_frames(), time.time()))
+            try:
+                with open("/tmp/websocket-debug-%d.txt" % int(time.time()), "w") as fd:
+                    fd.write(self.dump_debug_frames(abbreviate = False))
+                    fd.write("\n")
+            except:
+                pass
+
             self.close_code = 1002 # protocol error
             self.close_reason = e.args[0]
             self.loseConnection()
