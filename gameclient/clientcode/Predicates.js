@@ -1820,6 +1820,9 @@ PlayerLevelPredicate.prototype.is_satisfied = function(player, qdata) {
 PlayerLevelPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%d', this.level.toString()));
 };
+/** @override */
+PlayerLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
 
 /** @constructor @struct
   * @extends Predicate */
