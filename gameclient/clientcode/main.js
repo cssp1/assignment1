@@ -38400,13 +38400,15 @@ function invoke_you_got_bonus_units() {
     @param {!SPUI.Dialog} parent of this dialog
     @param {string} spellname
     @param {Object|null} spellarg
-    @param {number} ui_index */
-function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index) {
+    @param {number} ui_index
+    @param {Array<!Object>|null} expect_loot */
+function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index, expect_loot) {
     var spell = gamedata['spells'][spellname];
     dialog.user_data['spellname'] = spellname;
     dialog.user_data['spellarg'] = spellarg;
     dialog.user_data['spell'] = spell;
     dialog.user_data['ui_index'] = ui_index;
+    dialog.user_data['expect_loot'] = expect_loot; // was originally loot-bearing at set-up time
     dialog.user_data['context_parent'] = parent; // dialog that will be the parent of any spawned inventory context menus
     dialog.user_data['pending'] = false;
     dialog.user_data['base_xy'] = vec_copy(dialog.xy);
@@ -38418,7 +38420,7 @@ function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index)
     dialog.ondraw = update_buy_gamebucks_sku23;
 }
 
-function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
+function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg, expect_loot) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['gamebucks_sku_highlight_dialog']);
     dialog.user_data['dialog'] = 'gamebucks_sku_highlight_dialog';
     install_child_dialog(dialog);
@@ -38429,7 +38431,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     dialog.user_data['pending'] = false;
     dialog.user_data['any_sku_has_bonus'] = 1; // force "bonus text" mode
     dialog.user_data['expire_time'] = -1; // XXX does this need a per-sku override?
-    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0);
+    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0, expect_loot);
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
@@ -38437,6 +38439,26 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     return dialog;
 }
 function update_gamebucks_sku_highlight_dialog(dialog) {
+    if(!dialog.widgets['sku'].show) {
+        // the SKU went away, maybe it was a one-time deal that was purchased.
+        // we're done!
+        // (this will be one frame late since the child update runs after this, but whatever...)
+
+        // reparent "item discovered"
+        var d = dialog.children[dialog.children.length-1];
+        if(d.user_data && d.user_data['dialog'] /* XXX awkward - check if this is a dialog */) {
+            dialog.unparent(d);
+        } else {
+            d = null;
+        }
+        close_dialog(dialog);
+        if(d) {
+            install_child_dialog(d);
+            d.auto_center();
+        }
+        return;
+    }
+
     update_buy_gamebucks_dialog23_warning_text(dialog);
 }
 
@@ -38549,7 +38571,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     var i = 0;
     for(; i < spell_list.length; i++) {
         var d = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]);
-        init_buy_gamebucks_sku23(d, dialog, spell_list[i]['spellname'], spell_list[i]['spellarg'] || null, i);
+        init_buy_gamebucks_sku23(d, dialog, spell_list[i]['spellname'], spell_list[i]['spellarg'] || null, i, spell_list[i]['expect_loot'] || null);
         dialog.add(d); dialog.widgets['sku'+i.toString()] = d;
         d.clip_to = [dialog.widgets['sunken'].xy[0], dialog.widgets['sunken'].xy[1],
                      dialog.widgets['sunken'].wh[0], dialog.widgets['sunken'].wh[1]];
@@ -38659,7 +38681,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         if(highlight_only) {
             close_dialog(dialog);
         }
-        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(to_highlight['spellname'], to_highlight['spellarg']);
+        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(to_highlight['spellname'], to_highlight['spellarg'], to_highlight['expect_loot']);
         if(highlight_only) {
             //highlight_dialog.widgets['close_button'].onclick = function(w) { change_selection_ui(null); }
             return;
@@ -38800,6 +38822,7 @@ function update_buy_gamebucks_sku23(dialog) {
     var spellname = dialog.user_data['spellname'];
     var spell = dialog.user_data['spell'];
     var spellarg = dialog.user_data['spellarg'];
+    var expect_loot = dialog.user_data['expect_loot'];
 
     if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
         // spell disappeared (e.g. due to sale running out)
@@ -39145,8 +39168,13 @@ function update_buy_gamebucks_sku23(dialog) {
         }
     }
 
-    update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing);
+    var has_attachments = update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing);
 
+    if(expect_loot && (!has_attachments || (has_attachments.length == 1 && has_attachments[0]['spec'] == 'gamebucks'))) {
+        // we were showing an item bundle originally, but now we're not anymore (e.g. because it was a one-time bundle
+        // and the player bought it), so hide this since it will duplicate the non-bundled version of the same SKU.
+        dialog.show = false;
+    }
 }
 
 // return list of attachments, not including bonus gamebucks
@@ -39262,9 +39290,10 @@ function collapse_item_list(ls) {
 /** @param {!SPUI.Dialog} dialog
     @param {!Object} spell
     @param {?} spellarg
-    @param {boolean} enable_attachment_pulsing */
+    @param {boolean} enable_attachment_pulsing
+    @return {!Array<!Object>} attachments */
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing) {
-    if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
+    if(!('attachments0' in dialog.widgets)) { return []; } // inapplicable
     var item_list = [];
 
     // special case for bonus gamebucks - add a virtual "gamebucks" item
@@ -39277,6 +39306,7 @@ function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_a
     }
     item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
     update_buy_gamebucks_or_store_sku_attachments(dialog, item_list, enable_attachment_pulsing);
+    return item_list;
 };
 
 /** @param {!SPUI.Dialog} dialog
