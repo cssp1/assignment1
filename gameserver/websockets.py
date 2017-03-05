@@ -121,6 +121,8 @@ def mask(buf, key):
     The key must be exactly four bytes long.
     """
 
+    assert len(key) == 4
+
 #    key = [ord(i) for i in key]
 #    buf = list(buf)
 #    for i, char in enumerate(buf):
@@ -247,6 +249,7 @@ def parse_hybi07_frames(buf):
 
         if masked:
             data = mask(data, key)
+            assert len(data) == length
 
         if opcode == CLOSE:
             if len(data) >= 2:
@@ -258,6 +261,7 @@ def parse_hybi07_frames(buf):
 
         start += offset + length
         future_data = buf[start:] # for debugging only
+        #log.err('HERE fin %d length %d buf %d' % (fin, length, len(buf) - start))
         yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, future_data, key, data), start
 
 class WebSocketsProtocol(ProtocolWrapper):
@@ -302,8 +306,8 @@ class WebSocketsProtocol(ProtocolWrapper):
         else:
             ui_buffered_data = buffered_data
 
-        return '%.7f opcode %3d fin %d len %d buffered %d data %r buf %r' % \
-               (parse_time, raw_opcode, 1 if fin else 0, length, buffered_length, ui_data, ui_buffered_data)
+        return '%.7f opcode %3d fin %d len %d key %r buffered %d data %r buf %r' % \
+               (parse_time, raw_opcode, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
