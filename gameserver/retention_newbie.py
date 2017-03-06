@@ -265,6 +265,7 @@ class Sender(object):
             return
 
         # cannot re-notify a player notified since last login, except for critical windows
+        # and note that retain_* notifications do NOT update last_fb_notification_time
         if pcache.get('last_fb_notification_time', -1) >= pcache.get('last_login_time', -1):
             can_notify_again = False
             if 'account_creation_time' in pcache:
