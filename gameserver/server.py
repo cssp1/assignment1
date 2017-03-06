@@ -31041,6 +31041,8 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.gameapi = gameapi
         self.peer_ip = str(peer.host)
         self.connected = False
+        self.sp_length = -1 # for SpinPunch fragmentation
+        self.sp_buffer = [] # for SpinPunch fragmentation
         self.close_connection_watchdog = None
         self.connect_time = -1
         self.last_request_repr = '' # for debugging only
@@ -31081,13 +31083,41 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 
     def dataReceived(self, data):
         update_server_time()
-        ret = self.do_dataReceived(data)
+
+        # SpinPunch fragmentation protocol: this is another layer of fragmentation
+        # ON TOP OF WebSocket messages. Necessary because some browsers (IE)
+        # in some configurations seem to have trouble transmitting >32KB messages
+        # intact.
+        # The protocol is just this: one websocket message of the characters 'SP'
+        # plus the decimal length (0-padded to 20 digits), followed by individual
+        # messages to concatenate to re-assemble the original message.
+
+        if len(data) >= 22 and data[0] == 'S' and data[1] == 'P':
+            # start of a SpinPunch fragmented message
+            self.sp_length = int(data[2:])
+            return
+        elif self.sp_length >= 0:
+            # inside of a SpinPunch fragmented message
+            self.sp_buffer.append(data)
+            if sum(len(x) for x in self.sp_buffer) >= self.sp_length:
+                # full message received
+                message = "".join(self.sp_buffer)
+                self.sp_buffer = []
+                self.sp_length = -1
+            else:
+                # still waiting for more fragments
+                return
+        else:
+            # literal message
+            message = data
+
+        ret = self.messageReceived(message)
         if ret is None: # error
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
             self.transport.loseConnection()
 
     @catch_all('WS_GAMEAPI')
-    def do_dataReceived(self, data):
+    def messageReceived(self, data):
         args_dict = SpinJSON.loads(data)
         self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
         self.last_request_time = server_time

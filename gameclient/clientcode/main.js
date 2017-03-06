@@ -10043,6 +10043,35 @@ var last_websocket_xmit_len = -1;
 var last_websocket_queue = null; // last AJAXMessageQueue queued for transmission on the websocket
 var last_websocket_serial = -1; // serial number of last_websocket_queue
 
+/** Low-level websocket transmission function.
+
+    SpinPunch fragmentation protocol: this is another layer of fragmentation
+    ON TOP OF WebSocket messages. Necessary because some browsers (IE)
+    in some configurations seem to have trouble transmitting >32KB messages
+    intact.
+
+    The protocol is just this: one websocket message of the characters 'SP'
+    plus the decimal length (0-padded to 20 digits), followed by individual
+    messages to concatenate to re-assemble the original message.
+
+    @param {SPWebsocket.SPWebsocket} socket
+    @param {string} data */
+function websocket_transmit(socket, data) {
+    var max_msg = gamedata['client']['websocket_max_message'] || 0;
+    if(max_msg > 0 && data.length > max_msg) {
+        var ptr = 0;
+        // send "start of fragmented message" message
+        socket.send('SP'+pad_with_zeros(data.length.toString(), 20));
+        while(ptr < data.length) {
+            var to_send = Math.min(data.length - ptr, max_msg);
+            socket.send(data.slice(ptr, ptr + to_send));
+            ptr += to_send;
+        }
+    } else {
+        socket.send(data);
+    }
+};
+
 /** @param {boolean=} force
     @param {number=} my_timeout */
 function flush_message_queue(force, my_timeout) {
@@ -10186,7 +10215,8 @@ function flush_message_queue(force, my_timeout) {
             var on_websocket_reconnect = function(event) {
                 console.log('WebSocket reconnected. Retransmitting '+retrans_buffer.length().toString()+' messages.');
                 goog.array.forEach(retrans_buffer.buf, function(serial_msg) {
-                    the_websocket.send(JSON.stringify({'myarg': serial_msg[1],
+                    websocket_transmit(the_websocket,
+                                       JSON.stringify({'myarg': serial_msg[1],
                                                        'serial': serial_msg[0],
                                                        'ack': ajax_next_serial - 1,
                                                        'session': session.session_id}));
@@ -10203,7 +10233,7 @@ function flush_message_queue(force, my_timeout) {
             the_websocket.connect();
         }
 
-        send_it = (function (_data_str, _the_websocket) { return function() { _the_websocket.send(_data_str); }; })(data_str, the_websocket);
+        send_it = (function (_data_str, _the_websocket) { return function() { websocket_transmit(_the_websocket, _data_str); }; })(data_str, the_websocket);
 
     } else {
         // Google Closure XhrIo method

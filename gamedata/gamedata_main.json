@@ -97,6 +97,11 @@
 
         "websocket_keepalive_interval": 50, // always send something down the websocket this frequently
 
+        // max number of bytes to send in a single Websocket message.
+        // Some browsers (IE) seem to have trouble with 32KB+ messages.
+        // note: applies in upstream direction only.
+        "websocket_max_message": 30000,
+
         "ajax_message_buffer": 50, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
 
         "enable_ajax_longpoll": 1, // use longpoll request mechanism
