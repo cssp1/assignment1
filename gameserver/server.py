@@ -31092,7 +31092,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         # plus the decimal length (0-padded to 20 digits), followed by individual
         # messages to concatenate to re-assemble the original message.
 
-        if len(data) >= 22 and data[0] == 'S' and data[1] == 'P':
+        if self.sp_length < 0 and len(data) >= 22 and data[0] == 'S' and data[1] == 'P':
             # start of a SpinPunch fragmented message
             self.sp_length = int(data[2:])
             return
