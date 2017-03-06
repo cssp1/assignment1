@@ -178,6 +178,7 @@
 
     "exclusive_zone_player": 2, // minimum hex distance spacing of player base from other objects
     "neighbor_search_radius": 8, // when relocating base, how far away from the desired location to search for an empty spot
+    "relocate_min_move": 3, // minimum number of hexes to move when relocating within the same region
     "map_placement_gen": 3, // temporary - generation number for successive map placement trials
 
     "enable_auto_resolve": 1,

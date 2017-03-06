@@ -14025,7 +14025,7 @@ class LivePlayer(Player):
 
         if self.history.get('map_placement_gen', 0) < gamedata['territory']['map_placement_gen'] and \
            (self.eligible_for_quarries() or (force_region is not None)):
-            success = self.change_region(force_region if (force_region is not None) else None, None, session, retmsg, reason='update_map_placement')
+            success = self.change_region(force_region if (force_region is not None) else None, None, None, session, retmsg, reason='update_map_placement')
             if success and retmsg:
                 self.send_history_update(retmsg)
 
@@ -14043,14 +14043,14 @@ class LivePlayer(Player):
 
         return True
 
-    def change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+    def change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = ''):
         with admin_stats.latency_measurer('change_region(%s)' % reason):
-            return self._change_region(request_region, request_loc, session, retmsg, reason = reason)
+            return self._change_region(request_region, request_loc, request_precision, session, retmsg, reason = reason)
 
     # main region-change function
     # pass None to get a random region
     # returns whether it succeeded or not
-    def _change_region(self, request_region, request_loc, session, retmsg, reason = ''):
+    def _change_region(self, request_region, request_loc, request_precision, session, retmsg, reason = ''):
         if (not gamesite.nosql_client):
             return False
 
@@ -14058,8 +14058,14 @@ class LivePlayer(Player):
         new_region_pop = None
         new_loc = request_loc
 
+        # set up precision with defaults
+        precision = { 'min_move': gamedata['territory']['relocate_min_move'],
+                      'max_rad': gamedata['territory']['neighbor_search_radius'] }
+        if request_precision: # and allow request_precision to override
+            precision.update(request_precision)
+
         if gamedata['server']['log_map']:
-            gamesite.exception_log.event(server_time, 'map: player %d change_region %s %s' % (self.user_id, repr(new_region), repr(new_loc)))
+            gamesite.exception_log.event(server_time, 'map: player %d change_region %s %s request_precision %s precision %s' % (self.user_id, repr(new_region), repr(new_loc), repr(request_precision), repr(precision)))
 
         randgen = random.Random(self.user_id ^ gamedata['territory']['map_placement_gen'] ^ int(server_time))
 
@@ -14147,7 +14153,7 @@ class LivePlayer(Player):
             if new_loc:
                 # search within a radius around new_loc
                 trials_set = set()
-                rad = gamedata['territory']['neighbor_search_radius']
+                rad = precision['max_rad']
                 for i in xrange(100):
                     tr = (new_loc[0] + int((2*randgen.random()-1)*rad),
                           new_loc[1] + int((2*randgen.random()-1)*rad))
@@ -14177,7 +14183,12 @@ class LivePlayer(Player):
                 trials = map(lambda x: (min(max(placement_range[0][0] + int((placement_range[0][1]-placement_range[0][0])*randgen.random()), 2), map_dims[0]-2),
                                         min(max(placement_range[1][0] + int((placement_range[1][1]-placement_range[1][0])*randgen.random()), 2), map_dims[1]-2)), xrange(100))
 
+            # note: this will exclude the currently-occupied location, preventing "non-moves"
             trials = filter(lambda x: not Region(gamedata, new_region).obstructs_bases(x), trials)
+
+            if new_region == old_region and old_loc and precision['min_move'] > 1:
+                # exclude locations too near currently-occupied location
+                trials = filter(lambda x: hex_distance(x, old_loc) >= precision['min_move'], trials)
 
             if gamedata['server']['log_map']:
                 gamesite.exception_log.event(server_time, 'map: player %d change_region attempting to place in %s' % (self.user_id, repr(new_region)))
@@ -14282,7 +14293,7 @@ class LivePlayer(Player):
         # update player cache
         gamesite.pcache_client.player_cache_update(self.user_id, {'home_region':self.home_region, 'home_base_loc':self.my_home.base_map_loc}, reason ='change_region')
 
-        metric_event_coded(self.user_id, '4701_change_region_success', {'request_region':request_region, 'request_loc':request_loc,
+        metric_event_coded(self.user_id, '4701_change_region_success', {'request_region':request_region, 'request_loc':request_loc, 'request_precision':request_precision,
                                                                         'new_region': self.home_region, 'new_loc': self.my_home.base_map_loc,
                                                                         'ladder_reset': ladder_reset,
                                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':reason})
@@ -20390,6 +20401,25 @@ class GAMEAPI(resource.Resource):
 
             new_region = spellarg[0]
             new_loc = spellarg[1]
+            if len(spellarg) >= 3:
+                new_loc_precision = spellarg[2]
+            else:
+                new_loc_precision = None
+
+            if new_loc_precision:
+                # check validity of precision parameter
+                assert isinstance(new_loc_precision, dict)
+                # if not developer, then must use canned parameters
+                if not session.player.is_cheater:
+                    max_rad = new_loc_precision.get('max_rad', gamedata['territory']['neighbor_search_radius'])
+                    min_move = new_loc_precision.get('min_move', gamedata['territory']['relocate_min_move'])
+
+                    if max_rad != gamedata['territory']['neighbor_search_radius'] or \
+                       min_move < 1 or \
+                       min_move*3 >= max_rad*2: # ensure min_move is less than (2/3) of max_rad
+                        retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                        return False
+
             spell = gamedata['spells']['CHANGE_REGION']
             cdname = spell['cooldown_name']
 
@@ -20428,9 +20458,9 @@ class GAMEAPI(resource.Resource):
                         return False
 
             reason = 'player_request'
-            metric_event_coded(session.user.user_id, '4700_change_region_request', {'request_region':new_region, 'request_loc':new_loc,
+            metric_event_coded(session.user.user_id, '4700_change_region_request', {'request_region':new_region, 'request_loc':new_loc, 'request_precision':new_loc_precision,
                                                                                     'old_region':session.player.home_region, 'old_loc':session.player.my_home.base_map_loc, 'reason':reason})
-            success = session.player.change_region(new_region, new_loc, session, retmsg, reason=reason)
+            success = session.player.change_region(new_region, new_loc, new_loc_precision, session, retmsg, reason=reason)
 
             if success:
                 session.player.cooldown_trigger(cdname, spell['cooldown'])

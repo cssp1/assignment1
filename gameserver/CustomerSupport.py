@@ -1264,7 +1264,7 @@ class HandleChangeRegion(Handler):
 
     # then after complete_attack...
     def do_exec_online2(self, change_session_result, session, retmsg):
-        success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
+        success = session.player.change_region(self.new_region, None, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
         else:
@@ -1344,6 +1344,7 @@ class HandleChangeRegion(Handler):
 
         new_region = self.new_region
         new_loc = None
+        new_loc_precision = None
 
         base_id = 'h'+str(self.user_id) # copy of server.py: home_base_id()
 
@@ -1449,7 +1450,7 @@ class HandleChangeRegion(Handler):
 
         self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
                                                         'event_name': '4701_change_region_success',
-                                                        'request_region':new_region, 'request_loc':new_loc,
+                                                        'request_region':new_region, 'request_loc':new_loc, 'request_precision':new_loc_precision,
                                                         'new_region': player['base_region'], 'new_loc': player['base_map_loc'],
                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':'CustomerSupport'})
         # drop lock from create_map_feature()
