@@ -29121,7 +29121,8 @@ function alliance_logo_chooser_rowfunc(dialog, row, name) {
         fw.onclick = (function (_name) { return function(w) {
             var _dialog = w.parent;
             _dialog.user_data['logo'] = _name;
-            if(_dialog.parent) {
+            if(_dialog.parent && _dialog.parent.widgets['create_tab'] &&
+               _dialog.parent.widgets['create_tab'].user_data) {
                 _dialog.parent.widgets['create_tab'].user_data['logo'] = _dialog.user_data['logo'];
                 _dialog.parent.widgets['create_tab'].user_data['changed'] = true;
                 alliance_list_change_tab(_dialog.parent, _dialog.parent.user_data['tab']);

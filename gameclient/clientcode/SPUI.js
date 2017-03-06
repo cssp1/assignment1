@@ -2232,7 +2232,11 @@ SPUI.ActionButton.prototype.on_mouseup = function(uv, offset, button) {
         if(this.state === 'disabled') { return true; }
         if(this.onclick) {
             if(this.bg_image) {
-                var art_state = /** @type {!GameArt.Sprite} */ (GameArt.assets[this.bg_image].states[this.state]);
+                var art_asset = GameArt.assets[this.bg_image];
+                if(!art_asset.has_state(this.state)) {
+                    throw Error(this.get_address()+': art asset "'+this.bg_image+'" is missing state '+this.state);
+                }
+                var art_state = /** @type {!GameArt.Sprite} */ (art_asset.states[this.state]);
                 if(art_state.audio) {
                     art_state.audio.play(SPUI.time);
                 }

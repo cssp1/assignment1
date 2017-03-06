@@ -2301,6 +2301,9 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
             } else {
                 var icon_type;
                 if(feature['base_type'] == 'quarry') {
+                    if(!feature['base_icon']) {
+                        throw Error('quarry feature is missing base_icon! '+JSON.stringify(feature));
+                    }
                     icon_type = 'quarry_'+feature['base_icon'];
                 } else {
                     var info = (feature['base_type'] == 'home' && feature['base_landlord_id'] ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
@@ -2315,6 +2318,9 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                     }
                 }
 
+                if(!GameArt.assets['region_tiles'].has_state(icon_type)) {
+                    throw Error('region_tiles art asset is missing state "'+icon_type+'" for feature '+JSON.stringify(feature));
+                }
                 GameArt.assets['region_tiles'].states[icon_type].draw_topleft([base_xy[0]-cover[0], base_xy[1]-cover[1]-2], 0, 0);
             }
 
