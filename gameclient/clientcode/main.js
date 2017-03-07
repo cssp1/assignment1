@@ -17304,11 +17304,11 @@ function invoke_gift_received_dialog(override_ls) {
         sender_name = 'Unknown';
     }
 
-    if(get_facebook_viral('say_thanks') && sender_fbid) {
-        dialog.widgets['say_thanks_button'].onclick = (function (a, b, c, d) { return function() {
+    if(get_facebook_viral('say_thanks')) {
+        dialog.widgets['say_thanks_button'].onclick = (function (_sender_name, _loot) { return function() {
             change_selection(null);
-            invoke_say_thanks(a, b, c, d);
-        }; })(sender_fbid, sender_user_id, sender_name, ls[0].loot);
+            invoke_say_thanks(_sender_name, _loot);
+        }; })(sender_name, ls[0].loot);
     } else {
         dialog.widgets['say_thanks_button'].show = false;
     }
@@ -17320,7 +17320,7 @@ function invoke_gift_received_dialog(override_ls) {
     };
 };
 
-function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name, loot) {
+function invoke_say_thanks(recipient_ui_name, loot) {
     var viral = get_facebook_viral('say_thanks');
     if(!viral) { return; }
     var loot_text = '';
@@ -17333,8 +17333,8 @@ function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name
         loot_text += viral['ui_generic_loot'];
     }
 
-    FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
-                    description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
+    FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
+                    description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref:'feed_thanks'});
 };
