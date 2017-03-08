@@ -1277,7 +1277,7 @@
                     "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset":[0,-53] },
 
             "unit": { "kind": "ActionButton", "xy": [0,0], "dimensions": [57,57], "bg_image_offset": [0,3], "bg_image_justify": "center",
-                      "bg_image": "inventory_unknown", "state": "icon" },
+                      "state": "icon" },
             "counter": { "kind": "TextField", "xy": [0,74], "dimensions": [59,19],
                          "text_size": 13, "text_style": "bold", "ui_name": "99/99" },
             "cancel": { "kind": "ActionButton", "xy": [39,1], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1},
