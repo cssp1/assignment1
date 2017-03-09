@@ -15015,6 +15015,10 @@ class STATSAPI(resource.Resource):
             func = self.render_player
         elif method == 'alliance':
             func = self.render_alliance
+        elif method == 'gamedata':
+            func = self.render_gamedata
+        elif method == 'gamedata_ref':
+            func = self.render_gamedata_ref
         else:
             request.setResponseCode(http.BAD_REQUEST)
             return u'{"error":"Unknown method"}\n'.encode('utf-8')
@@ -15032,6 +15036,64 @@ class STATSAPI(resource.Resource):
             ret = u'{"error":"Internal server error"}\n'
 
         return ret.encode('utf-8')
+
+    def render_gamedata_ref(self, args):
+        # used to get misc. pieces of gamedata the front-end needs
+        data = {'strings':{'modstats':{'stats':gamedata['strings']['modstats']['stats']}},
+                'resources': gamedata['resources']}
+        return SpinJSON.dumps({'result': data}, newline=True, pretty=False)
+
+    def render_gamedata(self, args):
+        # responds to 3 types of query:
+        # 1. what kinds are available?
+        # 2. for a given kind, what specs are available?
+        # 3. return a given spec
+        kind = args.get('kind', None)
+        spec = args.get('spec', None)
+
+        assert kind in (None,'units','buildings','tech','items','enhacements')
+
+        if not kind:
+            # return master category list
+            data = ['units','buildings','tech']
+        elif not spec:
+            # directory listing
+
+            # return a subset of properties from each spec
+            FIELDS = ['name','ui_name','ui_priority',
+                      'manufacture_category','research_category','build_category','enhance_category','category']
+
+            def get_listing(spec):
+                ret = dict((f, spec[f]) for f in FIELDS if f in spec)
+                # also compute a "priority" for UI display
+                if 'ui_priority' not in ret:
+                    prio_field = {'units': 'build_time',
+                                  'buildings': 'build_time',
+                                  'tech': 'research_time',
+                                  'enhacements': 'enhance_time'}.get(kind)
+                    if prio_field:
+                        ret['ui_priority'] = -1 * GameObjectSpec.get_leveled_quantity(spec[prio_field], 1)
+                return ret
+
+            data = map(get_listing, filter(lambda x: not x.get('developer_only'), gamedata[kind].itervalues()))
+
+        else:
+            # one specific object
+            data = gamedata[kind][spec]
+
+            # cross-link techs and units
+            if kind == 'tech':
+                if 'associated_unit' in data:
+                    data['ui_description'] = gamedata['units'][data['associated_unit']]['ui_description']
+            elif kind == 'units':
+                if 'level_determined_by_tech' in data:
+                    tech = gamedata['tech'][data['level_determined_by_tech']]
+                    data['research_time'] = tech['research_time']
+                    for res in gamedata['resources']:
+                        if 'cost_'+res in tech:
+                            data['research_cost_'+res] = tech.get('cost_'+res)
+
+        return SpinJSON.dumps({'result': data}, newline=True, pretty=False)
 
     def render_player(self, args):
         player_id = int(args.get('player_id', -1))
