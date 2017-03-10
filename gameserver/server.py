@@ -25124,7 +25124,7 @@ class GAMEAPI(resource.Resource):
         user_agent = SpinHTTP.get_twisted_header(request, 'user-agent')
         args_dict = dict((k, request.args[k][0]) for k in request.args)
 
-        return self.render_request(request, args_dict, client_ip, user_agent)
+        return self.render_request(request, args_dict, client_ip, user_agent)[0]
 
     def render_request(self, http_request, args_dict, client_ip, user_agent):
         error_response = None
@@ -25146,7 +25146,9 @@ class GAMEAPI(resource.Resource):
             http_request.setHeader('Connection', 'close') # stop keepalive
             error_response = SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]})
 
-        return error_response or response
+        reply = error_response or response
+        is_error = (error_response is not None)
+        return (reply, is_error)
 
     def do_render_request(self, http_request, args_dict, client_ip, user_agent):
         if 'proxy_keepalive_only' in args_dict:
@@ -31173,22 +31175,44 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
             # literal message
             message = data
 
-        ret = self.messageReceived(message)
-        if ret is None: # error
-            self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_EXCEPTION"]]}))
-            self.transport.loseConnection()
+        self.messageReceived(message)
 
     @catch_all('WS_GAMEAPI')
     def messageReceived(self, data):
-        args_dict = SpinJSON.loads(data)
+
+        try:
+            args_dict = SpinJSON.loads(data)
+            if not isinstance(args_dict, dict):
+                raise ValueError('expected dict but got %r' % type(args_dict))
+
+        except ValueError:
+            if len(data) < 100:
+                ui_message = data
+            else:
+                # abbreviate
+                ui_message = data[0:16] + '...' + data[-16:]
+            gamesite.exception_log.event(server_time, 'WS_GAMEAPI received bad JSON message from %r: %r' % \
+                                         (self.peer_ip, ui_message))
+            # write the corrupted data out for later analysis
+            with open("/tmp/websocket-debug-%d.txt" % int(time.time()), "w") as fd:
+                fd.write(data)
+            self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]}))
+            self.transport.loseConnection()
+            return
+
         self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
         self.last_request_time = server_time
-        response = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
-        if response == twisted.web.server.NOT_DONE_YET:
+
+        reply, is_error = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
+
+        if reply == twisted.web.server.NOT_DONE_YET:
             pass
         else:
-            self.transport.write(response)
-        return True # signal wrapper that we're OK
+            self.transport.write(reply)
+
+        if is_error:
+            # disconnect when there's a protocol error or server exception
+            self.transport.loseConnection()
 
     def __repr__(self):
         if self.last_request_time > 0:
