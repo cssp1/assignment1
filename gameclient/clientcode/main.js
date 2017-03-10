@@ -48340,6 +48340,8 @@ function handle_server_message(data) {
             invoke_timeout_message('0611_client_died_from_maint_kick', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
         } else if(name == "SERVER_EXCEPTION") {
             invoke_timeout_message('0610_client_died_from_server_exception', {}, {});
+        } else if(name == "SERVER_PROTOCOL") {
+            invoke_timeout_message('0609_client_died_from_protocol_error', {}, {});
         } else if(name == "TOO_LAGGED_UPSTREAM") {
             invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'server'}, {});
         } else if(name == "TOO_LAGGED_DOWNSTREAM") {
