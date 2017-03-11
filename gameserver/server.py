@@ -8205,7 +8205,7 @@ class Base(object):
     def quarry_victory_satisfied(self):
         for obj in self.iter_objects():
             if obj.owner.user_id in (self.base_landlord_id, RogueOwner.user_id):
-                if obj.is_building() and (not obj.is_destroyed()) and obj.spec.history_category == 'turrets':
+                if obj.is_building() and (not obj.is_destroyed()) and obj.spec.history_category in ('turrets','turret_emplacements'):
                     return False
                 if obj.is_mobile() and (not obj.is_destroyed()) and self.can_deploy_unit(obj.spec):
                     return False
