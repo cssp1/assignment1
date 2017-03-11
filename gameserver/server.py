@@ -19645,11 +19645,13 @@ class GAMEAPI(resource.Resource):
 
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
 
-        session.player.recalc_stattab(session.player)
+        # use additional_base parameter to iterate through hive/quarry buildings -
+        # right now we restrict this to AIs and quarries just for safety, but in theory it should work for players too
+        session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
         session.player.stattab.send_update(session, change_retmsg)
+
         if session.viewing_player is not session.player:
-            # also iterate through hive/quarry buildings - right now we restrict this to AIs just for safety, but in theory it should work for players too
-            session.viewing_player.recalc_stattab(session.player, additional_base = session.viewing_base if ((session.viewing_base is not session.viewing_player.my_home) and session.viewing_player.is_ai()) else None)
+            session.viewing_player.recalc_stattab(session.player, additional_base = session.viewing_base if ((session.viewing_base is not session.viewing_player.my_home) and (session.viewing_player.is_ai() or session.viewing_base.base_type == 'quarry')) else None)
             session.viewing_player.stattab.send_update(session, change_retmsg)
 
         power_state = session.viewing_base.get_power_state()
