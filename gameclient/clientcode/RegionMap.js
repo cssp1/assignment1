@@ -2631,7 +2631,9 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
                 color = 'other_home';
             }
         }
-        if(feature['base_richness'] >= 40) {
+        var richness_table = gamedata['strings']['regional_map']['richness'];
+        var max_richness = richness_table[richness_table.length-1][0];
+        if(feature['base_richness'] >= max_richness) {
             color += '_xl';
         }
     } else if(goog.array.contains(['hive','raid'], feature['base_type'])) {
