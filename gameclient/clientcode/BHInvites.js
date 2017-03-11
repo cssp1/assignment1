@@ -133,6 +133,16 @@ BHInvites.init_invite_tab = function(dialog, mentor, trainee_list) {
     // begin async fetch of invite code
     BHSDK.bh_invite_code_get(gamedata['game_id'], (function (_dialog) { return function(result) {
         var dialog = _dialog;
+
+        if('error' in result) {
+            dialog.widgets['loading_spinner'].show = false;
+            dialog.widgets['invite_code_error'].show = true;
+            dialog.widgets['invite_code_error'].set_text_with_linebreaking(
+                dialog.data['widgets']['invite_code_error']['ui_name'].replace('%s', result['error'])
+            );
+            return;
+        }
+
         var code = result['code'];
         var url = result['url'];
         dialog.user_data['url'] = url;

@@ -9742,6 +9742,12 @@
             "instructions": { "kind": "TextField", "xy": [36,155], "dimensions": [246,200], "text_hjustify": "left", "text_vjustify": "top", "text_size": 13, "text_color": [0.8,0.8,0.8],
                               "ui_name": "Click below to get your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
 
+            "invite_code_error": { "show": 0, "kind": "TextField", "xy": [41,278], "dimensions": [230,44],
+                                   "text_hjustify": "center", "text_vjustify": "center",
+                                   "text_size": 13, "text_color": [1,0,0],
+                                   "ui_name": "Error retrieving invite code: %s"
+                                },
+
             "copy_link_button": { "show": 0, "kind": "ActionButton", "xy": [41,338], "dimensions": [230,44],
                                   "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
                                   "text_hjustify": "center", "text_vjustify": "center",
