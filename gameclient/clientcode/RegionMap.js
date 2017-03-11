@@ -1226,10 +1226,10 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                           PlayerInfoDialog.invoke(_feature['base_landlord_id']);
                       }; })(mapwidget, feature), 'passive']);
 
-    } else if(!player.is_cheater && goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates']) &&
-              ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
-              !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
-        var rpred = read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']);
+    } else if(!player.is_cheater && goog.array.contains(['hive','raid','quarry'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates']) &&
+              ('activation' in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]) &&
+              !read_predicate(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+        var rpred = read_predicate(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['activation']);
         var pred_text = rpred.ui_describe(player);
         buttons.push([gamedata['strings']['regional_map']['locked'], get_requirements_help(rpred), 'disabled_clickable',
                       gamedata['strings']['regional_map']['to_unlock'].replace('%s',pred_text), SPUI.error_text_color]);
@@ -1658,9 +1658,9 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         }
     } else if(('protection_end_time' in feature) && (feature['protection_end_time'] == 1 || feature['protection_end_time'] > mapwidget.time)) {
         blink_list.push({'status':(player.raids_enabled() ? 'protection' : 'home_or_protection')});
-    } else if(!player.is_cheater && goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates']) &&
-              ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
-              !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+    } else if(!player.is_cheater && goog.array.contains(['hive','raid','quarry'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates']) &&
+              ('activation' in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]) &&
+              !read_predicate(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
         blink_list.push({'status':'locked'});
     } else if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_expire_time' in feature) && (feature['base_expire_time'] > 0) &&
               (feature['base_expire_time'] - mapwidget.time) < gamedata['territory']['escaping_soon_time']) {
@@ -2348,17 +2348,17 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                 }
             }
 
-            if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[feature['base_type']+'s_client']['templates'])) {
-                if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens2']) {
-                    token_icon = ItemDisplay.get_inventory_item_spec(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['ui_tokens2']['spec'])['store_icon'];
+            if(goog.array.contains(['hive','raid','quarry'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'])) {
+                if(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['ui_tokens2']) {
+                    token_icon = ItemDisplay.get_inventory_item_spec(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['ui_tokens2']['spec'])['store_icon'];
                     // if the template specifies its own token_icon, override the default one here
-                    if(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['token_icon']) {
-                        token_icon = gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['token_icon'];
+                    if(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['token_icon']) {
+                        token_icon = gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['token_icon'];
                     }
                 }
-                if(!player.is_cheater && ('activation' in gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]) &&
-                   !read_predicate(gamedata[feature['base_type']+'s_client']['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
-                    show_padlock = true; // hive that player cannot attack
+                if(!player.is_cheater && ('activation' in gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]) &&
+                   !read_predicate(gamedata[{'hive':'hives_client','raid':'raids_client','quarry':'quarries_client'}[feature['base_type']]]['templates'][feature['base_template']]['activation']).is_satisfied(player,null)) {
+                    show_padlock = true; // hive or quarry that player cannot attack
                 }
             }
 

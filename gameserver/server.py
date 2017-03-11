@@ -19196,8 +19196,9 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "CANNOT_SPY_TRAVEL_NOT_ARRIVED"])
                 cannot_spy = True
 
-        if dest_base and dest_base.base_type == 'hive':
-            template = gamedata['hives_server']['templates'].get(dest_base.base_template, None)
+        if dest_base and dest_base.base_type in ('hive','quarry'):
+            template = gamedata[{'hive':'hives_server','quarry':'quarries_server'}[dest_base.base_type]]['templates'] \
+                       .get(dest_base.base_template, None)
             if template and ('activation' in template) and (not session.player.is_cheater):
                 if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
                     retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
