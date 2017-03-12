@@ -29366,7 +29366,8 @@ class GAMEAPI(resource.Resource):
 
                         for data in base.get('buildings',[]):
                             spec = data['spec']
-                            if 'quarry' in filename and spec == '%RESOURCE_harvester': # for quarries
+                            if ('quarr' in filename or 'strongpoint' in filename) and \
+                               spec == '%RESOURCE_harvester': # for quarries
                                 spec = gamedata['resources']['iron']['harvester_building']
                             obj = instantiate_object_for_player(session.player, session.player, spec, x=data['xy'][0], y=data['xy'][1],
                                                                 level = data.get('force_level', data.get('level',1)))
@@ -29431,7 +29432,8 @@ class GAMEAPI(resource.Resource):
                         for obj in session.player.home_base_iter():
                             if obj.is_building():
                                 spec = obj.spec.name
-                                if 'quarry' in filename and spec in [x['harvester_building'] for x in gamedata['resources'].itervalues()]:
+                                if ('quarr' in filename or 'strongpoint' in filename) \
+                                   and spec in [x['harvester_building'] for x in gamedata['resources'].itervalues()]:
                                     spec = '%RESOURCE_harvester'
                                 props = {'spec':spec, 'xy': [obj.x,obj.y],
                                          'force_level': obj.level }
