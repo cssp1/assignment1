@@ -15061,7 +15061,8 @@ class STATSAPI(resource.Resource):
 
             # return a subset of properties from each spec
             FIELDS = ['name','ui_name','ui_priority',
-                      'manufacture_category','research_category','build_category','enhance_category','category']
+                      'manufacture_category','research_category','build_category','enhance_category','category',
+                      'associated_unit']
 
             def get_listing(spec):
                 ret = dict((f, spec[f]) for f in FIELDS if f in spec)
@@ -15092,6 +15093,34 @@ class STATSAPI(resource.Resource):
                     for res in gamedata['resources']:
                         if 'cost_'+res in tech:
                             data['research_cost_'+res] = tech.get('cost_'+res)
+
+            # provide art URLs, if possible
+            for prop in ('icon','splash_image','art_asset'):
+                raw_entry = data.get(prop)
+                if raw_entry:
+                    if not isinstance(raw_entry, list):
+                        asset_list = [raw_entry]
+                    else:
+                        asset_list = raw_entry
+                    asset_name = asset_list[-1]
+                    asset = gamedata['art'].get(asset_name)
+                    if asset:
+                        found = False
+                        for state in ('hero','normal','icon'):
+                            state = asset['states'].get(state)
+                            if state:
+                                if 'images' in state:
+                                    filename = state['images'][0]
+                                    for proto in 'http', 'https':
+                                        key = {'http':'external_http_port','ssl':'external_ssl_port'}[proto]
+                                        if SpinConfig.config['proxyserver'].get(key, -1) > 0:
+                                            port = SpinConfig.config['proxyserver'][key]
+                                            port_str = (':%d' % port) if port != {'http':80,'https':443}[proto] else ''
+                                            host = SpinConfig.config['proxyserver'].get('external_host', socket.gethostname())
+                                            data[prop+'_url'] = '%s://%s%s/%s' % (proto,host, port_str, filename)
+                                            found = True
+                                            break
+                            if found: break
 
         return SpinJSON.dumps({'result': data}, newline=True, pretty=False)
 
