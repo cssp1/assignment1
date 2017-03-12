@@ -665,6 +665,8 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
         spec = p['spec']
         if spec == '%RESOURCE_harvester':
             spec = gamedata['resources'][resource]['harvester_building']
+        elif spec == 'quarry_logistics': # XXX temp for FS - don't spawn yet
+            continue
         assert spec in gamedata['buildings']
         obj = {'obj_id': nosql_id_generator.generate(),
                'spec':  spec,
