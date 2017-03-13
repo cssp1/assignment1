@@ -31225,10 +31225,10 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
             else:
                 # abbreviate
                 ui_message = data[0:16] + '...' + data[-16:]
-            gamesite.exception_log.event(server_time, 'WS_GAMEAPI received bad JSON message from %r: %r' % \
-                                         (self.peer_ip, ui_message))
+            gamesite.exception_log.event(server_time, 'WS_GAMEAPI received bad JSON message from %r (len %d): %r' % \
+                                         (self.peer_ip, len(data), ui_message))
             # write the corrupted data out for later analysis
-            with open("/tmp/websocket-debug-%d.txt" % int(time.time()), "w") as fd:
+            with open("/tmp/websocket-debug-%.6f.txt" % time.time(), "w") as fd:
                 fd.write(data)
             self.transport.write(SpinJSON.dumps({'serial':-1, 'clock': server_time, 'msg': [["ERROR", "SERVER_PROTOCOL"]]}))
             self.transport.loseConnection()
