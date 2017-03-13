@@ -15125,7 +15125,7 @@ class STATSAPI(resource.Resource):
                                 if 'images' in state:
                                     index = 0
                                     filename = state['images'][index]
-                                    for proto in 'http', 'https':
+                                    for proto in 'https', 'http':
                                         key = {'http':'external_http_port','ssl':'external_ssl_port'}[proto]
                                         if SpinConfig.config['proxyserver'].get(key, -1) > 0:
                                             port = SpinConfig.config['proxyserver'][key]
