@@ -15039,7 +15039,11 @@ class STATSAPI(resource.Resource):
 
     def render_gamedata_ref(self, args):
         # used to get misc. pieces of gamedata the front-end needs
-        data = {'strings':{'modstats':{'stats':gamedata['strings']['modstats']['stats']}},
+        data = {'strings':{'modstats':{'stats':gamedata['strings']['modstats']['stats']},
+                           'damage_vs_categories': gamedata['strings']['damage_vs_categories'],
+                           'object_kinds': gamedata['strings']['object_kinds'],
+                           'manufacture_categories': gamedata['strings']['manufacture_categories'],
+                           },
                 'resources': gamedata['resources']}
         return SpinJSON.dumps({'result': data}, newline=True, pretty=False)
 
@@ -15049,14 +15053,14 @@ class STATSAPI(resource.Resource):
         # 2. for a given kind, what specs are available?
         # 3. return a given spec
         kind = args.get('kind', None)
-        spec = args.get('spec', None)
+        specname = args.get('spec', None)
 
         assert kind in (None,'units','buildings','tech','items','enhacements')
 
         if not kind:
             # return master category list
             data = ['units','buildings','tech']
-        elif not spec:
+        elif not specname:
             # directory listing
 
             # return a subset of properties from each spec
@@ -15080,23 +15084,32 @@ class STATSAPI(resource.Resource):
 
         else:
             # one specific object
-            data = gamedata[kind][spec]
+
+            # copy, because we might mutate it!
+            spec = copy.deepcopy(gamedata[kind][specname])
+            data = {kind: {specname: spec}}
 
             # cross-link techs and units
             if kind == 'tech':
-                if 'associated_unit' in data:
-                    data['ui_description'] = gamedata['units'][data['associated_unit']]['ui_description']
+                if 'associated_unit' in spec:
+                    spec['ui_description'] = gamedata['units'][spec['associated_unit']]['ui_description']
             elif kind == 'units':
-                if 'level_determined_by_tech' in data:
-                    tech = gamedata['tech'][data['level_determined_by_tech']]
-                    data['research_time'] = tech['research_time']
+                if 'level_determined_by_tech' in spec:
+                    tech = gamedata['tech'][spec['level_determined_by_tech']]
+                    spec['research_time'] = tech['research_time']
                     for res in gamedata['resources']:
                         if 'cost_'+res in tech:
-                            data['research_cost_'+res] = tech.get('cost_'+res)
+                            spec['research_cost_'+res] = tech.get('cost_'+res)
+
+            # cross-link weapon spells
+            if kind == 'units' and 'spells' in spec:
+                data['spells'] = dict((spellname, gamedata['spells'][spellname]) for spellname in spec['spells'])
+            elif 'associated_spell' in spec:
+                data['spells'] = {spec['associated_spell']: gamedata['spells'][spec['associated_spell']]}
 
             # provide art URLs, if possible
             for prop in ('icon','splash_image','art_asset'):
-                raw_entry = data.get(prop)
+                raw_entry = spec.get(prop)
                 if raw_entry:
                     if not isinstance(raw_entry, list):
                         asset_list = [raw_entry]
@@ -15118,10 +15131,10 @@ class STATSAPI(resource.Resource):
                                             port = SpinConfig.config['proxyserver'][key]
                                             port_str = (':%d' % port) if port != {'http':80,'https':443}[proto] else ''
                                             host = SpinConfig.config['proxyserver'].get('external_host', socket.gethostname())
-                                            data[prop+'_url'] = '%s://%s%s/%s' % (proto,host, port_str, filename)
-                                            data[prop+'_dimensions'] = state['dimensions']
+                                            spec[prop+'_url'] = '%s://%s%s/%s' % (proto,host, port_str, filename)
+                                            spec[prop+'_dimensions'] = state['dimensions']
                                             if 'origins' in state:
-                                                data[prop+'_origin'] = state['origins'][2*index:2*index+2]
+                                                spec[prop+'_origin'] = state['origins'][2*index:2*index+2]
                                             found = True
                                             break
                             if found: break
