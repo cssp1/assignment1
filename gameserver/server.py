@@ -18590,8 +18590,9 @@ class GAMEAPI(resource.Resource):
                                                                                            'last_landlord_id': session.viewing_player.user_id})
 
                         # check if a strongpoint was conquered
-                        template = gamedata['quarries_server']['templates'][session.viewing_base.base_template]
-                        if template.get('turf_points',0) > 0:
+                        template = gamedata['quarries_server']['templates'].get(session.viewing_base.base_template,None)
+
+                        if template and template.get('turf_points',0) > 0:
                             session.increment_player_metric('strongpoints_conquered', 1, time_series = False)
 
                         # allow instant collection
