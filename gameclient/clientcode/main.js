@@ -42947,6 +42947,29 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
+    // optional webstats link
+    dialog.widgets['webstats_button'].show = false;
+    if(!dialog.widgets['upgrade_info_button'].show) {
+        var webstats_template = eval_cond_or_literal(gamedata['strings']['webstats_url'] || null, player, null);
+        if(webstats_template) {
+            var webstats_url = null;
+            if(!tech && unit && unit.is_building()) {
+                // building upgrade
+                webstats_url = webstats_template.replace('%kind', 'buildings').replace('%spec', unit.spec['name']);
+            } else if(tech && tech['associated_unit']) {
+                webstats_url = webstats_template.replace('%kind', 'units').replace('%spec', tech['associated_unit']);
+            } else if(tech) {
+                webstats_url = webstats_template.replace('%kind', 'tech').replace('%spec', tech['name']);
+            }
+            if(webstats_url) {
+                dialog.widgets['webstats_button'].show = true;
+                dialog.widgets['webstats_button'].onclick = (function(_url) { return function(w) {
+                    url_open_in_new_tab(_url);
+                }; })(webstats_url);
+            }
+        }
+    }
+
     // set up equipment widgets
     if(equip_slots) {
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));

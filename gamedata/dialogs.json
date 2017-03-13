@@ -2730,8 +2730,12 @@
                         "ui_name_unmodified": "No Mod", "ui_name_mod": "Mod L%d",
                         "ui_name": "Level %d",
                         "array": [2,1], "array_offset": [67,0] },
-            "upgrade_info_button": {"kind": "ActionButton", "xy":[234,75], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1, "show": 0 },
 
+            "upgrade_info_button": {"kind": "ActionButton", "xy":[234,75], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1, "show": 0 },
+            // mutually exclusive with upgrade_info_button
+            "webstats_button": {"kind": "RichTextField", "xy":[244,75], "dimensions":[86,26],
+                                "text_size": 13,
+                                "ui_name": "[color=#ffff00][u]More stats...[/u][/color]", "show": 0 },
 
             "col0,": { "kind": "TextField", "xy": [50,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "right", "delta_color": [1.0,0.5,0.05,1],
                        "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [35,132],
