@@ -15110,7 +15110,8 @@ class STATSAPI(resource.Resource):
                             state = asset['states'].get(state)
                             if state:
                                 if 'images' in state:
-                                    filename = state['images'][0]
+                                    index = 0
+                                    filename = state['images'][index]
                                     for proto in 'http', 'https':
                                         key = {'http':'external_http_port','ssl':'external_ssl_port'}[proto]
                                         if SpinConfig.config['proxyserver'].get(key, -1) > 0:
@@ -15118,6 +15119,9 @@ class STATSAPI(resource.Resource):
                                             port_str = (':%d' % port) if port != {'http':80,'https':443}[proto] else ''
                                             host = SpinConfig.config['proxyserver'].get('external_host', socket.gethostname())
                                             data[prop+'_url'] = '%s://%s%s/%s' % (proto,host, port_str, filename)
+                                            data[prop+'_dimensions'] = state['dimensions']
+                                            if 'origins' in state:
+                                                data[prop+'_origin'] = state['origins'][2*index:2*index+2]
                                             found = True
                                             break
                             if found: break
