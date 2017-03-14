@@ -42958,8 +42958,10 @@ function update_upgrade_dialog(dialog) {
                 webstats_url = webstats_template.replace('%kind', 'buildings').replace('%spec', unit.spec['name']);
             } else if(tech && tech['associated_unit']) {
                 webstats_url = webstats_template.replace('%kind', 'units').replace('%spec', tech['associated_unit']);
-            } else if(tech) {
+            } else if(tech && (techname in gamedata['tech'])) {
                 webstats_url = webstats_template.replace('%kind', 'tech').replace('%spec', tech['name']);
+            } else if(tech && (techname in gamedata['enhancements'])) {
+                webstats_url = webstats_template.replace('%kind', 'enhancements').replace('%spec', tech['name']);
             }
             if(webstats_url) {
                 dialog.widgets['webstats_button'].show = true;

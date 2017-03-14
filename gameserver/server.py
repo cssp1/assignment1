@@ -15055,7 +15055,7 @@ class STATSAPI(resource.Resource):
         kind = args.get('kind', None)
         specname = args.get('spec', None)
 
-        assert kind in (None,'units','buildings','tech','items','enhacements')
+        assert kind in (None,'units','buildings','tech','items','enhancements')
 
         if not kind:
             # return master category list
