@@ -10200,6 +10200,10 @@ function flush_message_queue(force, my_timeout) {
                 SPINPUNCHGAME.shutdown();
             };
             var on_websocket_message = function(event) {
+
+                // update client_time here immediately, for ping keepalives
+                client_time = (new Date()).getTime()/1000;
+
                 if(event.data == 'SPws_ping') {
                     // server set us a ping
                 } else {
