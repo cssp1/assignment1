@@ -31082,6 +31082,11 @@ class GameSite(server.Site):
                     client.last_xmit_time = server_time
                     client.transport.sendPing()
 
+                    # note: Chrome throttles background tabs really aggressively, so send a game-level message
+                    # in addition to a WebSocket-only ping, so that the client JavaScript has a chance to
+                    # respond with a ping of its own (avoiding http_connection_timeout for lack of incoming messages).
+                    client.transport.write('SPws_ping')
+
     def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
         host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
         port = SpinConfig.config['proxyserver']['external_http_port']

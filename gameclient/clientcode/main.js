@@ -10200,7 +10200,11 @@ function flush_message_queue(force, my_timeout) {
                 SPINPUNCHGAME.shutdown();
             };
             var on_websocket_message = function(event) {
-                on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
+                if(event.data == 'SPws_ping') {
+                    // server set us a ping
+                } else {
+                    on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
+                }
 
                 // Chrome throttles JavaScript timers in background tabs,
                 // but does allow WebSocket message processing - so use this as a chance to send keepalive ping.
