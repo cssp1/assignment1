@@ -1994,7 +1994,12 @@ class NoSQLClient (object):
     def get_mobile_objects_by_owner(self, region, user_id, reason=''): return self.instrument('get_mobile_objects_by_owner(%s)'%reason, self._find_objects, (region,'mobile',{'owner_id':user_id},))
 
     def get_mobile_objects_by_base(self, region, base_id, reason=''): return self.instrument('get_mobile_objects_by_base(%s)'%reason, self._find_objects, (region,'mobile',{'base_id':base_id},))
-    def get_fixed_objects_by_base(self, region, base_id, reason=''): return self.instrument('get_fixed_objects_by_base(%s)'%reason, self._find_objects, (region,'fixed',{'base_id':base_id},))
+    def get_fixed_objects_by_base(self, region, base_id, spec_filter = None, reason=''):
+        qs = {'base_id':base_id}
+        if spec_filter:
+            assert isinstance(spec_filter, list)
+            qs['spec'] = {'$in': spec_filter}
+        return self.instrument('get_fixed_objects_by_base(%s)'%reason, self._find_objects, (region,'fixed',qs))
 
     def _find_objects(self, region, table_name, query):
         ret = []
