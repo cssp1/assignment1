@@ -30285,7 +30285,7 @@ class GAMEAPI(resource.Resource):
     def update_bh_blog_feed(self):
         if 'bh_blog_mail' not in gamedata['strings']:
             returnValue(None)
-        if self.bh_blog_feed_time >= server_time - 5*60: # cache is recent
+        if self.bh_blog_feed_time >= server_time - 15*60: # cache is recent
             returnValue(self.bh_blog_feed_cache)
 
         self.bh_blog_feed_time = server_time
