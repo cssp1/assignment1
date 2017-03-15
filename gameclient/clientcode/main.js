@@ -29716,7 +29716,7 @@ function update_alliance_info_tab(dialog) {
                             alliance_in_different_continent = true;
                             continent_info = gamedata['continents'][info['continent']];
                         }
-                        if(alliance_in_different_continent) {
+                        if(alliance_in_different_continent && continent_info) {
                             var bridge = continent_bridge_available();
                             if(bridge) {
                                 join_cb = (function (___dialog, _continent_info, _join_cb) { return function() {
@@ -29731,7 +29731,7 @@ function update_alliance_info_tab(dialog) {
                                     invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%continent', _continent_info['ui_name']),
                                                                 {'dialog': 'message_dialog_big', 'close_button': true, 'cancel_button': true,
                                                                  'ok_button_ui_name': ___dialog.data['widgets']['join_button']['ui_name'], 'on_ok': _join_cb});
-                                }; })(dialog, continent_info, join_cb);
+                                }; })(__dialog, continent_info, join_cb);
                             }
                         }
                         __dialog.widgets['join_button'].onclick = join_cb;
