@@ -153,9 +153,16 @@ SPWebsocket.SPWebsocket.prototype.close_event_is_recoverable = function(event) {
     }
 
     if(event.code == 1001) {
-        return true; // proxy needs to restart
+        // proxy needs to restart (sometimes sent by CloudFlare)
+        return true;
     } else if(event.code === 1005 || event.code === 1006) {
         if(event.wasClean !== undefined && !event.wasClean) {
+            // non-clean shutdown
+            return true;
+
+        }
+        if(event.reason && event.reason.indexOf('CloudFlare') != -1) {
+            // sometimes CloudFlare uses code 1005 instead of 1001 for a proxy restart
             return true;
         }
     }
