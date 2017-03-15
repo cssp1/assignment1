@@ -31073,6 +31073,7 @@ class GameSite(server.Site):
                 if isinstance(client, WS_GAMEAPI_Protocol) and gamedata['server'].get('log_websocket_events',0) >= 2:
                     gamesite.exception_log.event(server_time, 'Closing WebSocket due to http_connection_timeout: %s' % client.peer_ip)
                 client.close_connection_aggressively()
+                continue # don't ping
 
             # send WebSocket pings periodically to avoid timeouts along the proxy chain
             if isinstance(client, WS_GAMEAPI_Protocol):
