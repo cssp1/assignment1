@@ -20,7 +20,9 @@ SPWebsocket.is_supported = function() { return (typeof(WebSocket) != 'undefined'
     @param {string} url
     @param {number} connect_timeout
     @param {number} msg_timeout
-    @param {boolean} enable_reconnect
+    @param {number} enable_reconnect
+        (0: disable, 1: reconnect for errors we are certain are transient,
+         2: reconnect even for "clean" shutdowns)
 */
 SPWebsocket.SPWebsocket = function(url, connect_timeout, msg_timeout, enable_reconnect) {
     this.url = url;
@@ -161,8 +163,18 @@ SPWebsocket.SPWebsocket.prototype.close_event_is_recoverable = function(event) {
             return true;
 
         }
-        if(event.reason && event.reason.indexOf('CloudFlare') != -1) {
-            // sometimes CloudFlare uses code 1005 instead of 1001 for a proxy restart
+
+        // sometimes CloudFlare uses code 1005 instead of 1001 for a proxy restart
+        if(event.reason && typeof(event.reason) === 'string') {
+            /** @type {string} */
+            var s_reason = /** @type {string} */ (event.reason.toString());
+            if(s_reason.indexOf('CloudFlare') != -1) {
+                return true;
+            }
+        }
+
+        // should we always classify codes 1005/1006 as recoverable, even if clean?
+        if(this.enable_reconnect >= 2) {
             return true;
         }
     }
@@ -185,7 +197,7 @@ SPWebsocket.SPWebsocket.prototype.on_close = function(_event) {
             var ui_method = ui_code+':'+ui_reason+':'+ui_was_clean+':'+this.recv_count.toString();
             this.last_close_ui_method = ui_method;
 
-            if(this.enable_reconnect && this.close_event_is_recoverable(event)) {
+            if(this.enable_reconnect >= 1 && this.close_event_is_recoverable(event)) {
                 this.retry_count += 1;
                 this.clear_socket();
                 this.connect();
