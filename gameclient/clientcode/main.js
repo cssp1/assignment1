@@ -25588,7 +25588,21 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         var ui_modstat_list = ui_modstat_buff_list.concat(ui_modstat_nerf_list);
         descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
     }
-
+    while(descr.indexOf('%quarries') >= 0) {
+        var ui_quarries = '';
+        if('data' in aura && ('ui_sources' in aura['data'])) {
+            var ui_ls = goog.array.map(aura['data']['ui_sources'], function(src) {
+                var ui_player = '';
+                var pcache = PlayerCache.query_sync_fetch(src['base_landlord_id']);
+                if(pcache) {
+                    ui_player = PlayerCache.get_ui_name(pcache) + ' ';
+                }
+                return ui_player + '(' + vec_print(src['base_map_loc']) + '): ' + '+' + (100.0*src['strength']).toFixed(2) + '%';
+            });
+            ui_quarries += ui_ls.join('\n');
+        }
+        descr = descr.replace('%quarries', ui_quarries);
+    }
     //dialog.widgets['description'].set_text_with_linebreaking(descr);
     //dialog.widgets['description'].wh[1] = dialog.widgets['description'].str.split('\n').length * dialog.widgets['description'].font.leading + dialog.widgets['description'].font.size;
     dialog.widgets['description'].set_text_bbcode(descr);
