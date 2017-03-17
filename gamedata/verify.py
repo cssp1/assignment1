@@ -418,7 +418,8 @@ def check_levels(specname, spec):
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
               'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'permanent_modstats',
-              'upgrade_ingredients', 'remove_ingredients', 'research_ingredients')
+              'upgrade_ingredients', 'remove_ingredients', 'research_ingredients',
+              'quarry_control_auras')
     error = 0
 
     histogram = {}
@@ -3578,7 +3579,8 @@ def main(args):
     error |= check_hives_and_raids('hive', gamedata['hives'])
     error |= check_hives_and_raids('raid', gamedata['raids'])
 
-    error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
+    if 'alliance_turf' in gamedata['quarries_client']:
+        error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
 
     if gamedata['territory'].get('enable_quarry_guards', True) and not gamedata.get('enable_defending_units',1):
         error |= 1; print 'territory.enable_quarry_guards should be off if global enable_defending_units setting is off'

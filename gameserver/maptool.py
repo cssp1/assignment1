@@ -928,7 +928,73 @@ def update_turf(db, lock_manager, region_id, dry_run = True):
                         print "winner same as before, no chat announcement"
                         pass
 
-def weed_expired_bases(db, lock_manager, region_id, base_types, dry_run = True):
+def update_alliance_bonuses(db, lock_manager, region_id, check_interval = None, dry_run = True):
+    # get all quarries
+    map_cache = get_existing_map_by_type(db, region_id, 'quarry')
+    landlord_ids = list(set([x['base_landlord_id'] for x in map_cache.itervalues() if x.get('base_landlord_id',-1) > 0]))
+    print "LANDLORD_IDS", landlord_ids
+    # get mapping of landlord to alliance_id
+    landlord_alliance_ids = dict(zip(landlord_ids, nosql_client.get_users_alliance(landlord_ids)))
+    print "LANDLORD_ALLIANCE_IDS", landlord_alliance_ids
+
+    awards_by_alliance = {}
+
+    for feature in map_cache.itervalues():
+        # (could be more efficient to just query fixed objects directly, instead of iterating by base)
+        if 'quarry_logistics' in gamedata['buildings']:
+            spec = gamedata['buildings']['quarry_logistics']
+            for obj in nosql_client.get_fixed_objects_by_base(region_id, feature['base_id'], spec_filter = ['quarry_logistics']):
+                alliance_id = landlord_alliance_ids[feature['base_landlord_id']]
+                if alliance_id >= 0:
+                    for aura in spec.get('quarry_control_auras',[]):
+                        strength = get_leveled_quantity(aura['strength'], obj.get('level',1))
+                        if strength > 0:
+                            if alliance_id not in awards_by_alliance:
+                                awards_by_alliance[alliance_id] = {}
+                            if aura['spec'] not in awards_by_alliance[alliance_id]:
+                                awards_by_alliance[alliance_id][aura['spec']] = {'spec': aura['spec'],
+                                                                                 'strength':0,
+                                                                                 'data': {'ui_sources':[]}}
+
+
+                            awards_by_alliance[alliance_id][aura['spec']]['strength'] += strength
+                            awards_by_alliance[alliance_id][aura['spec']]['data']['ui_sources'].append(
+                                {'base_id': feature['base_id'],
+                                 'region_id': region_id,
+                                 'base_map_loc': feature['base_map_loc'],
+                                 'base_landlord_id': feature['base_landlord_id'],
+                                 'level': obj.get('level', 1),
+                                 'strength': strength})
+
+    print "AWARDS_BY_ALLIANCE", awards_by_alliance
+
+    # send award to all members in the region
+    for alliance_id, awards in awards_by_alliance.iteritems():
+        award_players = []
+        member_ids = nosql_client.get_alliance_member_ids(alliance_id)
+
+        # query player cache for home regions (only give awards to players in this region)
+        pcache = dict(zip(member_ids, nosql_client.player_cache_lookup_batch(member_ids, fields=['home_region'])))
+        for player_id, info in pcache.iteritems():
+            if info.get('home_region',None) == region_id:
+                award_players.append(player_id)
+
+        if award_players:
+            for aura in awards.itervalues():
+                end_time = time_now + check_interval
+                if not dry_run:
+                    nosql_client.msg_send([{'to': award_players,
+                                            'type': 'apply_aura',
+                                            'expire_time': end_time,
+                                            'end_time': end_time,
+                                            'remove_by_name_first': True,
+                                            'aura_name': aura['spec'],
+                                            'aura_strength': aura['strength'],
+                                            'aura_data': aura['data']}])
+
+
+def weed_expired_bases(db, lock_manager, region_id, base_types,
+                       dry_run = True):
     for base_id in nosql_client.get_expired_map_feature_ids_by_types(region_id, base_types):
         clear_base(db, lock_manager, region_id, base_id, dry_run = dry_run)
 
@@ -1961,6 +2027,13 @@ if __name__ == '__main__':
                     print "%s: turf update..." % region_id
                     update_turf(db, lock_manager, region_id, dry_run=dry_run)
 
+                # 65. update alliance-wide bonuses
+                if 'alliance_bonuses' in gamedata['quarries_client']:
+                    print "%s: quarry alliance bonuses..." % region_id
+                    update_alliance_bonuses(db, lock_manager, region_id,
+                                            check_interval = gamedata['quarries_client']['alliance_bonuses']['check_interval'],
+                                            dry_run=dry_run)
+
                 # 70. respawn hives/quarries/raids
                 print "%s: spawning hives..." % region_id
                 spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
@@ -1969,6 +2042,11 @@ if __name__ == '__main__':
                 if raids_enabled:
                     print "%s: spawning raids..." % region_id
                     spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
+
+        elif action == 'update-alliance-bonuses':
+            update_alliance_bonuses(db, lock_manager, region_id,
+                                    check_interval = gamedata['quarries_client']['alliance_bonuses']['check_interval'],
+                                    dry_run=dry_run)
 
         elif action == 'prune-stale-locks':
             nosql_client.do_region_maint(region_id)

@@ -25597,7 +25597,11 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
                 if(pcache) {
                     ui_player = PlayerCache.get_ui_name(pcache) + ' ';
                 }
-                return ui_player + '(' + vec_print(src['base_map_loc']) + '): ' + '+' + (100.0*src['strength']).toFixed(2) + '%';
+                var ui_level = '';
+                if('level' in src) {
+                    ui_level = ' L'+pretty_print_number(src['level']);
+                }
+                return ui_player + '(' + vec_print(src['base_map_loc']) + ')' + ui_level + ': ' + '+' + (100.0*src['strength']).toFixed(2) + '%';
             });
             ui_quarries += ui_ls.join('\n');
         }

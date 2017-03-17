@@ -6208,7 +6208,7 @@ class Spec(object):
         list_seen = False
         for field_name, default_value in self.fields:
             # these list-valued fields don't affect the max level
-            if field_name in ("limit", "limit_requires", "spells", "gridsize", "unit_collision_gridsize", "exclusion_zone", "defense_types", "health_bar_dims", "research_categories", "crafting_categories", "max_ui_level"):
+            if field_name in ("limit", "limit_requires", "spells", "gridsize", "unit_collision_gridsize", "exclusion_zone", "defense_types", "health_bar_dims", "research_categories", "crafting_categories", "max_ui_level","quarry_control_auras"):
                 continue
             val = self.__dict__[field_name]
             if type(val) == list:
@@ -24119,9 +24119,12 @@ class GAMEAPI(resource.Resource):
                 elif msg['type'] == 'apply_aura':
                     end_time = msg['end_time']
                     if end_time > server_time:
-                        if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
-                                                     duration = end_time - server_time, ignore_limit = True):
-                            session.deferred_player_auras_update = True
+                        if msg['aura_name'] in gamedata['auras']:
+                            if msg.get('remove_by_name_first'):
+                                session.player.remove_aura(session, retmsg, msg['aura_name'], force = True)
+                            if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
+                                                         duration = end_time - server_time, ignore_limit = True):
+                                session.deferred_player_auras_update = True
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'chat_report':
