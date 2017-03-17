@@ -15,6 +15,7 @@ goog.require('CombatEngine');
 goog.require('DamageAttribution');
 goog.require('GameTypes');
 goog.require('GameObjectCollection');
+goog.require('SPHTTP');
 goog.require('WallManager');
 goog.require('ItemDisplay'); // just for get_inventory_item_level()
 goog.require('goog.events');
@@ -492,7 +493,15 @@ World.World.prototype.persist_debris = function() {
     for(var id in this.fxworld.current_under) {
         var effect = this.fxworld.current_under[id];
         if(effect.user_data && effect.user_data['persist'] === 'debris') {
-            send_to_server.func(["CREATE_INERT", effect.user_data['spec'], effect.user_data['pos'], effect.user_data['metadata']]);
+            var encoded_metadata = null;
+            if(effect.user_data['metadata']) {
+                // stringify, then wrap
+                encoded_metadata = SPHTTP.wrap_string(JSON.stringify(effect.user_data['metadata']));
+            }
+            send_to_server.func(["CREATE_INERT2",
+                                 effect.user_data['spec'],
+                                 effect.user_data['pos'],
+                                 encoded_metadata]);
             effect.user_data = null;
             this.fxworld.remove(effect);
         }

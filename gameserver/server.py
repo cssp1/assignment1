@@ -22282,14 +22282,13 @@ class GAMEAPI(resource.Resource):
         session.deferred_player_state_update = True
         return True
 
-    def do_create_inert(self, session, retmsg, spellargs):
+    def do_create_inert(self, session, retmsg, inert_type, coords, metadata):
         # XXX to make inerts work in remote bases, need to prune them
         if session.viewing_base is not session.viewing_player.my_home: return
 
         base = session.viewing_base
-        inert_type = spellargs[0]
-        j = int(spellargs[1][0]); i = int(spellargs[1][1])
-        metadata = spellargs[2]
+        j, i = coords
+
         spec = GameObjectSpec.lookup(inert_type)
         assert spec.kind == 'inert'
         assert spec.client_can_create
@@ -27354,8 +27353,15 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "AUTO_RESOLVE":
             self.auto_resolve(session, retmsg)
 
-        elif arg[0] == "CREATE_INERT":
-            self.do_create_inert(session, retmsg, arg[1:])
+        elif arg[0] == "CREATE_INERT" or arg[0] == "CREATE_INERT2":
+            inert_type = arg[1]
+            coords = arg[2]
+            metadata = arg[3]
+            if arg[0] == "CREATE_INERT2":
+                # new: use wrapped JSON for Unicode safety
+                if metadata:
+                    metadata = SpinJSON.loads(SpinHTTP.unwrap_string(metadata))
+            self.do_create_inert(session, retmsg, inert_type, coords, metadata)
 
         elif arg[0] == "QUARRY_COLLECT":
             if (not session.player.can_use_quarries()) or (not gamesite.nosql_client):
