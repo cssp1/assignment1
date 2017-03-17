@@ -25539,7 +25539,13 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         descr = descr.replace('%abspct', ((1.0+strength)*100.0).toFixed(0));
     }
     while(descr.indexOf('%pct') >= 0) {
-        descr = descr.replace('%pct', ((strength)*100.0).toFixed(0));
+        var ui_pct;
+        if(strength < 0.10) { // 10% or less
+            ui_pct = ((strength)*100.0).toFixed(2);
+        } else {
+            ui_pct = ((strength)*100.0).toFixed(0);
+        }
+        descr = descr.replace('%pct', ui_pct);
     }
     while(descr.indexOf('%oneminuspct') >= 0) {
         descr = descr.replace('%oneminuspct', ((1.0-strength)*100.0).toFixed(0));
