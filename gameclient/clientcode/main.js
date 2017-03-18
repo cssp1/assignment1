@@ -42568,6 +42568,19 @@ function update_upgrade_dialog(dialog) {
             });
         }
 
+        if(unit.spec['quarry_control_auras']) {
+            var au_list = unit.spec['quarry_control_auras'];
+            goog.array.forEach(au_list, function(au) {
+                var aura_specname = au['spec'];
+                var stat = 'quarry_control_aura:'+aura_specname;
+                if(stat in gamedata['strings']['modstats']['stats'] &&
+                   gamedata['strings']['modstats']['stats'][stat]['display'] !== null &&
+                   !goog.array.contains(feature_list, stat)) {
+                    feature_list.push(stat);
+                }
+            });
+        }
+
         // detect enhanceable stats
         if(unit.spec['enhancement_categories']) {
             for(var enh_name in gamedata['enhancements']) {

@@ -67,6 +67,14 @@ ModChain.get_base_value = function(stat, spec, level) {
     } else if(stat.indexOf('provides_limited_equipped:') == 0) {
         var thing = stat.replace('provides_limited_equipped:','');
         return get_leveled_quantity(spec['provides_limited_equipped'][thing]||0, level);
+    } else if(stat.indexOf('quarry_control_aura:') == 0) {
+        var au_specname = stat.replace('quarry_control_aura:','');
+        var au_data = goog.array.find(spec['quarry_control_auras'], function(au) { return au['spec'] === au_specname; });
+        if(!au_data) {
+            throw Error('quarry_control_aura "'+au_specname+'" not found in spec "' + spec['name'] + '"');
+        }
+        return get_leveled_quantity(au_data['strength'], level);
+
     } else {
         /*
         if(spec['permanent_modstats']) {
