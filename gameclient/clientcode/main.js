@@ -42201,7 +42201,7 @@ function update_upgrade_dialog(dialog) {
     } else {
         if(new_level > max_level || stats_only) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
-            widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',max_level.toString());
+            widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
         } else {
             widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
         }
@@ -42875,7 +42875,7 @@ function update_upgrade_dialog(dialog) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
-        } else if(new_level > max_level) {
+        } else if(stats_only || new_level > max_level) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
@@ -42992,7 +42992,7 @@ function update_upgrade_dialog(dialog) {
     } else if(old_level <= 0 && !show_level_0) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         dialog.widgets['header1'].show = false;
-    } else if(new_level > max_level) {
+    } else if(stats_only || new_level > max_level) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
         dialog.widgets['header1'].show = false;
     } else {
