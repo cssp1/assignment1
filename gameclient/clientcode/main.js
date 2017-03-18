@@ -21041,6 +21041,8 @@ function invoke_building_context_menu(mouse_xy) {
     var spec = obj.spec;
 
     var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
+    var quarry_stats_viewable = (session.is_quarry() && obj.spec['quarry_stats_viewable'] && session.region.data && session.region.data['storage'] == 'nosql');
+
     var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
 
     var dialog_name = 'building_context_menu';
@@ -21357,7 +21359,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if((session.home_base || quarry_buildable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
+            } else if((session.home_base || quarry_buildable || quarry_stats_viewable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
@@ -21373,10 +21375,17 @@ function invoke_building_context_menu(mouse_xy) {
                 if(migrate_spell && obj.spec['history_category'] == 'turrets' && read_predicate(migrate_spell['requires']).is_satisfied(player, null)) {
                     add_migrate_turret_heads_button(buttons);
                 } else {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
+                    // UPGRADE BUTTON
+
+                    // show "View Stats" rather than "Upgrade" if at max level
+                    var stats_only = (obj.level >= obj.get_max_ui_level() ||
+                                      // or, in a quarry, it's a quarry_stats_viewable but not quarry_buildable object
+                                      (!session.home_base && !quarry_buildable && quarry_stats_viewable));
+
+                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (stats_only ? '_maxlevel' : (obj.is_emplacement() ? '_emplacement' : ''))],
                                                         onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
                                                         spellname: 'INVOKE_UPGRADE_DIALOG',
-                                                        asset: ((obj.level < obj.get_max_ui_level() && upgrade_is_active) ? 'action_button_resizable' : 'menu_button_resizable')}));
+                                                        asset: (!stats_only && upgrade_is_active ? 'action_button_resizable' : 'menu_button_resizable')}));
                 }
             }
 
@@ -42100,6 +42109,9 @@ function update_upgrade_dialog(dialog) {
 
     var new_level = old_level + 1;
 
+    // flag that we can't do any upgrades, and this is just for showing stats
+    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_buildable']);
+
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
 
@@ -42187,7 +42199,7 @@ function update_upgrade_dialog(dialog) {
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
         }
     } else {
-        if(new_level > max_level) {
+        if(new_level > max_level || stats_only) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',max_level.toString());
         } else {
@@ -42246,9 +42258,9 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
 
-    dialog.widgets['cost_time'].show = (new_level <= max_level);
+    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level);
     for(var res in gamedata['resources']) {
-        var show_res = (new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
+        var show_res = (!stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
         if('resource_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['resource_'+res+'_icon'].show = show_res;
             dialog.widgets['resource_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
@@ -42266,7 +42278,7 @@ function update_upgrade_dialog(dialog) {
         (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
-    if(new_level > max_level) {
+    if(stats_only || new_level > max_level) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
@@ -42892,8 +42904,8 @@ function update_upgrade_dialog(dialog) {
         }
 
         dialog.widgets['mod_bar'+grid_y.toString()].show =
-            dialog.widgets['mod_text'+grid_y.toString()].show =
-            dialog.widgets['mod_button'+grid_y.toString()].show = !!(mod_tech || enh_tech);
+            dialog.widgets['mod_text'+grid_y.toString()].show = !!(mod_tech || enh_tech);
+        dialog.widgets['mod_button'+grid_y.toString()].show = (!stats_only && dialog.widgets['mod_bar'+grid_y.toString()].show);
 
         if(mod_tech || enh_tech) {
             // handler for click on "Modify" button
@@ -43033,7 +43045,7 @@ function update_upgrade_dialog(dialog) {
                     dialog.widgets['equip_slot'+slot_i].show =
                         dialog.widgets['equip_frame'+slot_i].show = true;
 
-                    dialog.widgets['equip_slot'+slot_i].state = 'normal';
+                    dialog.widgets['equip_slot'+slot_i].state = (stats_only ? 'disabled' : 'normal');
                     dialog.widgets['equip_slot'+slot_i].tooltip.str = null;
 
                     dialog.widgets['equip_frame'+slot_i].onclick = (function (_tech, _unit, _type_name, _n, _slot_i) { return function(w) {
@@ -43128,7 +43140,9 @@ function update_upgrade_dialog(dialog) {
 
     dialog.widgets['predicate_help_button'].show = false;
 
-    if(new_level > max_level) {
+    if(stats_only) {
+        // do nothing
+    } else if(new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
     } else if(builder && builder.is_damaged()) {
         // builder needs repair
@@ -43205,8 +43219,8 @@ function update_upgrade_dialog(dialog) {
 
     // connect button widget onclick() handlers
 
-    if(new_level > max_level) {
-        // already at max level
+    if(stats_only || new_level > max_level) {
+        // hide all buttons
         dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = dialog.widgets['use_resources_button'].show = false;
         // note: timer bar already hidden above
     } else {
@@ -43489,7 +43503,7 @@ function update_upgrade_dialog(dialog) {
 
     update_upgrade_dialog_equipment(dialog);
 
-    if(player.upgrade_bar_enabled()) {
+    if(!stats_only && player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, (tech ? ('enhance_time' in tech ? 'enhancement' : 'tech') : 'building'),
                           (tech ? techname : (unit ? unit.spec['name'] : null)),
                           new_level, (unit ? unit.id : null));
