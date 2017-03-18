@@ -1498,7 +1498,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
-                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'QUERY_STRING',
+                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'BASE_RICHNESS', 'QUERY_STRING',
                    'HAS_MENTOR'
                    ])
 
@@ -1673,6 +1673,9 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'QUERY_STRING':
         if ('key' not in pred) or ('value' not in pred) or not isinstance(pred['value'], basestring):
             error |= 1; print '%s: %s predicate needs a key and string value' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'BASE_RICHNESS':
+        if ('min_richness' not in pred):
+            error |= 1; print '%s: %s predicate missing "min_richness"' % (reason, pred['predicate'])
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)

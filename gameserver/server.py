@@ -19591,15 +19591,16 @@ class GAMEAPI(resource.Resource):
 
                        # viewing_trophy_data - obsolete
                        None,
-                       session.player.warehouse_is_busy() if (not session.home_base) else False,
+                       session.player.warehouse_is_busy() if (not session.home_base) else False, # [33]
 
                        [x['squad_id'] for x in session.defending_squads.itervalues()],
                        session.viewing_player.is_pvp_player(),
                        [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
-                       list(session.player.equipped_items_serialize()),
+                       list(session.player.equipped_items_serialize()), # [37]
                        session.debug_session_change_count,
-                       debug_prev_base_id
+                       debug_prev_base_id,
+                       session.viewing_base.base_richness, # [40]
                        ])
         session.debug_session_change_count += 1
         for astate in aura_states:

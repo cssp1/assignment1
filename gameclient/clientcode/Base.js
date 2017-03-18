@@ -29,6 +29,7 @@ Base.Base = function(id, base_data) {
     this.base_map_loc = null;
     this.base_expire_time = -1;
     this.base_last_attack_time = -1;
+    this.base_richness = -1;
     this.base_ui_name = 'Unknown';
     this.base_type = null;
     this.deployment_buffer = 1;
@@ -64,6 +65,7 @@ Base.Base.prototype.receive_state = function(base_data) {
     this.base_type = base_data['base_type'];
     this.base_ncells = ('base_ncells' in base_data ? base_data['base_ncells'] : null);
     this.base_last_attack_time = base_data['base_last_attack_time'] || -1;
+    this.base_richness = ('base_richness' in base_data ? base_data['base_richness'] : -1);
 };
 
 /** @override */
@@ -79,6 +81,7 @@ Base.Base.prototype.serialize = function() {
             'base_type': this.base_type,
             'base_ncells': this.base_ncells,
             'base_last_attack_time': this.base_last_attack_time,
+            'base_richness': this.base_richness,
             'power_state': this.power_state};
 };
 

@@ -524,6 +524,7 @@
         "ALL_BUILDINGS_UNDAMAGED": { "ui_name": "All buildings undamaged" },
         "OBJECT_UNDAMAGED": { "ui_name": "Repair %s" },
         "OBJECT_UNBUSY": { "ui_name": "%s not damaged or busy" },
+        "BASE_RICHNESS": { "ui_name": "Max level for this quarry. Upgrade requires quarry size %s or larger" },
         "BUILDING_QUANTITY": { "ui_name": "Build %d %s",
                                "ui_progress": "%d1/%d2 Built"},
         "UNIT_QUANTITY": { "ui_name": "%d %s" },

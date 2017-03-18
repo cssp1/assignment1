@@ -458,6 +458,30 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
+
+/** @constructor @struct
+  * @extends Predicate */
+function BaseRichnessPredicate(data) {
+    goog.base(this, data);
+    this.min_richness = data['min_richness'];
+}
+goog.inherits(BaseRichnessPredicate, Predicate);
+BaseRichnessPredicate.prototype.is_satisfied = function(player, qdata) {
+    return session.viewing_base && (session.viewing_base.base_richness >= this.min_richness);
+};
+BaseRichnessPredicate.prototype.do_ui_describe = function(player) {
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    var pair = goog.array.find(gamedata['strings']['regional_map']['richness'], function(entry) {
+        return entry[0] >= this.min_richness;
+    });
+    if(!pair) { pair = gamedata['strings']['regional_map']['richness'][gamedata['strings']['regional_map']['richness'].length-1]; }
+    ret = ret.replace('%s', pair[1]);
+    return new PredicateUIDescription(ret);
+};
+
+/** @override */
+BaseRichnessPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
 /** @constructor @struct
   * @extends Predicate */
 function BuildingLevelPredicate(data) {
@@ -1947,6 +1971,7 @@ function read_predicate(data) {
     else if(kind === 'ALL_BUILDINGS_UNDAMAGED') { return new AllBuildingsUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNDAMAGED') { return new ObjectUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNBUSY') { return new ObjectUnbusyPredicate(data); }
+    else if(kind === 'BASE_RICHNESS') { return new BaseRichnessPredicate(data); }
     else if(kind === 'BUILDING_DESTROYED') { return new BuildingDestroyedPredicate(data); }
     else if(kind === 'BUILDING_QUANTITY') { return new BuildingQuantityPredicate(data); }
     else if(kind === 'BUILDING_LEVEL') { return new BuildingLevelPredicate(data); }

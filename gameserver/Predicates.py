@@ -258,6 +258,14 @@ class ForemanIsBusyPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return player.foreman_is_busy()
 
+class BaseRichnessPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.min_richness = data['min_richness']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        assert session.viewing_base.base_type == 'quarry'
+        return session.viewing_base.base_richness >= self.min_richness
+
 class BuildingQuantityPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -966,6 +974,7 @@ def read_predicate(data):
     elif kind == 'OBJECT_UNDAMAGED': return ObjectUndamagedPredicate(data)
     elif kind == 'OBJECT_UNBUSY': return ObjectUnbusyPredicate(data)
     elif kind == 'FOREMAN_IS_BUSY': return ForemanIsBusyPredicate(data)
+    elif kind == 'BASE_RICHNESS': return BaseRichnessPredicate(data)
     elif kind == 'BUILDING_QUANTITY': return BuildingQuantityPredicate(data)
     elif kind == 'BUILDING_LEVEL': return BuildingLevelPredicate(data)
     elif kind == 'UNIT_QUANTITY': return UnitQuantityPredicate(data)

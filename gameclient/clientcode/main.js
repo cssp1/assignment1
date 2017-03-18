@@ -46603,7 +46603,8 @@ function handle_server_message(data) {
                                                 'base_ui_name': data[21],
                                                 'base_type': data[22],
                                                 'base_ncells': data[23],
-                                                'base_last_attack_time': data[27] || -1}),
+                                                'base_last_attack_time': data[27] || -1,
+                                                'base_richness': data[40] || -1}),
                                  session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens']) // enable_citizens
                                 );
 
