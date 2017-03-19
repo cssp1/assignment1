@@ -419,6 +419,9 @@
 
         "enable_post_screenshot": 1, // show "post screenshot" feature, on platforms that support it
 
+        // setting to deal with Facebook's broken API. See FBUploadPhoto.js.
+        "post_screenshot_method": "ajax_withCredentials",
+
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
 
