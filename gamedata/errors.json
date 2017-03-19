@@ -114,7 +114,7 @@
     "CANNOT_ATTACK_STRONGER_PLAYER": { "ui_name": "Cannot attack this base because the opponent is significantly stronger than you" },
     "CANNOT_ATTACK_YOU_ARE_ISOLATED": { "ui_name": "Cannot attack this base because you are isolated from PvP against innocent players" },
     "CANNOT_ATTACK_THEY_ARE_ISOLATED": { "ui_name": "Cannot attack this base because the owner is isolated from PvP" },
-    "CANNOT_ATTACK_ALT_ACCOUNT": { "ui_name": "Unable to attack a base that you or a close relative control" },
+    "CANNOT_ATTACK_ALT_ACCOUNT": { "ui_name": "Cannot attack your own alt accounts" },
     "CANNOT_ATTACK_SAME_ALLIANCE": { "ui_name": "Unable to attack - this player is in your alliance!" },
     "CANNOT_ATTACK_SANDSTORM_MAX": { "ui_name": "Unable to attack because of the intense sandstorm" },
     "CANNOT_ATTACK_QUARRY_LIMIT_REACHED": { "ui_name": "Quarry control limit reached.\nUpgrade Transmitter to raise limit, or abandon one of your other quarries." },

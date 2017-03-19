@@ -19571,7 +19571,6 @@ class GAMEAPI(resource.Resource):
                         if obj.auras: aura_states.append(obj.serialize_auras())
 
         is_alt_account_unattackable = (session.viewing_player is not session.player) and \
-                                      (session.viewing_base is session.viewing_player.my_home) and \
                                       session.player.is_alt_account_unattackable(session.viewing_player.user_id)
 
         # retrieve spyee's alliance info
@@ -23349,6 +23348,10 @@ class GAMEAPI(resource.Resource):
         if pvp_balance == 'same_alliance':
             return (False, "CANNOT_ATTACK_SAME_ALLIANCE")
 
+        if (other_player is not player) and \
+           player.is_alt_account_unattackable(other_player.user_id) and gamedata['prevent_alt_attacks']:
+            return (False, "CANNOT_ATTACK_ALT_ACCOUNT")
+
         if base is not other_player.my_home:
             # quarry reinforcement or attack
 
@@ -23403,9 +23406,6 @@ class GAMEAPI(resource.Resource):
 
             if player.stattab.sandstorm_max:
                 return (False, "CANNOT_ATTACK_SANDSTORM_MAX")
-
-            if player.is_alt_account_unattackable(other_player.user_id) and gamedata['prevent_alt_attacks']:
-                return (False, "CANNOT_ATTACK_ALT_ACCOUNT")
 
         return (True, None)
 
