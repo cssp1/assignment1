@@ -8336,22 +8336,27 @@ class Base(object):
 
         if fields: # manually specify fields to write
             newstate = {'obj_id':state['obj_id']}
+            unset = []
             for field in fields:
-                if field in state: newstate[field] = state[field]
+                if field in state:
+                    newstate[field] = state[field]
+                else:
+                    unset.append(field)
             state = newstate
         else:
+            unset = None # overwrite, don't unset
             state['base_id'] = self.base_id
 
         if verbose and gamedata['server'].get('log_nosql',0) >= 3:
             gamesite.exception_log.event(server_time, 'nosql_update %s: %s reason %s' % (self.base_id, repr(state), reason))
         if object.is_mobile():
-            return gamesite.nosql_client.update_mobile_object(self.base_region, state, partial = bool(fields), reason=reason)
+            return gamesite.nosql_client.update_mobile_object(self.base_region, state, partial = bool(fields), unset = unset, reason=reason)
         else:
             if ('owner_id' in state) and (state['owner_id'] > 0) and (state['owner_id'] != self.base_landlord_id):
                 if gamedata['server'].get('log_nosql',0) >= 1 and state.get('spec',None) != 'barrier':
                     gamesite.exception_log.event(server_time, 'nosql_update %s: %s but base_landlord_id = %d, reason %s' % (self.base_id, repr(state), self.base_landlord_id, reason))
 
-            return gamesite.nosql_client.update_fixed_object(self.base_region, state, partial = bool(fields), reason=reason)
+            return gamesite.nosql_client.update_fixed_object(self.base_region, state, partial = bool(fields), unset = unset, reason=reason)
     def nosql_read(self, observer, player, reason):
         if (not gamesite.nosql_client) or (not self.is_nosql_base()): return None
         if gamedata['server'].get('log_nosql',0) >= 2:

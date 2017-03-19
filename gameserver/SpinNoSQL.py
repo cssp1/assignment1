@@ -2014,14 +2014,15 @@ class NoSQLClient (object):
     def _get_base_ids_referenced_by_objects(self, region):
         return self.region_table(region, 'mobile').find().distinct('base_id') + self.region_table(region, 'fixed').find().distinct('base_id')
 
-    def update_mobile_object(self, region, obj, partial=False, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial))
-    def update_fixed_object(self, region, obj, partial=False, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial))
-    def _update_object(self, region, table_name, obj, partial):
+    def update_mobile_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial,unset))
+    def update_fixed_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial,unset))
+    def _update_object(self, region, table_name, obj, partial, unset):
         if not partial:
             assert 'obj_id' in obj
             assert 'owner_id' in obj
             assert 'base_id' in obj
             # optional now: assert 'kind' in obj
+            assert unset is None
 
         # temporary swap the obj_id field for the _id field
         obj['_id'] = self.encode_object_id(obj['obj_id'])
@@ -2031,7 +2032,10 @@ class NoSQLClient (object):
             if partial:
                 _id = obj['_id']
                 del obj['_id']
-                self.region_table(region, table_name).update_one({'_id':_id}, {'$set': obj}, upsert = False)
+                qs = {'$set': obj}
+                if unset: # list of properties to unset
+                    qs['$unset'] = dict((f, 1) for f in unset)
+                self.region_table(region, table_name).update_one({'_id':_id}, qs, upsert = False)
             else:
                 self.region_table(region, table_name).replace_one({'_id':obj['_id']}, obj, upsert = True)
         finally:
