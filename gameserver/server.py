@@ -7280,12 +7280,18 @@ class Building(MapBlockingGameObject):
             return True
         return False
 
-    def halt_upgrade(self):
+    def halt_upgrade(self): # and keep progress
         if self.upgrade_start_time > 0:
             self.upgrade_done_time += (server_time - self.upgrade_start_time)
             self.upgrade_start_time = -1
             return True
         return False
+
+    def cancel_upgrade(self):
+        self.upgrade_total_time = -1
+        self.upgrade_start_time = -1
+        self.upgrade_done_time = -1
+        self.upgrade_ingredients = None
 
     def halt_manuf(self):
         if self.manuf_start_time > 0:
@@ -7306,6 +7312,9 @@ class Building(MapBlockingGameObject):
         if self.enhancing:
             return self.enhancing.halt(server_time)
         return False
+
+    def cancel_enhancing(self):
+        self.enhancing = None
 
     # halt all activity (due to getting damaged). Return True if the halting counts as "havoc".
     def halt_all(self):
@@ -8227,13 +8236,25 @@ class Base(object):
             elif obj.is_building() or obj.is_inert():
                 obj.owner = new_owner if obj.is_building() else EnvironmentOwner
                 fields = ['owner_id']
-                if gamedata['territory']['quarry_dump_on_conquer'] and obj.is_building() and obj.is_producer():
-                    # note: the following init_production() will restart the harvester
-                    obj.produce_start_time = -1
-                    obj.produce_rate = -1
-                    obj.contents = 0
-                    fields += ['produce_start_time', 'produce_rate', 'contents']
+                if obj.is_building():
+                    # clear some state on conquer
+                    if obj.is_producer() and gamedata['territory']['quarry_dump_on_conquer']:
+                        # note: the following init_production() will restart the harvester
+                        obj.produce_start_time = -1
+                        obj.produce_rate = -1
+                        obj.contents = 0
+                        fields += ['produce_start_time', 'produce_rate', 'contents']
+                    if obj.is_upgrading():
+                        # cancel upgrade immediately, no refund
+                        obj.cancel_upgrade()
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients']
+                    if obj.is_enhancing():
+                        # cancel enhancement immediately, no refund
+                        obj.cancel_enhancing()
+                        fields += ['enhancing']
+
                 self.nosql_write_one(obj, 'quarry_conquer', fields = fields)
+
         for obj in to_remove: self.drop_object(obj)
         self.init_production(new_owner)
         self.base_times_conquered += 1
@@ -8253,7 +8274,22 @@ class Base(object):
                 to_remove.append(obj); continue
             elif obj.is_building() or obj.is_inert():
                 obj.owner = RogueOwner # XXX really should be a fake player with the ID of base_creator_id
-                self.nosql_write_one(obj, 'quarry_abandon', fields = ['owner_id'])
+                fields = ['owner_id']
+                if obj.is_building():
+                    if obj.is_upgrading():
+                        # cancel upgrade immediately, no refund
+                        obj.cancel_upgrade()
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients']
+                    if obj.is_enhancing():
+                        # cancel enhancement immediately, no refund
+                        obj.cancel_enhancing()
+                        fields += ['enhancing']
+                    if obj.is_damaged() and gamedata['territory'].get('quarry_repair_on_abandon', False):
+                        # repair it
+                        obj.repair_finish_time = -1
+                        obj.heal_to_full()
+                        fields += ['repair_finish_time','hp','hp_ratio','disarmed']
+                self.nosql_write_one(obj, 'quarry_abandon', fields = fields)
         for obj in to_remove: self.drop_object(obj)
 
     def reset_to_full_health(self):
@@ -21270,10 +21306,7 @@ class GAMEAPI(resource.Resource):
         refund = dict((res,int(gamedata['upgrade_cancel_refund']*GameObjectSpec.get_leveled_quantity(getattr(object.spec, 'build_cost_'+res), object.level+1))) for res in gamedata['resources'])
         ingr_list = object.upgrade_ingredients
 
-        object.upgrade_total_time = -1
-        object.upgrade_start_time = -1
-        object.upgrade_done_time = -1
-        object.upgrade_ingredients = None
+        object.cancel_upgrade()
 
         refund = session.player.resources.gain_res(refund, reason='canceled_upgrade')
         admin_stats.econ_flow_player(session.player, 'investment', 'buildings', refund, spec = object.spec.name, level = object.level+1)
@@ -21745,7 +21778,7 @@ class GAMEAPI(resource.Resource):
                       for res in gamedata['resources'])
         ingr_list = enh_state.get('ingredients', None)
 
-        object.enhancing = None
+        object.cancel_enhancing()
         session.viewing_base.nosql_write_one(object, 'cancel_enhance', fields = ['enhancing'])
 
         refund = session.player.resources.gain_res(refund, reason='canceled_enhancement')
