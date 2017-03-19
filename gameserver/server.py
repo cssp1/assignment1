@@ -15107,7 +15107,7 @@ class STATSAPI(resource.Resource):
             # directory listing
 
             # return a subset of properties from each spec
-            FIELDS = ['name','ui_name','ui_priority',
+            FIELDS = ['name','ui_name','ui_priority','ui_tier',
                       'manufacture_category','research_category','build_category','enhance_category','category',
                       'associated_unit']
 
