@@ -199,7 +199,7 @@
     "log_alt_accounts": 0,  // log detection of possible alt accounts (2 to also log all same-ip logins, not just detector triggers)
     "alt_detect_logins": 5,   // if more than this many logins occur on the same IP, assume the player is an alt (-1 to disable)
     "alt_no_protect_after": 10, // deny damage protection to alt accounts after this # of attacks (-1 to disable)
-    "alt_no_attack_after": 20, // deny ability to attack alt accounts after this # of attacks (-1 to disable)
+    "alt_no_attack_after": 0, // deny ability to attack alt accounts after this # of attacks (-1 to disable)
 
     // don't bother reporting in log unless the defender fits these criteria
     "anti_bullying_defender_filter": { "predicate": "ALWAYS_TRUE" },
