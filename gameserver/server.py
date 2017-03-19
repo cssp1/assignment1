@@ -4948,6 +4948,8 @@ class Session(object):
         if obj.enhancements is None: obj.enhancements = {}
         obj.enhancements[enh_name] = level
 
+        self.viewing_base.nosql_write_one(obj, 'give_enhancement', fields = ['enhancements', 'enhancing'])
+
         player.recalc_stattab(self.player)
 
         if give_xp:
@@ -16237,7 +16239,7 @@ class Store(object):
                 if unit.owner is not session.player:
                     error_reason.append('player does not own this object')
                     return -1, p_currency
-                if (not (formula == 'upgrade' and unit.spec.quarry_buildable)) and (unit not in session.player.home_base_iter()):
+                if (not ((formula == 'upgrade' or formula.startswith('enhance')) and unit.spec.quarry_buildable)) and (unit not in session.player.home_base_iter()):
                     error_reason.append('this object is not in the player\'s home base, and is not quarry_buildable')
                     return -1, p_currency
 
@@ -21724,6 +21726,7 @@ class GAMEAPI(resource.Resource):
         if ingr_list:
             state['ingredients'] = copy.deepcopy(ingr_list)
         object.enhancing = Business.EnhanceBusiness(state, init_total_time = enhance_time, init_start_time = server_time)
+        session.viewing_base.nosql_write_one(object, 'do_enhance', fields = ['enhancing'])
 
         session.deferred_object_state_updates.add(object)
         session.deferred_player_state_update = True
@@ -21743,6 +21746,7 @@ class GAMEAPI(resource.Resource):
         ingr_list = enh_state.get('ingredients', None)
 
         object.enhancing = None
+        session.viewing_base.nosql_write_one(object, 'cancel_enhance', fields = ['enhancing'])
 
         refund = session.player.resources.gain_res(refund, reason='canceled_enhancement')
         admin_stats.econ_flow_player(session.player, 'investment', 'enhancement', refund, spec = enh_state['spec'], level = enh_level)
@@ -29044,12 +29048,12 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_research(session, retmsg, object)
 
             elif spellname == "ENHANCE_FOR_FREE":
-                if object not in session.player.home_base_iter():
+                if (not object.spec.quarry_buildable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_enhance(session, retmsg, object, spellargs)
             elif spellname == "CANCEL_ENHANCE":
-                if object not in session.player.home_base_iter():
+                if (not object.spec.quarry_buildable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_cancel_enhance(session, retmsg, object)
