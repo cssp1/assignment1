@@ -473,7 +473,7 @@ BaseRichnessPredicate.prototype.do_ui_describe = function(player) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
     var pair = goog.array.find(gamedata['strings']['regional_map']['richness'], function(entry) {
         return entry[0] >= this.min_richness;
-    });
+    }, this);
     if(!pair) { pair = gamedata['strings']['regional_map']['richness'][gamedata['strings']['regional_map']['richness'].length-1]; }
     ret = ret.replace('%s', pair[1]);
     return new PredicateUIDescription(ret);
