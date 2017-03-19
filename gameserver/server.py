@@ -21330,9 +21330,16 @@ class GAMEAPI(resource.Resource):
         if object.is_damaged() or object.is_busy():
             return # ignore invalid request
 
-        if session.player.foreman_is_busy():
-            retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
-            return
+        if session.home_base:
+            if session.player.foreman_is_busy():
+                retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+                return
+        else:
+            # quarries
+            if any(o.is_building() and o.is_using_foreman() for o in \
+                   session.viewing_base.iter_objects()):
+                retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+                return
 
         max_level = object.spec.maxlevel
         if object.spec.max_ui_level and (not session.player.is_cheater):
@@ -21670,9 +21677,16 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "LAB_IS_BUSY", object.obj_id])
             return
 
-        if session.player.foreman_is_busy():
-            retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
-            return
+        if session.home_base:
+            if session.player.foreman_is_busy():
+                retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+                return
+        else:
+            # quarries
+            if any(o.is_building() and o.is_using_foreman() for o in \
+                   session.viewing_base.iter_objects()):
+                retmsg.append(["ERROR", "FOREMAN_IS_BUSY"])
+                return
 
         spec = session.player.get_abtest_spec(EnhancementSpec, enh_name)
 
