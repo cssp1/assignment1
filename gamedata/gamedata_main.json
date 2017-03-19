@@ -417,6 +417,8 @@
         "enable_websockets": 1, // use websockets by default, if browser supports them
         "enable_websocket_reconnect": 2, // flag to turn on reconnection attempts (for meaning see SPWebsockets.js)
 
+        "enable_post_screenshot": 1, // show "post screenshot" feature, on platforms that support it
+
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
 
