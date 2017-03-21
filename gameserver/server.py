@@ -9069,7 +9069,7 @@ class Player(AbstractPlayer):
 
         to_remove_expired = []
         for aura in self.player_auras_recently_expired:
-            if (server_time - aura.get('end_time',-1)) >= gamedata['server'].get('player_auras_track_recently_expired_for',86400): # keep for one day
+            if (server_time - aura.get('end_time',-1)) >= gamedata['server'].get('player_auras_track_recently_expired_for',5*86400): # keep for 5 days
                 to_remove_expired.append(aura)
         for aura in to_remove_expired:
             self.player_auras_recently_expired.remove(aura)
