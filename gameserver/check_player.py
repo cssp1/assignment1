@@ -430,7 +430,6 @@ if __name__ == '__main__':
         driver = SpinUserDB.driver
 
     if user_id is None and (facebook_id or battlehouse_id):
-        print 'looking up user...'
         if facebook_id:
             sid = 'fb'+facebook_id
         elif battlehouse_id:
@@ -644,7 +643,6 @@ if __name__ == '__main__':
         if bh_id and BHAPI.supported():
             print fmt % ('---Battlehouse Account Info---', '')
             bh_user = SpinJSON.loads(BHAPI.BHAPI_raw('/user/'+bh_id))
-            bh_user['merged_to'] = '9ccffa07-7195-410b-b058-c29812f85dda' # XXXXXX
             if bh_user.get('banned'):
                 print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
             elif bh_user.get('merged_to'):
