@@ -221,6 +221,27 @@ def init_db_client():
     ret.set_time(time_now)
     return ret
 
+# trace chain of merged Battlehouse accounts recursively to find the player ID at the end
+def trace_bh_account_merges(db_client, bh_id):
+    bh_user = SpinJSON.loads(BHAPI.BHAPI_raw('/user/'+bh_id))
+    if bh_user.get('merged_to'):
+        return trace_bh_account_merges(db_client, bh_user['merged_to'])
+
+    # look up local game player ID of the merged account
+    alt_id = -1
+    if 0:
+        # do not use social_id_to_spinpunch, since that would find the old pre-merge account?
+        alt_user = db_client.player_cache_query_by_social_id('bh'+bh_id)
+        if alt_user:
+            alt_id = alt_user['user_id']
+    else:
+        alt_id = db_client.social_id_to_spinpunch_single('bh'+bh_id, False)
+
+    if alt_id > 0:
+        return 'player ID %d' % alt_id
+    else:
+        return 'not in game database'
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -651,9 +672,8 @@ if __name__ == '__main__':
 
                 # look up local game player ID of the merged account
                 if not db_client: db_client = init_db_client()
-                alt_id = db_client.social_id_to_spinpunch_single('bh'+bh_id, False)
-                if alt_id > 0:
-                    ui_merged_to += ' (player ID %d)' % alt_id
+
+                ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
 
                 print fmt % ('Merged to account:', ui_merged_to)
 

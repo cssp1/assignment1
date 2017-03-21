@@ -1332,6 +1332,18 @@ class NoSQLClient (object):
 
             return ret
 
+    # only used for PCHECK customer support purposes. NOT INDEXED!
+    def player_cache_query_by_social_id(self, social_id, reason = None):
+        return self.instrument('player_cache_query_by_social_id(%s)'%reason, self._player_cache_query_by_social_id, (social_id,))
+    def _player_cache_query_by_social_id(self, social_id):
+        # blank out some fields that should not be sent to the client
+        fields = {'LOCK_HOLDER':0,'LOCK_GENERATION':0,'LOCK_TIME':0}
+
+        result = self.player_cache().find_one({'social_id':social_id}, fields)
+        if result:
+            result = self.decode_player_cache(result)
+        return result
+
     ###### PLAYER LOCKING (embedded in player_cache) ######
     # note: extra unused parameters are for drop-in compatibility with old dbserver API
 
