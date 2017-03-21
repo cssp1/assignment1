@@ -89,7 +89,10 @@ def feature_expired(feature):
 def pretty_feature(feature):
     base_id = feature.get('base_id', 'unknown')
     base_type = feature.get('base_type', 'unknown')
-    base_ui_name = feature.get('base_ui_name', 'unknown')
+    if base_type in ('quarry','hive','raid') and feature.get('base_template'):
+        base_ui_name = feature['base_template']
+    else:
+        base_ui_name = feature.get('base_ui_name', 'unknown')
     try:
         base_ui_name = base_ui_name.encode('ascii')
     except UnicodeEncodeError:
@@ -625,12 +628,17 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
     else:
         xform = [1,0,0,1,0,0]
 
+    if SpinConfig.game() == 'fs':
+        base_ui_name = template['ui_name'] # '%s %04d' % (template['ui_name'], id_num)
+    else:
+        base_ui_name = '%s%s-%04d' % (random_letter(), random_letter(), id_num)
+
     base_data = {
         'base_id': base_id,
         'base_landlord_id': owner_id,
         'base_map_loc': None,
         'base_type': 'quarry',
-        'base_ui_name': '%s%s-%04d' % (random_letter(), random_letter(), id_num), # ui_name
+        'base_ui_name': base_ui_name,
         'base_richness': template['base_richness'],
         'base_icon': template['icon'].replace('%RESOURCE', resource),
         'base_climate': assign_climate,

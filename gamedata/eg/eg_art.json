@@ -1005,25 +1005,25 @@
 
     "resource_icon_clock": { "states": { "normal": { "images": ["art/ui/menu_buttons16.png"], "dimensions": [35,35], "origins": [251,522] } } },
 
-    "resource_icon_combat_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,0], "dimensions": [21,21] } } },
-    "resource_icon_cpu": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,21], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_fbcredits": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,42], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_iron": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,63], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_power": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,84], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_protection_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,105], "dimensions": [21,21] } } },
-    "resource_icon_reset_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,126], "dimensions": [21,21] } } },
-    "resource_icon_water": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,147], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_xp": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,168], "dimensions": [21,21] } } },
-    "resource_icon_bullet": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,210], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_damage": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,231], "dimensions": [21,21], "load_priority": 100 } } },
-    "resource_icon_res3": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,273], "dimensions": [21,21] } } },
-    "resource_icon_foreman": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,273], "dimensions": [21,21] } } },
+    "resource_icon_combat_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,0], "dimensions": [21,21] } } },
+    "resource_icon_cpu": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,21], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_fbcredits": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,42], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_iron": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,63], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_power": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,84], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_protection_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,105], "dimensions": [21,21] } } },
+    "resource_icon_reset_time": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,126], "dimensions": [21,21] } } },
+    "resource_icon_water": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,147], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_xp": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,168], "dimensions": [21,21] } } },
+    "resource_icon_bullet": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,210], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_damage": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,231], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_res3": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,273], "dimensions": [21,21] } } },
+    "resource_icon_foreman": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,273], "dimensions": [21,21] } } },
 
     // CURRENCY ICONS (referenced in store.json and can be overridden by A/B tests)
 
     // small/medium/large depiction of gamebucks:
     // note: 21x21 merged with resource_icons for desktop rendering efficiency
-    "resource_icon_alloys": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,189], "dimensions": [21,21], "load_priority": 100 } } },
+    "resource_icon_alloys": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,189], "dimensions": [21,21], "load_priority": 100 } } },
     // 28x28 icon for misc dialogs
     "alloy_icon_med": { "states": { "normal": { "images": ["art/ui/gamebucks_gold2.png"], "origins": [82,0], "dimensions": [28,28], "load_priority": 80 } } },
     // 32x32 icon for price display readouts
@@ -1236,7 +1236,7 @@
     "inventory_nothing": { "states": { "normal": { "images": ["art/ui/tr_inventory_icons43.jpg"], "origins": [250,250], "dimensions": [50,50] } } },
 
     "inventory_ops_needs": { "states": { "normal": { "images": ["art/ui/tr_inventory_icons43.jpg"], "origins": [100,150], "dimensions": [50,50] } } },
-    "resource_icon_ops_needs": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5h.png"], "origins": [0,252], "dimensions": [21,21] } } },
+    "resource_icon_ops_needs": { "states": { "normal": { "images": ["art/ui/tr_resource_icons5i.png"], "origins": [0,252], "dimensions": [21,21] } } },
 
     // this is used for the hold_unit_space aura
     "hold_unit_space":  { "states": { "normal": { "subassets": ["inventory_bg_orange", "inventory_rifleman", "inventory_padlock"] } } },
@@ -2774,34 +2774,34 @@
     "region_tr_island2_bg": { "states": { "normal": { "images": ["art/regions/tr_island2_1024.jpg"], "dimensions": [1024,512] } } },
 
     "map_flame": { "states": { "normal": { "style": "animation", "framerate": 4, "loop": 1,"images": [
-        "art/regions/tr_tiles5.png", "*", "*", "*"
+        "art/regions/tr_tiles6.png", "*", "*", "*"
     ], "dimensions": [64,64], "origins": [192,0,192,64,192,128,192,192], "composite_mode": "lighter", "alpha": 0.8 } } },
-    "map_bubble":  { "states": { "normal": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,192], "alpha": 1 } } },
+    "map_bubble":  { "states": { "normal": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,192], "alpha": 1 } } },
 
     "region_tiles": { "states": {
         // remember this image is downscaled by 50% during build, so cut origins in half!
         // use --filter catmull-rom -r 0.5 --unpremultiply
-        "desertA": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,128] },
-        "desertB": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,64] },
-        "desertC": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,0] },
-        "desertD": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,384] },
-        "desertE": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,448] },
+        "desertA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,128] },
+        "desertB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,64] },
+        "desertC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,0] },
+        "desertD": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,384] },
+        "desertE": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,448] },
 
-        "mountainA": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,192] },
-        "mountainB": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,256] },
-        "mountainC": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,256] },
+        "mountainA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,192] },
+        "mountainB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,256] },
+        "mountainC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,256] },
 
-        "grassA": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,320] },
-        "grassB": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,384] },
-        "grassC": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,320] },
+        "grassA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,320] },
+        "grassB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,384] },
+        "grassC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,320] },
 
-        "waterA": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [0,448] },
+        "waterA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,448] },
 
-        "base": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,  0] },
-        "base_destroyed": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [192,256] },
-        "quarry_water": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96, 64] },
-        "quarry_iron": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [96,128] },
-        "quarry_res3": { "images": ["art/regions/tr_tiles5.png"], "dimensions": [96,64], "origins": [192,320] }
+        "base": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,  0] },
+        "base_destroyed": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [192,256] },
+        "quarry_water": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96, 64] },
+        "quarry_iron": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,128] },
+        "quarry_res3": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [192,320] }
     } },
 
     //        "building_shield_big": { "states": { "normal": { "images": ["art/fx/building_shields.png"], "origins": [0,0], "center":[126,97], "dimensions": [256,150], "delay_load": 1 } } },

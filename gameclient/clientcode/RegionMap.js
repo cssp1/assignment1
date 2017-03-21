@@ -1489,7 +1489,14 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         var qtip;
         if(1) {
             var data = ui.data['widgets']['qstat'];
-            qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', data['ui_tooltip_sizes'][rich_str]).replace('%RESOURCE', gamedata['resources'][feature['base_icon']]['ui_name']);
+            var ui_res = '';
+            if(feature['base_icon'] in gamedata['resources']) {
+                ui_res = gamedata['resources'][feature['base_icon']]['ui_name'];
+            } else if(feature['base_icon'] in gamedata['strings']['regional_map']) {
+                ui_res = goog.string.trim(gamedata['strings']['regional_map'][feature['base_icon']].replace('%s',''));
+            }
+            var ui_long_rich_str = (rich_str in data['ui_tooltip_sizes'] ? data['ui_tooltip_sizes'][rich_str] : rich_str);
+            qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', ui_long_rich_str).replace('%RESOURCE', ui_res);
         }
 
         ui.widgets['qsize'].str = rich_str;
@@ -2625,7 +2632,7 @@ RegionMap.RegionMap.prototype.classify_feature = function(feature) {
                 color = 'alliance_hostile';
             }
         } else {
-            if(feature['base_icon'] in gamedata['resources']) {
+            if((feature['base_icon'] in gamedata['resources']) || ('quarry_'+feature['base_icon'] in gamedata['territory']['label_colors'])) {
                 color = 'quarry_'+feature['base_icon'];
             } else {
                 color = 'other_home';

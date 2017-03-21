@@ -446,6 +446,7 @@
         "all_quarries": "Quarries",
         "quarry": "Quarry %s",
         "strongpoint": "Strongpoint %s",
+        "logistics": "Clan Logistics %s",
         "hive_descr": "Camp",
         "hive_label": "", // no label by default
         "raid_descr": "Raid",

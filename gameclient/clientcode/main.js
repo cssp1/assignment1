@@ -10,6 +10,7 @@ goog.provide('SPINPUNCHGAME');
 
 goog.require('goog.object');
 goog.require('goog.array');
+goog.require('goog.string');
 goog.require('goog.net.XhrIo');
 goog.require('goog.net.ErrorCode');
 goog.require('goog.crypt.base64');
@@ -21751,7 +21752,8 @@ function invoke_region_map(target_loc) {
         'attacker': region_map_finder_state_init(),
         'hive_token': region_map_finder_state_init(),
         'raid': region_map_finder_state_init(),
-        'strongpoint': region_map_finder_state_init()
+        'strongpoint': region_map_finder_state_init(),
+        'quarry_logistics': region_map_finder_state_init()
     };
     for(var res in gamedata['resources']) {
         dialog.user_data['finder_states']['quarry_'+res] = region_map_finder_state_init();
@@ -22313,18 +22315,27 @@ function region_map_finder_update(dialog, kind, state) {
     var tooltip_str;
     var onclick;
     if(show) {
-        var ui_res = '';
+        var ui_res = ''; // "Iron/Water/Logistics" etc for quarries
         if(kind_res) {
             if(kind_res in gamedata['resources']) {
                 ui_res = gamedata['resources'][kind_res]['ui_name'];
             } else if(kind_res in gamedata['items']) {
                 ui_res = gamedata['items'][kind_res]['ui_name'];
+            } else if(kind_res in gamedata['strings']['regional_map']) {
+                ui_res = goog.string.trim(gamedata['strings']['regional_map'][kind_res].replace('%s',''));
+            } else {
+                throw Error('ui_res not found for '+kind_res);
             }
         }
 
         if(kind_root == 'quarry') {
-            button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
-            tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+            if('ui_name_quarry_'+kind_res in dialog.data['widgets']['misc_finder']) {
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry_'+kind_res].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry_'+kind_res].replace('%s', ui_res);
+            } else {
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+            }
             player.record_feature_use('quarry_finder_seen');
         } else {
             button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind].replace('%s', ui_res);
@@ -36438,7 +36449,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                 var qtip;
                 if(1) {
                     var data = dialog.data['widgets']['row_qstat'];
-                    qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', data['ui_tooltip_sizes'][rich_str]).replace('%RESOURCE', gamedata['resources'][quarry['base_icon']]['ui_name']);
+                    var ui_long_rich_str = (rich_str in data['ui_tooltip_sizes'] ? data['ui_tooltip_sizes'][rich_str] : rich_str);
+                    qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', ui_long_rich_str).replace('%RESOURCE', gamedata['resources'][quarry['base_icon']]['ui_name']);
                 }
 
                 dialog.widgets['row_qsize'+row].show = true;
