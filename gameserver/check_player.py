@@ -637,14 +637,17 @@ if __name__ == '__main__':
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
             print fmt % ('Known alt accounts:', '')
-            for s_other_id in sorted(player['known_alt_accounts'].iterkeys(), key = int):
-                entry = player['known_alt_accounts'][s_other_id]
+            for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
+                                     key = lambda id_entry: -id_entry[1].get('logins',1)):
                 if private_ip_re.match(entry.get('last_ip', 'Unknown')):
                     continue # invalid entry
                 if entry.get('logins',1) == 0:
                     continue # ignore
                 elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
+                    continue
+                elif 'last_login' in entry and entry['last_login'] < (time_now - 14*86400) and entry.get('logins',1) < 100:
+                    # ignore logins more than 2 weeks ago
                     continue
                 print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',
