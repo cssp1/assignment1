@@ -12,6 +12,7 @@ import SpinConfig
 import SpinJSON
 import SpinS3
 import ControlAPI
+import BHAPI
 from SpinHTTP import private_ip_re
 
 def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
@@ -215,6 +216,11 @@ def check_bloat(input, min_size = 1024, print_max = 20):
     for key, slen in sizes[0:print_max]:
         print '%-50s %-10.2f kB' % (key, slen/1024.0)
 
+def init_db_client():
+    ret = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
+    ret.set_time(time_now)
+    return ret
+
 # main program
 if __name__ == '__main__':
     import codecs
@@ -224,7 +230,7 @@ if __name__ == '__main__':
                                                       'ban', 'ban-days=', 'unban', 'isolate', 'unisolate', 'make-chat-mod', 'unmake-chat-mod',
                                                       'db-host=', 'db-port=', 'db-secret=', 'live',
                                                       's3', 's3-key-file=', 's3-userdb-bucket=', 's3-playerdb-bucket=',
-                                                      'user-id=', 'facebook-id=', 'game-id=',
+                                                      'user-id=', 'facebook-id=', 'battlehouse-id=', 'game-id=',
                                                       'give-alloy=', 'give-protection-time=', 'give-item=', 'melt-hours=', 'item-stack=', 'item-log-reason=',
                                                       'give-item-subject=', 'give-item-body=',
                                                       'send-message', 'message-subject=', 'message-body=', 'message-sender=', 'message-expire-time=', 'message-expire-in=',
@@ -235,6 +241,7 @@ if __name__ == '__main__':
     game_id = SpinConfig.config['game_id']
     user_id = None
     facebook_id = None
+    battlehouse_id = None
     bloat = False
     abtests = False
     db_host = None
@@ -319,6 +326,8 @@ if __name__ == '__main__':
             user_id = int(val)
         elif key == '--facebook-id':
             facebook_id = str(val)
+        elif key == '--battlehouse-id':
+            battlehouse_id = str(val)
         elif key == '--game-id' or key == '-g':
             game_id = val
         elif key == '--give-alloy':
@@ -364,11 +373,12 @@ if __name__ == '__main__':
         print 'error! item "%s" not found in gamedata.items' % give_item
         sys.exit(1)
 
-    if user_id is None and facebook_id is None:
+    if user_id is None and facebook_id is None and battlehouse_id is None:
         print 'usage: %s [options]' % sys.argv[0]
         print 'options:'
         print '    --user-id ID        choose player by game player ID'
         print '    --facebook-id ID    choose player by Facebook user ID'
+        print '    --battlehouse-id ID    choose player by Battlehouse user ID'
         print ''
         print '    --game-id ID        look up users for game ID (either mf or tr)'
         print ''
@@ -408,10 +418,9 @@ if __name__ == '__main__':
 
     db_client = None
 
-    if (user_id is None and facebook_id) or need_lock or give_item or send_message:
+    if (user_id is None and (facebook_id or battlehouse_id)) or need_lock or give_item or send_message:
         # need DB client
-        db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
-        db_client.set_time(time_now)
+        db_client = init_db_client()
 
     if force_s3:
         driver = SpinUserDB.S3Driver(game_id = game_id, key_file = s3_key_file,
@@ -420,11 +429,15 @@ if __name__ == '__main__':
     else:
         driver = SpinUserDB.driver
 
-    if user_id is None and facebook_id:
-        print 'looking up user by Facebook ID...'
-        user_id = db_client.facebook_id_to_spinpunch_single(facebook_id, False)
+    if user_id is None and (facebook_id or battlehouse_id):
+        print 'looking up user...'
+        if facebook_id:
+            sid = 'fb'+facebook_id
+        elif battlehouse_id:
+            sid = 'bh'+battlehouse_id
+        user_id = db_client.social_id_to_spinpunch_single(sid, False)
         if user_id < 0:
-            raise Exception('No user found for this Facebook ID')
+            raise Exception('No user found for this ID')
 
     try:
         user_filename = '%d.txt' % (user_id)
@@ -500,7 +513,8 @@ if __name__ == '__main__':
         if user.get('kg_username', None):
             print fmt % ('Kongregate Name:', '"'+user['kg_username']+'"')
 
-        if user.get('bh_id', None):
+        bh_id = user.get('bh_id', None)
+        if bh_id:
             print fmt % ('Battlehouse ID:', '"'+str(user['bh_id'])+'"')
         if user.get('bh_username', None):
             print fmt % ('Battlehouse Name:', '"'+user['bh_username']+'"')
@@ -627,6 +641,40 @@ if __name__ == '__main__':
         if player.get('chat_official',0):
             print fmt % ('CHAT OFFICIAL (blue text) account', '')
 
+        if bh_id and BHAPI.supported():
+            print fmt % ('---Battlehouse Account Info---', '')
+            bh_user = SpinJSON.loads(BHAPI.BHAPI_raw('/user/'+bh_id))
+            bh_user['merged_to'] = '9ccffa07-7195-410b-b058-c29812f85dda' # XXXXXX
+            if bh_user.get('banned'):
+                print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+            elif bh_user.get('merged_to'):
+                print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
+                ui_merged_to = bh_user['merged_to']
+
+                # look up local game player ID of the merged account
+                if not db_client: db_client = init_db_client()
+                alt_id = db_client.social_id_to_spinpunch_single('bh'+bh_id, False)
+                if alt_id > 0:
+                    ui_merged_to += ' (player ID %d)' % alt_id
+
+                print fmt % ('Merged to account:', ui_merged_to)
+
+            ui_creation_provider = bh_user.get('creation_provider', 'unknown')
+            if ui_creation_provider == 'local':
+                ui_creation_provider = 'email'
+            print fmt % ('Login Provider:', ui_creation_provider)
+            if bh_user.get('creation_provider_id'):
+                print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
+            if bh_user.get('real_name'):
+                print fmt % ('Real Name:', bh_user['real_name'])
+            if bh_user.get('ui_email'):
+                print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
+            bh_creat = bh_user.get('creation_time')
+            bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
+            print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+            print fmt % ('--- END Battlehouse Account Info---', '')
+
+
         if 'idle_check' in player and len(player['idle_check'].get('history',[])) > 0:
             successes = len(filter(lambda x: x['result'] == 'success', player['idle_check']['history']))
             fails = len(filter(lambda x: x['result'] == 'fail', player['idle_check']['history']))
@@ -636,7 +684,7 @@ if __name__ == '__main__':
             print fmt % ('Anti-Bot CAPTCHA:', ui_captcha)
 
         if 'known_alt_accounts' in player and player['known_alt_accounts']:
-            print fmt % ('Known alt accounts:', '')
+            print fmt % ('Known game alt accounts:', '')
             for s_other_id, entry in sorted(player['known_alt_accounts'].iteritems(),
                                      key = lambda id_entry: -id_entry[1].get('logins',1)):
                 if private_ip_re.match(entry.get('last_ip', 'Unknown')):
