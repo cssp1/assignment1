@@ -6281,6 +6281,7 @@ class GameObjectSpec(Spec):
         ["provides_quarry_control", 0],
         ["quarry_movable", False],
         ["quarry_buildable", False],
+        ["quarry_upgradable", False],
         ["build_time", 0],
         ["repair_time", 0],
         ] + resource_fields("build_cost") + [
@@ -15139,7 +15140,14 @@ class STATSAPI(resource.Resource):
                         ret['ui_priority'] = -1 * GameObjectSpec.get_leveled_quantity(spec[prio_field], 1)
                 return ret
 
-            data = map(get_listing, filter(lambda x: not x.get('developer_only'), gamedata[kind].itervalues()))
+            def can_show(spec):
+                # note: show_webstats overrides developer_only
+                if 'show_webstats' in spec:
+                    return bool(spec['show_webstats'])
+                if spec.get('developer_only'): return False
+                return True
+
+            data = map(get_listing, filter(can_show, gamedata[kind].itervalues()))
 
         else:
             # one specific object
@@ -16071,8 +16079,8 @@ class Store(object):
             if unit.owner is not session.player:
                 error_reason.append('player does not own this object')
                 return -1, p_currency
-            if (not unit.spec.quarry_buildable) and (unit not in session.player.home_base_iter()):
-                error_reason.append('this object is not in the player\'s home base, and is not quarry_buildable')
+            if (not unit.spec.quarry_upgradable) and (unit not in session.player.home_base_iter()):
+                error_reason.append('this object is not in the player\'s home base, and is not quarry_upgradable')
                 return -1, p_currency
 
             if unit.is_damaged() and (not unit.is_repairing()):
@@ -16291,8 +16299,8 @@ class Store(object):
                 if unit.owner is not session.player:
                     error_reason.append('player does not own this object')
                     return -1, p_currency
-                if (not ((formula == 'upgrade' or formula.startswith('enhance')) and unit.spec.quarry_buildable)) and (unit not in session.player.home_base_iter()):
-                    error_reason.append('this object is not in the player\'s home base, and is not quarry_buildable')
+                if (not ((formula == 'upgrade' or formula.startswith('enhance')) and unit.spec.quarry_upgradable)) and (unit not in session.player.home_base_iter()):
+                    error_reason.append('this object is not in the player\'s home base, and is not quarry_upgradable')
                     return -1, p_currency
 
                 if (not unit.is_building()):
@@ -21214,7 +21222,7 @@ class GAMEAPI(resource.Resource):
     def do_speedup_for_free(self, session, retmsg, object):
         assert object.is_building()
         if session.viewing_base is not session.player.my_home:
-            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_upgradable and session.viewing_base.base_landlord_id == session.player.user_id:
                 pass # OK to access remotely
             else:
                 retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
@@ -21311,7 +21319,7 @@ class GAMEAPI(resource.Resource):
             return # ignore invalid request
 
         if session.viewing_base is not session.player.my_home:
-            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_upgradable and session.viewing_base.base_landlord_id == session.player.user_id:
                 pass # OK to access remotely
             else:
                 retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
@@ -21365,7 +21373,7 @@ class GAMEAPI(resource.Resource):
             return
 
         if session.viewing_base is not session.player.my_home:
-            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_upgradable and session.viewing_base.base_landlord_id == session.player.user_id:
                 pass # OK to access remotely
             else:
                 retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
@@ -21459,7 +21467,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
             return False
         if session.viewing_base is not session.player.my_home:
-            if session.viewing_base.is_nosql_base() and object.spec.quarry_buildable and session.viewing_base.base_landlord_id == session.player.user_id:
+            if session.viewing_base.is_nosql_base() and object.spec.quarry_upgradable and session.viewing_base.base_landlord_id == session.player.user_id:
                 pass # OK to access remotely
             else:
                 retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
@@ -29111,12 +29119,12 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_research(session, retmsg, object)
 
             elif spellname == "ENHANCE_FOR_FREE":
-                if (not object.spec.quarry_buildable) and (object not in session.player.home_base_iter()):
+                if (not object.spec.quarry_upgradable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_enhance(session, retmsg, object, spellargs)
             elif spellname == "CANCEL_ENHANCE":
-                if (not object.spec.quarry_buildable) and (object not in session.player.home_base_iter()):
+                if (not object.spec.quarry_upgradable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_cancel_enhance(session, retmsg, object)

@@ -21044,7 +21044,7 @@ function invoke_building_context_menu(mouse_xy) {
     var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
     var quarry_stats_viewable = (session.is_quarry() && obj.spec['quarry_stats_viewable'] && session.region.data && session.region.data['storage'] == 'nosql');
 
-    var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
+    var quarry_upgradable = (session.is_quarry() && obj.spec['quarry_upgradable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
 
     var dialog_name = 'building_context_menu';
 
@@ -21182,13 +21182,13 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['REPAIR']['ui_name'], onclick: invoke_repair_dialog}));
-        } else if((session.home_base || quarry_buildable) && (obj.is_repairing() || obj.is_under_construction() || obj.is_removing())) {
+        } else if((session.home_base || quarry_upgradable) && (obj.is_repairing() || obj.is_under_construction() || obj.is_removing())) {
             // offer to speed up repairs or construction
             upgrade_is_active = false;
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
-        } else if((session.home_base || quarry_buildable) && (obj.is_upgrading() || obj.is_enhancing())) {
+        } else if((session.home_base || quarry_upgradable) && (obj.is_upgrading() || obj.is_enhancing())) {
             // if upgrading or enhancing, then just show speedup and cancel
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
@@ -21360,7 +21360,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if((session.home_base || quarry_buildable || quarry_stats_viewable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
+            } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
@@ -21380,8 +21380,8 @@ function invoke_building_context_menu(mouse_xy) {
 
                     // show "View Stats" rather than "Upgrade" if at max level
                     var stats_only = (obj.level >= obj.get_max_ui_level() ||
-                                      // or, in a quarry, it's a quarry_stats_viewable but not quarry_buildable object
-                                      (!session.home_base && !quarry_buildable && quarry_stats_viewable));
+                                      // or, in a quarry, it's a quarry_stats_viewable but not quarry_upgradable object
+                                      (!session.home_base && !quarry_upgradable && quarry_stats_viewable));
 
                     buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (stats_only ? '_maxlevel' : (obj.is_emplacement() ? '_emplacement' : ''))],
                                                         onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
@@ -42122,7 +42122,7 @@ function update_upgrade_dialog(dialog) {
     var new_level = old_level + 1;
 
     // flag that we can't do any upgrades, and this is just for showing stats
-    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_buildable']);
+    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
 
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
