@@ -41084,6 +41084,9 @@ function build_dialog_change_category(dialog, category) {
             if((spec['developer_only'] || spec['ui_priority'] < 0) && (spin_secure_mode || !player.is_cheater)) {
                 continue;
             }
+            if(spec['quarry_only'] && session.viewing_base.base_type != 'quarry') { continue; }
+            if(session.viewing_base.base_type == 'quarry' && !spec['quarry_buildable']) { continue; }
+
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             dialog.user_data['speclist'].push(name);

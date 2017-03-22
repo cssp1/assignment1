@@ -556,8 +556,9 @@ if __name__ == '__main__':
     building_names = sorted(gamedata['buildings'].keys())
 
     # remove non-relevant buildings
-    building_names = filter(lambda name: (not gamedata['buildings'][name].get('developer_only') or \
-                              name in ('weapon_factory', 'weapon_lab', 'turret_emplacement')),
+    building_names = filter(lambda name: (not (gamedata['buildings'][name].get('developer_only') or \
+                                               gamedata['buildings'][name].get('quarry_only')) or \
+                                          name in ('weapon_factory', 'weapon_lab', 'turret_emplacement')),
                             building_names)
 
     if gamedata['townhall']:

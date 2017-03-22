@@ -6335,6 +6335,7 @@ class GameObjectSpec(Spec):
         ["resurrectable_without_tech", False],
         ["donatable", True],
         ["developer_only", 0],
+        ["quarry_only", 0],
         ["always_free_speedup", False],
         ["no_free_speedup", False],
         ["unit_repair_resources", -1],
@@ -15126,7 +15127,7 @@ class STATSAPI(resource.Resource):
             # return a subset of properties from each spec
             FIELDS = ['name','ui_name','ui_priority','ui_tier',
                       'manufacture_category','research_category','build_category','enhance_category','category',
-                      'associated_unit']
+                      'associated_unit','quarry_only']
 
             def get_listing(spec):
                 ret = dict((f, spec[f]) for f in FIELDS if f in spec)
@@ -22422,7 +22423,8 @@ class GAMEAPI(resource.Resource):
         else:
             assert spec.kind == 'building'
 
-        if spec.developer_only and (spin_secure_mode or (not session.player.is_developer())):
+        if (spec.developer_only and (spin_secure_mode or (not session.player.is_developer()))) or \
+           (spec.quarry_only and session.viewing_base.base_type != 'quarry'):
             retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
             return
 
