@@ -42,7 +42,11 @@ class StupidPythonUTC(datetime.tzinfo):
 stupid_python_utc = StupidPythonUTC()
 
 def decode_time_datetime(dt):
-    return (dt - datetime.datetime(1970, 1, 1, tzinfo=stupid_python_utc)).total_seconds()
+    ret = dt - datetime.datetime(1970, 1, 1, tzinfo=stupid_python_utc)
+    if hasattr(ret, 'total_seconds'):
+        return ret.total_seconds()
+    # Python 2.6 compatibility
+    return (ret.microseconds + (ret.seconds + ret.days * 24 * 3600) * 10**6) / 10**6
 
 def ec2_inst_is_vpc(inst): return (inst.vpc_id is not None)
 def ec2_res_is_vpc(res): return ('VPC' in res['ProductDescription'])
