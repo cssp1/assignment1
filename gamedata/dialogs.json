@@ -7963,9 +7963,9 @@
 
             "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,282], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
 
-            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,262], "color": [0,0,0,0.6], "bevel": 2 },
+            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,314], "color": [0,0,0,0.6], "bevel": 2 },
 
-            "loading_spinner": { "kind": "StaticImage", "xy":[55,151], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
+            "loading_spinner": { "kind": "StaticImage", "xy":[96,151], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
 
             "jewel": { "show": 0, "kind": "Dialog", "xy": [177,20], "dimensions": [17,14], "dialog": "notification_jewel" }
         }

@@ -38523,6 +38523,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg, expect_loot)
     return dialog;
 }
 function update_gamebucks_sku_highlight_dialog(dialog) {
+    dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
     if(!dialog.widgets['sku'].show) {
         // the SKU went away, maybe it was a one-time deal that was purchased.
         // we're done!
@@ -38796,6 +38797,8 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 }
 
 function update_buy_gamebucks_dialog23(dialog) {
+    dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
+
     var spell_list = dialog.user_data['spell_list'];
 
     if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
