@@ -12540,8 +12540,7 @@ function update_aura_bar(dialog) {
     // dummy aura for damage protection
     if(player.resource_state['protection_end_time'] > server_time) {
         display_aura_list.unshift({'spec':'damage_protection', 'end_time': player.resource_state['protection_end_time'],
-                                   'ui_glow': (dialog.user_data['protection_time_glow'] ?
-                                               dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5) : 0)});
+                                   'ui_glow': !!dialog.user_data['protection_time_glow']});
     }
 
     // dummy aura for donated units
@@ -12658,9 +12657,10 @@ function update_aura_bar(dialog) {
                 dialog.widgets['aura_timer'+i].show = false;
             }
 
-            if(aura['ui_glow'] > 0) {
+            if(aura['ui_glow'] || aura_spec['ui_glow']) {
+                var flash = dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5);
                 dialog.widgets['aura_glow'+i].show = true;
-                dialog.widgets['aura_glow'+i].alpha = aura['ui_glow'];
+                dialog.widgets['aura_glow'+i].alpha = flash;
             } else {
                 dialog.widgets['aura_glow'+i].show = false;
             }
@@ -25636,6 +25636,8 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     // EXPIRES
     if(('end_time' in aura) && (aura['end_time'] > 0)) {
         dialog.widgets['expires'].show = true;
+        dialog.widgets['expires'].text_color = SPUI.make_colorv('expires_color' in spec ? spec['expires_color'] : dialog.data['widgets']['expires']['text_color']);
+
         dialog.widgets['expires'].xy[1] = dialog.widgets['description'].xy[1] + dialog.widgets['description'].wh[1] - dialog.widgets['description'].font.size;
         dialog.widgets['bgrect'].wh[1] += dialog.widgets['expires'].wh[1];
     }
