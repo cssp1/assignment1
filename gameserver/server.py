@@ -2429,7 +2429,21 @@ class User:
                     elif action['status'] in ('initiated', 'processing'):
                         completed = False # need to poll again later
                         break
-            # note: if result['data'] is empty, then drop the inflight request without executing the order
+            else:
+                # result['data'] is empty. If this is a very RECENT
+                # payment, do nothing right now, and wait for the
+                # webhook callback. (Facebook has started returning blank
+                # data for payments for a few seconds after the client
+                # completes them!)
+                if payment_data.get('time',-1) >= server_time - 60:
+                    completed = False
+                    if gamedata['server']['log_fbpayments'] >= 2:
+                        gamesite.exception_log.event(server_time, 'ping_fbpayment user %d request_id %s empty response on a recent payment, doing nothing' % (session.player.user_id, request_id))
+                    else:
+                        gamesite.facebook_log.event(server_time, 'ping_fbpayment user %d request_id %s empty response on a recent payment, doing nothing' % (session.player.user_id, request_id))
+
+
+            # note: if result['data'] is empty for an OLD payment, then drop the inflight request without executing the order
             if completed:
                 del session.player.fbpayments_inflight[request_id]
                 if paid:
@@ -2548,7 +2562,9 @@ class User:
                         # XXX refund?
 
                     # note: send AFTER executing spell, so that player state is already updated
-                    if 'tag' in payment_data: retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag'], True])
+                    if 'tag' in payment_data:
+                        retmsg.append(["FBPAYMENT_ORDER_ACK", payment_data['tag'], True])
+                        session.queue_flush_outgoing_messages()
 
         # fire deferred completion
         if d: d.callback(True)
