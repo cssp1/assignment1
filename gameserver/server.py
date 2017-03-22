@@ -19312,12 +19312,16 @@ class GAMEAPI(resource.Resource):
                 cannot_spy = True
 
         if dest_base and dest_base.base_type in ('hive','quarry'):
-            template = gamedata[{'hive':'hives_server','quarry':'quarries_server'}[dest_base.base_type]]['templates'] \
-                       .get(dest_base.base_template, None)
-            if template and ('activation' in template) and (not session.player.is_cheater):
-                if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
-                    retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
-                    cannot_spy = True
+            if dest_base.base_landlord_id == session.player.user_id:
+                pass # can always visit your own quarries
+            else:
+                # check activation predicate
+                template = gamedata[{'hive':'hives_server','quarry':'quarries_server'}[dest_base.base_type]]['templates'] \
+                           .get(dest_base.base_template, None)
+                if template and ('activation' in template) and (not session.player.is_cheater):
+                    if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
+                        retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
+                        cannot_spy = True
 
         # check for uncollected loot when leaving home base
         if dest_base or (dest_user is not session.user):
