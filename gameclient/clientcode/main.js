@@ -41004,7 +41004,9 @@ function get_building_jewels() {
     for(var name in gamedata['buildings']) {
         var spec = gamedata['buildings'][name];
         var category = spec['build_category'];
-        if(spec['developer_only']) { continue; }
+        if(spec['developer_only'] || spec['ui_priority'] < 0) { continue; }
+        if(spec['quarry_only'] && session.viewing_base.base_type != 'quarry') { continue; }
+        if(session.viewing_base.base_type == 'quarry' && !spec['quarry_buildable']) { continue; }
 
         var pred_ok = true;
         goog.array.forEach(['show_if', 'activation', 'requires'], function(pred) {
