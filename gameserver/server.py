@@ -8256,7 +8256,8 @@ class Base(object):
                 fields = ['owner_id']
                 if obj.is_building():
                     # clear some state on conquer
-                    if obj.is_producer() and gamedata['territory']['quarry_dump_on_conquer']:
+                    if obj.is_producer() and gamedata['territory']['quarry_dump_on_conquer'] and \
+                       ((not old_owner.is_ai()) or gamedata['territory'].get('quarry_dump_on_conquer_ai',False)):
                         # note: the following init_production() will restart the harvester
                         obj.produce_start_time = -1
                         obj.produce_rate = -1
@@ -8307,6 +8308,14 @@ class Base(object):
                         obj.repair_finish_time = -1
                         obj.heal_to_full()
                         fields += ['repair_finish_time','hp','hp_ratio','disarmed']
+
+                    if obj.is_producer() and gamedata['territory'].get('quarry_dump_on_abandon', False):
+                        # note: this will need init_production() to restart, e.g. on next base load
+                        obj.produce_start_time = -1
+                        obj.produce_rate = -1
+                        obj.contents = 0
+                        fields += ['produce_start_time', 'produce_rate', 'contents']
+
                 self.nosql_write_one(obj, 'quarry_abandon', fields = fields)
         for obj in to_remove: self.drop_object(obj)
 
