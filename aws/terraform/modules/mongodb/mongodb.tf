@@ -52,7 +52,7 @@ resource "aws_iam_instance_profile" "mongodb" {
 # EC2 instance
 
 resource "aws_instance" "mongodb" {
-  count = 3
+  count = "${var.n_instances}"
 
   # Amazon Linux AMI 2016.09.1 
   # HVM EBS-Backed
@@ -60,8 +60,8 @@ resource "aws_instance" "mongodb" {
   # HVM Instance Store
   # ami = "ami-24e7f233"
 
-  # production: m4.large? t2.large?
-  # testing: t2.medium?
+  # production: i3.large
+  # testing: t2.medium
   instance_type = "t2.medium"
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.mongodb.name}"
@@ -76,17 +76,27 @@ resource "aws_instance" "mongodb" {
     Terraform = "true"
   }
 
+  # note: data size BFM 4.4G, TR 66G
+
+  # update mongodb_device below with device name!
+
+  # for EBS (test) server
   ebs_block_device = {
-    device_name = "/dev/sdz"
+    device_name = "/dev/sdx"
     volume_type = "io1"
-    # BFM 4.4G, TR 66G
     volume_size = 10
     iops = 100
   }
 
+  # for i3 servers with NVMe ephemeral device
+#  ephemeral_block_device {
+#    device_name = "/dev/nvme0n1"
+#  }
+
   user_data = <<EOF
 ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_device=/dev/sdx" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_replica_set_name=${var.sitename}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_replica_set_serial=${count.index}" >> /etc/facter/facts.d/terraform.txt
@@ -96,7 +106,7 @@ EOF
 }
 
 resource "cloudflare_record" "cf_mongodb" {
-  count = 3
+  count = "${var.n_instances}"
   domain = "${var.sitedomain}"
   name = "${var.sitename}-mongodb-${count.index}"
   value = "${element(aws_instance.mongodb.*.public_dns, count.index)}"

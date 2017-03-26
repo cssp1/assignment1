@@ -14,6 +14,10 @@ variable "availability_zones" {
   description = "Comma-separated list of AWS availability zones to use, including region prefix"
   # e.g. "us-east-1a,us-east-1c"
 }
+variable "n_instances" {
+  description = "Number of MongoDB server instances"
+  default = 1
+}
 variable "ssh_access_security_group_id" {}
 variable "mongodb_security_group_id" {}
 variable "mongodb_root_password" {}
