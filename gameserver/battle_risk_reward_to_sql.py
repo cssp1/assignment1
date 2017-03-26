@@ -484,7 +484,7 @@ if __name__ == '__main__':
             old_limit = time_now - KEEP_DAYS * 86400
 
             if verbose: print 'pruning', battles_risk_reward_table
-            cur.execute("DELETE FROM "+sql_util.sym(battles_risk_reward_table)+" WHERE time < %s", old_limit)
+            cur.execute("DELETE FROM "+sql_util.sym(battles_risk_reward_table)+" WHERE time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'optimizing', battles_risk_reward_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battles_risk_reward_table))

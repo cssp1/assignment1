@@ -461,35 +461,35 @@ if __name__ == '__main__':
             old_limit = time_now - KEEP_DAYS * 86400
 
             if verbose: print 'pruning', battle_loot_table
-            cur.execute("DELETE loot FROM "+sql_util.sym(battle_loot_table)+" loot INNER JOIN "+sql_util.sym(battles_table)+" battles ON loot.battle_id = battles.battle_id WHERE battles.time < %s", old_limit)
+            cur.execute("DELETE loot FROM "+sql_util.sym(battle_loot_table)+" loot INNER JOIN "+sql_util.sym(battles_table)+" battles ON loot.battle_id = battles.battle_id WHERE battles.time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'removing orphans and optimizing', battle_loot_table
                 cur.execute("DELETE FROM "+sql_util.sym(battle_loot_table)+" WHERE battle_id NOT IN (SELECT battle_id FROM "+sql_util.sym(battles_table)+")")
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battle_loot_table))
 
             if verbose: print 'pruning', battle_units_table
-            cur.execute("DELETE units FROM "+sql_util.sym(battle_units_table)+" units INNER JOIN "+sql_util.sym(battles_table)+" battles ON units.battle_id = battles.battle_id WHERE battles.time < %s", old_limit)
+            cur.execute("DELETE units FROM "+sql_util.sym(battle_units_table)+" units INNER JOIN "+sql_util.sym(battles_table)+" battles ON units.battle_id = battles.battle_id WHERE battles.time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'removing orphans and optimizing', battle_units_table
                 cur.execute("DELETE FROM "+sql_util.sym(battle_units_table)+" WHERE battle_id NOT IN (SELECT battle_id FROM "+sql_util.sym(battles_table)+")")
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battle_units_table))
 
             if verbose: print 'pruning', battle_items_table
-            cur.execute("DELETE items FROM "+sql_util.sym(battle_items_table)+" items INNER JOIN "+sql_util.sym(battles_table)+" battles ON items.battle_id = battles.battle_id WHERE battles.time < %s", old_limit)
+            cur.execute("DELETE items FROM "+sql_util.sym(battle_items_table)+" items INNER JOIN "+sql_util.sym(battles_table)+" battles ON items.battle_id = battles.battle_id WHERE battles.time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'removing orphans and optimizing', battle_items_table
                 cur.execute("DELETE FROM "+sql_util.sym(battle_items_table)+" WHERE battle_id NOT IN (SELECT battle_id FROM "+sql_util.sym(battles_table)+")")
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battle_items_table))
 
             if verbose: print 'pruning', battle_damage_table
-            cur.execute("DELETE damage FROM "+sql_util.sym(battle_damage_table)+" damage INNER JOIN "+sql_util.sym(battles_table)+" battles ON damage.battle_id = battles.battle_id WHERE battles.time < %s", old_limit)
+            cur.execute("DELETE damage FROM "+sql_util.sym(battle_damage_table)+" damage INNER JOIN "+sql_util.sym(battles_table)+" battles ON damage.battle_id = battles.battle_id WHERE battles.time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'removing orphans and optimizing', battle_damage_table
                 cur.execute("DELETE FROM "+sql_util.sym(battle_damage_table)+" WHERE battle_id NOT IN (SELECT battle_id FROM "+sql_util.sym(battles_table)+")")
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battle_damage_table))
 
             if verbose: print 'pruning', battles_table
-            cur.execute("DELETE FROM "+sql_util.sym(battles_table)+" WHERE time < %s", old_limit)
+            cur.execute("DELETE FROM "+sql_util.sym(battles_table)+" WHERE time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'optimizing', battles_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battles_table))

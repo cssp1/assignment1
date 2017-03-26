@@ -850,7 +850,7 @@ if __name__ == '__main__':
                     KEEP_DAYS = 999
                     old_limit = time_now - KEEP_DAYS * 86400
 
-                    cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", old_limit)
+                    cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", [old_limit])
                     con.commit()
 
             if verbose: print 'all done.'
