@@ -2044,10 +2044,13 @@ class NoSQLClient (object):
             if partial:
                 _id = obj['_id']
                 del obj['_id']
-                qs = {'$set': obj}
+                qs = {}
+                if len(obj) > 0:
+                    qs['$set'] = obj
                 if unset: # list of properties to unset
                     qs['$unset'] = dict((f, 1) for f in unset)
-                self.region_table(region, table_name).update_one({'_id':_id}, qs, upsert = False)
+                if len(qs) > 0:
+                    self.region_table(region, table_name).update_one({'_id':_id}, qs, upsert = False)
             else:
                 self.region_table(region, table_name).replace_one({'_id':obj['_id']}, obj, upsert = True)
         finally:
