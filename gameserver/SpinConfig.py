@@ -402,7 +402,8 @@ def parse_mysql_config(dbname, cfg):
         password = cfg['password']
     port = cfg.get('port',3306)
     table_prefix = cfg.get('table_prefix', '')
-    return {'connect_args':(cfg['host'], username, password, dbname), 'connect_kwargs':{'use_unicode': True, 'charset': 'utf8'},
+    return {'connect_args':(cfg['host'], username, password, dbname),
+            'connect_kwargs':{'use_unicode': True, 'charset': 'utf8mb4'},
             'host':cfg['host'], 'port':port, 'username':username, 'password':password,
             'dbname': dbname, 'table_prefix': table_prefix, 'maintenance_window': cfg.get('maintenance_window',None)}
 
