@@ -108,7 +108,7 @@ EOF
 resource "cloudflare_record" "cf_mongodb" {
   count = "${var.n_instances}"
   domain = "${var.sitedomain}"
-  name = "${var.sitename}-mongodb-${count.index}"
+  name = "${var.sitename}-${count.index}"
   value = "${element(aws_instance.mongodb.*.public_dns, count.index)}"
   type = "CNAME"
   proxied = false
