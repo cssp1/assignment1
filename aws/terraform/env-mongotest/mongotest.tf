@@ -4,6 +4,7 @@ variable "availability_zones" {}
 variable "subnet_ids" {}
 variable "ssh_access_security_group_id" {}
 variable "mongodb_security_group_id" {}
+variable "n_instances" {}
 
 module "mongodb" {
   source = "../modules/mongodb"
@@ -20,7 +21,7 @@ module "mongodb" {
   cron_mail_sns_topic = "${var.cron_mail_sns_topic}"
   puppet_s3_bucket = "${var.puppet_s3_bucket}"
   ssh_access_security_group_id = "${var.ssh_access_security_group_id}"
-
+  n_instances = "${var.n_instances}"
   mongodb_root_password = "${var.mongodb_root_password}"
   mongodb_security_group_id = "${var.mongodb_security_group_id}"
 }
