@@ -260,16 +260,22 @@ if __name__ == '__main__':
                                                        'expressions': ['cpc'],
                                                        'operator': 'EXACT'}])
 
-            cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
-                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
-                            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
-                            ((day_start,
+            try:
+                to_insert = [(day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
                               'google', # campaign
                               'google', # source
                               row.get('ga:campaign',None), # note: Google Adwords Campaign name ->Code
-                              row['ga:totalEvents']) for row in report))
+                              row['ga:totalEvents']) for row in report]
+                cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
+                                "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
+                                "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+                                to_insert)
+            except:
+                print cur._last_executed
+                print '\n'.join(map(repr, to_insert))
+                raise
 
     for table, affected, interval, dt in ((bh_summary_table, set(), 'day', 86400),
                                           (bh_detail_table, set(), 'day', 86400),
