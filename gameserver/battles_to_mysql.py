@@ -315,7 +315,7 @@ if __name__ == '__main__':
                     if ktype == 'POINT':
                         keys.append(kname)
                         values.append("POINT(%d %d)" % tuple(val))
-                        formats.append("GeomFromText(%s)")
+                        formats.append("ST_GeomFromText(%s)")
                         keys.append(kname+'_x'); values.append(val[0]); formats.append('%s')
                         keys.append(kname+'_y'); values.append(val[1]); formats.append('%s')
                     else:
@@ -348,7 +348,7 @@ if __name__ == '__main__':
             if 'damage' in row:
                 cur.executemany("INSERT INTO "+sql_util.sym(battle_damage_table) + \
                                 " (battle_id,user_id,mobile,level,stack,iron,water,res3,time,spec) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                                battle_damage_iter(battle_id, row['damage']))
+                                list(battle_damage_iter(battle_id, row['damage'])))
 
             batch += 1
             total += 1
