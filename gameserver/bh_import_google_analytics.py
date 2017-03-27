@@ -198,30 +198,30 @@ if __name__ == '__main__':
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",pageviews,sessions,new_users,dau) " + \
                             "VALUES(%s,%s,%s,%s,%s)",
-                            ((day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers'], row['ga:1dayUsers']) for row in report))
+                            [(day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers'], row['ga:1dayUsers']) for row in report])
 
         elif table == bh_detail_table:
             report = get_detail_report(analytics, day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",referer,path,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:fullReferrer'], row['ga:hostname']+row['ga:pagePath'], row['ga:pageviews']) for row in report))
+                            [(day_start, row['ga:fullReferrer'], row['ga:hostname']+row['ga:pagePath'], row['ga:pageviews']) for row in report])
 
         elif table == bh_clicks_table:
             report = get_event_report(analytics, ["outbound-article","outbound-widget"], day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",click,count) " + \
                             "VALUES(%s,%s,%s)",
-                            ((day_start, '"%s" (%s)' % (row['ga:eventLabel'],row['ga:eventAction']), row['ga:totalEvents']) for row in report))
+                            [(day_start, '"%s" (%s)' % (row['ga:eventLabel'],row['ga:eventAction']), row['ga:totalEvents']) for row in report])
         elif table == bh_login_summary_table:
             report = get_event_report(analytics, ["bhlogin"], day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",event_name,event_data,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start,
+                            [(day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
-                              row['ga:totalEvents']) for row in report))
+                              row['ga:totalEvents']) for row in report])
         elif table == bh_login_campaign_summary_table:
 
             # need two separate queries here, due to quirkiness of the Google Analytics Reporting API
@@ -242,13 +242,13 @@ if __name__ == '__main__':
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
                             "VALUES(%s,%s,%s,%s,%s,%s,%s)",
-                            ((day_start,
+                            [(day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
                               row.get('ga:campaign',None),
                               row.get('ga:source',None),
                               row.get('ga:campaignCode',None),
-                              row['ga:totalEvents']) for row in report))
+                              row['ga:totalEvents']) for row in report])
 
             # second, grab ONLY Google Adwords events (as identified by google/cpc source/medium)
             report = get_event_report(analytics, ["bhlogin"], day_start, dt,
