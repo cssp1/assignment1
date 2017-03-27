@@ -549,6 +549,7 @@ class HandleAuraActive(Handler):
         return ReturnValue(result = self.aura_active(player.get('player_auras', []), self.args['aura_name']))
     def aura_active(self, player_auras, aura_name):
         for aura in player_auras:
+            if aura.get('start_time',-1) > self.time_now: continue
             if aura.get('end_time',-1) > 0 and aura['end_time'] < self.time_now: continue
             if aura['spec'] == aura_name:
                 return True

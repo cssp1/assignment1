@@ -110,7 +110,7 @@ class MetricEventConsequent(Consequent):
                 aura_specname = props[k]['$aura_data']['spec']
                 aura_dataname = props[k]['$aura_data']['data']
                 aura = None
-                for a in player.player_auras:
+                for a in player.player_auras_iter_const():
                     if a['spec'] == aura_specname:
                         aura = a; break
                 if aura:
@@ -251,7 +251,7 @@ class GiveTrophiesConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         amount = self.amount
         if self.amount_from_aura:
-            for aura in player.player_auras:
+            for aura in player.player_auras_iter_const():
                 if aura['spec'] == self.amount_from_aura:
                     given = aura.get('stack', 1)
                     aura['stack'] = 0 # mark it as already given

@@ -368,10 +368,10 @@ class AuraActivePredicate(Predicate):
         return self.is_satisfied2(None, player, qdata)
     def is_satisfied2(self, session, player, qdata, override_time = None):
         player.prune_player_auras()
-        aura_list = player.player_auras
+        aura_list = player.player_auras_iter_const()
         if override_time is not None:
             # also check against recently-expired auras (e.g. for sales)
-            aura_list = aura_list + player.get_player_auras_recently_expired(override_time)
+            aura_list = list(aura_list) + player.get_player_auras_recently_expired(override_time)
         for aura in aura_list:
             if override_time is not None and aura.get('start_time',-1) > override_time: continue
 

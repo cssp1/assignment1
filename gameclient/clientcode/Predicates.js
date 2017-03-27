@@ -745,6 +745,7 @@ AuraActivePredicate.prototype.find_aura = function(player, qdata) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
+            if(('start_time' in aura) && (aura['start_time'] > server_time)) { continue; }
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             if(this.match_data !== null) {
                 var theirs = aura['data'] || null;
@@ -790,6 +791,7 @@ AuraInactivePredicate.prototype.do_ui_describe = function(player) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.act_pred.aura_name && ((aura['stack']||1) >= this.act_pred.min_stack)) {
+            if(('start_time' in aura) && (aura['start_time'] > server_time)) { continue; }
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             togo = ('end_time' in aura ? aura['end_time'] - server_time : -1);
         }

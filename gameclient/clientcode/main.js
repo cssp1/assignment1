@@ -6836,7 +6836,8 @@ player.get_lottery_state = function(scanner) {
 
         // check for aura scans
         var aura = goog.array.find(player.player_auras, function(a) {
-            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time'])) &&
+                (!('start_time' in a) || (server_time >= a['start_time']));
         });
         if(aura) {
             ret.num_scans += ('stack' in aura ? aura['stack'] : 1);
@@ -12527,6 +12528,7 @@ function update_aura_bar(dialog) {
 
     // get list of auras to show - filter out expired/hidden auras
     var display_aura_list = goog.array.filter(player.player_auras, function(aura) {
+        if('start_time' in aura && aura['start_time'] > server_time) { return false; }
         if(aura['end_time'] && aura['end_time'] > 0 && aura['end_time'] < server_time) { return false; }
         var spec =  gamedata['auras'][aura['spec']];
         if(('show' in spec) && (!spec['show'])) { return false; }
@@ -37996,7 +37998,9 @@ function purchase_ui_event(event_name, extra_props) {
 
     // look for an active flash sale
     var aura = goog.array.find(player.player_auras, function(a) {
-        return goog.array.contains(['null_sale', 'flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
+        return goog.array.contains(['null_sale', 'flash_sale', 'item_bundles'], a['spec']) &&
+            a['end_time'] > server_time &&
+            (!('start_time' in a) || a['start_time'] < server_time);
     });
     if(aura && ('data' in aura)) {
         goog.array.forEach(['kind','duration','tag'], function(field) {

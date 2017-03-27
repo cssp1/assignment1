@@ -8219,7 +8219,7 @@ class Base(object):
                             return True
 
             # this override is for hitlist, which is "either townhall or X%+ base damage"
-            for aura in session.player.player_auras:
+            for aura in session.player.player_auras_iter_const():
                 for effect in aura.get('effects',[]): # XXXXXX doesn't this need to indirect via 'spec'?
                     if effect['code'] == 'base_damage_win_condition':
                         if base_damage >= effect['amount']:
@@ -9064,7 +9064,16 @@ class Player(AbstractPlayer):
 
     # modestly censored version of player auras for use in battle logs
     def player_auras_censored(self):
-        return [aura for aura in self.player_auras if gamedata['auras'].get(aura['spec'],{}).get('show_in_battle_log',True)]
+        return [aura for aura in self.player_auras_iter_const() if gamedata['auras'].get(aura['spec'],{}).get('show_in_battle_log',True)]
+
+    def player_auras_iter_const(self):
+        for aura in self.player_auras:
+            end_time = aura.get('end_time',-1)
+            if (end_time > 0) and (server_time >= end_time):
+                continue
+            if server_time < aura.get('start_time',-1):
+                continue
+            yield aura
 
     def prune_player_auras(self, is_session_change = False, is_login = False, is_recalc_stattab = False):
         to_remove = []
@@ -9140,7 +9149,7 @@ class Player(AbstractPlayer):
             if (not force) and (retmsg is not None):
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
 
-    def do_apply_aura(self, aura_name, strength = 1, duration = -1, level = 1, stack = -1, data = None, ignore_limit = False):
+    def do_apply_aura(self, aura_name, strength = 1, duration = -1, level = 1, stack = -1, data = None, ignore_limit = False, start_time = -1):
         spec = gamedata['auras'][aura_name]
         aura = None
 
@@ -9170,6 +9179,8 @@ class Player(AbstractPlayer):
 
             if True: # always overwrite aura duration
                 aura['start_time'] = server_time
+                if start_time > 0:
+                    gamesite.exception_log.event(server_time, 'warning: attempt to update current aura "%s" with future start time! player %d' % (aura['spec'], self.user_id))
                 if new_end_time < 0 and 'end_time' in aura: del aura['end_time']
                 else: aura['end_time'] = new_end_time
 
@@ -9186,13 +9197,14 @@ class Player(AbstractPlayer):
                 if aura_count >= gamedata['player_aura_limit']:
                     return False
             # create new aura
-            aura = {'spec': aura_name, 'start_time': server_time}
+            aura = {'spec': aura_name,
+                    'start_time': start_time if start_time > 0 else server_time}
             if strength != 1:
                 aura['strength'] = strength
             if level != 1:
                 aura['level'] = level
             if duration > 0:
-                aura['end_time'] = server_time + duration
+                aura['end_time'] = aura['start_time'] + duration
             if stack > 0:
                 aura['stack'] = stack
             if data is not None:
@@ -9229,7 +9241,7 @@ class Player(AbstractPlayer):
 
     def run_battle_end_auras(self, outcome, session, retmsg):
         to_remove = []
-        for aura in self.player_auras:
+        for aura in self.player_auras_iter_const():
             spec = gamedata['auras'].get(aura['spec'], None)
             if not spec: continue
             if spec.get('ends_on', None) == 'battle_end':
@@ -11358,7 +11370,7 @@ class Player(AbstractPlayer):
 
         # apply effects of existing decay aura
         if pred_ok:
-            for aura in self.player_auras:
+            for aura in self.player_auras_iter_const():
                 if aura['spec'] == 'trophy_pvp_decay':
                     elapsed = server_time - aura['start_time']
                     # note: aura['end_time'] may be -1 or missing for damaged-and-not-yet-repairing bases
@@ -11703,7 +11715,7 @@ class Player(AbstractPlayer):
 
             # calculate effects of player auras
 
-            for aura in player.player_auras:
+            for aura in player.player_auras_iter_const():
                 if aura['spec'] not in gamedata['auras']:
                     gamesite.exception_log.event(server_time, 'player %d has unrecognized aura %s' % (player.user_id, aura['spec']))
                     continue
@@ -16173,7 +16185,7 @@ class Store(object):
                 return -1, p_currency
 
             aura = None
-            for a in session.player.player_auras:
+            for a in session.player.player_auras_iter_const():
                 if a['spec'] == aura_name and ('end_time' in a):
                     aura = a
                     break
@@ -17125,7 +17137,7 @@ class Store(object):
         elif spellname == "PLAYER_AURA_SPEEDUP_FOR_MONEY":
             aura_name = spellarg
             aura = None
-            for a in session.player.player_auras:
+            for a in session.player.player_auras_iter_const():
                 if a['spec'] == aura_name and ('end_time' in a):
                     aura = a
                     break
@@ -17526,7 +17538,7 @@ class Store(object):
                                            'gui_version': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_version', gamedata['store'].get('buy_gamebucks_dialog_version',1)), session, session.player),
                                            'gui_look': Predicates.eval_cond_or_literal(session.player.get_any_abtest_value('buy_gamebucks_dialog_look', gamedata['store'].get('buy_gamebucks_dialog_look',None)), session, session.player),
                                            }
-                for aura in session.player.player_auras:
+                for aura in session.player.player_auras_iter_const():
                     if aura['spec'] in ('null_sale','flash_sale','item_bundles') and aura.get('end_time', -1) > server_time:
                         for FIELD in ('kind', 'duration', 'tag'):
                             if FIELD in aura['data']:
@@ -18320,13 +18332,13 @@ class GAMEAPI(resource.Resource):
                         bonus = entry[1]
                         break
                 if bonus > 0:
-                    for aura in session.player.player_auras:
+                    for aura in session.player.player_auras_iter_const():
                         if aura['spec'].startswith('trophy_pvp_plus'):
                             winner_pts = aura.get('stack',1)
                             if winner_pts > 0:
                                 winner_pts += max(1, int(winner_pts*bonus))
                                 aura['stack'] = winner_pts
-                    for aura in session.viewing_player.player_auras:
+                    for aura in session.viewing_player.player_auras_iter_const():
                         if aura['spec'].startswith('trophy_pvp_minus'):
                             loser_pts = -aura.get('stack',1)
                             if loser_pts < 0:
@@ -23261,7 +23273,7 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "CANNOT_SCAN_NO_CHARGES"])
                 success = False
         elif source == 'aura':
-            for a in session.player.player_auras:
+            for a in session.player.player_auras_iter_const():
                 if a['spec'] == 'lottery_scans' and ('end_time' not in a or a['end_time'] > server_time):
                     aura = a; break
             if (not aura) or (aura.get('stack',1) < 1):
