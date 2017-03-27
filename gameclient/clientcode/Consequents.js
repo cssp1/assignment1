@@ -12,6 +12,7 @@ goog.provide('Consequents');
 goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
 goog.require('OfferChoice');
+goog.require('LoginIncentiveDialog');
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but
@@ -725,6 +726,19 @@ InvokeOfferChoiceConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeLoginIncentiveDialogConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(InvokeLoginIncentiveDialogConsequent, Consequent);
+InvokeLoginIncentiveDialogConsequent.prototype.execute = function(state) {
+    var invoker = (function () { return function() {
+        LoginIncentiveDialog.invoke();
+    }; })();
+    notification_queue.push(invoker);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function EnableCombatResourceBarsConsequent(data) {
     goog.base(this, data);
     this.enabled = data['enable'];
@@ -904,6 +918,7 @@ function read_consequent(data) {
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
     else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
+    else if(kind === 'INVOKE_LOGIN_INCENTIVE_DIALOG') { return new InvokeLoginIncentiveDialogConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }

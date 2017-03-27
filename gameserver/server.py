@@ -5082,6 +5082,8 @@ class Session(object):
             str_reason = 'refund:'+str(reason_id)
         elif reason == 'promo_code':
             str_reason = 'promo_code:'+reason_id
+        elif reason == 'login_incentive':
+            str_reason = 'login_incentive:'+str(reason_id)
         else:
             gamesite.exception_log.event(server_time, 'unknown give_loot reason %s!' % reason)
             return []
@@ -29007,6 +29009,22 @@ class GAMEAPI(resource.Resource):
             client_contents = arg[1]
             session.player.loot_buffer_release('LOOT_BUFFER_RELEASE')
             retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, False])
+
+        elif arg[0] == "LOGIN_INCENTIVE_CLAIM":
+            for aura in session.player.player_auras_iter_const():
+                if aura['spec'] == 'login_incentive_ready':
+                    cur_count = aura.get('stack',1)
+                    next_count = cur_count + 1
+
+                    # cycle back to 1 after the last reward
+                    if ('login_incentive_%d' % next_count) not in gamedata['loot_tables']:
+                        next_count = 1
+
+                    context = {'loot_reason_id': cur_count,
+                               'next_count': next_count}
+                    session.execute_consequent_safe(session.player.get_abtest_consequent('login_incentive_claim'), session.player, retmsg,
+                                                    context = context, reason = arg[0])
+                    break
 
         elif arg[0] == "DAILY_TIP_UNDERSTOOD":
             tipname = arg[1]

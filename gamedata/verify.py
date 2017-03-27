@@ -1702,7 +1702,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE',
+                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
                         'ALL_AGGRESSIVE',
                    ])
 
@@ -1724,7 +1724,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             error |= check_consequent(c, reason = reason, context = context, context_data = context_data)
     elif cons['consequent'] == "GIVE_LOOT":
         error |= check_loot_table(cons['loot'], reason = reason, expire_time = cons.get('item_expire_at',-1), duration = cons.get('item_duration',-1))
-        if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code'):
+        if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code', 'login_incentive'):
             error |= 1
             print '%s: GIVE_LOOT consequent has bad "reason", it should be "%s"' % (reason, context)
         if 'mail_template' in cons:
@@ -1915,7 +1915,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                                 'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'TAKE_ITEMS',
                                 'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE',
+                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
                                 'NULL']:
         # we recognize these ones, but they don't have detailed sanity checks written for them yet
         pass
