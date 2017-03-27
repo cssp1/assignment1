@@ -1146,6 +1146,17 @@ if __name__ == '__main__':
                             ]
                     else:
                         raise Exception('unhandled case')
+
+                    if 'max_cc_level_to_see' in data:
+                        # note: this only applies to the first base, and only if the instance cooldown
+                        # is inactive (allow players who started fighting this sequence and promote CC
+                        # level during the same week to finish the sequence)
+                        show_pred['subpredicates'] += [
+                            {"predicate": "OR", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname},
+                                                                  {"predicate": "NOT", "subpredicates": [
+                            {"predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['max_cc_level_to_see'][diff]+1}]}
+                            ]}
+                            ]
                 else:
                     # not first base
                     show_pred['subpredicates'] += [{ "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname }]
