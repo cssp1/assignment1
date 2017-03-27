@@ -11999,9 +11999,11 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
     // token count update
     var shift = [0,0]; // shift other widgets over to make room
     if('resource_bar_tokens' in dialog.data['widgets']) {
-        var token_names = player.get_any_abtest_value('show_item_quantity', gamedata['store']['show_item_quantity']);
-        // can be undefined, null, string, or Array - canonicalize to Array
-        if(!(token_names instanceof Array)) { token_names = (token_names ? [token_names] : []); }
+        if(gamedata['store']['show_item_quantity']) {
+            token_names = eval_cond(gamedata['store']['show_item_quantity'], player, null) || [];
+        } else {
+            token_names = [];
+        }
 
         for(var y = 0; y < dialog.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
             for(var x = 0; x < dialog.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
