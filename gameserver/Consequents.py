@@ -277,6 +277,8 @@ class ApplyAuraConsequent(Consequent):
         self.name = data['aura_name']
         self.duration = data.get('aura_duration',-1)
         self.duration_from_event = data.get('aura_duration_from_event', None)
+        self.duration_period_origin = data.get('aura_duration_period_origin', None)
+        self.start_time_offset = data.get('start_time_offset', 0)
         self.strength = data.get('aura_strength',1)
         self.level = data.get('aura_level',1)
         self.aura_data = data.get('aura_data', None)
@@ -297,6 +299,7 @@ class ApplyAuraConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         stack = -1
         duration = self.duration
+        start_time = -1
 
         if self.duration_from_event:
             event_kind = self.duration_from_event.get('event_kind', 'current_event')
@@ -307,6 +310,15 @@ class ApplyAuraConsequent(Consequent):
             else:
                 togo = -neg_time_to_end
                 duration = togo if (duration < 0) else min(duration, togo)
+
+        elif self.duration_period_origin is not None:
+            ref_time = player.get_absolute_time()
+            if self.start_time_offset >= self.duration:
+                # set for full duration of next period
+                start_time = self.duration_period_origin + self.duration * \
+                             ((ref_time - self.duration_period_origin + self.start_time_offset) // self.duration)
+            else:
+                duration = self.duration - ((ref_time - self.duration_period_origin) % self.duration)
 
         if self.stack > 0:
             stack = self.stack
@@ -332,7 +344,7 @@ class ApplyAuraConsequent(Consequent):
                     instance_data[k] = duration
         else:
             instance_data = None
-        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True):
+        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True, start_time = start_time):
             session.player.stattab.send_update(session, retmsg)
             spec = session.player.get_abtest_aura(self.name)
             if ('on_apply' in spec):
