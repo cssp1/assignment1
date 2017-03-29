@@ -221,7 +221,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
                     prop_stack.pop();
                     code_stack.pop();
                     code_text_stack.pop();
-                    insert_string = pretty_print_date(parseInt(arg,10)); // XXX imported from main.js
+                    insert_string = pretty_print_date_utc(parseInt(arg,10)); // XXX imported from main.js
                 } else if(plugins && (root in plugins)) {
                     // note: don't call the handler yet, because we need to wait until text is accumulated to the close of the block
                     // also note we need to add a *reference* to a state object, not a literal, since inner blocks are going to clone this.

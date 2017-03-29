@@ -516,17 +516,21 @@ function pretty_print_time_very_brief(sec) {
 }
 
 // turns a UNIX timestamp into a string like "2013 Dec 9"
-function pretty_print_date(ts) {
+function pretty_print_date_utc(ts) {
+    var d = new Date(ts*1000);
+    return d.getUTCFullYear().toString()+' '+gamedata['strings']['months_short'][d.getUTCMonth()]+' '+d.getUTCDate().toString();
+}
+function pretty_print_date_local(ts) {
     var d = new Date(ts*1000);
     return d.getFullYear().toString()+' '+gamedata['strings']['months_short'][d.getMonth()]+' '+d.getDate().toString();
 }
 
-// "2013 Dec 9 01:23"
-function pretty_print_date_and_time(ts) {
+// "2013 Dec 9 01:23" *UTC*
+function pretty_print_date_and_time_utc(ts) {
     var dt = ts % 86400;
     var hours = Math.floor(dt/3600);
     var minutes = Math.floor(dt/60) % 60;
-    return pretty_print_date(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
+    return pretty_print_date_utc(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
 }
 
 // pad a string with zeros until it is length 'n'
@@ -23538,7 +23542,7 @@ function mail_dialog_select_mail(dialog, row) {
             var ghost = mail['attachments_ghost'][i];
             if(ghost && ghost['collected_at']) {
                 dialog.widgets['attach_taken'].show = true;
-                dialog.widgets['attach_taken'].str = dialog.data['widgets']['attach_taken']['ui_name'].replace('%s', pretty_print_date(ghost['collected_at']));
+                dialog.widgets['attach_taken'].str = dialog.data['widgets']['attach_taken']['ui_name'].replace('%s', pretty_print_date_utc(ghost['collected_at']));
                 break;
             }
         }
@@ -29943,7 +29947,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
 
             // member since
             if('join_time' in member) {
-                d.user_data['ui_member_since'] = d.data['widgets']['info']['ui_member_since'].replace('%s', pretty_print_date(member['join_time']));
+                d.user_data['ui_member_since'] = d.data['widgets']['info']['ui_member_since'].replace('%s', pretty_print_date_utc(member['join_time']));
             } else {
                 d.user_data['ui_member_since'] = null;
             }
