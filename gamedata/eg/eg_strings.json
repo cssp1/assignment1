@@ -1556,5 +1556,7 @@
                       "Juliet", "Kilo", "Lima", "Mike", "November", "October", "Papa", "Quebec", "Romeo",
                       "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-Ray", "Yankee", "Zulu"],
     "months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "days_of_week_short": ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+    "days_of_week": ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
     "unknown": "Unknown"
 }
