@@ -113,6 +113,16 @@ def check_retain(pcache, player, config):
     if (time_now - pcache.get('last_login_time',-1)) >= num_hours*3600:
         return config['ref'], '', None # send it
     return None, None, None
+def check_login_incentive_expiring(pcache, player, config):
+    aura_list = player.get('player_auras', [])
+    for aura in aura_list:
+        if aura['spec'] == 'login_incentive_ready' and \
+           time_now >= aura.get('start_time',-1) and \
+           time_now < aura['end_time'] and \
+           time_now >= aura['end_time'] - 8 * 3600: # XXX A/B test how soon to start sending these
+            ui_time_togo = '%.1f hrs' % ((aura['end_time']-time_now)/3600.0)
+            return config['ref'], ui_time_togo, None
+
 def check_fishing_complete(pcache, player, config):
     prefs = player.get('player_preferences', {})
     if type(prefs) is dict and (not prefs.get('enable_fishing_notifications',True)): return None, None, None
@@ -158,6 +168,7 @@ CHECKERS = {
     'production_complete': check_production_complete,
     'army_repaired': check_army_repaired,
     'fishing_complete': check_fishing_complete,
+    'login_incentive_expiring': check_login_incentive_expiring,
     'retain_': check_retain,
     }
 
