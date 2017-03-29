@@ -7622,36 +7622,86 @@
         }
     },
 
+    "login_incentive_reward": {
+        "dimensions": [54,146],
+        "widgets": {
+            "day": { "kind": "TextField", "xy": [0,-2], "dimensions": [54,32], "text_size": 17, "text_hjustify": "center",
+                     "text_color_future": [0.66,0.66,0.66,1],
+                     "text_color_today": [1,1,1,1],
+                     "text_color_day7": [1,1,0,1],
+                     "text_color_claimed": [0.2,0.2,0.2],
+                     "drop_shadow": 1,
+                     "ui_name": "Day %stack"
+                   },
+
+            "border": { "kind": "SolidRect", "xy": [0,39], "dimensions": [54,54],
+                        "color": [0,0,0,0.5], "bevel": 3,
+                        "outline_color_claimed": [0.2,0.2,0.2,1],
+                        "outline_color_future": [0.4,0.4,0.4,1],
+                        "outline_color_day7": [0.4,0.4,0.4,1],
+                        "outline_color_today": [1,1,0,1],
+                        "outline_width": 2 },
+            "item": { "kind": "Dialog", "xy": [2,41], "dimensions": [50,50],
+                      "dialog": "item_display"
+                    },
+            "label": { "kind": "TextField", "xy": [0,101], "dimensions": [54,32], "text_size": 13, "text_hjustify": "center",
+                       "text_color_future": [0.66,0.66,0.66,1],
+                       "text_color_today": [1,1,1,1],
+                       "text_color_day7": [1,1,0,1],
+                       "text_color_claimed": [0.2,0.2,0.2],
+                       "drop_shadow": 1,
+                       "ui_name": "%dayofweek\n%date"
+                     },
+            "glow": { "show": 0, "kind": "StaticImage", "xy":[-23,16], "dimensions":[100,100],
+                      "asset": "dialog_glow_resizable",
+                      "bg_image_resizable": 1, "alpha": 0.7, "composite_mode": "lighter"}
+        }
+    },
+
     "login_incentive_dialog": {
         "clip_children": 0,
-        "dimensions": [648,438],
+        "dimensions": [736,423],
+        "default_button": "claim_button",
         "widgets": {
-            "bg_blanker": { "kind": "SolidRect", "xy": [-1000,-1000], "dimensions": [4670,4670], "color":[0.01,0.01,0.01,1] },
-            "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[708,498],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
-                      "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2,
-                      "sound": "success_sound_exploding_glass_01"
-                    },
-            "bg": { "kind": "StaticImage", "xy": [0,0], "dimensions": [648,438], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+                      "sound": "success_sound_exploding_glass_01",
+                      "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "Daily Login Reward" },
 
-            "sunken_left":{"kind":"StaticImage","xy":[15,60],"dimensions":[174,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
-            "sunken_right":{"kind":"StaticImage","xy":[200,60],"dimensions":[430,350],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "sidebar_splash_frame": { "kind": "SolidRect", "xy": [26,77], "dimensions": [151,316],
-                                      "color": [0,0,0,0.5], "bevel": 3,
-                                      "outline_color": [0.4,0.4,0.4,1],
-                                      "outline_width": 2 },
-            "sidebar_splash":{"kind":"StaticImage","xy":[30,83],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions":[663,32], "color": [0,0,0,0.25] },
+            "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13, "text_color":[0.8,0.8,0.8,1],
+                             "text_style": "thick", "text_hjustify": "center", "drop_shadow":1,
+                             "ui_name": "Claim one free reward for each consecutive day you log in" },
 
-            "title_bold": { "kind": "TextField", "xy": [0,10], "dimensions": [650, 40], "text_size": 27, "text_style": "bold",
-                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "Special Offer!" },
-            "description1": { "kind": "TextField", "xy": [200,85], "dimensions": [430,32], "text_size": 13, "text_style": "bold", "text_hjustify": "center",
-                              "ui_name": "Click one of the choices to activate a new special offer:" },
+            "sunken_left":{"kind":"StaticImage","xy":[50,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[54,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
-            "choice": { "kind": "Dialog", "dialog": "offer_choice_item",
-                        "xy":[215,140], "array": [3,1], "array_offset": [135,0]},
 
-            "description2": { "kind": "TextField", "xy": [200,336], "dimensions": [430,32], "text_size": 13, "text_hjustify": "center", "text_color": [0.8,0.8,0.8,1],
-                              "ui_name": "Offers are for you only, and available for a limited time." }
+            "sunken2": {"kind": "StaticImage", "xy":[218,112], "dimensions":[460,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "rewards": { "kind": "Dialog", "xy": [229,122], "dimensions": [54,146], "dialog": "login_incentive_reward",
+                         "array": [7,1], "array_offset": [64,0] },
+
+            "claim_button": { "kind": "ActionButton", "xy": [381,308], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+                              "bg_image": "action_button_resizable", "text_style": "bold",
+                              "bg_image_resizable": 1, "push_bg_image": 1,
+                              "ui_name": "Claim",
+                              "ui_name_cooldown": "Claimed",
+                              "ui_name_pending": "Claiming..." },
+
+            "status": { "kind": "TextField", "xy": [237,355], "dimensions": [420,33], "text_size": 13,
+                        "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1],
+                        // stack = 1
+                        "ui_name": "Claim today's reward within %togo to keep your progress!",
+                        // on cooldown
+                        "ui_name_cooldown": "Next reward available at midnight GMT (in %togo)",
+                        "text_color": [1,1,0,1]
+                       }
         }
     },
 

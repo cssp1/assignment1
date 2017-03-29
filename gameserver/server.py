@@ -29024,7 +29024,11 @@ class GAMEAPI(resource.Resource):
                                'next_count': next_count}
                     session.execute_consequent_safe(session.player.get_abtest_consequent('login_incentive_claim'), session.player, retmsg,
                                                     context = context, reason = arg[0])
+
                     break
+
+            if session.player.loot_buffer:
+                retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
 
         elif arg[0] == "DAILY_TIP_UNDERSTOOD":
             tipname = arg[1]
