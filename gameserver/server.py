@@ -15441,7 +15441,13 @@ class CONTROLAPI(resource.Resource):
             # Twisted gives us request.args in the form of raw bytes
             # I think in most cases we want to immediately convert to Unicode strings here.
             # Though maybe a future bulk-data-transfer call would want to preserve raw bytes?
-            args = dict([(k, unicode(urllib.unquote(v[0]).decode('utf-8'))) for k, v in request.args.iteritems() if k not in ('secret','method')])
+            try:
+                args = dict([(k, unicode(urllib.unquote(v[0]).decode('utf-8'))) for k, v in request.args.iteritems() if k not in ('secret','method')])
+            except UnicodeDecodeError:
+                gamesite.exception_log.event(server_time, 'CONTROLAPI call with invalid Unicode args: %r' % repr(request.args))
+                request.setResponseCode(http.BAD_REQUEST)
+                return SpinJSON.dumps({'error':'Arguments contain invalid Unicode'})
+
             with admin_stats.latency_measurer('CONTROLAPI(ALL)'):
                 with admin_stats.latency_measurer('CONTROLAPI(HTTP:%s)' % method):
                     ret = catch_all('CONTROLAPI (method %r args %r)' % (method, args))(self.handle)(request, secret, method, args)
