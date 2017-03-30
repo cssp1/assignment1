@@ -167,7 +167,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
         elif key == 'browser_os': return 'VARCHAR(16)'
         elif key == 'browser_name': return 'VARCHAR(16)'
         elif key == 'birthday': return 'VARCHAR(10)'
-        elif key == 'last_login_ip': return 'VARCHAR(16)'
+        elif key == 'last_login_ip': return 'VARCHAR(64)'
         else: return 'VARCHAR(128)'
 
     else: # not a recognized data type
@@ -474,9 +474,12 @@ def do_slave(input):
                 alt_accounts = user.get('known_alt_accounts', None)
                 if alt_accounts and type(alt_accounts) is dict:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['alts_table']) + \
-                                    " (user_id, other_id, logins, attacks, last_simultaneous_login)" + \
-                                    " VALUES (%s,%s,%s,%s,%s)",
-                                    [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None)) \
+                                    " (user_id, other_id, lower_id, higher_id, logins, attacks, last_simultaneous_login, last_ip)" + \
+                                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                                    [(user['user_id'], int(alt_sid),
+                                      min(user['user_id'], int(alt_sid)),
+                                      max(user['user_id'], int(alt_sid)),
+                                      alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None), alt.get('last_ip',None)) \
                                      for alt_sid, alt in alt_accounts.iteritems() if alt.get('logins',1) > 0 and not alt.get('ignore',False)])
 
             # army composition table
@@ -757,10 +760,16 @@ if __name__ == '__main__':
                 sql_util.ensure_table(cur, alts_table+'_temp',
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('other_id','INT4 NOT NULL'),
+                                                  ('lower_id','INT4 NOT NULL'),
+                                                  ('higher_id','INT4 NOT NULL'),
                                                   ('logins','INT4'),
                                                   ('attacks','INT4'),
-                                                  ('last_simultaneous_login','INT8')],
+                                                  ('last_simultaneous_login','INT8'),
+                                                  ('last_ip', 'VARCHAR(64)'),
+                                                  ],
                                        'indices': {'by_user_id': {'keys': [('user_id','ASC')]},
+                                                   # to uniquify alt "groups", knock out any user_id that appears as a higher_id in this table
+                                                   'by_higher_id': {'keys': [('higher_id','ASC')]},
                                                    #'by_logins': {'keys': [('logins','ASC')]},
                                                    #'by_attacks': {'keys': [('attacks','ASC')]},
                                                    }
