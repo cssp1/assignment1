@@ -275,8 +275,8 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['upgrade_achievement_table']) + \
                                     " (" + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", kind, spec, level, is_maxed, num_players) " + \
                                     " VALUES (" + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE num_players = num_players + %s",
-                                    [k + (v,v) for k,v in upgrade_achievement_counters.iteritems()])
+                                    " ON DUPLICATE KEY UPDATE num_players = num_players + VALUES(num_players)",
+                                    [k + (v,) for k,v in upgrade_achievement_counters.iteritems()])
                     con.commit()
                     upgrade_achievement_counters.clear()  # clear accumulator
                     break
@@ -293,8 +293,8 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
                                     " (time, " + ','.join([x[0] for x in collapsed_summary_dimensions(sql_util)]) + ", kind, spec, level, location, total_count) " + \
                                     " VALUES (%s, " + ','.join(['%s'] * len(collapsed_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE total_count = total_count + %s",
-                                    [(time_now,) + k + (v, v) for k,v in army_composition.iteritems()])
+                                    " ON DUPLICATE KEY UPDATE total_count = total_count + VALUES(total_count)",
+                                    [(time_now,) + k + (v,) for k,v in army_composition.iteritems()])
                     con.commit()
                     army_composition.clear() # clear accumulator
                     break
@@ -311,9 +311,9 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['resource_levels_table']) + \
                                     " (time, " + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", resource, total_amount, num_players) " + \
                                     " VALUES (%s, " + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE total_amount = total_amount + %s, num_players = num_players + %s",
+                                    " ON DUPLICATE KEY UPDATE total_amount = total_amount + VALUES(total_amount), num_players = num_players + VALUES(num_players)",
                                     # note: "v" here is (amount, num_players) for each summary dimension combination
-                                    [(time_now,) + k + tuple(v) + tuple(v) for k,v in resource_levels.iteritems()])
+                                    [(time_now,) + k + tuple(v) for k,v in resource_levels.iteritems()])
                     con.commit()
                     resource_levels.clear() # clear accumulator
                     break
@@ -330,9 +330,9 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['abtests_table']) + \
                                     " (user_id, test_name, group_name, join_time) " + \
                                     " VALUES (%s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE group_name = %s, join_time = %s",
+                                    " ON DUPLICATE KEY UPDATE group_name = VALUES(group_name), join_time = VALUES(join_time)",
                                     # note: "k" is (user_id, test_name, "v" is (group_name, join_time)
-                                    [k + v + v for k,v in abtest_memberships.iteritems()])
+                                    [k + v for k,v in abtest_memberships.iteritems()])
                     con.commit()
                     abtest_memberships.clear() # clear accumulator
                     break
