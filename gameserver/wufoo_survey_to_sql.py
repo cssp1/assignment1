@@ -9,6 +9,7 @@
 import sys, time, getopt, csv
 import SpinConfig
 import SpinSQLUtil
+from SpinHTTP import ip_matching_key
 import MySQLdb
 
 time_now = int(time.time())
@@ -94,6 +95,7 @@ if __name__ == '__main__':
     questions = None
 
     seen_user_ids = set()
+    seen_ips = set()
 
     for row in csv_reader:
         if questions is None:
@@ -147,8 +149,18 @@ if __name__ == '__main__':
             print 'skipping duplicate user_id', user_id
             continue
 
-        timestamp = -1 # XXXXXX long(mktime_tz(parsedate_tz(row[col_time])))
         ip = row[col_ip]
+        if not ip:
+            print 'skipping missing IP'
+            continue
+        ip = ip_matching_key(ip)
+
+        if ip in seen_ips:
+            print 'skipping duplicate IP', ip
+            continue
+
+        timestamp = None # XXX long(mktime_tz(parsedate_tz(row[col_time])))
+
 
         for question_id in questions:
             raw = row[question_id]
@@ -171,6 +183,7 @@ if __name__ == '__main__':
 
 
         seen_user_ids.add(user_id)
+        seen_ips.add(ip)
         #print 'ROW'
         #print row
 
