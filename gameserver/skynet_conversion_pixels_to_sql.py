@@ -85,7 +85,7 @@ if __name__ == '__main__':
         end_time = min(end_time, time_now - 12*3600) # also, don't grab data that's *too* recent because the userdb files may be unavailable
 
         if not dry_run:
-            cur.execute("SELECT time FROM "+sql_util.sym(conversions_table)+" WHERE tgt_game = %s ORDER BY time DESC LIMIT 1", game_id)
+            cur.execute("SELECT time FROM "+sql_util.sym(conversions_table)+" WHERE tgt_game = %s ORDER BY time DESC LIMIT 1", [game_id])
             row = cur.fetchone()
             con.commit()
         else:
