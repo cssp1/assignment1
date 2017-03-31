@@ -5068,6 +5068,7 @@ class Session(object):
         loot = self.get_loot_items(player, loot_table, item_duration, item_expire_at)
         if not loot: return []
 
+        inventory_log_reason = reason
         if reason == 'ai_base':
             str_reason = 'AI %d (%s L%d)' % (self.viewing_player.user_id, self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level)
         elif reason == 'ai_attack':
@@ -5084,6 +5085,7 @@ class Session(object):
             str_reason = 'promo_code:'+reason_id
         elif reason == 'login_incentive':
             str_reason = 'login_incentive:'+str(reason_id)
+            inventory_log_reason = str_reason # log the day number here
         else:
             gamesite.exception_log.event(server_time, 'unknown give_loot reason %s!' % reason)
             return []
@@ -5097,7 +5099,7 @@ class Session(object):
             discovered_where = 'loot_buffer'
             player.loot_buffer += loot
             for item in loot:
-                player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=reason)
+                player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=inventory_log_reason)
         elif reason == 'ai_base':
             discovered_where = 'messages'
             player.send_loot_mail(self.viewing_user.get_ui_name(self.viewing_player), self.viewing_player.resources.player_level,
