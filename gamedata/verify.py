@@ -3715,6 +3715,8 @@ def main(args):
         for COND in 'ui_warning', 'metrics_description':
             if COND in data and not isinstance(data[COND], basestring):
                 error |= check_cond_chain(data[COND], reason = 'loot_tables:'+name+':'+COND)
+        if 'item_for_ui' in data and data['item_for_ui']['spec'] not in gamedata['items']:
+            error |= 1; print 'loot table %s has invalid item_for_ui %r' % (name, data['item_for_ui'])
 
     for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():
         error |= check_loot_table(loot, reason='lottery_slot_tables:'+name)

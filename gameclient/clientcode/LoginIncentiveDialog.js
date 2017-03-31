@@ -94,8 +94,23 @@ LoginIncentiveDialog.update = function(dialog) {
                                      {glow:false,hide_tooltip:true});
         } else {
             // XXX hook this up to the loot table?
-            ItemDisplay.display_item(r.widgets['item'], {'spec': (i+1 == 7 ? 'gamebucks' : 'login_incentive_random')},
-                                     {glow:(i+1 == cur_stack),hide_tooltip:true});
+            var table = gamedata['loot_tables_client']['login_incentive_'+(i+1).toString()];
+            if(!table) { throw Error('login_incentive loot table not found '+(i+1).toString()); }
+            var show_item = null;
+            var hide_tooltip = true;
+            if('item_for_ui' in table) {
+                show_item = table['item_for_ui'];
+                hide_tooltip = false;
+            } else {
+                var item_list = session.get_loot_items(player, table['loot']).item_list;
+                if(item_list.length < 1) { throw Error('got no items from login_incentive loot table '+(i+1).toString()); }
+                show_item = item_list[0];
+                hide_tooltip = false;
+            }
+            ItemDisplay.display_item(r.widgets['item'], show_item,
+                                     {glow:(i+1 == cur_stack),
+                                      hide_tooltip:hide_tooltip,
+                                      context_parent:dialog});
         }
     }
 
