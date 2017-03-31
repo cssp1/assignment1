@@ -38787,7 +38787,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         }
     } else if(highlight_only) {
         //throw Error('no SKU to highlight');
-        var msg = 'no SKU to highlight!\nplayer_auras: '+JSON.stringify(player.player_auras)+'\nhighlight_list: '+JSON.stringify(highlight_list);
+        var msg = 'no SKU to highlight!\nserver_time: '+server_time.toString()+'\nplayer_auras: '+JSON.stringify(player.player_auras)+'\nhighlight_list: '+JSON.stringify(highlight_list);
         metric_event('0970_client_exception', add_demographics({'method':msg, 'location':'invoke_buy_gamebucks_dialog23',
                                                                 'since_connect': (session.connected() ? client_time - session.connect_time : session.connect_time),
                                                                 'since_pageload': client_time - spin_pageload_begin,

@@ -9155,6 +9155,11 @@ class Player(AbstractPlayer):
         spec = gamedata['auras'][aura_name]
         aura = None
 
+        # to prevent slight client/server clock mismatches from making the client think that
+        # just-applied auras are not active, fudge the aura['start_time'] backward a few seconds,
+        # UNLESS given a specific (future) starting time
+        FUDGE_START_TIME = 10
+
         # find any existing aura with same spec, level, and data
         for a in self.player_auras:
             if a['spec'] == aura_name and a.get('level',1) == level and \
@@ -9180,7 +9185,7 @@ class Player(AbstractPlayer):
             new_end_time = server_time + duration if duration > 0 else -1
 
             if True: # always overwrite aura duration
-                aura['start_time'] = server_time
+                aura['start_time'] = server_time - FUDGE_START_TIME
                 if start_time > 0:
                     gamesite.exception_log.event(server_time, 'warning: attempt to update current aura "%s" with future start time! player %d' % (aura['spec'], self.user_id))
                 if new_end_time < 0 and 'end_time' in aura: del aura['end_time']
@@ -9200,7 +9205,7 @@ class Player(AbstractPlayer):
                     return False
             # create new aura
             aura = {'spec': aura_name,
-                    'start_time': start_time if start_time > 0 else server_time}
+                    'start_time': start_time if start_time > 0 else (server_time - FUDGE_START_TIME)}
             if strength != 1:
                 aura['strength'] = strength
             if level != 1:
