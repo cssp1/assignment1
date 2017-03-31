@@ -112,7 +112,7 @@ BEGIN
            -- if camp maps to facebook_free or game_viral, return those
            -- if camp maps to MISSING, then ignore (!) this user (this is what ANALYTICS2 does - maybe we should report it as 'FB MISSING' instead?)
            -- otherwise, map to 'paid'
-           RETURN (CASE (SELECT remap_facebook_campaigns(camp))
+           RETURN (CASE (SELECT remap_facebook_campaigns(camp)) COLLATE utf8mb4_unicode_ci
            WHEN 'facebook_free' THEN 'FB Free (Facebook)'
            WHEN 'fb_page' THEN 'FB Free (Fan Page)'
            WHEN 'game_viral' THEN 'FB Free (Game Viral)'
