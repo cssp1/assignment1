@@ -441,11 +441,10 @@ class Sender(object):
                                   'ui_cta': email_conf['ui_cta'].encode('utf-8'),
                                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
                                   'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
-                                  }
 
-                        # temporary A/B test (with promising results)
-                        if player['abtests'].get('T324_bh_fb_notifications', 'on') == 'on':
-                            params['facebook'] = '1'
+                                  # BH users should also get Facebook notifications, where applicable
+                                  'facebook': '1'
+                                  }
 
                     else:
                         raise Exception('unexpected frame_platform %r' % frame_platform)
