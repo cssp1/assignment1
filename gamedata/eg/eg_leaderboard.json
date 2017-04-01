@@ -1,0 +1,29 @@
+// Copyright (c) 2015 Battlehouse Inc.All rights reserved.
+// Use of this source code is governed by an MIT-style license that can be
+// found in the LICENSE file.
+
+{
+    // Scores2 leaderboard data, server side
+    // (strings.json has the client-side GUI display settings.)
+
+    // leaderboard score fields, signals the server that these should
+    // be tracked for migration from player history to Scores2.
+    "score_fields": {
+        "xp": {"history_prefix": "score_xp"},
+        "resources_looted": {"history_prefix": "score_resources_looted"},
+        "conquests": {"history_prefix": "score_conquests"},
+        "havoc_caused": {"history_prefix": "score_havoc"},
+        "damage_inflicted": {"history_prefix": "score_damage"},
+        "damage_inflicted_pve": {"history_prefix": "score_damage_pve"},
+        "quarry_resources": {"history_prefix": "quarry_resources", "region_specific": 1},
+        "strongpoint_resources": {"history_prefix": "strongpoint_resources", "region_specific": 1, "leaderboard_query_is_region_specific": 0},
+        "hive_kill_points": {"history_prefix": "hive_kill_points", "region_specific": 1, "leaderboard_query_is_region_specific": 0},
+        "hive_kill_points_global": {"history_prefix": "hive_kill_points_global"},
+        "trophies_pvp": {"history_prefix": "trophies_pvp"},
+        "trophies_pve": {"history_prefix": "trophies_pve"},
+        "trophies_pvv": {"history_prefix": "trophies_pvv"},
+        "tokens_looted": {"history_prefix": "tokens_looted"},
+        "achievement_points": {"history_prefix": "achievement_points"},
+        "trainee_completions": {"history_prefix": "trainee_completions"}
+    }
+}

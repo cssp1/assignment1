@@ -603,6 +603,9 @@
     "skip_quest_claim": 0, // make QUEST_COMPLETED predicates react to goal satisfaction rather than reward claim
 
     "enable_leaderboard": true, // default setting for leaderboard, if no A/B test applies
+    "leaderboard":
+#include "$GAME_ID/$GAME_ID_leaderboard.json"
+    ,
 
     "enable_inventory": 1,
     //    "inventory_available_during_warehouse_upgrade": false,

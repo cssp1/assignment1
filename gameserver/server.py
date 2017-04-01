@@ -238,27 +238,6 @@ def is_valid_alias(name):
 # recognize obsolete time-series history fields for deletion
 obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$|^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
 
-# leaderboard score fields
-
-SCORE_FIELDS = {
-    'xp': {'history_prefix': 'score_xp'},
-    'resources_looted': {'history_prefix': 'score_resources_looted'},
-    'conquests': {'history_prefix': 'score_conquests'},
-    'havoc_caused': {'history_prefix': 'score_havoc'},
-    'damage_inflicted': {'history_prefix': 'score_damage'},
-    'damage_inflicted_pve': {'history_prefix': 'score_damage_pve'},
-    'quarry_resources': {'history_prefix': 'quarry_resources', 'region_specific': True},
-    'strongpoint_resources': {'history_prefix': 'strongpoint_resources', 'region_specific': True, 'leaderboard_query_is_region_specific': False},
-    'hive_kill_points': {'history_prefix': 'hive_kill_points', 'region_specific': True, 'leaderboard_query_is_region_specific': False},
-    'hive_kill_points_global': {'history_prefix': 'hive_kill_points_global'},
-    'trophies_pvp': {'history_prefix': 'trophies_pvp'},
-    'trophies_pve': {'history_prefix': 'trophies_pve'},
-    'trophies_pvv': {'history_prefix': 'trophies_pvv'},
-    'tokens_looted': {'history_prefix': 'tokens_looted'},
-    'achievement_points': {'history_prefix': 'achievement_points'},
-    'trainee_completions': {'history_prefix': 'trainee_completions'},
-    }
-
 SCORES2_MIGRATION_VERSION = 9
 
 def conceal_protection_time(x):
@@ -11992,7 +11971,6 @@ class Player(AbstractPlayer):
 
     # translate client-side stat name and period to the precise server-side Scores2 (stat,(scope,loc)) coordinates for scores2 lookup
     def scores2_query_addr(self, client_name, period, region = None, time_loc = None):
-        entry = SCORE_FIELDS[client_name]
         if period == 'week':
             time_scope = Scores2.FREQ_WEEK
             if time_loc is None:
@@ -12005,7 +11983,9 @@ class Player(AbstractPlayer):
             time_scope = Scores2.FREQ_ALL
             time_loc = 0
         else: raise Exception('unhandled period '+period)
-        if region and entry.get('region_specific', False) and entry.get('leaderboard_query_is_region_specific', True):
+
+        entry = gamedata['leaderboard']['score_fields'].get(client_name, None)
+        if region and entry and entry.get('region_specific', False) and entry.get('leaderboard_query_is_region_specific', True):
             space_scope = Scores2.SPACE_REGION
             space_loc = region
         else:
@@ -12390,7 +12370,7 @@ class Player(AbstractPlayer):
 
         self.scores2.clear()
 
-        for stat, data in SCORE_FIELDS.iteritems(): # for each tracked legacy stat
+        for stat, data in gamedata['leaderboard']['score_fields'].iteritems(): # for each tracked legacy stat
             prefix = data['history_prefix']
             if stat.endswith('_global'): continue # these are computed by summing region-specific values
 

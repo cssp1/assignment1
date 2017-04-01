@@ -899,7 +899,13 @@ def check_continent(name, data):
         print '%s: id mismatch' % name
     return error
 
-def check_leaderboard(leaderboard):
+def check_leaderboard_server(leaderboard):
+    error = 0
+    for name, entry in leaderboard['score_fields'].iteritems():
+        pass
+    return error
+
+def check_leaderboard_client(leaderboard):
     error = 0
     for cat_name, data in leaderboard['categories'].iteritems():
         if 'show_if' in data:
@@ -922,6 +928,8 @@ def check_scores2_stat(stat, reason):
     error = 0
     if stat['name'] not in gamedata['strings']['leaderboard']['categories']:
         error |= 1; print '%s: stat %s not found in gamedata.strings.leaderboard.categories' % (reason, stat['name'])
+    if stat['name'] not in gamedata['leaderboard']['score_fields']:
+        error |= 1; print '%s: stat %s not found in gamedata.leaderboard.score_fields' % (reason, stat['name'])
     if stat['time_scope'] not in ('week','season','ALL'):
         error |= 1; print '%s: bad stat time_scope %s' % (reason, stat['time_scope'])
     if stat['space_scope'] not in ('region','continent','ALL'):
@@ -3534,7 +3542,8 @@ def main(args):
     for name, data in gamedata['spells'].iteritems():
         error |= check_spell('spell:'+name, data)
 
-    error |= check_leaderboard(gamedata['strings']['leaderboard'])
+    error |= check_leaderboard_client(gamedata['strings']['leaderboard'])
+    error |= check_leaderboard_server(gamedata['leaderboard'])
 
     for name, data in gamedata['regions'].iteritems():
         error |= check_region(name, data)
