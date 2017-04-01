@@ -12009,6 +12009,8 @@ class Player(AbstractPlayer):
         any_changed = False
 
         for name, value in stats.iteritems():
+            if name not in gamedata['leaderboard']['score_fields']:
+                continue # not active in this game
 
             if name.startswith('trophies_'):
                 kind = name[9:12]; assert kind in ('pve','pvp','pvv')
@@ -12371,7 +12373,8 @@ class Player(AbstractPlayer):
         self.scores2.clear()
 
         for stat, data in gamedata['leaderboard']['score_fields'].iteritems(): # for each tracked legacy stat
-            prefix = data['history_prefix']
+            prefix = data.get('history_prefix', None)
+            if prefix is None: continue # not present in history
             if stat.endswith('_global'): continue # these are computed by summing region-specific values
 
             if stat.startswith('trophies_'):
@@ -19083,12 +19086,23 @@ class GAMEAPI(resource.Resource):
                         stats['damage_inflicted_pve'] = session.loot.get('damage_inflicted',0)
                     stats['hive_kill_points'] = session.loot.get('hive_kill_points',0) # must be set via SESSION_LOOT consequent
 
-                stats['tokens_looted'] = sum([item.get('stack',1) for item in session.loot.get('items',[]) \
-                                              if gamedata['items'][item['spec']].get('category')=='token'], 0)
-
                 # collect trophy stats - note, trophies can come from AI attacks, but other stats cannot
                 for st in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
                     stats[st] = session.loot.get(st, 0)
+
+                # collect stats associated with items looted
+                for item in session.loot.get('items',[]):
+                    spec = gamedata['items'].get(item['spec'])
+                    if not spec: continue
+                    if spec.get('category') == 'token':
+                        stack = item.get('stack',1)
+
+                        # generic token counter
+                        stats['tokens_looted'] = stats.get('tokens_looted',0) + stack
+
+                        # type-specific token counter
+                        skey = 'tokens_looted:'+item['spec']
+                        stats[skey] = stats.get(skey,0) + stack
 
                 session.player.modify_scores(stats, reason = 'complete_attack(attacker)')
 
