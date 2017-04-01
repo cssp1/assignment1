@@ -5434,6 +5434,7 @@
             "value_prop": { "kind": "TextField", "xy": [181,57], "dimensions": [290,160], "text_size": 15,
                             "text_vjustify": "top", "text_hjustify": "left",
                             "ui_name": "Build your armies together, and fight to control the land!",
+                            "ui_name_fb": "- Trade free gifts every day\n- Protect each other from attacks\n- Take revenge on your enemies together!",
                             "ui_name_bh": "Recruit trainees to earn exclusive bonus items and free daily gifts!"
                           },
 
