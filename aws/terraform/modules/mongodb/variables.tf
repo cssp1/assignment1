@@ -1,5 +1,6 @@
 variable "sitename" {}
 variable "extra_backups_bucket" { default = "example" } # gives read access to the backups bucket for this site
+variable "backups_bucket" {}
 variable "sitedomain" {}
 variable "region" {}
 variable "key_pair_name" {}

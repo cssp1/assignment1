@@ -5,6 +5,7 @@ variable "subnet_ids" {}
 variable "ssh_access_security_group_id" {}
 variable "mongodb_security_group_id" {}
 variable "n_instances" {}
+variable "backups_bucket" {}
 
 module "mongodb" {
   source = "../modules/mongodb"
@@ -14,6 +15,7 @@ module "mongodb" {
   availability_zones = "${var.availability_zones}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
+  backups_bucket = "${var.backups_bucket}"
   extra_backups_bucket = "${var.extra_backups_bucket}"
   region = "${var.region}"
   key_pair_name = "${var.key_pair_name}"

@@ -32,11 +32,11 @@ resource "aws_iam_role_policy" "mongodb" {
       "Resource": ["arn:aws:s3:::${var.puppet_s3_bucket}*"]
     },
     { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:GetObject","s3:HeadObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::${var.sitename}-mongodb-backups*"]
+      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:HeadObject","s3:PutObject"],
+      "Resource": ["arn:aws:s3:::${var.backups_bucket}*"]
     },
     { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:GetObject","s3:HeadObject"],
+      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:HeadObject"],
       "Resource": ["arn:aws:s3:::${var.extra_backups_bucket}*"]
     }
   ]
@@ -98,6 +98,7 @@ ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_device=/dev/sdx" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_backups_bucket=${var.backups_bucket}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_replica_set_name=${var.sitename}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_replica_set_serial=${count.index}" >> /etc/facter/facts.d/terraform.txt
  - echo "include spin_mongodb" >> /etc/puppet/main.pp
