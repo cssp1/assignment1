@@ -378,6 +378,9 @@ def parse_mongodb_config(dbname, cfg, parent = None):
                 raise Exception('invalid special character in MongoDB %s for database %s' % (check_name, dbname))
 
     connect_url = 'mongodb://%s:%s@%s/%s' % (username,password,host_string,dbname)
+    if replica_set:
+        connect_url += '?replicaSet='+replica_set
+
     connect_args = []
     connect_kwargs = {'host':connect_url}
     if replica_set:
