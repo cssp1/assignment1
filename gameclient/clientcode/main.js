@@ -24844,7 +24844,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
                     var descr = s['ui_description'].replace('%s', ui_name).replace('%d', ((_multi && 'stack' in _item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, _item['stack']) : ''));
                     if(_want_refund) {
-                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(spec, (_multi && 'stack' in _item) ? _item['stack'] : 1));
+                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(_item, (_multi && 'stack' in _item) ? _item['stack'] : 1));
                     }
                     invoke_child_message_dialog(s['ui_title'].replace('%s', ui_name), descr,
                                                 {'cancel_button': true,

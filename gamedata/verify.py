@@ -1156,7 +1156,12 @@ def check_item(itemname, spec):
         error |= check_predicate(spec['refundable_when'], reason = 'item %s: refundable_when' % itemname)
 
     if 'refund' in spec:
-        error |= check_loot_table(spec['refund'], reason = 'refund')
+        refund_list = spec['refund']
+        # per-level list?
+        if len(refund_list) < 1 or not (isinstance(refund_list[0], list) or refund_list[0] is None):
+            refund_list = [refund_list]
+        for tab in refund_list:
+            error |= check_loot_table(tab, reason = 'refund')
 
     if 'pre_use' in spec:
         error |= check_consequent(spec['pre_use'], reason = 'item %s: pre_use')

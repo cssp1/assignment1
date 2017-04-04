@@ -28621,10 +28621,13 @@ class GAMEAPI(resource.Resource):
                 success = True
 
                 if want_refund:
-                    if num_removed == 1:
-                        loot_table = spec['refund']
-                    else:
-                        loot_table = [{'multi':[spec['refund']], 'multi_stack':num_removed}]
+                    loot_table = spec['refund']
+                    if len(loot_table) >= 1 and (isinstance(loot_table[0], list) or loot_table[0] is None):
+                        # per-level list
+                        loot_table = loot_table[item.get('level',1)-1]
+
+                    if num_removed != 1:
+                        loot_table = [{'multi':[loot_table], 'multi_stack':num_removed}]
                     session.give_loot(session.player, retmsg, loot_table, 'refund', reason_id = '%dx %s' % (num_removed, specname))
                 if spec:
                     session.increment_player_metric('item:'+spec['name']+':trashed', num_removed, time_series=False)

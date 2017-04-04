@@ -449,7 +449,7 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
     if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
         descr += '\n\n';
         var template = spec['ui_refund'] || gamedata['strings']['inventory_refund'];
-        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(spec, 1));
+        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(item, 1));
     }
 
     return descr;
@@ -466,11 +466,21 @@ ItemDisplay.get_inventory_item_color = function(spec) {
 };
 
 /** return displayable refund description for a refundable item
-    @param {Object} spec
-    @param {number} count
+    @param {Object} item
+    @param {number} count - overrides stack count
     @returns {string} */
-ItemDisplay.get_inventory_item_refund_str = function(spec, count) {
+ItemDisplay.get_inventory_item_refund_str = function(item, count) {
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    var level = ('level' in item ? item['level'] : 1);
+
     var refund = spec['refund'];
+
+    // is it a per-level list?
+    if(refund.length >= 1 && (Array.isArray(refund[0]) || refund[0] === null)) {
+        if(refund.length < level) { throw Error('refund array not long enough: '+item['spec']); }
+        refund = refund[level-1];
+    }
+
     if(refund.length != 1 || !('spec' in refund[0])) {
         throw Error('unhandled refund str '+JSON.stringify(spec['refund']));
     }
