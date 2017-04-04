@@ -31103,7 +31103,7 @@ player.advance_squads = function() {
         }
 
         // don't try to drive squads around outside home base (only because the server doesn't take the commands)
-        if(!session.home_base) { return; }
+        if(!gamedata['territory']['enable_squad_control_away_from_home'] && !session.home_base) { return; }
 
         var orders = player.squad_get_client_data(squad_data['id'], 'squad_orders');
         var max_dist_to_exit_map = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit

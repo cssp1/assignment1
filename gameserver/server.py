@@ -30098,7 +30098,9 @@ class GAMEAPI(resource.Resource):
                 reactor.callLater(0, do_squad_resolve, session, session.player.home_region, loc)
 
             elif spellname == 'SQUAD_EXIT_MAP':
-                if session.has_attacked:
+                # not sure how much protection against concurrency is really needed here?
+                if (not gamedata['territory'].get('enable_squad_control_away_from_home', False)) and \
+                   session.has_attacked:
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_IN_COMBAT"])
                     return
                 squad_id = int(spellargs[0])
