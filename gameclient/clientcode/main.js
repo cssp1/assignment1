@@ -7981,11 +7981,17 @@ function inventory_item_can_fit(item, inventory, max_usable_inventory) {
 
 function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     // operate on a copy of the inventory and resources
+
+    // note: this is a SHALLOW copy of inventory. Only 'stack' count will be mutated.
     var scratch = [];
     for(var i = 0; i < inventory.length; i++) {
         scratch.push(goog.object.clone(inventory[i]));
     }
-    var scratch_resource_state = goog.object.clone(player.resource_state);
+
+    // this is a DEEP clone of resource_state, necessary because the resource
+    // entries are themselves arrays.
+    var scratch_resource_state = /** @type {!Object<string,*>} */
+        (goog.object.unsafeClone(player.resource_state));
 
     for(var i = 0; i < items.length; i++) {
         var item = items[i];
