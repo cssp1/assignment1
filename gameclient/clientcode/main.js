@@ -23750,8 +23750,10 @@ function update_mail_dialog_context(dialog) {
     Otherwise run the callback immediately.
     @param {!Array.<!Object>} item_list
     @param {function()} action_cb
-    @param {boolean} multi - operate on entire stack, not just one from each stack */
-function confirm_item_delete(item_list, action_cb, multi) {
+    @param {boolean} multi - operate on entire stack, not just one from each stack
+    @param {string|null|undefined=} refund_str - if present, confirm for a refund instead of a deletion
+*/
+function confirm_item_delete(item_list, action_cb, multi, refund_str) {
     var need_confirm = goog.array.some(item_list, function(item) {
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
         return !!spec['ui_precious'];
@@ -23776,7 +23778,7 @@ function confirm_item_delete(item_list, action_cb, multi) {
             var descr = ((multi && 'stack' in item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']) : '') + ui_name;
             return descr;
         });
-        invoke_item_delete_confirm_dialog(action_cb, ui_item_list);
+        invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str);
         return;
     } else {
         action_cb();
@@ -23784,30 +23786,35 @@ function confirm_item_delete(item_list, action_cb, multi) {
 }
 
 /** @param {function()} action_cb
-    @param {!Array.<string>} ui_item_list */
-function invoke_item_delete_confirm_dialog(action_cb, ui_item_list) {
+    @param {!Array.<string>} ui_item_list
+    @param {string|null|undefined?} refund_str - if present, confirm for a refund instead of a deletion
+*/
+function invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['item_delete_confirm_dialog']);
     dialog.user_data['dialog'] = 'item_delete_confirm_dialog';
     dialog.user_data['action_cb'] = action_cb;
+    dialog.user_data['want_refund'] = !!refund_str;
 
     dialog.modal = true;
     install_child_dialog(dialog);
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
-    var ui_descr = dialog.data['widgets']['description']['ui_name'];
-    dialog.widgets['description'].set_text_bbcode(ui_descr.replace('%thing',ui_item_list.join(', ')));
+    dialog.widgets['title'].str = dialog.data['widgets']['title'][refund_str ? 'ui_name_refund' : 'ui_name'];
+
+    var ui_descr = dialog.data['widgets']['description'][refund_str ? 'ui_name_refund' : 'ui_name'];
+    dialog.widgets['description'].set_text_bbcode(ui_descr.replace('%thing',ui_item_list.join(', ')).replace('%refund',refund_str));
 
     dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
         var dialog = w.parent;
-        if(dialog.widgets['input'].str.toUpperCase() != dialog.data['widgets']['input']['require_string']) { return; } // mismatch
+        if(dialog.widgets['input'].str.toUpperCase() != dialog.data['widgets']['input'][dialog.user_data['want_refund'] ? 'require_string_refund' : 'require_string']) { return; } // mismatch
         var cb = dialog.user_data['action_cb'];
         close_parent_dialog(w);
         cb();
     };
     dialog.widgets['input'].ontype = function(w) {
         var dialog = w.parent;
-        dialog.widgets['ok_button'].state = (dialog.widgets['input'].str.toUpperCase() == dialog.data['widgets']['input']['require_string']) ? 'normal' : 'disabled';
+        dialog.widgets['ok_button'].state = (dialog.widgets['input'].str.toUpperCase() == dialog.data['widgets']['input'][dialog.user_data['want_refund'] ? 'require_string_refund' : 'require_string']) ? 'normal' : 'disabled';
     };
     SPUI.set_keyboard_focus(dialog.widgets['input']);
 
@@ -24849,18 +24856,20 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     var spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
                     var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
                     var descr = s['ui_description'].replace('%s', ui_name).replace('%d', ((_multi && 'stack' in _item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, _item['stack']) : ''));
+                    var refund_str = null;
                     if(_want_refund) {
-                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(_item, (_multi && 'stack' in _item) ? _item['stack'] : 1));
+                        refund_str = ItemDisplay.get_inventory_item_refund_str(_item, (_multi && 'stack' in _item) ? _item['stack'] : 1);
+                        descr = descr.replace('%refund', refund_str);
                     }
                     invoke_child_message_dialog(s['ui_title'].replace('%s', ui_name), descr,
                                                 {'cancel_button': true,
                                                  'ok_button_ui_name': s['ui_button'],
-                                                 'on_ok': (function (__cb, _w, __item, __multi) { return function() {
+                                                 'on_ok': (function (__cb, _w, __item, __multi, _refund_str) { return function() {
                                                      // extra layer of confirmation for precious items
                                                      confirm_item_delete([__item], (function (___cb, __w) { return function() {
                                                          ___cb(__w);
-                                                     }; })(__cb, _w), __multi);
-                                                 }; })(_cb, w, _item, _multi)});
+                                                     }; })(__cb, _w), __multi, _refund_str);
+                                                 }; })(_cb, w, _item, _multi, refund_str)});
                 }; })(cb, item, i, want_refund, multi);
             } else {
                 widget.onclick = cb;
