@@ -28626,9 +28626,10 @@ class GAMEAPI(resource.Resource):
                         # per-level list
                         loot_table = loot_table[item.get('level',1)-1]
 
-                    if num_removed != 1:
-                        loot_table = [{'multi':[loot_table], 'multi_stack':num_removed}]
-                    session.give_loot(session.player, retmsg, loot_table, 'refund', reason_id = '%dx %s' % (num_removed, specname))
+                    if loot_table: # might be None
+                        if num_removed != 1:
+                            loot_table = [{'multi':[loot_table], 'multi_stack':num_removed}]
+                        session.give_loot(session.player, retmsg, loot_table, 'refund', reason_id = '%dx %s' % (num_removed, specname))
                 if spec:
                     session.increment_player_metric('item:'+spec['name']+':trashed', num_removed, time_series=False)
             else:

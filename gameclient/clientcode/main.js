@@ -24741,7 +24741,7 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         }
 
         // show refund button when a refund exists and show_refundable_when is true
-        if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
+        if(ItemDisplay.inventory_item_is_refundable(item)) {
             dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
                                                                          ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
                                                                          spellname:"INVENTORY_REFUND"}));
