@@ -2145,8 +2145,11 @@ def check_hives_and_raids(kind, hives):
         # check future spawn population for abnormally low or high intervals
         if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
             i = 0
+
             while spawn_pop[i+1][0] <= past_limit: # ignore intervals before past_limit
                 i += 1
+                if i+1 >= len(spawn_pop):
+                    break
 
             for j in xrange(i, len(spawn_pop)):
                 entry_t, pop, ui_names = spawn_pop[j]
