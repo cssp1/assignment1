@@ -510,7 +510,7 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
         for obj in base_objects:
             nosql_client._update_object(region_id,
                                         'mobile' if (obj['spec'] in gamedata['units']) else 'fixed',
-                                        {'obj_id':obj['obj_id'],'owner_id':feature['base_landlord_id']}, True)
+                                        {'obj_id':obj['obj_id'],'owner_id':feature['base_landlord_id']}, True, None)
             #nosql_write_all_objects(region_id, base_id, feature['base_landlord_id'], base_objects)
         nosql_client.update_map_feature(region_id, base_id, new_props)
     lock_manager.release(region_id, base_id, base_generation = base_data.get('base_generation',-1))
