@@ -510,12 +510,20 @@ goog.inherits(BuildingLevelPredicate, Predicate);
 BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     // special case for quarries etc
     if(!this.obj_id && !session.home_base) {
+
+        /** @type {string|null} for debugging */
+        var err = null;
         if(!this.building_spec['track_level_in_player_history']) {
-            throw Error('cannot evaluate outside home base without track_level_in_player_history: '+JSON.stringify(this.data));
+            err = 'cannot evaluate outside home base without track_level_in_player_history';
         }
         if(this.trigger_qty !== 1 || this.upgrading_ok) {
-            throw Error('cannot evaluate outside home base with trigger_qty != 1 or upgrading_ok');
+            err = 'cannot evaluate outside home base with trigger_qty != 1 or upgrading_ok';
         }
+        if(err) { // don't crash, but assume it's false
+            log_exception(null, err);
+            return false;
+        }
+
         var history_key = this.building_spec['name']+'_level';
         var cur_level = (history_key in player.history ? player.history[history_key] : 0);
         return cur_level >= this.trigger_level;
