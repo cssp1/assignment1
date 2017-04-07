@@ -76,7 +76,7 @@ if [[ "$FREQ" == "daily" ]]; then
   # analytics-views
   run_it ./update-analytics-views.sh # requires sessions, metrics, facebook_campaign_map (currently from upcache), fb_notifications, fb_permissions, credits, battles, battle_risk_reward
 
-  run_it ./map_to_mysql.py -q
+  run_it ./map_to_mysql.py -q --prune
   run_it ./damage_protection_to_sql.py -q --prune
   run_it ./ladder_pvp_to_sql.py -q --prune
   run_it ./chat_to_sql.py -q --prune
