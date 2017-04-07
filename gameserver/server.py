@@ -21420,7 +21420,7 @@ class GAMEAPI(resource.Resource):
         # check if requirements are satisfied
         if object.spec.requires:
             req = GameObjectSpec.get_leveled_quantity(object.spec.requires, object.level+1)
-            if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+            if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                 fail = True
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                gamedata['buildings'][object.spec.name]['requires']])
