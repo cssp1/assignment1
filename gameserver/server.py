@@ -8287,6 +8287,11 @@ class Base(object):
                         # cancel enhancement immediately, no refund
                         obj.cancel_enhancing()
                         fields += ['enhancing']
+                    if obj.is_crafting():
+                        # cancel crafting immediately, no refund
+                        # note: this will leave turret emplacements empty - OK?
+                        obj.crafting = None
+                        fields += ['crafting']
                     if obj.is_damaged() and gamedata['territory'].get('quarry_repair_on_abandon', False):
                         # repair it
                         obj.repair_finish_time = -1
