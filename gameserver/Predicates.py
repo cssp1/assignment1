@@ -295,7 +295,7 @@ class BuildingLevelPredicate(Predicate):
         self.trigger_level = data['trigger_level']
         self.trigger_qty = data.get('trigger_qty', 1)
         self.upgrading_ok = data.get('upgrading_ok', False)
-    def is_satisfied2(self, session, player, qdata, override_time = None):
+    def is_satisfied(self, player, qdata):
         count = 0
         for obj in player.home_base_iter():
             if obj.spec.kind == 'building' and obj.spec.name == self.building_type and \
