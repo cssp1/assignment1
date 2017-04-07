@@ -6262,6 +6262,7 @@ class GameObjectSpec(Spec):
         ["provides_inventory", 0],
         ["provides_limited_equipped", None],
         ["provides_quarry_control", 0],
+        ["quarry_yield", 1], # per-harvester attribute, multiplies regional yield
         ["quarry_movable", False],
         ["quarry_buildable", False],
         ["quarry_upgradable", False],
@@ -7226,9 +7227,9 @@ class Building(MapBlockingGameObject):
         capacity = self.get_leveled_quantity(self.spec.production_capacity)
 
         # adjust by A/B test modifier
-        yield_rate = 1
+        yield_rate = self.spec.quarry_yield
         if base_type == 'quarry' and (base_region in gamedata['regions']):
-            yield_rate = gamedata['regions'][base_region].get('quarry_yield', 1)
+            yield_rate *= gamedata['regions'][base_region].get('quarry_yield', 1)
 
         #capacity = int(capacity * player.get_abtest_value('T001_harvester_cap', 'modifier', 1))
 
