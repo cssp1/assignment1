@@ -460,10 +460,19 @@ def get_tier_requirement(pred, verbose = False):
     elif pred['predicate'] == 'AND':
         for sub in pred['subpredicates']:
             ret = max(ret, get_tier_requirement(sub, verbose = verbose))
+    elif pred['predicate'] == 'OR':
+        for sub in pred['subpredicates']:
+            ret = min(ret, get_tier_requirement(sub, verbose = verbose))
     elif pred['predicate'] == 'ALWAYS_TRUE':
         pass
     elif pred['predicate'] == 'PLAYER_HISTORY':
-        pass # ignore this
+        if pred['key'] == gamedata['townhall']+'_level':
+            assert pred['method'] == '>='
+            ret = pred['value']
+        else:
+            pass
+    elif pred['predicate'] in ('BASE_RICHNESS','BASE_TYPE'):
+        ret = 1
     else:
         raise Exception('unhandled predicate %r' % pred)
     return ret
