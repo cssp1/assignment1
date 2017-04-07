@@ -478,9 +478,23 @@ BaseRichnessPredicate.prototype.do_ui_describe = function(player) {
     ret = ret.replace('%s', pair[1]);
     return new PredicateUIDescription(ret);
 };
-
 /** @override */
 BaseRichnessPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
+function BaseTypePredicate(data) {
+    goog.base(this, data);
+    this.types = data['types'];
+}
+goog.inherits(BaseTypePredicate, Predicate);
+BaseTypePredicate.prototype.is_satisfied = function(player, qdata) {
+    return session.viewing_base && goog.array.contains(this.types, session.viewing_base.base_type);
+};
+BaseTypePredicate.prototype.do_ui_describe = function(player) { return null; }; // don't show in GUI
+/** @override */
+BaseTypePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
 
 /** @constructor @struct
   * @extends Predicate */
@@ -1973,6 +1987,7 @@ function read_predicate(data) {
     else if(kind === 'ALL_BUILDINGS_UNDAMAGED') { return new AllBuildingsUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNDAMAGED') { return new ObjectUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNBUSY') { return new ObjectUnbusyPredicate(data); }
+    else if(kind === 'BASE_TYPE') { return new BaseTypePredicate(data); }
     else if(kind === 'BASE_RICHNESS') { return new BaseRichnessPredicate(data); }
     else if(kind === 'BUILDING_DESTROYED') { return new BuildingDestroyedPredicate(data); }
     else if(kind === 'BUILDING_QUANTITY') { return new BuildingQuantityPredicate(data); }
