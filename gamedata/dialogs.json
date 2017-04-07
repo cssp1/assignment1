@@ -8758,13 +8758,14 @@
                         "transparent_to_mouse":0 },
             "icon": { "kind":"Dialog", "xy":[3,4], "dimensions": [50,50], "dialog": "unit_icon" },
             "name":  { "kind": "TextField", "xy": [58,5], "dimensions": [100,17], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
+                       "clip_to": [58,5,100,17],
                        "text_hjustify": "left", "text_vjustify": "top" },
             "coords":  { "kind": "TextField", "xy": [58,21], "dimensions": [100,17], "text_size": 13, "text_style": "normal", "drop_shadow": 0,
                          "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.7,0.7,0.7,1],
                          "ui_name": "(%x,%y)", "ui_name_unknown": "?" },
 
-            "qicon": {"kind": "ActionButton", "xy": [120,18], "dimensions": [21,21], "bg_image": "resource_icon_water" },
-            "qsize": {"kind": "TextField", "xy":[134,19], "dimensions": [37,43],"text_size": 15,"text_hjustify":"center","text_vjustify":"top","text_style":"bold","drop_shadow":1 },
+            "qicon": {"kind": "ActionButton", "xy": [120,24], "dimensions": [21,21], "bg_image": "resource_icon_water" },
+            "qsize": {"kind": "TextField", "xy":[134,25], "dimensions": [37,43],"text_size": 15,"text_hjustify":"center","text_vjustify":"top","text_style":"bold","drop_shadow":1 },
 
             "squad_hp_bar": { "kind": "ProgressBar", "xy": [57,40], "dimensions": [50,9], "outline_width": 1,
                               "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
