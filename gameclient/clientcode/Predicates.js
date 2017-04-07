@@ -509,12 +509,12 @@ function BuildingLevelPredicate(data) {
 goog.inherits(BuildingLevelPredicate, Predicate);
 BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
     // special case for quarries etc
-    if(!session.home_base) {
+    if(!this.obj_id && !session.home_base) {
         if(!this.building_spec['track_level_in_player_history']) {
-            throw Error('cannot evaluate outside home base without track_level_in_player_history');
+            throw Error('cannot evaluate outside home base without track_level_in_player_history: '+JSON.stringify(this.data));
         }
-        if(this.trigger_qty !== 1 || this.upgrading_ok || this.obj_id) {
-            throw Error('cannot evaluate outside home base with trigger_qty != 1, upgrading_ok, or obj_id');
+        if(this.trigger_qty !== 1 || this.upgrading_ok) {
+            throw Error('cannot evaluate outside home base with trigger_qty != 1 or upgrading_ok');
         }
         var history_key = this.building_spec['name']+'_level';
         var cur_level = (history_key in player.history ? player.history[history_key] : 0);
@@ -556,7 +556,7 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
         return null;
     }
 
-    if(!session.home_base) { return null; } // punt to avoid a special case for quarries
+    if(!this.obj_id && !session.home_base) { return null; } // punt to avoid a special case for quarries
 
     var raw_count = 0;
     var level_count = 0;

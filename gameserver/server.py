@@ -16320,7 +16320,7 @@ class Store(object):
                 if unit.owner is not session.player:
                     error_reason.append('player does not own this object')
                     return -1, p_currency
-                if (not ((formula == 'upgrade' or formula.startswith('enhance')) and unit.spec.quarry_upgradable)) and (unit not in session.player.home_base_iter()):
+                if (not ((formula == 'upgrade' or formula.startswith('enhance') or formula == 'craft_gamebucks') and unit.spec.quarry_upgradable)) and (unit not in session.player.home_base_iter()):
                     error_reason.append('this object is not in the player\'s home base, and is not quarry_upgradable')
                     return -1, p_currency
 
@@ -21907,7 +21907,7 @@ class GAMEAPI(resource.Resource):
             target = session.get_object(arg.delivery_address['obj_id'])
 
             if (target.owner is not player) or \
-               (target not in player.home_base_iter()):
+               (target not in player.home_base_iter() and not target.spec.quarry_upgradable):
                 if retmsg is not None: retmsg.append(["ERROR", "OBJECT_IS_NOT_CAPABLE"])
                 return False
 
@@ -22048,7 +22048,7 @@ class GAMEAPI(resource.Resource):
 
         if not self.can_craft(session, player, object, arg, retmsg = retmsg,
                               check_predicates = check_predicates, take_resources = take_resources, take_ingredients = take_ingredients):
-            return
+            return False
 
         # target object for delivery
         if arg.delivery_address and ('obj_id' in arg.delivery_address) and session.has_object(arg.delivery_address['obj_id']):
@@ -22101,6 +22101,8 @@ class GAMEAPI(resource.Resource):
             delay += d
         object.crafting.queue.append(Business.CraftingBusiness(state, init_total_time = craft_time, init_start_time = server_time + max(0, delay)))
 
+        session.viewing_base.nosql_write_one(object, 'do_craft', fields = ['crafting'])
+
         if recipe['crafting_category'] == 'fishing':
             player.fishing_log_event('5150_fish_start', object.crafting.queue[0], ui_index = arg.ui_index, time_left = craft_time)
 
@@ -22111,10 +22113,14 @@ class GAMEAPI(resource.Resource):
             if len(target.equipment) < 1:
                 target.equipment = None
             assert removed
-            player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), level=removed.get('level',None), reason='replaced')
+            session.viewing_base.nosql_write_one(target, 'do_craft', fields = ['equipment'])
+
+            if session.home_base:
+                player.inventory_log_event('5131_item_trashed', removed['spec'], -removed.get('stack',1), removed.get('expire_time',-1), level=removed.get('level',None), reason='replaced')
+
             if target is not object:
                 retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
-            player.recalc_stattab(player)
+            player.recalc_stattab(player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
             player.stattab.send_update(session, retmsg)
 
         if 'on_start' in recipe:
@@ -22165,6 +22171,8 @@ class GAMEAPI(resource.Resource):
             object.halt_crafting(True)
             object.update_crafting(-1)
 
+        session.viewing_base.nosql_write_one(object, 'do_cancel_craft', fields = ['crafting'])
+
         # figure out how many resources to return to player
         if recipe:
             cost = bus.craft_state.get('cost',{})
@@ -22214,6 +22222,7 @@ class GAMEAPI(resource.Resource):
         object.crafting.queue.remove(bus)
         if len(object.crafting.queue) < 1:
             object.crafting = None
+        session.viewing_base.nosql_write_one(object, 'do_collect_craft_one', fields = ['crafting'])
 
         recipe = gamedata['crafting']['recipes'].get(bus.craft_state['recipe'],None)
         if recipe:
@@ -22240,7 +22249,8 @@ class GAMEAPI(resource.Resource):
                                                                     None, None],
                                                   force = True)
                     looted += loot
-                    session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
+                    if session.home_base:
+                        session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
                 except:
                     gamesite.exception_log.event(server_time, 'player %d crafting delivery %r target not found for %r, discarding. %s' % \
                                                  (object.owner.user_id, bus.craft_state, item, traceback.format_exc().strip())) # OK
@@ -23086,7 +23096,7 @@ class GAMEAPI(resource.Resource):
             return False
 
         obj = session.get_object(dest_object_id)
-        if (not obj) or (obj.owner is not session.player) or (not obj.is_building()) or (obj not in session.player.home_base_iter()):
+        if (not obj) or (obj.owner is not session.player) or (not obj.is_building()) or (obj not in session.player.home_base_iter() and (not obj.spec.quarry_upgradable)):
             retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
             return False
         if (not force) and (obj.is_damaged() or obj.is_busy()):
@@ -23097,10 +23107,11 @@ class GAMEAPI(resource.Resource):
         if obj.equipment is None: obj.equipment = {}
         ret = self.do_equip(session, retmsg, obj.spec, obj.level, obj.equipment, dest_addr, inventory_slot, add_item, remove_item, force = force)
         if len(obj.equipment) < 1: obj.equipment = None
+        session.viewing_base.nosql_write_one(obj, 'do_equip_building', fields = ['equipment'])
 
         if ret:
             session.power_changed(session.viewing_base, obj, retmsg)
-            session.player.recalc_stattab(session.player)
+            session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
             session.player.stattab.send_update(session, retmsg)
             if obj.is_producer():
                 obj.update_production(session.player, session.player.my_home.base_type, session.player.my_home.base_region, compute_power_factor(session.player.my_home.get_power_state()))
@@ -23229,7 +23240,8 @@ class GAMEAPI(resource.Resource):
             remove_item = Equipment.equip_remove(equipment, dest_addr, remove_specname, level = remove_item.get('level',None))
             if remove_spec and remove_spec.get('remove_fragility',0) >= 1:
                 # item destroyed
-                session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
+                if not session.home_base:
+                    session.player.inventory_log_event('5131_item_trashed', remove_specname, -remove_item.get('stack',1), remove_item.get('expire_time',-1), level=remove_item.get('level',1), reason='removed')
             else:
                 # note: pass inflated max_usable_inventory here as "buffer" space, since we checked for space above
                 # in over-full warehouse situtations, we don't want this to fail, so pass -1 instead of the true slot count
@@ -25531,7 +25543,7 @@ class GAMEAPI(resource.Resource):
 
         if session.deferred_stattab_update:
             session.deferred_stattab_update = False
-            session.player.recalc_stattab(session.player)
+            session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
             session.player.stattab.send_update(session, retmsg)
 
         if session.deferred_mailbox_update:
@@ -29191,7 +29203,7 @@ class GAMEAPI(resource.Resource):
                 self.do_cancel_enhance(session, retmsg, object)
 
             elif spellname == "CRAFT_FOR_FREE":
-                if object not in session.player.home_base_iter():
+                if (not object.spec.quarry_upgradable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_craft(session, session.player, retmsg, object, self.CraftSpellarg(spellargs[0]),
@@ -29200,7 +29212,7 @@ class GAMEAPI(resource.Resource):
                               take_ingredients = (not session.player.is_cheater))
 
             elif spellname == "CANCEL_CRAFT":
-                if object not in session.player.home_base_iter():
+                if (not object.spec.quarry_upgradable) and (object not in session.player.home_base_iter()):
                     retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
                     return
                 self.do_cancel_craft(session, retmsg, object, spellargs[0])
@@ -29268,12 +29280,14 @@ class GAMEAPI(resource.Resource):
                     return session.start_async_request(self.instant_attack(session, retmsg, spellargs))
 
             elif spellname == "CONFIG_SET":
-                if object not in session.player.home_base_iter():
-                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
-                    return
                 if (not object.is_building()) or (object.owner is not session.player):
                     retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
                     return
+
+                if object not in session.player.home_base_iter() and not object.spec.quarry_upgradable:
+                    retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                    return
+
                 config = spellargs[0]
                 if config is not None:
                     assert type(config) is dict

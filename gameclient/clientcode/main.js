@@ -21269,7 +21269,7 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_crafter()) {
+            if(obj.is_crafter() && (session.home_base || quarry_upgradable)) {
                 upgrade_is_active = false;
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
 
@@ -21340,7 +21340,7 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_emplacement()) { // special case for emplacements
+            if(obj.is_emplacement() && (session.home_base || quarry_upgradable)) { // special case for emplacements
                 dialog_name = 'emplacement_context_menu';
                 var cur_item = obj.turret_head_item();
                 var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
@@ -21350,6 +21350,16 @@ function invoke_building_context_menu(mouse_xy) {
                     var item_level = ItemDisplay.get_inventory_item_level(cur_item);
                     if(tech_level > item_spec['level']) {
                         under_leveled = true;
+
+                        // but also check recipe predicate (quarries)
+                        if('associated_crafting_recipes' in item_spec) {
+                            var recipe = gamedata['crafting']['recipes'][item_spec['associated_crafting_recipes'][0]];
+                            goog.array.forEach(['show_if', 'requires'], function(pred) {
+                                if(pred in recipe && !read_predicate(recipe[pred]).is_satisfied(player, null)) {
+                                    under_leveled = false;
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -21362,7 +21372,8 @@ function invoke_building_context_menu(mouse_xy) {
                                                                        }));
                 }
 
-                if(cur_item) {
+                // avoid showing "research" button outside home base
+                if(session.home_base && cur_item) {
                     upgrade_is_active = !under_leveled;
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
                     special_buttons['head'].push(new ContextMenuButton({ui_name: upgr_spell['ui_name_building_context_emplacement'],
