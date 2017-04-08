@@ -520,7 +520,7 @@ BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
             err = 'cannot evaluate outside home base with trigger_qty != 1 or upgrading_ok';
         }
         if(err) { // don't crash, but assume it's false
-            log_exception(null, err);
+            log_exception(null, err+': '+JSON.stringify(this.data));
             return false;
         }
 
