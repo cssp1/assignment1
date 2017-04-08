@@ -18985,6 +18985,26 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                     break;
                 }
             }
+        } else if(widget_name && widget_name.indexOf('INVENTORY:') == 0) {
+            // similar special-case hack for Inventory dialog
+            var spec_name = widget_name.split(':')[1];
+            var cols = parent.data['widgets']['slot']['array'][0];
+            var slots_per_page = parent.user_data['rows_per_page'] * parent.user_data['cols_per_page'];
+            found_widget_name = null;
+            for(var y = 0; y < parent.data['widgets']['slot']['array'][1]; y++) {
+                for(var x = 0; x < cols; x++) {
+                    var wname = x.toString()+','+y.toString();
+                    var slot = y*cols + x + parent.user_data['page'] * slots_per_page;
+                    if(slot < player.inventory.length) {
+                        var item = player.inventory[slot];
+                        if(item['spec'] === spec_name) {
+                            found_widget_name = 'frame'+wname;
+                            break;
+                        }
+                    }
+                }
+                if(found_widget_name) { break; }
+            }
         } else if(widget_name && widget_name.indexOf('MAP:') == 0) {
             var chapter = widget_name.split(':')[1];
             var index = parent.user_data['buttons'].indexOf(chapter);

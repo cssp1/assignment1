@@ -13210,6 +13210,10 @@ class LivePlayer(Player):
         return None
 
     def apply_promo_code(self, session, retmsg, code):
+        if 'enable_promo_codes' in gamedata['predicate_library'] and \
+           (not Predicates.read_predicate(gamedata['predicate_library']['enable_promo_codes']).is_satisfied(self, None)):
+            return
+
         data = gamedata['promo_codes'].get(code, None)
         if not data: return
         for PRED in ('show_if', 'requires'):
