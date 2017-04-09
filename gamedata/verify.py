@@ -1567,10 +1567,14 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred['building_type'] not in gamedata['buildings']:
             error |= 1
             print '%s: %s predicate refers to nonexistent building "%s"' % (reason, pred['predicate'], pred['building_type'])
-        elif 'trigger_level' in pred:
-            if pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['build_time']):
+        else:
+            if 'trigger_level' in pred and \
+               pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['build_time']):
+                    error |= 1
+                    print '%s: %s predicate requires building "%s" level %d (beyond its max)' % (reason, pred['predicate'], pred['building_type'], pred['trigger_level'])
+            if not gamedata['buildings'][pred['building_type']].get('track_level_in_player_history',False):
                 error |= 1
-                print '%s: %s predicate requires building "%s" level %d (beyond its max)' % (reason, pred['predicate'], pred['building_type'], pred['trigger_level'])
+                print '%s: %s predicate requires building "%s" track_level_in_player_history' % (reason, pred['predicate'], pred['building_type'])
     elif pred['predicate'] == 'OBJECT_UNDAMAGED':
         if pred['spec'] not in gamedata['buildings']:
             error |= 1
