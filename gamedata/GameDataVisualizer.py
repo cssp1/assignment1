@@ -175,11 +175,7 @@ class BuildingTable(Table):
                 last_tier = 1
                 tiers = []
                 for pred in spec['requires']:
-                    if pred['predicate'] == 'BUILDING_LEVEL' and \
-                       pred['building_type'] == gamedata['townhall']:
-                        tier = pred['trigger_level']
-                    else:
-                        tier = last_tier
+                    tier = max(last_tier, get_tier_requirement(pred))
                     tiers.append(tier)
                     last_tier = tier
                 if 'limit' in spec and isinstance(spec['limit'], list):
