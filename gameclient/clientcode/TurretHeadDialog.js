@@ -279,7 +279,7 @@ TurretHeadDialog.ondraw = function(dialog) {
     dialog.widgets['current'].show = !!current_item;
 
     if(current_item) {
-        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_item, null);
+        TurretHeadDialog.set_stats_display(dialog.widgets['current'], dialog.user_data['emplacement'], current_item, null, false);
     }
 
     // click-to-select
@@ -325,9 +325,52 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
     var product_level = ItemDisplay.get_inventory_item_level(product_item);
     var product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
 
+    var compat_list;
+    if('compatible' in product_spec['equip']) {
+        compat_list = product_spec['equip']['compatible'];
+    } else {
+        compat_list = [product_spec['equip']];
+    }
+
+    // see if we need to down-level the recipe
+    var downleveled = false;
+
+    // note: to keep code simple, assume product level and recipe level match for this case
+    if(!session.home_base && 'associated_tech' in recipe_spec && recipe_level > 1 && product_level == recipe_level) {
+        goog.array.forEach(compat_list, function(compat) {
+            if('min_level' in compat) {
+                var min_level = get_leveled_quantity(compat['min_level'], product_level);
+                if(emplacement_obj.level < min_level) {
+                    // imagine the emplacement is upgraded as much as possible, before hitting its own predicate
+                    var max_emplacement_level = emplacement_obj.level;
+                    for(; max_emplacement_level < get_max_level(emplacement_obj.spec) &&
+                        read_predicate(get_leveled_quantity(emplacement_obj.spec['requires'], max_emplacement_level+1)).is_satisfied(player, null); max_emplacement_level += 1) {}
+
+                    // downlevel
+                    var new_product_level = product_level;
+                    while(new_product_level > 1 && max_emplacement_level < get_leveled_quantity(compat['min_level'], new_product_level)) {
+                        new_product_level -= 1;
+                    }
+                    if(new_product_level < product_level) {
+                        //console.log("DOWNLEVELING FROM "+product_level.toString()+' TO '+new_product_level.toString()+' max_emplacement_level '+max_emplacement_level.toString());
+                        downleveled = true;
+                        recipe_level = new_product_level;
+                        product_item = get_crafting_recipe_product_list(recipe_spec, recipe_level)[0];
+                        product_level = ItemDisplay.get_inventory_item_level(product_item);
+                        if(product_level != new_product_level) {
+                            throw Error('new_product_level mismatch');
+                        }
+                        product_spec = ItemDisplay.get_inventory_item_spec(product_item['spec']);
+                    }
+                }
+            }
+        });
+    }
+    parent.widgets['label_downleveled'].show = downleveled;
+
     TurretHeadDialog.set_stats_display(dialog.widgets['stats'], emplacement_obj, product_item,
                                        // show current_item for comparison, if different from product_item
-                                       (current_item && !ItemDisplay.same_item(current_item, product_item) ? current_item : null));
+                                       (current_item && !ItemDisplay.same_item(current_item, product_item) ? current_item : null), downleveled);
 
     // XXX most of this is copy/pasted from update_upgrade_dialog() - maybe unify into some kind of can_cast_spell variant
     var use_resources_offered = true;
@@ -425,12 +468,6 @@ TurretHeadDialog.set_recipe_display = function(dialog, emplacement_obj, recipe_n
 
     // BUILDING COMPATIBILITY requirement
     if(!player.is_cheater) {
-        var compat_list;
-        if('compatible' in product_spec['equip']) {
-            compat_list = product_spec['equip']['compatible'];
-        } else {
-            compat_list = [product_spec['equip']];
-        }
         goog.array.forEach(compat_list, function(compat) {
             if('min_level' in compat) {
                 var min_level = get_leveled_quantity(compat['min_level'], product_level);
@@ -673,8 +710,9 @@ TurretHeadDialog._remove_turret_head_anti_missile_mod = function(modchain) {
 /** @param {SPUI.Dialog} dialog
     @param {GameObject} emplacement_obj it will go onto
     @param {!Object} item - the turret head item
-    @param {Object|null} relative_to - another turret head item to compare this one to */
-TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, relative_to) {
+    @param {Object|null} relative_to - another turret head item to compare this one to
+    @param {boolean} is_downleveled - to show an asterisk for down-leveled turrest */
+TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, relative_to, is_downleveled) {
     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
     var level = ItemDisplay.get_inventory_item_level(item);
     var relative_spec = (relative_to ? ItemDisplay.get_inventory_item_spec(relative_to['spec']) : null);
@@ -683,6 +721,9 @@ TurretHeadDialog.set_stats_display = function(dialog, emplacement_obj, item, rel
     dialog.widgets['name'].str = ItemDisplay.get_inventory_item_ui_name(spec);
     if('level' in item) { // leveled item
         dialog.widgets['name'].str += ' L'+item['level'].toString();
+        if(is_downleveled) {
+            dialog.widgets['name'].str += '*';
+        }
     }
 
     // main icon

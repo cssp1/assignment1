@@ -2191,6 +2191,9 @@
             "label_new": { "kind": "TextField", "xy": [211,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon:" },
             "label_new_detail": { "kind": "TextField", "xy": [360,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon Detail:" },
 
+            "label_downleveled": { "kind": "TextField", "xy": [360,74], "dimensions": [342,33], "text_size": 13, "text_hjustify": "right", "ui_name": "* Max level limited by Quarry size", "text_color":[1,1,0], "show": 0 },
+
+
             "recipe_slot": { "kind": "ActionButton", "xy": [213,126], "dimensions": [50,50], "bg_image": "inventory_slot",
                              "array": [2,3], "array_offset": [59,57] },
             "recipe_icon": { "kind": "StaticImage", "xy": [213,126], "dimensions": [50,50],
