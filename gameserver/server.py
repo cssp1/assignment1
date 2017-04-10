@@ -1614,8 +1614,8 @@ class User:
             if 'activation' not in base: continue
 
             pred = Predicates.read_predicate(base['activation'])
-            if not pred.is_satisfied(session.player, None):
-                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied(session.player, None):
+            if not pred.is_satisfied2(session, session.player, None):
+                if ('show_if' in base) and Predicates.read_predicate(base['show_if']).is_satisfied2(session, session.player, None):
                     # still show it
                     pass
                 else:
@@ -14164,8 +14164,8 @@ class LivePlayer(Player):
                 regions = sorted([x['id'] for x in gamedata['regions'].itervalues() if \
                                   (x.get('auto_join',True) and \
                                    (('auto_join_if' not in x) or Predicates.read_predicate(x['auto_join_if']).is_satisfied(self,None)) and \
-                                   (('show_if' not in x) or Predicates.read_predicate(x['show_if']).is_satisfied(session.player, None)) and \
-                                   (('requires' not in x) or Predicates.read_predicate(x['requires']).is_satisfied(session.player, None)) and \
+                                   (('show_if' not in x) or Predicates.read_predicate(x['show_if']).is_satisfied2(session, session.player, None)) and \
+                                   (('requires' not in x) or Predicates.read_predicate(x['requires']).is_satisfied2(session, session.player, None)) and \
                                    ((not x.get('developer_only',0)) or session.player.is_developer()))
                                   ])
 
@@ -16045,7 +16045,7 @@ class Store(object):
                     return -1, p_currency
                 spec = gamedata['items'][spellarg['skudata']['item']]
 
-                if ('store_requires' in spec) and (not Predicates.read_predicate(spec['store_requires']).is_satisfied(session.player, None)):
+                if ('store_requires' in spec) and (not Predicates.read_predicate(spec['store_requires']).is_satisfied2(session, session.player, None)):
                     error_reason.append('item "%s" store_requires predicate failed' % spellarg['spec'])
                     return -1, p_currency
 
@@ -16357,7 +16357,7 @@ class Store(object):
                     return -1, p_currency
                 if unit.spec.requires and (not session.player.is_cheater):
                     req = GameObjectSpec.get_leveled_quantity(unit.spec.requires, unit.level+1)
-                    if (not req.is_satisfied(session.player, None)):
+                    if (not req.is_satisfied2(session, session.player, None)):
                         error_reason.append('upgrade requirements not satisfied')
                         return -1, p_currency
 
@@ -16441,7 +16441,7 @@ class Store(object):
                                             (spec.show_if, 'show_if')):
                         if pred:
                             req = EnhancementSpec.get_leveled_quantity(pred, new_level)
-                            if (not req.is_satisfied(session.player, None)):
+                            if (not req.is_satisfied2(session, session.player, None)):
                                 error_reason.append('enhancement %s not satisfied' % pred_name)
                                 return -1, p_currency
 
@@ -16494,15 +16494,15 @@ class Store(object):
                         return -1, p_currency
                 if spec.requires and (not session.player.is_cheater):
                     req = TechSpec.get_leveled_quantity(spec.requires, new_level)
-                    if (not req.is_satisfied(session.player, None)):
+                    if (not req.is_satisfied2(session, session.player, None)):
                         error_reason.append('research requirements not satisfied')
                         return -1, p_currency
                 if spec.show_if and (not session.player.is_cheater):
-                    if not spec.show_if.is_satisfied(session.player, None):
+                    if not spec.show_if.is_satisfied2(session, session.player, None):
                         error_reason.append('research show_if not satisfied')
                         return -1, p_currency
                 if spec.activation and (not session.player.is_cheater):
-                    if not spec.activation.is_satisfied(session.player, None):
+                    if not spec.activation.is_satisfied2(session, session.player, None):
                         error_reason.append('research activation not satisfied')
                         return -1, p_currency
 
@@ -19333,7 +19333,7 @@ class GAMEAPI(resource.Resource):
             # sometimes playerdb/userdb files are missing when spying on brand new accounts that haven't been flushed yet
 
             my_filter = gamedata['server'].get('bad_internet_exception_log_filter', None)
-            if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied(session.player, None)):
+            if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied2(session, session.player, None)):
                 gamesite.exception_log.event(server_time, 'spy error: userdb %d playerdb %d basedb %d entry %s:%s (spied by user %d)' % (bool(dest_user), bool(dest_player), bool(dest_base), str(dest_user_id), str(dest_base_id), session.user.user_id))
 
             if dest_base_id:
@@ -19360,7 +19360,7 @@ class GAMEAPI(resource.Resource):
                 template = gamedata[{'hive':'hives_server','quarry':'quarries_server'}[dest_base.base_type]]['templates'] \
                            .get(dest_base.base_template, None)
                 if template and ('activation' in template) and (not session.player.is_cheater):
-                    if (not Predicates.read_predicate(template['activation']).is_satisfied(session.player,None)):
+                    if (not Predicates.read_predicate(template['activation']).is_satisfied2(session, session.player,None)):
                         retmsg.append(["ERROR", "CANNOT_SPY_INVALID_AI"])
                         cannot_spy = True
 
@@ -19471,7 +19471,7 @@ class GAMEAPI(resource.Resource):
             ((session.player.is_ladder_player() and session.viewing_player.is_ladder_player()) or \
              (session.using_squad_deployment() and (session.player.home_region in gamedata['regions']) and \
               ('ladder_on_map_if' in gamedata['regions'][session.player.home_region]) and \
-              Predicates.read_predicate(gamedata['regions'][session.player.home_region]['ladder_on_map_if']).is_satisfied(session.player, None) \
+              Predicates.read_predicate(gamedata['regions'][session.player.home_region]['ladder_on_map_if']).is_satisfied2(session, session.player, None) \
               ) \
              ) \
             ):
@@ -19770,7 +19770,7 @@ class GAMEAPI(resource.Resource):
              session.using_squad_deployment() and \
              (session.player.home_region in gamedata['regions']) and \
              ('ladder_on_map_if' in gamedata['regions'][session.player.home_region]) and \
-             Predicates.read_predicate(gamedata['regions'][session.player.home_region]['ladder_on_map_if']).is_satisfied(session.player, None):
+             Predicates.read_predicate(gamedata['regions'][session.player.home_region]['ladder_on_map_if']).is_satisfied2(session, session.player, None):
             # create artificial point loss when crossing ladder_win_damage to punish players for getting so damaged they can't lose more points
             entry = gamedata['matchmaking']['ladder_point_minloss_table']['defender_defeat']
             delta = session.viewing_player.ladder_points() - session.player.ladder_points()
@@ -20488,10 +20488,10 @@ class GAMEAPI(resource.Resource):
             return
         data = gamedata['achievements'][name]
         for PRED in ('activation', 'show_if'):
-            if ((PRED in data) and (not (Predicates.read_predicate(data[PRED]).is_satisfied(session.player, None)))):
+            if ((PRED in data) and (not (Predicates.read_predicate(data[PRED]).is_satisfied2(session, session.player, None)))):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", data[PRED]])
                 return
-        if (not Predicates.read_predicate(data['goal']).is_satisfied(session.player, None)):
+        if (not Predicates.read_predicate(data['goal']).is_satisfied2(session, session.player, None)):
             retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", data['goal']])
             return
         props = {'time': server_time}
@@ -20524,7 +20524,7 @@ class GAMEAPI(resource.Resource):
                 to_go = session.player.cooldowns[cd_name]['end'] - server_time
                 raise Exception('player %d: spell cooldown %s has not expired yet (%d sec to go)' % (session.player.user_id, cd_name, to_go))
 
-        if ('new_store_requires' in spell) and (not Predicates.read_predicate(spell['new_store_requires']).is_satisfied(session.player, None)):
+        if ('new_store_requires' in spell) and (not Predicates.read_predicate(spell['new_store_requires']).is_satisfied2(session, session.player, None)):
             raise Exception('player %d: not allowed to cast spell %s' % (session.player.user_id, spellname))
 
         success_ret = True
@@ -20667,7 +20667,7 @@ class GAMEAPI(resource.Resource):
 
             requirement = session.player.get_any_abtest_value('change_region_requirement', gamedata['territory']['change_region_requirement'])
             pred = Predicates.read_predicate(requirement)
-            if not pred.is_satisfied(session.player, None):
+            if not pred.is_satisfied2(session, session.player, None):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", requirement])
                 return False
 
@@ -20677,8 +20677,8 @@ class GAMEAPI(resource.Resource):
                     if (not data.get('open_join',True)) or \
                        ((not session.player.is_developer()) and data.get('developer_only',0)) or \
                        ((not session.player.is_developer()) and (data.get('pop_hard_cap',-1) >= 0 and gamesite.nosql_client.get_map_feature_population(new_region,'home',reason='change_region_specific') >= data['pop_hard_cap'])) or \
-                       (('show_if' in data) and (not Predicates.read_predicate(data['show_if']).is_satisfied(session.player, None))) or \
-                       ((spellname != "CHANGE_REGION_INSTANTLY_ANYWHERE") and ('requires' in data) and (not Predicates.read_predicate(data['requires']).is_satisfied(session.player, None))):
+                       (('show_if' in data) and (not Predicates.read_predicate(data['show_if']).is_satisfied2(session, session.player, None))) or \
+                       ((spellname != "CHANGE_REGION_INSTANTLY_ANYWHERE") and ('requires' in data) and (not Predicates.read_predicate(data['requires']).is_satisfied2(session, session.player, None))):
                         retmsg.append(["ERROR", "CANNOT_CHANGE_REGION_DESTINATION_FULL"])
                         return False
 
@@ -21530,7 +21530,7 @@ class GAMEAPI(resource.Resource):
         # check if requirements are satisfied
         if (not ignore_requires) and object.spec.requires and (not session.player.is_cheater):
             req = GameObjectSpec.get_leveled_quantity(object.spec.requires, object.level+1)
-            if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+            if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                gamedata['buildings'][object.spec.name]['requires']])
                 return False
@@ -21647,7 +21647,7 @@ class GAMEAPI(resource.Resource):
         for reqname, reqlist in (('show_if', spec.show_if), ('activation', spec.activation), ('requires', spec.requires)):
             if reqlist:
                 req = TechSpec.get_leveled_quantity(reqlist, current+1)
-                if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+                if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                    TechSpec.get_leveled_quantity(gamedata['tech'][tech_name][reqname], current+1)])
@@ -21791,7 +21791,7 @@ class GAMEAPI(resource.Resource):
         for reqname, reqlist in (('show_if', spec.show_if), ('activation', spec.activation), ('requires', spec.requires)):
             if reqlist:
                 req = EnhancementSpec.get_leveled_quantity(reqlist, current+1)
-                if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+                if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                    EnhancementSpec.get_leveled_quantity(gamedata['enhancements'][enh_name][reqname], current+1)])
@@ -22501,7 +22501,7 @@ class GAMEAPI(resource.Resource):
         for reqname, reqlist in (('show_if', spec.show_if), ('requires', spec.requires)):
             if reqlist:
                 req = GameObjectSpec.get_leveled_quantity(reqlist, 1)
-                if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+                if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                     fail = True
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                    gamedata['buildings'][building_type][reqname]])
@@ -22562,7 +22562,7 @@ class GAMEAPI(resource.Resource):
             # check predicate quantity constraint
             if spec.limit_requires:
                 pred = spec.limit_requires[current]
-                if not Predicates.read_predicate(pred).is_satisfied(session.player, None):
+                if not Predicates.read_predicate(pred).is_satisfied2(session, session.player, None):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", pred])
                     return
 
@@ -22710,13 +22710,13 @@ class GAMEAPI(resource.Resource):
         # check if requirements are satisfied
         if spec.requires:
             req = GameObjectSpec.get_leveled_quantity(spec.requires, 1)
-            if (not session.player.is_cheater) and (not req.is_satisfied(session.player, None)):
+            if (not session.player.is_cheater) and (not req.is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",
                                gamedata['units'][spec_name]['requires']])
                 return
         for pname, ppred in (('activation', spec.activation), ('show_if', spec.show_if)):
             if ppred:
-                if not ppred.is_satisfied(session.player, None):
+                if not ppred.is_satisfied2(session, session.player, None):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", gamedata['units'][spec_name][pname]])
                     return
 
@@ -22851,7 +22851,7 @@ class GAMEAPI(resource.Resource):
                 if (not session.player.is_cheater):
                     if space_usage['ALL']+space > session.player.stattab.total_space:
                         # only alert if trim_unit_space_if is enabled
-                        if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
+                        if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied2(session, session.player, None):
                             gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize army! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.total_space, repr(space_usage)))
 
                     if space_usage[str(SQUAD_IDS.BASE_DEFENDERS)] + space > session.player.stattab.main_squad_space:
@@ -22860,7 +22860,7 @@ class GAMEAPI(resource.Resource):
                             destination_squad = SQUAD_IDS.RESERVES
                         else:
                             # only alert if trim_unit_space_if is enabled
-                            if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied(session.player, None):
+                            if Predicates.read_predicate(gamedata['server']['trim_unit_space_if']).is_satisfied2(session, session.player, None):
                                 gamesite.exception_log.event(server_time, 'player %d (CC%d) produced into oversize base defenders! (new %d limit %d army %s)' % (session.player.user_id, session.player.get_townhall_level(), space, session.player.stattab.main_squad_space, repr(space_usage)))
 
                 session.increment_player_metric('units_manufactured', 1, bucket = True, time_series = False)
@@ -23186,7 +23186,7 @@ class GAMEAPI(resource.Resource):
                 session.player.send_inventory_update(retmsg)
                 return False
 
-            if 'requires' in add_spec['equip'] and (not Predicates.read_predicate(add_spec['equip']['requires']).is_satisfied(session.player, None)):
+            if 'requires' in add_spec['equip'] and (not Predicates.read_predicate(add_spec['equip']['requires']).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", add_spec['equip']['requires']])
                 return False
 
@@ -23216,7 +23216,7 @@ class GAMEAPI(resource.Resource):
             if not Equipment.equip_has(equipment, dest_addr, remove_specname, level = remove_item.get('level',None)): # note: default level to None meaning "don't care" and not 1
                 retmsg.append(["ERROR", "EQUIP_INVALID"])
                 return False
-            if 'unequip_requires' in remove_spec['equip'] and (not Predicates.read_predicate(remove_spec['equip']['unequip_requires']).is_satisfied(session.player, None)):
+            if 'unequip_requires' in remove_spec['equip'] and (not Predicates.read_predicate(remove_spec['equip']['unequip_requires']).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED",remove_spec['equip']['unequip_requires']])
                 return False
 
@@ -23290,7 +23290,7 @@ class GAMEAPI(resource.Resource):
             success = False
 
         for PRED in ('show_if', 'requires'):
-            if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied(session.player, None)):
+            if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
                 success = False
 
@@ -24090,7 +24090,7 @@ class GAMEAPI(resource.Resource):
         pred_or_literal = session.player.get_any_abtest_value('enable_resource_gifts', gamedata.get('enable_resource_gifts',False))
         if (not pred_or_literal) or \
            (isinstance(pred_or_literal, dict) and \
-            (not Predicates.read_predicate(pred_or_literal).is_satisfied(session.player, None))):
+            (not Predicates.read_predicate(pred_or_literal).is_satisfied2(session, session.player, None))):
             session.send([["ERROR", "SERVER_PROTOCOL"]])
             return
 
@@ -24325,7 +24325,7 @@ class GAMEAPI(resource.Resource):
 
                 elif msg['type'] == 'mail':
                     if 'discard_if' in msg and (msg['discard_if'] in gamedata['predicate_library']):
-                        if Predicates.read_predicate({'predicate':'LIBRARY', 'name':msg['discard_if']}).is_satisfied(session.player, None):
+                        if Predicates.read_predicate({'predicate':'LIBRARY', 'name':msg['discard_if']}).is_satisfied2(session, session.player, None):
                             # ack and discard
                             to_ack.append(msg['msg_id'])
                             continue
@@ -24520,7 +24520,7 @@ class GAMEAPI(resource.Resource):
         if not feed: return
         if 'bh_blog_mail' not in gamedata['strings']: return
         if 'bh_blog_feed_to_mail_enabled_if' not in gamedata: return
-        if (not Predicates.read_predicate(gamedata['bh_blog_feed_to_mail_enabled_if']).is_satisfied(session.player, None)): return
+        if (not Predicates.read_predicate(gamedata['bh_blog_feed_to_mail_enabled_if']).is_satisfied2(session, session.player, None)): return
 
         latest_time = -1 # time of latest entry, to update player seen counter
 
@@ -26506,7 +26506,7 @@ class GAMEAPI(resource.Resource):
         # note: achievements update should come AFTER history update, so that client will resolve PLAYER_HISTORY predicates in achievements correctly
         retmsg.append(["ACHIEVEMENTS_UPDATE", session.player.achievements])
 
-        if session.player.tutorial_state == "COMPLETE" and Predicates.read_predicate(gamedata['client']['motd_filter']).is_satisfied(session.player,None):
+        if session.player.tutorial_state == "COMPLETE" and Predicates.read_predicate(gamedata['client']['motd_filter']).is_satisfied2(session, session.player,None):
             # check if player is due for various popups
             force_time = session.player.get_any_abtest_value('motd_refresh_time', gamedata['server']['message_of_the_day'].get('refresh_time',-1))
             if ((server_time - session.player.last_motd) > gamedata['client']['motd_interval']) or \
@@ -26984,7 +26984,7 @@ class GAMEAPI(resource.Resource):
                             for entry in gamedata['ai_bases_server']['ladder_pvp_bases']:
                                 if session.player.resources.player_level < entry.get('min_level',-1) or \
                                    session.player.resources.player_level > entry.get('max_level',999) or \
-                                   ('activation' in entry and not Predicates.read_predicate(entry['activation']).is_satisfied(session.player, None)): continue # out of level range
+                                   ('activation' in entry and not Predicates.read_predicate(entry['activation']).is_satisfied2(session, session.player, None)): continue # out of level range
 
                                 id = entry['base_id']
                                 if id in exclude_user_ids: continue
@@ -27053,7 +27053,7 @@ class GAMEAPI(resource.Resource):
 
                     base = gamedata['ai_bases_server']['bases'][str(dest_id)]
                     if ('activation' in base) and \
-                       (not Predicates.read_predicate(base['activation']).is_satisfied(session.player,None)) and \
+                       (not Predicates.read_predicate(base['activation']).is_satisfied2(session, session.player,None)) and \
                        (not session.player.is_cheater):
                         if 0:
                             gamesite.exception_log.event(server_time, 'preventing attempt by player %d to visit AI player %d - unsatisfied predicate' % (session.user.user_id, dest_id))
@@ -27306,7 +27306,7 @@ class GAMEAPI(resource.Resource):
 
             except:
                 my_filter = gamedata['server'].get('bad_internet_exception_log_filter', None)
-                if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied(session.player, None)):
+                if (not my_filter) or (Predicates.read_predicate(my_filter).is_satisfied2(session, session.player, None)):
                     gamesite.exception_log.event(server_time, '%s Exception (player %d): %s' % (arg[0],session.user.user_id,traceback.format_exc().strip())) # OK
                 retmsg.append(["ERROR", "ORDER_PROCESSING"])
                 # update object state, in case the client is out of sync
@@ -27657,7 +27657,7 @@ class GAMEAPI(resource.Resource):
             region_list = [data for data in gamedata['regions'].itervalues() if \
                            (data.get('open_join',True)) and \
                            ((not data.get('developer_only',0)) or session.player.is_developer()) and \
-                           (('show_if' not in data) or (Predicates.read_predicate(data['show_if']).is_satisfied(session.player, None)))]
+                           (('show_if' not in data) or (Predicates.read_predicate(data['show_if']).is_satisfied2(session, session.player, None)))]
             populations = dict([(data['id'], gamesite.nosql_client.get_map_feature_population(data['id'],'home',reason='REGION_POP_QUERY')) for data in region_list])
 
             # sort from high to low pop
@@ -27675,7 +27675,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["REGION_POP_QUERY_RESULT", tag, client_populations])
 
             pred = gamedata['server'].get('log_region_pop_query_if',None)
-            if pred and Predicates.read_predicate(pred).is_satisfied(session.player, None):
+            if pred and Predicates.read_predicate(pred).is_satisfied2(session, session.player, None):
                 gamesite.exception_log.event(server_time, 'REGION_POP_QUERY (player %d) returns: %s' % (session.player.user_id, SpinJSON.dumps(client_populations)))
 
         elif arg[0] == "CHANGE_REGION":
@@ -28042,7 +28042,7 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
                 success = False
 
-            if (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(session.player, None)):
+            if (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied2(session, session.player, None)):
                 retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                 success = False
 
@@ -28297,7 +28297,7 @@ class GAMEAPI(resource.Resource):
                 return
 
             if success:
-                if (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied(session.player, None)):
+                if (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'}).is_satisfied2(session, session.player, None)):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                     success = False
 
@@ -28628,7 +28628,7 @@ class GAMEAPI(resource.Resource):
             spec = gamedata['items'].get(specname, None)
             if want_refund:
                 assert spec
-                if (not spec.get('refund',False)) or (('refundable_when' in spec) and (not Predicates.read_predicate(spec['refundable_when']).is_satisfied(session.player, None))):
+                if (not spec.get('refund',False)) or (('refundable_when' in spec) and (not Predicates.read_predicate(spec['refundable_when']).is_satisfied2(session, session.player, None))):
                     retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
                     return
 
@@ -29771,7 +29771,7 @@ class GAMEAPI(resource.Resource):
                     retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
                     success = False
 
-                if spellname == "ALLIANCE_CREATE" and (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_create_requirement'}).is_satisfied(session.player, None)):
+                if spellname == "ALLIANCE_CREATE" and (not Predicates.read_predicate({'predicate':'LIBRARY','name':'alliance_create_requirement'}).is_satisfied2(session, session.player, None)):
                     retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                     success = False
 
