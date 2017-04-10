@@ -10069,7 +10069,7 @@ var last_websocket_serial = -1; // serial number of last_websocket_queue
     @param {SPWebsocket.SPWebsocket} socket
     @param {string} data */
 function websocket_transmit(socket, data) {
-    var max_msg = gamedata['client']['websocket_max_message'] || 0;
+    var max_msg = eval_cond(gamedata['client']['websocket_max_message'] || 0, player, null);
     if(max_msg > 0 && data.length > max_msg) {
         var ptr = 0;
         // send "start of fragmented message" message
@@ -10142,10 +10142,12 @@ function flush_message_queue(force, my_timeout) {
             var enable_reconnect = (get_query_string('enable_websocket_reconnect') === '1' ||
                                     player.get_any_abtest_value('enable_websocket_reconnect',
                                                                 gamedata['client']['enable_websocket_reconnect']));
+            var min_delay = eval_cond(gamedata['client']['websocket_min_delay'], player, null);
             the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(),
                                                         ajax_config['message_timeout_hello'],
                                                         ajax_config['message_timeout_gameplay'],
-                                                        enable_reconnect);
+                                                        enable_reconnect,
+                                                        min_delay);
             var on_websocket_error = function(event) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();

@@ -23,17 +23,20 @@ SPWebsocket.is_supported = function() { return (typeof(WebSocket) != 'undefined'
     @param {number} enable_reconnect
         (0: disable, 1: reconnect for errors we are certain are transient,
          2: reconnect even for "clean" shutdowns)
+    @param {number} min_delay
 */
-SPWebsocket.SPWebsocket = function(url, connect_timeout, msg_timeout, enable_reconnect) {
+SPWebsocket.SPWebsocket = function(url, connect_timeout, msg_timeout, enable_reconnect, min_delay) {
     this.url = url;
     this.connect_timeout = connect_timeout;
     this.msg_timeout = msg_timeout;
     this.enable_reconnect = enable_reconnect;
+    this.min_delay = min_delay;
     this.socket = null;
     this.socket_state = SPWebsocket.SocketState.CLOSED;
     this.target = new goog.events.EventTarget();
     this.connect_watchdog = null;
     this.connect_time = -1;
+    this.delay_timer = null;
     this.msg_watchdog = null;
     this.msg_time = -1;
     this.to_send = [];
@@ -91,9 +94,25 @@ SPWebsocket.SPWebsocket.prototype.clear_socket = function() {
 
 /** @private */
 SPWebsocket.SPWebsocket.prototype._flush_to_send = function() {
+    if(this.delay_timer) { return; }
+
     while(this.to_send.length > 0) {
         this.socket.send(this.to_send[0]);
         this.to_send.splice(0,1);
+
+        if(this.min_delay > 0) {
+            // for Safari 10.1 work-around: wait before sending again
+            this.delay_timer = window.setTimeout(goog.bind(this._flush_to_send_timeout, this), 1000*this.min_delay);
+            break;
+        }
+    }
+};
+
+/** @private */
+SPWebsocket.SPWebsocket.prototype._flush_to_send_timeout = function() {
+    this.delay_timer = null;
+    if(this.socket_state == SPWebsocket.SocketState.CONNECTED) {
+        this._flush_to_send();
     }
 };
 

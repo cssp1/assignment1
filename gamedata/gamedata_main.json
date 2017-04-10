@@ -100,7 +100,13 @@
         // max number of bytes to send in a single Websocket message.
         // Some browsers (IE) seem to have trouble with 32KB+ messages.
         // note: applies in upstream direction only.
-        "websocket_max_message": 30000,
+        "websocket_max_message": [[{"predicate":"BROWSER_NAME", "names": ["Explorer"]}, 30000],
+                                  [{"predicate":"BROWSER_NAME", "names": ["Safari"]}, 20000],
+                                  [{"predicate": "ALWAYS_TRUE"}, -1]],
+        // min delay between large successive websocket transmissions.
+        // To work around Safari 10.1 bug: https://bugs.webkit.org/show_bug.cgi?id=170463
+        "websocket_min_delay": [[{"predicate":"BROWSER_NAME", "names": ["Safari"]}, 0.05],
+                                [{"predicate": "ALWAYS_TRUE"}, -1]],
 
         "ajax_message_buffer": 50, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
 
