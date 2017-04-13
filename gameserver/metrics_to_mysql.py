@@ -116,6 +116,11 @@ if __name__ == '__main__':
                 keyvals.append(('spec',row['quest']))
                 if 'count' in row:
                     keyvals.append(('stack',row['count']))
+            elif row['event_name'] == '4030_upgrade_building':
+                # note: for FS quarries only
+                if row.get('base_type') != 'quarry': continue
+                keyvals.append(('spec',row['building_type']))
+                keyvals.append(('stack',row.get('level',1)))
             elif row['event_name'] == '4701_change_region_success':
                 if row.get('reason',None) in ('player_request',): # only include player-initiated changes
                     keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column

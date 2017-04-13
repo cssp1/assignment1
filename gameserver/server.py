@@ -21119,6 +21119,9 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_ingredients = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
 
+                    if SpinConfig.game() == 'fs':
+                        metric_event_coded(object.owner.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'use_resources', 'base_type': session.viewing_base.base_type})
+
                     # run metrics for home-base buildings
                     if base is object.owner.my_home:
                         session.deferred_history_update = True
@@ -21571,7 +21574,8 @@ class GAMEAPI(resource.Resource):
                 self.give_xp_to(session, session.player, retmsg, xp_amount, 'building', [object.x,object.y], obj_session_id = object.obj_id)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
-        metric_event_coded(session.user.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'instant'})
+        if SpinConfig.game() == 'fs':
+            metric_event_coded(session.user.user_id, '4030_upgrade_building', {'building_type':object.spec.name, 'level':object.level, 'method':'instant', 'base_type': session.viewing_base.base_type})
 
         if session.viewing_base is session.player.my_home:
             session.deferred_history_update = True
