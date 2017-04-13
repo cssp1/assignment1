@@ -119,7 +119,7 @@ if __name__ == '__main__':
                                              [[('time',time_now),
                                                ('region_id',name),
                                                ('spec',row['_id']['spec']),
-                                               ('level',row['_id']['level']),
+                                               ('level',row['_id'].get('level',1)),
                                                ('count',row['count'])] for row in counts])
 
                 # get enhancements too
