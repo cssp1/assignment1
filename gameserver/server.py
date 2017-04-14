@@ -3557,7 +3557,8 @@ class DamageLog(object):
 
 class GameObjectDamageLog(DamageLog):
     def init(self, obj, consumable = False):
-        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
+        if (not (obj.is_building() or obj.is_mobile())) or \
+           obj.max_hp == 0: return # ignore scenery etc
         sowner_id = str(obj.owner.user_id)
         if sowner_id not in self.state: self.state[sowner_id] = {}
         self._init(self.state[sowner_id], obj, consumable = consumable)
@@ -3568,7 +3569,8 @@ class GameObjectDamageLog(DamageLog):
         state[obj.obj_id] = {'spec':obj.spec.name, 'level':obj.level, 'orig_health': obj.hp/float(obj.max_hp)}
         if consumable: state[obj.obj_id]['consumable'] = 1
     def record(self, obj):
-        if (not (obj.is_building() or obj.is_mobile())): return # ignore scenery etc
+        if (not (obj.is_building() or obj.is_mobile())) or \
+           obj.max_hp == 0: return # ignore scenery etc
         sowner_id = str(obj.owner.user_id)
         if sowner_id not in self.state:
             if gamedata['server'].get('log_damage_log',1) >= 1:
