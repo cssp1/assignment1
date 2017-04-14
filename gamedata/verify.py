@@ -493,9 +493,10 @@ def check_level_progression(spec, maxlevel):
     tocheck = []
 
     LEVEL_PROGRESSION_FIELDS = \
-                             resource_fields('storage') + resource_fields('provides') + resource_fields('produces') + [
+                             resource_fields('storage') + resource_fields('provides') + resource_fields('produces') + \
+                             resource_fields('vault') + [
         'provides_space', 'provides_donated_space', 'provides_total_space', 'provides_squad_space', 'provides_squads',
-        'provides_inventory', 'provides_power', 'provides_foremen', 'manufacture_speed', 'max_hp'
+        'provides_inventory', 'provides_power', 'provides_foremen', 'manufacture_speed', 'max_hp',
         ]
     for FIELD in LEVEL_PROGRESSION_FIELDS:
         if FIELD in spec:
