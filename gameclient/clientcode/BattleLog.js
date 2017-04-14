@@ -125,6 +125,8 @@ BattleLog.compress_group = function(group) {
     if(group.length < 2) { return [group[0]]; }
 
     var units = {};
+    var looted = {}; // accumulators for looted/lost amounts
+
     for(var i = 0; i < group.length; i++) {
         var met = group[i];
         var key = met['unit_type']+'|'+('level' in met ? met['level'].toString() : '?');
@@ -133,15 +135,24 @@ BattleLog.compress_group = function(group) {
             key += '|'+JSON.stringify(props);
         }
         units[key] = (units[key] || 0) + 1;
+        for(var prop in met) {
+            if(prop.indexOf('looted_') === 0 || prop.indexOf('lost_') === 0) {
+                looted[prop] = (prop in looted ? looted[prop] : 0) + met[prop];
+            }
+        }
     }
     var met = {};
     for(var prop in group[0]) {
-        if(prop == 'unit_type' || prop == 'level' || prop == 'turret_head') {
+        if(prop == 'unit_type' || prop == 'level' || prop == 'turret_head' ||
+           prop.indexOf('looted_') === 0 || prop.indexOf('lost_') === 0) {
             continue;
         }
         met[prop] = group[0][prop];
     }
     met['multi_units'] = units;
+    for(var k in looted) {
+        met[k] = looted[k];
+    }
     return [met];
 };
 
@@ -485,7 +496,7 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                     } else {
                         color = white;
                     }
-                    loot.push(new SPText.ABlock(amount.toString() + ' '+ resdata['ui_name'], {color:color}));
+                    loot.push(new SPText.ABlock(pretty_print_number(amount) + ' '+ resdata['ui_name'], {color:color}));
                 }
             });
 
