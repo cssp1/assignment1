@@ -428,8 +428,10 @@ class HardcorePvPResLoot(PvPResLoot):
 
             for res in gamedata['resources']:
                 if obj.get_leveled_quantity(getattr(obj.spec, 'storage_'+res)) > 0:
-                    looted[res] = int(factors[res] * loot_attacker_gains[res] * getattr(owning_player.resources,res))
-                    lost[res] = int(factors[res] * loot_defender_loses[res] * getattr(owning_player.resources,res))
+                    source_amount = max(0, getattr(owning_player.resources,res) - owning_player.stattab.vault_res[res])
+
+                    looted[res] = int(factors[res] * loot_attacker_gains[res] * source_amount)
+                    lost[res] = int(factors[res] * loot_defender_loses[res] * source_amount)
 
             # loot is taken directly from the owner's stored resources
             owning_player.resources.gain_res(dict((res,-lost[res]) for res in lost), reason='looted_by_attacker')
@@ -452,7 +454,10 @@ class SpecificPvPResLoot(PvPResLoot):
 
         if base.base_resource_loot is None:
             # we're going to persist this between logins to remember the amount of resources still "unexposed" to looting
-            base.base_resource_loot = dict((res, getattr(self.defender.resources, res)) for res in gamedata['resources'])
+            base.base_resource_loot = dict((res, max(0,
+                                                     getattr(self.defender.resources, res) - self.defender.stattab.vault_res[res]
+                                                     )
+                                            ) for res in gamedata['resources'])
 
         # precalculate the total loot available to the attacker
         self.starting_resource_loot = dict((res, 0) for res in gamedata['resources'])
@@ -639,7 +644,10 @@ class AllOrNothingPvPResLoot(PvPResLoot):
 
         if base.base_resource_loot is None:
             # we're going to persist this until the defender logs in next, to remember the amount of resources still "unexposed" to looting
-            base.base_resource_loot = dict((res, getattr(defender.resources, res)) for res in gamedata['resources'])
+            base.base_resource_loot = dict((res, max(0,
+                                                     getattr(self.defender.resources, res) - self.defender.stattab.vault_res[res]
+                                                     )
+                                            ) for res in gamedata['resources'])
 
         # on win, how much the attacker will gain, limited by cargo space
         self.looted = dict((res,

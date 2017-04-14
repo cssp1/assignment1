@@ -42575,6 +42575,7 @@ function update_upgrade_dialog(dialog) {
         goog.object.forEach(gamedata['resources'], function(resdata, resname) {
             if(('produces_'+resname) in unit.spec) { feature_list.push('produces_'+resname); }
             if(('storage_'+resname) in unit.spec && !('provides_space' in unit.spec) /* omit on CC */ ) { feature_list.push('storage_'+resname); }
+            if(('vault_'+resname) in unit.spec) { feature_list.push('vault_'+resname); }
         });
         if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }

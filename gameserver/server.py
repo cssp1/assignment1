@@ -6281,6 +6281,7 @@ class GameObjectSpec(Spec):
         ] + resource_fields("produces") + [
         ["production_capacity", 0],
         ] + resource_fields("storage") + [
+        ] + resource_fields("vault") + [
         ] + resource_fields("cargo") + [
         ] + resource_fields("specific_pve_loot_fraction", default = -1) + [
         ] + resource_fields("specific_pvp_loot_fraction", default = -1) + [
@@ -8641,6 +8642,7 @@ class AbstractPlayer(object):
     def is_developer(self): return False
     class AbstractStattab(object):
         modded_buildings = {}
+        vault_res = dict((res,0) for res in gamedata['resources'])
         def get_player_stat(self, stat): raise Exception('AbstractPlayer has no stat table')
         def get_unit_stat(self, specname, stat, default_value): return default_value
 
@@ -11655,6 +11657,7 @@ class Player(AbstractPlayer):
             self.total_space = 0 # max space for all of the player's units
             self.total_foremen = 0 # max number of foremen
             use_squads = player.squads_enabled()
+            self.vault_res = dict((res, 0) for res in gamedata['resources']) # resname -> vault amount
 
             # calculate unit space and unit repair speeds
             # also look for and apply permanent auras
@@ -11687,6 +11690,9 @@ class Player(AbstractPlayer):
                         for tag, num in obj.spec.provides_limited_equipped.iteritems():
                             if tag not in self.limited_equipped: self.limited_equipped[tag] = 0
                             self.limited_equipped[tag] += obj.get_leveled_quantity(num)
+
+                    for res in gamedata['resources']:
+                        self.vault_res[res] += obj.get_leveled_quantity(getattr(obj.spec, 'vault_'+res))
 
                     if obj.auras is not None:
                         Aura.prune_auras(obj.auras, is_stattab_refresh = True)
@@ -11819,6 +11825,7 @@ class Player(AbstractPlayer):
                     'total_space': self.total_space,
                     'quarry_control_limit': self.quarry_control_limit,
                     'total_foremen': self.total_foremen,
+                    'vault_res': copy.copy(self.vault_res),
 
                     'player': self.player_stats,
                     'units': self.units,
