@@ -2351,6 +2351,9 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
     elif not gamedata['ai_bases']['loot_table'] and base_type != 'quarry':
         error |= 1; print 'AI base %s needs a base_resource_loot table' % strid
 
+    # make sure there are buildings that yield the specified base_resouce_loot
+    has_resources = set()
+
     for KIND in ('scenery', 'buildings', 'units'):
         if KIND in base:
             for item in base[KIND]:
@@ -2389,8 +2392,10 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                         if 'produces_'+res in spec:
                             has_this_res = True
                             # is_producer = True
-                        if has_this_res and (res not in ('iron','water')):
-                            has_exotic_resource = (item['spec'], res)
+                        if has_this_res:
+                            has_resources.add(res)
+                            if res not in ('iron','water'):
+                                has_exotic_resource = (item['spec'], res)
 
                     # check that quarries do not have storage buildings (unsupported/exploitable code path)
                     if base_type == 'quarry' and is_storage:
@@ -2453,6 +2458,12 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                                                         print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
     if 'buildings' in base:
         error |= check_ai_base_contents_power(base['buildings'], strid)
+
+    if 'base_resource_loot' in base and base_type != 'raid':
+        for res in base['base_resource_loot']:
+            if res not in has_resources:
+                error |= 1; print 'AI base %s has base_resource_loot with %s, but no lootable buildings of that type' % (strid, res)
+
     return error
 
 def check_ai_base_contents_power(building_list, strid):
