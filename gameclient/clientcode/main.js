@@ -2225,7 +2225,10 @@ GameObject.prototype.weapon_range = function() {
 
     return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
-GameObject.prototype.is_invul = function() { return this.spec['quarry_invul'] && session.is_quarry(); };
+GameObject.prototype.is_invul = function() {
+    return (this.spec['max_hp'] === 0) ||
+        (this.spec['quarry_invul'] && session.is_quarry());
+};
 
 // return true if we have a weapon that can shoot at target (regardless of whether target is in range or not)
 GameObject.prototype.can_shoot_at = function(target) {
@@ -2556,7 +2559,7 @@ function calculate_battle_outcome() {
             if(obj.spec['name'] === 'barrier') { return; }
 
             // do not count invulnerable objects (e.g. quarry harvesters)
-            if(obj.spec['max_hp'] === 0 || obj.is_invul()) { return; }
+            if(obj.is_invul()) { return; }
 
             if(player.tutorial_state != "COMPLETE") {
                 // special case for tutorial: end battle once the three main buildings are destroyed
@@ -52168,7 +52171,7 @@ function draw_building_or_inert(world, obj, powerfac) {
             throw Error('missing art asset for '+obj.spec['name']);
         }
 
-        if(obj.is_building() && obj.is_invul()) {
+        if(obj.is_building() && obj.is_invul() && obj.spec['max_hp'] !== 0) {
             var asset = (obj.spec['gridsize'][0] >= 12 ? 'building_shield_big' : 'building_shield_small');
             if(asset in GameArt.assets) { GameArt.assets[asset].draw(xy, facing, client_time, 'normal'); }
         }
