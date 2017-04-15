@@ -1015,6 +1015,7 @@ class UserTable:
               ('browser_caps', None),
               ('last_sprobe_result', None),
               ('locale', str),
+              ('timezone', int),
               ('frame_platform', str),
               ('social_id', str),
               ('facebook_id', str),
@@ -1233,6 +1234,7 @@ class User:
         self.devicePixelRatio = None
 
         self.locale = None
+        self.timezone = None
 
         self.frame_platform = None
         self.social_id = None
@@ -2915,6 +2917,8 @@ class User:
                         pass
                 if 'currency' in self.facebook_profile:
                     self.facebook_currency = self.facebook_profile['currency']
+                if 'timezone' in self.facebook_profile and isinstance(self.facebook_profile['timezone'], int):
+                    self.timezone = self.facebook_profile['timezone']
                 if 'third_party_id' in self.facebook_profile:
                     self.facebook_third_party_id = self.facebook_profile['third_party_id']
                 if ('permissions' in self.facebook_profile) and self.active_session and ('data' in self.facebook_profile['permissions']) and (len(self.facebook_profile['permissions']['data']) > 0):
@@ -26811,6 +26815,7 @@ class GAMEAPI(resource.Resource):
                        'last_login_time': session.user.last_login_time,
                        'last_login_ip': session.user.last_login_ip,
                        'country': session.user.country,
+                       'timezone': session.user.timezone,
                        'developer': 1 if session.player.is_developer() else None,
                        'uninstalled': None,
                        'last_mtime': server_time,
