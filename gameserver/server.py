@@ -1006,6 +1006,7 @@ class UserTable:
               ('account_creation_time', int),
               ('last_login_time', int),
               ('last_login_ip', str),
+              ('last_logout_time', int),
               ('uninstalled', int),
               ('birthday', None),
               ('browser_name', str),
@@ -1208,7 +1209,8 @@ class User:
         self.fb_hit_time = -1 # server_time at which the user's Facebook data was downloaded
         self.fb_retrieve_semaphore = None # set of outstanding profile/friends/likes requests (by string name) to keep track of what's in progress
         self.account_creation_time = -1 # server_time at which account was originally created
-        self.last_login_time = -1 # last time at which user played a game
+        self.last_login_time = -1 # last time at which user played the game
+        self.last_logout_time = -1 # last time at which user exited the game
         self.last_login_ip = '' # last IP address from which this user logged in
         self.uninstalled = 0 # true if person uninstalled the game via the frame platform
         self.country = '' # Facebook country from which user last logged in
@@ -26679,6 +26681,7 @@ class GAMEAPI(resource.Resource):
 
         # close final session
         session.player.history['sessions'][-1][1] = logout_time
+        session.user.last_logout_time = logout_time
 
         metric_event_coded(session.user.user_id, '0900_logged_out',
                            {'method': method,
@@ -26823,6 +26826,8 @@ class GAMEAPI(resource.Resource):
                        'ui_name': session.user.get_ui_name(session.player),
                        'ui_name_searchable': session.user.get_ui_name_searchable(session.player)
                        }
+        if reason.startswith('log_out'):
+            cache_props['last_logout_time'] = session.user.last_logout_time
         real_name = session.user.get_real_name()
         if real_name != cache_props['ui_name']:
             cache_props['real_name'] = real_name
