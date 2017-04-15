@@ -77,6 +77,7 @@ import MalformedJSON
 import PlayerPortraits
 import Raid
 import Scores2
+import Notification2
 import CustomerSupport
 import ActivityClassifier
 import IdleCheck
@@ -1521,9 +1522,13 @@ class User:
             if player and ('notif_t=app_notification' in data.get('url','')) and ('fb_ref' in data):
                 # strip suffixes applied by retention_newbie.py
                 ref = data['fb_ref']
+                if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
+
+                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, player.history)
+
                 for IGNORE in ('_24h', '_168h'):
                     ref = ref.replace(IGNORE, '')
-                if ref.endswith('_n') or ref.endswith('_e'): ref = ref[:-2]
+
                 dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
                 # reset unacked counter
                 if 'notification:'+ref+':unacked' in player.history:
@@ -26308,7 +26313,7 @@ class GAMEAPI(resource.Resource):
 
             # record BH notification hits
             if ('bh_source' in url_qs) and (url_qs['bh_source'][0] == 'notification') and \
-               ('ref' in url_qs) and ('fb_ref' in url_qs):
+               ('ref' in url_qs) and ('fb_ref' in url_qs) and url_qs['ref'][0]:
                 ref = url_qs['ref'][0]
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
@@ -26318,6 +26323,7 @@ class GAMEAPI(resource.Resource):
                 # reset unacked counter
                 if 'notification:'+ref+':unacked' in player.history:
                     del player.history['notification:'+ref+':unacked']
+                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, player.history)
 
             if ('bh_invite' in url_qs):
                 # delay this until the first info query finishes, so that bh_username is valid
@@ -27877,10 +27883,15 @@ class GAMEAPI(resource.Resource):
             ref = arg[1]
             if ref == 'ALL':
                 for key in session.player.history.keys():
-                    if key.startswith('notification:') and (key.endswith(':unacked') or key.endswith(':last_time')):
+                    if (key.startswith('notification:') or key.startswith('notification2:')) \
+                       and (key.endswith(':unacked') or key.endswith(':last_time')):
                         del session.player.history[key]
             else:
-                for key in ('notification:'+ref+':unacked', 'notification:'+ref+':last_time'):
+                for key in ('notification:'+ref+':unacked',
+                            'notification:'+ref+':last_time',
+                            'notification2:'+ref+':unacked',
+                            'notification2:'+ref+':last_time',
+                            ):
                     if key in session.player.history:
                         del session.player.history[key]
 

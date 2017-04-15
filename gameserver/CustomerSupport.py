@@ -22,6 +22,7 @@ from Raid import recall_squad, RecallSquadException, \
      army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
      calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
+import Notification2
 from Predicates import read_predicate
 
 def get_leveled_quantity(qty, level): # XXX duplicate
@@ -1599,8 +1600,11 @@ class HandleSendNotification(Handler):
             self.config = self.gamedata['fb_notifications']['notifications'].get(self.config_name, None)
             if self.config is None:
                 raise Exception('notification config not found in gamedata.fb_notifications')
+
         else:
             self.config = None # arbitrary message
+
+        self.n2_stream = Notification2.ref_to_stream(self.config['ref'] if self.config else None)
 
         # "force" means "ignore all frequency checks, just send it!" (e.g. for payment confirmations)
         self.force = bool(int(self.args.get('force','0')))
@@ -1654,35 +1658,57 @@ class HandleSendNotification(Handler):
            (not session.player.player_preferences.get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
             return ReturnValue(result = 'disabled by player preference')
 
-        is_elder = (len(session.player.history.get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+        elder_suffix = ''
 
-        if not self.force: # "soft" enable/disable checks
+        if session.player.abtests.get('T330_notification2') == 'on':
+            # NEW Notification2 path
+            n2_class = Notification2.get_user_class(session.player.history, self.gamedata['townhall'])
+            elder_suffix = '_%s' % n2_class
 
-            if self.config and \
-               (is_elder and (not self.config.get('enable_elder', True))) or \
-               ((not is_elder) and (not self.config.get('enable_newbie', True))):
-                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+            timezone = session.user.timezone if (session.user.timezone is not None) else Notification2.DEFAULT_TIMEZONE
 
-            if not self.multi_per_logout:
-                last_logout = session.player.last_logout_time()
-                if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
-                    return ReturnValue(result = 'already notified since last logout')
+            if not self.force:
+                can_send, reason = Notification2.can_send(self.time_now, timezone,
+                                                          self.n2_stream,
+                                                          self.config['ref'] if self.config else None,
+                                                          session.player.history,
+                                                          session.player.cooldowns,
+                                                          n2_class)
+                if not can_send:
+                    return ReturnValue(result = reason)
 
-            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
-            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
-            if self.config and \
-               (self.time_now - session.player.history.get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+        else:
+            # OLD path
+            is_elder = (len(session.player.history.get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+            elder_suffix = '_e' if is_elder else '_n'
 
-            if self.config and self.config.get('auto_mute',0) > 0:
-                mute_key = 'notification:'+self.config['ref']+':unacked'
-                if session.player.history.get(mute_key,0) >= self.config['auto_mute']:
-                    session.player.player_preferences[self.config['mute_preference_key']] = 0
-                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
+            if not self.force: # "soft" enable/disable checks
+
+                if self.config and \
+                   (is_elder and (not self.config.get('enable_elder', True))) or \
+                   ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                    return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+                if not self.multi_per_logout:
+                    last_logout = session.player.last_logout_time()
+                    if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
+                        return ReturnValue(result = 'already notified since last logout')
+
+                # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
+                # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+                if self.config and \
+                   (self.time_now - session.player.history.get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                    return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+                if self.config and self.config.get('auto_mute',0) > 0:
+                    mute_key = 'notification:'+self.config['ref']+':unacked'
+                    if session.player.history.get(mute_key,0) >= self.config['auto_mute']:
+                        session.player.player_preferences[self.config['mute_preference_key']] = 0
+                        return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
-            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+            fb_ref = self.config['ref'] + elder_suffix
         elif self.config:
             fb_ref = self.config['ref']
         else:
@@ -1705,6 +1731,11 @@ class HandleSendNotification(Handler):
                 key = 'notification:'+self.config['ref']+':last_time'
                 session.player.history[key] = self.time_now
 
+                if session.player.abtests.get('T330_notification2') == 'on':
+                    Notification2.record_send(self.time_now, timezone, self.n2_stream,
+                                              self.config['ref'],
+                                              session.player.history, session.player.cooldowns)
+
         return ReturnValue(result = 'ok')
 
     def exec_offline(self, user, player):
@@ -1716,38 +1747,60 @@ class HandleSendNotification(Handler):
            (not player['player_preferences'].get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
             return ReturnValue(result = 'disabled by player preference')
 
-        is_elder = (len(player['history'].get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+        elder_suffix = ''
 
-        if not self.force: # "soft" enable/disable checks
+        if player.get('abtests',{}).get('T330_notification2') == 'on':
+            # NEW Notification2 path
+            n2_class = Notification2.get_user_class(player['history'], self.gamedata['townhall'])
+            elder_suffix = '_%s' % n2_class
 
-            if self.config and \
-               (is_elder and (not self.config.get('enable_elder', True))) or \
-               ((not is_elder) and (not self.config.get('enable_newbie', True))):
-                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+            timezone = user['timezone'] if (user.get('timezone') is not None) else Notification2.DEFAULT_TIMEZONE
 
-            if not self.multi_per_logout:
-                last_logout = -1
-                if player['history'].get('sessions'):
-                    last_logout = player['history']['sessions'][-1][1]
-                if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
-                    return ReturnValue(result = 'already notified since last logout')
+            if not self.force:
+                can_send, reason = Notification2.can_send(self.time_now, timezone,
+                                                          self.n2_stream,
+                                                          self.config['ref'] if self.config else None,
+                                                          player['history'],
+                                                          player['cooldowns'],
+                                                          n2_class)
+                if not can_send:
+                    return ReturnValue(result = reason)
 
-            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
-            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
-            if self.config and \
-               (self.time_now - player['history'].get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+        else:
+            # OLD path
+            is_elder = (len(player['history'].get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+            elder_suffix = '_e' if is_elder else '_n'
 
-            if self.config and self.config.get('auto_mute',0) > 0:
-                mute_key = 'notification:'+self.config['ref']+':unacked'
-                if player['history'].get(mute_key,0) >= self.config['auto_mute']:
-                    if 'player_preferences' not in player: player['player_preferences'] = {}
-                    player['player_preferences'][self.config['mute_preference_key']] = 0
-                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
+            if not self.force: # "soft" enable/disable checks
+
+                if self.config and \
+                   (is_elder and (not self.config.get('enable_elder', True))) or \
+                   ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                    return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+                if not self.multi_per_logout:
+                    last_logout = -1
+                    if player['history'].get('sessions'):
+                        last_logout = player['history']['sessions'][-1][1]
+                    if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
+                        return ReturnValue(result = 'already notified since last logout')
+
+                # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
+                # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+                if self.config and \
+                   (self.time_now - player['history'].get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                    return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+                if self.config and self.config.get('auto_mute',0) > 0:
+                    mute_key = 'notification:'+self.config['ref']+':unacked'
+                    if player['history'].get(mute_key,0) >= self.config['auto_mute']:
+                        if 'player_preferences' not in player: player['player_preferences'] = {}
+                        player['player_preferences'][self.config['mute_preference_key']] = 0
+                        return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
-            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+            fb_ref = self.config['ref'] + elder_suffix
         elif self.config:
             fb_ref = self.config['ref']
         else:
@@ -1769,6 +1822,11 @@ class HandleSendNotification(Handler):
                 player['history'][key] = player['history'].get(key,0)+1
                 key = 'notification:'+self.config['ref']+':last_time'
                 player['history'][key] = self.time_now
+
+                if player.get('abtests',{}).get('T330_notification2') == 'on':
+                    Notification2.record_send(self.time_now, timezone, self.n2_stream,
+                                              self.config['ref'],
+                                              player['history'], player['cooldowns'])
 
         return ReturnValue(result = 'ok')
 
