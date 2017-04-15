@@ -2815,7 +2815,7 @@ class User:
         # This results in no birthday info and no is_eligible_promo data.
         # We'll need to do client-side queries for those
 
-        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,third_party_id,currency,is_eligible_promo,permissions'
+        profile_url = SpinFacebook.versioned_graph_endpoint_secure('user', endpoint)+'&fields=id,birthday,email,name,first_name,last_name,gender,locale,timezone,third_party_id,currency,is_eligible_promo,permissions'
         friends_url = SpinFacebook.versioned_graph_endpoint_secure('friend', endpoint+'/friends')+'?limit=500&offset=0'
         likes_url = SpinFacebook.versioned_graph_endpoint_secure('like', endpoint+'/likes')+'?limit=500&offset=0'
 
