@@ -7,21 +7,21 @@
 # load some standard Python libraries
 import sys, time, requests, getopt, traceback, random, re, functools
 import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
-import SpinNoSQL, SpinNoSQLLog, SpinETL
-import SpinFacebook
+import SpinNoSQL, SpinNoSQLLog
 import SpinSingletonProcess
+import ControlAPI
+import Notification2
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
-critical_re = re.compile('([0-9]+)h')
 retain_re = re.compile('retain_([0-9]+)h')
 
 # skip users last modified a long time ago
-MAX_MTIME_AGE = 3*24*60*60 # 3 days
+MAX_MTIME_AGE = 8*86400 # 8+ days
 
 # skip users last modified fewer than this many seconds ago
-MIN_MTIME_AGE = 5*60
+MIN_MTIME_AGE = 30*60 # 30min
 
 # process batches of this many users at once
 BATCH_SIZE = 100
@@ -33,7 +33,10 @@ def get_leveled_quantity(qty, level):
         return qty[level-1]
     return qty
 
-def check_harv_full(pcache, player, config):
+def check_harv_full(pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     total_harvesters = 0
     full_harvesters = 0
 
@@ -55,7 +58,10 @@ def check_harv_full(pcache, player, config):
 
     return 'harv_full', '', None
 
-def check_upgrade_complete(ref, building_type, specific_level, pcache, player, config):
+def check_upgrade_complete(ref, building_type, specific_level, pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if building_type != 'ALL' and obj['spec'] != building_type: continue
@@ -65,7 +71,10 @@ def check_upgrade_complete(ref, building_type, specific_level, pcache, player, c
                 ui_name = gamedata['buildings'][obj['spec']]['ui_name']
                 return ref, ui_name, None
     return None, None, None
-def check_research_complete(pcache, player, config):
+def check_research_complete(pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     for obj in player['my_base']:
         if obj['spec'] not in gamedata['buildings']: continue
         if ('research_item' in obj) and ('research_start_time' in obj) and ('research_total_time' in obj) and (obj['research_start_time'] > 0):
@@ -73,7 +82,10 @@ def check_research_complete(pcache, player, config):
                 ui_name = gamedata['tech'][obj['research_item']]['ui_name']
                 return 'research_complete', ui_name, None
     return None, None, None
-def check_production_complete(pcache, player, config):
+def check_production_complete(pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     any_manuf = False
     all_complete = True
     for obj in player['my_base']:
@@ -88,7 +100,10 @@ def check_production_complete(pcache, player, config):
     if any_manuf and all_complete:
         return 'production_complete', '', None
     return None, None, None
-def check_army_repaired(pcache, player, config):
+def check_army_repaired(pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     if 'unit_repair_queue' in player and len(player['unit_repair_queue']) > 0:
         tags = dict([(item.get('tag',0), 1) for item in player['unit_repair_queue']])
         item = player['unit_repair_queue'][-1]
@@ -106,15 +121,20 @@ def check_army_repaired(pcache, player, config):
                     return None, None, None # damaged
             return 'army_repaired', '', None
     return None, None, None
-def check_retain(pcache, player, config):
+def check_retain(pcache, n2_class, player, config):
     num_hours = int(retain_re.match(config['ref']).group(1))
-    if player['history'].get('fb_notification:'+config['ref']+':last_time',-1) > pcache.get('last_login_time',-1):
-        return None, None, None # already sent this one since last login
-    if (time_now - pcache.get('last_login_time',-1)) >= num_hours*3600:
+
+    if n2_class is Notification2.USER_NEW and num_hours > 48:
+        # FB best practice: don't send >48h retention notification to non-tutorial-completers
+        return None, None, None
+
+    if player['history'].get('notification2:'+config['ref']+':last_time',-1) > pcache.get('last_logout_time',-1):
+        return None, None, None # already sent this one since last logout
+    if (time_now - pcache.get('last_logout_time',-1)) >= num_hours*3600:
         return config['ref'], '', None # send it
     return None, None, None
 
-def check_login_incentive_expiring(pcache, player, config):
+def check_login_incentive_expiring(pcache, n2_class, player, config):
     aura_list = player.get('player_auras', [])
     for aura in aura_list:
         if aura['spec'] == 'login_incentive_ready' and \
@@ -125,7 +145,10 @@ def check_login_incentive_expiring(pcache, player, config):
             return config['ref'], ui_time_togo, None
     return None, None, None
 
-def check_fishing_complete(pcache, player, config):
+def check_fishing_complete(pcache, n2_class, player, config):
+    if n2_class is Notification2.USER_NEW:
+        return None, None, None # not for tutorial-incomplete newbies
+
     prefs = player.get('player_preferences', {})
     if type(prefs) is dict and (not prefs.get('enable_fishing_notifications',True)): return None, None, None
     for obj in player['my_base']:
@@ -141,25 +164,6 @@ def check_fishing_complete(pcache, player, config):
                     if prog >= bus['total_time']:
                         return 'fishing_complete', gamedata['crafting']['recipes'][bus['craft']['recipe']]['ui_name'], bus
     return None, None, None
-def finish_fishing_complete(player, bus):
-    LIMIT = 2
-    if LIMIT >= 1:
-        # if we're about to send a notification, see if the user has
-        # not responded to several previous ones, and disable the
-        # preference if so.
-        prefs = player.get('player_preferences', {})
-        if type(prefs) is dict and ('enable_fishing_notifications' not in prefs):
-            if player['history'].get('fishing_notifications_sent',0) >= LIMIT:
-                num_clicked = sum([v for k,v in player['history'].iteritems() if \
-                                   k.startswith('fb_notification:fishing_complete_') and k.endswith(':clicked')], 0)
-                if num_clicked < 1:
-                    prefs['enable_fishing_notifications'] = 0
-                    player['player_preferences'] = prefs
-                    return False
-
-    bus['notified'] = 1
-    player['history']['fishing_notifications_sent'] = player['history'].get('fishing_notifications_sent',0) + 1
-    return True
 
 # functions to check if a notification applies
 CHECKERS = {
@@ -177,34 +181,16 @@ CHECKERS = {
 # list of (-priority, ref, check_func) sorted in descending priority (increasing negative priority) order
 CHECKERS_BY_PRIORITY = []
 
-# separately collect the critical post-creation-time-window notifications
-CRITICALS = {}
-
 for key, val in gamedata['fb_notifications']['notifications'].iteritems():
     if val.get('enable_elder', True) or val.get('enable_newbie', True):
-        match = critical_re.match(key)
-        if match:
-            # post-creation-time-window notification, handled specially
-            num_hours = int(match.group(1))
-            # time range to which this notification applies
-            CRITICALS[key] = [num_hours*60*60, (num_hours+24)*60*60]
-            continue
         match = retain_re.match(key)
         if match:
-            # haven't-logged-in-for-a-while notification, handled regularly,
-            # but raise MAX_MTIME_AGE if necessary
-            num_hours = int(match.group(1))
-            # widen the time window to make sure we catch everyone (max retain wait + 1 day)
-            MAX_MTIME_AGE = max(MAX_MTIME_AGE, num_hours*60*60 + 24*60*60)
             CHECKERS_BY_PRIORITY.append((-val['priority'], key, CHECKERS['retain_']))
             continue
-        if key in CHECKERS: # regular checker
+        elif key in CHECKERS: # regular checker
             CHECKERS_BY_PRIORITY.append((-val['priority'], key, CHECKERS[key]))
 
 CHECKERS_BY_PRIORITY.sort()
-
-# functions to mutate player after sending a notification
-FINISHERS = {'fishing_complete': finish_fishing_complete }
 
 class Sender(object):
     def __init__(self, db_client, lock_client, dry_run = True, msg_fd = None):
@@ -225,7 +211,8 @@ class Sender(object):
         self.requests_session = requests.Session()
 
     # pass in the player_cache entry
-    def notify_user(self, user_id, pcache, index = -1, total_count = -1, only_frame_platform = None):
+    def notify_user(self, user_id, pcache, index = -1, total_count = -1, only_frame_platform = None, test_mode = False):
+        global time_now
 
         self.seen += 1
 
@@ -238,19 +225,20 @@ class Sender(object):
 
         #print >> self.msg_fd, 'PCACHE:', repr(pcache)
 
-        if not pcache.get('tutorial_complete',False):
-            print >> self.msg_fd, '(player_cache says) tutorial not complete'
+        if pcache.get('social_id') in (None, -1, '-1', 'ai'): # skip AIs
+            print >> self.msg_fd, '(player_cache says) AI player'
             return
 
-        if frame_platform not in self.active_platforms:
+        if (not test_mode) and frame_platform not in self.active_platforms:
             print >> self.msg_fd, '(player_cache says) frame_platform is not active'
             return
 
         platform_id = None
         if 'social_id' in pcache and pcache['social_id'].startswith(frame_platform):
             platform_id = pcache['social_id'][2:]
-        elif frame_platform == 'fb' and 'facebook_id' in pcache:
-            platform_id = str(pcache['facebook_id'])
+        else:
+            print >> self.msg_fd, '(player_cache says) social_id not available for platform %s!' % frame_platform
+            return
 
         if (not platform_id) or (len(platform_id) < 3):
             print >> self.msg_fd, '(player_cache says) invalid platform_id: %r' % platform_id
@@ -260,78 +248,40 @@ class Sender(object):
             print >> self.msg_fd, '(player_cache says) player is logged in or being modified right now'
             return
 
-        if pcache.get('uninstalled',0):
-            print >> self.msg_fd, '(player_cache says) player uninstalled'
+        if frame_platform == 'fb' and pcache.get('uninstalled',0):
+            print >> self.msg_fd, '(player_cache says) player uninstalled from FB'
             return
 
         if not pcache.get('enable_fb_notifications', True):
             print >> self.msg_fd, '(player_cache says) player turned off FB notifications'
             return
 
-
-        if (time_now - pcache.get('last_fb_notification_time', -1)) < gamedata['fb_notifications']['min_interval']:
-            print >> self.msg_fd, '(player_cache says) has already been notified less than min_interval seconds ago'
-            return
-
         if ((time_now - pcache.get('last_mtime',-1)) < MIN_MTIME_AGE):
             print >> self.msg_fd, '(player_cache says) player cache data was modified less than %d minutes ago' % (MIN_MTIME_AGE/60)
             return
 
-        # cannot re-notify a player notified since last login, except for critical windows
-        # and note that retain_* notifications do NOT update last_fb_notification_time
-        if pcache.get('last_fb_notification_time', -1) >= pcache.get('last_login_time', -1):
-            can_notify_again = False
-            if 'account_creation_time' in pcache:
-                for r in CRITICALS.itervalues():
-                    if pcache['account_creation_time'] >= (time_now-r[1]) and \
-                       pcache['account_creation_time'] <  (time_now-r[0]):
-                        can_notify_again = True
-                        break
-            if not can_notify_again:
-                print >> self.msg_fd, '(player_cache says) has already been notified since last login, and is not in critical window'
-                return
-
         try:
             player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
+            user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
 
         except SpinS3.S3404Exception:
-            # missing playerdb - might be due to an S3 failure
-            print >> self.msg_fd, '(playerDB data missing)'
+            # missing data - might be due to an S3 failure
+            print >> self.msg_fd, '(playerDB or userDB data missing)'
             return
 
-        if (player['abtests'].get('T330_notification2', None) == "on"):
-            print >> self.msg_fd, '(player says) in T330_notification2, skipping'
+        time_now = int(time.time()) # update time after possible long download
+
+        if (not test_mode) and (player['abtests'].get('T330_notification2', None) != "on"):
+            print >> self.msg_fd, '(player says) is not in T330_notification2, skipping'
             return
 
-        prefs = player.get('player_preferences', {})
-        if type(prefs) is dict and (not prefs.get('enable_fb_notifications', gamedata['strings']['settings']['enable_fb_notifications']['default_val'])):
-            print >> self.msg_fd, '(player says) enable_fb_notifications preference is OFF'
-            # use pcache for this?
-            # self.db_client.player_cache_update(user_id, {'enable_fb_notifications': 0})
-            return
+        n2_class = Notification2.get_user_class(player['history'], gamedata['townhall'])
 
-        last_logout_time = player['history']['sessions'][-1][1]
+        last_logout_time = user['last_logout_time'] if ('last_logout_time' in user) else player['history']['sessions'][-1][1]
 
         if (last_logout_time < 0 or (time_now - last_logout_time) < MIN_MTIME_AGE):
             print >> self.msg_fd, '(player says) played less than %d mins ago' % (MIN_MTIME_AGE/60)
             return
-
-        # check for applicable critical time window
-        critical_ref = None
-        if 'creation_time' in player:
-            for key, r in CRITICALS.iteritems():
-                if player['creation_time'] >= (time_now-r[1]) and \
-                   player['creation_time'] <  (time_now-r[0]) and \
-                   player['history'].get('fb_notification:'+key+':sent',0) < 1:
-                    critical_ref = key
-
-        if (not critical_ref) and player.get('last_fb_notification_time', -1) >= last_logout_time:
-            print >> self.msg_fd, '(player says) has already been notified since last logout, and is not in critical window'
-            # fix pcache entry
-            self.db_client.player_cache_update(user_id, {'last_fb_notification_time': player.get('last_fb_notification_time',-1)})
-            return
-
-        elder = (len(player['history']['sessions']) >= gamedata['fb_notifications']['elder_threshold'])
 
         ref = None
         replace_s = ''
@@ -340,41 +290,30 @@ class Sender(object):
         for prio, key, func in CHECKERS_BY_PRIORITY:
             config = gamedata['fb_notifications']['notifications'].get(key, None)
             if not config: continue
+
             if frame_platform == 'bh' and 'email' not in config: continue
             if player.get('creation_time',-1) < config.get('min_account_creation_time',-1): continue
 
-            min_interval = config.get('min_interval', -1)
-            if (min_interval > 0) and (time_now - player.get('last_fb_notification_time', -1) < min_interval):
-                #print >> self.msg_fd, 'too early to check for %s'
-                continue
-
-            if (elder and (not config.get('enable_elder', True))) or \
-               ((not elder) and (not config.get('enable_newbie', True))):
+            can_send, reason = Notification2.can_send(time_now, user.get('timezone', Notification2.DEFAULT_TIMEZONE),
+                                                      Notification2.ref_to_stream(key), key, player['history'],
+                                                      player['cooldowns'], n2_class)
+            if not can_send:
+                #print >> self.msg_fd, '%s: Notification2.can_send False because %s...' % (key, reason)
                 continue
 
             #print >> self.msg_fd, 'checking %s...' % key
-            ref, replace_s, checker_state = func(pcache, player, config)
+            ref, replace_s, checker_state = func(pcache, n2_class, player, config)
             if ref: break
 
-        if (not ref) and critical_ref:
-            # and (player['abtests'].get('T210_nnh_notification', None) == 'on'):
-            # send critical notification
-            config = gamedata['fb_notifications']['notifications'][critical_ref]
-            if ((elder and config.get('enable_elder', True)) or \
-               ((not elder) and config.get('enable_newbie', True))) and \
-               (frame_platform != 'bh' or 'email' in config):
-                ref = critical_ref
-                replace_s = ''
-
         if not ref:
-            print >> self.msg_fd, 'nothing to notify about (critical %s)' % critical_ref
+            print >> self.msg_fd, 'nothing to notify about'
             return
 
         self.eligible += 1
 
         ref_suffix = ''
         if gamedata['fb_notifications']['elder_suffix']:
-            ref_suffix += '_e' if elder else '_n'
+            ref_suffix += '_' + n2_class
 
         config = gamedata['fb_notifications']['notifications'][ref]
         ui_name = config['ui_name']
@@ -387,98 +326,24 @@ class Sender(object):
         text = ui_name.replace('%s', replace_s)
         print >> self.msg_fd, 'eligible for: "%s"...' % (text)
 
-        # userdb entry is necessary to find country for demographics dimensions
-        # but ignore failures
         try:
-            user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+            response = ControlAPI.CONTROLAPI({'method': 'send_notification', 'user_id': user_id,
+                                              'text': text.encode('utf-8'),
+                                              'config': config['ref']},
+                                             'send_player_notifications', max_tries = 1)
+            print >> self.msg_fd, 'notification sent!'
+            print >> self.msg_fd, 'GOT:', response
 
-        # October 2015 server bug caused some players to get written out without userdb entry. Ignore this.
-        except SpinS3.S3404Exception:
-            user = {}
+        except ControlAPI.ControlAPIException as e:
+            print >> self.msg_fd, 'ControlAPIException', e
+        except ControlAPI.ControlAPIGameException as e:
+            print >> self.msg_fd, 'ControlAPIGameException', e
 
-        generation = player.get('generation',0)
-        if not self.dry_run:
-            if self.lock_client.player_lock_acquire_attack(user_id, generation) < 0:
-                print >> self.msg_fd, 'cannot write, player is logged in'
-                return
-
-        try:
-            if ref in FINISHERS:
-                actually_send_it = FINISHERS[ref](player, checker_state)
-                print >> self.msg_fd, 'mutator returned %r' % actually_send_it
-                print >> self.msg_fd, repr(player['player_preferences'])
-            else:
-                actually_send_it = True
-
-            if actually_send_it:
-                # update last_fb_notification_time, but skip this for retain_* notifications,
-                # since we might want to try more at different intervals
-                if not retain_re.match(ref):
-                    player['last_fb_notification_time'] = time_now
-                player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
-                player['history']['fb_notification:'+ref+':sent'] = player['history'].get('fb_notification:'+ref+':sent',0)+1
-                player['history']['fb_notification:'+ref+':last_time'] = time_now
-
-            # write player even if not sending the notification
-            player['generation'] = generation+1
-
-            if not self.dry_run:
-                SpinUserDB.driver.sync_write_player(user_id, SpinJSON.dumps(player, pretty=True, newline=True, double_precision=5))
-                print >> self.msg_fd, 'written!'
-
-                if actually_send_it:
-                    if frame_platform == 'fb':
-                        url = SpinFacebook.versioned_graph_endpoint_secure('notification', str(platform_id)+'/notifications')
-                        params = {'href': '',
-                                  'ref': config['ref'] + ref_suffix,
-                                  'template': text.encode('utf-8') }
-                    elif frame_platform == 'bh':
-                        url = SpinConfig.config['battlehouse_api_path'] + '/user/' + platform_id + '/notify'
-                        email_conf = config['email']
-                        params = {'service': SpinConfig.game(),
-                                  'api_secret': SpinConfig.config['battlehouse_api_secret'],
-                                  'ui_subject': email_conf['ui_subject'].encode('utf-8'),
-                                  'ui_headline': email_conf['ui_headline'].encode('utf-8'),
-                                  'ui_body': text.encode('utf-8'),
-                                  'ui_cta': email_conf['ui_cta'].encode('utf-8'),
-                                  'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
-                                  'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
-
-                                  # BH users should also get Facebook notifications, where applicable
-                                  'facebook': '1'
-                                  }
-
-                    else:
-                        raise Exception('unexpected frame_platform %r' % frame_platform)
-
-                    print >> self.msg_fd, 'request:', url, params
-
-                    try:
-                        response = self.requests_session.post(url, data = params, timeout = 10)
-                        if response.status_code == 200:
-                            print >> self.msg_fd, 'notification sent!'
-                            print >> self.msg_fd, 'GOT:', response.text
-                        else:
-                            raise Exception('unexpected response code %d body %r' % (response.status_code, response.text))
-                    except:
-                        print >> self.msg_fd, 'API error:', traceback.format_exc()
-
-                    self.fb_notifications_log.event(time_now, {'user_id': user_id,
-                                                               'event_name': '7130_fb_notification_sent', 'code':7130,
-                                                               'sum': SpinETL.get_denormalized_summary_props(gamedata, player, user, 'brief'),
-                                                               'ref': config['ref'],
-                                                               'fb_ref': config['ref'] + ref_suffix})
-
-                    # RETURN HITS WILL LOOK LIKE THIS:
-                    # http://apps.facebook.com/marsfrontier/?fb_source=notification&fb_ref=harv_full&ref=notif&notif_t=app_notification
-
-                    # tell player cache we mutated the player, so that upcache will pick it up on next sweep
-                    self.db_client.player_cache_update(user_id, {'last_mtime': time_now,
-                                                                 'last_fb_notification_time': player['last_fb_notification_time']})
-
-        finally:
-            if not self.dry_run:
-                self.lock_client.player_lock_release(user_id, player['generation'], 2)
+        # RETURN HITS WILL LOOK LIKE THIS:
+        # Facebook:
+        # https://apps.facebook.com/marsfrontier/?fb_source=notification&fb_ref=harv_full&ref=notif&notif_t=app_notification
+        # Battlehouse:
+        # https://www.battlehouse.com/play/firestrike?bh_source=notification&ref=REF&fb_ref=REF_n
 
         self.sent += 1
         self.sent_now += 1
@@ -495,7 +360,7 @@ class NullFD(object):
     def write(self, stuff): pass
 
 
-def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame_platform):
+def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame_platform, test_mode):
     msg_fd = sys.stderr if verbose else NullFD()
 
     # reconnect to DB to avoid subprocesses sharing conenctions
@@ -507,13 +372,15 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame
 
     sender = Sender(db_client, lock_client, dry_run = dry_run, msg_fd = msg_fd)
     pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['tutorial_complete',
-                                                                       'facebook_id','social_id','frame_platform',
-                                                                       'last_login_time','last_mtime', 'uninstalled',
+                                                                       'social_id','frame_platform',
+                                                                       'last_logout_time',
+                                                                       'last_mtime', 'uninstalled',
                                                                        'enable_fb_notifications',
-                                                                       'last_fb_notification_time', 'LOCK_STATE'])
+                                                                       'last_fb_notification_time',
+                                                                       'LOCK_STATE'])
     for i in xrange(len(batch)):
         try:
-            sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform)
+            sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform, test_mode = test_mode)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
         except Exception as e:
@@ -527,7 +394,7 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame
     sender.finish()
 
 def my_slave(input):
-    run_batch(input['batch_num'], input['batch'], input['total_count'], input['limit'], input['dry_run'], input['verbose'], input['only_frame_platform'])
+    run_batch(input['batch_num'], input['batch'], input['total_count'], input['limit'], input['dry_run'], input['verbose'], input['only_frame_platform'], input['test_mode'])
 
 # main program
 if __name__ == '__main__':
@@ -537,7 +404,7 @@ if __name__ == '__main__':
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['dry-run','test', 'limit=', 'parallel=', 'quiet', 'frame-platform='])
     dry_run = False
-    test = False
+    test_mode = False
     limit = -1
     parallel = -1
     verbose = True
@@ -547,7 +414,7 @@ if __name__ == '__main__':
         if key == '--dry-run':
             dry_run = True
         elif key == '--test':
-            test = True
+            test_mode = True
         elif key == '--limit':
             limit = int(val)
         elif key == '--parallel':
@@ -557,18 +424,19 @@ if __name__ == '__main__':
         elif key == '--frame-platform':
             only_frame_platform = val
 
-    with SpinSingletonProcess.SingletonProcess('retention-newbie-%s' % (SpinConfig.config['game_id'],)):
+    with SpinSingletonProcess.SingletonProcess('send-player-notifications-%s' % (SpinConfig.config['game_id'],)):
 
         db_client = connect_to_db()
 
         id_list = []
-        if test:
-            id_list += [1112, 1114, 1115]
+        if test_mode:
+            id_list += [1112, 1114, 1115, 1179934, 1179935]
 
-        if not test:
+        if not test_mode:
             if verbose: print 'querying player_cache...'
             id_list += db_client.player_cache_query_mtime_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
-                                                                           [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
+                                                                           [],
+                                                                           require_tutorial_complete = False)
 
         id_list.sort(reverse=True)
         total_count = len(id_list)
@@ -579,12 +447,13 @@ if __name__ == '__main__':
 
         if parallel <= 1:
             for batch_num in xrange(len(batches)):
-                run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose, only_frame_platform)
+                run_batch(batch_num, batches[batch_num], total_count, limit, dry_run, verbose, only_frame_platform, test_mode)
         else:
             SpinParallel.go([{'batch_num':batch_num,
                               'batch':batches[batch_num],
                               'total_count':total_count,
                               'limit':limit, 'verbose':verbose, 'only_frame_platform': only_frame_platform,
+                              'test_mode': test_mode,
                               'dry_run':dry_run} for batch_num in xrange(len(batches))],
                             [sys.argv[0], '--slave'],
                             on_error = 'break', nprocs=parallel, verbose = False)

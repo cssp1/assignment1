@@ -47,6 +47,7 @@ def ref_to_stream(ref):
             'bh_invite_daily_gift': STREAM_URGENT,
             '168h': STREAM_RETENTION,
             'retain_168h': STREAM_RETENTION,
+            'retain_167h': STREAM_RETENTION,
             '24h': STREAM_RETENTION,
             'retain_47h': STREAM_RETENTION,
             'retain_23h': STREAM_RETENTION,
