@@ -1841,6 +1841,8 @@ class User:
         self.bh_profile = data # store entire profile
 
         self.bh_username = data['ui_name']
+        if 'timezone' in data and isinstance(data['timezone'], int):
+            self.timezone = data['timezone']
         if 'birthday' in data: pass # no birthday data
         last_hit_time, self.bh_hit_time = self.bh_hit_time, server_time
 
