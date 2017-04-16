@@ -23952,6 +23952,9 @@ class GAMEAPI(resource.Resource):
             sent = False
 
         if sent:
+            # update last_mtime so ETL script picks up the user next time around
+            gamesite.pcache_client.player_cache_update(to_user_id, {'last_mtime': server_time})
+
             metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
                                                                          'ref': sp_ref,
                                                                          'fb_ref': fb_ref})
