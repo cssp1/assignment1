@@ -15,6 +15,10 @@ import sys, os, pwd, traceback
 try:
     import email.parser, boto.sns
 
+    msg = None
+    subject = None
+    body = None
+
     # cron runs this in the same context as the job that produced the error messages.
     # It doesn't set the environment variables USER, HOME, etc to match the effective UID.
     # We have to do this manually so that boto will find the credentials.
@@ -38,13 +42,27 @@ try:
     subject = msg.get('Subject', 'Cron error')
     body = msg.get_payload().strip()
 
+    subject = subject.decode('utf-8').encode('ascii') # note: subject must be ASCII!
+    body = body.decode('utf-8').encode('utf-8')
+
+    # obey message limits:
+    if len(body) > 262144:
+        body = body[:200000]
+    if len(subject) > 100:
+        subject = subject[:100]
+
     con = boto.sns.connect_to_region(region)
     con.publish(topic = topic_arn, message = body, subject = subject)
 
 # fallback error catcher
 except Exception as e:
     err_fd = open('/tmp/cron-mail-to-sns-error.txt', 'a')
-    err_fd.write('USER %s ENV %r\n' % (os.getenv('USER'), os.environ))
+    if body and len(body) > 100:
+        ui_body = body[0:16]+'...'+body[-16:]
+    else:
+        ui_body = body
+    err_fd.write('USER %s ENV %r MSG %r SUBJECT %r BODY %r\n' % \
+                 (os.getenv('USER'), os.environ, msg, subject, ui_body))
     err_fd.write(traceback.format_exc()+'\n')
 
 # example="""From: root (Cron Daemon)
