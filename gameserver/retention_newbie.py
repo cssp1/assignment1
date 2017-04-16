@@ -567,8 +567,8 @@ if __name__ == '__main__':
 
         if not test:
             if verbose: print 'querying player_cache...'
-            id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
-                                                                                                         [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
+            id_list += db_client.player_cache_query_mtime_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
+                                                                           [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
 
         id_list.sort(reverse=True)
         total_count = len(id_list)

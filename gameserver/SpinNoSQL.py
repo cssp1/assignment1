@@ -1233,16 +1233,17 @@ class NoSQLClient (object):
         return map(lambda x: x['_id'], result)
 
     # special case for use by notification checker
-    def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges,
-                                                                                townhall_name = None, min_townhall_level = None,
-                                                                                include_home_regions = None,
-                                                                                exclude_home_regions = None,
-                                                                                min_known_alt_count = None,
-                                                                                min_idle_check_fails = None,
-                                                                                min_idle_check_last_fail_time = None,
-                                                                                reason = None):
-        qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
-                     [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
+    def player_cache_query_mtime_or_ctime_between(self, mtime_ranges, ctime_ranges,
+                                                  townhall_name = None, min_townhall_level = None,
+                                                  include_home_regions = None,
+                                                  exclude_home_regions = None,
+                                                  min_known_alt_count = None,
+                                                  min_idle_check_fails = None,
+                                                  min_idle_check_last_fail_time = None,
+                                                  require_tutorial_complete = True,
+                                                  reason = None):
+        qs = {'$or': [{'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
+                     [{'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
         if townhall_name and min_townhall_level:
             qs = {'$and': [qs, {townhall_name+'_level': {'$gte': min_townhall_level}}]}
         if min_known_alt_count:
@@ -1255,7 +1256,10 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
         if exclude_home_regions:
             qs = {'$and': [qs, {'home_region': {'$nin': exclude_home_regions}}]}
-        return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
+        if require_tutorial_complete:
+            qs = {'$and': [qs, {'tutorial_complete':1}]}
+
+        return self.instrument('player_cache_query_mtime_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
     def player_cache_query_ladder_rival(self, query, maxret, randomize_quality = 1, reason = None):
