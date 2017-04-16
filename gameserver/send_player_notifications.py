@@ -256,17 +256,24 @@ class Sender(object):
             print >> self.msg_fd, '(player_cache says) player turned off FB notifications'
             return
 
-        if ((time_now - pcache.get('last_mtime',-1)) < MIN_MTIME_AGE):
-            print >> self.msg_fd, '(player_cache says) player cache data was modified less than %d minutes ago' % (MIN_MTIME_AGE/60)
+        last_logout_time = pcache.get('last_logout_time', -1)
+        if last_logout_time < 0:
+            print >> self.msg_fd, '(player_cache says) no last_logout_time'
             return
+        if (time_now - last_logout_time) < MIN_MTIME_AGE:
+            print >> self.msg_fd, '(player_cache says) player logged out less than %d minutes ago' % (MIN_MTIME_AGE/60)
+            return
+
+#        if ((time_now - pcache.get('last_mtime',-1)) < MIN_MTIME_AGE):
+#            print >> self.msg_fd, '(player_cache says) player cache data was modified less than %d minutes ago' % (MIN_MTIME_AGE/60)
+#            return
 
         try:
             player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
-            user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
 
         except SpinS3.S3404Exception:
             # missing data - might be due to an S3 failure
-            print >> self.msg_fd, '(playerDB or userDB data missing)'
+            print >> self.msg_fd, '(playerDB data missing)'
             return
 
         time_now = int(time.time()) # update time after possible long download
@@ -277,7 +284,8 @@ class Sender(object):
 
         n2_class = Notification2.get_user_class(player['history'], gamedata['townhall'])
 
-        last_logout_time = user['last_logout_time'] if ('last_logout_time' in user) else player['history']['sessions'][-1][1]
+        # note: trust pcache on timezone - it's not really critical
+        timezone = pcache.get('timezone', Notification2.DEFAULT_TIMEZONE)
 
         if (last_logout_time < 0 or (time_now - last_logout_time) < MIN_MTIME_AGE):
             print >> self.msg_fd, '(player says) played less than %d mins ago' % (MIN_MTIME_AGE/60)
@@ -294,7 +302,7 @@ class Sender(object):
             if frame_platform == 'bh' and 'email' not in config: continue
             if player.get('creation_time',-1) < config.get('min_account_creation_time',-1): continue
 
-            can_send, reason = Notification2.can_send(time_now, user.get('timezone', Notification2.DEFAULT_TIMEZONE),
+            can_send, reason = Notification2.can_send(time_now, timezone,
                                                       Notification2.ref_to_stream(key), key, player['history'],
                                                       player['cooldowns'], n2_class)
             if not can_send:
@@ -311,12 +319,9 @@ class Sender(object):
 
         self.eligible += 1
 
-        ref_suffix = ''
-        if gamedata['fb_notifications']['elder_suffix']:
-            ref_suffix += '_' + n2_class
-
         config = gamedata['fb_notifications']['notifications'][ref]
         ui_name = config['ui_name']
+        ref_suffix = ''
         if type(ui_name) is dict: # A/B test
             key_list = sorted(ui_name.keys())
             key = key_list[random.randint(0,len(key_list)-1)]
@@ -324,20 +329,21 @@ class Sender(object):
             ui_name = ui_name[key]
             ref_suffix += '_'+key[3:]
         text = ui_name.replace('%s', replace_s)
-        print >> self.msg_fd, 'eligible for: "%s"...' % (text)
+        print >> self.msg_fd, 'eligible for: %s_%s%s "%s"...' % (config['ref'], n2_class, ref_suffix, text)
 
-        try:
-            response = ControlAPI.CONTROLAPI({'method': 'send_notification', 'user_id': user_id,
-                                              'text': text.encode('utf-8'),
-                                              'config': config['ref']},
-                                             'send_player_notifications', max_tries = 1)
-            print >> self.msg_fd, 'notification sent!'
-            print >> self.msg_fd, 'GOT:', response
+        if not self.dry_run:
+            try:
+                response = ControlAPI.CONTROLAPI({'method': 'send_notification', 'user_id': user_id,
+                                                  'text': text.encode('utf-8'),
+                                                  'ref_suffix': ref_suffix,
+                                                  'config': config['ref']},
+                                                 'send_player_notifications', max_tries = 1)
+                print >> self.msg_fd, 'Sent! Response:', response
 
-        except ControlAPI.ControlAPIException as e:
-            print >> self.msg_fd, 'ControlAPIException', e
-        except ControlAPI.ControlAPIGameException as e:
-            print >> self.msg_fd, 'ControlAPIGameException', e
+            except ControlAPI.ControlAPIException as e:
+                print >> self.msg_fd, 'ControlAPIException', e
+            except ControlAPI.ControlAPIGameException as e:
+                print >> self.msg_fd, 'ControlAPIGameException', e
 
         # RETURN HITS WILL LOOK LIKE THIS:
         # Facebook:

@@ -1626,6 +1626,9 @@ class HandleSendNotification(Handler):
         else:
             self.replacements = None
 
+        # suffix for the "ref" parameter, used for A/B testing
+        self.ref_suffix = self.args.get('ref_suffix', '')
+
         # optional override of the "ref" referer parameter. Only used if no "config" is selected.
         self.ref_override = self.args.get('ref',None)
         if not self.config and not self.ref_override:
@@ -1714,6 +1717,7 @@ class HandleSendNotification(Handler):
         else:
             assert self.ref_override
             fb_ref = self.ref_override
+        fb_ref += self.ref_suffix
 
         # BH users should also get Facebook notifications, where applicable
         mirror_to_facebook = (session.user.frame_platform == 'bh')
@@ -1806,6 +1810,7 @@ class HandleSendNotification(Handler):
         else:
             assert self.ref_override
             fb_ref = self.ref_override
+        fb_ref += self.ref_suffix
 
         # BH users should also get Facebook notifications, where applicable
         mirror_to_facebook = (user.get('frame_platform') == 'bh')
