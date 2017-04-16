@@ -773,6 +773,7 @@ function AuraActivePredicate(data) {
     goog.base(this, data);
     this.aura_name = data['aura_name'];
     this.min_stack = data['min_stack'] || 1;
+    this.min_level = data['min_level'] || -1;
     this.match_data = data['match_data'] || null;
 }
 goog.inherits(AuraActivePredicate, Predicate);
@@ -781,7 +782,7 @@ goog.inherits(AuraActivePredicate, Predicate);
 AuraActivePredicate.prototype.find_aura = function(player, qdata) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
-        if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
+        if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack) && ((aura['level']||1) >= this.min_level)) {
             if(('start_time' in aura) && (aura['start_time'] > server_time)) { continue; }
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             if(this.match_data !== null) {

@@ -370,6 +370,7 @@ class AuraActivePredicate(Predicate):
         Predicate.__init__(self, data)
         self.aura_name = data['aura_name']
         self.min_stack = data.get('min_stack',1)
+        self.min_level = data.get('min_level',-1)
         self.match_data = data.get('match_data', None)
     def is_satisfied(self, player, qdata):
         return self.is_satisfied2(None, player, qdata)
@@ -382,7 +383,7 @@ class AuraActivePredicate(Predicate):
         for aura in aura_list:
             if override_time is not None and aura.get('start_time',-1) > override_time: continue
 
-            if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
+            if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack and aura.get('level',1) >= self.min_level:
                 if self.match_data is not None:
                     is_matched = True
                     for k, v in self.match_data.iteritems():
