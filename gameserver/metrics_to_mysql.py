@@ -147,8 +147,8 @@ if __name__ == '__main__':
             elif row['event_name'] == '3350_no_miss_hack':
                 keyvals.append(('spec', row['spellname']))
 
-            elif row['event_name'] == '6000_reacquisition_gift_sent':
-                keyvals.append(('spec', row['gift']))
+            elif row['event_name'] in ('6000_retention_incentive_sent','6001_retention_incentive_claimed'):
+                keyvals.append(('stack', row['days']))
 
             elif row['event_name'] == '5141_dp_cancel_aura_acquired':
                 keyvals.append(('spec', row['aura_name']))
