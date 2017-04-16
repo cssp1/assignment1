@@ -1259,6 +1259,9 @@ class NoSQLClient (object):
         if require_tutorial_complete:
             qs = {'$and': [qs, {'tutorial_complete':1}]}
 
+        # don't include AI players
+        qs = {'$and': [qs, {'social_id': {'$ne': 'ai'}}]}
+
         return self.instrument('player_cache_query_mtime_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
