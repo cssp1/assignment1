@@ -7,6 +7,7 @@
 
 import Predicates
 import time, random, bisect, copy
+import SpinConfig
 
 # also depends on Player and GameObjects from server.py
 
@@ -28,6 +29,9 @@ class AndConsequent(Consequent):
     def execute(self, session, player, retmsg, context=None):
         for sub in self.subconsequents:
             sub.execute(session, player, retmsg, context)
+    def execute_offline(self, gamesite, user, player, context=None):
+        for sub in self.subconsequents:
+            sub.execute_offline(gamesite, user, player, context)
 
 class RandomConsequent(Consequent):
     def __init__(self, data):
@@ -133,6 +137,57 @@ class MetricEventConsequent(Consequent):
         if self.summary_key:
             props[self.summary_key] = player.get_denormalized_summary_props('brief')
         session.metric_event_coded(player, self.event_name, props)
+
+    def execute_offline(self, gamesite, user, player, context=None):
+        if self.frequency == 'session':
+            return # not when offline
+
+        # prepare properties
+        props = copy.deepcopy(self.props)
+        for k in props.keys():
+            # special cases
+
+            # grab a piece of data off an aura
+            if isinstance(props[k], dict) and '$aura_data' in props[k]:
+                aura_specname = props[k]['$aura_data']['spec']
+                aura_dataname = props[k]['$aura_data']['data']
+                aura = None
+                for a in player['player_auras']:
+                    if a['spec'] == aura_specname:
+                        aura = a; break
+                if aura:
+                    props[k] = aura.get('data', {}).get(aura_dataname)
+                else:
+                    del props[k] # silently drop the property
+
+            # grab a player history key
+            elif isinstance(props[k], dict) and '$player_history' in props[k]:
+                props[k] = player['history'].get(props[k]['$player_history'], 0)
+
+            # context variables
+            elif isinstance(props[k], basestring) and len(props[k]) >= 1 and props[k][0] == '$':
+                context_key = props[k][1:]
+                if context and (context_key in context):
+                    props[k] = context[context_key]
+                else:
+                    del props[k]
+
+        if self.summary_key:
+            # note: only access to "user" is here
+            props[self.summary_key] = {'cc': player['history'].get(gamesite.get_gamedata()['townhall']+'_level',1),
+                                       'plat': user.get('frame_platform','fb'),
+                                       'rcpt': player['history'].get('money_spent', 0),
+                                       'ct': user.get('country','unknown'),
+                                       'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
+            if user.get('developer'):
+                props[self.summary_key]['developer'] = 1
+
+        props['user_id'] = player['user_id']
+        props['event_name'] = self.event_name
+        props['code'] = int(self.event_name[0:4])
+        gamesite.metrics_log.event(gamesite.get_server_time(), props)
+
+
 
 class SpawnSecurityTeamConsequent(Consequent):
     def __init__(self, data):
@@ -350,6 +405,82 @@ class ApplyAuraConsequent(Consequent):
             if ('on_apply' in spec):
                 read_consequent(spec['on_apply']).execute(session, player, retmsg, context)
 
+    def execute_offline(self, gamesite, user, player, context=None):
+        stack = self.stack
+        duration = self.duration
+        assert not self.duration_from_event
+        assert self.duration_period_origin is None
+        assert self.stack <= 0
+
+        spec = gamesite.get_gamedata()['auras'][self.name]
+
+        if self.aura_data:
+            data = copy.deepcopy(self.aura_data)
+            for k in data.keys():
+                if data[k] == '$duration': # dynamic replacement
+                    data[k] = duration
+        else:
+            data = None
+
+        aura = None
+
+        # to prevent slight client/server clock mismatches from making the client think that
+        # just-applied auras are not active, fudge the aura['start_time'] backward a few seconds,
+        # UNLESS given a specific (future) starting time
+        FUDGE_START_TIME = 10
+
+        # find any existing aura with same spec, level, and data
+        for a in player['player_auras']:
+            if a['spec'] == self.name and a.get('level',1) == self.level and \
+               (data is None or \
+                all(a.get('data',{}).get(k,None) == v for k,v in data.iteritems())):
+                aura = a
+                break
+
+        if aura is not None:
+            # stack existing aura
+
+            # OVERWRITE old strength - necessary so you can't
+            # infinitely extend a powerful aura by repeatedly
+            # applying cheaper, weaker auras with the same effect.
+            if self.strength != 1:
+                aura['strength'] = self.strength
+            elif ('strength' in aura):
+                del aura['strength']
+
+            new_end_time = gamesite.get_server_time() + duration if duration > 0 else -1
+
+            if True: # always overwrite aura duration
+                aura['start_time'] = gamesite.get_server_time() - FUDGE_START_TIME
+                if new_end_time < 0 and 'end_time' in aura: del aura['end_time']
+                else: aura['end_time'] = new_end_time
+
+            max_stack = spec.get('max_stack',-1)
+            if max_stack > 0: aura['stack'] = min(aura['stack'], max_stack)
+
+            # overwrite data (but note match requirement above)
+            if (data is None) and 'data' in aura: del aura['data']
+            if (data is not None): aura['data'] = data
+
+        else:
+            # create new aura
+            aura = {'spec': self.name,
+                    'start_time': (gamesite.get_server_time() - FUDGE_START_TIME)}
+            if self.strength != 1:
+                aura['strength'] = self.strength
+            if self.level != 1:
+                aura['level'] = self.level
+            if duration > 0:
+                aura['end_time'] = aura['start_time'] + duration
+            if stack > 0:
+                aura['stack'] = stack
+            if data is not None:
+                aura['data'] = data
+            player['player_auras'].append(aura)
+
+        if ('on_apply' in spec):
+            read_consequent(spec['on_apply']).execute_offline(gamesite, user, player, context)
+
 class RemoveAuraConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
@@ -358,6 +489,21 @@ class RemoveAuraConsequent(Consequent):
         self.match_data = data.get('match_data', None)
     def execute(self, session, player, retmsg, context=None):
         session.player.remove_aura(session, retmsg, self.name, remove_stack = self.remove_stack, force = True, data = self.match_data)
+    def execute_offline(self, gamesite, user, player, context=None):
+        for aura in player['player_auras']:
+            if aura['spec'] == self.name and \
+               (self.match_data is None or \
+                all(aura.get('data',{}).get(k,None) == v for k,v in self.match_data.iteritems())):
+                if self.remove_stack > 0:
+                    new_stack = aura.get('stack',1) - self.remove_stack
+                    if new_stack <= 0:
+                        player['player_auras'].remove(aura)
+                    else:
+                        if 'stack' in aura: del aura['stack']
+                        if new_stack != 1: aura['stack'] = new_stack
+                else:
+                    player['player_auras'].remove(aura)
+                return
 
 class CooldownTriggerConsequent(Consequent):
     def __init__(self, data):

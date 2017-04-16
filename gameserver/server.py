@@ -30576,6 +30576,9 @@ class GameSite(server.Site):
     displayTracebacks = False
     protocol = GameProtocol
 
+    def get_server_time(self): return server_time
+    def get_gamedata(self): return gamedata
+
     def log_async_exception(self, exc):
         self.exception_log.event(server_time, exc)
     def log_facebook_exception(self, exc):

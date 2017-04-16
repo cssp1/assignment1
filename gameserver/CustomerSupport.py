@@ -16,7 +16,9 @@ import SpinConfig
 import random
 import math
 #import copy
+import traceback
 from Region import Region
+import Consequents
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException, \
      army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
@@ -1740,6 +1742,9 @@ class HandleSendNotification(Handler):
                                               self.config['ref'],
                                               session.player.history, session.player.cooldowns)
 
+                if 'on_send' in self.config:
+                    session.execute_consequent_safe(self.config['on_send'], session.player, retmsg, reason='send_notification')
+
         return ReturnValue(result = 'ok')
 
     def exec_offline(self, user, player):
@@ -1832,6 +1837,14 @@ class HandleSendNotification(Handler):
                     Notification2.record_send(self.time_now, timezone, self.n2_stream,
                                               self.config['ref'],
                                               player['history'], player['cooldowns'])
+
+                if 'on_send' in self.config:
+                    reason = 'send_notification'
+                    cons = self.config['on_send']
+                    try:
+                        Consequents.read_consequent(cons).execute_offline(self.gamesite, user, player)
+                    except Exception:
+                        self.gamesite.exception_log.event(self.time_now, 'Consequent exception off-line player %d from %s:\n%s\n%s' % (self.user_id, reason, repr(cons), traceback.format_exc().strip()))
 
         return ReturnValue(result = 'ok')
 

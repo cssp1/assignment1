@@ -3445,6 +3445,13 @@ def check_adnetwork(name, data):
         error |= check_predicate(evdata['predicate'], reason='adnetwork:'+name)
     return error
 
+def check_notification(name, data):
+    error = 0
+    reason = 'notification:%s' % name
+    if 'on_send' in data:
+        error |= check_consequent(data['on_send'], reason=reason+':on_send')
+    return error
+
 def check_promo_codes(promo_codes):
     error = 0
     for name, data in promo_codes.iteritems():
@@ -3834,6 +3841,10 @@ def main(args):
         error |= check_adnetwork(name, data)
 
     error |= check_loading_screens(gamedata['loading_screens'])
+
+
+    for name, data in gamedata['fb_notifications']['notifications'].iteritems():
+        error |= check_notification(name, data)
 
     # this must come last, because it depends on required_art_assets being filled out by previous code
     error |= check_art(gamedata['art'],
