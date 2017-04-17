@@ -121,12 +121,17 @@ def check_army_repaired(pcache, n2_class, player, config):
                     return None, None, None # damaged
             return 'army_repaired', '', None
     return None, None, None
+
 def check_retain(pcache, n2_class, player, config):
     num_hours = int(retain_re.match(config['ref']).group(1))
 
     if n2_class is Notification2.USER_NEW and num_hours > 48:
         # FB best practice: don't send >48h retention notification to non-tutorial-completers
         return None, None, None
+
+    if num_hours <= 24:
+        if player['history'].get('notification2:login_incentive_expiring:last_time',-1) > pcache.get('last_logout_time',-1):
+            return None, None, None # login_incentive_expiring replaces the <24h retention notification, if sent
 
     if player['history'].get('notification2:'+config['ref']+':last_time',-1) > pcache.get('last_logout_time',-1):
         return None, None, None # already sent this one since last logout

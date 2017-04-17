@@ -54,8 +54,8 @@ def ref_to_stream(ref):
             '24h': STREAM_RETENTION,
             'retain_47h': STREAM_RETENTION,
             'retain_23h': STREAM_RETENTION,
+            'login_incentive_expiring': STREAM_RETENTION,
 
-            'login_incentive_expiring': STREAM_URGENT, # ???
             'fishing_complete': STREAM_PROGRESSION, # ???
 
             }.get(ref, STREAM_PROGRESSION)
