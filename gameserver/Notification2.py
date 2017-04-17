@@ -51,9 +51,12 @@ def ref_to_stream(ref):
             '168h': STREAM_RETENTION,
             'retain_168h': STREAM_RETENTION,
             'retain_167h': STREAM_RETENTION,
+            'retain_167h_incentive': STREAM_RETENTION,
             '24h': STREAM_RETENTION,
             'retain_47h': STREAM_RETENTION,
+            'retain_47h_incentive': STREAM_RETENTION,
             'retain_23h': STREAM_RETENTION,
+            'retain_23h_incentive': STREAM_RETENTION,
             'login_incentive_expiring': STREAM_RETENTION,
 
             'fishing_complete': STREAM_PROGRESSION, # ???

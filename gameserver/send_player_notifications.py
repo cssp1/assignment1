@@ -15,7 +15,7 @@ import Notification2
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
-retain_re = re.compile('retain_([0-9]+)h')
+retain_re = re.compile('^retain_([0-9]+)h(_incentive)?$')
 
 # skip users last modified a long time ago
 MAX_MTIME_AGE = 8*86400 # 8+ days
@@ -133,10 +133,14 @@ def check_retain(pcache, n2_class, player, config):
         if player['history'].get('notification2:login_incentive_expiring:last_time',-1) > pcache.get('last_logout_time',-1):
             return None, None, None # login_incentive_expiring replaces the <24h retention notification, if sent
 
-    if player['history'].get('notification2:'+config['ref']+':last_time',-1) > pcache.get('last_logout_time',-1):
-        return None, None, None # already sent this one since last logout
+    # inhibit if this num_hours notification was already sent (non-incentive or _incentive variant)
+    for key in ('retain_%dh' % num_hours, 'retain_%dh_incentive' % num_hours):
+        if player['history'].get('notification2:'+key+':last_time',-1) > pcache.get('last_logout_time',-1):
+            return None, None, None # already sent this one since last logout
+
     if (time_now - pcache.get('last_logout_time',-1)) >= num_hours*3600:
         return config['ref'], '', None # send it
+
     return None, None, None
 
 def check_login_incentive_expiring(pcache, n2_class, player, config):
