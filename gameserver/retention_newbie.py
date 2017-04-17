@@ -14,8 +14,8 @@ import SpinSingletonProcess
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
-critical_re = re.compile('([0-9]+)h')
-retain_re = re.compile('retain_([0-9]+)h')
+critical_re = re.compile('^([0-9]+)h$')
+retain_re = re.compile('^retain_([0-9]+)h$')
 
 # skip users last modified a long time ago
 MAX_MTIME_AGE = 3*24*60*60 # 3 days
