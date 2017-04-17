@@ -22288,8 +22288,8 @@ class GAMEAPI(resource.Resource):
                     if session.home_base:
                         session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None), reason='crafted')
                 except:
-                    gamesite.exception_log.event(server_time, 'player %d crafting delivery %r target not found for %r, discarding. %s' % \
-                                                 (object.owner.user_id, bus.craft_state, item, traceback.format_exc().strip())) # OK
+                    gamesite.exception_log.event(server_time, 'player %d crafting delivery from %s %r at base_id %r %r target not found for %r, discarding. %s' % \
+                                                 (object.owner.user_id, object.spec.name, object.obj_id, session.viewing_base.base_id, bus.craft_state, item, traceback.format_exc().strip())) # OK
             else:
 
                 # returned "looted" list does include fungible items
