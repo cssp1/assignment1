@@ -30824,7 +30824,7 @@ class GameSite(server.Site):
             self.listener_ssl = reactor.listenSSL(self.config.game_ssl_port, self,
                                                   SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                                         SpinConfig.config['ssl_crt_file'],
-                                                                                        certificateChainFile=SpinConfig.config['ssl_chain_file']),
+                                                                                        certificateChainFile=SpinConfig.config.get('ssl_chain_file',None)),
                                                   interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
 
         # make sure players are logged out and flushed before server shuts down

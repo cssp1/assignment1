@@ -3433,7 +3433,7 @@ def do_main():
         reactor.listenSSL(myport_ssl, proxysite,
                           SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                 SpinConfig.config['ssl_crt_file'],
-                                                                certificateChainFile=SpinConfig.config['ssl_chain_file']),
+                                                                certificateChainFile=SpinConfig.config.get('ssl_chain_file',None)),
                           backlog=backlog)
 
     global metrics_log
