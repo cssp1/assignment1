@@ -712,8 +712,8 @@ if __name__ == '__main__':
                 elif entry.get('logins',1) < 0 or entry.get('ignore',False): # marked non-alt
                     print fmt % ('', 'ID: %7d, IGNORED (marked as non-alt)' % (int(s_other_id)))
                     continue
-                elif 'last_login' in entry and entry['last_login'] < (time_now - 14*86400) and entry.get('logins',1) < 100:
-                    # ignore logins more than 2 weeks ago
+                elif 'last_login' in entry and entry['last_login'] < (time_now - 90*86400) and entry.get('logins',1) < 100:
+                    # ignore logins more than 90d ago
                     continue
                 print fmt % ('', 'ID: %7d, #Logins: %4d, Last simultanous login: %s (IP %s)' % (int(s_other_id), entry.get('logins',1),
                                                                                                 pretty_print_time(time_now - entry['last_login'], limit = 2)+' ago' if 'last_login' in entry else 'Unknown',

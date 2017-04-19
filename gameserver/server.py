@@ -13436,21 +13436,21 @@ class LivePlayer(Player):
         limit = gamedata['server']['alt_no_attack_after']
         if limit < 0: return False
         alt_data = self.get_alt_data(other_id)
-        return alt_data and (alt_data.get('attacks',0) >= limit)
+        return alt_data and (alt_data.get('attacks',0) >= limit) and (alt_data.get('last_login',server_time) >= server_time - 90*86400)
 
     def is_alt_account_unprotectable(self, other_id):
         if (not spin_secure_mode): return False
         limit = gamedata['server']['alt_no_protect_after']
         if limit < 0: return False
         alt_data = self.get_alt_data(other_id)
-        return alt_data and (alt_data.get('attacks',0) >= limit)
+        return alt_data and (alt_data.get('attacks',0) >= limit) and (alt_data.get('last_login',server_time) >= server_time - 90*86400)
 
     def is_alt_account_unladderable(self, other_id):
         if (not spin_secure_mode): return False
         limit = gamedata['server'].get('alt_no_ladder_after',0)
         if limit < 0: return False
         alt_data = self.get_alt_data(other_id)
-        return alt_data and (alt_data.get('attacks',0) >= limit)
+        return alt_data and (alt_data.get('attacks',0) >= limit) and (alt_data.get('last_login',server_time) >= server_time - 90*86400)
 
     # accept URL parameters to override A/B test cohort assignment, and other developer-only variables
     def read_url_overrides(self, user, q):
