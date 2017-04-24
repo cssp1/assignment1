@@ -9268,34 +9268,34 @@ class Player(AbstractPlayer):
     def stored_item_iter(self):
         for item in self.inventory: yield item
         for item in self.loot_buffer: yield item
-    def equipped_item_iter(self):
+    def equipped_item_iter(self, base):
         for eqdict in self.unit_equipment.itervalues():
             for item in Equipment.equip_iter(eqdict):
                 yield item
-        for obj in self.home_base_iter():
+        for obj in base.iter_objects():
             if obj.is_building() and obj.equipment:
                 for item in Equipment.equip_iter(obj.equipment):
                     yield item
-    def equipped_items_serialize(self): # similar to equipped_item_iter, but for transmission to the client
+    def equipped_items_serialize(self, base): # similar to equipped_item_iter, but for transmission to the client
         for eqdict in self.unit_equipment.itervalues():
             for ret in Equipment.equip_serialize(eqdict):
                 ret['obj_id'] = 'UNIT_EQUIPMENT'
                 yield ret
-        for obj in self.home_base_iter():
+        for obj in base.iter_objects():
             if obj.is_building() and obj.equipment:
                 for ret in Equipment.equip_serialize(obj.equipment):
                     ret['obj_id'] = obj.obj_id
                     yield ret
 
-    def count_limited_equipped_items(self, tag):
+    def count_limited_equipped_items(self, tag, base):
         count = 0
-        for item in self.equipped_item_iter():
+        for item in self.equipped_item_iter(base):
             if item['spec'] in gamedata['items'] and \
                gamedata['items'][item['spec']].get('limited_equipped',None) == tag:
                 count += item.get('stack', 1)
 
         # check current crafting products that are going to be delivered into building slots
-        for obj in self.home_base_iter():
+        for obj in base.iter_objects():
             if obj.is_building() and obj.is_crafter() and obj.is_crafting():
                 for bus in obj.crafting.queue:
                     if bus.craft_state.get('delivery',None) and ('obj_id' in bus.craft_state['delivery']):
@@ -9316,7 +9316,7 @@ class Player(AbstractPlayer):
                 count += item.get('stack',1)
                 if count >= min_count:
                     return True
-        for item in self.equipped_item_iter():
+        for item in self.equipped_item_iter(self.my_home):
             if item['spec'] == name and (level is None or item.get('level',1) == level) and (min_level is None or item.get('level',1) >= min_level):
                 count += 1
                 if count >= min_count:
@@ -11565,7 +11565,7 @@ class Player(AbstractPlayer):
             self.player.prune_player_auras(is_recalc_stattab = True)
 
             # check for item set completion
-            for item in self.player.equipped_item_iter():
+            for item in self.player.equipped_item_iter(player.my_home):
                 self.add_set_item(gamedata['items'].get(item['spec'], None))
             if gamedata['count_unequipped_items_in_sets']:
                 for item in self.player.stored_item_iter():
@@ -19731,7 +19731,11 @@ class GAMEAPI(resource.Resource):
                        session.viewing_player.is_pvp_player(),
                        [self.get_player_cache_props(session.user, session.player, session.alliance_id_cache)] + \
                        ([self.get_player_cache_props(session.viewing_user, session.viewing_player, session.viewing_alliance_id_cache)] if ((session.viewing_player is not session.player) and (not session.viewing_player.is_ai())) else []),
-                       list(session.player.equipped_items_serialize()), # [37]
+
+                       # list of equipped items AT HOME BASE usable in combat (e.g. missiles), used to drive the combat item bar GUI
+                       # this is NOT the list of equipped items in the viewing base!
+                       list(session.player.equipped_items_serialize(session.player.my_home)), # [37]
+
                        session.debug_session_change_count,
                        debug_prev_base_id,
                        session.viewing_base.base_richness, # [40]
@@ -21978,7 +21982,7 @@ class GAMEAPI(resource.Resource):
 
                         if not replacing_equivalent:
                             # do need to check existing items
-                            for item in session.player.equipped_item_iter():
+                            for item in session.player.equipped_item_iter(session.viewing_base):
                                 item_spec = gamedata['items'].get(item['spec'], None)
                                 if item_spec and item_spec.get('unique_equipped',None) == product_spec['unique_equipped']:
                                     if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_UNIQUE", product_spec['name']])
@@ -21997,7 +22001,7 @@ class GAMEAPI(resource.Resource):
                         if not replacing_equivalent:
                             # do need to count existing items
                             if session.player.stattab.limited_equipped.get(product_spec['limited_equipped'],0) < \
-                               product.get('stack',1) + session.player.count_limited_equipped_items(product_spec['limited_equipped']):
+                               product.get('stack',1) + session.player.count_limited_equipped_items(product_spec['limited_equipped'], session.viewing_base):
                                 if retmsg is not None: retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", product_spec['name']])
                                 return False
 
@@ -23219,7 +23223,7 @@ class GAMEAPI(resource.Resource):
             if (not session.player.is_cheater):
                 # check unique_equipped constraint
                 if ('unique_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('unique_equipped',None) != add_spec['unique_equipped'])):
-                    for item in session.player.equipped_item_iter():
+                    for item in session.player.equipped_item_iter(session.viewing_base):
                         item_spec = gamedata['items'].get(item['spec'], None)
                         if item_spec and item_spec.get('unique_equipped',None) == add_spec['unique_equipped']:
                             # doubled
@@ -23229,7 +23233,7 @@ class GAMEAPI(resource.Resource):
                 # check limited_equipped constraint
                 if ('limited_equipped' in add_spec) and ((not remove_spec) or (remove_spec.get('limited_equipped',None) != add_spec['limited_equipped'])):
                     if session.player.stattab.limited_equipped.get(add_spec['limited_equipped'],0) < \
-                       add_item.get('stack',1) + session.player.count_limited_equipped_items(add_spec['limited_equipped']):
+                       add_item.get('stack',1) + session.player.count_limited_equipped_items(add_spec['limited_equipped'], session.viewing_base):
                         retmsg.append(["ERROR", "EQUIP_INVALID_LIMITED", add_spec['name']])
                         return False
 
