@@ -1052,7 +1052,7 @@ if __name__ == '__main__':
                 ui_map_name = data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')
 
                 if game_id == 'fs' and data.get('repeatable'):
-                    ui_map_name = '** EVENT: '+ui_map_name+' **'
+                    ui_map_name = 'EVENT: '+ui_map_name+''
 
                 print >> out_fd, '''
     ////////////////////////////////////////////////////////////
