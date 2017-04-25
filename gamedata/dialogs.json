@@ -2814,38 +2814,46 @@
                             "show": 0
                           },
 
-            "requirements": { "kind": "TextField", "xy": [588,78], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
+            "requirements": { "kind": "TextField", "xy": [588,75], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
 
-            "resource_water_button": { "kind": "ActionButton", "xy": [543,111], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_water_icon": { "kind": "StaticImage", "xy": [578,110], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
-            "cost_water": { "kind": "TextField", "xy": [578,110], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
+            "resource_water_button": { "kind": "ActionButton", "xy": [543,103], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_water_icon": { "kind": "StaticImage", "xy": [578,102], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
+            "cost_water": { "kind": "TextField", "xy": [578,102], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
                             "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [570,144], "show": 0 },
 
 
-            "resource_iron_button": { "kind": "ActionButton", "xy": [543,136], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_iron_icon": { "kind": "StaticImage", "xy": [578,135], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
+            "resource_iron_button": { "kind": "ActionButton", "xy": [543,128], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_iron_icon": { "kind": "StaticImage", "xy": [578,127], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
 
-            "cost_iron": { "kind": "TextField", "xy": [578,135], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
+            "cost_iron": { "kind": "TextField", "xy": [578,127], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
                            "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [570,169], "show": 0 },
 
 
-            "resource_power_button": { "kind": "ActionButton", "xy": [543,161], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_power_icon": { "kind": "StaticImage", "xy": [578,160], "dimensions": [21,21], "asset": "resource_icon_power" },
-            "cost_power": { "kind": "TextField", "xy": [578,160], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
+            "resource_power_button": { "kind": "ActionButton", "xy": [543,153], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_power_icon": { "kind": "StaticImage", "xy": [578,152], "dimensions": [21,21], "asset": "resource_icon_power" },
+            "cost_power": { "kind": "TextField", "xy": [578,152], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
                             "ui_tooltip": "Current power usage: %CUR\nPower needed during upgrade: %DURING\nPower needed after upgrade: %AFTER",
                             "ui_tooltip_maxlevel": "Power needed",
                             "tooltip_delay": 0, "fixed_tooltip_offset": [500,194], "fixed_tooltip_offset_maxlevel": [590,194]
                           },
 
-            "resource_res3_button": { "kind": "ActionButton", "xy": [619,111], "dimensions": [0,0], "show": 0 }, // placeholder for code only
-            "resource_res3_icon": { "kind": "StaticImage", "xy": [654,110], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
+            "resource_res3_button": { "kind": "ActionButton", "xy": [619,103], "dimensions": [0,0], "show": 0 }, // placeholder for code only
+            "resource_res3_icon": { "kind": "StaticImage", "xy": [654,102], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
 
-            "cost_res3": { "kind": "TextField", "xy": [654,110], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+            "cost_res3": { "kind": "TextField", "xy": [654,102], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
                            "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [646,144], "show": 0 },
 
+            "requirements_item_status": { "kind": "SolidRect", "xy": [576,253], "dimensions": [54,54],
+                                          "outline_width": 1,
+                                          "color_present": [0,1,0,0.5],
+                                          "color_missing": [1,0,0,0.5],
+                                          "array": [2,1], "array_offset": [66,0] },
+            "requirements_item": { "kind": "Dialog", "dialog": "item_display", "xy": [578,255], "dimensions": [50,50],
+                                   "ui_tooltip": "Item required in Warehouse: %ITEM",
+                                   "array": [2,1], "array_offset": [66,0] },
 
-            "predicate_help_button": { "kind": "ActionButton", "xy": [543,194], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "requirements_text":  { "kind": "TextField", "xy": [574,196], "dimensions": [140,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
+            "predicate_help_button": { "kind": "ActionButton", "xy": [543,178], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "requirements_text":  { "kind": "TextField", "xy": [574,179], "dimensions": [140,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                                     "ui_name": "Test 1\nTest 2\nTest 3",
                                     "ui_name_needs_repair": "%s needs repair",
                                     "ui_name_busy": "%s busy",

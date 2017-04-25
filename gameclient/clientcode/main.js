@@ -43318,6 +43318,57 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
+    // check for ingredients
+    var ingr_list = [];
+    if(!stats_only && new_level <= max_level) {
+        if(tech && ('enhance_time' in tech)) {
+            ingr_list = get_enhancement_ingredients_list(tech, new_level);
+        } else if(tech) {
+            ingr_list = get_tech_ingredients_list(tech, new_level);
+        } else {
+            ingr_list = get_building_ingredients_list(unit.spec, new_level);
+        }
+    }
+    ItemDisplay.display_item_array(dialog, 'requirements_item', ingr_list, {hide_tooltip: true});
+    var ingr_by_specname = {};
+    for(var i = 0; i < dialog.data['widgets']['requirements_item']['array'][0]; i++) {
+        if(i < ingr_list.length) {
+            var ingr = ingr_list[i];
+            var ingr_spec = gamedata['items'][ingr['spec']];
+            var ingr_stack = ('stack' in ingr ? ingr['stack'] : 1);
+            var ingr_level = ('level' in ingr ? ingr['level'] : null);
+            var ui_ingr = ItemDisplay.get_inventory_item_stack_prefix(ingr_spec, ingr_stack) + ItemDisplay.get_inventory_item_ui_name_long(ingr_spec, ingr_level);
+            dialog.widgets['requirements_item'+i.toString()].widgets['frame'].tooltip.str =
+                dialog.data['widgets']['requirements_item']['ui_tooltip'].replace('%ITEM', ui_ingr);
+
+            // group items by spec/level for the tooltip
+            var key = ingr['spec'];
+            if(ingr_level) { key += ':L'+ingr_level.toString(); }
+
+            var has_it = player.inventory_item_quantity(ingr['spec'], ingr['level']) - (ingr_by_specname[key] || 0) >= ingr_stack;
+            ingr_by_specname[key] = (ingr_by_specname[key]||0) + ingr_stack;
+            dialog.widgets['requirements_item'+i.toString()].widgets['frame'].state = (has_it ? 'normal_nohighlight' : 'disabled');
+            dialog.widgets['requirements_item_status'+i.toString()].show = true;
+            dialog.widgets['requirements_item_status'+i.toString()].color = SPUI.make_colorv(dialog.data['widgets']['requirements_item_status'][(has_it ? 'color_present' : 'color_missing')]);
+
+            if(!has_it) {
+                req.push(dialog.data['widgets']['requirements_item']['ui_tooltip'].replace('%ITEM', ui_ingr));
+                use_resources_requirements_ok = instant_requirements_ok = false;
+
+                if(!dialog.widgets['predicate_help_button'].show) {
+                    var helper = (function(_spec, _qty) { return function() {
+                        var s = gamedata['errors']['INSUFFICIENT_ITEMS'];
+                        invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%s',_spec['ui_name_plural'] || _spec['ui_name']).replace('%d',pretty_print_number(_qty)), {'dialog': 'message_dialog_big'});
+                    }; })(ingr_spec, ingr_stack);
+                    dialog.widgets['predicate_help_button'].show = true;
+                    dialog.widgets['predicate_help_button'].onclick = helper;
+                }
+            }
+        } else {
+            dialog.widgets['requirements_item_status'+i.toString()].show = false;
+        }
+    }
+
     dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
 
     for(var i = 0; i < req.length; i++) {
