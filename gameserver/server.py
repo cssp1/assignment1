@@ -6519,6 +6519,7 @@ class EnhancementSpec(Spec):
                ] + resource_fields("cost") + [
                ["enhance_time", 0],
                ["ingredients", None],
+               ["refund_ingredients", False],
                ["xp", -1],
                ["enhancement_category", None],
                ["effects", None],
@@ -21889,11 +21890,15 @@ class GAMEAPI(resource.Resource):
 
         enh_state = object.enhancing.enhance_state
         enh_level = enh_state['level']
+        enh_spec = session.player.get_abtest_spec(EnhancementSpec, enh_state['spec'])
 
         # figure out how many resources to return to player
         refund = dict((res, int(gamedata['upgrade_cancel_refund']*enh_state['cost'].get(res,0))) \
                       for res in gamedata['resources'])
-        ingr_list = enh_state.get('ingredients', None)
+        if enh_spec.refund_ingredients:
+            ingr_list = enh_state.get('ingredients', None)
+        else:
+            ingr_list = None
 
         object.cancel_enhancing()
         session.viewing_base.nosql_write_one(object, 'cancel_enhance', fields = ['enhancing'])

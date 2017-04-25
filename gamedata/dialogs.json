@@ -205,24 +205,30 @@
     },
 
     "confirm_cancel_dialog": {
-        "dimensions": [451, 151],
+        "dimensions": [451, 171],
         "default_button": "ok_button",
         "widgets": {
-            "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,171], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken_left": {"kind": "StaticImage", "xy":[9,11], "dimensions":[72,96], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [9,23], "dimensions": [72,72], "clip_to": [13,23,65,72], "asset": "valentina_72x72" },
+            "sunken_right": {"kind": "StaticImage", "xy":[89,11], "dimensions":[352,96], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "title":  { "kind": "TextField", "xy": [108,19], "dimensions": [300, 24], "text_style": "bold", "text_hjustify": "left", "ui_name": "Confirm" },
             "close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "TextField", "xy": [108,43], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
                              "text_vjustify": "top",
                              "ui_name_upgrade": "Are you sure you want to cancel this upgrade?\nOnly half of your resources will be returned.",
+                             "ui_name_enhance": "Are you sure you want to cancel this upgrade?\nOnly half of your resources will be returned.",
                              "ui_name_research": "Are you sure you want to cancel this research?\nOnly half of your resources will be returned.",
                              "ui_name_crafting": "Are you sure you want to cancel production?\nOnly half of your resources will be returned.",
                              "ui_name_crafting_turret_head": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
-                             "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress."
+                             "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress.",
+                             "ui_name_ingredient_loss": "Items used for this upgrade will NOT be returned."
                            },
-            "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
+            "ok_button": { "kind": "ActionButton", "xy": [308,130], "dimensions": [134,28],
                            "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                            "ui_name_upgrade": "Cancel Upgrade",
+                           "ui_name_enhance": "Cancel Upgrade",
                            "ui_name_research": "Cancel Research",
                            "ui_name_crafting": "Cancel Work",
                            "ui_name_crafting_turret_head": "Destroy Weapon",

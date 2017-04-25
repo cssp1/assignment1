@@ -19906,14 +19906,21 @@ function invoke_player_aura_speedup_dialog(aura_name) {
     return dialog;
 }
 
-function invoke_confirm_cancel_message(type, cancel_cb) {
+/** @param {string} type - "upgrade", "research", etc
+    @param {function()} cancel_cb - callback for "OK"
+    @param {boolean=} ingredient_loss - if true, warn about losing ingredient items */
+function invoke_confirm_cancel_message(type, cancel_cb, ingredient_loss) {
     var dialog_data = gamedata['dialogs']['confirm_cancel_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
-    dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name_'+type]);
+    var txt = dialog.data['widgets']['description']['ui_name_'+type]
+    if(ingredient_loss) {
+        txt += ' ' + dialog.data['widgets']['description']['ui_name_ingredient_loss'];
+    }
+    dialog.widgets['description'].set_text_with_linebreaking(txt);
     dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_'+type];
     dialog.widgets['ok_button'].onclick = (function (_cancel_cb) { return function(w) { close_parent_dialog(w); cancel_cb(); }; })(cancel_cb);
     dialog.widgets['close_button'].onclick = close_parent_dialog;
@@ -21237,7 +21244,14 @@ function invoke_building_context_menu(mouse_xy) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
                                                 onclick: (function (_obj) { return function() {
                                                     change_selection_ui(null);
-                                                    invoke_confirm_cancel_message('upgrade', (function (__obj) { return function() { send_to_server.func(["CAST_SPELL", __obj.id, (__obj.is_enhancing() ? "CANCEL_ENHANCE" : "CANCEL_UPGRADE")]); }; })(_obj));
+                                                    var ingredient_loss = false;
+                                                    if(_obj.is_enhancing()) {
+                                                        var enh_spec = gamedata['enhancements'][_obj.enhancing['enhance']['spec']];
+                                                        if(_obj.enhancing['enhance']['ingredients'] && !enh_spec['refund_ingredients']) {
+                                                            ingredient_loss = true;
+                                                        }
+                                                    }
+                                                    invoke_confirm_cancel_message((_obj.is_enhancing() ? 'enhance' : 'upgrade'), (function (__obj) { return function() { send_to_server.func(["CAST_SPELL", __obj.id, (__obj.is_enhancing() ? "CANCEL_ENHANCE" : "CANCEL_UPGRADE")]); }; })(_obj), ingredient_loss);
                                                 }; })(selection.unit), asset: 'menu_button_resizable'}));
         } else {
             // not damaged and not upgrading
@@ -43352,13 +43366,29 @@ function update_upgrade_dialog(dialog) {
             // tell the server to research this tech
             var builder = _dialog.user_data['builder'] || null;
             if(builder) {
-                if('enhance_time' in _dialog.user_data['tech']) {
-                    var cur_level = builder.enhancements ? builder.enhancements[_dialog.user_data['techname']] || 0 : 0;
-                    send_to_server.func(["CAST_SPELL", builder.id, "ENHANCE_FOR_FREE", _dialog.user_data['techname'], cur_level+1]);
+                var tech = _dialog.user_data['tech'];
+                if('enhance_time' in tech) {
+                    var cur_level = builder.enhancements ? builder.enhancements[tech['name']] || 0 : 0;
+                    var ingr_list = get_enhancement_ingredients_list(tech, cur_level+1);
+                    var do_it = (function (__dialog, _builder, _name, _level) { return function() {
+                        send_to_server.func(["CAST_SPELL", _builder.id, "ENHANCE_FOR_FREE", _name, _level]);
+                        invoke_ui_locker(_builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
+
+                    }; })(_dialog, builder, tech['name'], cur_level+1);
+
+                    if(ingr_list && ingr_list.length > 0 && !tech['refund_ingredients']) {
+                        var s = gamedata['strings']['enhance_confirm_ingredient_loss'];
+                        invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                                    {'cancel_button': true,
+                                                     'ok_button_ui_name': s['ui_button'],
+                                                     'on_ok': do_it});
+                    } else {
+                        do_it();
+                    }
                 } else {
-                    send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", _dialog.user_data['techname']]);
+                    send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", tech['name']]);
+                    invoke_ui_locker(builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
                 }
-                invoke_ui_locker(builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
             } else {
                 close_dialog(_dialog);
             }
