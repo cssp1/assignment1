@@ -640,7 +640,7 @@ def check_enhancement(specname, keyname, spec, maxlevel):
             if effect['code'] != 'modstat':
                 error |= 1
                 print '%s: uses invalid effect code %s' % effect['code']
-            error |= check_modstat(effect, specname)
+            error |= check_modstat(effect, specname, affects = effect.get('affects',None))
 
     # check resource requirement vs CC level
     if verbose:

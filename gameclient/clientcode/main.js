@@ -42568,10 +42568,7 @@ function update_upgrade_dialog(dialog) {
     } else {
         // BUILDING
         if(unit.spec['show_hp_stat']) { feature_list.push('max_hp'); }
-        if(unit.is_researcher()) { feature_list.push('research_level'); }
-        if(unit.is_researcher()) { feature_list.push('research_speed'); }
-        if(unit.is_crafter() && !unit.is_emplacement() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
-        if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
+
         goog.object.forEach(gamedata['resources'], function(resdata, resname) {
             if(('produces_'+resname) in unit.spec) { feature_list.push('produces_'+resname); }
             if(('storage_'+resname) in unit.spec && !('provides_space' in unit.spec) /* omit on CC */ ) { feature_list.push('storage_'+resname); }
@@ -42579,6 +42576,24 @@ function update_upgrade_dialog(dialog) {
         });
         if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
         if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
+
+        // detect enhanceable stats
+        if(unit.spec['enhancement_categories']) {
+            for(var enh_name in gamedata['enhancements']) {
+                var enh_tech = gamedata['enhancements'][enh_name];
+                if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
+                    var stat = enh_tech['effects'][0]['stat'];
+                    if(!goog.array.contains(feature_list, stat)) {
+                        feature_list.push(stat);
+                    }
+                }
+            }
+        }
+
+        if(unit.is_researcher()) { feature_list.push('research_level'); }
+        if(unit.is_researcher()) { feature_list.push('research_speed'); }
+        if(unit.is_crafter() && !unit.is_emplacement() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
+        if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
 
         if('provides_quarry_control' in unit.spec && session.region.map_enabled()) { feature_list.push('provides_quarry_control'); }
         if(player.squads_enabled()) {
@@ -42677,19 +42692,6 @@ function update_upgrade_dialog(dialog) {
             });
         }
 
-        // detect enhanceable stats
-        if(unit.spec['enhancement_categories']) {
-            for(var enh_name in gamedata['enhancements']) {
-                var enh_tech = gamedata['enhancements'][enh_name];
-                if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
-                    var stat = enh_tech['effects'][0]['stat'];
-                    if(!goog.array.contains(feature_list, stat)) {
-                        feature_list.push(stat);
-                    }
-                }
-            }
-        }
-
     } // END is a building
 
     // gather misc. new-style modstats
@@ -42753,6 +42755,9 @@ function update_upgrade_dialog(dialog) {
             feature_list.push('xp');
         }
     }
+
+    // remove duplicates
+    goog.array.removeDuplicates(feature_list);
 
     var item_host_building = null;
     if(tech && tech['associated_item']) {

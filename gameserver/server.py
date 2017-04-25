@@ -11619,6 +11619,10 @@ class Player(AbstractPlayer):
                                         if effect['code'] == 'modstat':
                                             if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
                                                 strength = self.get_modstat_strength(effect, enh_level)
+                                                if effect.get('affects') == "player":
+                                                    # apply to player for mechanical effect, AND to building for GUI stat display
+                                                    self.apply_modstat_to_player(effect['stat'], effect['method'], strength, 'enhancement', enh_name, {'effect':i, 'level':enh_level})
+
                                                 self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'enhancement', enh_name, {'effect':i, 'level':enh_level})
 
             # calculate effect of techs
