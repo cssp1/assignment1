@@ -61,7 +61,7 @@ def require_art_file(name):
 # CC L6 = 4*L10 storage = 24400000
 # CC L8 = 4*L12 storage = 34000000
 
-MAX_RESOURCE_COST = 34000000
+MAX_RESOURCE_COST = 40000000
 MAX_STORAGE = None
 
 def check_url(url, reason):
