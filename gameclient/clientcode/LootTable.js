@@ -63,12 +63,21 @@ LootTable.get_loot = function(tables, tab, cond_resolver) {
 
         var r = Math.random();
         r *= breakpoints[breakpoints.length-1];
-        groupnum = Math.min(goog.array.binarySearch(breakpoints, r), breakpoints.length-1);
+        groupnum = goog.array.binarySearch(breakpoints, r);
+        if(groupnum < 0) {
+            groupnum = -groupnum - 1;
+        }
     }
 
     var data = tab[groupnum];
+    if(data === undefined) {
+        throw Error('bad loot table: groupnum '+groupnum.toString()+' in '+JSON.stringify(tab));
+    }
 
     if('table' in data) {
+        if(!(data['table'] in tables)) {
+            throw Error('missing loot table: '+data['table']);
+        }
         ret = LootTable.combine_result(ret, LootTable.get_loot(tables, tables[data['table']]['loot'], cond_resolver));
     } else if('cond' in data) {
         var cond = /** @type {LootTable.CondChain} */ (data['cond']);
