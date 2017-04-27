@@ -7800,10 +7800,14 @@ class Quest:
     def __init__(self, name):
         self.name = name
 
-        # these fields are Predicate objects, the rest are raw JSON
+        # these fields are Predicate objects
         self.goal = None
         self.activation = None
         self.show_if = None
+
+        # Consequent object
+        self.completion_server = None
+
         self.force_claim = False
 
         for key in gamedata["quests"][name]:
@@ -7814,6 +7818,8 @@ class Quest:
                 self.activation = Predicates.read_predicate(val)
             elif key == 'show_if':
                 self.show_if = Predicates.read_predicate(val)
+            elif key == 'completion_server':
+                self.completion_server = Consequents.read_consequent(val)
             else:
                 setattr(self, key, val)
 
@@ -7821,8 +7827,10 @@ class Quest:
     def make_patched(self, patch):
         ret = copy.copy(self)
         for key, val in patch.iteritems():
-            if key == 'goal' or key == 'activation':
+            if key in ('goal','activation','show_if'):
                 setattr(ret, key, Predicates.read_predicate(val))
+            elif key == 'completion_server':
+                setattr(ret, key, Consequents.read_consequent(val))
             else:
                 ret.__dict__[key] = val
         return ret
@@ -20512,6 +20520,9 @@ class GAMEAPI(resource.Resource):
         else:
             evname = '4010_quest_complete'
         metric_event_coded(session.user.user_id, evname, props)
+
+        if quest.completion_server:
+            quest.completion_server.execute(session, session.player, retmsg)
 
     def do_claim_achievement(self, session, retmsg, name):
         if name in session.player.achievements:

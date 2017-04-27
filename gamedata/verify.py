@@ -2746,7 +2746,7 @@ def check_quests(quests):
             if check_predicate(data[PRED], reason = 'quest:'+key+':'+PRED):
                 error |= 1
                 print 'quest %s has bad %s predicate' % (key,PRED)
-        for CONS in ('ui_accept_consequent','completion'):
+        for CONS in ('ui_accept_consequent','completion','completion_server'):
             if (CONS in data) and check_consequent(data[CONS], reason = 'quest:'+key+':'+CONS):
                 error |= 1; print 'quest %s has bad %s consequent' % (key,CONS)
 
