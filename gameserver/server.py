@@ -9362,7 +9362,9 @@ class Player(AbstractPlayer):
         return False
 
     def prune_inventory(self, session):
+        ref_time = self.get_absolute_time()
         to_remove = []
+        morphed = False
         for item in self.inventory:
             spec = gamedata['items'].get(item['spec'],None)
 
@@ -9372,12 +9374,37 @@ class Player(AbstractPlayer):
                 if expire_time > 0:
                     item['expire_time'] = expire_time
 
-            if (item.get('expire_time',-1) > 0) and (server_time > item['expire_time']):
-                to_remove.append(item)
+            if (item.get('expire_time',-1) > 0) and (ref_time > item['expire_time']):
+
+                if spec.get('expire_into'):
+                    # morph instead of expiring
+                    new_expire_time = session.get_item_spec_forced_expiration(gamedata['items'][spec['expire_into']])
+                    if new_expire_time > 0 and ref_time > new_expire_time:
+                        # but the morph target expired too, so just remove normally
+                        to_remove.append(item)
+
+                    else:
+                        # morph it
+                        self.inventory_log_event('5132_item_expired', item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None))
+
+                        item['spec'] = spec['expire_into']
+
+                        if new_expire_time > 0:
+                            item['expire_time'] = new_expire_time
+                        elif 'expire_time' in item:
+                            del item['expire_time']
+
+                        self.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason='expire_into')
+                        morphed = True
+
+                else:
+                    to_remove.append(item)
+
         for item in to_remove:
             self.inventory.remove(item)
             self.inventory_log_event('5132_item_expired', item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None))
-        return len(to_remove) > 0
+
+        return len(to_remove) > 0 or morphed
 
     def prune_mailbox(self):
         to_remove = []
@@ -13123,6 +13150,7 @@ class LivePlayer(Player):
 
     def send_inventory_update(self, retmsg):
         res = self.resources.calc_snapshot()
+        # copy.deepcopy(self.inventory) ?
         retmsg.append(["INVENTORY_UPDATE", res.max_inventory(), self.inventory, res.reserved_inventory()])
 
     # log fishing-related events

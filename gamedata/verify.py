@@ -1343,6 +1343,10 @@ def check_item(itemname, spec):
     if 'use_effect' in spec:
         error |= check_visual_effect('%s:use_effect' % itemname, spec['use_effect'])
 
+    if 'expire_into' in spec:
+        if spec['expire_into'] not in gamedata['items']:
+            error |= 1; print '%s: expire_into "%s" is not a valid item' % (itemname, spec['expire_into'])
+
     return error
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'weapon_range_pvp', 'effective_weapon_range', 'ice_effects', 'rate_of_fire',
