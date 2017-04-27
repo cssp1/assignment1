@@ -24805,19 +24805,25 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
 
         // show refund button when a refund exists and show_refundable_when is true
         if(ItemDisplay.inventory_item_is_refundable(item)) {
-            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
-                                                                         ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
-                                                                         spellname:"INVENTORY_REFUND"}));
-            if(item['stack'] && item['stack'] > 1) { // big stack
+            if(!(item['stack'] && item['stack'] >= 500)) {
+                // show single-refund option unless it's a huge stack
+                dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
+                                                                             ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
+                                                                             spellname:"INVENTORY_REFUND"}));
+            }
+            if(item['stack'] && item['stack'] > 1) { // stack >=1
                 dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_all_button'],
                                                                              ui_name_pending:gamedata['strings']['inventory']['refund_all_button_pending'],
                                                                              spellname:"INVENTORY_REFUND_ALL"}));
             }
         }
 
-        dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
-                                                                     ui_name_pending:gamedata['strings']['inventory']['discard_button_pending'],
-                                                                     spellname:"INVENTORY_TRASH"}));
+        if(!(item['stack'] && item['stack'] >= 500)) {
+            // show single-discard option unless it's a huge stack
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
+                                                                         ui_name_pending:gamedata['strings']['inventory']['discard_button_pending'],
+                                                                         spellname:"INVENTORY_TRASH"}));
+        }
         if(item['stack'] && item['stack'] > 1) {
             dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_all_button'],
                                                                          ui_name_pending:gamedata['strings']['inventory']['discard_all_button_pending'],
