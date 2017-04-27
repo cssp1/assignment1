@@ -2971,6 +2971,7 @@ def check_events(events):
         if data.get('kind','MISSING') not in ('event_tutorial', # newbie tutorial guy-in-corner
                                               'current_event', # event guy-in-corner
                                               'current_event_store', # event store open
+                                              'current_event_no_store', # event store not open
                                               'current_quarry_contest', # (obsolete) legacy regional quarry tournament
                                               'current_trophy_pve_challenge', # (obsolete) PvE trophy tournament
                                               'current_trophy_pvp_challenge', # PvP point tournament

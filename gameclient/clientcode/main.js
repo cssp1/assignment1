@@ -37265,7 +37265,7 @@ player.event_list_cache_index = null;
     @param {number} ref_time
     @param {boolean} ignore_activation */
 player.get_event_schedule = function(event_kind, event_name, ref_time, ignore_activation) {
-    if(!goog.array.contains(['current_event','current_event_store','facebook_sale','bargain_sale',
+    if(!goog.array.contains(['current_event','current_event_store','current_event_no_store','facebook_sale','bargain_sale',
                              'current_stat_tournament',
                              'current_trophy_pve_challenge','current_trophy_pvp_challenge'], event_kind)) {
         throw Error('unhandled event_kind '+event_kind);
