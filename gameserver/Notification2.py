@@ -50,6 +50,7 @@ def ref_to_stream(ref):
 
             '168h': STREAM_RETENTION,
             'retain_168h': STREAM_RETENTION,
+            'retain_168h_incentive': STREAM_RETENTION,
             'retain_167h': STREAM_RETENTION,
             'retain_167h_incentive': STREAM_RETENTION,
             '24h': STREAM_RETENTION,
