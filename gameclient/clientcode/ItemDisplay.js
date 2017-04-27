@@ -449,7 +449,7 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
     if(ItemDisplay.inventory_item_is_refundable(item)) {
         descr += '\n\n';
         var template = spec['ui_refund'] || gamedata['strings']['inventory_refund'];
-        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(item, 1));
+        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(item));
     }
 
     return descr;
@@ -490,12 +490,14 @@ ItemDisplay.get_inventory_item_color = function(spec) {
 
 /** return displayable refund description for a refundable item
     @param {Object} item
-    @param {number} count - overrides stack count
+    @param {number=} count - overrides stack count
     @returns {string} */
 ItemDisplay.get_inventory_item_refund_str = function(item, count) {
     var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
     var level = ('level' in item ? item['level'] : 1);
-
+    if(count === undefined) {
+        count = ('stack' in item? item['stack'] : 1);
+    }
     var refund = spec['refund'];
 
     // is it a per-level list?
