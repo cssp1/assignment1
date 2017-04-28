@@ -22154,7 +22154,7 @@ class GAMEAPI(resource.Resource):
             cost = dict((res,GameObjectSpec.get_leveled_quantity(amount, arg.recipe_level)) for res, amount in GameObjectSpec.get_leveled_quantity(recipe['cost'], arg.recipe_level).iteritems())
             negative_cost = dict((res,-cost[res]) for res in cost)
             player.resources.gain_res(negative_cost, reason='crafting')
-            admin_stats.econ_flow_player(player, recipe.get('econ_category','crafting'), 'crafting', negative_cost)
+            admin_stats.econ_flow_player(player, recipe.get('econ_category',catdata.get('econ_category','crafting')), recipe.get('econ_subcategory',catdata.get('econ_subcategory','crafting')), negative_cost)
         else:
             cost = {}
 
