@@ -54,15 +54,13 @@ resource "aws_iam_instance_profile" "mongodb" {
 resource "aws_instance" "mongodb" {
   count = "${var.n_instances}"
 
-  # Amazon Linux AMI 2016.09.1 
-  # HVM EBS-Backed
-  ami = "ami-9be6f38c"
+  # Amazon Linux AMI 2017.03
+  # us-east-1 HVM (SSD) EBS-Backed 64-bit
+  ami = "ami-c58c1dd3"
   # HVM Instance Store
   # ami = "ami-24e7f233"
 
-  # production: i3.large
-  # testing: t2.medium
-  instance_type = "t2.medium"
+  instance_type = "${var.mongodb_instance_type}"
   associate_public_ip_address = true
   iam_instance_profile = "${aws_iam_instance_profile.mongodb.name}"
   subnet_id = "${element(split(",", var.subnet_ids), count.index)}"
@@ -81,22 +79,25 @@ resource "aws_instance" "mongodb" {
   # update mongodb_device below with device name!
 
   # for EBS (test) server
-  ebs_block_device = {
-    device_name = "/dev/sdx"
-    volume_type = "io1"
-    volume_size = 10
-    iops = 100
-  }
+#  ebs_block_device = {
+#    device_name = "/dev/sdx"
+#    volume_type = "io1"
+#    volume_size = 10
+#    iops = 100
+#  }
 
   # for i3 servers with NVMe ephemeral device
+  # (not necessary - leave disabled?)
 #  ephemeral_block_device {
 #    device_name = "/dev/nvme0n1"
+#    no_device = "true"
+#    virtual_name = "ephemeral0"
 #  }
 
   user_data = <<EOF
 ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_device=/dev/sdx" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_device=/dev/nvme0n1" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_backups_bucket=${var.backups_bucket}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_replica_set_name=${var.sitename}" >> /etc/facter/facts.d/terraform.txt

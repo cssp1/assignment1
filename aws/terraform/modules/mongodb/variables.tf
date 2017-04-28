@@ -15,6 +15,10 @@ variable "availability_zones" {
   description = "Comma-separated list of AWS availability zones to use, including region prefix"
   # e.g. "us-east-1a,us-east-1c"
 }
+variable "mongodb_instance_type" {
+  description = "AWS EC2 instance type for MongoDB"
+  # use t2.medium for testing, i3.large for production
+}
 variable "n_instances" {
   description = "Number of MongoDB server instances"
   default = 1

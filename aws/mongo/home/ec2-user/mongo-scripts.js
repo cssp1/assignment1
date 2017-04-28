@@ -6,10 +6,13 @@
 // set up ~/.aws/credentials, then
 /usr/bin/aws s3 cp s3://spinpunch-backups/MYGAME-player-data-20150909 . --recursive  --exclude='*' --include='mongo*'
 for F in *.tar.gz; do tar zxf $F; done
-rm -rf admin
+rm -rf admin *.tar.gz
 
-// restore the backup
-mongorestore -u root -p `cat /home/ec2-user/.ssh/MYGAME-mongo-root-password` --authenticationDatabase admin .
+// restore the backup into original databases...
+mongorestore -u root -p [password] --authenticationDatabase admin .
+
+// restore the backup into new (single) database...
+for F in ${GAME_ID}prod*; do mongorestore --authenticationDatabase admin -u root -p [password] --drop -d [new_database] $F; done
 
 // alternative: don't delete "admin", and don't use credentials for mongorestore
 
