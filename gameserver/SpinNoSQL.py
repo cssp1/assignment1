@@ -1207,10 +1207,13 @@ class NoSQLClient (object):
 
     # this is for internal use only
     # it is allowed to return an iterator
-    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False):
+    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False, force_last_mtime_index = False):
         result = self.player_cache().find(qs, {'_id':1})
 
-        if force_player_level_index:
+        if force_last_mtime_index:
+            # this takes priority since it is likely to be more restrictive
+            result = result.hint([('last_mtime',pymongo.ASCENDING)])
+        elif force_player_level_index:
             result = result.hint([('player_level',pymongo.ASCENDING)])
 
         if randomize_quality > 0:
@@ -1272,6 +1275,7 @@ class NoSQLClient (object):
         # translate legacy query syntax to MongoDB
 
         references_player_level = False
+        references_last_mtime = False
 
         # need to emulate a join on player_scores for the score range
         score_first = False # whether to perform the score query before the player cache query
@@ -1285,6 +1289,7 @@ class NoSQLClient (object):
             key = '_id' if (item[0] == 'user_id') else item[0]
 
             if item[0] == 'player_level': references_player_level = True
+            elif item[0] == 'last_mtime': references_last_mtime = True
 
             if type(key) is tuple:
                 assert key[0] == 'scores2' # scores1 is obsolete now
@@ -1327,6 +1332,7 @@ class NoSQLClient (object):
             cache_qs = {'$and':qand}
             ret = []
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
+                                                                    force_last_mtime_index = references_last_mtime,
                                                                     force_player_level_index = references_player_level):
                 # check if candidate's score is within the specified range
                 if score_stat and \
