@@ -112,6 +112,15 @@ def battles_summary_schema(sql_util): return {
     'indices': {'by_day': {'unique': False, 'keys': [('day','ASC')]}}
     }
 
+
+# track user_ids of all CCL2+ players who battled each day, for long-term retention studies
+def battle_players_schema(sql_util): return {
+    'fields': [('day', 'INT8 NOT NULL'),
+               ('user_id', 'INT4'),
+               ],
+    'indices': {'by_day': {'unique': False, 'keys': [('day','ASC')]}}
+    }
+
 def battle_units_schema(sql_util): return {
     'fields': [('battle_id', 'CHAR(24) NOT NULL'),
                ('specname', 'VARCHAR(32) NOT NULL'),
@@ -223,6 +232,7 @@ if __name__ == '__main__':
 
         battles_table = cfg['table_prefix']+game_id+'_battles'
         battles_summary_table = cfg['table_prefix']+game_id+'_battles_daily_summary'
+        battle_players_table = cfg['table_prefix']+game_id+'_battle_players_daily'
         battle_units_table = cfg['table_prefix']+game_id+'_battle_units'
         battle_units_summary_table = cfg['table_prefix']+game_id+'_battle_units_daily_summary'
         battle_loot_table = cfg['table_prefix']+game_id+'_battle_loot'
@@ -235,6 +245,7 @@ if __name__ == '__main__':
 
         for table, schema in ((battles_table, battles_schema(sql_util)),
                               (battles_summary_table, battles_summary_schema(sql_util)),
+                              (battle_players_table, battle_players_schema(sql_util)),
                               (battle_units_table, battle_units_schema(sql_util)),
                               (battle_units_summary_table, battle_units_summary_schema(sql_util)),
                               (battle_loot_table, battle_loot_schema(sql_util)),
@@ -394,6 +405,7 @@ if __name__ == '__main__':
                 cur.execute("DELETE FROM "+sql_util.sym(battles_summary_table)+" WHERE day >= %s AND day < %s+86400", [day_start,]*2)
                 cur.execute("DELETE FROM "+sql_util.sym(battle_loot_summary_table)+" WHERE day >= %s AND day < %s+86400", [day_start,]*2)
                 cur.execute("DELETE FROM "+sql_util.sym(battle_units_summary_table)+" WHERE day >= %s AND day < %s+86400", [day_start,]*2)
+                cur.execute("DELETE FROM "+sql_util.sym(battle_players_table)+" WHERE day >= %s AND day < %s+86400", [day_start,]*2)
 
                 # merge all PvP opponents into a single "NULL" opponent_id to minimize summary table size
                 opponent_id_expr = "IF(IF(battles.active_opponent_id = battles.attacker_id, attacker_type, defender_type) = 'ai', battles.active_opponent_id, NULL)"
@@ -450,6 +462,16 @@ if __name__ == '__main__':
                             "GROUP BY day, frame_platform, country_tier, townhall_level, spend_bracket, base_type, opponent_id, units.specname ORDER BY NULL",
                             [day_start,]*2)
 
+                if verbose: print 'updating', battle_players_table, 'at', time.strftime('%Y%m%d', time.gmtime(day_start))
+                cur.execute("INSERT INTO "+sql_util.sym(battle_players_table) + \
+                            "SELECT 86400*FLOOR(battles.time/86400.0) AS day," + \
+                            "       battles.active_player_id AS user_id " + \
+                            "FROM "+sql_util.sym(battles_table)+" battles " + \
+                            "WHERE battles.time >= %s AND battles.time < %s+86400 " + \
+                            "      AND battles.active_player_townhall_level >= 2 " + \
+                            "GROUP BY day, battles.active_player_id ORDER BY NULL",
+                            [day_start,]*2)
+
                 con.commit() # one commit per day
 
         else:
@@ -493,5 +515,11 @@ if __name__ == '__main__':
             if do_optimize:
                 if verbose: print 'optimizing', battles_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(battles_table))
+
+            if verbose: print 'pruning', battle_players_table
+            cur.execute("DELETE FROM "+sql_util.sym(battle_players_table)+" WHERE day < %s", [old_limit])
+            if do_optimize:
+                if verbose: print 'optimizing', battle_players_table
+                cur.execute("OPTIMIZE TABLE "+sql_util.sym(battle_players_table))
 
             con.commit()
