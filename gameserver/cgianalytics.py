@@ -1785,6 +1785,9 @@ FUNNEL_BASIC = [
     {'name': 'A01 Tutorial Complete', 'func': lambda user: user.get('completed_tutorial',False), 'show_p':True },
     {'name': 'A02 Central Computer L2 within 1 Day of acct creation', 'mandatory_age': 24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 2, 1), 'show_p': True },
     {'name': 'A04A Returned between 24-48 hrs after acct creation', 'mandatory_age': 48*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 2, after=1) >= 1, 'show_p':True },
+    {'name': 'A04A1 Returned between 48-72 hrs after acct creation', 'mandatory_age': 72*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 3, after=2) >= 1, 'show_p':True },
+    {'name': 'A04A2 Returned between 72-96 hrs after acct creation', 'mandatory_age': 96*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 4, after=3) >= 1, 'show_p':True },
+    {'name': 'A04A3 Returned between 120-144 hrs after acct creation', 'mandatory_age': 144*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 6, after=5) >= 1, 'show_p':True },
     {'name': 'A04B Returned between 168-192 hrs after acct creation', 'mandatory_age': 192*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 8, after=7) >= 1, 'show_p':True },
     {'name': 'A04C Returned between 672-696 hrs after acct creation', 'mandatory_age': 696*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 29, after=28) >= 1, 'show_p':True },
 
