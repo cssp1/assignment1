@@ -133,7 +133,7 @@
         "ui_damage_vs": {"rover": 2, "transport": 1, "starcraft": 1, "building": 1},
         "level_determined_by_tech": "oh58_production",
         "gridsize": [2,2],
-        "art_asset": "oh58",
+        "art_asset": "oh58x_tnormal",
         "muzzle_height": -1,
         "manufacture_category": "starcraft",
         "consumes_space": 29,
