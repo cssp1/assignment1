@@ -149,7 +149,7 @@ def check_login_incentive_expiring(pcache, n2_class, player, config):
         if aura['spec'] == 'login_incentive_ready' and \
            time_now >= aura.get('start_time',-1) and \
            time_now < aura['end_time'] and \
-           time_now >= aura['end_time'] - 8 * 3600: # XXX A/B test how soon to start sending these
+           time_now >= aura['end_time'] - 4 * 3600: # XXX A/B test how soon to start sending these
             ui_time_togo = '%.1f hrs' % ((aura['end_time']-time_now)/3600.0)
             return config['ref'], ui_time_togo, None
     return None, None, None
