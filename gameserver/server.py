@@ -7544,15 +7544,9 @@ class Building(MapBlockingGameObject):
             else:
                 return -1
         elif self.is_enhancing():
-            ret = self.enhancing.total_time - self.enhancing.done_time
-            if self.enhancing.start_time > 0:
-                ret -= max(0, server_time - self.enhancing.start_time)
-            return max(0, ret)
+            return self.enhancing.finish_time()
         elif self.is_removing():
-            ret = self.removing.total_time - self.removing.done_time
-            if self.removing.start_time > 0:
-                ret -= max(0, server_time - self.removing.start_time)
-            return max(0, ret)
+            return self.removing.finish_time()
         elif self.is_under_construction():
             if self.build_start_time > 0:
                 return self.build_start_time + (self.build_total_time - self.build_done_time)
