@@ -265,6 +265,25 @@ class Sender(object):
             print >> self.msg_fd, '(player_cache says) player turned off FB notifications'
             return
 
+        # do not perform country tier exclusion if player is a payer or high level
+        apply_exclusions = True
+        if 'force_eligible_money_spent' in gamedata['fb_notifications']:
+            if pcache.get('money_spent',0) >= gamedata['fb_notifications']['force_eligible_money_spent']:
+                apply_exclusions = False
+        if 'force_eligible_player_level' in gamedata['fb_notifications']:
+            if pcache.get('player_level',0) >= gamedata['fb_notifications']['force_eligible_player_level']:
+                apply_exclusions = False
+
+        if apply_exclusions:
+            # country tier exclusion
+            if 'eligible_country_tiers' in gamedata['fb_notifications']:
+                eligible_country_tiers = gamedata['fb_notifications']['eligible_country_tiers']
+                if 'country' in pcache:
+                    country_tier = SpinConfig.country_tier_map.get(pcache['country'], 4)
+                    if country_tier not in eligible_country_tiers:
+                        print >> self.msg_fd, '(player_cache says) not in eligible country tier'
+                        return
+
         last_logout_time = pcache.get('last_logout_time', -1)
         if last_logout_time < 0:
             print >> self.msg_fd, '(player_cache says) no last_logout_time'
@@ -388,6 +407,7 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame
     sender = Sender(db_client, lock_client, dry_run = dry_run, msg_fd = msg_fd)
     pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['tutorial_complete',
                                                                        'social_id','frame_platform',
+                                                                       'country', 'money_spent', 'player_level',
                                                                        'last_logout_time',
                                                                        'last_mtime', 'uninstalled',
                                                                        'enable_fb_notifications',
