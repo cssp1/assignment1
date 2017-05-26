@@ -1665,7 +1665,7 @@ class HandleSendNotification(Handler):
 
         elder_suffix = ''
 
-        if session.player.abtests.get('T330_notification2') == 'on':
+        if session.player.abtests.get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs',):
             # NEW Notification2 path
             n2_class = Notification2.get_user_class(session.player.history, self.gamedata['townhall'])
             elder_suffix = '_%s' % n2_class
@@ -1737,7 +1737,7 @@ class HandleSendNotification(Handler):
                 key = 'notification:'+self.config['ref']+':last_time'
                 session.player.history[key] = self.time_now
 
-                if session.player.abtests.get('T330_notification2') == 'on':
+                if session.player.abtests.get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs',):
                     Notification2.record_send(self.time_now, timezone, self.n2_stream,
                                               self.config['ref'],
                                               session.player.history, session.player.cooldowns)
@@ -1758,7 +1758,7 @@ class HandleSendNotification(Handler):
 
         elder_suffix = ''
 
-        if player.get('abtests',{}).get('T330_notification2') == 'on':
+        if player.get('abtests',{}).get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs'):
             # NEW Notification2 path
             n2_class = Notification2.get_user_class(player['history'], self.gamedata['townhall'])
             elder_suffix = '_%s' % n2_class
@@ -1833,7 +1833,7 @@ class HandleSendNotification(Handler):
                 key = 'notification:'+self.config['ref']+':last_time'
                 player['history'][key] = self.time_now
 
-                if player.get('abtests',{}).get('T330_notification2') == 'on':
+                if player.get('abtests',{}).get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs'):
                     Notification2.record_send(self.time_now, timezone, self.n2_stream,
                                               self.config['ref'],
                                               player['history'], player['cooldowns'])

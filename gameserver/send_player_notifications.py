@@ -306,7 +306,7 @@ class Sender(object):
 
         time_now = int(time.time()) # update time after possible long download
 
-        if (not test_mode) and (player['abtests'].get('T330_notification2', None) != "on"):
+        if (not test_mode) and (player['abtests'].get('T330_notification2', None) != "on") and gamedata['game_id'] not in ('dv','fs'):
             print >> self.msg_fd, '(player says) is not in T330_notification2, skipping'
             return
 
