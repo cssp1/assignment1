@@ -6537,7 +6537,7 @@
                                         "text_hjustify": "left", "ui_name": "Location", "show": 1 },
             "column_header_status": { "kind": "TextField", "xy": [422,79], "dimensions": [187,23],"text_size": 13, "text_style": "bold",
                                       "text_hjustify": "left", "ui_name": "Status", "ui_name_loot": "Loot" }, // this becomes "Loot" when the Location column is disabled (since "Status" is mainly for Regional Map stuff)
-            "column_header_time": { "kind": "TextField", "xy": [527,79], "dimensions": [154,23],"text_size": 13, "text_style": "bold",
+            "column_header_time": { "kind": "TextField", "xy": [523,79], "dimensions": [154,23],"text_size": 13, "text_style": "bold",
                                     "text_hjustify": "left", "ui_name": "Time" },
 
             "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
@@ -6578,11 +6578,11 @@
                              "ui_name_points": "%d Points",
                              "array": [1,5], "array_offset": [0,56] },
 
-            "row_loot": {"kind": "TextField", "xy":[422,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
-                         "text_hjustify":"left","text_vjustify":"top",
-                         "ui_name":"%si %IRON\n%sw %WATER", // all-caps here gets replaced by resource ui_name in JavaScript, as well as the %s-first-initial
+            "row_loot": {"kind": "TextField", "xy":[422,105], "dimensions": [37,32],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
+                         "text_hjustify":"left","text_vjustify":"center",
+                         "ui_name":"", // all-caps here gets replaced by resource ui_name in JavaScript, as well as the %s-first-initial
                          "array": [1,5], "array_offset": [0,56] },
-            "row_time": {"kind": "TextField", "xy":[527,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
+            "row_time": {"kind": "TextField", "xy":[523,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
                          "text_hjustify":"left","text_vjustify":"top","ui_name":"%s", "array": [1,5], "array_offset": [0,56] },
 
             "row_log_button": { "kind": "ActionButton", "xy": [586,105], "dimensions": [94,24], "bg_image": "menu_button_94px", "text_size": 13, "text_style": "bold",

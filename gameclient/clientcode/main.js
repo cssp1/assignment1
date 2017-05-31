@@ -27040,7 +27040,7 @@ function battle_history_change_page(dialog, page) {
                         }
                     }
                 }
-                var s = dialog.data['widgets']['row_loot']['ui_name'];
+                var s_list = [];
 
                 for(var res in gamedata['resources']) {
                     var amount;
@@ -27057,11 +27057,13 @@ function battle_history_change_page(dialog, page) {
                     } else {
                         amount = 0;
                     }
-                    // rather complex string replacement to get this right. Note, we add the minus sign here for lost amounts.
-                    s = s.replace('%'+res.toUpperCase(), gamedata['resources'][res]['ui_name']);
-                    s = s.replace('%s'+res[0] /* first character */, ((is_lost && amount > 0) ? '-' : '') + pretty_print_number(amount));
+
+                    if(amount != 0) {
+                        // Note, we add the minus sign here for lost amounts.
+                        s_list.push(((is_lost && amount > 0) ? '-' : '') + pretty_print_qty_brief(amount) + ' ' + gamedata['resources'][res]['ui_name']);
+                    }
                 }
-                dialog.widgets['row_loot'+row].str = s;
+                dialog.widgets['row_loot'+row].str = s_list.join('\n');
             }
 
             if(gamedata['client']['battle_history_time_column']) {
