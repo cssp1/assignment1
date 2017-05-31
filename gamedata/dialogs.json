@@ -7724,7 +7724,7 @@
                         // on cooldown
                         "ui_name_cooldown": "Next reward available at midnight GMT (in %togo)",
                         "text_color": [1,1,0,1]
-                       }
+                      }
         }
     },
 
@@ -9859,7 +9859,7 @@
                                    "text_hjustify": "center", "text_vjustify": "center",
                                    "text_size": 13, "text_color": [1,0,0],
                                    "ui_name": "Error retrieving invite code: %s"
-                                },
+                                 },
 
             "copy_link_button": { "show": 0, "kind": "ActionButton", "xy": [41,338], "dimensions": [230,44],
                                   "bg_image": "menu_button_resizable", "bg_image_resizable": 1,

@@ -46,4 +46,4 @@ if __name__ == '__main__':
     print geo.get_country('8.8.8.8')
     print geo.get_country('2602:0306:36d6:46d0:45eb:f0d6:accc:3819')
     print geo.get_country('2a02:0c7f:5242:9200:5cd5:c475:7388:977a')
-    
+
