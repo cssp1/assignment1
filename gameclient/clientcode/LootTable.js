@@ -76,7 +76,7 @@ LootTable.get_loot = function(tables, tab, cond_resolver) {
 
     if('table' in data) {
         if(!(data['table'] in tables)) {
-            throw Error('missing loot table: '+data['table']);
+            throw Error('missing loot table: '+ /** @type {string} */ (data['table']));
         }
         ret = LootTable.combine_result(ret, LootTable.get_loot(tables, tables[data['table']]['loot'], cond_resolver));
     } else if('cond' in data) {
