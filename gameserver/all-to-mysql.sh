@@ -92,7 +92,9 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./alliance_events_to_sql.py -q --prune
   run_it ./alliance_state_to_sql.py -q
   run_it ./skynet_conversion_pixels_to_sql.py -q
-  run_it ./schedule_to_sql.py --workspace 'spinpunch.com' --project 'SHIP Schedule' --project 'Market Research' -q
+
+  # OBSOLETE
+  # run_it ./schedule_to_sql.py --workspace 'spinpunch.com' --project 'SHIP Schedule' --project 'Market Research' -q
 
   # upcache is slowest
 
