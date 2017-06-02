@@ -29751,6 +29751,11 @@ function update_alliance_info_tab(dialog) {
         if('ui_description' in r) { _dialog.widgets['alliance_description'].set_text_with_linebreaking(r['ui_description']); }
         if('num_members' in r) { _dialog.widgets['num_members'].str = r['num_members'].toString() + '/' + gamedata['alliances']['max_members'].toString(); }
 
+        _dialog.widgets['view_battles_button'].show = !!gamedata['battle_logs_public'];
+        _dialog.widgets['view_battles_button'].onclick = (function (_r) { return function(w) {
+            invoke_battle_history_dialog(-1, -1, _r['id'], '', -1);
+        }; })(r);
+
         // start loading the alliance member info
         var join_type = r['join_type'];
         _dialog.user_data['join_type'] = join_type;

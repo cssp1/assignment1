@@ -3730,41 +3730,43 @@
             "sunken_base": {"kind": "StaticImage", "xy":[40,57], "dimensions":[656,407],
                             "asset": "dialog_sunken_resizable", "bg_image_resizable": 1, "alpha": 0.7 },
 
-            "sunken_top": {"kind": "StaticImage", "xy":[48,63], "dimensions":[640,74], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "sunken_top": {"kind": "StaticImage", "xy":[48,63], "dimensions":[640,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "alliance_logo":  {"kind": "StaticImage", "xy":[63,74], "dimensions":[50,50] },
             "alliance_logo_frame": {"kind": "StaticImage", "xy":[63,74], "dimensions":[50,50], "asset": "inventory_frame", "state": "normal_nohighlight" },
 
-            "alliance_name": { "kind": "TextField", "xy": [126,73], "dimensions": [306, 20], "text_size": 19, "text_style": "thick",
-                               "clip_to": [126,73,306,20],
+            "alliance_name": { "kind": "TextField", "xy": [126,85], "dimensions": [306, 20], "text_size": 19, "text_style": "thick",
+                               "clip_to": [126,85,306,20],
                                "text_hjustify": "left", "ui_name": "-", "ui_name_invalid": "Invalid Alliance" },
-            "join_type": { "kind": "TextField", "xy": [126,97], "dimensions": [145, 17], "text_size": 13, "text_hjustify": "left",
+            "join_type": { "kind": "TextField", "xy": [65,133], "dimensions": [145, 17], "text_size": 13, "text_hjustify": "left",
                            "ui_name": "Type: " },
-            "num_members_label":  { "kind": "TextField", "xy": [280,97], "dimensions": [88, 17], "text_size": 13, "text_hjustify": "right",
+            "num_members_label":  { "kind": "TextField", "xy": [215,133], "dimensions": [88, 17], "text_size": 13, "text_hjustify": "right",
                                     "ui_name": "Members:" },
-            "num_members":        { "kind": "TextField", "xy": [280,97], "dimensions": [132, 17], "text_size": 13, "text_hjustify": "right",
+            "num_members":        { "kind": "TextField", "xy": [215,133], "dimensions": [132, 17], "text_size": 13, "text_hjustify": "right",
                                     "ui_name": "" },
 
             "points_label":  { "show": 0,
-                               "kind": "TextField", "xy": [126,114], "dimensions": [300, 18], "text_size": 13, "text_hjustify": "left",
+                               "kind": "TextField", "xy": [65,150], "dimensions": [300, 18], "text_size": 13, "text_hjustify": "left",
                                "ui_tooltip": "Alliance Tournament Points is a weighted sum of points\ncontributed by individual alliance members.\n\nPoint leaders #1-10 contribute 50% of their Tournament Points\nPoint leaders #11-20 contribute 25% of their Tournament Points\nPoint leaders #21-30 contribute 12% of their Tournament Points\nPoint leaders #31-40 contribute 10% of their Tournament Points\nPoint leaders #41-50 contribute 3% of their Tournament Points", "tooltip_delay": 0,
                                "ui_tooltip_togo": "\n\nTournament ends in %s",
-                               "fixed_tooltip_offset": [100,144],
                                "ui_name": "Alliance Tournament Points:" },
             "points_icon": { "show": 0,
-                             "kind": "StaticImage", "xy": [417,115], "dimensions": [15,15], "asset": "trophy_15x15" },
+                             "kind": "StaticImage", "xy": [352,151], "dimensions": [15,15], "asset": "trophy_15x15" },
             "points":        { "show": 0,
-                               "kind": "TextField", "xy": [280,114], "dimensions": [132, 18], "text_size": 13, "text_hjustify": "right",
+                               "kind": "TextField", "xy": [215,150], "dimensions": [132, 18], "text_size": 13, "text_hjustify": "right",
                                "ui_name": "?" },
 
-            "alliance_description":  { "kind": "TextField", "xy": [437,71], "dimensions": [150, 55], "text_size": 12, "text_hjustify": "left",
-                                       "clip_to": [437,71,150,50],
+            "alliance_description":  { "kind": "TextField", "xy": [395,133], "dimensions": [200, 50], "text_size": 12, "text_hjustify": "left",
+                                       "clip_to": [395,133,200,50],
                                        "text_vjustify": "top" },
 
             "members": { "kind": "Dialog", "dialog": "alliance_member_row",
-                         "xy": [48,143], "array": [1,6], "array_offset": [0,50] },
+                         "xy": [48,193], "array": [1,5], "array_offset": [0,50] },
 
-            "join_button": { "kind": "ActionButton", "xy": [604,85], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "view_battles_button": { "kind": "ActionButton", "xy": [470,70], "dimensions": [120,28],"bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                     "show": 0, "ui_name": "Battle History"},
+
+            "join_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "show": 0,
                              "ui_name": "Join", "ui_name_request_sent": "Waiting",
                              "ui_tooltip": "", "tooltip_delay": 0,
@@ -3777,10 +3779,10 @@
                              "ui_tooltip_unmet_requirement": "Unmet requirement: %s"
                            },
 
-            "leave_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "leave_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                               "show": 0, "ui_name": "Leave", "ui_name_disband": "Disband" },
 
-            "edit_button": { "kind": "ActionButton", "xy": [604,102], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "edit_button": { "kind": "ActionButton", "xy": [604,102], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "show": 0, "ui_name": "Settings", "ui_tooltip": "", "tooltip_delay": 0 },
 
             "scroll_left": { "kind": "ActionButton", "xy": [13,195], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left_bright", "push_bg_image":1 },
