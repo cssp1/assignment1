@@ -55,7 +55,6 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
-goog.require('DeploymentMarkers');
 goog.require('Dripper');
 goog.require('Bounce');
 goog.require('CombatEngine');
@@ -16697,23 +16696,6 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 
         }; })(most_recent_summary);
 
-    } else if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
-        dialog.widgets['show_markers_button'].show = true;
-        dialog.widgets['show_markers_button'].onclick = (function (_summary) { return function(w) {
-            var locker = invoke_ui_locker_until_closed();
-            // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
-            // and is missing defender_id
-            get_battle_log(_summary['time'], _summary['attacker_user_id'], session.user_id,
-                           _summary['base_id'] || null, null,
-                           (function (__summary, _locker) { return function(result) {
-                               close_dialog(_locker);
-                               if(result && result['log']) {
-                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result['log']);
-                               } else {
-                                   invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['loading_text']['ui_name_unavailable'], '', {'dialog': 'message_dialog'});
-                               }
-                           }; })(_summary, locker));
-        }; })(most_recent_summary);
     }
 };
 
@@ -27421,44 +27403,6 @@ function can_show_replay_for_battle_summary(summary) {
     return their_replay_version === cur_replay_version;
 }
 
-// given a battle summary, determine if we can show deployment markers
-function can_show_deployment_markers_for_battle_summary(summary) {
-    if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
-    return (!summary['raid_mode'] &&
-            summary['base_id'] === session.viewing_base.base_id &&
-            ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
-             vec_equals(summary['base_ncells'] || gamedata['map']['default_ncells'],
-                        (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
-            ('deployed_units' in summary) &&
-            goog.object.getCount(summary['deployed_units']) >= 1);
-}
-
-// given a battle log, turn on the deployment markers for it
-function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
-    // mimic normal unit deployment spread
-    var radius = player.get_any_abtest_value('unit_deploy_spread', gamedata['unit_deploy_spread']);
-    var ncells = session.viewing_base.ncells();
-
-    var deployments = [];
-    goog.array.forEach(log, function(e) {
-        if(e['event_name'] === '3910_unit_deployed' && e['user_id'] === attacker_id) {
-            var spec = gamedata['units'][e['unit_type']];
-            if(!spec) { return; }
-
-            var pos = [clamp(e['x']+radius*(Math.random()-0.5), 0, ncells[0]-1),
-                       clamp(e['y']+radius*(Math.random()-0.5), 0, ncells[1]-1)];
-
-            deployments.push({specname: e['unit_type'],
-                              level: e['level'],
-                              altitude: get_leveled_quantity(spec['altitude'] || 0, e['level']),
-                              pos: pos});
-        }
-    });
-    if(deployments.length < 1) { return; }
-    change_selection_ui(null);
-    DeploymentMarkers.invoke_gui(session.get_real_world().fxworld, attacker_name, deployments);
-}
-
 function receive_battle_log_result(dialog, ret) {
     var log, replay_exists;
     if(!ret) {
@@ -27488,12 +27432,6 @@ function receive_battle_log_result(dialog, ret) {
 
         // see if we can show deployment markers for this
         var summary = dialog.user_data['summary'];
-        if(can_show_deployment_markers_for_battle_summary(summary)) {
-            dialog.widgets['show_markers_button'].show = true;
-            dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
-                show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
-            }; })(summary, log);
-        }
 
         if(replay_exists && can_show_replay_for_battle_summary(summary)) {
             dialog.widgets['replay_button'].show = true;

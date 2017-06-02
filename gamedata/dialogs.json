@@ -5539,12 +5539,6 @@
             "friend_icon2": { "kind": "FriendIcon", "xy": [221, 230], "dimensions": [50,73], "state": "disabled" },
             //
 
-            // markers and replay buttons are mutually exclusive
-            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
-                                     "bg_image_resizable": 1,
-                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
-                                     "ui_tooltip": "Show where the latest attacker deployed units","tooltip_delay": 0},
-
             "replay_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
                                "bg_image_resizable": 1,
                                "bg_image": "action_button_resizable", "ui_name": "View Replay", "ui_tooltip_unavailable": "Replay not available",
@@ -6624,10 +6618,6 @@
                                "bg_image_resizable": 1,
                                "bg_image": "action_button_resizable", "ui_name": "View Replay", "ui_tooltip_unavailable": "Replay not available",
                                "ui_tooltip": "", "tooltip_color": [1,0,0], "tooltip_delay": 0},
-            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [540,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
-                                     "bg_image_resizable": 1,
-                                     "bg_image": "menu_button_resizable", "ui_name": "Show Deployments",
-                                     "ui_tooltip": "Show where the attacker deployed units","tooltip_delay": 0},
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "base_damage_label": { "show": 0, "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
