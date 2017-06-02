@@ -26697,6 +26697,28 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_all'] + dev_str;
     }
 
+    // set up subtitle
+    if(from_id > 0) {
+        var pinfo = PlayerCache.query_sync(from_id);
+        if(pinfo) {
+            dialog.widgets['subtitle'].str = PlayerCache.get_ui_name(pinfo);
+            if('player_level' in pinfo) {
+                dialog.widgets['subtitle'].str += ' (L'+pinfo['player_level'].toString()+')';
+            }
+            if('alliance_id' in pinfo && pinfo['alliance_id'] >= 0) {
+                var alinfo = AllianceCache.query_info_sync(pinfo['alliance_id']);
+                if(alinfo && alinfo['chat_tag']) {
+                    dialog.widgets['subtitle'].str += ' ['+alinfo['chat_tag']+']';
+                }
+            }
+        }
+    } else if(from_alliance > 0) {
+        var alinfo = AllianceCache.query_info_sync(from_alliance);
+        if(alinfo) {
+            dialog.widgets['subtitle'].str = alliance_display_name(alinfo);
+        }
+    }
+
     dialog.widgets['column_header_time'].show = !!gamedata['client']['battle_history_time_column'];
     dialog.widgets['column_header_location'].show = !!gamedata['client']['battle_history_location_column'];
     dialog.widgets['column_header_outcome'].show = !dialog.widgets['column_header_location'].show;
