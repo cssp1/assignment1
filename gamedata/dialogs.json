@@ -6611,10 +6611,13 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Battle Log" },
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[210,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Battle Log"},
 
-            "replay_button": { "show": 0, "kind": "ActionButton", "xy": [352,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [450,15], "dimensions": [140, 41], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[456,21], "dimensions":[32,32], "asset": "facebook_icon"},
+
+            "replay_button": { "show": 0, "kind": "ActionButton", "xy": [270,15], "dimensions": [140,41], "text_size": 13, "text_style": "bold",
                                "bg_image_resizable": 1,
                                "bg_image": "action_button_resizable", "ui_name": "View Replay", "ui_tooltip_unavailable": "Replay not available",
                                "ui_tooltip": "", "tooltip_color": [1,0,0], "tooltip_delay": 0},

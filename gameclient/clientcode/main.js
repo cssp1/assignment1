@@ -27446,6 +27446,18 @@ function receive_battle_log_result(dialog, ret) {
                 download_and_play_replay(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'],
                                          dialog.user_data['signature'], fail_cb);
             };
+
+            var link_qs = battle_replay_link_qs(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature']);
+            if(link_qs && FBShare.supported()) {
+                dialog.widgets['fb_share_button'].show =
+                    dialog.widgets['fb_share_icon'].show = true;
+                var text = gamedata['virals']['replay']['ui_post_headline']
+                    .replace('%ATTACKER', dialog.widgets['attacker_name'].str)
+                    .replace('%DEFENDER', dialog.widgets['defender_name'].str);
+                dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+                    FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+                }; })(link_qs, text);
+            }
         }
     }
     dialog.widgets['log'].scroll_to_top();
