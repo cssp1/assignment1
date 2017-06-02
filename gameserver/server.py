@@ -20026,7 +20026,7 @@ class GAMEAPI(resource.Resource):
         assert (source > 0) or (alliance_A > 0) or (alliance_B > 0)
 
         # permission check
-        if source != session.user.user_id and (not session.player.is_developer()):
+        if source != session.user.user_id and (not session.player.is_developer()) and (not gamedata.get('battle_logs_public',False)):
             # no peeking at others' battle histories unless you are a developer, or in the same alliance
             is_same_alliance = ((alliance_A > 0 or alliance_B > 0) and \
                                 session.get_alliance_id(reason='query_battle_history') >= 0 and \
@@ -20328,7 +20328,7 @@ class GAMEAPI(resource.Resource):
 
         # the battle log itself does not have sufficient information (attacker/defender alliance IDs) to determine
         # access permission. So instead, we use a secure signature of the args from the battle history.
-        if not session.player.is_developer():
+        if not session.player.is_developer() and (not gamedata.get('battle_logs_public',False)):
             if session.user.user_id not in (attacker, defender) and \
                client_sig != self.sign_battle_history(battle_time, attacker, defender, base_id):
                 retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])

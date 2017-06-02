@@ -26675,7 +26675,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
     // flag that we're looking at another player's personal battles (only allowed if they are in the same alliance)
-    dialog.user_data['alliancemate_flag'] = (!player.is_developer() && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
+    dialog.user_data['alliancemate_flag'] = (!(gamedata['battle_logs_public'] || player.is_developer()) && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
     dialog.user_data['sumlist'] = null;
     dialog.user_data['first_on_page'] = []; // index of first shown summary in sumlist
     dialog.user_data['chapter'] = null;
@@ -26690,7 +26690,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.widgets['alliance_button'].onclick = function(w) { battle_history_change_chapter(w.parent, 'alliance'); };
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    var dev_str = (from_id !== session.user_id && from_alliance !== session.alliance_id ? ' (As '+from_id.toString()+') ' : '');
+    var dev_str = (!gamedata['battle_logs_public'] && from_id !== session.user_id && from_alliance !== session.alliance_id ? ' (As '+from_id.toString()+') ' : '');
     if(user_id > 0) {
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_vs'].replace('%s', name.split(' ')[0] + ' (L'+ level.toString()+')') + dev_str;
     } else {

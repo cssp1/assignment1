@@ -6528,7 +6528,7 @@
                                     "ui_tooltip": "Show battles against human rivals", "tooltip_delay": 0 },
             "alliance_button": { "kind": "ActionButton", "xy": [542,12], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Alliance",
-                                 "ui_tooltip": "Show multiplayer battles involving your alliance",
+                                 "ui_tooltip": "Show multiplayer battles involving alliancemates",
                                  "ui_tooltip_no_alliance": "To join an alliance, use the\n\"A\" button at top of window.",
                                  "tooltip_delay": 0 },
 
