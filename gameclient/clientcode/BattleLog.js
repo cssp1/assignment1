@@ -273,8 +273,8 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         opprole = 'defender';
     }
 
-    names[myrole] = names[my_id] = BattleLog.format_name_for_display(summary[myrole+'_name'], is_ai_user_id_range(my_id), viewer_id === my_id);
-    poss[myrole] = poss[my_id] = BattleLog.make_possessive(names[myrole], viewer_id === my_id);
+    names[myrole] = names[summary[myrole+'_id']] = BattleLog.format_name_for_display(summary[myrole+'_name'], is_ai_user_id_range(summary[myrole+'_id']), viewer_id === summary[myrole+'_id']);
+    poss[myrole] = poss[summary[myrole+'_id']] = BattleLog.make_possessive(names[myrole], viewer_id === summary[myrole+'_id']);
 
     names[opprole] = names[summary[opprole+'_id']] = BattleLog.format_name_for_display(summary[opprole+'_name'], is_ai_user_id_range(summary[opprole+'_id']), viewer_id === summary[opprole+'_id']);
     poss[opprole] = poss[summary[opprole+'_id']] = BattleLog.make_possessive(names[opprole], viewer_id === summary[opprole+'_id']);
