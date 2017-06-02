@@ -3634,6 +3634,22 @@ class AttackLog (object):
             return '%d-%d-vs-%d-at-%s.json.gz' % (log_time, attacker_id, defender_id, base_id)
         else:
             return '%d-%d-vs-%d.json.gz' % (log_time, attacker_id, defender_id)
+
+    # inverse of above
+    battle_id_re = re.compile('^([0-9]+)-([0-9]+)-vs-([0-9]+)(-at-[0-9a-z]+)?$')
+
+    @classmethod
+    def parse_battle_id(cls, battle_id):
+        matches = cls.battle_id_re.match(battle_id)
+        if not matches:
+            return None
+        slog_time, sattacker_id, sdefender_id, slocation = matches.groups()
+        log_time = int(slog_time)
+        attacker_id = int(sattacker_id)
+        defender_id = int(sdefender_id)
+        location = slocation[5:] if slocation else None
+        return (log_time, attacker_id, defender_id, location)
+
     @classmethod
     def storage_dir(cls, log_time):
         return spin_log_dir+'/'+SpinLog.time_to_date_string(log_time)+'-battles'
@@ -15158,6 +15174,8 @@ class STATSAPI(resource.Resource):
             func = self.render_player
         elif method == 'alliance':
             func = self.render_alliance
+        elif method == 'battle':
+            func = self.render_battle
         elif method == 'gamedata':
             func = self.render_gamedata
         elif method == 'gamedata_ref':
@@ -15478,6 +15496,25 @@ class STATSAPI(resource.Resource):
                                     entry['alliance_chat_tag'] = al.get('chat_tag', None)
 
         return SpinJSON.dumps({'result':ret}, newline=True, pretty=False)
+
+    def render_battle(self, args):
+        battle_id = args.get('battle_id', -1)
+        parsed = AttackLog.parse_battle_id(battle_id)
+        if not parsed:
+            ret = {'error': 'Bad battle ID %s' % (battle_id)}
+        else:
+            log_time, attacker_id, defender_id, location = parsed
+            hot_summaries = gamesite.nosql_client.battles_get(attacker_id, defender_id, -1, -1, limit = 1,
+                                                              time_range = [log_time, log_time+1],
+                                                              fields = gamesite.gameapi.BATTLE_HISTORY_FIELDS,
+                                                              reason = 'STATSAPI(battle)')
+            if not hot_summaries:
+                ret = {'error': 'Battle %s not found' % (battle_id)}
+            else:
+                summary = hot_summaries[0]
+                ret = {'result': {'summary': summary}}
+
+        return SpinJSON.dumps(ret, newline=True, pretty=False)
 
 # REST interface used by proxyserver, PCHECK, and other game servers to communicate with us
 class CONTROLAPI(resource.Resource):
