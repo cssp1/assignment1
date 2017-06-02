@@ -26674,6 +26674,11 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
+
+    if(from_id < 0 && from_alliance < 0) {
+        throw Error('at least one of from_id or from_alliance must be >=0');
+    }
+
     // flag that we're looking at another player's personal battles (only allowed if they are in the same alliance)
     dialog.user_data['alliancemate_flag'] = (!(gamedata['battle_logs_public'] || player.is_developer()) && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
     dialog.user_data['sumlist'] = null;
@@ -26724,7 +26729,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.widgets['column_header_outcome'].show = !dialog.widgets['column_header_location'].show;
     dialog.widgets['column_header_status'].str = dialog.data['widgets']['column_header_status'][(gamedata['client']['battle_history_location_column'] ? 'ui_name' : 'ui_name_loot')];
 
-    battle_history_change_chapter(dialog, ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human'));
+    battle_history_change_chapter(dialog, (from_id < 0 && from_alliance >= 0 ? 'alliance' : ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human')));
 
     dialog.ondraw = update_battle_history_dialog;
     return dialog;
@@ -26849,10 +26854,10 @@ function battle_history_change_page(dialog, page) {
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
 
     // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
-    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'];
+    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
 
-    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
-    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id);
+    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_id'] >= 0);
+    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id) && (dialog.user_data['from_id'] >= 0);
     if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
         // for the player, who is not in an alliance
         dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
