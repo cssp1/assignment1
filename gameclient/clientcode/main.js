@@ -46997,27 +46997,37 @@ function handle_server_message(data) {
 
         // deep link to a replay
         var immediate_replay = get_query_string('replay');
-        if(immediate_replay) {
+        var immediate_battle_log =  get_query_string('battle_log');
+        if(immediate_replay || immediate_battle_log) {
             // relies on the server's naming convention: "1457163456-828095-vs-3606753-at-s3606753_42"
-            var fields = immediate_replay.split('-');
+            var fields = (immediate_replay || immediate_battle_log).split('-');
             var battle_time = parseInt(fields[0], 10);
             var attacker_id = parseInt(fields[1], 10);
             var defender_id = parseInt(fields[3], 10);
             var base_id = (fields.length >= 6 ? fields[5] : null);
             var signature = get_query_string('replay_signature');
             if(!signature || signature.length < 1) { signature = null; }
-            download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
-                // failure path
+            if(immediate_replay || player.tutorial_state != "COMPLETE") {
+                download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
+                    // failure path
+                    if(player.tutorial_state != "COMPLETE") {
+                        player.tutorial_hold = false;
+                        tutorial_step(true);
+                    }
+                });
+                // special case for replay on first visit
+
                 if(player.tutorial_state != "COMPLETE") {
-                    player.tutorial_hold = false;
+                    player.tutorial_hold = true;
                     tutorial_step(true);
                 }
-            });
-            // special case for replay on first visit
-
-            if(player.tutorial_state != "COMPLETE") {
-                player.tutorial_hold = true;
-                tutorial_step(true);
+            } else if(immediate_battle_log) {
+                query_battle_history(attacker_id, defender_id, -1, -1, 'any', [battle_time, battle_time+1],
+                                     function(sumlist, siglist, is_final, is_error) {
+                                         if(!is_error && sumlist && sumlist.length >= 1) {
+                                             invoke_battle_log_dialog(sumlist[0], siglist[0], -1);
+                                         }
+                                     });
             }
         }
 
