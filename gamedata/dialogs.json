@@ -6625,12 +6625,12 @@
                                      "ui_tooltip": "Show where the attacker deployed units","tooltip_delay": 0},
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
+            "base_damage_label": { "show": 0, "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
-            "base_damage": { "kind": "TextField", "xy": [61,98], "dimensions": [105,30], "text_size": 32, "text_style": "bold",
+            "base_damage": { "show": 0, "kind": "TextField", "xy": [61,98], "dimensions": [105,30], "text_size": 32, "text_style": "bold",
                              "text_hjustify": "left", "ui_name": "" },
 
-            "location": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 15, "text_style": "bold",
+            "location": { "show": 0, "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 15, "text_style": "bold",
                           "text_hjustify": "left", "ui_name": "Location" },
 
             "outcome": { "kind": "TextField", "xy": [58,126], "dimensions": [105,38],"text_size": 16, "text_style": "bold",

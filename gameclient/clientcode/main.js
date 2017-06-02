@@ -27271,17 +27271,14 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
     };
 
     // pre-fill summary info
-    dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = (!summary['at_quarry'] && !summary['at_squad'] && !summary['at_raid']);
-    dialog.widgets['location'].show = ((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']);
     if((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']) {
+        dialog.widgets['location'].show = true;
         dialog.widgets['location'].set_text_with_linebreaking(summary['base_ui_name']);
-    }
-
-    dialog.widgets['base_damage_label'].show =
-        dialog.widgets['base_damage'].show = ('base_damage' in summary);
-    if('base_damage' in summary) {
+    } else if('base_damage' in summary) {
+        dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = true;
         dialog.widgets['base_damage'].str = Math.floor(100.0*summary['base_damage']).toFixed(0)+'%';
     }
+
     dialog.widgets['outcome'].str = summary['ui_outcome'];
     if(summary['loot'] && 'battle_stars' in summary['loot']) {
         var star_count = goog.object.getCount(summary['loot']['battle_stars']);
