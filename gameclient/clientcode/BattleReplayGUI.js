@@ -103,4 +103,5 @@ BattleReplayGUI.update = function(dialog) {
                                                   .replace('%attacker', replay_player.header['attacker_name'] || '?')
                                                   .replace('%defender', replay_player.header['defender_name'] || '?'),
                                                   null, system_chat_bbcode_click_handlers); // for [url] handling
+    dialog.widgets['description'].clip_to_max_lines(2, '');
 };
