@@ -659,7 +659,7 @@ function current_pvp_season() {
 
 // only works after init()
 function has_true_fullscreen() {
-    if(!(canvas['SPINrequestFullScreen'] && document['SPINcancelFullScreen'])) { return false; }
+    if(!(canvas_div['SPINrequestFullScreen'] && document['SPINcancelFullScreen'])) { return false; }
     if(get_query_string('truefullscreen') === '1') { return true; }
     return read_predicate(gamedata['client']['truefullscreen']).is_satisfied(player,null);
 }
@@ -672,7 +672,7 @@ function toggle_true_fullscreen() {
         if(player.tutorial_state != "COMPLETE") {
             player.record_feature_use('truefullscreen_during_tutorial');
         }
-        canvas['SPINrequestFullScreen']();
+        canvas_div['SPINrequestFullScreen']();
     }
 }
 
@@ -10805,34 +10805,34 @@ SPINPUNCHGAME.init = function() {
     })();
 
     // note: Closure incorrectly obfuscates these canvas/document properties, so manually quote all lookups
-    canvas['SPINrequestFullScreen'] = (function() {
+    canvas_div['SPINrequestFullScreen'] = (function() {
         var event_name = null, fun = null;
 
         // standard version
-        fun = canvas['requestFullScreenWithKeys'] ||
-            canvas['requestFullScreen'];
+        fun = canvas_div['requestFullScreenWithKeys'] ||
+            canvas_div['requestFullScreen'];
         if(fun) {
             event_name = 'fullscreenchange';
         } else {
             // try webkit version
-            fun = canvas['webkitRequestFullScreenWithKeys'] ||
-                  canvas['webkitRequestFullScreen'];
+            fun = canvas_div['webkitRequestFullScreenWithKeys'] ||
+                  canvas_div['webkitRequestFullScreen'];
             if(fun && (spin_demographics['browser_name'] !== 'Safari')) { // webkit fullscreen seems broken on Safari now!
                 event_name = 'webkitfullscreenchange';
                 // manually ensure keyboard input works
-                if(fun === canvas['webkitRequestFullScreen']) {
-                    fun = function() { canvas['webkitRequestFullScreen'](Element['ALLOW_KEYBOARD_INPUT']); };
+                if(fun === canvas_div['webkitRequestFullScreen']) {
+                    fun = function() { canvas_div['webkitRequestFullScreen'](Element['ALLOW_KEYBOARD_INPUT']); };
                 }
             } else {
                 // try mozilla version
-                fun = canvas['mozRequestFullScreenWithKeys'] ||
-                      canvas['mozRequestFullScreen'];
+                fun = canvas_div['mozRequestFullScreenWithKeys'] ||
+                      canvas_div['mozRequestFullScreen'];
                 if(fun) {
                     event_name = 'mozfullscreenchange';
                 } else {
                     // try IE version
-                    fun = canvas['msRequestFullScreenWithKeys'] ||
-                          canvas['msRequestFullScreen'];
+                    fun = canvas_div['msRequestFullScreenWithKeys'] ||
+                          canvas_div['msRequestFullScreen'];
                     if(fun) {
                         event_name = 'msfullscreenchange';
                     }

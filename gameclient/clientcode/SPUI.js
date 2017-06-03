@@ -3303,6 +3303,7 @@ SPUI.HTMLTextInput.prototype.input_activate = function() {
     SPUI.HTMLTextInput.inject_css();
 
     this.input.style.position = 'absolute';
+    //this.input.style.zIndex = "1000";
     this.input.style.padding = '0';
     this.input.style.font = this.font.str();
     this.input.style.background = 'none';
