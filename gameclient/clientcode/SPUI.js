@@ -3290,8 +3290,8 @@ SPUI.HTMLTextInput.inject_css = function() {
 // make the HTMLInputElement "live"
 SPUI.HTMLTextInput.prototype.input_activate = function() {
     var xy = this.get_absolute_xy();
-    this.input.style.left = xy[0].toString()+'px';
-    this.input.style.top = xy[1].toString()+'px';
+    this.input.style.left = (xy[0] + canvas_div_offsetLeft).toString()+'px';
+    this.input.style.top = (xy[1] + canvas_div_offsetTop).toString()+'px';
     this.input.style.width = (this.wh[0].toString())+'px';
     this.input.style.height = (this.wh[1].toString())+'px';
 

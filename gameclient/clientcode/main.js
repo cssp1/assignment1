@@ -49075,7 +49075,7 @@ function event_to_canvas(e) {
             x = e.clientX; /*+ document.body.scrollLeft + document.documentElement.scrollLeft; */
             y = e.clientY; /*+ document.body.scrollTop + document.documentElement.scrollTop; */
         }
-        if(!canvas_is_fullscreen) {
+        if(true || !canvas_is_fullscreen) {
             x -= canvas_div_offsetLeft;
             y -= canvas_div_offsetTop;
         }
