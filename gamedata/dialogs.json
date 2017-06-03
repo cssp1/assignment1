@@ -7697,7 +7697,7 @@
             "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions":[663,32], "color": [0,0,0,0.25] },
             "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13, "text_color":[0.8,0.8,0.8,1],
                              "text_style": "thick", "text_hjustify": "center", "drop_shadow":1,
-                             "ui_name": "Claim one free reward for each consecutive day you log in" },
+                             "ui_name": "Claim one free reward each consecutive day you log in" },
 
             "sunken_left":{"kind":"StaticImage","xy":[50,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
             "sidebar_splash":{"kind":"StaticImage","xy":[54,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
