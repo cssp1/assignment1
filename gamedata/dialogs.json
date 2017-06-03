@@ -7688,25 +7688,29 @@
                       "sound": "success_sound_exploding_glass_01",
                       "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
             "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
-            "title": { "kind": "TextField", "xy": [39,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [29,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Daily Login Reward" },
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
-            "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions":[663,32], "color": [0,0,0,0.25] },
+            "sunken": {"kind": "StaticImage", "xy":[26,66], "dimensions":[685,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [27,68], "dimensions":[683,32], "color": [0,0,0,0.25] },
             "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13, "text_color":[0.8,0.8,0.8,1],
                              "text_style": "thick", "text_hjustify": "center", "drop_shadow":1,
                              "ui_name": "Claim one free reward each consecutive day you log in" },
 
-            "sunken_left":{"kind":"StaticImage","xy":[50,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
-            "sidebar_splash":{"kind":"StaticImage","xy":[54,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+            "sunken_left":{"kind":"StaticImage","xy":[38,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[42,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
 
-            "sunken2": {"kind": "StaticImage", "xy":[218,112], "dimensions":[460,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "sunken2": {"kind": "StaticImage", "xy":[200,112], "dimensions":[500,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
 
-            "rewards": { "kind": "Dialog", "xy": [229,122], "dimensions": [54,146], "dialog": "login_incentive_reward",
-                         "array": [7,1], "array_offset": [64,0] },
+            "rewards": { "kind": "Dialog", "xy": [230,122], "dimensions": [54,146], "dialog": "login_incentive_reward",
+                         "array": [7,1], "array_offset": [63,0] },
+
+            "scroll_left": { "show": 0, "kind": "ActionButton", "xy": [209,162], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_left", "push_bg_image": 1 },
+
+            "scroll_right": { "show": 0, "kind": "ActionButton", "xy": [677,162], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_right", "push_bg_image": 1 },
 
             "claim_button": { "kind": "ActionButton", "xy": [381,308], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
                               "bg_image": "action_button_resizable", "text_style": "bold",

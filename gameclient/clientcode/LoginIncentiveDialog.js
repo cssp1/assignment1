@@ -20,6 +20,16 @@ LoginIncentiveDialog.invoke = function() {
     dialog.user_data['dialog'] = 'login_incentive_dialog';
     dialog.user_data['pending'] = false;
     dialog.user_data['sync_marker'] = null;
+    dialog.user_data['scroll_pos'] = -1;
+    dialog.user_data['n_rewards'] = 0;
+    for(var i = 0; ; i++) {
+        if(('login_incentive_'+(i+1).toString()) in gamedata['loot_tables_client']) {
+            dialog.user_data['n_rewards'] += 1;
+        } else {
+            break;
+        }
+    }
+
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -31,7 +41,31 @@ LoginIncentiveDialog.invoke = function() {
         dialog.user_data['sync_marker'] = synchronizer.request_sync();
     };
     dialog.ondraw = LoginIncentiveDialog.update;
+
+    // set up scrolling
+    dialog.widgets['scroll_left'].show =
+        dialog.widgets['scroll_right'].show =
+        (dialog.user_data['n_rewards'] > dialog.data['widgets']['rewards']['array'][0]);
+    dialog.widgets['scroll_left'].onclick = function(w) {
+        var dialog = w.parent;
+        LoginIncentiveDialog.scroll(dialog, dialog.user_data['scroll_pos']-1);
+    };
+    dialog.widgets['scroll_right'].onclick = function(w) {
+        var dialog = w.parent;
+        LoginIncentiveDialog.scroll(dialog, dialog.user_data['scroll_pos']+1);
+    };
+
     return dialog;
+};
+
+/** @param {!SPUI.Dialog} dialog */
+LoginIncentiveDialog.scroll = function(dialog, new_pos) {
+    var max_pos = dialog.user_data['n_rewards'] - dialog.data['widgets']['rewards']['array'][0];
+    new_pos = Math.max(0, Math.min(new_pos, max_pos));
+
+    dialog.user_data['scroll_pos'] = new_pos;
+    dialog.widgets['scroll_left'].state = (new_pos > 0 ? 'normal' : 'disabled');
+    dialog.widgets['scroll_right'].state = (new_pos < max_pos ? 'normal' : 'disabled');
 };
 
 /** @param {!SPUI.Dialog} dialog */
@@ -59,6 +93,12 @@ LoginIncentiveDialog.update = function(dialog) {
     // 1-based index of the reward we are going to get next
     var cur_stack = (ready_aura ? (ready_aura['stack']||1) : (next_aura['stack']||1));
 
+    // initial scroll
+    if(dialog.user_data['scroll_pos'] < 0) {
+        LoginIncentiveDialog.scroll(dialog, cur_stack - 2);
+    }
+    var scroll_pos = dialog.user_data['scroll_pos'];
+
     // calculate the time at which we began the current streak
     // (beginning of UTC day when first aura was granted)
     var t_origin;
@@ -71,15 +111,16 @@ LoginIncentiveDialog.update = function(dialog) {
 
     for(var i = 0; i < dialog.data['widgets']['rewards']['array'][0]; i++) {
         var r = dialog.widgets['rewards'+i.toString()];
+        var daynum = i + 1 + scroll_pos; // 1-based
         r.widgets['day'].str = r.data['widgets']['day']['ui_name']
-            .replace('%stack', (i+1).toString());
-        var color_mode = (i+1 == 7 ? 'day7' :
-                          (i+1 < cur_stack ? 'claimed' :
-                          ((ready_aura && (i+1 == cur_stack)) ? 'today' :
+            .replace('%stack', daynum.toString());
+        var color_mode = (((daynum % 7) == 0) ? 'day7' :
+                          (daynum < cur_stack ? 'claimed' :
+                          ((ready_aura && (daynum == cur_stack)) ? 'today' :
                            'future')));
         r.widgets['day'].text_color = SPUI.make_colorv(r.data['widgets']['day']['text_color_'+color_mode]);
 
-        var d = new Date((t_origin + i*86400) * 1000);
+        var d = new Date((t_origin + (daynum-1)*86400) * 1000);
         var ui_date = gamedata['strings']['months_short'][d.getUTCMonth()]+' '+d.getUTCDate().toString();
         var ui_day_of_week = gamedata['strings']['days_of_week_short'][d.getUTCDay()];
         r.widgets['label'].str = r.data['widgets']['label']['ui_name']
@@ -88,14 +129,13 @@ LoginIncentiveDialog.update = function(dialog) {
 
         r.widgets['border'].outline_color = SPUI.make_colorv(r.data['widgets']['border']['outline_color_'+color_mode]);
 
-        if(i+1 < cur_stack) {
+        if(daynum < cur_stack) {
             // already claimed
             ItemDisplay.display_item(r.widgets['item'], {'spec': 'login_incentive_already_claimed'},
                                      {glow:false,hide_tooltip:true});
         } else {
-            // XXX hook this up to the loot table?
-            var table = gamedata['loot_tables_client']['login_incentive_'+(i+1).toString()];
-            if(!table) { throw Error('login_incentive loot table not found '+(i+1).toString()); }
+            var table = gamedata['loot_tables_client']['login_incentive_'+daynum.toString()];
+            if(!table) { throw Error('login_incentive loot table not found '+daynum.toString()); }
             var show_item = null;
             var hide_tooltip = true;
             if('item_for_ui' in table) {
@@ -103,12 +143,12 @@ LoginIncentiveDialog.update = function(dialog) {
                 hide_tooltip = false;
             } else {
                 var item_list = session.get_loot_items(player, table['loot']).item_list;
-                if(item_list.length < 1) { throw Error('got no items from login_incentive loot table '+(i+1).toString()); }
+                if(item_list.length < 1) { throw Error('got no items from login_incentive loot table '+daynum.toString()); }
                 show_item = item_list[0];
                 hide_tooltip = false;
             }
             ItemDisplay.display_item(r.widgets['item'], show_item,
-                                     {glow:(i+1 == cur_stack),
+                                     {glow:(daynum == cur_stack),
                                       hide_tooltip:hide_tooltip,
                                       context_parent:dialog});
         }
