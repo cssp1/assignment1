@@ -122,7 +122,7 @@ def get_csv_fields(gamedata):
           "adotomi_context", "dauup_context",
           "last_login_time", "logged_in_times", "last_purchase_time",
           "facebook_id", "country", "country_tier", "currency", "facebook_permissions_str",
-          "gender", "locale", "birth_year", "birthday", "facebook_name", "email", "link",
+          "gender", "locale", "birth_year", "birthday", "facebook_name", "facebook_first_name", "email", "link",
           "tutorial_state", "player_level", "completed_quests", "lock_state",
           'payer_promo_offered', 'promo_gamebucks_earned', 'payer_promo_gamebucks_earned', 'fb_gift_cards_redeemed',
           "money_spent", "money_refunded", "gamebucks_refunded", "largest_purchase", "time_in_game"] + \
