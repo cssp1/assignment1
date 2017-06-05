@@ -20449,11 +20449,14 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         dialog.widgets['trophy_amount'].str = pretty_print_number(trophies);
     }
 
-    if('battle_stars' in loot && 'base_damage' in battle_summary) {
-        dialog.widgets['battle_stars_bg'].show =
-            dialog.widgets['battle_stars_base_damage'].show = true;
+    if('base_damage' in battle_summary) {
+        dialog.widgets['battle_stars_base_damage'].show = true;
         var pct = Math.floor(100*battle_summary['base_damage']).toFixed(0);
         dialog.widgets['battle_stars_base_damage'].str = dialog.data['widgets']['battle_stars_base_damage']['ui_name'].replace('%d', pct);
+    }
+
+    if('battle_stars' in loot && 'base_damage' in battle_summary) {
+        dialog.widgets['battle_stars_bg'].show = true;
         var count = goog.object.getCount(loot['battle_stars']);
         for(var i = 0; i < dialog.data['widgets']['battle_stars_hole']['array'][0]; i++) {
             dialog.widgets['battle_stars_hole'+i.toString()].show = true;
