@@ -18447,13 +18447,13 @@ function update_retreating_dialog(dialog) {
 }
 
 function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
-                                  battle_opponent_name,
-                                   outcome, loot, battle_summary, ladder_state) {
+                                   battle_opponent_name,
+                                   outcome, loot, battle_summary, ladder_state, replay_signature) {
     if(outcome == 'victory' &&
        player.get_any_abtest_value('fancy_victory_dialog', gamedata['client']['fancy_victory_dialog'])) {
         return invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                            battle_opponent_name,
-                                           outcome, loot, battle_summary, ladder_state);
+                                           outcome, loot, battle_summary, ladder_state, replay_signature);
     }
 
     change_selection(null);
@@ -20068,7 +20068,7 @@ function test_flash_offer(offer) {
 
 function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                   battle_opponent_name,
-                                  outcome, loot, battle_summary, ladder_state)
+                                  outcome, loot, battle_summary, ladder_state, replay_signature)
 {
     // home-base and hive victories go through the fancy version of this dialog
     if(outcome == 'victory' &&
@@ -20077,7 +20077,7 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
        player.get_any_abtest_value('fancy_victory_dialog', gamedata['client']['fancy_victory_dialog'])) {
         return invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                            battle_opponent_name,
-                                           outcome, loot, battle_summary, ladder_state);
+                                           outcome, loot, battle_summary, ladder_state, replay_signature);
     }
 
     var trophy_delta = 0, trophy_type = null;
@@ -20228,19 +20228,28 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
     for(var n in gamedata['units']) {
         units[n] = 999;
     }
+    var loot =  {'iron':12345, 'looted_uncapped_iron':12345,
+                 'water':5432, 'looted_uncapped_water':12345,
+                 'res3':543, 'looted_uncapped_res3':543,
+                 'units_killed':units,
+                 'units_lost':units,
+                 'items': (has_item_loot ? [{'spec':'token','stack':1000},{'spec':'inventory_unknown','stack':5}] : [])};
+    if(has_trophies) {
+        loot['trophies_pvp'] = 30;
+        loot['battle_stars'] = {'foo':1,'bar':2,'baz':3};
+    }
     invoke_fancy_victory_dialog(kind, {base_type:'home'}, ai_id, '-1', 10, null,
                                 'Test AI', 'victory',
-                                {'iron':12345, 'looted_uncapped_iron':12345,
-                                 'water':5432, 'looted_uncapped_water':12345,
-                                 'res3':543, 'looted_uncapped_res3':543,
-                                 'units_killed':units,
-                                 'units_lost':units,
-                                 'battle_stars':{'foo':1,'bar':2,'baz':3},
-                                 'trophies_pvp': (has_trophies ? 30 : null),
-                                 'items': (has_item_loot ? [{'spec':'token','stack':1000},{'spec':'inventory_unknown','stack':5}] : [])},
+                                loot,
                                 {'base_damage': 0.51,
-                                 'deployed_units':units},
-                                (kind == 'ladder' ? ladder_state : null));
+                                 'attacker_id': session.user_id,
+                                 'defender_id': ai_id,
+                                 'time': Math.floor(server_time),
+                                 'base_id': 'h'+ai_id.toString(),
+                                 'deployed_units':units,
+                                 'replay_version': gamedata['replay_version']},
+                                (kind == 'ladder' ? ladder_state : null),
+                               'abcdef');
 }
 
 // get a string representing the units you killed in battle
@@ -20276,7 +20285,7 @@ function get_loot_kills_list(loot, separator, max_count) {
 
 function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                      battle_opponent_name,
-                                     outcome, loot, battle_summary, ladder_state) {
+                                     outcome, loot, battle_summary, ladder_state, replay_signature) {
     // do this first so it pops under
     if(player.tutorial_state === 'wait_battle_finish2') {
         metric_event('0330_tutorial_battle_ended', {});
@@ -20288,9 +20297,24 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['dialog'] = 'fancy_victory_dialog';
     dialog.user_data['context'] = null;
     dialog.user_data['anim_start_time'] = client_time;
+    dialog.user_data['replay_signature'] = replay_signature;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
+
+    if(player.tutorial_state == 'COMPLETE' && can_show_replay_for_battle_summary(battle_summary)) {
+        var link_qs = battle_replay_link_qs(battle_summary['time'], battle_summary['attacker_id'], battle_summary['defender_id'], battle_summary['base_id'], dialog.user_data['replay_signature']);
+        if(link_qs && FBShare.supported()) {
+            dialog.widgets['fb_share_button'].show =
+                dialog.widgets['fb_share_icon'].show = true;
+            var text = gamedata['virals']['replay']['ui_post_headline']
+                .replace('%ATTACKER', player.get_ui_name()) // battle_summary['attacker_name'])
+                .replace('%DEFENDER', battle_opponent_name); //  battle_summary['defender_name']);
+            dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+                FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+            }; })(link_qs, text);
+        }
+    }
 
     dialog.widgets['winner_name'].str = player.get_ui_name();
     dialog.widgets['loser_name'].str = battle_opponent_name;
@@ -46666,8 +46690,8 @@ function handle_server_message(data) {
         var base_data = data[3];
         var battle_base = new Base.Base(base_data['base_id'], base_data);
         var battle_ladder_state = data[4];
-
         var battle_loot = battle_summary['loot'] || {};
+        var battle_replay_signature = data[5] || null;
 
         var battle_type = (battle_base.base_id === player.home_base_id ? 'home' :
                            (battle_ladder_state ? 'ladder' :
@@ -46688,26 +46712,26 @@ function handle_server_message(data) {
             if(player.tutorial_state != "COMPLETE") {
                 cb = goog.partial(invoke_ai_attack_finish_dialog, battle_loot);
             } else {
-                cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                    invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+                cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature) { return function() {
+                    invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature);
                 }; })(battle_type, battle_base,
                       null, // battle_opponent_user_id,
                       null, // battle_opponent_fbid,
                       -1, // battle_opponent_level,
                       null, // battle_opponent_friend,
                       battle_opponent_name,
-                      battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+                      battle_outcome, battle_loot, battle_summary, battle_ladder_state, battle_replay_signature);
             }
         } else if(battle_outcome != 'none') {
-            cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+            cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature) { return function() {
+                invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature);
             }; })(battle_type, battle_base,
                   battle_opponent_user_id,
                   null, // battle_opponent_fbid,
                   battle_opponent_level,
                   null, // battle_opponent_friend,
                   battle_opponent_name,
-                  battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+                  battle_outcome, battle_loot, battle_summary, battle_ladder_state, battle_replay_signature);
         }
 
         if(cb) {

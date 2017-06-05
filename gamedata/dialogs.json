@@ -4412,6 +4412,13 @@
                   ] } }
             ],
 
+            "fb_share_button": [{ "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
+                                { "type": "SPFX",
+                                  "effect": { "layer": "ui", "translate": [0,3,0], "type": "explosion", "sprite": "fx/glow_static",
+                                              "delay": 1.2, "duration": 1.0, "fade": 0.5,
+                                              "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] }
+                                }],
+            "fb_share_icon": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
 
             //////////////////////////////////////////////////////////////////////////////////////////////
             //   WINNER / LOSER effects
@@ -4616,38 +4623,38 @@
             "winner_portrait_frame": {"kind": "StaticImage", "xy":[229,46], "dimensions":[50,50], "asset": "dialog_portrait_frame" },
             "loser_portrait_frame": {"kind": "StaticImage", "xy":[229,92], "dimensions":[50,50], "asset": "dialog_portrait_frame" },
 
-            "winner_glow": { "kind": "StaticImage", "xy": [276,45], "dimensions": [287,48], "asset": "dialog_glow_thinner",
+            "winner_glow": { "kind": "StaticImage", "xy": [276,45], "dimensions": [247,48], "asset": "dialog_glow_thinner",
                              "bg_image_resizable": 1, "opacity": 0.4, "composite_mode": "lighter"},
-            "winner_bg": { "kind": "SolidRect", "xy": [287,56], "dimensions": [265,26], "color": [0.03,0.03,0.03,1], "bevel": 3 },
-            "winner_inner": { "kind": "SolidRect", "xy": [290,60], "dimensions": [259,18], "color": [0.9,0.9,0.9,1], "bevel": 2 },
+            "winner_bg": { "kind": "SolidRect", "xy": [287,56], "dimensions": [225,26], "color": [0.03,0.03,0.03,1], "bevel": 3 },
+            "winner_inner": { "kind": "SolidRect", "xy": [290,60], "dimensions": [219,18], "color": [0.9,0.9,0.9,1], "bevel": 2 },
 
             "winner_plate": { "kind": "StaticImage", "xy": [290,58], "dimensions": [84,22], "asset": "win_nameplate", "opacity": 0.9 },
 
-            "loser_bg": { "kind": "SolidRect", "xy": [287,101], "dimensions": [265,26], "color": [0.02,0.02,0.02,1], "bevel": 3 },
+            "loser_bg": { "kind": "SolidRect", "xy": [287,103], "dimensions": [225,26], "color": [0.02,0.02,0.02,1], "bevel": 3 },
 
             // note: width is rescaled in invoke_fancy_victory_dialog() to correspond to loser's kill/death ratio
-            "loser_inner": { "kind": "SolidRect", "xy": [290,105], "dimensions": [259,18], "color": [0.1,0.1,0.1,1], "bevel": 2 },
+            "loser_inner": { "kind": "SolidRect", "xy": [290,107], "dimensions": [219,18], "color": [0.1,0.1,0.1,1], "bevel": 2 },
 
-            "loser_plate": { "kind": "StaticImage", "xy": [290,103], "dimensions": [84,22], "asset": "loss_nameplate", "opacity": 0.6 },
+            "loser_plate": { "kind": "StaticImage", "xy": [290,105], "dimensions": [84,22], "asset": "loss_nameplate", "opacity": 0.6 },
 
             "winner_label":  { "kind": "TextField", "xy": [294,60], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
                                "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 1 },
-            "loser_label":  { "kind": "TextField", "xy": [296,106], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
+            "loser_label":  { "kind": "TextField", "xy": [296,108], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
                               "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 1 },
 
             "winner_name":  { "kind": "TextField", "xy": [377,60], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0,0,0,1],
                               "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 0 },
-            "loser_name":  { "kind": "TextField", "xy": [377,106], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
+            "loser_name":  { "kind": "TextField", "xy": [377,108], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
                              "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 0 },
 
-            "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [574,56],"dimensions": [174,69], "color": [0.04,0.04,0.04,1],
+            "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [547,56],"dimensions": [174,69], "color": [0.04,0.04,0.04,1],
                                  "bevel": 3, "outline_color": [0.8,0.8,0.8,1], "outline_width": 1 },
-            "battle_stars_hole": { "show": 0, "kind": "StaticImage", "xy": [606,63], "dimensions": [30,30], "asset": "battle_star_hole",
+            "battle_stars_hole": { "show": 0, "kind": "StaticImage", "xy": [579,63], "dimensions": [30,30], "asset": "battle_star_hole",
                                    "array": [3,1], "array_offset": [40,0] },
-            "battle_stars_star": { "show": 0, "kind": "StaticImage", "xy": [606,63], "dimensions": [30,30], "asset": "battle_star",
+            "battle_stars_star": { "show": 0, "kind": "StaticImage", "xy": [579,63], "dimensions": [30,30], "asset": "battle_star",
                                    "array": [3,1], "array_offset": [40,0] },
 
-            "battle_stars_base_damage": { "show":0, "kind": "TextField", "xy": [574,55], "dimensions": [174,71],
+            "battle_stars_base_damage": { "show":0, "kind": "TextField", "xy": [547,55], "dimensions": [174,71],
                                           "text_size": 15, "text_style": "thick", "text_vjustify": "bottom", "text_hjustify": "center",
                                           "text_color": [0.9,0.4,0.01,1], "drop_shadow": 1, "text_offset": [0,-11],
                                           "ui_name": "%d% Base Damage" },
@@ -4661,8 +4668,11 @@
             "units_lost":  { "kind": "TextField", "xy": [695,90], "dimensions": [86,17], "text_size": 13, "text_style": "thick",
                              "text_hjustify": "left", "ui_name": "%d" },
 
-            "you_won":  { "kind": "TextField", "xy": [18,59], "dimensions": [202,46], "text_size": 40,
+            "you_won":  { "kind": "TextField", "xy": [18,42], "dimensions": [202,46], "text_size": 40,
                           "ui_name": "You Won!", "text_style": "bold italic", "drop_shadow": 1 },
+
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [36,98], "dimensions": [174,37], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[45,102], "dimensions":[32,32], "asset": "facebook_icon"},
 
             "sunken_l":  {"kind": "StaticImage", "xy":[21,145], "dimensions":[491,212], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "sunken_r":  {"kind": "StaticImage", "xy":[518,145], "dimensions":[231,212], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },

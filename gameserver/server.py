@@ -19286,7 +19286,9 @@ class GAMEAPI(resource.Resource):
                            outcome,
                            summary,
                            session.viewing_base.get_cache_props(), # extra_props = {'deployment_buffer': session.viewing_base.deployment_buffer} ?
-                           session.ladder_state])
+                           session.ladder_state,
+                           self.sign_battle_history(summary['time'], summary['attacker_id'], summary['defender_id'], summary.get('base_id', None))
+                           ])
 
         # queue the callback (and any future complete_attack()s called before the I/O completes), and call them after I/O completes
 
