@@ -1658,6 +1658,7 @@ SPUI.RichTextField = function(data) {
     this.text_vjustify = data['text_vjustify'] || 'center';
     this.text_offset = data['text_offset'] || [0,0];
     this.drop_shadow = data['drop_shadow'] || false;
+    this.alpha = data['alpha'] || 1;
     this.resize_to_fit_text = data['resize_to_fit_text'] || false;
     this.push_text = ('push_text' in data ? data['push_text'] : false); // whether text gets "pushed"
     this.text = null;
@@ -1750,6 +1751,9 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     if(this.drop_shadow) {
         SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0]+this.drop_shadow,text_offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
+    }
+    if(this.alpha < 1) {
+        SPUI.ctx.globalAlpha *= this.alpha;
     }
     SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = SPUI.default_text_color.str();
     SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0],text_offset[1]+this.xy[1]], this.font);

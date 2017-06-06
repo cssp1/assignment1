@@ -20245,6 +20245,7 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
                                  'attacker_id': session.user_id,
                                  'defender_id': ai_id,
                                  'time': Math.floor(server_time),
+                                 'duration': 945,
                                  'base_id': 'h'+ai_id.toString(),
                                  'deployed_units':units,
                                  'replay_version': gamedata['replay_version']},
@@ -20342,14 +20343,6 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 units_lost += qty;
             }
         }
-        dialog.widgets['units_killed'].str = pretty_print_number(units_killed);
-        dialog.widgets['units_lost'].str = pretty_print_number(units_lost);
-    } else{
-        // hide the units killed and units lost counters when we don't have defending units enabled
-        dialog.widgets['units_killed'].show = false;
-        dialog.widgets['units_killed_label'].show = false;
-        dialog.widgets['units_lost'].show = false;
-        dialog.widgets['units_lost_label'].show = false;
     }
 
     // scale loser_inner bar width according to how well the loser did in terms of kills vs. losses
@@ -20363,7 +20356,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     }
     // set .data to a modified copy of the original so that the size_change animation picks up the new final "dimensions"
     dialog.widgets['loser_inner'].data = goog.object.clone(dialog.widgets['loser_inner'].data);
-    dialog.widgets['loser_inner'].wh[0] = dialog.widgets['loser_inner'].data['dimensions'][0] = Math.floor(84 + loser_width*(259-84));
+    dialog.widgets['loser_inner'].wh[0] = dialog.widgets['loser_inner'].data['dimensions'][0] = Math.floor(84 + loser_width*(dialog.data['widgets']['loser_inner']['dimensions'][0]-84));
 
     if(player.get_any_abtest_value('show_xp_gains', gamedata['client']['show_xp_gains'])) {
         dialog.widgets['loot_xp_amount'].num_val = loot['xp'] || 0;
@@ -20390,6 +20383,9 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['trophy_type'] = ((loot['trophies_pvv'] || 0) != 0 ? 'pvv' : ((loot['trophies_pvp'] || 0) != 0 ? 'pvp' : 'pve'));
 
     if(battle_type !== 'home') {
+        // OFFENSE only
+
+        // loot amounts
         for(var res in gamedata['resources']) {
             if('row_'+res+'_amount' in dialog.widgets) {
                 /* dialog.widgets['total_'+res+'_amount'].num_val = */ dialog.widgets['row_'+res+'_amount'].num_val = looted_res[res];
@@ -20404,14 +20400,47 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 });
             }
         }
+
+        // spent units
+        if(gamedata['client']['battle_end_dialog_show_units_deployed'] && ('deployed_units' in battle_summary)) {
+            dialog.widgets['you_spent'].show = true;
+            var i = 0, j = 0;
+            for(var specname in gamedata['units']) {
+                if(specname in battle_summary['deployed_units']) {
+                    var spec = gamedata['units'][specname];
+                    var qty = battle_summary['deployed_units'][specname];
+
+                    var d = dialog.widgets[SPUI.get_array_widget_name('spent_unit', dialog.data['widgets']['spent_unit']['array'], [i,j])];
+                    d.show = true;
+                    d.user_data['specname'] = specname;
+                    if('icon' in spec) {
+                        d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
+                    } else {
+                        d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
+                    }
+                    d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
+                    d.widgets['stack'].str = pretty_print_number(qty);
+                    d.widgets['frame'].state = 'normal_nohighlight'; // 'disabled' use grayed-out frame
+                    d.widgets['frame'].tooltip.str = pretty_print_number(qty)+'x '+((spec['ui_name_plural'] && qty != 1) ? spec['ui_name_plural'] : spec['ui_name']);
+                    i += 1;
+                    if(i >= dialog.data['widgets']['spent_unit']['array'][0]) {
+                        i = 0;
+                        j += 1;
+                        if(j >= dialog.data['widgets']['spent_unit']['array'][1]) {
+                            console.log('ran out of space to display units!');
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     } else {
-        dialog.widgets['separator_top'].xy = vec_copy(dialog.data['widgets']['separator_top']['xy_home']);
-        // print list of units you destroyed
+        // DEFENSE only
+
+        // hide loot display
         if(!trophies) {
             dialog.widgets['you_gained'].show = false; // nothing "gained", so don't show it
         }
-        dialog.widgets['row_name'].show =
-            dialog.widgets['row_bullet'].show = false;
         for(var res in gamedata['resources']) {
             goog.array.forEach(['row_%s_icon', 'row_%s_amount', 'total_%s_icon', 'total_%s_amount'], function(s) {
                 var wname = s.replace('%s', res);
@@ -20420,44 +20449,22 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 }
             });
         }
-        dialog.widgets['row_defense'].show = true;
-        dialog.widgets['row_defense'].set_text_with_linebreaking(dialog.data['widgets']['row_defense']['ui_name'] + '\n' + get_loot_kills_list(loot, '\n', dialog.widgets['row_defense'].data['max_lines']));
+    }
+
+    if(1) {
+        dialog.widgets['row_battle_stats'].show = true;
+        var bbstr = dialog.data['widgets']['row_battle_stats']['ui_name'];
+        bbstr = bbstr.replace('%DURATION', pretty_print_time(battle_summary['duration']));
+        var kills_list = get_loot_kills_list(loot, ', ', 3 /* dialog.widgets['row_battle_stats'].data['max_lines'] */);
+        if(kills_list && kills_list.length > 0) {
+            bbstr += dialog.data['widgets']['row_battle_stats']['ui_name_units_killed'].replace('%KILLED', kills_list);
+        }
+        dialog.widgets['row_battle_stats'].set_text_bbcode(bbstr);
+        /*
         // so that typewriter animation will work
         dialog.widgets['row_defense'].data = goog.object.clone(dialog.widgets['row_defense'].data);
         dialog.widgets['row_defense'].data['ui_name'] = dialog.widgets['row_defense'].str;
-    }
-
-    if(battle_type !== 'home' && gamedata['client']['battle_end_dialog_show_units_deployed'] && ('deployed_units' in battle_summary)) {
-        dialog.widgets['you_spent'].show = true;
-        var i = 0, j = 0;
-        for(var specname in gamedata['units']) {
-            if(specname in battle_summary['deployed_units']) {
-                var spec = gamedata['units'][specname];
-                var qty = battle_summary['deployed_units'][specname];
-
-                var d = dialog.widgets[SPUI.get_array_widget_name('spent_unit', dialog.data['widgets']['spent_unit']['array'], [i,j])];
-                d.show = true;
-                d.user_data['specname'] = specname;
-                if('icon' in spec) {
-                    d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
-                } else {
-                    d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
-                }
-                d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
-                d.widgets['stack'].str = pretty_print_number(qty);
-                d.widgets['frame'].state = 'normal_nohighlight'; // 'disabled' use grayed-out frame
-                d.widgets['frame'].tooltip.str = pretty_print_number(qty)+'x '+((spec['ui_name_plural'] && qty != 1) ? spec['ui_name_plural'] : spec['ui_name']);
-                i += 1;
-                if(i >= dialog.data['widgets']['spent_unit']['array'][0]) {
-                    i = 0;
-                    j += 1;
-                    if(j >= dialog.data['widgets']['spent_unit']['array'][1]) {
-                        console.log('ran out of space to display units!');
-                        break;
-                    }
-                }
-            }
-        }
+        */
     }
 
     if(trophies > 0) {
@@ -20473,7 +20480,8 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         dialog.widgets['trophy_amount'].str = pretty_print_number(trophies);
     }
 
-    if('base_damage' in battle_summary) {
+    // upper base damage display (redundant with bottom display when battle_type == 'home')
+    if(battle_type != 'home' && 'base_damage' in battle_summary) {
         dialog.widgets['battle_stars_base_damage'].show = true;
         var pct = Math.floor(100*battle_summary['base_damage']).toFixed(0);
         dialog.widgets['battle_stars_base_damage'].str = dialog.data['widgets']['battle_stars_base_damage']['ui_name'].replace('%d', pct);
@@ -20645,9 +20653,11 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 }
 
 function apply_animation(dialog, wname, widget, anim_data, anim_time, anim) {
+    if(!widget) { throw Error('unknown widget: '+wname); }
     if(!widget.show) { return; }
 
-    if(0 in anim) {
+    if(anim === undefined) { throw Error('bad animation for widget: '+wname); }
+    if(Array.isArray(anim)) {
         // it's an array
         for(var i = 0; i < anim.length; i++) {
             apply_animation(dialog, wname, widget, anim_data, anim_time, anim[i]);

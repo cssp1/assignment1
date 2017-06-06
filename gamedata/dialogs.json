@@ -4451,10 +4451,6 @@
             //   KILLS & LOSSES
             //////////////////////////////////////////////////////////////////////////////////////////////
 
-            "units_killed_label": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
-            "units_lost_label": { "type": "fadein", "start_time": 1.4, "end_time": 1.6 },
-            "units_killed": { "type": "same_as", "ref": "units_killed_label" },
-            "units_lost": { "type": "same_as", "ref": "units_lost_label" },
             "battle_stars_bg": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
             "battle_stars_base_damage": { "type": "same_as", "ref": "battle_stars_bg", "delay": 0.2 },
             "battle_stars_hole0": { "type": "same_as", "ref": "battle_stars_bg", "delay": 0.3 },
@@ -4482,11 +4478,9 @@
             //          "separator_btm": { "type": "same_as", "ref": "separator_top" },
 
 
-            "row_name": { "type": "same_as", "ref": "you_gained", "delay": 0.2 },
-            "row_defense": [{"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
-                            { "type": "same_as", "ref": "row_name" }],
+            "row_battle_stats": [// not supported with RichTextField: {"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
+                { "type": "fadein", "start_time": 2.5, "end_time": 3.0 }],
 
-            "row_bullet": { "type": "same_as", "ref": "row_name" },
             "row_water_icon": { "type": "same_as", "ref": "loot_xp_icon", "delay": 0.2 },
             "row_water_amount": { "type": "same_as", "ref": "loot_xp_amount", "delay": 0.2 },
             "row_iron_icon": { "type": "same_as", "ref": "row_water_icon" },
@@ -4501,22 +4495,15 @@
             //          "total_iron_amount": { "type": "same_as", "ref": "total_water_amount" },
             "you_spent": { "type": "same_as", "ref": "you_gained", "delay": 0.9 },
 
-            "spent_unit0,0": [{ "type": "fadein", "start_time": 2.0, "end_time": 2.2 },
-                              { "type": "transform", "start_time": 1.2, "end_time": 2.4,
-                                "start_transform": [4,0,0,4,-10,-10]}],
+            "spent_unit0": [{ "type": "fadein", "start_time": 2.0, "end_time": 2.2 },
+                            { "type": "transform", "start_time": 1.2, "end_time": 2.4,
+                              "start_transform": [4,0,0,4,-10,-10]}],
 
-            "spent_unit1,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.2 },
-            "spent_unit2,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.4 },
-            "spent_unit3,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.6 },
-            "spent_unit4,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.8 },
-            "spent_unit5,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 1.0 },
-
-            "spent_unit0,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.1 },
-            "spent_unit1,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.3 },
-            "spent_unit2,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.5 },
-            "spent_unit3,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.7 },
-            "spent_unit4,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.9 },
-            "spent_unit5,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 1.1 },
+            "spent_unit1": { "type": "same_as", "ref": "spent_unit0", "delay": 0.2 },
+            "spent_unit2": { "type": "same_as", "ref": "spent_unit0", "delay": 0.4 },
+            "spent_unit3": { "type": "same_as", "ref": "spent_unit0", "delay": 0.6 },
+            "spent_unit4": { "type": "same_as", "ref": "spent_unit0", "delay": 0.8 },
+            "spent_unit5": { "type": "same_as", "ref": "spent_unit0", "delay": 1.0 },
 
             "trophy_label": { "type": "same_as", "ref": "row_water_icon", "delay": 0.2 },
             "trophy_bg": [{ "type": "same_as", "ref": "trophy_label", "delay": 0 },
@@ -4637,14 +4624,18 @@
 
             "loser_plate": { "kind": "StaticImage", "xy": [290,105], "dimensions": [84,22], "asset": "loss_nameplate", "opacity": 0.6 },
 
-            "winner_label":  { "kind": "TextField", "xy": [294,60], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
+            "winner_label":  { "kind": "TextField", "xy": [294,60], "dimensions": [125,17], "text_size": 15, "text_style": "bold italic",
                                "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 1 },
-            "loser_label":  { "kind": "TextField", "xy": [296,108], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
+            "loser_label":  { "kind": "TextField", "xy": [296,108], "dimensions": [125,17], "text_size": 15, "text_style": "bold italic",
                               "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 1 },
 
-            "winner_name":  { "kind": "TextField", "xy": [377,60], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0,0,0,1],
+            "winner_name":  { "kind": "TextField", "xy": [377,60], "dimensions": [125,17],
+                              "clip_to": [377,60,125,17],
+                              "text_size": 13, "text_style": "thick", "text_color": [0,0,0,1],
                               "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 0 },
-            "loser_name":  { "kind": "TextField", "xy": [377,108], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
+            "loser_name":  { "kind": "TextField", "xy": [377,108], "dimensions": [125,17],
+                             "clip_to": [377,108,125,17],
+                             "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
                              "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 0 },
 
             "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [547,56],"dimensions": [174,69], "color": [0.04,0.04,0.04,1],
@@ -4659,15 +4650,6 @@
                                           "text_color": [0.9,0.4,0.01,1], "drop_shadow": 1, "text_offset": [0,-11],
                                           "ui_name": "%d% Base Damage" },
 
-            "units_killed_label":  { "kind": "TextField", "xy": [560,62], "dimensions": [116,17], "text_size": 13, "text_style": "thick",
-                                     "text_hjustify": "right", "ui_name": "Kills" },
-            "units_killed":  { "kind": "TextField", "xy": [695,62], "dimensions": [86,17], "text_size": 13, "text_style": "thick",
-                               "text_hjustify": "left", "ui_name": "%d" },
-            "units_lost_label":  { "kind": "TextField", "xy": [560,90], "dimensions": [116,17], "text_size": 13, "text_style": "thick",
-                                   "text_hjustify": "right", "ui_name": "Losses" },
-            "units_lost":  { "kind": "TextField", "xy": [695,90], "dimensions": [86,17], "text_size": 13, "text_style": "thick",
-                             "text_hjustify": "left", "ui_name": "%d" },
-
             "you_won":  { "kind": "TextField", "xy": [18,42], "dimensions": [202,46], "text_size": 40,
                           "ui_name": "You Won!", "text_style": "bold italic", "drop_shadow": 1 },
 
@@ -4678,20 +4660,11 @@
             "sunken_r":  {"kind": "StaticImage", "xy":[518,145], "dimensions":[231,212], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "sunken_val":  {"kind": "StaticImage", "xy":[21,364], "dimensions":[80,80], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
 
-            "you_gained":  { "kind": "TextField", "xy": [45,160], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
+            "you_gained":  { "kind": "TextField", "xy": [45,160], "dimensions": [187,21], "text_size": 15, "text_style": "bold",
                              "text_hjustify": "left", "ui_name": "Gain:" },
             "loot_xp_icon": { "kind": "StaticImage", "xy": [236,161], "dimensions": [21,21], "asset": "resource_icon_xp" },
 
             "loot_xp_amount": { "kind": "TextField", "xy": [266,161], "dimensions": [70,19],"text_size": 15, "text_style": "bold", "ui_name": "xxx,xxx,xxx" },
-
-            "separator_top": {"kind": "Line", "xy": [45,221], "xy_home": [45,221], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
-
-            "row_defense": { "show": 0, "max_lines": 5,
-                             "kind": "TextField", "xy": [45,230], "dimensions": [400,250], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top", "text_style": "thick",
-                             "ui_name": "Enemy Units Destroyed:" },
-
-            "row_name": { "show": 0, "kind": "TextField", "xy": [74,212], "dimensions": [157,25], "text_size": 15, "text_hjustify": "left", "text_style": "thick", "ui_name": "Loot" },
-            "row_bullet":  { "show": 0, "kind": "StaticImage", "xy": [46,212], "dimensions": [21,21], "asset": "resource_icon_bullet" },
 
             "row_water_icon": { "kind": "StaticImage", "xy": [145,160], "dimensions": [21,21], "asset": "resource_icon_water" },
             "row_water_amount": { "kind": "TextField", "xy": [175,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
@@ -4700,28 +4673,28 @@
             "row_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [256,160], "dimensions": [21,21], "asset": "resource_icon_res3" },
             "row_res3_amount": { "show": 0, "kind": "TextField", "xy": [286,160], "dimensions": [65,19],"text_size": 15, "text_style": "bold" },
 
-            "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,237], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
+            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [360,160], "dimensions": [125,42], "color": [0,0,0,0.4], "bevel": 3 },
+            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [365,166], "dimensions": [30,30], "asset": "trophy_30x30" },
+            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [402,171], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
+            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [359,160], "dimensions": [62,13], "asset": "button_shine" },
+
+            "separator_top": {"kind": "Line", "xy": [45,218], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
+
+            // offense, disposable-unit-games only
+            "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,227], "dimensions": [187,21], "text_size": 15, "text_style": "bold",
                             "text_hjustify": "left", "ui_name": "Spend:" },
-            "spent_unit": { "show": 0, "kind": "Dialog", "xy": [144,235], "dimensions": [50,50], "dialog": "item_display",
-                            "array": [6,2], "array_offset": [55,53] },
+            "spent_unit": { "show": 0, "kind": "Dialog", "xy": [144,225], "dimensions": [50,50], "dialog": "item_display",
+                            "array": [6,1], "array_offset": [57,53] },
 
-            //          "separator_btm": {"kind": "Line", "xy": [45,255], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
-
-            //          "total_name": { "kind": "TextField", "xy": [74,261], "dimensions": [157,25], "text_size": 15, "text_hjustify": "left", "text_style": "thick", "ui_name": "Total" },
-            //          "total_water_icon": { "kind": "StaticImage", "xy": [236,263], "dimensions": [21,21], "asset": "resource_icon_water" },
-            //          "total_water_amount": { "kind": "TextField", "xy": [266,263], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
-            //          "total_iron_icon": { "kind": "StaticImage", "xy": [371,263], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            //          "total_iron_amount": { "kind": "TextField", "xy": [401,263], "dimensions": [70,19],"text_size": 15, "text_style": "bold"},
+            "row_battle_stats": { "show": 0, "max_lines": 4,
+                                  "kind": "RichTextField", "xy": [45,273], "dimensions": [435,60], "text_size": 13, "text_hjustify": "left", "text_vjustify": "top",
+                                  "ui_name": "[color=#ffff00][b]Battle Stats:[/b][/color]\n[b]Duration:[/b] %DURATION",
+                                  "ui_name_units_killed": "\n[b]Enemy Units Destroyed:[/b] %KILLED" },
 
             "trophy_label": { "show": 0,
                               "kind": "TextField", "xy": [209,379], "dimensions": [223,62], "text_size": 15, "text_style": "thick",
                               "text_hjustify": "left", "text_vjustify": "top",
                               "ui_name": "" },
-
-            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [360,160], "dimensions": [125,42], "color": [0,0,0,0.4], "bevel": 3 },
-            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [365,166], "dimensions": [30,30], "asset": "trophy_30x30" },
-            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [402,171], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
-            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [359,160], "dimensions": [62,13], "asset": "button_shine" },
 
             "trophy_expires": { "show": 0, "kind": "TextField", "xy": [288,417], "dimensions": [135, 17], "text_size": 13,
                                 "text_color": [1,0,0,1],
