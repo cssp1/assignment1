@@ -9090,14 +9090,17 @@
             "topbar": { "kind": "SolidRect", "xy": [200,68], "dimensions": [500,32], "color": [0,0,0,0.4] },
             "leftbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [163,340], "color": [0,0,0,1] },
 
-            "loot_arrow": { "kind": "StaticImage", "xy": [188,137], "dimensions": [24,24], "asset": "arrow_e" },
-
             "loot_label": { "kind": "TextField", "xy": [55,76], "dimensions": [145,60], "text_size": 13,
                             "ui_name": "Click to store loot\nin Warehouse",
                             "text_color": [1,1,1,1], "text_hjustify": "left", "text_vjustify": "top" },
 
             "warehouse_label": { "kind": "TextField", "xy": [200,69], "dimensions": [490,32], "text_size": 13, "ui_name": "Warehouse (Level %d)",
                                  "text_color": [1,1,1,1], "text_hjustify": "center", "text_vjustify": "center" },
+
+            "restack_spinner": { "kind": "StaticImage", "xy":[606,76], "dimensions":[16,16], "asset":"loading_spinner"},
+
+            "restack_button": {"kind": "ActionButton", "xy":[628,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
+                            "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
 
             "help_button": {"kind": "ActionButton", "xy":[659,72], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
                             "ui_tooltip": "How Loot works", "tooltip_delay": 0 },
@@ -9205,7 +9208,11 @@
                                 "ui_name_repair": "Resolve", // "Repair"
                                 "ui_name_repair_speedup": "Resolve", // "Speed Up",
                                 "ui_name_upgrade_speedup": "Resolve" // "Speed Up"
-                              }
+                              },
+            "pending_all_mask": { "show": 0, "kind": "SolidRect", "color": [0,0,0,0.5],
+                              "xy": [200,100], "dimensions": [500,309], "transparent_to_mouse": false },
+
+            "loot_arrow": { "kind": "StaticImage", "xy": [188,137], "dimensions": [24,24], "asset": "arrow_e" }
         }
     },
 
@@ -9231,6 +9238,10 @@
             "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.25] },
             "section": { "kind": "TextField", "xy": [37,68], "dimensions": [663,32], "text_size": 13, "ui_name": "Items",
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
+
+            "restack_spinner": { "kind": "StaticImage", "xy":[642,76], "dimensions":[16,16], "asset":"loading_spinner"},
+            "restack_button": {"kind": "ActionButton", "xy":[664,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
+                               "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
 
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
             "slot": { "kind": "ActionButton", "xy": [48,110], "dimensions": [50,50], "bg_image": "inventory_slot",
@@ -9285,7 +9296,10 @@
             "instructions_expire": { "kind": "TextField", "xy": [50,350], "dimensions": [663,16], "text_size": 13,
                                      "ui_name": "Items that expire marked with",
                                      "text_color": [0.66,0.66,0.66,1], "text_hjustify": "left" },
-            "instructions_expire_icon": {"kind": "StaticImage", "xy":[227,351], "dimensions":[13,13], "asset": "pacman_icon" }
+            "instructions_expire_icon": {"kind": "StaticImage", "xy":[227,351], "dimensions":[13,13], "asset": "pacman_icon" },
+
+            "pending_all_mask": { "show": 0, "kind": "SolidRect", "bevel": 2, "color": [0,0,0,0.5],
+                                  "xy": [37,100], "dimensions": [663,309], "transparent_to_mouse": false }
         }
     },
 

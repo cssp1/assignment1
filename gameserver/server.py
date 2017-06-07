@@ -13160,8 +13160,56 @@ class LivePlayer(Player):
 
     def send_inventory_update(self, retmsg):
         res = self.resources.calc_snapshot()
-        # copy.deepcopy(self.inventory) ?
-        retmsg.append(["INVENTORY_UPDATE", res.max_inventory(), self.inventory, res.reserved_inventory()])
+        retmsg.append(["INVENTORY_UPDATE", res.max_inventory(), copy.deepcopy(self.inventory), res.reserved_inventory()])
+
+    def inventory_restack(self, sort_order):
+        # restack stackable items as compactly as possible
+
+        # transform item into a hashable key, ignoring stack count
+        def item_to_key(item):
+            return tuple(sorted((k_v[0],k_v[1]) for k_v in item.iteritems() if k_v[0] != 'stack'))
+
+        # transform hashable key back into list of items (limited by max_stack)
+        def key_to_items(key, stack):
+            item = dict(key)
+            assert 'stack' not in item
+            if item['spec'] in gamedata['items']:
+                max_stack = gamedata['items'][item['spec']].get('max_stack',1)
+            else:
+                max_stack = 1
+            ret = []
+            while stack > max_stack:
+                inst = copy.deepcopy(item)
+                if max_stack != 1: inst['stack'] = max_stack
+                ret.append(inst)
+                stack -= max_stack
+
+            if stack != 1: item['stack'] = stack
+            ret.append(item)
+            return ret
+
+        # count items by key
+        inv = dict()
+        for item in self.inventory:
+            key = item_to_key(item)
+            inv[key] = inv.get(key,0) + item.get('stack',1)
+
+        # reconstruct compacted inventory
+        new_inventory = sum((key_to_items(key, stack) for key, stack in inv.iteritems()), [])
+
+        # sort the items
+        def item_sort_key(item):
+            if item['spec'] in gamedata['items']:
+                spec = gamedata['items'][item['spec']]
+                if 'category' in spec:
+                    return spec['category']
+            return item['spec']
+        new_inventory.sort(key = item_sort_key, reverse = (sort_order == -1))
+
+        #gamesite.exception_log.event(server_time, 'OLD: %r\nNEW: %r' % (self.inventory, new_inventory))
+
+        # atomically update inventory
+        self.inventory = new_inventory
 
     # log fishing-related events
     def fishing_log_event(self, event_name, queue_entry, ui_index = None, time_left = None, loot = None):
@@ -28945,6 +28993,14 @@ class GAMEAPI(resource.Resource):
             if success and (not is_equipped):
                 session.player.send_inventory_update(retmsg)
                 retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+
+        elif arg[0] == "INVENTORY_RESTACK":
+            sort_order = arg[1]
+            if session.player.warehouse_is_busy():
+                retmsg.append(["ERROR", "WAREHOUSE_IS_BUSY"])
+                return
+            session.player.inventory_restack(sort_order)
+            session.player.send_inventory_update(retmsg)
 
         elif arg[0] == "EQUIP_BUILDING":
             try:

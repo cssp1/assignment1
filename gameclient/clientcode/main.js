@@ -24258,8 +24258,10 @@ function invoke_inventory_dialog(force) {
     return dialog;
 }
 
+var inventory_restack_sync_marker = Synchronizer.INIT;
 // the "inventory grid" functions are used by both inventory_dialog and loot_dialog
 function init_inventory_grid(dialog) {
+    dialog.user_data['restack_sort_order'] = 1;
     dialog.user_data['context'] = null;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['item']['array'][1];
     dialog.user_data['cols_per_page'] = dialog.data['widgets']['item']['array'][0];
@@ -24368,6 +24370,7 @@ function update_inventory_grid(dialog) {
 
                     if(item['pending']) { can_activate = false; }
                     if(warehouse_busy) { can_activate = false; }
+                    if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { can_activate = false; }
 
                     dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === slot ? 'active' : 'normal'));
 
@@ -24531,6 +24534,20 @@ function update_inventory_grid(dialog) {
         dialog.widgets['overstuffed_warning'].show = (player.inventory.length > player.max_usable_inventory());
         dialog.widgets['overstuffed_warning'].str = dialog.data['widgets']['overstuffed_warning'][(warehouse && warehouse.level < warehouse.get_max_ui_level() ? 'ui_name': 'ui_name_maxlevel')].replace('%s', warehouse.spec['ui_name']);
     }
+
+    dialog.widgets['restack_button'].show = !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
+    dialog.widgets['restack_button'].onclick = function(w) {
+        var dialog = w.parent;
+        if(dialog.user_data['context']) {
+            invoke_inventory_context(dialog, null, -1, null, false);
+        }
+        if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { return; }
+        send_to_server.func(["INVENTORY_RESTACK", dialog.user_data['restack_sort_order']]);
+        dialog.user_data['restack_sort_order'] *= -1;
+        inventory_restack_sync_marker = synchronizer.request_sync();
+    };
+    dialog.widgets['restack_spinner'].show =
+        dialog.widgets['pending_all_mask'].show = !synchronizer.is_in_sync(inventory_restack_sync_marker);
 };
 
 /** @constructor @struct
