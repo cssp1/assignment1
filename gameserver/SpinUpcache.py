@@ -1127,6 +1127,11 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             obj['gamebucks_balance'] = resources.get('gamebucks', 0) # note: this is redundant with a player history field of the same name filled in by TIME_CURRENT_FIELDS. Added just to be sure it's here even if we don't have that player history field.
             obj['lock_state'] = data.get('lock_state', 0)
 
+            if data.get('alias'):
+                obj['alias'] = data['alias']
+            elif 'alias' in obj:
+                del obj['alias']
+
             # note: override userdb facebook_permissions with playerdb facebook_permissions
             if 'facebook_permissions' in data and type(data['facebook_permissions']) is list:
                 obj['facebook_permissions_str'] = string.join(data['facebook_permissions'], ',')
