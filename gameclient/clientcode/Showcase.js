@@ -42,7 +42,7 @@ Showcase.append_bbcode_text_with_line_breaking = function(widget, big_string, pr
 
 Showcase.apply_showcase_hacks = function(dialog, hack) {
     if('ui_title' in hack) {
-        dialog.widgets['mission_title'].str = eval_cond_or_literal(hack['ui_title'], player, null);
+        dialog.widgets['mission_title'].set_text_with_linebreaking(eval_cond_or_literal(hack['ui_title'], player, null));
     }
     if('ui_subtitle' in hack) {
         dialog.widgets['subtitle'].str = eval_cond_or_literal(hack['ui_subtitle'], player, null);

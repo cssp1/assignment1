@@ -8335,8 +8335,8 @@
                          "gradient": "hinout", "gradient_midpoint": 0.7 },
 
             // MAIN TITLES
-            "mission_title": { "kind": "TextField", "xy": [17,43], "dimensions": [175, 45], "text_size": 17, "text_style": "thick", "text_hjustify": "center", "text_color": [1, 0.55, 0.01, 1], "drop_shadow": 1 },
-            "subtitle": { "kind": "TextField", "xy": [17,65], "dimensions": [175, 45], "text_size": 11, "text_style": "normal", "text_hjustify": "center", "text_color": [0.5,0.5,0.5,1], "drop_shadow": 1 },
+            "mission_title": { "kind": "TextField", "xy": [17,38], "dimensions": [175, 39], "text_size": 17, "text_style": "thick", "text_hjustify": "center", "text_color": [1, 0.55, 0.01, 1], "drop_shadow": 1 },
+            "subtitle": { "kind": "TextField", "xy": [17,90], "dimensions": [175, 17], "text_size": 11, "text_style": "normal", "text_hjustify": "center", "text_color": [0.5,0.5,0.5,1], "drop_shadow": 1 },
 
             // AI
             "ai_frame": { "kind": "SolidRect", "xy": [25,113], "dimensions": [157,168], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
