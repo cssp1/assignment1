@@ -1344,8 +1344,14 @@ def check_item(itemname, spec):
         error |= check_visual_effect('%s:use_effect' % itemname, spec['use_effect'])
 
     if 'expire_into' in spec:
-        if spec['expire_into'] not in gamedata['items']:
-            error |= 1; print '%s: expire_into "%s" is not a valid item' % (itemname, spec['expire_into'])
+        if isinstance(spec['expire_into'], list): # cond chain
+            error |= check_cond_chain(spec['expire_into'], reason = 'item %s:expire_into' % (itemname,))
+            result_list = [x[1] for x in spec['expire_into']]
+        else:
+            result_list = [spec['expire_into'],]
+        for result in result_list:
+            if result is not None and result not in gamedata['items']:
+                error |= 1; print '%s: expire_into "%s" is not a valid item' % (itemname, result)
 
     return error
 

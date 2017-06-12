@@ -9386,9 +9386,10 @@ class Player(AbstractPlayer):
 
             if (item.get('expire_time',-1) > 0) and (ref_time > item['expire_time']):
 
-                if spec.get('expire_into'):
+                expire_into = Predicates.eval_cond_or_literal(spec.get('expire_into'), session, self)
+                if expire_into:
                     # morph instead of expiring
-                    new_expire_time = session.get_item_spec_forced_expiration(gamedata['items'][spec['expire_into']])
+                    new_expire_time = session.get_item_spec_forced_expiration(gamedata['items'][expire_into])
                     if new_expire_time > 0 and ref_time > new_expire_time:
                         # but the morph target expired too, so just remove normally
                         to_remove.append(item)
@@ -9397,7 +9398,7 @@ class Player(AbstractPlayer):
                         # morph it
                         self.inventory_log_event('5132_item_expired', item['spec'], -item.get('stack',1), item.get('expire_time',-1), level = item.get('level',None))
 
-                        item['spec'] = spec['expire_into']
+                        item['spec'] = expire_into
 
                         if new_expire_time > 0:
                             item['expire_time'] = new_expire_time
