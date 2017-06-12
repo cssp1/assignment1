@@ -3203,6 +3203,7 @@ def check_store_sku(sku_name, sku):
                     expect_library_preds.add(root + ('_unlocked_L%d' % level))
             else: # non-per-level blueprint
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
+                expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
 
 
     for PRED in ('activation', 'requires', 'collected', 'show_if'):
