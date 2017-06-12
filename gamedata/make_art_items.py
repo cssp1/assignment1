@@ -72,6 +72,7 @@ if __name__ == '__main__':
                                'aircraft_tier_12': [0,1],
                                'aircraft_tier_14': [0,1],
                                'special_aircraft_tier_10': [0,1],
+                               'special_aircraft_tier_15': [0,1],
 
                                # BFM
                                'marine': [0,0],
