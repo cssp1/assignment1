@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="x-ua-compatible" content="IE=Edge"> 
+<meta charset="UTF-8">
+    <style type="text/css">
+     body {
+	 font-family: sans-serif;
+	 color: #808080;
+	 background: linear-gradient(#121212, #363636)
+     }
+     a, a:visited {
+	 color: inherit;
+	 text-decoration: none;
+     }
+     a:hover {
+	 color: inherit;
+	 text-decoration: none;
+     }
+     .djm-footer {
+         color: #808080;
+     }
+     .djm-footer-a, .djm-footer-a:visited {
+	 color: #d2b053;
+     }
+     .djm-footer-a:hover {
+	 color: #fff000;
+	 text-decoration: underline;
+     }
+     .djm-header-a, .djm-header-a:visited {
+	 color: #fd2;
+     }
+     .djm-header-a:hover {
+	 color: #fff;
+	 text-decoration: underline;
+     }
+     .djm-body-a, .djm-body-a:visited {
+	 color: #fff;
+     }
+     .djm-body-a:hover {
+	 color: #fff;
+	 text-decoration: underline;
+     }
+     table {
+	 border: 0;
+     }
+     .djm-center-column {
+	 background: linear-gradient(#262626, #121212);
+	 border: 2px solid #303030;
+     }
+     .djm-btn-div {
+	 border-radius: 14px;
+	 background: #bd1b1b;
+	 padding: 10px 20px 10px 20px;
+	 box-shadow: 0px 0px 10px #d0d0d0;
+     }
+     .djm-btn-div:hover {
+	 background: #df3c3c;
+	 box-shadow: 0px 0px 20px #ffffd0;
+     }
+     .djm-btn-a {
+	 text-decoration: none;
+	 font-size: 200%;
+	 color: #fff !important;
+	 text-shadow: 1px 1px 2px black;
+     }
+     .djm-btn-a:hover {
+	 text-decoration: none !important;
+     }
+     .djm-notification-top {
+	 color: #808080;
+	 font-size: 18px;
+     }
+     .djm-notification-body {
+	 color: #fff;
+	 font-style: bold;
+	 font-size: 120%;
+     }
+     .djm-notification-headline {
+	 color: #fd2; /* #df3c3c; */
+	 font-size: 300%;
+	 /* -webkit-mask-image: linear-gradient(top, rgba(0,0,0,1), rgba(0,0,0,.5) 50%, rgba(0,0,0,1)); */
+     }
+    </style>
+    <title></title>
+</head>
+<body style="font-family: sans-serif;color: #808080;background: linear-gradient(#121212, #363636);">
+<script type="application/ld+json">
+{
+  "@context": "http://schema.org",
+  "@type": "EmailMessage",
+  "description": "{{ UI_SUBJECT }}",
+  "potentialAction": {
+    "@type": "ViewAction",
+    "target": "{{ GAME_URL }}",
+    "name": "{{ UI_CTA }}"
+  }
+}
+</script>
+    <table align="center" class="djm-center-column" style="min-width: 400px;width: 75%;border: 2px solid #303030;background: linear-gradient(#262626, #121212);">
+        <tr>
+            <td><center><div class="djm-notification-top" style="margin-top: 20px;margin-bottom: 5px;color: #808080;font-size: 18px;">
+		<a class="djm-header-a" href="{{ GAME_URL }}" style="color: #fd2;text-decoration: none;">
+                    <!-- {{ UI_SUBJECT }} -->
+		</a>
+	    </div></center></td>
+        </tr>
+        <tr>
+            <td><center>
+                <a href="{{ GAME_URL }}" style="color: inherit;text-decoration: none;">
+		    <svg xmlns="http://www.w3.org/2000/svg" style="margin: 0px;" width="370" height="60" viewbox="0 0 480 60">
+			<defs>
+			    <style>
+			     .cls-1 {
+				 fill: #fff;
+				 fill-rule: evenodd;
+			     }
+			    </style>
+			</defs>
+			<path id="battlehouse_logo_white_vector.svg" class="cls-1" d="M69.389,51.184C67.641,59.616,61.983,66.3,52.958,66.3A16.334,16.334,0,1,1,67.36,42.24C63.733,28.687,50.139,22.26,38.519,24.669c-10.627,2.2-19.679,9.7-19.679,21.637,0,7.542,1.229,22.464,20.4,27.682C23.349,73.988,10,59.638,10,45.3,10,28.332,22.558,13.99,40.058,13.99,67.484,13.99,71.905,39.913,69.389,51.184Z" transform="translate(0 -15)" style="fill: #fff;fill-rule: evenodd;"></path>
+    <path id="battlehouse_logo_white_vector_text1.svg" class="cls-1" d="M117.062,60.592V49.349L112.4,46.02l4.585-3.493V32.484l-5.808-4.148h-24v36.4H111.1Zm-11-17.847H98.11v-7.75h7.947v7.75Zm0.077,15.282H98.11V49.349h8.024v8.678Zm51.505,6.713-9.629-36.4H131.732L122.1,64.74H133.8l1.757-7.314h8.636l1.758,7.314h11.692ZM143.73,50.55h-7.642l2.9-11.134c0.459-1.692.612-3.439,0.917-5.185C140.6,39.8,142.278,45.037,143.73,50.55Zm42.642-14.9V28.336H157.715V35.65h8.865V64.74h10.851V35.65h8.941Zm32.478,0V28.336H190.193V35.65h8.864V64.74h10.852V35.65h8.941ZM246.514,64.74V57.263H233.6V28.336H222.671v36.4h23.843Zm30.491-29.2v-7.2H251.1v36.4h25.83V57.263h-14.9V49.676h13.755v-7.2H262.1V35.54h14.9Zm36.452,29.2v-36.4H302.605V41.49H294.2V28.336H283.271v36.4H294.2V49.24h8.33v15.5h10.928ZM350.521,60.7V32.429l-5.732-4.093h-18.57l-5.731,4.093V60.7l5.731,4.039h18.57Zm-10.928-2.62h-8.177V34.995h8.177V58.082Zm48.143,2.511V28.336H376.885V58.027H368.4V28.336H357.55V60.592l5.732,4.148h18.723Zm36.911-21.668V32.266l-5.731-3.93H400.5l-5.655,4.148V43.836l18.723,7.914v6.386h-7.795V51.15l-11,1.2v8.132l5.961,4.257h18.035l5.808-4.148V47.384l-18.647-7.8v-4.8h7.719v5.4Zm32.936-3.384v-7.2H431.677v36.4h25.83V57.263h-14.9V49.676h13.756v-7.2h-13.68V35.54h14.9Z" transform="translate(0 -15)" style="fill: #fff;fill-rule: evenodd;"></path>
+      <path id="battlehouse_logo_white_vector_text2.svg" class="cls-1" d="M462.027,17.3V15.694h-6.305V17.3h1.95v6.393h2.388V17.3h1.967Zm10.924,6.393v-8H469.4l-1.278,4.174a5.058,5.058,0,0,0-.134.864c-0.034.24-.051,0.48-0.084,0.72l-0.135-1.043a2.893,2.893,0,0,0-.084-0.54l-1.278-4.174h-3.548v8h2.186V19.208c0-.648-0.084-1.3-0.084-1.943a19.657,19.657,0,0,0,.42,1.943l1.43,4.486H469l1.412-4.486a15.4,15.4,0,0,0,.42-1.943c-0.016.648-.084,1.3-0.084,1.943v4.486h2.2Z" transform="translate(0 -15)" style="fill: #fff;fill-rule: evenodd;"></path>
+		    </svg>
+		</a>
+            </center></td>
+        </tr>
+ 
+	<tr>
+	    <td><center>
+		<div class="djm-notification-headline" style="width: 80%;margin: 10px;color: #fd2;font-size: 300%;">
+		    <a class="djm-header-a" href="{{ GAME_URL }}" style="color: #fd2;text-decoration: none;">
+			{{ UI_HEADLINE }}
+		    </a>
+		</div>
+	    </center></td>
+	</tr>
+
+	<tr>
+	    <td><center>
+		<div class="djm-notification-body" style="width: 50%;margin: 10px;color: #fff;font-style: bold; font-size: 120%;">
+		    <a class="djm-body-a" href="{{ GAME_URL }}" style="color: #fff;text-decoration: none;">
+			<p>{{ UI_BODY }}</p>
+		    </a>
+		</div>
+	    </center></td>
+	</tr>
+
+	<tr>
+	    <td><center>
+		<a href="{{ GAME_URL }}" class="djm-btn-a" style="color: #fff !important;text-decoration: none;font-size: 200%;text-shadow: 1px 1px 2px black;">
+		<div class="djm-btn-div" style="width: 50%;margin: 40px;border-radius: 14px;background: #bd1b1b;background: linear-gradient(#ff4b4b,#bd1b1b);padding: 10px 20px 10px 20px;box-shadow: 0px 0px 10px #d0d0d0;">
+		    {{ UI_CTA }}
+		</div>
+		</a>
+	    </center></td>
+	</tr>
+
+        <tr>
+            <td><center>
+		<div class="djm-footer" style="width: 50%; margin:10px; color: #808080;">
+                Don't want emails? <a class="djm-footer-a" href="{{ UNSUBSCRIBE_URL }}" style="color: #d2b053;text-decoration: none;">Unsubscribe</a>.<br>
+                <a class="djm-footer-a" href="https://www.battlehouse.com/privacy-policy/" target="_blank" style="color: #d2b053;text-decoration: none;">Privacy Policy</a>. &copy; Battlehouse<br>7357 Woodbine Ave, Suite 119, Markham, ON, L3R6L3 Canada
+		</div>
+            </center></td>
+        </tr>
+    </table>
+</body>
+</html>

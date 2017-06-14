@@ -11,6 +11,7 @@ import SpinNoSQL, SpinNoSQLLog
 import SpinSingletonProcess
 import ControlAPI
 import Notification2
+import Mailgun
 
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
@@ -26,7 +27,19 @@ MIN_MTIME_AGE = 60*60 # 60min
 # process batches of this many users at once
 BATCH_SIZE = 100
 
+if 'mailgun_bulk' in SpinConfig.config:
+    mailgun = Mailgun.Mailgun(SpinConfig.config['mailgun_bulk'])
+else:
+    mailgun = None
+
 time_now = int(time.time())
+
+def linebreaks_to_p_br(text):
+    """ replace \n\n with </p><p> and \n with <br> for HTML formatting """
+    return text.replace('\n\n', '</p><p>').replace('\n', '<br>')
+
+def make_html_safe(text):
+    return text.replace('<','&lt;').replace('>','&gt;').replace('&','&amp;')
 
 def get_leveled_quantity(qty, level):
     if type(qty) == list:
@@ -370,7 +383,7 @@ class Sender(object):
                                                   'ref_suffix': ref_suffix,
                                                   'config': config['ref']},
                                                  'send_player_notifications', max_tries = 1)
-                print >> self.msg_fd, 'Sent! Response:', response
+                print >> self.msg_fd, 'CONTROLAPI Sent! Response:', response
 
             except ControlAPI.ControlAPIException as e:
                 print >> self.msg_fd, 'ControlAPIException', e
@@ -382,6 +395,56 @@ class Sender(object):
         # https://apps.facebook.com/marsfrontier/?fb_source=notification&fb_ref=harv_full&ref=notif&notif_t=app_notification
         # Battlehouse:
         # https://www.battlehouse.com/play/firestrike?bh_source=notification&ref=REF&fb_ref=REF_n
+
+        # mirror Facebook notifications to email
+        if frame_platform == 'fb' and 'email' in config and mailgun and \
+           player['abtests'].get('T331_notification_emails', None) == "on":
+            # get the email address
+            email = None
+            try:
+                user = SpinJSON.loads(SpinUserDB.driver.sync_download_user(user_id))
+                if 'facebook_profile' in user and 'email' in user['facebook_profile']:
+                    email = user['facebook_profile']['email']
+            except SpinS3.S3404Exception:
+                # missing data - might be due to an S3 failure
+                print >> self.msg_fd, '(userDB data missing)'
+                pass
+
+            if email:
+                # choose template based on email provider
+                template_html_name = 'email_notification_html.html.inlined' if email.lower().endswith('gmail.com') else \
+                                     'email_notification_html.html'
+                template_html = open(template_html_name).read().decode('utf-8')
+                template_plaintext = open('email_notification_plaintext.txt').read().decode('utf-8')
+
+                replacements = {'{{ UI_SUBJECT }}': config['email']['ui_subject'],
+                                '{{ GAME_URL }}': 'https://apps.facebook.com/%s/?fb_source=notification&ref=%s&fb_ref=%s&utm_medium=email' % (SpinConfig.config['facebook_app_namespace'], config['ref'], '%s_%s%s' % (config['ref'], n2_class, ref_suffix)),
+                                '{{ UI_CTA }}': config['email']['ui_cta'],
+                                '{{ UI_HEADLINE }}': config['email']['ui_headline'],
+                                '{{ UI_BODY }}': text,
+                                '{{ UNSUBSCRIBE_URL }}': '%unsubscribe_url%'} # use Mailgun's native replacement
+
+                expr = re.compile('|'.join(replacements.keys()))
+                ui_body_plaintext = expr.sub(lambda match: replacements[match.group(0)], template_plaintext)
+
+                # prevent unwanted HTML injection
+                for k in replacements:
+                    if k.startswith('UI_'):
+                        replacements[k] = linebreaks_to_p_br(self.make_html_safe(replacements[k]))
+
+                ui_body_html = expr.sub(lambda match: replacements[match.group(0)], template_html)
+
+                req = mailgun.send(email,
+                                   config['email']['ui_subject'],
+                                   ui_body_plaintext,
+                                   ui_body_html = ui_body_html,
+                                   tags = ['%s_%s%s' % (config['ref'], n2_class, ref_suffix)])
+
+                if dry_run:
+                    print >> self.msg_fd, '(dry-run) mailgun: %r' % req
+                else:
+                    mg_response = getattr(self.requests_session, req['method'].lower())(req['url'], data = req['params'], headers = req['headers'])
+                    print >> self.msg_fd, 'Mailgun Sent! response: %d %r' % (mg_response.status_code, mg_response.json())
 
         self.sent += 1
         self.sent_now += 1
