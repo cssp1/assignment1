@@ -49,6 +49,31 @@ if __name__ == '__main__':
                                'saber': [-2,1],
                                'ch47': [0,0],
 
+                               # FS
+                               'infantry_tier_1': [0,4],
+                               'infantry_tier_5': [0,0],
+                               'infantry_tier_10': [0,0],
+                               'special_infantry_tier_4': [0,0],
+                               'armor_tier_1': [0,2],
+                               'armor_tier_2': [0,2],
+                               'armor_tier_4': [0,2],
+                               'armor_tier_5': [0,2],
+                               'armor_tier_7': [0,2],
+                               'armor_tier_9': [0,2],
+                               'armor_tier_11': [0,2],
+                               'armor_tier_13': [0,2],
+                               'armor_tier_15': [2,2],
+                               'special_armor_tier_7': [0,2],
+
+                               'aircraft_tier_1': [0,1],
+                               'aircraft_tier_3': [0,1],
+                               'aircraft_tier_6': [0,1],
+                               'aircraft_tier_8': [0,1],
+                               'aircraft_tier_12': [0,1],
+                               'aircraft_tier_14': [0,1],
+                               'special_aircraft_tier_10': [0,1],
+                               'special_aircraft_tier_15': [0,1],
+
                                # BFM
                                'marine': [0,0],
                                'grenadier': [0,0],

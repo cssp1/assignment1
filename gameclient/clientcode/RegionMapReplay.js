@@ -202,7 +202,7 @@ RegionMapReplay.update = function(dialog) {
     if(t !== null) {
         ui_time_unix = Math.floor(t).toFixed(0);
         // add seconds manually
-        ui_time_date = pretty_print_date_and_time(t) + ':' + pad_with_zeros(Math.floor(t % 60).toFixed(0), 2);
+        ui_time_date = pretty_print_date_and_time_utc(t) + ':' + pad_with_zeros(Math.floor(t % 60).toFixed(0), 2);
     } else {
         ui_time_unix = ui_time_date = '-';
     }

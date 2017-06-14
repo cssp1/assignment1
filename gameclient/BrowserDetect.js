@@ -171,6 +171,11 @@ var BrowserDetect = {
                            identity: "Android"
                 },
                 {
+                        string: navigator.userAgent,
+                        subString: "CrOS",
+                        identity: "ChromeOS"
+                },
+                {
                         string: navigator.platform,
                         subString: "Linux",
                         identity: "Linux"

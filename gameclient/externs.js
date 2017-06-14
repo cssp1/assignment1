@@ -15,7 +15,8 @@ var BHSDK = {
         @param {function({code: string, url: string}): null} cb */
     "bh_invite_code_get": function(service, cb) {},
     /** @param {{ui_subject: string, ui_body: string}} params */
-    "bh_popup_message": function(params) {}
+    "bh_popup_message": function(params) {},
+    "bh_popup_show_how_to_bookmark": function() {}
 };
 
 // Global variables that are sent to the client by our proxyserver via proxy_index.html template replacements
@@ -54,6 +55,7 @@ var spin_session_data;
 /** @type {boolean} */
 var spin_secure_mode;
 var spin_kissmetrics_enabled;
+/** @type {string} */
 var spin_frame_platform;
 var spin_social_id;
 /** @type {boolean} */
@@ -70,6 +72,8 @@ var spin_battlehouse_user;
 var spin_battlehouse_api_path;
 /** @type {string} */
 var spin_battlehouse_access_token;
+/** @type {string} */
+var spin_battlehouse_fb_app_id;
 /** @type {boolean} */
 var spin_facebook_enabled;
 /** @type {string} */
@@ -79,6 +83,14 @@ var spin_facebook_signed_request;
 var spin_facebook_oauth_token;
 var spin_facebook_login_permissions;
 var spin_facebook_api_versions;
+
+// VVV specific to FacebookSDK.js VVV
+/** @type {!Array<function()>} */
+var spin_facebook_sdk_on_init_callbacks;
+/** @type {boolean} */
+var spin_facebook_sdk_loaded;
+// ^^^ specific to FacebookSDK.js ^^^
+
 var spin_art_protocol;
 var spin_art_path;
 var spin_unsupported_browser_landing;
@@ -111,6 +123,9 @@ var FB = {
         "logEvent": function() {},
         "EventNames": function() {},
         "ParameterNames": function() {}
+    },
+    "XFBML": {
+        "parse": function() {}
     },
     "Canvas": {
         "setSize": function() {},
@@ -686,6 +701,19 @@ Event.prototype.pointerType = function() {};
 Event.prototype.MSPOINTER_TYPE_TOUCH = function() {};
 Event.prototype.MSPOINTER_TYPE_MOUSE = function() {};
 Event.prototype.MSPOINTER_TYPE_PEN = function() {};
+
+// WebSocket API
+
+//
+/**
+ * @constructor
+ * @extends Event
+ */
+var CloseEvent = function() {};
+/** @type {number|undefined} */
+CloseEvent.prototype.code;
+/** @type {boolean|undefined} */
+CloseEvent.prototype.wasClean;
 
 // Fix old Google Closure Library incompatibility with more recent Closure Compilers
 

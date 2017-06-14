@@ -1,0 +1,16 @@
+#cloud-config
+runcmd:
+ - yum update -y
+ - yum install -y puppet3 facter2 aws-cli
+ - mkdir -p /etc/facter/facts.d /etc/puppet/modules
+ - rm -f /etc/facter/facts.d/terraform.txt && touch /etc/facter/facts.d/terraform.txt && chmod 0600 /etc/facter/facts.d/terraform.txt
+ - echo "terraform_cron_mail_sns_topic=${terraform_cron_mail_sns_topic}" >> /etc/facter/facts.d/terraform.txt
+ - echo "sitename=${sitename}" >> /etc/facter/facts.d/terraform.txt
+ - echo "sitedomain=${sitedomain}" >> /etc/facter/facts.d/terraform.txt
+ - echo "enable_backups=${enable_backups}" >> /etc/facter/facts.d/terraform.txt
+ - echo "puppet_s3_bucket=${puppet_s3_bucket}" >> /etc/facter/facts.d/terraform.txt
+ - aws s3 cp s3://${puppet_s3_bucket}/battlehouse-infra-puppet-modules.tar.gz /tmp
+ - (cd /etc/puppet/modules && tar zxf /tmp/battlehouse-infra-puppet-modules.tar.gz) && rm -f /tmp/battlehouse-infra-puppet-modules.tar.gz
+ - chmod +x /etc/puppet/modules/*/facts.d/*
+ - echo "include spin_ec2" > /etc/puppet/main.pp
+ - chown -R root:root /etc/puppet

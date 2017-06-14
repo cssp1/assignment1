@@ -446,13 +446,36 @@ ItemDisplay.get_inventory_item_ui_description = function(item, opts) {
         }
     }
 
-    if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
+    if(ItemDisplay.inventory_item_is_refundable(item)) {
         descr += '\n\n';
         var template = spec['ui_refund'] || gamedata['strings']['inventory_refund'];
-        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(spec, 1));
+        descr += template.replace('%s', ItemDisplay.get_inventory_item_refund_str(item));
     }
 
     return descr;
+};
+
+/** check if an item can be refunded right now
+    @param {!Object} item
+    @return {boolean} */
+ItemDisplay.inventory_item_is_refundable = function(item) {
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    if(!('refund' in spec)) { return false; }
+
+    if(('refundable_when' in spec) && !read_predicate(spec['refundable_when']).is_satisfied(player, null)) {
+        return false;
+    }
+
+    var refund = spec['refund'];
+    var level = ('level' in item ? item['level'] : 1);
+
+    // is it a per-level list?
+    if(refund.length >= 1 && (Array.isArray(refund[0]) || refund[0] === null)) {
+        if(refund.length < level) { throw Error('refund array not long enough: '+item['spec']); }
+        refund = refund[level-1];
+    }
+
+    return (refund !== null);
 };
 
 /** return SPUI.Color corresponding to item rarity
@@ -466,11 +489,23 @@ ItemDisplay.get_inventory_item_color = function(spec) {
 };
 
 /** return displayable refund description for a refundable item
-    @param {Object} spec
-    @param {number} count
+    @param {Object} item
+    @param {number=} count - overrides stack count
     @returns {string} */
-ItemDisplay.get_inventory_item_refund_str = function(spec, count) {
+ItemDisplay.get_inventory_item_refund_str = function(item, count) {
+    var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
+    var level = ('level' in item ? item['level'] : 1);
+    if(count === undefined) {
+        count = ('stack' in item? item['stack'] : 1);
+    }
     var refund = spec['refund'];
+
+    // is it a per-level list?
+    if(refund.length >= 1 && (Array.isArray(refund[0]) || refund[0] === null)) {
+        if(refund.length < level) { throw Error('refund array not long enough: '+item['spec']); }
+        refund = refund[level-1];
+    }
+
     if(refund.length != 1 || !('spec' in refund[0])) {
         throw Error('unhandled refund str '+JSON.stringify(spec['refund']));
     }

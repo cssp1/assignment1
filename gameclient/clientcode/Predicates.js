@@ -458,6 +458,44 @@ BuildingQuantityPredicate.prototype.do_ui_help = function(player) {
     return null;
 };
 
+
+/** @constructor @struct
+  * @extends Predicate */
+function BaseRichnessPredicate(data) {
+    goog.base(this, data);
+    this.min_richness = data['min_richness'];
+}
+goog.inherits(BaseRichnessPredicate, Predicate);
+BaseRichnessPredicate.prototype.is_satisfied = function(player, qdata) {
+    return session.viewing_base && (session.viewing_base.base_richness >= this.min_richness);
+};
+BaseRichnessPredicate.prototype.do_ui_describe = function(player) {
+    var ret = gamedata['strings']['predicates'][this.kind]['ui_name'];
+    var pair = goog.array.find(gamedata['strings']['regional_map']['richness'], function(entry) {
+        return entry[0] >= this.min_richness;
+    }, this);
+    if(!pair) { pair = gamedata['strings']['regional_map']['richness'][gamedata['strings']['regional_map']['richness'].length-1]; }
+    ret = ret.replace('%s', pair[1]);
+    return new PredicateUIDescription(ret);
+};
+/** @override */
+BaseRichnessPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
+function BaseTypePredicate(data) {
+    goog.base(this, data);
+    this.types = data['types'];
+}
+goog.inherits(BaseTypePredicate, Predicate);
+BaseTypePredicate.prototype.is_satisfied = function(player, qdata) {
+    return session.viewing_base && goog.array.contains(this.types, session.viewing_base.base_type);
+};
+BaseTypePredicate.prototype.do_ui_describe = function(player) { return null; }; // don't show in GUI
+/** @override */
+BaseTypePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+
 /** @constructor @struct
   * @extends Predicate */
 function BuildingLevelPredicate(data) {
@@ -470,6 +508,27 @@ function BuildingLevelPredicate(data) {
 }
 goog.inherits(BuildingLevelPredicate, Predicate);
 BuildingLevelPredicate.prototype.is_satisfied = function(player, qdata) {
+    // special case for quarries etc
+    if(!this.obj_id && !session.home_base) {
+
+        /** @type {string|null} for debugging */
+        var err = null;
+        if(!this.building_spec['track_level_in_player_history']) {
+            err = 'cannot evaluate outside home base without track_level_in_player_history';
+        }
+        if(this.trigger_qty !== 1 || this.upgrading_ok) {
+            err = 'cannot evaluate outside home base with trigger_qty != 1 or upgrading_ok';
+        }
+        if(err) { // don't crash, but assume it's false
+            log_exception(null, err+': '+JSON.stringify(this.data));
+            return false;
+        }
+
+        var history_key = this.building_spec['name']+'_level';
+        var cur_level = (history_key in player.history ? player.history[history_key] : 0);
+        return cur_level >= this.trigger_level;
+    }
+
     var count = 0;
     if(session.for_each_real_object(function(obj) {
         if((!this.obj_id || this.obj_id === obj.id) &&
@@ -504,6 +563,8 @@ BuildingLevelPredicate.prototype.do_ui_help = function(player) {
     if(('show_if' in this.building_spec) && !read_predicate(this.building_spec['show_if']).is_satisfied(player, null)) {
         return null;
     }
+
+    if(!this.obj_id && !session.home_base) { return null; } // punt to avoid a special case for quarries
 
     var raw_count = 0;
     var level_count = 0;
@@ -712,6 +773,7 @@ function AuraActivePredicate(data) {
     goog.base(this, data);
     this.aura_name = data['aura_name'];
     this.min_stack = data['min_stack'] || 1;
+    this.min_level = data['min_level'] || -1;
     this.match_data = data['match_data'] || null;
 }
 goog.inherits(AuraActivePredicate, Predicate);
@@ -720,7 +782,8 @@ goog.inherits(AuraActivePredicate, Predicate);
 AuraActivePredicate.prototype.find_aura = function(player, qdata) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
-        if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack)) {
+        if(aura['spec'] == this.aura_name && ((aura['stack']||1) >= this.min_stack) && ((aura['level']||1) >= this.min_level)) {
+            if(('start_time' in aura) && (aura['start_time'] > server_time)) { continue; }
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             if(this.match_data !== null) {
                 var theirs = aura['data'] || null;
@@ -766,6 +829,7 @@ AuraInactivePredicate.prototype.do_ui_describe = function(player) {
     for(var i = 0; i < player.player_auras.length; i++) {
         var aura = player.player_auras[i];
         if(aura['spec'] == this.act_pred.aura_name && ((aura['stack']||1) >= this.act_pred.min_stack)) {
+            if(('start_time' in aura) && (aura['start_time'] > server_time)) { continue; }
             if(('end_time' in aura) && (aura['end_time'] > 0) && (aura['end_time'] < server_time)) { continue; }
             togo = ('end_time' in aura ? aura['end_time'] - server_time : -1);
         }
@@ -1378,11 +1442,19 @@ FacebookAppNamespacePredicate.prototype.is_satisfied = function(player, qdata) {
 function ClientFacebookLikesPredicate(data) {
     goog.base(this, data);
     this.id = data['id'];
+    // return value to assume if the data seems unreliable
+    this.assume_default = (!!data['default']) || false;
 }
 goog.inherits(ClientFacebookLikesPredicate, Predicate);
 ClientFacebookLikesPredicate.prototype.is_satisfied = function(player, qdata) {
     if(!spin_facebook_enabled || spin_frame_platform != 'fb') { return false; }
-    return SPFB.likes(this.id);
+    var result = SPFB.likes(this.id);
+    if(result.reliable) {
+        return result.likes_it;
+    } else {
+        // note: likes_it will always be false here
+        return this.assume_default;
+    }
 };
 
 /** @constructor @struct
@@ -1812,6 +1884,9 @@ PlayerLevelPredicate.prototype.is_satisfied = function(player, qdata) {
 PlayerLevelPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name'].replace('%d', this.level.toString()));
 };
+/** @override */
+PlayerLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
 
 /** @constructor @struct
   * @extends Predicate */
@@ -1936,6 +2011,8 @@ function read_predicate(data) {
     else if(kind === 'ALL_BUILDINGS_UNDAMAGED') { return new AllBuildingsUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNDAMAGED') { return new ObjectUndamagedPredicate(data); }
     else if(kind === 'OBJECT_UNBUSY') { return new ObjectUnbusyPredicate(data); }
+    else if(kind === 'BASE_TYPE') { return new BaseTypePredicate(data); }
+    else if(kind === 'BASE_RICHNESS') { return new BaseRichnessPredicate(data); }
     else if(kind === 'BUILDING_DESTROYED') { return new BuildingDestroyedPredicate(data); }
     else if(kind === 'BUILDING_QUANTITY') { return new BuildingQuantityPredicate(data); }
     else if(kind === 'BUILDING_LEVEL') { return new BuildingLevelPredicate(data); }

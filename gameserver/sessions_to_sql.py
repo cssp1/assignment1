@@ -112,7 +112,7 @@ def do_main():
     if verbose: print 'earliest_incomplete', earliest_incomplete, 'latest_complete', latest_complete, '-> start_time', start_time
 
     # dump the tail end of old SQL data, since new logins may have appeared between then and now
-    cur.execute("DELETE FROM "+sql_util.sym(sessions_table)+" WHERE start >= %s", start_time)
+    cur.execute("DELETE FROM "+sql_util.sym(sessions_table)+" WHERE start >= %s", [start_time])
     if verbose: print 'dumped', cur.rowcount, 'sessions starting', start_time
     con.commit()
 
@@ -259,7 +259,7 @@ def do_main():
 
         if verbose: print 'pruning', sessions_table
         cur = con.cursor()
-        cur.execute("DELETE FROM "+sql_util.sym(sessions_table)+" WHERE start < %s", old_limit)
+        cur.execute("DELETE FROM "+sql_util.sym(sessions_table)+" WHERE start < %s", [old_limit])
         if do_optimize:
             if verbose: print 'optimizing', sessions_table
             cur.execute("OPTIMIZE TABLE "+sql_util.sym(sessions_table))

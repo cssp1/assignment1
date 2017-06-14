@@ -222,7 +222,7 @@ if __name__ == '__main__':
             if verbose: print 'pruning', damage_attribution_table, 'limit was', time_now - int(KEEP_DAYS * 86400), 'after affected_days limit', old_limit
 
             cur = con.cursor()
-            cur.execute("DELETE FROM "+sql_util.sym(damage_attribution_table)+" WHERE time < %s", old_limit)
+            cur.execute("DELETE FROM "+sql_util.sym(damage_attribution_table)+" WHERE time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'optimizing', damage_attribution_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(damage_attribution_table))

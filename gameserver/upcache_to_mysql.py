@@ -85,8 +85,11 @@ lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
                                           'acquisition_ad_skynet',
                                           'country', 'country_tier', 'currency', 'timezone',
                                           'completed_tutorial',
-                                          'frame_platform', 'social_id', 'facebook_id', 'facebook_name', 'kg_id', 'kg_username', 'ag_id', 'ag_username', 'bh_id', 'bh_username', 'mm_id', 'mm_username',
-                                          'money_spent', 'money_refunded', 'num_purchases', 'client:purchase_ui_opens', 'client:purchase_ui_opens_preftd', 'player_level', 'player_xp',
+                                          'frame_platform', 'social_id', 'facebook_id', 'facebook_name', 'facebook_first_name', 'kg_id', 'kg_username', 'ag_id', 'ag_username', 'bh_id', 'bh_username', 'mm_id', 'mm_username',
+                                          'money_spent', 'money_refunded', 'num_purchases',
+                                          'client:purchase_ui_opens', 'client:purchase_ui_opens_preftd',
+                                          'client:purchase_inits', 'client:purchase_inits_preftd',
+                                          'player_level', 'player_xp',
                                           'home_region', 'tutorial_state', 'upcache_time',
                                           'returned_[0-9]+-[0-9]+h',
                                           'reacquired_[0-9]+d', 'first_time_reacquired_[0-9]+d', 'last_time_reacquired_[0-9]+d',
@@ -164,7 +167,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
         elif key == 'browser_os': return 'VARCHAR(16)'
         elif key == 'browser_name': return 'VARCHAR(16)'
         elif key == 'birthday': return 'VARCHAR(10)'
-        elif key == 'last_login_ip': return 'VARCHAR(16)'
+        elif key == 'last_login_ip': return 'VARCHAR(64)'
         else: return 'VARCHAR(128)'
 
     else: # not a recognized data type
@@ -272,8 +275,8 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['upgrade_achievement_table']) + \
                                     " (" + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", kind, spec, level, is_maxed, num_players) " + \
                                     " VALUES (" + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE num_players = num_players + %s",
-                                    [k + (v,v) for k,v in upgrade_achievement_counters.iteritems()])
+                                    " ON DUPLICATE KEY UPDATE num_players = num_players + VALUES(num_players)",
+                                    [k + (v,) for k,v in upgrade_achievement_counters.iteritems()])
                     con.commit()
                     upgrade_achievement_counters.clear()  # clear accumulator
                     break
@@ -290,8 +293,8 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['army_composition_table']) + \
                                     " (time, " + ','.join([x[0] for x in collapsed_summary_dimensions(sql_util)]) + ", kind, spec, level, location, total_count) " + \
                                     " VALUES (%s, " + ','.join(['%s'] * len(collapsed_summary_dimensions(sql_util))) + ", %s, %s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE total_count = total_count + %s",
-                                    [(time_now,) + k + (v, v) for k,v in army_composition.iteritems()])
+                                    " ON DUPLICATE KEY UPDATE total_count = total_count + VALUES(total_count)",
+                                    [(time_now,) + k + (v,) for k,v in army_composition.iteritems()])
                     con.commit()
                     army_composition.clear() # clear accumulator
                     break
@@ -308,9 +311,9 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['resource_levels_table']) + \
                                     " (time, " + ','.join([x[0] for x in sql_util.summary_out_dimensions()]) + ", resource, total_amount, num_players) " + \
                                     " VALUES (%s, " + ','.join(['%s'] * len(sql_util.summary_out_dimensions())) + ", %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE total_amount = total_amount + %s, num_players = num_players + %s",
+                                    " ON DUPLICATE KEY UPDATE total_amount = total_amount + VALUES(total_amount), num_players = num_players + VALUES(num_players)",
                                     # note: "v" here is (amount, num_players) for each summary dimension combination
-                                    [(time_now,) + k + tuple(v) + tuple(v) for k,v in resource_levels.iteritems()])
+                                    [(time_now,) + k + tuple(v) for k,v in resource_levels.iteritems()])
                     con.commit()
                     resource_levels.clear() # clear accumulator
                     break
@@ -327,9 +330,9 @@ def do_slave(input):
                     cur.executemany("INSERT INTO "+sql_util.sym(input['abtests_table']) + \
                                     " (user_id, test_name, group_name, join_time) " + \
                                     " VALUES (%s, %s, %s, %s) " + \
-                                    " ON DUPLICATE KEY UPDATE group_name = %s, join_time = %s",
+                                    " ON DUPLICATE KEY UPDATE group_name = VALUES(group_name), join_time = VALUES(join_time)",
                                     # note: "k" is (user_id, test_name, "v" is (group_name, join_time)
-                                    [k + v + v for k,v in abtest_memberships.iteritems()])
+                                    [k + v for k,v in abtest_memberships.iteritems()])
                     con.commit()
                     abtest_memberships.clear() # clear accumulator
                     break
@@ -471,9 +474,12 @@ def do_slave(input):
                 alt_accounts = user.get('known_alt_accounts', None)
                 if alt_accounts and type(alt_accounts) is dict:
                     cur.executemany("INSERT INTO "+sql_util.sym(input['alts_table']) + \
-                                    " (user_id, other_id, logins, attacks, last_simultaneous_login)" + \
-                                    " VALUES (%s,%s,%s,%s,%s)",
-                                    [(user['user_id'], int(alt_sid), alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None)) \
+                                    " (user_id, other_id, lower_id, higher_id, logins, attacks, last_simultaneous_login, last_ip)" + \
+                                    " VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                                    [(user['user_id'], int(alt_sid),
+                                      min(user['user_id'], int(alt_sid)),
+                                      max(user['user_id'], int(alt_sid)),
+                                      alt.get('logins',1), alt.get('attacks',1), alt.get('last_login',None), alt.get('last_ip',None)) \
                                      for alt_sid, alt in alt_accounts.iteritems() if alt.get('logins',1) > 0 and not alt.get('ignore',False)])
 
             # army composition table
@@ -754,10 +760,16 @@ if __name__ == '__main__':
                 sql_util.ensure_table(cur, alts_table+'_temp',
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('other_id','INT4 NOT NULL'),
+                                                  ('lower_id','INT4 NOT NULL'),
+                                                  ('higher_id','INT4 NOT NULL'),
                                                   ('logins','INT4'),
                                                   ('attacks','INT4'),
-                                                  ('last_simultaneous_login','INT8')],
+                                                  ('last_simultaneous_login','INT8'),
+                                                  ('last_ip', 'VARCHAR(64)'),
+                                                  ],
                                        'indices': {'by_user_id': {'keys': [('user_id','ASC')]},
+                                                   # to uniquify alt "groups", knock out any user_id that appears as a higher_id in this table
+                                                   'by_higher_id': {'keys': [('higher_id','ASC')]},
                                                    #'by_logins': {'keys': [('logins','ASC')]},
                                                    #'by_attacks': {'keys': [('attacks','ASC')]},
                                                    }
@@ -847,7 +859,7 @@ if __name__ == '__main__':
                     KEEP_DAYS = 999
                     old_limit = time_now - KEEP_DAYS * 86400
 
-                    cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", old_limit)
+                    cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", [old_limit])
                     con.commit()
 
             if verbose: print 'all done.'

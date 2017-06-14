@@ -63,6 +63,8 @@ def get_cc_requirement_predicate(gamedata, pred):
         return -1
     elif pred['predicate'] == 'LIBRARY':
         return get_cc_requirement_predicate(gamedata, gamedata['predicate_library'][pred['name']])
+    elif pred['predicate'] == 'BASE_RICHNESS':
+        return pred['min_richness']//10 # keep in sync with balance.py
     elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
                                'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE'):
         pass

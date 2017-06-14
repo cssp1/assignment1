@@ -76,7 +76,7 @@ if [[ "$FREQ" == "daily" ]]; then
   # analytics-views
   run_it ./update-analytics-views.sh # requires sessions, metrics, facebook_campaign_map (currently from upcache), fb_notifications, fb_permissions, credits, battles, battle_risk_reward
 
-  run_it ./map_to_mysql.py -q
+  run_it ./map_to_mysql.py -q --prune
   run_it ./damage_protection_to_sql.py -q --prune
   run_it ./ladder_pvp_to_sql.py -q --prune
   run_it ./chat_to_sql.py -q --prune
@@ -92,7 +92,9 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./alliance_events_to_sql.py -q --prune
   run_it ./alliance_state_to_sql.py -q
   run_it ./skynet_conversion_pixels_to_sql.py -q
-  run_it ./schedule_to_sql.py --workspace 'spinpunch.com' --project 'SHIP Schedule' --project 'Market Research' -q
+
+  # OBSOLETE
+  # run_it ./schedule_to_sql.py --workspace 'spinpunch.com' --project 'SHIP Schedule' --project 'Market Research' -q
 
   # upcache is slowest
 

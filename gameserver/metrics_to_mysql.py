@@ -116,6 +116,11 @@ if __name__ == '__main__':
                 keyvals.append(('spec',row['quest']))
                 if 'count' in row:
                     keyvals.append(('stack',row['count']))
+            elif row['event_name'] == '4030_upgrade_building':
+                # note: for FS quarries only
+                if row.get('base_type') != 'quarry': continue
+                keyvals.append(('spec',row['building_type']))
+                keyvals.append(('stack',row.get('level',1)))
             elif row['event_name'] == '4701_change_region_success':
                 if row.get('reason',None) in ('player_request',): # only include player-initiated changes
                     keyvals.append(('spec',row.get('new_region',None))) # stick the new region name in the 'spec' column
@@ -142,8 +147,8 @@ if __name__ == '__main__':
             elif row['event_name'] == '3350_no_miss_hack':
                 keyvals.append(('spec', row['spellname']))
 
-            elif row['event_name'] == '6000_reacquisition_gift_sent':
-                keyvals.append(('spec', row['gift']))
+            elif row['event_name'] in ('6000_retention_incentive_sent','6001_retention_incentive_claimed'):
+                keyvals.append(('stack', row['days']))
 
             elif row['event_name'] == '5141_dp_cancel_aura_acquired':
                 keyvals.append(('spec', row['aura_name']))
@@ -213,7 +218,7 @@ if __name__ == '__main__':
 
             if verbose: print 'pruning', metrics_table
             cur = con.cursor()
-            cur.execute("DELETE FROM "+sql_util.sym(metrics_table)+" WHERE time < %s", old_limit)
+            cur.execute("DELETE FROM "+sql_util.sym(metrics_table)+" WHERE time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'optimizing', metrics_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(metrics_table))

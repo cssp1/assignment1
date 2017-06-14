@@ -51,7 +51,9 @@ if __name__ == '__main__':
         admin_config['password'] = password
         admin_conf = SpinConfig.parse_mongodb_config(name, admin_config, parent = parents.get(name,None))
 
-        if admin_conf['host'] != host: continue
+        if admin_conf['host'] != host and host not in admin_config.get('hosts',''):
+            continue
+
         if not nosql_con:
             # note! connect to 'admin' database as root
             print 'Connecting to', host, 'admin...'

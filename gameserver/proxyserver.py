@@ -90,6 +90,8 @@ proxy_launch_time = proxy_time
 
 const_one_year = 60*60*24*365
 
+image_dimensions_re = re.compile(r'^.*([^0-9]+)([0-9]+)x([0-9]+).(jpg|png|gif|mp4|webm)')
+
 fb_async_http = None
 if SpinConfig.config.get('enable_facebook', 0):
     config = SpinConfig.config['proxyserver'].get('AsyncHTTP_Facebook', {})
@@ -210,7 +212,7 @@ def reload_static_includes():
     global static_includes
     STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'index_body_bh.html', 'index_body_mm.html', 'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
-                            'FacebookSDK.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html', 'BattlehouseSDK.js',
+                            'FacebookSDK.js', 'FacebookSDK_Battlehouse.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html', 'BattlehouseSDK.js',
                             'XsollaSDK.min.js']
     new_includes = dict([(basename, open('../gameclient/'+basename).read().decode('utf-8')) for basename in STATIC_INCLUDE_FILES])
     static_includes = new_includes
@@ -472,7 +474,7 @@ class FBVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.facebook_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = self.server_protocol + 'apps.facebook.com/' + SpinConfig.config['facebook_app_namespace'] + '/' + q_clean_qs(request.uri)
+        self.game_container = 'https://apps.facebook.com/' + SpinConfig.config['facebook_app_namespace'] + '/' + q_clean_qs(request.uri)
 
     # canvas_url is the URL for the CONTENTS of the iframe, used for refreshing/reloading the game - SHOULD include signed_request
     def canvas_url(self):
@@ -581,7 +583,9 @@ class BHVisitor(Visitor):
         return ('go_away_whitelist' in SpinConfig.config) and (self.battlehouse_id not in SpinConfig.config['go_away_whitelist'])
 
     def set_game_container(self, request):
-        self.game_container = SpinConfig.config['proxyserver'].get('fallback_landing', '//www.battlehouse.com/') # punt :(
+        self.game_container = 'https://www.battlehouse.com/play/' + \
+                              SpinConfig.config['battlehouse_app_namespace']
+        # don't add any campaign/invite params here
 
     # XXXXXXBH this might break the OAuth redirect to have extra parameters in the query string?
     def canvas_url(self):
@@ -638,6 +642,9 @@ visitor_table = {}
 
 def controlapi_url(gameserver_host, gameserver_port):
     return 'http://%s:%d/CONTROLAPI' % (gameserver_host, gameserver_port)
+
+def statsapi_url(gameserver_host, gameserver_port):
+    return 'http://%s:%d/STATSAPI' % (gameserver_host, gameserver_port)
 
 def controlapi_handle(request):
     if 'secret' not in request.args or request.args['secret'][-1] != SpinConfig.config['proxy_api_secret'] or 'method' not in request.args:
@@ -820,6 +827,62 @@ def controlapi_queue_poll():
             d.addErrback(unlock_and_pass_error, entry)
             d.addCallback(unlock_check, dummy_request, entry)
 
+
+@defer.inlineCallbacks
+def statsapi_handle(request):
+    """ simple forwarding for STATSAPI requests """
+    try:
+        ret = yield do_statsapi_handle(request)
+
+    except BaseException:
+        exception_log.event(proxy_time, 'proxyserver: STATSAPI error on %s:\n%s' % \
+                            (log_request(request), traceback.format_exc()))
+        raise
+
+    defer.returnValue(ret)
+
+@defer.inlineCallbacks
+def do_statsapi_handle(request):
+    auth = SpinHTTP.get_twisted_header(request, 'Authorization')
+    if not auth or (not auth.startswith('Bearer ')) or \
+       (auth.split(' ')[1] != SpinConfig.config['stats_api_secret']):
+        request.setResponseCode(http.BAD_REQUEST)
+        defer.returnValue(u'{"error":"Unauthorized"}\n'.encode('utf-8'))
+
+    fwd = get_any_game_server()
+    if not fwd:
+        SpinHTTP.set_service_unavailable(request)
+        defer.returnValue(SpinHTTP.service_unavailable_response_body.encode('utf-8'))
+
+    # prepare everything we need to forward the request
+    headers = request.getAllHeaders()
+    headers.update(make_proxy_headers(request))
+    postdata = request.content.read()
+    if request.args:
+        url_qs = '?' + ('&'.join([k+'='+urllib.quote_plus(v) for k in request.args for v in request.args[k]]))
+    else:
+        url_qs = ''
+    final_url = statsapi_url(fwd[0], fwd[1]) + url_qs
+
+    resp_body, resp_headers, resp_status = \
+                 yield control_async_http.queue_request_deferred(proxy_time,
+                                                                 final_url,
+                                                                 headers = headers,
+                                                                 postdata = postdata,
+                                                                 method = 'GET',
+                                                                 callback_type = control_async_http.CALLBACK_FULL,
+                                                                 accept_http_errors = True)
+
+    update_time()
+
+    if resp_headers:
+        for k, v in resp_headers.iteritems():
+            # translate from multi-valued headers to single-valued headers, keeping only the last one
+            assert isinstance(v, list)
+            request.setHeader(k,v[-1])
+
+    request.setResponseCode(int(resp_status))
+    defer.returnValue(resp_body or u''.encode('utf-8'))
 
 # Currently active GAMEAPI sessions
 
@@ -1031,7 +1094,9 @@ class GameProxy(proxy.ReverseProxyResource):
                 return self.index_visit_login_spam()
 
         # check for overload condition
-        if control_async_http.num_on_wire() >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',100):
+        on_wire = control_async_http.num_on_wire()
+        if on_wire >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',100):
+            raw_log.event(proxy_time, 'server_overload with %d on AsyncHTTP_CONTROLAPI wire' % (on_wire,))
             return self.index_visit_server_overload()
 
         if verbose() >= 2:
@@ -1496,8 +1561,11 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_fb(self, request, visitor):
 
         # check for signed_request (either sent as POST arg or GET query string)
-        if 'signed_request' in request.args:
+        if 'spin_signed_request' in request.args:
+            visitor.raw_signed_request = request.args['spin_signed_request'][-1]
+        elif 'signed_request' in request.args:
             visitor.raw_signed_request = request.args['signed_request'][-1]
+
         elif (not SpinConfig.config.get('enable_facebook',0)) and (not SpinConfig.config.get('secure_mode',0)):
             # Facebook not enabled, use fake test user
 
@@ -1560,6 +1628,10 @@ class GameProxy(proxy.ReverseProxyResource):
                 if 'oauth_token' in signed_request:
                     visitor.oauth_token = signed_request['oauth_token']
 
+                # accept raw oauth_token from client flow (?)
+                elif (not visitor.oauth_token) and ('spin_oauth_token' in request.args):
+                    visitor.oauth_token = request.args['spin_oauth_token'][-1]
+
                 else:
                     # don't reset?
                     # visitor.oauth_token = None
@@ -1574,9 +1646,26 @@ class GameProxy(proxy.ReverseProxyResource):
 
         if (not visitor.raw_signed_request):
             if SpinHTTP.get_twisted_header(request,'user-agent').startswith('facebookexternalhit'):
+
+                if SpinConfig.config['proxyserver'].get('fbexternalhit_video'):
+                    video_url = SpinConfig.config['proxyserver']['fbexternalhit_video']
+                    dim_match = image_dimensions_re.match(video_url)
+                    if dim_match:
+                        video_width, video_height = int(dim_match.group(2)), int(dim_match.group(3))
+                    else:
+                        video_width, video_height = 1280, 720 # default
+                    video_block = '''
+<meta property="og:video" content="%s" />
+<meta property="og:video:type" content="video/mp4" />
+<meta property="og:video:width" content="%d" />
+<meta property="og:video:height" content="%d" />''' % (video_url, video_width, video_height)
+                else:
+                    video_block = ''
+
                 replacements = {
-                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit TItle'),
+                    '$FBEXTERNALHIT_TITLE$': SpinConfig.config['proxyserver'].get('fbexternalhit_title', 'FB External Hit Title'),
                     '$FBEXTERNALHIT_IMAGE$': SpinConfig.config['proxyserver'].get('fbexternalhit_image', 'FB External Hit Image'),
+                    '$FBEXTERNALHIT_VIDEO_BLOCK$': video_block,
                     '$FBEXTERNALHIT_DESCRIPTION$': SpinConfig.config['proxyserver'].get('fbexternalhit_description', 'FB External Hit Description'),
                     }
                 expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
@@ -2119,6 +2208,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 if not success: # CONTROLAPI call failed
                     if verbose(): print 'invalidate: CONTROLAPI failure on server %s user %d session %s' % (prev_session.gameserver_name, session.user_id, prev_session.session_id)
                     session_load.remove(session.gameserver_name, session.session_id)
+                    raw_log.event(proxy_time, 'server_overload due to CONTROLAPI termination failure on server %s user %d session %s' % (prev_session.gameserver_name, session.user_id, prev_session.session_id))
                     ret = self.index_visit_server_overload()
                 else:
                     if not is_latest:
@@ -2294,11 +2384,13 @@ class GameProxy(proxy.ReverseProxyResource):
         if session.ip == '10.181.117.67': # bad CloudFlare IP
             possible_alts = []
         else:
-            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', -1)
+            stickiness = SpinConfig.config['proxyserver'].get('alt_ip_stickiness', 3600)
             if stickiness > 0: # use new persistent record
-                db_client.ip_hit_record(session.ip, session.user_id)
-                possible_alts = db_client.ip_hits_get(session.ip, since = proxy_time - stickiness, exclude_user_id = session.user_id)
+                ip_key = SpinHTTP.ip_matching_key(session.ip)
+                db_client.ip_hit_record(ip_key, session.user_id)
+                possible_alts = db_client.ip_hits_get(ip_key, since = proxy_time - stickiness, exclude_user_id = session.user_id)
             else: # old instantaneous-only approach
+                # note: won't detect IPv6 alts with different addresses within a /64!
                 possible_alts = db_client.sessions_get_users_by_ip(session.ip, exclude_user_id = session.user_id)
 
         if possible_alts:
@@ -2337,6 +2429,12 @@ class GameProxy(proxy.ReverseProxyResource):
         assert visitor.social_id is not None
         assert visitor.auth_token() is not None
         assert extra_data is not None
+
+        facebook_sdk = ''
+        if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)):
+            facebook_sdk = get_static_include('FacebookSDK.js')
+        elif visitor.frame_platform == 'bh' and SpinConfig.config.get('battlehouse_fb_app_id'):
+            facebook_sdk = get_static_include('FacebookSDK_Battlehouse.js')
 
         replacements = self.get_fb_global_variables(request, visitor)
         replacements.update({
@@ -2382,12 +2480,14 @@ class GameProxy(proxy.ReverseProxyResource):
             '$LOAD_GAME_CODE$': load_game_code,
             '$ONLOAD$': string.join(onload,' '),
 
-            '$FACEBOOK_SDK$': get_static_include('FacebookSDK.js') if (visitor.frame_platform == 'fb' and SpinConfig.config.get('enable_facebook',0)) else '',
+            '$FACEBOOK_SDK$': facebook_sdk,
             '$KONGREGATE_SDK$': get_static_include('KongregateSDK.js') if (visitor.frame_platform == 'kg' and SpinConfig.config.get('enable_kongregate',0)) else '',
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
             '$BATTLEHOUSE_SDK$': get_static_include('BattlehouseSDK.js').replace('$BH_LOGIN_PATH$',SpinConfig.config['battlehouse_api_path']) if (visitor.frame_platform == 'bh' and SpinConfig.config.get('enable_battlehouse',0)) else '',
+            '$BATTLEHOUSE_FB_APP_ID$': SpinConfig.config.get('battlehouse_fb_app_id',''),
+
             # XXX use an out-of-line cacheable compressed file
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.min.js') if (SpinConfig.config.get('enable_xsolla',0) and visitor.frame_platform in ('ag','bh','mm')) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
@@ -2461,6 +2561,11 @@ class GameProxy(proxy.ReverseProxyResource):
         elif self.path == '/CONTROLAPI':
             d = controlapi_handle(request)
             d.addCallback(SpinHTTP.complete_deferred_request, request)
+            return twisted.web.server.NOT_DONE_YET
+
+        elif self.path == '/STATSAPI':
+            d = statsapi_handle(request)
+            d.addBoth(SpinHTTP.complete_deferred_request_safe, request)
             return twisted.web.server.NOT_DONE_YET
 
         elif self.path == '/KGAPI':
@@ -2752,7 +2857,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'bh')
             elif self.path == '/MMROOT':
                 ret = self.render_ROOT(request, frame_platform = 'mm')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -3152,7 +3257,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
@@ -3329,7 +3434,7 @@ def do_main():
         reactor.listenSSL(myport_ssl, proxysite,
                           SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                 SpinConfig.config['ssl_crt_file'],
-                                                                certificateChainFile=SpinConfig.config['ssl_chain_file']),
+                                                                certificateChainFile=SpinConfig.config.get('ssl_chain_file',None)),
                           backlog=backlog)
 
     global metrics_log

@@ -18,7 +18,9 @@ background: #dddddd; color: #000000;
 padding:0; margin: 10px; }
 label { font-size: 14px; }
 select { height:28px; font-size: 16px; }
-input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
+input, .ui-widget input { font-family: monospace; font-size: 16px; height:28px; padding:0; }
+/* wide inputs */
+input#payment_id, input#battlehouse_id { width: 400px; }
 .spin_button { width: 150px; height: 35px; font-size: 16px; padding:0; margin-left: 5px; margin-right: 5px; }
 .spin_button_tiny { line-height: 0px; font-size: 8px !important; height: 12px; }
 .spin_radio { vertical-align: bottom; }
@@ -157,7 +159,7 @@ var payment_lookup = function() {
 };
 
 var get_ident_type = function() {
-    return {0: 'user_id', 1: 'facebook_id'}[$('#player_lookup').tabs("option","active")];
+    return {0: 'user_id', 1: 'facebook_id', 2: 'battlehouse_id'}[$('#player_lookup').tabs("option","active")];
 };
 
 var get_ident = function() {
@@ -174,12 +176,18 @@ var get_ident = function() {
         var id = parseInt(sid);
         if(isNaN(id)) { alert("Bad Facebook ID value: "+sid); return null; }
         return {'facebook_id':id};
+    } else if(t == 'battlehouse_id') {
+        var sid = $("#battlehouse_id")[0].value;
+        if(!sid) { return null; }
+        if(sid.length != 36) { alert("Bad Battlehouse ID value: "+sid); return null; }
+        return {'battlehouse_id':sid};
     }
 };
 
 var pretty_ident = function(ident) {
     if('user_id' in ident) { return 'User ID '+ident['user_id'].toString(); }
     if('facebook_id' in ident) { return 'Facebook ID '+ident['facebook_id'].toString(); }
+    if('battlehouse_id' in ident) { return 'Battlehouse ID '+ident['battlehouse_id'].toString(); }
     return 'unknown ident';
 };
 
@@ -543,7 +551,7 @@ var method_get_raw_player = function() {
                 window.open(content, '_blank');
             });
         } else {
-            var attachment_name = ('user_id' in ident ? ident['user_id'].toString() : 'fb'+ident['facebook_id']) + '_'+spin_game_id+'.txt';
+            var attachment_name = ('user_id' in ident ? ident['user_id'].toString() : ('facebook_id' in ident ? 'fb'+ident['facebook_id'] : ('battlehouse_id' in ident ? 'bh'+ident['battlehouse_id'] : 'unknown'))) + '_'+spin_game_id+'.txt';
             var args = $.extend(ident, {'spin_token':spin_token, 'method':'get_raw_player', 'stringify':0, 'attachment_name':attachment_name, 'gzip_encode':1});
             window.open(spin_url+'/player?'+$.param(args), '_blank');
         }
@@ -1637,12 +1645,16 @@ $(function() {
   <ul>
     <li><a href="#player_lookup_by_user_id">Find by User ID</a></li>
     <li><a href="#player_lookup_by_facebook_id">Find by Facebook ID</a></li>
+    <li><a href="#player_lookup_by_battlehouse_id">Find by Battlehouse ID</a></li>
   </ul>
     <div id="player_lookup_by_user_id">
         User ID: <input type="text" id="user_id" name="user_id" autofocus><button onclick="method_lookup()" class="spin_button">Lookup</button>
     </div>
     <div id="player_lookup_by_facebook_id">
         Facebook ID: <input type="text" id="facebook_id" name="facebook_id"><button onclick="method_lookup()" class="spin_button">Lookup</button>
+    </div>
+    <div id="player_lookup_by_battlehouse_id">
+        Battlehouse ID: <input type="text" id="battlehouse_id" name="battlehouse_id"><button onclick="method_lookup()" class="spin_button">Lookup</button>
     </div>
 </div>
 

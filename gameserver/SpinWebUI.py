@@ -381,8 +381,8 @@ class JQueryUI (PageContent):
                    { xtype: 'radiogroup', fieldLabel: 'Stages', name: 'funnel_stages',
                      columns: 2, vertical: true, width:250, labelWidth: 65,
                      items: [
-                             { boxLabel: 'KPIs', name: 'funnel_stages', inputValue: 'skynet', checked:false },
-                             { boxLabel: 'All', name: 'funnel_stages', inputValue: 'ALL', checked:true }
+                             { boxLabel: 'KPIs', name: 'funnel_stages', inputValue: 'skynet', checked:true },
+                             { boxLabel: 'All', name: 'funnel_stages', inputValue: 'ALL', checked:false }
                             ]
                    },
                    { xtype: 'checkbox', fieldLabel: 'Show Correlation w/Paying', id:'client_show_pay_corr', name: 'client_show_pay_corr', labelWidth: 220, checked:false },

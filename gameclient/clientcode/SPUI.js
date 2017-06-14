@@ -231,6 +231,7 @@ SPUI.disabled_text_color = new SPUI.Color(0.4,0.4,0.4,1);
 SPUI.error_text_color = new SPUI.Color(1,0,0,1);
 SPUI.warning_text_color = new SPUI.Color(1,0.33,0,1);
 SPUI.good_text_color = new SPUI.Color(0.2,1,0.2,1);
+SPUI.disabled_good_text_color = new SPUI.Color(0.1,0.5,0.1,1);
 SPUI.modal_bg_color = new SPUI.Color(0,0,0,0.5);
 
 // Element
@@ -1657,6 +1658,7 @@ SPUI.RichTextField = function(data) {
     this.text_vjustify = data['text_vjustify'] || 'center';
     this.text_offset = data['text_offset'] || [0,0];
     this.drop_shadow = data['drop_shadow'] || false;
+    this.alpha = data['alpha'] || 1;
     this.resize_to_fit_text = data['resize_to_fit_text'] || false;
     this.push_text = ('push_text' in data ? data['push_text'] : false); // whether text gets "pushed"
     this.text = null;
@@ -1749,6 +1751,9 @@ SPUI.RichTextField.prototype.do_draw = function(offset) {
     if(this.drop_shadow) {
         SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = '#000000';
         SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0]+this.drop_shadow,text_offset[1]+this.xy[1]+this.drop_shadow], this.font, true);
+    }
+    if(this.alpha < 1) {
+        SPUI.ctx.globalAlpha *= this.alpha;
     }
     SPUI.ctx.fillStyle = SPUI.ctx.strokeStyle = SPUI.default_text_color.str();
     SPText.render_text(this.rtxt, [text_offset[0]+this.xy[0],text_offset[1]+this.xy[1]], this.font);
@@ -2231,7 +2236,11 @@ SPUI.ActionButton.prototype.on_mouseup = function(uv, offset, button) {
         if(this.state === 'disabled') { return true; }
         if(this.onclick) {
             if(this.bg_image) {
-                var art_state = /** @type {!GameArt.Sprite} */ (GameArt.assets[this.bg_image].states[this.state]);
+                var art_asset = GameArt.assets[this.bg_image];
+                if(!art_asset.has_state(this.state)) {
+                    throw Error(this.get_address()+': art asset "'+this.bg_image+'" is missing state '+this.state);
+                }
+                var art_state = /** @type {!GameArt.Sprite} */ (art_asset.states[this.state]);
                 if(art_state.audio) {
                     art_state.audio.play(SPUI.time);
                 }
@@ -3285,8 +3294,8 @@ SPUI.HTMLTextInput.inject_css = function() {
 // make the HTMLInputElement "live"
 SPUI.HTMLTextInput.prototype.input_activate = function() {
     var xy = this.get_absolute_xy();
-    this.input.style.left = xy[0].toString()+'px';
-    this.input.style.top = xy[1].toString()+'px';
+    this.input.style.left = (xy[0] + canvas_div_offsetLeft).toString()+'px';
+    this.input.style.top = (xy[1] + canvas_div_offsetTop).toString()+'px';
     this.input.style.width = (this.wh[0].toString())+'px';
     this.input.style.height = (this.wh[1].toString())+'px';
 
@@ -3298,6 +3307,7 @@ SPUI.HTMLTextInput.prototype.input_activate = function() {
     SPUI.HTMLTextInput.inject_css();
 
     this.input.style.position = 'absolute';
+    //this.input.style.zIndex = "1000";
     this.input.style.padding = '0';
     this.input.style.font = this.font.str();
     this.input.style.background = 'none';

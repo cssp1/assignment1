@@ -10,6 +10,7 @@ goog.provide('SPINPUNCHGAME');
 
 goog.require('goog.object');
 goog.require('goog.array');
+goog.require('goog.string');
 goog.require('goog.net.XhrIo');
 goog.require('goog.net.ErrorCode');
 goog.require('goog.crypt.base64');
@@ -54,7 +55,6 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
-goog.require('DeploymentMarkers');
 goog.require('Dripper');
 goog.require('Bounce');
 goog.require('CombatEngine');
@@ -515,17 +515,21 @@ function pretty_print_time_very_brief(sec) {
 }
 
 // turns a UNIX timestamp into a string like "2013 Dec 9"
-function pretty_print_date(ts) {
+function pretty_print_date_utc(ts) {
+    var d = new Date(ts*1000);
+    return d.getUTCFullYear().toString()+' '+gamedata['strings']['months_short'][d.getUTCMonth()]+' '+d.getUTCDate().toString();
+}
+function pretty_print_date_local(ts) {
     var d = new Date(ts*1000);
     return d.getFullYear().toString()+' '+gamedata['strings']['months_short'][d.getMonth()]+' '+d.getDate().toString();
 }
 
-// "2013 Dec 9 01:23"
-function pretty_print_date_and_time(ts) {
+// "2013 Dec 9 01:23" *UTC*
+function pretty_print_date_and_time_utc(ts) {
     var dt = ts % 86400;
     var hours = Math.floor(dt/3600);
     var minutes = Math.floor(dt/60) % 60;
-    return pretty_print_date(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
+    return pretty_print_date_utc(ts) + ' ' + pad_with_zeros(hours.toFixed(0), 2)+':'+pad_with_zeros(minutes.toFixed(0), 2);
 }
 
 // pad a string with zeros until it is length 'n'
@@ -655,7 +659,7 @@ function current_pvp_season() {
 
 // only works after init()
 function has_true_fullscreen() {
-    if(!(canvas['SPINrequestFullScreen'] && document['SPINcancelFullScreen'])) { return false; }
+    if(!(canvas_div['SPINrequestFullScreen'] && document['SPINcancelFullScreen'])) { return false; }
     if(get_query_string('truefullscreen') === '1') { return true; }
     return read_predicate(gamedata['client']['truefullscreen']).is_satisfied(player,null);
 }
@@ -668,7 +672,7 @@ function toggle_true_fullscreen() {
         if(player.tutorial_state != "COMPLETE") {
             player.record_feature_use('truefullscreen_during_tutorial');
         }
-        canvas['SPINrequestFullScreen']();
+        canvas_div['SPINrequestFullScreen']();
     }
 }
 
@@ -1152,7 +1156,7 @@ function AJAXMessageQueue() {
     this.queue = [];
     this.serial = -1;
     this.recv_progress = -1; // UNRELIABLE indication of progress receiving the response to this message bundle (-1 if unknown)
-}
+};
 AJAXMessageQueue.prototype.push = function(msg) {
     this.queue.push(msg);
 };
@@ -1175,6 +1179,22 @@ ServerSender.prototype.func = function(msg) {
     message_queue.push(msg);
 };
 var send_to_server = new ServerSender();
+
+/** @constructor */
+function RetransBuffer() {
+    this.buf = [];
+};
+RetransBuffer.prototype.append = function(serial, msg) {
+    this.buf.push([serial, msg]);
+};
+RetransBuffer.prototype.trim = function(ack) {
+    while(this.buf.length > 0 && this.buf[0][0] <= ack) {
+        this.buf.shift();
+    }
+};
+RetransBuffer.prototype.length = function() { return this.buf.length; };
+
+var retrans_buffer = new RetransBuffer();
 
 // general-purpose mechanism for waiting for the server to acknowledge all actions submitted up to now
 /** @constructor @struct */
@@ -2204,7 +2224,10 @@ GameObject.prototype.weapon_range = function() {
 
     return get_weapon_range(this.combat_stats, this.get_auto_spell_level(), spell);
 };
-GameObject.prototype.is_invul = function() { return this.spec['quarry_invul'] && session.is_quarry(); };
+GameObject.prototype.is_invul = function() {
+    return (this.spec['max_hp'] === 0) ||
+        (this.spec['quarry_invul'] && session.is_quarry());
+};
 
 // return true if we have a weapon that can shoot at target (regardless of whether target is in range or not)
 GameObject.prototype.can_shoot_at = function(target) {
@@ -2535,7 +2558,7 @@ function calculate_battle_outcome() {
             if(obj.spec['name'] === 'barrier') { return; }
 
             // do not count invulnerable objects (e.g. quarry harvesters)
-            if(obj.spec['max_hp'] === 0 || obj.is_invul()) { return; }
+            if(obj.is_invul()) { return; }
 
             if(player.tutorial_state != "COMPLETE") {
                 // special case for tutorial: end battle once the three main buildings are destroyed
@@ -6819,7 +6842,8 @@ player.get_lottery_state = function(scanner) {
 
         // check for aura scans
         var aura = goog.array.find(player.player_auras, function(a) {
-            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time']));
+            return (a['spec'] == 'lottery_scans') && (!('end_time' in a) || (server_time < a['end_time'])) &&
+                (!('start_time' in a) || (server_time >= a['start_time']));
         });
         if(aura) {
             ret.num_scans += ('stack' in aura ? aura['stack'] : 1);
@@ -7127,7 +7151,7 @@ player.init_abtests = function(test_data) {
         if(test_name in gamedata['abtests'] && gamedata['abtests'][test_name]['active'] && (group in gamedata['abtests'][test_name]['groups'])) {
             var data = gamedata['abtests'][test_name]['groups'][group];
             if(data['patches_client_gamedata']) {
-                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'enhancements', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial'];
+                var kinds = ['resources', 'spells', 'units', 'buildings', 'tech', 'enhancements', 'art', 'dialogs', 'strings', 'map', 'quests', 'predicate_library', 'consequent_library', 'tutorial','virals'];
                 for(var i = 0; i < kinds.length; i++) {
                     var kind = kinds[i];
                     if(kind in data) {
@@ -7959,11 +7983,17 @@ function inventory_item_can_fit(item, inventory, max_usable_inventory) {
 
 function inventory_items_can_all_fit(items, inventory, max_usable_inventory) {
     // operate on a copy of the inventory and resources
+
+    // note: this is a SHALLOW copy of inventory. Only 'stack' count will be mutated.
     var scratch = [];
     for(var i = 0; i < inventory.length; i++) {
         scratch.push(goog.object.clone(inventory[i]));
     }
-    var scratch_resource_state = goog.object.clone(player.resource_state);
+
+    // this is a DEEP clone of resource_state, necessary because the resource
+    // entries are themselves arrays.
+    var scratch_resource_state = /** @type {!Object<string,*>} */
+        (goog.object.unsafeClone(player.resource_state));
 
     for(var i = 0; i < items.length; i++) {
         var item = items[i];
@@ -10027,6 +10057,35 @@ var last_websocket_xmit_len = -1;
 var last_websocket_queue = null; // last AJAXMessageQueue queued for transmission on the websocket
 var last_websocket_serial = -1; // serial number of last_websocket_queue
 
+/** Low-level websocket transmission function.
+
+    SpinPunch fragmentation protocol: this is another layer of fragmentation
+    ON TOP OF WebSocket messages. Necessary because some browsers (IE)
+    in some configurations seem to have trouble transmitting >32KB messages
+    intact.
+
+    The protocol is just this: one websocket message of the characters 'SP'
+    plus the decimal length (0-padded to 20 digits), followed by individual
+    messages to concatenate to re-assemble the original message.
+
+    @param {SPWebsocket.SPWebsocket} socket
+    @param {string} data */
+function websocket_transmit(socket, data) {
+    var max_msg = eval_cond(gamedata['client']['websocket_max_message'] || 0, player, null);
+    if(max_msg > 0 && data.length > max_msg) {
+        var ptr = 0;
+        // send "start of fragmented message" message
+        socket.send('SP'+pad_with_zeros(data.length.toString(), 20));
+        while(ptr < data.length) {
+            var to_send = Math.min(data.length - ptr, max_msg);
+            socket.send(data.slice(ptr, ptr + to_send));
+            ptr += to_send;
+        }
+    } else {
+        socket.send(data);
+    }
+};
+
 /** @param {boolean=} force
     @param {number=} my_timeout */
 function flush_message_queue(force, my_timeout) {
@@ -10064,11 +10123,13 @@ function flush_message_queue(force, my_timeout) {
         // Websockets
         var data_dict = {'myarg': message_queue.queue, // NOT stringified internally
                          'serial': message_serial,
+                         'ack': ajax_next_serial - 1,
                          'session': session.session_id};
         if(!keepalive) {
             // message is automatic, do not keepalive
             data_dict['nokeepalive'] = 1;
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         var data_str = JSON.stringify(data_dict);
         message_queue.serial = message_serial;
@@ -10080,7 +10141,15 @@ function flush_message_queue(force, my_timeout) {
         last_websocket_xmit_len = data_str.length;
 
         if(!the_websocket) {
-            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(), ajax_config['message_timeout_hello'], ajax_config['message_timeout_gameplay']);
+            var enable_reconnect = (get_query_string('enable_websocket_reconnect') === '1' ||
+                                    player.get_any_abtest_value('enable_websocket_reconnect',
+                                                                gamedata['client']['enable_websocket_reconnect']));
+            var min_delay = eval_cond(gamedata['client']['websocket_min_delay'], player, null);
+            the_websocket = new SPWebsocket.SPWebsocket(gameapi_url(),
+                                                        ajax_config['message_timeout_hello'],
+                                                        ajax_config['message_timeout_gameplay'],
+                                                        enable_reconnect,
+                                                        min_delay);
             var on_websocket_error = function(event) {
                 if(!the_websocket || SPINPUNCHGAME.shutdown_in_progress || client_state === client_states.TIMED_OUT) { return; } // irrelevant
                 the_websocket.close();
@@ -10140,35 +10209,68 @@ function flush_message_queue(force, my_timeout) {
                 if(client_state !== client_states.TIMED_OUT) {
                     //invoke_timeout_message('0600_client_idle_timeout', {}, {});
                     var s = gamedata['errors']['UNKNOWN_SESSION'];
-                    invoke_timeout_message('0601_client_died_from_unknown_session', {},
-                                           {'ui_title': s['ui_title'], 'ui_description': s['ui_name'], 'ui_button': s['ui_button'],
+                    invoke_timeout_message('0643_client_died_from_ws_shutdown', {'method': event.data},
+                                           {'ui_title': s['ui_title'], 'ui_description': s['ui_name'].replace('%d','643'), 'ui_button': s['ui_button'],
                                             'dialog': s['dialog'] || null});
                 }
                 SPINPUNCHGAME.shutdown();
             };
             var on_websocket_message = function(event) {
-                on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
-            };
 
+                // update client_time here immediately, for ping keepalives
+                client_time = (new Date()).getTime()/1000;
+
+                if(event.data == 'SPws_ping') {
+                    // server set us a ping
+                } else {
+                    on_ajax(event.data, (the_websocket && the_websocket.url.indexOf('ws://') == 0 ? 'direct_ws' : 'direct_wss'));
+                }
+
+                // Chrome throttles JavaScript timers in background tabs,
+                // but does allow WebSocket message processing - so use this as a chance to send keepalive ping.
+                if(the_websocket && gamedata['client']['websocket_keepalive_interval'] > 0 &&
+                   (client_time - last_websocket_keepalive > gamedata['client']['websocket_keepalive_interval'])) {
+                    last_chat_ping = client_time;
+                    last_websocket_keepalive = client_time;
+                    send_to_server.func(["PING_CHAT", player.chat_seen, 'websocket_keepalive_message']);
+                    flush_message_queue(true);
+                }
+            };
+            var on_websocket_reconnect = function(event) {
+                console.log('WebSocket reconnected. Retransmitting '+retrans_buffer.length().toString()+' messages.');
+                goog.array.forEach(retrans_buffer.buf, function(serial_msg) {
+                    websocket_transmit(the_websocket,
+                                       JSON.stringify({'myarg': serial_msg[1],
+                                                       'serial': serial_msg[0],
+                                                       'ack': ajax_next_serial - 1,
+                                                       'session': session.session_id}));
+                    ajax_last_ack = ajax_next_serial - 1;
+                });
+                send_to_server.func(["RECONNECT"]);
+                flush_message_queue(true);
+            };
             goog.events.listen(the_websocket.target, 'error', on_websocket_error);
             goog.events.listen(the_websocket.target, 'shutdown', on_websocket_shutdown);
             goog.events.listen(the_websocket.target, 'message', on_websocket_message);
+            goog.events.listen(the_websocket.target, 'reconnect', on_websocket_reconnect);
 
             the_websocket.connect();
         }
 
-        send_it = (function (_data_str, _the_websocket) { return function() { _the_websocket.send(_data_str); }; })(data_str, the_websocket);
+        send_it = (function (_data_str, _the_websocket) { return function() { websocket_transmit(_the_websocket, _data_str); }; })(data_str, the_websocket);
 
     } else {
         // Google Closure XhrIo method
         var msg = 'myarg='+encodeURIComponent(JSON.stringify(message_queue.queue));
         message_queue.serial = message_serial;
         msg += '&serial='+message_serial.toString();
+        msg += '&ack='+(ajax_next_serial-1).toString();
         msg += '&session='+session.session_id.toString();
         if(!keepalive) {
             // message is automatic, do not keepalive
             msg += '&nokeepalive=1';
         }
+        ajax_last_ack = ajax_next_serial - 1;
 
         last_ajax_serial = message_serial;
         last_ajax_xmit_time = client_time;
@@ -10208,6 +10310,11 @@ function flush_message_queue(force, my_timeout) {
         window.setTimeout(send_it, Math.floor(1000*inject_lag));
     } else {
         send_it();
+    }
+
+    retrans_buffer.append(message_serial, message_queue.queue);
+    if(retrans_buffer.length() >= gamedata['client']['ajax_message_buffer']) {
+        invoke_timeout_message('0624_client_retrans_buffer_overflow', {'len': retrans_buffer.length()}, {});
     }
 
     message_queue = new AJAXMessageQueue();
@@ -10455,7 +10562,7 @@ function linkbar_put_id(user_id) {
     if(user_id <= 0) { return; }
     var bar = document.getElementById('spin_footer_linkbar_id');
     if(!bar) { return; }
-    bar.innerHTML = 'Your Player ID: <b>'+user_id.toString()+'</b>&nbsp;&nbsp;&nbsp;';
+    bar.innerHTML = 'Player ID: <b>'+user_id.toString()+'</b>&nbsp;&nbsp;&nbsp;';
 }
 
 // replace __USER_ID__/__ISSUE_ID__ in URL paths (or any string) with the player's actual user_id and camouflaged money_spent amount
@@ -10698,34 +10805,34 @@ SPINPUNCHGAME.init = function() {
     })();
 
     // note: Closure incorrectly obfuscates these canvas/document properties, so manually quote all lookups
-    canvas['SPINrequestFullScreen'] = (function() {
+    canvas_div['SPINrequestFullScreen'] = (function() {
         var event_name = null, fun = null;
 
         // standard version
-        fun = canvas['requestFullScreenWithKeys'] ||
-            canvas['requestFullScreen'];
+        fun = canvas_div['requestFullScreenWithKeys'] ||
+            canvas_div['requestFullScreen'];
         if(fun) {
             event_name = 'fullscreenchange';
         } else {
             // try webkit version
-            fun = canvas['webkitRequestFullScreenWithKeys'] ||
-                  canvas['webkitRequestFullScreen'];
+            fun = canvas_div['webkitRequestFullScreenWithKeys'] ||
+                  canvas_div['webkitRequestFullScreen'];
             if(fun && (spin_demographics['browser_name'] !== 'Safari')) { // webkit fullscreen seems broken on Safari now!
                 event_name = 'webkitfullscreenchange';
                 // manually ensure keyboard input works
-                if(fun === canvas['webkitRequestFullScreen']) {
-                    fun = function() { canvas['webkitRequestFullScreen'](Element['ALLOW_KEYBOARD_INPUT']); };
+                if(fun === canvas_div['webkitRequestFullScreen']) {
+                    fun = function() { canvas_div['webkitRequestFullScreen'](Element['ALLOW_KEYBOARD_INPUT']); };
                 }
             } else {
                 // try mozilla version
-                fun = canvas['mozRequestFullScreenWithKeys'] ||
-                      canvas['mozRequestFullScreen'];
+                fun = canvas_div['mozRequestFullScreenWithKeys'] ||
+                      canvas_div['mozRequestFullScreen'];
                 if(fun) {
                     event_name = 'mozfullscreenchange';
                 } else {
                     // try IE version
-                    fun = canvas['msRequestFullScreenWithKeys'] ||
-                          canvas['msRequestFullScreen'];
+                    fun = canvas_div['msRequestFullScreenWithKeys'] ||
+                          canvas_div['msRequestFullScreen'];
                     if(fun) {
                         event_name = 'msfullscreenchange';
                     }
@@ -11101,7 +11208,17 @@ function init_desktop_dialogs() {
             dialog.widgets['map_button'].onclick = function() { invoke_map_dialog(null); };
             dialog.widgets['store_button'].onclick = function(w) { invoke_store(); };
 
-            var do_add_friend = function() { change_selection(null); invoke_invite_friends_dialog('friend_bar'); }
+            var do_add_friend = function() {
+                change_selection(null);
+                if(spin_frame_platform == 'bh') {
+                    // on battlehouse, go directly to Membership Rewards
+                    invoke_invite_friends_dialog('friend_bar');
+                } else {
+                    // on FB etc, show prompt first
+                    invoke_invite_friends_prompt('friend_bar');
+                }
+            }
+
             for(var i = 0; i < dialog.widgets['friend_bar'].data['widgets']['friend_icon']['array'][0]; i++) {
                 dialog.widgets['friend_bar'].widgets['add_friend_button'+i.toString()].onclick = do_add_friend;
             }
@@ -11405,6 +11522,19 @@ function update_friend_bar(dialog) {
     var base_xy_min = vec_add(dialog.parent.data['widgets']['friend_bar']['xy'], dialog.data['xy_minimized']);
     dialog.xy = vec_floor(vec_lerp(dialog.user_data['maximized'] ? base_xy_min : base_xy_max,
                                    dialog.user_data['maximized'] ? base_xy_max : base_xy_min, t));
+
+    // flashing "+Add" button row
+    if(player.get_townhall_level() < 5 && !invite_friends_dialog_shown_this_session) {
+        for(var row = 0; row < dialog.data['widgets']['add_friend_button']['array'][0]; row++) {
+            var w = dialog.widgets['add_friend_button'+row.toString()];
+            if(w.show && w.state !== 'disabled' && 'text_color_emphasis' in w.data) {
+                var period = 10.0, duration = 0.3, offset = row * 0.1;
+                var anim_t = ((client_time-offset) % period);
+                var col_v = (anim_t < duration ? w.data['text_color_emphasis'] : w.data['text_color']);
+                w.text_color = SPUI.make_colorv(col_v);
+            }
+        }
+    }
 }
 
 function invoke_player_portrait_dialog() {
@@ -11883,9 +12013,13 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
     // token count update
     var shift = [0,0]; // shift other widgets over to make room
     if('resource_bar_tokens' in dialog.data['widgets']) {
-        var token_names = player.get_any_abtest_value('show_item_quantity', gamedata['store']['show_item_quantity']);
-        // can be undefined, null, string, or Array - canonicalize to Array
-        if(!(token_names instanceof Array)) { token_names = (token_names ? [token_names] : []); }
+        /** @type {Array<string>} */
+        var token_names;
+        if(gamedata['store']['show_item_quantity']) {
+            token_names = eval_cond(gamedata['store']['show_item_quantity'], player, null) || [];
+        } else {
+            token_names = [];
+        }
 
         for(var y = 0; y < dialog.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
             for(var x = 0; x < dialog.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
@@ -12412,6 +12546,7 @@ function update_aura_bar(dialog) {
 
     // get list of auras to show - filter out expired/hidden auras
     var display_aura_list = goog.array.filter(player.player_auras, function(aura) {
+        if('start_time' in aura && aura['start_time'] > server_time) { return false; }
         if(aura['end_time'] && aura['end_time'] > 0 && aura['end_time'] < server_time) { return false; }
         var spec =  gamedata['auras'][aura['spec']];
         if(('show' in spec) && (!spec['show'])) { return false; }
@@ -12425,8 +12560,7 @@ function update_aura_bar(dialog) {
     // dummy aura for damage protection
     if(player.resource_state['protection_end_time'] > server_time) {
         display_aura_list.unshift({'spec':'damage_protection', 'end_time': player.resource_state['protection_end_time'],
-                                   'ui_glow': (dialog.user_data['protection_time_glow'] ?
-                                               dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5) : 0)});
+                                   'ui_glow': !!dialog.user_data['protection_time_glow']});
     }
 
     // dummy aura for donated units
@@ -12543,9 +12677,10 @@ function update_aura_bar(dialog) {
                 dialog.widgets['aura_timer'+i].show = false;
             }
 
-            if(aura['ui_glow'] > 0) {
+            if(aura['ui_glow'] || aura_spec['ui_glow']) {
+                var flash = dialog.data['widgets']['aura_glow']['alpha'] * (0.5*Math.sin(dialog.data['widgets']['aura_glow']['pulse_frequency']*client_time/(2*Math.PI))+0.5);
                 dialog.widgets['aura_glow'+i].show = true;
-                dialog.widgets['aura_glow'+i].alpha = aura['ui_glow'];
+                dialog.widgets['aura_glow'+i].alpha = flash;
             } else {
                 dialog.widgets['aura_glow'+i].show = false;
             }
@@ -12887,6 +13022,8 @@ function update_desktop_dialogs() {
     var show_evil_valentina = false;
     var show_regional_event_info = false;
 
+    dialog.widgets['network_trouble_message'].show = (the_websocket && the_websocket.is_reconnecting());
+
     if(session.home_base) {
         dialog.widgets['battle_history_jewel'].user_data['count'] = player.new_battle_histories;
         dialog.widgets['keyboard_shortcuts_jewel'].user_data['count'] = player.check_feature_use('keyboard_shortcuts_list') ? 0 : 1;
@@ -12899,10 +13036,12 @@ function update_desktop_dialogs() {
             dialog.widgets['low_power_message'].str = dialog.data['widgets']['low_power_message']['ui_name'].replace('%d', Math.min(99, 100.0*session.get_draw_world().base.power_factor()).toFixed(0)).replace('%POWERPLANTS',gamedata['buildings'][gamedata['strings']['modstats']['stats']['limit:energy']['check_spec']]['ui_name_plural']);
         }
 
-        dialog.widgets['user_abtest_message'].show = (player.tutorial_state == "COMPLETE" &&
+        dialog.widgets['user_abtest_message'].show = !dialog.widgets['network_trouble_message'].show &&
+                                                      (player.tutorial_state == "COMPLETE" &&
                                                       !(player.quest_tracked && player.quest_tracked['ui_step']) &&
                                                       !session.has_attacked &&
-                                                      !session.incoming_attack_pending());
+                                                      !session.incoming_attack_pending() &&
+                                                      !anon_mode);
         dialog.widgets['user_abtest_message'].str = eval_cond_or_literal(player.get_any_abtest_value('ui_user_abtest_message', gamedata['strings']['ui_user_abtest_message'] || null), player, null) || null;
 
         dialog.widgets['edit_mode_message'].show = !!player.is_cheater;
@@ -15928,9 +16067,6 @@ function init_chat_frame() {
     if(player.get_any_abtest_value('enable_alliances', gamedata['client']['enable_alliances'])) {
         dialog.user_data['channel_names'].push('ALLIANCE');
     }
-    if(player.is_developer()) {
-        dialog.user_data['channel_names'].push('DEVELOPER');
-    }
 
     change_chat_tab(dialog, null);
 
@@ -16560,23 +16696,6 @@ function invoke_you_were_attacked_dialog(recent_attacks) {
 
         }; })(most_recent_summary);
 
-    } else if(can_show_deployment_markers_for_battle_summary(most_recent_summary)) {
-        dialog.widgets['show_markers_button'].show = true;
-        dialog.widgets['show_markers_button'].onclick = (function (_summary) { return function(w) {
-            var locker = invoke_ui_locker_until_closed();
-            // XXX note: "recent attack" version of battle summary uses attacker_user_id not attacker_id,
-            // and is missing defender_id
-            get_battle_log(_summary['time'], _summary['attacker_user_id'], session.user_id,
-                           _summary['base_id'] || null, null,
-                           (function (__summary, _locker) { return function(result) {
-                               close_dialog(_locker);
-                               if(result && result['log']) {
-                                   show_deployments_for_battle_log(__summary['attacker_name'], __summary['attacker_user_id'], result['log']);
-                               } else {
-                                   invoke_child_message_dialog(gamedata['dialogs']['battle_log_dialog']['widgets']['loading_text']['ui_name_unavailable'], '', {'dialog': 'message_dialog'});
-                               }
-                           }; })(_summary, locker));
-        }; })(most_recent_summary);
     }
 };
 
@@ -16962,7 +17081,7 @@ function invoke_recycle_dialog(obj) {
         spec = obj.spec; level = obj.level; hp = obj.hp; max_hp = obj.max_hp;
     }
 
-    dialog.widgets['title'].str = gamedata['spells']['RECYCLE_UNIT']['ui_prompt'].replace('%d', spec['ui_name']);
+    dialog.widgets['title'].str = gamedata['spells']['RECYCLE_UNIT']['ui_prompt'].replace('%d', spec['ui_name']).replace('%level', pretty_print_number(level));
     dialog.widgets['ok_button'].str = gamedata['spells']['RECYCLE_UNIT']['ui_name'];
     dialog.widgets['tip_text'].str = dialog.data['widgets']['tip_text']['ui_name'].replace('%s', gamedata['spells']['RECYCLE_UNIT']['ui_name']);
 
@@ -17197,11 +17316,11 @@ function invoke_gift_received_dialog(override_ls) {
         sender_name = 'Unknown';
     }
 
-    if(get_facebook_viral('say_thanks') && sender_fbid) {
-        dialog.widgets['say_thanks_button'].onclick = (function (a, b, c, d) { return function() {
+    if(get_facebook_viral('say_thanks')) {
+        dialog.widgets['say_thanks_button'].onclick = (function (_sender_name, _loot) { return function() {
             change_selection(null);
-            invoke_say_thanks(a, b, c, d);
-        }; })(sender_fbid, sender_user_id, sender_name, ls[0].loot);
+            invoke_say_thanks(_sender_name, _loot);
+        }; })(sender_name, ls[0].loot);
     } else {
         dialog.widgets['say_thanks_button'].show = false;
     }
@@ -17213,7 +17332,7 @@ function invoke_gift_received_dialog(override_ls) {
     };
 };
 
-function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name, loot) {
+function invoke_say_thanks(recipient_ui_name, loot) {
     var viral = get_facebook_viral('say_thanks');
     if(!viral) { return; }
     var loot_text = '';
@@ -17226,13 +17345,18 @@ function invoke_say_thanks(recipient_fb_id, recipient_user_id, recipient_fb_name
         loot_text += viral['ui_generic_loot'];
     }
 
-    FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
-                    description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_fb_name),
+    FBShare.invoke({name:viral['ui_post_headline'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
+                    description:viral['ui_post_description'].replace('%LOOT', loot_text).replace('%THANKEE', recipient_ui_name),
                     picture: gamedata['virals']['common_image_path'] + (('image' in viral) ? viral['image'] : gamedata['virals']['default_image']),
                     ref:'feed_thanks'});
 };
 
+// to stop the flashing "+Add" buttons
+var invite_friends_dialog_shown_this_session = false;
+
 function invoke_invite_friends_dialog(reason) {
+    invite_friends_dialog_shown_this_session = true;
+
     if(spin_frame_platform == 'kg') {
         if(!spin_kongregate_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
         SPKongregate.showInvitationBox({'content': gamedata['virals']['invite_friends']['ui_post_message'],
@@ -17668,7 +17792,7 @@ function invoke_level_up_dialog() {
     if(friend_invites_enabled()) {
         dialog.widgets['spam_button_invite'].onclick = function() {
             change_selection(null);
-            invoke_invite_friends_dialog('level_up_dialog');
+            invoke_invite_friends_prompt('level_up_dialog');
         };
 
         // show "Inform Earth" for level 2 (on Facebook), and "Invite Friends" for level 3 and beyond
@@ -18323,13 +18447,13 @@ function update_retreating_dialog(dialog) {
 }
 
 function invoke_defense_end_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
-                                  battle_opponent_name,
-                                   outcome, loot, battle_summary, ladder_state) {
+                                   battle_opponent_name,
+                                   outcome, loot, battle_summary, ladder_state, replay_signature) {
     if(outcome == 'victory' &&
        player.get_any_abtest_value('fancy_victory_dialog', gamedata['client']['fancy_victory_dialog'])) {
         return invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                            battle_opponent_name,
-                                           outcome, loot, battle_summary, ladder_state);
+                                           outcome, loot, battle_summary, ladder_state, replay_signature);
     }
 
     change_selection(null);
@@ -18848,6 +18972,26 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                     break;
                 }
             }
+        } else if(widget_name && widget_name.indexOf('INVENTORY:') == 0) {
+            // similar special-case hack for Inventory dialog
+            var spec_name = widget_name.split(':')[1];
+            var cols = parent.data['widgets']['slot']['array'][0];
+            var slots_per_page = parent.user_data['rows_per_page'] * parent.user_data['cols_per_page'];
+            found_widget_name = null;
+            for(var y = 0; y < parent.data['widgets']['slot']['array'][1]; y++) {
+                for(var x = 0; x < cols; x++) {
+                    var wname = x.toString()+','+y.toString();
+                    var slot = y*cols + x + parent.user_data['page'] * slots_per_page;
+                    if(slot < player.inventory.length) {
+                        var item = player.inventory[slot];
+                        if(item['spec'] === spec_name) {
+                            found_widget_name = 'frame'+wname;
+                            break;
+                        }
+                    }
+                }
+                if(found_widget_name) { break; }
+            }
         } else if(widget_name && widget_name.indexOf('MAP:') == 0) {
             var chapter = widget_name.split(':')[1];
             var index = parent.user_data['buttons'].indexOf(chapter);
@@ -19157,13 +19301,22 @@ function tutorial_step_repair_message(data) {
 
 // note: this is used for both the tutorial step and the on-login invite friends prompt
 function setup_invite_friends_prompt(dialog, reason) {
-    var tut_data = gamedata['tutorial']['congratulations_message'];
-
-    dialog.widgets['title'].str = tut_data['ui_viral_title'];
     dialog.user_data['invite_friends_reason'] = reason;
 
+    dialog.widgets['title'].set_text_with_linebreaking_and_shrink_font_to_fit(dialog.data['widgets']['title']['ui_name'].replace('%game', gamedata['strings']['game_name']));
+
+    /** @type {string} */
+    var value_prop;
+    // customize text per platform
+    if('ui_name_'+spin_frame_platform in dialog.data['widgets']['value_prop']) {
+        value_prop = dialog.data['widgets']['value_prop']['ui_name_'+spin_frame_platform];
+    } else {
+        value_prop = dialog.data['widgets']['value_prop']['ui_name'];
+    }
+    dialog.widgets['value_prop'].set_text_with_linebreaking(value_prop.replace('%game', gamedata['strings']['game_name']));
+
     var num_friends = 0;
-    var friend_name = null;
+    var friend_name = '';
 
     for(var i = 0; i < player.friends.length; i++) {
         var friend = player.friends[i];
@@ -19175,24 +19328,19 @@ function setup_invite_friends_prompt(dialog, reason) {
         }
     }
 
-    var descr = '';
+    var proof = '';
+
     if(num_friends < 1) {
-        // customize text per platform
-        if('ui_description_has_no_friends_'+spin_frame_platform in tut_data) {
-            descr += tut_data['ui_description_has_no_friends_'+spin_frame_platform];
-        } else {
-            descr += tut_data['ui_description_has_no_friends'];
-        }
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_no_friends'];
     } else if(num_friends < 2) {
-        descr += tut_data['ui_description_has_one_friend'].replace('%s', friend_name);
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_one_friend'];
     } else if(num_friends < 3) {
-        descr += tut_data['ui_description_has_two_friends'].replace('%s', friend_name).replace('%d', (num_friends-1).toFixed(0));
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_two_friends'];
     } else {
-        descr += tut_data['ui_description_has_many_friends'].replace('%s', friend_name).replace('%d', (num_friends-1).toFixed(0));
+        proof = dialog.data['widgets']['social_proof']['ui_name_has_many_friends'];
     }
 
-    dialog.widgets['description'].str += descr;
-    dialog.widgets['description'].set_text_with_linebreaking(dialog.widgets['description'].str);
+    dialog.widgets['social_proof'].set_text_with_linebreaking(proof.replace('%game', gamedata['strings']['game_name']).replace('%s', friend_name).replace('%d', pretty_print_number(num_friends-1)));
 
     // fill in friend widgets
     var row = 0;
@@ -19204,21 +19352,47 @@ function setup_invite_friends_prompt(dialog, reason) {
         row++;
     }
 
-    if('ui_name_'+spin_frame_platform in dialog.widgets['ok_button'].data) {
-        dialog.widgets['ok_button'].str = dialog.widgets['ok_button'].data['ui_name_'+spin_frame_platform];
-    }
-    dialog.widgets['ok_button'].onclick = function(w) {
-        var reason = w.parent.user_data['invite_friends_reason'];
-        change_selection(null);
-        if(player.tutorial_state === 'congratulations_message' || !friend_invites_enabled()) {
-            advance_tutorial();
-        } else {
-            invoke_invite_friends_dialog(reason);
+    // "direct_share" means we'll skip friend selector / membership rewards
+    // and just offer to share a "join the game" link.
+
+    var direct_share = (spin_frame_platform == 'fb' && FBShare.supported() &&
+                        read_predicate(gamedata['client']['invite_prompt_direct_share']).is_satisfied(player));
+
+    if(direct_share) {
+        dialog.widgets['ok_button'].show = false;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = true;
+        dialog.default_button = dialog.widgets['fb_share_button'];
+        dialog.widgets['fb_share_button'].onclick = function() {
+            invite_friends_dialog_shown_this_session = true; // stop the "+Add" button flashing
+            change_selection(null);
+            metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief'), 'method': 'share_invite'});
+            FBShare.invoke({name: gamedata['virals']['invite_friends']['ui_post_message'],
+                            description: gamedata['virals']['ui_post_description'],
+                            link_qs: {'spin_campaign': 'share_invite'},
+                            ref: 'share_invite'});
+        };
+    } else {
+        dialog.widgets['ok_button'].show = true;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = false;
+        dialog.default_button = dialog.widgets['ok_button'];
+        if('ui_name_'+spin_frame_platform in dialog.widgets['ok_button'].data) {
+            dialog.widgets['ok_button'].str = dialog.widgets['ok_button'].data['ui_name_'+spin_frame_platform];
         }
-   };
+
+        dialog.widgets['ok_button'].onclick = function(w) {
+            // note: there used to be a special case here for the rails tutorial,
+            // but it's no longer relevant because the invite prompt was moved
+            // into the new quest-based tutorial system.
+            var reason = w.parent.user_data['invite_friends_reason'];
+            change_selection(null);
+            invoke_invite_friends_dialog(reason);
+        };
+    }
 }
 
-function invoke_invite_friends_prompt() {
+function invoke_invite_friends_prompt(reason) {
     if(!friend_invites_enabled()) { return null; }
 
     change_selection(null);
@@ -19231,7 +19405,7 @@ function invoke_invite_friends_prompt() {
     dialog.modal = true;
     dialog.auto_center();
 
-    setup_invite_friends_prompt(dialog, 'invite_friends_prompt');
+    setup_invite_friends_prompt(dialog, reason);
 
     dialog.widgets['close_button'].onclick = function() { change_selection(null); };
     if(!read_predicate(gamedata['client']['invite_prompt_closeable']).is_satisfied(player)) {
@@ -19256,9 +19430,6 @@ function tutorial_step_congratulations(data) {
 
     dialog.auto_center();
 
-    dialog.widgets['title'].str = data['ui_name'];
-    dialog.widgets['description'].str = data['ui_description'];
-
     setup_invite_friends_prompt(dialog, 'tutorial_step_congratulations');
 
     dialog.widgets['close_button'].show = false;
@@ -19271,6 +19442,7 @@ function tutorial_step_congratulations(data) {
     }, 20000);
 
     make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+    make_tutorial_arrow_for_button('tutorial_congratulations', 'fb_share_button', 'up');
 
     GameArt.play_canned_sound('conquer_sound');
 }
@@ -19716,14 +19888,21 @@ function invoke_player_aura_speedup_dialog(aura_name) {
     return dialog;
 }
 
-function invoke_confirm_cancel_message(type, cancel_cb) {
+/** @param {string} type - "upgrade", "research", etc
+    @param {function()} cancel_cb - callback for "OK"
+    @param {boolean=} ingredient_loss - if true, warn about losing ingredient items */
+function invoke_confirm_cancel_message(type, cancel_cb, ingredient_loss) {
     var dialog_data = gamedata['dialogs']['confirm_cancel_dialog'];
     var dialog = new SPUI.Dialog(dialog_data);
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
 
-    dialog.widgets['description'].set_text_with_linebreaking(dialog.data['widgets']['description']['ui_name_'+type]);
+    var txt = dialog.data['widgets']['description']['ui_name_'+type]
+    if(ingredient_loss) {
+        txt += ' ' + dialog.data['widgets']['description']['ui_name_ingredient_loss'];
+    }
+    dialog.widgets['description'].set_text_with_linebreaking(txt);
     dialog.widgets['ok_button'].str = dialog.data['widgets']['ok_button']['ui_name_'+type];
     dialog.widgets['ok_button'].onclick = (function (_cancel_cb) { return function(w) { close_parent_dialog(w); cancel_cb(); }; })(cancel_cb);
     dialog.widgets['close_button'].onclick = close_parent_dialog;
@@ -19889,7 +20068,7 @@ function test_flash_offer(offer) {
 
 function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                   battle_opponent_name,
-                                  outcome, loot, battle_summary, ladder_state)
+                                  outcome, loot, battle_summary, ladder_state, replay_signature)
 {
     // home-base and hive victories go through the fancy version of this dialog
     if(outcome == 'victory' &&
@@ -19898,7 +20077,7 @@ function invoke_battle_end_dialog(battle_type, battle_base, battle_opponent_user
        player.get_any_abtest_value('fancy_victory_dialog', gamedata['client']['fancy_victory_dialog'])) {
         return invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                            battle_opponent_name,
-                                           outcome, loot, battle_summary, ladder_state);
+                                           outcome, loot, battle_summary, ladder_state, replay_signature);
     }
 
     var trophy_delta = 0, trophy_type = null;
@@ -20049,19 +20228,29 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
     for(var n in gamedata['units']) {
         units[n] = 999;
     }
+    var loot =  {'iron':12345, 'looted_uncapped_iron':12345,
+                 'water':5432, 'looted_uncapped_water':12345,
+                 'res3':543, 'looted_uncapped_res3':543,
+                 'units_killed':units,
+                 'units_lost':units,
+                 'items': (has_item_loot ? [{'spec':'token','stack':1000},{'spec':'inventory_unknown','stack':5}] : [])};
+    if(has_trophies) {
+        loot['trophies_pvp'] = 30;
+        loot['battle_stars'] = {'foo':1,'bar':2,'baz':3};
+    }
     invoke_fancy_victory_dialog(kind, {base_type:'home'}, ai_id, '-1', 10, null,
                                 'Test AI', 'victory',
-                                {'iron':12345, 'looted_uncapped_iron':12345,
-                                 'water':5432, 'looted_uncapped_water':12345,
-                                 'res3':543, 'looted_uncapped_res3':543,
-                                 'units_killed':units,
-                                 'units_lost':units,
-                                 'battle_stars':{'foo':1,'bar':2,'baz':3},
-                                 'trophies_pvp': (has_trophies ? 30 : null),
-                                 'items': (has_item_loot ? [{'spec':'token','stack':1000},{'spec':'inventory_unknown','stack':5}] : [])},
+                                loot,
                                 {'base_damage': 0.51,
-                                 'deployed_units':units},
-                                (kind == 'ladder' ? ladder_state : null));
+                                 'attacker_id': session.user_id,
+                                 'defender_id': ai_id,
+                                 'time': Math.floor(server_time),
+                                 'duration': 945,
+                                 'base_id': 'h'+ai_id.toString(),
+                                 'deployed_units':units,
+                                 'replay_version': gamedata['replay_version']},
+                                (kind == 'ladder' ? ladder_state : null),
+                               'abcdef');
 }
 
 // get a string representing the units you killed in battle
@@ -20097,7 +20286,7 @@ function get_loot_kills_list(loot, separator, max_count) {
 
 function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_user_id, battle_opponent_fbid, battle_opponent_level, battle_opponent_friend,
                                      battle_opponent_name,
-                                     outcome, loot, battle_summary, ladder_state) {
+                                     outcome, loot, battle_summary, ladder_state, replay_signature) {
     // do this first so it pops under
     if(player.tutorial_state === 'wait_battle_finish2') {
         metric_event('0330_tutorial_battle_ended', {});
@@ -20109,9 +20298,24 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['dialog'] = 'fancy_victory_dialog';
     dialog.user_data['context'] = null;
     dialog.user_data['anim_start_time'] = client_time;
+    dialog.user_data['replay_signature'] = replay_signature;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
+
+    if(player.tutorial_state == 'COMPLETE' && can_show_replay_for_battle_summary(battle_summary)) {
+        var link_qs = battle_replay_link_qs(battle_summary['time'], battle_summary['attacker_id'], battle_summary['defender_id'], battle_summary['base_id'], dialog.user_data['replay_signature']);
+        if(link_qs && FBShare.supported()) {
+            dialog.widgets['fb_share_button'].show =
+                dialog.widgets['fb_share_icon'].show = true;
+            var text = gamedata['virals']['replay']['ui_post_headline']
+                .replace('%ATTACKER', player.get_ui_name()) // battle_summary['attacker_name'])
+                .replace('%DEFENDER', battle_opponent_name); //  battle_summary['defender_name']);
+            dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+                FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+            }; })(link_qs, text);
+        }
+    }
 
     dialog.widgets['winner_name'].str = player.get_ui_name();
     dialog.widgets['loser_name'].str = battle_opponent_name;
@@ -20139,14 +20343,6 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 units_lost += qty;
             }
         }
-        dialog.widgets['units_killed'].str = pretty_print_number(units_killed);
-        dialog.widgets['units_lost'].str = pretty_print_number(units_lost);
-    } else{
-        // hide the units killed and units lost counters when we don't have defending units enabled
-        dialog.widgets['units_killed'].show = false;
-        dialog.widgets['units_killed_label'].show = false;
-        dialog.widgets['units_lost'].show = false;
-        dialog.widgets['units_lost_label'].show = false;
     }
 
     // scale loser_inner bar width according to how well the loser did in terms of kills vs. losses
@@ -20160,7 +20356,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     }
     // set .data to a modified copy of the original so that the size_change animation picks up the new final "dimensions"
     dialog.widgets['loser_inner'].data = goog.object.clone(dialog.widgets['loser_inner'].data);
-    dialog.widgets['loser_inner'].wh[0] = dialog.widgets['loser_inner'].data['dimensions'][0] = Math.floor(84 + loser_width*(259-84));
+    dialog.widgets['loser_inner'].wh[0] = dialog.widgets['loser_inner'].data['dimensions'][0] = Math.floor(84 + loser_width*(dialog.data['widgets']['loser_inner']['dimensions'][0]-84));
 
     if(player.get_any_abtest_value('show_xp_gains', gamedata['client']['show_xp_gains'])) {
         dialog.widgets['loot_xp_amount'].num_val = loot['xp'] || 0;
@@ -20187,6 +20383,9 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['trophy_type'] = ((loot['trophies_pvv'] || 0) != 0 ? 'pvv' : ((loot['trophies_pvp'] || 0) != 0 ? 'pvp' : 'pve'));
 
     if(battle_type !== 'home') {
+        // OFFENSE only
+
+        // loot amounts
         for(var res in gamedata['resources']) {
             if('row_'+res+'_amount' in dialog.widgets) {
                 /* dialog.widgets['total_'+res+'_amount'].num_val = */ dialog.widgets['row_'+res+'_amount'].num_val = looted_res[res];
@@ -20201,14 +20400,47 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 });
             }
         }
+
+        // spent units
+        if(gamedata['client']['battle_end_dialog_show_units_deployed'] && ('deployed_units' in battle_summary)) {
+            dialog.widgets['you_spent'].show = true;
+            var i = 0, j = 0;
+            for(var specname in gamedata['units']) {
+                if(specname in battle_summary['deployed_units']) {
+                    var spec = gamedata['units'][specname];
+                    var qty = battle_summary['deployed_units'][specname];
+
+                    var d = dialog.widgets[SPUI.get_array_widget_name('spent_unit', dialog.data['widgets']['spent_unit']['array'], [i,j])];
+                    d.show = true;
+                    d.user_data['specname'] = specname;
+                    if('icon' in spec) {
+                        d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
+                    } else {
+                        d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
+                    }
+                    d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
+                    d.widgets['stack'].str = pretty_print_number(qty);
+                    d.widgets['frame'].state = 'normal_nohighlight'; // 'disabled' use grayed-out frame
+                    d.widgets['frame'].tooltip.str = pretty_print_number(qty)+'x '+((spec['ui_name_plural'] && qty != 1) ? spec['ui_name_plural'] : spec['ui_name']);
+                    i += 1;
+                    if(i >= dialog.data['widgets']['spent_unit']['array'][0]) {
+                        i = 0;
+                        j += 1;
+                        if(j >= dialog.data['widgets']['spent_unit']['array'][1]) {
+                            console.log('ran out of space to display units!');
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     } else {
-        dialog.widgets['separator_top'].xy = vec_copy(dialog.data['widgets']['separator_top']['xy_home']);
-        // print list of units you destroyed
+        // DEFENSE only
+
+        // hide loot display
         if(!trophies) {
             dialog.widgets['you_gained'].show = false; // nothing "gained", so don't show it
         }
-        dialog.widgets['row_name'].show =
-            dialog.widgets['row_bullet'].show = false;
         for(var res in gamedata['resources']) {
             goog.array.forEach(['row_%s_icon', 'row_%s_amount', 'total_%s_icon', 'total_%s_amount'], function(s) {
                 var wname = s.replace('%s', res);
@@ -20217,44 +20449,22 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 }
             });
         }
-        dialog.widgets['row_defense'].show = true;
-        dialog.widgets['row_defense'].set_text_with_linebreaking(dialog.data['widgets']['row_defense']['ui_name'] + '\n' + get_loot_kills_list(loot, '\n', dialog.widgets['row_defense'].data['max_lines']));
+    }
+
+    if(1) {
+        dialog.widgets['row_battle_stats'].show = true;
+        var bbstr = dialog.data['widgets']['row_battle_stats']['ui_name'];
+        bbstr = bbstr.replace('%DURATION', pretty_print_time(battle_summary['duration']));
+        var kills_list = get_loot_kills_list(loot, ', ', 3 /* dialog.widgets['row_battle_stats'].data['max_lines'] */);
+        if(kills_list && kills_list.length > 0) {
+            bbstr += dialog.data['widgets']['row_battle_stats']['ui_name_units_killed'].replace('%KILLED', kills_list);
+        }
+        dialog.widgets['row_battle_stats'].set_text_bbcode(bbstr);
+        /*
         // so that typewriter animation will work
         dialog.widgets['row_defense'].data = goog.object.clone(dialog.widgets['row_defense'].data);
         dialog.widgets['row_defense'].data['ui_name'] = dialog.widgets['row_defense'].str;
-    }
-
-    if(battle_type !== 'home' && gamedata['client']['battle_end_dialog_show_units_deployed'] && ('deployed_units' in battle_summary)) {
-        dialog.widgets['you_spent'].show = true;
-        var i = 0, j = 0;
-        for(var specname in gamedata['units']) {
-            if(specname in battle_summary['deployed_units']) {
-                var spec = gamedata['units'][specname];
-                var qty = battle_summary['deployed_units'][specname];
-
-                var d = dialog.widgets[SPUI.get_array_widget_name('spent_unit', dialog.data['widgets']['spent_unit']['array'], [i,j])];
-                d.show = true;
-                d.user_data['specname'] = specname;
-                if('icon' in spec) {
-                    d.widgets['item'].asset = get_leveled_quantity(spec['icon'],1);
-                } else {
-                    d.widgets['item'].asset = get_leveled_quantity(spec['art_asset'],1);
-                }
-                d.widgets['item'].state = GameArt.assets[d.widgets['item'].asset].has_state('icon') ? 'icon' : 'normal';
-                d.widgets['stack'].str = pretty_print_number(qty);
-                d.widgets['frame'].state = 'normal_nohighlight'; // 'disabled' use grayed-out frame
-                d.widgets['frame'].tooltip.str = pretty_print_number(qty)+'x '+((spec['ui_name_plural'] && qty != 1) ? spec['ui_name_plural'] : spec['ui_name']);
-                i += 1;
-                if(i >= dialog.data['widgets']['spent_unit']['array'][0]) {
-                    i = 0;
-                    j += 1;
-                    if(j >= dialog.data['widgets']['spent_unit']['array'][1]) {
-                        console.log('ran out of space to display units!');
-                        break;
-                    }
-                }
-            }
-        }
+        */
     }
 
     if(trophies > 0) {
@@ -20270,11 +20480,15 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
         dialog.widgets['trophy_amount'].str = pretty_print_number(trophies);
     }
 
-    if('battle_stars' in loot && 'base_damage' in battle_summary) {
-        dialog.widgets['battle_stars_bg'].show =
-            dialog.widgets['battle_stars_base_damage'].show = true;
+    // upper base damage display (redundant with bottom display when battle_type == 'home')
+    if(battle_type != 'home' && 'base_damage' in battle_summary) {
+        dialog.widgets['battle_stars_base_damage'].show = true;
         var pct = Math.floor(100*battle_summary['base_damage']).toFixed(0);
         dialog.widgets['battle_stars_base_damage'].str = dialog.data['widgets']['battle_stars_base_damage']['ui_name'].replace('%d', pct);
+    }
+
+    if('battle_stars' in loot && 'base_damage' in battle_summary) {
+        dialog.widgets['battle_stars_bg'].show = true;
         var count = goog.object.getCount(loot['battle_stars']);
         for(var i = 0; i < dialog.data['widgets']['battle_stars_hole']['array'][0]; i++) {
             dialog.widgets['battle_stars_hole'+i.toString()].show = true;
@@ -20439,9 +20653,11 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
 }
 
 function apply_animation(dialog, wname, widget, anim_data, anim_time, anim) {
+    if(!widget) { throw Error('unknown widget: '+wname); }
     if(!widget.show) { return; }
 
-    if(0 in anim) {
+    if(anim === undefined) { throw Error('bad animation for widget: '+wname); }
+    if(Array.isArray(anim)) {
         // it's an array
         for(var i = 0; i < anim.length; i++) {
             apply_animation(dialog, wname, widget, anim_data, anim_time, anim[i]);
@@ -20893,7 +21109,9 @@ function invoke_building_context_menu(mouse_xy) {
     var spec = obj.spec;
 
     var quarry_movable = (session.is_quarry() && obj.spec['quarry_movable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
-    var quarry_buildable = (session.is_quarry() && obj.spec['quarry_buildable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
+    var quarry_stats_viewable = (session.is_quarry() && obj.spec['quarry_stats_viewable'] && session.region.data && session.region.data['storage'] == 'nosql');
+
+    var quarry_upgradable = (session.is_quarry() && obj.spec['quarry_upgradable'] && session.viewing_base.base_landlord_id == session.user_id && session.region.data && session.region.data['storage'] == 'nosql');
 
     var dialog_name = 'building_context_menu';
 
@@ -21031,13 +21249,13 @@ function invoke_building_context_menu(mouse_xy) {
 
         if(obj.is_damaged() && (!session.home_base || !obj.is_repairing())) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['REPAIR']['ui_name'], onclick: invoke_repair_dialog}));
-        } else if((session.home_base || quarry_buildable) && (obj.is_repairing() || obj.is_under_construction() || obj.is_removing())) {
+        } else if((session.home_base || quarry_upgradable) && (obj.is_repairing() || obj.is_under_construction() || obj.is_removing())) {
             // offer to speed up repairs or construction
             upgrade_is_active = false;
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
-        } else if((session.home_base || quarry_buildable) && (obj.is_upgrading() || obj.is_enhancing())) {
+        } else if((session.home_base || quarry_upgradable) && (obj.is_upgrading() || obj.is_enhancing())) {
             // if upgrading or enhancing, then just show speedup and cancel
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
@@ -21045,7 +21263,14 @@ function invoke_building_context_menu(mouse_xy) {
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
                                                 onclick: (function (_obj) { return function() {
                                                     change_selection_ui(null);
-                                                    invoke_confirm_cancel_message('upgrade', (function (__obj) { return function() { send_to_server.func(["CAST_SPELL", __obj.id, (__obj.is_enhancing() ? "CANCEL_ENHANCE" : "CANCEL_UPGRADE")]); }; })(_obj));
+                                                    var ingredient_loss = false;
+                                                    if(_obj.is_enhancing()) {
+                                                        var enh_spec = gamedata['enhancements'][_obj.enhancing['enhance']['spec']];
+                                                        if(_obj.enhancing['enhance']['ingredients'] && !enh_spec['refund_ingredients']) {
+                                                            ingredient_loss = true;
+                                                        }
+                                                    }
+                                                    invoke_confirm_cancel_message((_obj.is_enhancing() ? 'enhance' : 'upgrade'), (function (__obj) { return function() { send_to_server.func(["CAST_SPELL", __obj.id, (__obj.is_enhancing() ? "CANCEL_ENHANCE" : "CANCEL_UPGRADE")]); }; })(_obj), ingredient_loss);
                                                 }; })(selection.unit), asset: 'menu_button_resizable'}));
         } else {
             // not damaged and not upgrading
@@ -21102,7 +21327,7 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_crafter()) {
+            if(obj.is_crafter() && (session.home_base || quarry_upgradable)) {
                 upgrade_is_active = false;
                 var cat = gamedata['crafting']['categories'][obj.spec['crafting_categories'][0]];
 
@@ -21173,7 +21398,7 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_emplacement()) { // special case for emplacements
+            if(obj.is_emplacement() && (session.home_base || quarry_upgradable)) { // special case for emplacements
                 dialog_name = 'emplacement_context_menu';
                 var cur_item = obj.turret_head_item();
                 var item_spec = (cur_item ? ItemDisplay.get_inventory_item_spec(cur_item['spec']) : null);
@@ -21183,6 +21408,16 @@ function invoke_building_context_menu(mouse_xy) {
                     var item_level = ItemDisplay.get_inventory_item_level(cur_item);
                     if(tech_level > item_spec['level']) {
                         under_leveled = true;
+
+                        // but also check recipe predicate (quarries)
+                        if('associated_crafting_recipes' in item_spec) {
+                            var recipe = gamedata['crafting']['recipes'][item_spec['associated_crafting_recipes'][0]];
+                            goog.array.forEach(['show_if', 'requires'], function(pred) {
+                                if(pred in recipe && !read_predicate(recipe[pred]).is_satisfied(player, null)) {
+                                    under_leveled = false;
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -21195,7 +21430,8 @@ function invoke_building_context_menu(mouse_xy) {
                                                                        }));
                 }
 
-                if(cur_item) {
+                // avoid showing "research" button outside home base
+                if(session.home_base && cur_item) {
                     upgrade_is_active = !under_leveled;
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
                     special_buttons['head'].push(new ContextMenuButton({ui_name: upgr_spell['ui_name_building_context_emplacement'],
@@ -21209,7 +21445,7 @@ function invoke_building_context_menu(mouse_xy) {
 
             if(obj.time_until_finish() > 0) {
                 // object is busy with something, cannot upgrade
-            } else if((session.home_base || quarry_buildable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
+            } else if((session.home_base || quarry_upgradable || quarry_stats_viewable) && (obj.get_max_ui_level() > 1 || obj.is_storage() || (('equip_slots' in obj.spec) && !obj.is_minefield()))) {
                 var spell = gamedata['spells']['SHOW_UPGRADE'];
                 if(obj.level < obj.get_max_ui_level()) {
                     if(gamedata['store']['enable_upgrade_all_barriers'] && (obj.spec['name'] === 'barrier')) {
@@ -21225,10 +21461,17 @@ function invoke_building_context_menu(mouse_xy) {
                 if(migrate_spell && obj.spec['history_category'] == 'turrets' && read_predicate(migrate_spell['requires']).is_satisfied(player, null)) {
                     add_migrate_turret_heads_button(buttons);
                 } else {
-                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (obj.level < obj.get_max_ui_level() ? (obj.is_emplacement() ? '_emplacement' : '') : '_maxlevel')],
+                    // UPGRADE BUTTON
+
+                    // show "View Stats" rather than "Upgrade" if at max level
+                    var stats_only = (obj.level >= obj.get_max_ui_level() ||
+                                      // or, in a quarry, it's a quarry_stats_viewable but not quarry_upgradable object
+                                      (!session.home_base && !quarry_upgradable && quarry_stats_viewable));
+
+                    buttons.push(new ContextMenuButton({ui_name: spell['ui_name'+ (stats_only ? '_maxlevel' : (obj.is_emplacement() ? '_emplacement' : ''))],
                                                         onclick: (function (_obj) { return function() { invoke_upgrade_building_dialog(_obj); }; })(obj),
                                                         spellname: 'INVOKE_UPGRADE_DIALOG',
-                                                        asset: ((obj.level < obj.get_max_ui_level() && upgrade_is_active) ? 'action_button_resizable' : 'menu_button_resizable')}));
+                                                        asset: (!stats_only && upgrade_is_active ? 'action_button_resizable' : 'menu_button_resizable')}));
                 }
             }
 
@@ -21594,7 +21837,8 @@ function invoke_region_map(target_loc) {
         'attacker': region_map_finder_state_init(),
         'hive_token': region_map_finder_state_init(),
         'raid': region_map_finder_state_init(),
-        'strongpoint': region_map_finder_state_init()
+        'strongpoint': region_map_finder_state_init(),
+        'quarry_logistics': region_map_finder_state_init()
     };
     for(var res in gamedata['resources']) {
         dialog.user_data['finder_states']['quarry_'+res] = region_map_finder_state_init();
@@ -22156,18 +22400,27 @@ function region_map_finder_update(dialog, kind, state) {
     var tooltip_str;
     var onclick;
     if(show) {
-        var ui_res = '';
+        var ui_res = ''; // "Iron/Water/Logistics" etc for quarries
         if(kind_res) {
             if(kind_res in gamedata['resources']) {
                 ui_res = gamedata['resources'][kind_res]['ui_name'];
             } else if(kind_res in gamedata['items']) {
                 ui_res = gamedata['items'][kind_res]['ui_name'];
+            } else if(kind_res in gamedata['strings']['regional_map']) {
+                ui_res = goog.string.trim(gamedata['strings']['regional_map'][kind_res].replace('%s',''));
+            } else {
+                throw Error('ui_res not found for '+kind_res);
             }
         }
 
         if(kind_root == 'quarry') {
-            button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
-            tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+            if('ui_name_quarry_'+kind_res in dialog.data['widgets']['misc_finder']) {
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry_'+kind_res].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry_'+kind_res].replace('%s', ui_res);
+            } else {
+                button_name = dialog.data['widgets']['misc_finder']['ui_name_quarry'].replace('%s', ui_res);
+                tooltip_str = dialog.data['widgets']['misc_finder']['ui_tooltip_quarry'].replace('%s', ui_res);
+            }
             player.record_feature_use('quarry_finder_seen');
         } else {
             button_name = dialog.data['widgets']['misc_finder']['ui_name_'+kind].replace('%s', ui_res);
@@ -22774,6 +23027,10 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
                 var new_is_ladder = !!(gamedata['regions'][_id]['ladder_pvp']);
                 var ladder_reset = (old_is_ladder && !new_is_ladder) && gamedata['matchmaking']['zero_points_on_ladder_exit'];
 
+                var old_is_pvp = !(session.region.data && session.region.data['zero_points_on_entry']);
+                var new_is_pvp = !(gamedata['regions'][_id]['zero_points_on_entry']);
+                if(old_is_pvp && !new_is_pvp) { ladder_reset = true; }
+
                 var msg = gamedata['strings']['change_region_confirm' + (within_region ? '_within_region' : (ladder_reset ? '_ladder_reset': '' ))];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', gamedata['regions'][_id]['ui_name']),
                                             msg['ui_description'].replace('%s', gamedata['regions'][_id]['ui_name'])+'\n\n'+gamedata['strings']['regional_map']['change_region_feature_info'].replace('%NAME',gamedata['regions'][_id]['ui_name']).replace('%DESCR',gamedata['regions'][_id]['ui_description_long']),
@@ -23360,7 +23617,7 @@ function mail_dialog_select_mail(dialog, row) {
             var ghost = mail['attachments_ghost'][i];
             if(ghost && ghost['collected_at']) {
                 dialog.widgets['attach_taken'].show = true;
-                dialog.widgets['attach_taken'].str = dialog.data['widgets']['attach_taken']['ui_name'].replace('%s', pretty_print_date(ghost['collected_at']));
+                dialog.widgets['attach_taken'].str = dialog.data['widgets']['attach_taken']['ui_name'].replace('%s', pretty_print_date_utc(ghost['collected_at']));
                 break;
             }
         }
@@ -23562,8 +23819,10 @@ function update_mail_dialog_context(dialog) {
     Otherwise run the callback immediately.
     @param {!Array.<!Object>} item_list
     @param {function()} action_cb
-    @param {boolean} multi - operate on entire stack, not just one from each stack */
-function confirm_item_delete(item_list, action_cb, multi) {
+    @param {boolean} multi - operate on entire stack, not just one from each stack
+    @param {string|null|undefined=} refund_str - if present, confirm for a refund instead of a deletion
+*/
+function confirm_item_delete(item_list, action_cb, multi, refund_str) {
     var need_confirm = goog.array.some(item_list, function(item) {
         var spec = ItemDisplay.get_inventory_item_spec(item['spec']);
         return !!spec['ui_precious'];
@@ -23588,7 +23847,7 @@ function confirm_item_delete(item_list, action_cb, multi) {
             var descr = ((multi && 'stack' in item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, item['stack']) : '') + ui_name;
             return descr;
         });
-        invoke_item_delete_confirm_dialog(action_cb, ui_item_list);
+        invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str);
         return;
     } else {
         action_cb();
@@ -23596,30 +23855,35 @@ function confirm_item_delete(item_list, action_cb, multi) {
 }
 
 /** @param {function()} action_cb
-    @param {!Array.<string>} ui_item_list */
-function invoke_item_delete_confirm_dialog(action_cb, ui_item_list) {
+    @param {!Array.<string>} ui_item_list
+    @param {string|null|undefined?} refund_str - if present, confirm for a refund instead of a deletion
+*/
+function invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['item_delete_confirm_dialog']);
     dialog.user_data['dialog'] = 'item_delete_confirm_dialog';
     dialog.user_data['action_cb'] = action_cb;
+    dialog.user_data['want_refund'] = !!refund_str;
 
     dialog.modal = true;
     install_child_dialog(dialog);
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
-    var ui_descr = dialog.data['widgets']['description']['ui_name'];
-    dialog.widgets['description'].set_text_bbcode(ui_descr.replace('%thing',ui_item_list.join(', ')));
+    dialog.widgets['title'].str = dialog.data['widgets']['title'][refund_str ? 'ui_name_refund' : 'ui_name'];
+
+    var ui_descr = dialog.data['widgets']['description'][refund_str ? 'ui_name_refund' : 'ui_name'];
+    dialog.widgets['description'].set_text_bbcode(ui_descr.replace('%thing',ui_item_list.join(', ')).replace('%refund',refund_str));
 
     dialog.widgets['ok_button'].onclick = dialog.widgets['input'].ontextready = function(w) {
         var dialog = w.parent;
-        if(dialog.widgets['input'].str.toUpperCase() != dialog.data['widgets']['input']['require_string']) { return; } // mismatch
+        if(dialog.widgets['input'].str.toUpperCase() != dialog.data['widgets']['input'][dialog.user_data['want_refund'] ? 'require_string_refund' : 'require_string']) { return; } // mismatch
         var cb = dialog.user_data['action_cb'];
         close_parent_dialog(w);
         cb();
     };
     dialog.widgets['input'].ontype = function(w) {
         var dialog = w.parent;
-        dialog.widgets['ok_button'].state = (dialog.widgets['input'].str.toUpperCase() == dialog.data['widgets']['input']['require_string']) ? 'normal' : 'disabled';
+        dialog.widgets['ok_button'].state = (dialog.widgets['input'].str.toUpperCase() == dialog.data['widgets']['input'][dialog.user_data['want_refund'] ? 'require_string_refund' : 'require_string']) ? 'normal' : 'disabled';
     };
     SPUI.set_keyboard_focus(dialog.widgets['input']);
 
@@ -23994,8 +24258,10 @@ function invoke_inventory_dialog(force) {
     return dialog;
 }
 
+var inventory_restack_sync_marker = Synchronizer.INIT;
 // the "inventory grid" functions are used by both inventory_dialog and loot_dialog
 function init_inventory_grid(dialog) {
+    dialog.user_data['restack_sort_order'] = 1;
     dialog.user_data['context'] = null;
     dialog.user_data['rows_per_page'] = dialog.data['widgets']['item']['array'][1];
     dialog.user_data['cols_per_page'] = dialog.data['widgets']['item']['array'][0];
@@ -24104,6 +24370,7 @@ function update_inventory_grid(dialog) {
 
                     if(item['pending']) { can_activate = false; }
                     if(warehouse_busy) { can_activate = false; }
+                    if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { can_activate = false; }
 
                     dialog.widgets['frame'+wname].state = (!can_activate ? 'cooldown' : (dialog.user_data['context'] && dialog.user_data['context'].user_data['slot'] === slot ? 'active' : 'normal'));
 
@@ -24267,6 +24534,20 @@ function update_inventory_grid(dialog) {
         dialog.widgets['overstuffed_warning'].show = (player.inventory.length > player.max_usable_inventory());
         dialog.widgets['overstuffed_warning'].str = dialog.data['widgets']['overstuffed_warning'][(warehouse && warehouse.level < warehouse.get_max_ui_level() ? 'ui_name': 'ui_name_maxlevel')].replace('%s', warehouse.spec['ui_name']);
     }
+
+    dialog.widgets['restack_button'].show = !warehouse_busy && eval_cond_or_literal(gamedata['client']['enable_inventory_restack'] || 0, player, null);
+    dialog.widgets['restack_button'].onclick = function(w) {
+        var dialog = w.parent;
+        if(dialog.user_data['context']) {
+            invoke_inventory_context(dialog, null, -1, null, false);
+        }
+        if(!synchronizer.is_in_sync(inventory_restack_sync_marker)) { return; }
+        send_to_server.func(["INVENTORY_RESTACK", dialog.user_data['restack_sort_order']]);
+        dialog.user_data['restack_sort_order'] *= -1;
+        inventory_restack_sync_marker = synchronizer.request_sync();
+    };
+    dialog.widgets['restack_spinner'].show =
+        dialog.widgets['pending_all_mask'].show = !synchronizer.is_in_sync(inventory_restack_sync_marker);
 };
 
 /** @constructor @struct
@@ -24559,20 +24840,26 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         }
 
         // show refund button when a refund exists and show_refundable_when is true
-        if(spec['refund'] && (('refundable_when' in spec) ? read_predicate(spec['refundable_when']).is_satisfied(player, null) : true)) {
-            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
-                                                                         ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
-                                                                         spellname:"INVENTORY_REFUND"}));
-            if(item['stack'] && item['stack'] > 1) { // big stack
+        if(ItemDisplay.inventory_item_is_refundable(item)) {
+            if(!(item['stack'] && item['stack'] >= 500)) {
+                // show single-refund option unless it's a huge stack
+                dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_button'],
+                                                                             ui_name_pending:gamedata['strings']['inventory']['refund_button_pending'],
+                                                                             spellname:"INVENTORY_REFUND"}));
+            }
+            if(item['stack'] && item['stack'] > 1) { // stack >=1
                 dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['refund_all_button'],
                                                                              ui_name_pending:gamedata['strings']['inventory']['refund_all_button_pending'],
                                                                              spellname:"INVENTORY_REFUND_ALL"}));
             }
         }
 
-        dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
-                                                                     ui_name_pending:gamedata['strings']['inventory']['discard_button_pending'],
-                                                                     spellname:"INVENTORY_TRASH"}));
+        if(!(item['stack'] && item['stack'] >= 500)) {
+            // show single-discard option unless it's a huge stack
+            dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_button'],
+                                                                         ui_name_pending:gamedata['strings']['inventory']['discard_button_pending'],
+                                                                         spellname:"INVENTORY_TRASH"}));
+        }
         if(item['stack'] && item['stack'] > 1) {
             dialog.user_data['buttons'].push(new InventoryContextButton({ui_name:gamedata['strings']['inventory']['discard_all_button'],
                                                                          ui_name_pending:gamedata['strings']['inventory']['discard_all_button_pending'],
@@ -24661,18 +24948,20 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
                     var spec = ItemDisplay.get_inventory_item_spec(_item['spec']);
                     var ui_name = ItemDisplay.get_inventory_item_ui_name(spec);
                     var descr = s['ui_description'].replace('%s', ui_name).replace('%d', ((_multi && 'stack' in _item) ? ItemDisplay.get_inventory_item_stack_prefix(spec, _item['stack']) : ''));
+                    var refund_str = null;
                     if(_want_refund) {
-                        descr = descr.replace('%refund', ItemDisplay.get_inventory_item_refund_str(spec, (_multi && 'stack' in _item) ? _item['stack'] : 1));
+                        refund_str = ItemDisplay.get_inventory_item_refund_str(_item, (_multi && 'stack' in _item) ? _item['stack'] : 1);
+                        descr = descr.replace('%refund', refund_str);
                     }
                     invoke_child_message_dialog(s['ui_title'].replace('%s', ui_name), descr,
                                                 {'cancel_button': true,
                                                  'ok_button_ui_name': s['ui_button'],
-                                                 'on_ok': (function (__cb, _w, __item, __multi) { return function() {
+                                                 'on_ok': (function (__cb, _w, __item, __multi, _refund_str) { return function() {
                                                      // extra layer of confirmation for precious items
                                                      confirm_item_delete([__item], (function (___cb, __w) { return function() {
                                                          ___cb(__w);
-                                                     }; })(__cb, _w), __multi);
-                                                 }; })(_cb, w, _item, _multi)});
+                                                     }; })(__cb, _w), __multi, _refund_str);
+                                                 }; })(_cb, w, _item, _multi, refund_str)});
                 }; })(cb, item, i, want_refund, multi);
             } else {
                 widget.onclick = cb;
@@ -25387,7 +25676,13 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         descr = descr.replace('%abspct', ((1.0+strength)*100.0).toFixed(0));
     }
     while(descr.indexOf('%pct') >= 0) {
-        descr = descr.replace('%pct', ((strength)*100.0).toFixed(0));
+        var ui_pct;
+        if(strength < 0.10) { // 10% or less
+            ui_pct = ((strength)*100.0).toFixed(2);
+        } else {
+            ui_pct = ((strength)*100.0).toFixed(0);
+        }
+        descr = descr.replace('%pct', ui_pct);
     }
     while(descr.indexOf('%oneminuspct') >= 0) {
         descr = descr.replace('%oneminuspct', ((1.0-strength)*100.0).toFixed(0));
@@ -25430,7 +25725,25 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         var ui_modstat_list = ui_modstat_buff_list.concat(ui_modstat_nerf_list);
         descr = descr.replace('%modstats', ui_modstat_list.join('\n'));
     }
-
+    while(descr.indexOf('%quarries') >= 0) {
+        var ui_quarries = '';
+        if('data' in aura && ('ui_sources' in aura['data'])) {
+            var ui_ls = goog.array.map(aura['data']['ui_sources'], function(src) {
+                var ui_player = '';
+                var pcache = PlayerCache.query_sync_fetch(src['base_landlord_id']);
+                if(pcache) {
+                    ui_player = PlayerCache.get_ui_name(pcache) + ' ';
+                }
+                var ui_level = '';
+                if('level' in src) {
+                    ui_level = ' L'+pretty_print_number(src['level']);
+                }
+                return ui_player + '(' + vec_print(src['base_map_loc']) + ')' + ui_level + ': ' + '+' + (100.0*src['strength']).toFixed(2) + '%';
+            });
+            ui_quarries += ui_ls.join('\n');
+        }
+        descr = descr.replace('%quarries', ui_quarries);
+    }
     //dialog.widgets['description'].set_text_with_linebreaking(descr);
     //dialog.widgets['description'].wh[1] = dialog.widgets['description'].str.split('\n').length * dialog.widgets['description'].font.leading + dialog.widgets['description'].font.size;
     dialog.widgets['description'].set_text_bbcode(descr);
@@ -25440,6 +25753,8 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
     // EXPIRES
     if(('end_time' in aura) && (aura['end_time'] > 0)) {
         dialog.widgets['expires'].show = true;
+        dialog.widgets['expires'].text_color = SPUI.make_colorv('expires_color' in spec ? spec['expires_color'] : dialog.data['widgets']['expires']['text_color']);
+
         dialog.widgets['expires'].xy[1] = dialog.widgets['description'].xy[1] + dialog.widgets['description'].wh[1] - dialog.widgets['description'].font.size;
         dialog.widgets['bgrect'].wh[1] += dialog.widgets['expires'].wh[1];
     }
@@ -26395,8 +26710,13 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.user_data['from_id'] = from_id;
     dialog.user_data['user_id'] = user_id;
     dialog.user_data['from_alliance'] = from_alliance;
+
+    if(from_id < 0 && from_alliance < 0) {
+        throw Error('at least one of from_id or from_alliance must be >=0');
+    }
+
     // flag that we're looking at another player's personal battles (only allowed if they are in the same alliance)
-    dialog.user_data['alliancemate_flag'] = (!player.is_developer() && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
+    dialog.user_data['alliancemate_flag'] = (!(gamedata['battle_logs_public'] || player.is_developer()) && from_id !== session.user_id && session.is_in_alliance() && from_alliance === session.alliance_id);
     dialog.user_data['sumlist'] = null;
     dialog.user_data['first_on_page'] = []; // index of first shown summary in sumlist
     dialog.user_data['chapter'] = null;
@@ -26411,11 +26731,33 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.widgets['alliance_button'].onclick = function(w) { battle_history_change_chapter(w.parent, 'alliance'); };
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
-    var dev_str = (from_id !== session.user_id && from_alliance !== session.alliance_id ? ' (As '+from_id.toString()+') ' : '');
+    var dev_str = (!gamedata['battle_logs_public'] && from_id !== session.user_id && from_alliance !== session.alliance_id ? ' (As '+from_id.toString()+') ' : '');
     if(user_id > 0) {
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_vs'].replace('%s', name.split(' ')[0] + ' (L'+ level.toString()+')') + dev_str;
     } else {
         dialog.widgets['title'].str = dialog.data['widgets']['title']['ui_name_all'] + dev_str;
+    }
+
+    // set up subtitle
+    if(from_id > 0) {
+        var pinfo = PlayerCache.query_sync(from_id);
+        if(pinfo) {
+            dialog.widgets['subtitle'].str = PlayerCache.get_ui_name(pinfo);
+            if('player_level' in pinfo) {
+                dialog.widgets['subtitle'].str += ' (L'+pinfo['player_level'].toString()+')';
+            }
+            if('alliance_id' in pinfo && pinfo['alliance_id'] >= 0) {
+                var alinfo = AllianceCache.query_info_sync(pinfo['alliance_id']);
+                if(alinfo && alinfo['chat_tag']) {
+                    dialog.widgets['subtitle'].str += ' ['+alinfo['chat_tag']+']';
+                }
+            }
+        }
+    } else if(from_alliance > 0) {
+        var alinfo = AllianceCache.query_info_sync(from_alliance);
+        if(alinfo) {
+            dialog.widgets['subtitle'].str = alliance_display_name(alinfo);
+        }
     }
 
     dialog.widgets['column_header_time'].show = !!gamedata['client']['battle_history_time_column'];
@@ -26423,7 +26765,7 @@ function invoke_battle_history_dialog(from_id, user_id, from_alliance, name, lev
     dialog.widgets['column_header_outcome'].show = !dialog.widgets['column_header_location'].show;
     dialog.widgets['column_header_status'].str = dialog.data['widgets']['column_header_status'][(gamedata['client']['battle_history_location_column'] ? 'ui_name' : 'ui_name_loot')];
 
-    battle_history_change_chapter(dialog, ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human'));
+    battle_history_change_chapter(dialog, (from_id < 0 && from_alliance >= 0 ? 'alliance' : ((user_id > 0 && is_ai_user_id_range(user_id)) ? 'ai' : 'human')));
 
     dialog.ondraw = update_battle_history_dialog;
     return dialog;
@@ -26548,10 +26890,10 @@ function battle_history_change_page(dialog, page) {
     var chapter_pages = Math.floor((chapter_battles+rows_per_page-1)/rows_per_page);
 
     // note: currently, AI battles do not record involved_alliances, so cannot be looked up for alliancemates.
-    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'];
+    dialog.widgets['single_player_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && !dialog.user_data['alliancemate_flag'] && (dialog.user_data['from_id'] >= 0);
 
-    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0);
-    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id);
+    dialog.widgets['multiplayer_button'].show = dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_id'] >= 0);
+    dialog.widgets['alliance_button'].show = eval_cond_or_literal(gamedata['client']['enable_alliance_battle_history'], player, null) && dialog.user_data['enable_buttons'] && (dialog.user_data['user_id'] <= 0) && (dialog.user_data['from_alliance'] >= 0 || dialog.user_data['from_id'] === session.user_id) && (dialog.user_data['from_id'] >= 0);
     if(dialog.widgets['alliance_button'].show && dialog.user_data['from_alliance'] < 0) {
         // for the player, who is not in an alliance
         dialog.widgets['alliance_button'].tooltip.str = dialog.data['widgets']['alliance_button']['ui_tooltip_no_alliance'];
@@ -26761,7 +27103,7 @@ function battle_history_change_page(dialog, page) {
                         }
                     }
                 }
-                var s = dialog.data['widgets']['row_loot']['ui_name'];
+                var s_list = [];
 
                 for(var res in gamedata['resources']) {
                     var amount;
@@ -26778,11 +27120,13 @@ function battle_history_change_page(dialog, page) {
                     } else {
                         amount = 0;
                     }
-                    // rather complex string replacement to get this right. Note, we add the minus sign here for lost amounts.
-                    s = s.replace('%'+res.toUpperCase(), gamedata['resources'][res]['ui_name']);
-                    s = s.replace('%s'+res[0] /* first character */, ((is_lost && amount > 0) ? '-' : '') + pretty_print_number(amount));
+
+                    if(amount != 0) {
+                        // Note, we add the minus sign here for lost amounts.
+                        s_list.push(((is_lost && amount > 0) ? '-' : '') + pretty_print_qty_brief(amount) + ' ' + gamedata['resources'][res]['ui_name']);
+                    }
                 }
-                dialog.widgets['row_loot'+row].str = s;
+                dialog.widgets['row_loot'+row].str = s_list.join('\n');
             }
 
             if(gamedata['client']['battle_history_time_column']) {
@@ -26990,17 +27334,14 @@ function invoke_battle_log_dialog(summary, signature, friendly_id) {
     };
 
     // pre-fill summary info
-    dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = (!summary['at_quarry'] && !summary['at_squad'] && !summary['at_raid']);
-    dialog.widgets['location'].show = ((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']);
     if((summary['at_quarry'] || summary['at_squad'] || summary['at_raid']) && summary['base_ui_name']) {
+        dialog.widgets['location'].show = true;
         dialog.widgets['location'].set_text_with_linebreaking(summary['base_ui_name']);
-    }
-
-    dialog.widgets['base_damage_label'].show =
-        dialog.widgets['base_damage'].show = ('base_damage' in summary);
-    if('base_damage' in summary) {
+    } else if('base_damage' in summary) {
+        dialog.widgets['base_damage'].show = dialog.widgets['base_damage_label'].show = true;
         dialog.widgets['base_damage'].str = Math.floor(100.0*summary['base_damage']).toFixed(0)+'%';
     }
+
     dialog.widgets['outcome'].str = summary['ui_outcome'];
     if(summary['loot'] && 'battle_stars' in summary['loot']) {
         var star_count = goog.object.getCount(summary['loot']['battle_stars']);
@@ -27116,44 +27457,6 @@ function can_show_replay_for_battle_summary(summary) {
     return their_replay_version === cur_replay_version;
 }
 
-// given a battle summary, determine if we can show deployment markers
-function can_show_deployment_markers_for_battle_summary(summary) {
-    if(!player.get_any_abtest_value('battle_history_deployment_markers', gamedata['client']['battle_history_deployment_markers'])) { return false; }
-    return (!summary['raid_mode'] &&
-            summary['base_id'] === session.viewing_base.base_id &&
-            ((!summary['base_ncells'] && !session.viewing_base.base_ncells) ||
-             vec_equals(summary['base_ncells'] || gamedata['map']['default_ncells'],
-                        (session.viewing_base.base_ncells || gamedata['map']['default_ncells']))) &&
-            ('deployed_units' in summary) &&
-            goog.object.getCount(summary['deployed_units']) >= 1);
-}
-
-// given a battle log, turn on the deployment markers for it
-function show_deployments_for_battle_log(attacker_name, attacker_id, log) {
-    // mimic normal unit deployment spread
-    var radius = player.get_any_abtest_value('unit_deploy_spread', gamedata['unit_deploy_spread']);
-    var ncells = session.viewing_base.ncells();
-
-    var deployments = [];
-    goog.array.forEach(log, function(e) {
-        if(e['event_name'] === '3910_unit_deployed' && e['user_id'] === attacker_id) {
-            var spec = gamedata['units'][e['unit_type']];
-            if(!spec) { return; }
-
-            var pos = [clamp(e['x']+radius*(Math.random()-0.5), 0, ncells[0]-1),
-                       clamp(e['y']+radius*(Math.random()-0.5), 0, ncells[1]-1)];
-
-            deployments.push({specname: e['unit_type'],
-                              level: e['level'],
-                              altitude: get_leveled_quantity(spec['altitude'] || 0, e['level']),
-                              pos: pos});
-        }
-    });
-    if(deployments.length < 1) { return; }
-    change_selection_ui(null);
-    DeploymentMarkers.invoke_gui(session.get_real_world().fxworld, attacker_name, deployments);
-}
-
 function receive_battle_log_result(dialog, ret) {
     var log, replay_exists;
     if(!ret) {
@@ -27183,12 +27486,6 @@ function receive_battle_log_result(dialog, ret) {
 
         // see if we can show deployment markers for this
         var summary = dialog.user_data['summary'];
-        if(can_show_deployment_markers_for_battle_summary(summary)) {
-            dialog.widgets['show_markers_button'].show = true;
-            dialog.widgets['show_markers_button'].onclick = (function (_summary, _log) { return function(w) {
-                show_deployments_for_battle_log(_summary['attacker_name'], _summary['attacker_id'], _log);
-            }; })(summary, log);
-        }
 
         if(replay_exists && can_show_replay_for_battle_summary(summary)) {
             dialog.widgets['replay_button'].show = true;
@@ -27203,6 +27500,18 @@ function receive_battle_log_result(dialog, ret) {
                 download_and_play_replay(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'],
                                          dialog.user_data['signature'], fail_cb);
             };
+
+            var link_qs = battle_replay_link_qs(summary['time'], summary['attacker_id'], summary['defender_id'], summary['base_id'], dialog.user_data['signature']);
+            if(link_qs && FBShare.supported()) {
+                dialog.widgets['fb_share_button'].show =
+                    dialog.widgets['fb_share_icon'].show = true;
+                var text = gamedata['virals']['replay']['ui_post_headline']
+                    .replace('%ATTACKER', dialog.widgets['attacker_name'].str)
+                    .replace('%DEFENDER', dialog.widgets['defender_name'].str);
+                dialog.widgets['fb_share_button'].onclick = (function (_link_qs, _text) { return function(w) {
+                    FBShare.invoke({link_qs: _link_qs, name: _text, ref: 'replay'});
+                }; })(link_qs, text);
+            }
         }
     }
     dialog.widgets['log'].scroll_to_top();
@@ -28847,8 +29156,6 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
                     for(var j = 0; j < d.data['widgets']['join_type_choice']['array'][0]; j++) {
                         d.widgets['join_type_choice'+j.toString()].state = (d.data['widgets']['join_type_choice']['join_types'][j] == d.user_data['join_type'] ? 'active' : 'normal');
                     }
-                    // enable "edit/create" button
-                    alliance_list_create_tab_update_create_button(d);
                 }; })(i);
             }
 
@@ -28860,7 +29167,9 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
         d.widgets['logo'].asset = get_alliance_logo_asset(d.user_data['logo'] || null);
 
         SPUI.set_keyboard_focus(d.widgets['name_input']);
-        alliance_list_create_tab_update_create_button(d);
+        d.ondraw = function(d) {
+            alliance_list_create_tab_update_create_button(d);
+        };
 
     } else if(newtab == 'info') {
         var d = dialog.widgets['info_tab'];
@@ -28977,7 +29286,8 @@ function alliance_logo_chooser_rowfunc(dialog, row, name) {
         fw.onclick = (function (_name) { return function(w) {
             var _dialog = w.parent;
             _dialog.user_data['logo'] = _name;
-            if(_dialog.parent) {
+            if(_dialog.parent && _dialog.parent.widgets['create_tab'] &&
+               _dialog.parent.widgets['create_tab'].user_data) {
                 _dialog.parent.widgets['create_tab'].user_data['logo'] = _dialog.user_data['logo'];
                 _dialog.parent.widgets['create_tab'].user_data['changed'] = true;
                 alliance_list_change_tab(_dialog.parent, _dialog.parent.user_data['tab']);
@@ -29445,6 +29755,11 @@ function update_alliance_info_tab(dialog) {
         if('ui_description' in r) { _dialog.widgets['alliance_description'].set_text_with_linebreaking(r['ui_description']); }
         if('num_members' in r) { _dialog.widgets['num_members'].str = r['num_members'].toString() + '/' + gamedata['alliances']['max_members'].toString(); }
 
+        _dialog.widgets['view_battles_button'].show = !!gamedata['battle_logs_public'];
+        _dialog.widgets['view_battles_button'].onclick = (function (_r) { return function(w) {
+            invoke_battle_history_dialog(-1, -1, _r['id'], '', -1);
+        }; })(r);
+
         // start loading the alliance member info
         var join_type = r['join_type'];
         _dialog.user_data['join_type'] = join_type;
@@ -29563,7 +29878,7 @@ function update_alliance_info_tab(dialog) {
                             alliance_in_different_continent = true;
                             continent_info = gamedata['continents'][info['continent']];
                         }
-                        if(alliance_in_different_continent) {
+                        if(alliance_in_different_continent && continent_info) {
                             var bridge = continent_bridge_available();
                             if(bridge) {
                                 join_cb = (function (___dialog, _continent_info, _join_cb) { return function() {
@@ -29578,7 +29893,7 @@ function update_alliance_info_tab(dialog) {
                                     invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%continent', _continent_info['ui_name']),
                                                                 {'dialog': 'message_dialog_big', 'close_button': true, 'cancel_button': true,
                                                                  'ok_button_ui_name': ___dialog.data['widgets']['join_button']['ui_name'], 'on_ok': _join_cb});
-                                }; })(dialog, continent_info, join_cb);
+                                }; })(__dialog, continent_info, join_cb);
                             }
                         }
                         __dialog.widgets['join_button'].onclick = join_cb;
@@ -29738,7 +30053,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
 
             // member since
             if('join_time' in member) {
-                d.user_data['ui_member_since'] = d.data['widgets']['info']['ui_member_since'].replace('%s', pretty_print_date(member['join_time']));
+                d.user_data['ui_member_since'] = d.data['widgets']['info']['ui_member_since'].replace('%s', pretty_print_date_utc(member['join_time']));
             } else {
                 d.user_data['ui_member_since'] = null;
             }
@@ -30894,7 +31209,7 @@ player.advance_squads = function() {
         }
 
         // don't try to drive squads around outside home base (only because the server doesn't take the commands)
-        if(!session.home_base) { return; }
+        if(!gamedata['territory']['enable_squad_control_away_from_home'] && !session.home_base) { return; }
 
         var orders = player.squad_get_client_data(squad_data['id'], 'squad_orders');
         var max_dist_to_exit_map = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit
@@ -31341,7 +31656,7 @@ function update_repair_control(dialog) {
             }
 
             dialog.widgets['grid'+coord].asset = get_leveled_quantity(spec['art_asset'], level);
-            dialog.widgets['grid'+coord].tooltip.str = spec['ui_name'];
+            dialog.widgets['grid'+coord].tooltip.str = dialog.data['widgets']['grid']['ui_tooltip'].replace('%s', spec['ui_name']).replace('%cur', pretty_print_number(level)).replace('%max', pretty_print_number(get_max_ui_level(spec)));
             dialog.widgets['grid'+coord].alpha = (spec['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
             dialog.widgets['grid_health'+coord].show = (hp != max_hp) && (hp>0);
             dialog.widgets['grid_health'+coord].progress = repair_progress;
@@ -32345,6 +32660,7 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['in_production_time'].show =
         dialog.widgets['in_production_progress'].show =
         dialog.widgets['in_production_cancel'].show = (builder && manuf_queue.length > 0);
+    dialog.widgets['in_production_level'].show = false;
 
     if(builder && manuf_queue.length > 0) {
         var item = manuf_queue[0];
@@ -32363,6 +32679,13 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['in_production_cancel'].onclick = (function(b,x,n) { return function() {
             cancel_manuf_item(b,x,n); }; })(builder, 0, item['spec_name']);
         dialog.widgets['in_production_cancel'].state = 'normal';
+
+        if('level' in item &&
+           ('update_unit_levels_on_tech_upgrade' in gamedata) &&
+           !gamedata['update_unit_levels_on_tech_upgrade']) {
+            dialog.widgets['in_production_level'].show = true;
+            dialog.widgets['in_production_level'].str = dialog.data['widgets']['in_production_level']['ui_name'].replace('%d', pretty_print_number(item['level']));
+        }
     }
 
     // fill in production queue display
@@ -32370,16 +32693,18 @@ function update_manufacture_dialog(dialog) {
         dialog.widgets['queue'+box.toString()].show =
             dialog.widgets['queue_counter_bg'+box.toString()].show =
             dialog.widgets['queue_counter'+box.toString()].show =
+            dialog.widgets['queue_level'+box.toString()].show =
             dialog.widgets['queue_cancel'+box.toString()].show = false;
     }
 
     var box = -1;
     var kind = null;
+    var last_level = -1;
     var counters = [0,0,0,0];
     if(builder) {
         for(var i = 1; i < manuf_queue.length; i++) {
             var item = manuf_queue[i];
-            if(item['spec_name'] != kind) {
+            if(item['spec_name'] != kind || (item['level']||-1) != last_level) {
                 // start a new box
                 box += 1;
                 if(box >= 4) {
@@ -32387,6 +32712,7 @@ function update_manufacture_dialog(dialog) {
                     break;
                 }
                 kind = item['spec_name'];
+                last_level = item['level'] || -1;
                 dialog.widgets['queue'+box.toString()].show = true;
                 dialog.widgets['queue'+box.toString()].bg_image = get_leveled_quantity(gamedata['units'][kind]['art_asset'], item['level']);
                 dialog.widgets['queue'+box.toString()].alpha = (gamedata['units'][kind]['cloaked'] ? gamedata['client']['cloaked_opacity'] : 1);
@@ -32395,6 +32721,15 @@ function update_manufacture_dialog(dialog) {
                 dialog.widgets['queue_cancel'+box.toString()].show = true;
                 dialog.widgets['queue_cancel'+box.toString()].state = 'normal';
                 dialog.widgets['queue_cancel'+box.toString()].onclick = (function(b,x,n) { return function() { cancel_manuf_item(b,x,n); }; })(builder, i, kind);
+
+
+                if('level' in item &&
+                   ('update_unit_levels_on_tech_upgrade' in gamedata) &&
+                   !gamedata['update_unit_levels_on_tech_upgrade']) {
+                    dialog.widgets['queue_level'+box.toString()].show = true;
+                    dialog.widgets['queue_level'+box.toString()].str = dialog.data['widgets']['queue_level']['ui_name'].replace('%d', pretty_print_number(item['level']));
+                }
+
                 counters[box] = 1;
             } else {
                 counters[box] += 1;
@@ -35907,7 +36242,7 @@ function update_map_dialog(dialog) {
                     if('ui_instance_cooldown' in base) {
                         var togo = player.cooldown_togo(base['ui_instance_cooldown']);
                         if(togo > 0) {
-                            attackability_str = dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown'].replace('%s', pretty_print_time(togo));
+                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo));
                             attackability_col = dialog.data['widgets']['row_attackability']['text_color_resets_inprogress'];
                         }
                     }
@@ -36232,7 +36567,8 @@ function map_dialog_change_page(dialog, chapter, page) {
                 var qtip;
                 if(1) {
                     var data = dialog.data['widgets']['row_qstat'];
-                    qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', data['ui_tooltip_sizes'][rich_str]).replace('%RESOURCE', gamedata['resources'][quarry['base_icon']]['ui_name']);
+                    var ui_long_rich_str = (rich_str in data['ui_tooltip_sizes'] ? data['ui_tooltip_sizes'][rich_str] : rich_str);
+                    qtip = data['ui_tooltip_'+fullness_state].replace('%SIZE', ui_long_rich_str).replace('%RESOURCE', gamedata['resources'][quarry['base_icon']]['ui_name']);
                 }
 
                 dialog.widgets['row_qsize'+row].show = true;
@@ -36314,7 +36650,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                         if(difficulty) {
                             show_difficulty = true;
                             dialog.widgets['row_ai_difficulty'+row].str = dialog.data['widgets']['row_ai_difficulty']['ui_name_'+difficulty];
-                            var COLOR_MAP = {'obsolete': SPUI.disabled_text_color,
+                            var COLOR_MAP = {'obsolete': SPUI.disabled_good_text_color,
                                              'easy': SPUI.good_text_color,
                                              'medium': SPUI.warning_text_color,
                                              'hard': SPUI.error_text_color,
@@ -36729,6 +37065,9 @@ function apply_dialog_hacks(dialog, _tip, consequent_context) {
     if('understood_button_xy' in _tip) {
         dialog.widgets['ok_button'].xy = _tip['understood_button_xy'];
     }
+    if('understood_button_dimensions' in _tip) {
+        dialog.widgets['ok_button'].wh = vec_copy(_tip['understood_button_dimensions']);
+    }
     if('understood_button_ui_name' in _tip) {
         dialog.widgets['ok_button'].str = _tip['understood_button_ui_name'];
     }
@@ -36961,7 +37300,7 @@ player.event_list_cache_index = null;
     @param {number} ref_time
     @param {boolean} ignore_activation */
 player.get_event_schedule = function(event_kind, event_name, ref_time, ignore_activation) {
-    if(!goog.array.contains(['current_event','current_event_store','facebook_sale','bargain_sale',
+    if(!goog.array.contains(['current_event','current_event_store','current_event_no_store','facebook_sale','bargain_sale',
                              'current_stat_tournament',
                              'current_trophy_pve_challenge','current_trophy_pvp_challenge'], event_kind)) {
         throw Error('unhandled event_kind '+event_kind);
@@ -37773,7 +38112,9 @@ function purchase_ui_event(event_name, extra_props) {
 
     // look for an active flash sale
     var aura = goog.array.find(player.player_auras, function(a) {
-        return goog.array.contains(['null_sale', 'flash_sale', 'item_bundles'], a['spec']) && a['end_time'] > server_time;
+        return goog.array.contains(['null_sale', 'flash_sale', 'item_bundles'], a['spec']) &&
+            a['end_time'] > server_time &&
+            (!('start_time' in a) || a['start_time'] < server_time);
     });
     if(aura && ('data' in aura)) {
         goog.array.forEach(['kind','duration','tag'], function(field) {
@@ -38263,13 +38604,15 @@ function invoke_you_got_bonus_units() {
     @param {!SPUI.Dialog} parent of this dialog
     @param {string} spellname
     @param {Object|null} spellarg
-    @param {number} ui_index */
-function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index) {
+    @param {number} ui_index
+    @param {Array<!Object>|null} expect_loot */
+function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index, expect_loot) {
     var spell = gamedata['spells'][spellname];
     dialog.user_data['spellname'] = spellname;
     dialog.user_data['spellarg'] = spellarg;
     dialog.user_data['spell'] = spell;
     dialog.user_data['ui_index'] = ui_index;
+    dialog.user_data['expect_loot'] = expect_loot; // was originally loot-bearing at set-up time
     dialog.user_data['context_parent'] = parent; // dialog that will be the parent of any spawned inventory context menus
     dialog.user_data['pending'] = false;
     dialog.user_data['base_xy'] = vec_copy(dialog.xy);
@@ -38281,7 +38624,7 @@ function init_buy_gamebucks_sku23(dialog, parent, spellname, spellarg, ui_index)
     dialog.ondraw = update_buy_gamebucks_sku23;
 }
 
-function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
+function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg, expect_loot) {
     var dialog = new SPUI.Dialog(gamedata['dialogs']['gamebucks_sku_highlight_dialog']);
     dialog.user_data['dialog'] = 'gamebucks_sku_highlight_dialog';
     install_child_dialog(dialog);
@@ -38292,7 +38635,7 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     dialog.user_data['pending'] = false;
     dialog.user_data['any_sku_has_bonus'] = 1; // force "bonus text" mode
     dialog.user_data['expire_time'] = -1; // XXX does this need a per-sku override?
-    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0);
+    init_buy_gamebucks_sku23(dialog.widgets['sku'], dialog, spellname, spellarg, 0, expect_loot);
 
     dialog.widgets['close_button'].onclick = close_parent_dialog;
 
@@ -38300,6 +38643,27 @@ function invoke_gamebucks_sku_highlight_dialog(spellname, spellarg) {
     return dialog;
 }
 function update_gamebucks_sku_highlight_dialog(dialog) {
+    dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
+    if(!dialog.widgets['sku'].show) {
+        // the SKU went away, maybe it was a one-time deal that was purchased.
+        // we're done!
+        // (this will be one frame late since the child update runs after this, but whatever...)
+
+        // reparent "item discovered"
+        var d = dialog.children[dialog.children.length-1];
+        if(d.user_data && d.user_data['dialog'] /* XXX awkward - check if this is a dialog */) {
+            dialog.unparent(d);
+        } else {
+            d = null;
+        }
+        close_dialog(dialog);
+        if(d) {
+            install_child_dialog(d);
+            d.auto_center();
+        }
+        return;
+    }
+
     update_buy_gamebucks_dialog23_warning_text(dialog);
 }
 
@@ -38412,7 +38776,7 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
     var i = 0;
     for(; i < spell_list.length; i++) {
         var d = new SPUI.Dialog(gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]);
-        init_buy_gamebucks_sku23(d, dialog, spell_list[i]['spellname'], spell_list[i]['spellarg'] || null, i);
+        init_buy_gamebucks_sku23(d, dialog, spell_list[i]['spellname'], spell_list[i]['spellarg'] || null, i, spell_list[i]['expect_loot'] || null);
         dialog.add(d); dialog.widgets['sku'+i.toString()] = d;
         d.clip_to = [dialog.widgets['sunken'].xy[0], dialog.widgets['sunken'].xy[1],
                      dialog.widgets['sunken'].wh[0], dialog.widgets['sunken'].wh[1]];
@@ -38522,13 +38886,23 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
         if(highlight_only) {
             close_dialog(dialog);
         }
-        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(to_highlight['spellname'], to_highlight['spellarg']);
+        var highlight_dialog = invoke_gamebucks_sku_highlight_dialog(to_highlight['spellname'], to_highlight['spellarg'], to_highlight['expect_loot']);
         if(highlight_only) {
             //highlight_dialog.widgets['close_button'].onclick = function(w) { change_selection_ui(null); }
             return;
         }
     } else if(highlight_only) {
-        throw Error('no SKU to highlight');
+        //throw Error('no SKU to highlight');
+        var msg = 'no SKU to highlight!\nserver_time: '+server_time.toString()+'\nplayer_auras: '+JSON.stringify(player.player_auras)+'\nhighlight_list: '+JSON.stringify(highlight_list);
+        metric_event('0970_client_exception', add_demographics({'method':msg, 'location':'invoke_buy_gamebucks_dialog23',
+                                                                'since_connect': (session.connected() ? client_time - session.connect_time : session.connect_time),
+                                                                'since_pageload': client_time - spin_pageload_begin,
+                                                                'server_message_history': debug_server_message_history.join(','),
+                                                                'gameclient_build_date':(typeof gameclient_build_date === 'undefined' ? 'unknown' : gameclient_build_date),
+                                                                'gamedata_build_info':gamedata['gamedata_build_info']}));
+
+        close_dialog(dialog);
+        return;
     }
 
     var go_away = function(w) {
@@ -38553,6 +38927,8 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 }
 
 function update_buy_gamebucks_dialog23(dialog) {
+    dialog.widgets['close_button'].state = (dialog.user_data['pending'] ? 'disabled' : 'normal');
+
     var spell_list = dialog.user_data['spell_list'];
 
     if(dialog.user_data['scroll_pos'] != dialog.user_data['scroll_goal']) {
@@ -38663,6 +39039,7 @@ function update_buy_gamebucks_sku23(dialog) {
     var spellname = dialog.user_data['spellname'];
     var spell = dialog.user_data['spell'];
     var spellarg = dialog.user_data['spellarg'];
+    var expect_loot = dialog.user_data['expect_loot'];
 
     if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player, null)) {
         // spell disappeared (e.g. due to sale running out)
@@ -39008,11 +39385,16 @@ function update_buy_gamebucks_sku23(dialog) {
         }
     }
 
-    update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing);
+    var has_attachments = update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing);
 
+    if(expect_loot && (!has_attachments || (has_attachments.length == 1 && has_attachments[0]['spec'] == 'gamebucks'))) {
+        // we were showing an item bundle originally, but now we're not anymore (e.g. because it was a one-time bundle
+        // and the player bought it), so hide this since it will duplicate the non-bundled version of the same SKU.
+        dialog.show = false;
+    }
 }
 
-// return list of attachments, not including bonus gamebucks
+// return list of attachments, not including bonus gamebucks that come from nominal vs. actual quantity
 function buy_gamebucks_sku2_item_list(spell, spellarg) {
     if('loot_table' in spell && (!spellarg || spellarg['want_loot'])) {
         return session.get_loot_items(player, gamedata['loot_tables_client'][spell['loot_table']]['loot']).item_list;
@@ -39125,21 +39507,28 @@ function collapse_item_list(ls) {
 /** @param {!SPUI.Dialog} dialog
     @param {!Object} spell
     @param {?} spellarg
-    @param {boolean} enable_attachment_pulsing */
+    @param {boolean} enable_attachment_pulsing
+    @return {!Array<!Object>} attachments */
 function update_buy_gamebucks_sku2_attachments(dialog, spell, spellarg, enable_attachment_pulsing) {
-    if(!('attachments0' in dialog.widgets)) { return; } // inapplicable
+    if(!('attachments0' in dialog.widgets)) { return []; } // inapplicable
     var item_list = [];
 
     // special case for bonus gamebucks - add a virtual "gamebucks" item
     if('nominal_quantity' in spell && spell['nominal_quantity'] < spell['quantity']) {
-        var bonus_pct = 100.0*(spell['quantity']-spell['nominal_quantity'])/spell['nominal_quantity'];
+        item_list.push({'spec':'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity']});
+    };
+    item_list = collapse_item_list(item_list.concat(buy_gamebucks_sku2_item_list(spell, spellarg)));
+
+    if(item_list.length >= 1 && item_list[0]['spec'] == 'gamebucks') {
+        // add UI text for the "bonus" gamebucks
+        var item = item_list[0];
+        var stack = ('stack' in item ? item['stack'] : 1);
+        var bonus_pct = 100.0*stack/spell['nominal_quantity'];
         var bonus_pct_str = Math.max(Math.floor(bonus_pct), 1).toFixed(0);
-        item_list.push({'spec': 'gamebucks', 'stack': spell['quantity'] - spell['nominal_quantity'],
-                        'ui_name': dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%pct', bonus_pct_str).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name())
-                       });
+        item['ui_name'] = dialog.widgets['attachments0'].data['widgets']['name']['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(stack)).replace('%pct', bonus_pct_str).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name());
     }
-    item_list = item_list.concat(collapse_item_list(buy_gamebucks_sku2_item_list(spell, spellarg)));
     update_buy_gamebucks_or_store_sku_attachments(dialog, item_list, enable_attachment_pulsing);
+    return item_list;
 };
 
 /** @param {!SPUI.Dialog} dialog
@@ -40743,7 +41132,9 @@ function get_building_jewels() {
     for(var name in gamedata['buildings']) {
         var spec = gamedata['buildings'][name];
         var category = spec['build_category'];
-        if(spec['developer_only']) { continue; }
+        if(spec['developer_only'] || spec['ui_priority'] < 0) { continue; }
+        if(spec['quarry_only'] && session.viewing_base.base_type != 'quarry') { continue; }
+        if(session.viewing_base.base_type == 'quarry' && !spec['quarry_buildable']) { continue; }
 
         var pred_ok = true;
         goog.array.forEach(['show_if', 'activation', 'requires'], function(pred) {
@@ -40828,6 +41219,9 @@ function build_dialog_change_category(dialog, category) {
             if((spec['developer_only'] || spec['ui_priority'] < 0) && (spin_secure_mode || !player.is_cheater)) {
                 continue;
             }
+            if(spec['quarry_only'] && session.viewing_base.base_type != 'quarry') { continue; }
+            if(session.viewing_base.base_type == 'quarry' && !spec['quarry_buildable']) { continue; }
+
             if('show_if' in spec && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
             if('activation' in spec && !read_predicate(spec['activation']).is_satisfied(player, null)) { continue; }
             dialog.user_data['speclist'].push(name);
@@ -41865,6 +42259,9 @@ function update_upgrade_dialog(dialog) {
 
     var new_level = old_level + 1;
 
+    // flag that we can't do any upgrades, and this is just for showing stats
+    var stats_only = (techname === 'BUILDING' && !session.home_base && !unit.spec['quarry_upgradable']);
+
     // whether it is possible to perform the upgrade using resources (vs. instant purchase)
     var use_resources_offered = true;
 
@@ -41942,12 +42339,19 @@ function update_upgrade_dialog(dialog) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
             widget.str = widget.data['ui_name_stats'].replace('%s',tech['ui_name']).replace('%d',max_level.toString());
         } else {
+            if(('update_unit_levels_on_tech_upgrade' in gamedata) &&
+               !gamedata['update_unit_levels_on_tech_upgrade']) {
+                // call this "Research" instead of "Upgrade" when the new level isn't applied to existing units
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_research'];
+            } else {
+                dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name'];
+            }
             widget.str = widget.data['ui_name'].replace('%s', tech['ui_name']).replace('%d', new_level.toString());
         }
     } else {
-        if(new_level > max_level) {
+        if(new_level > max_level || stats_only) {
             dialog.widgets['title_bold'].str = dialog.data['widgets']['title_bold']['ui_name_stats'];
-            widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',max_level.toString());
+            widget.str = widget.data['ui_name_stats'].replace('%s',unit.spec['ui_name']).replace('%d',old_level.toString());
         } else {
             widget.str = widget.data['ui_name'].replace('%s', unit.spec['ui_name']).replace('%d', new_level.toString());
         }
@@ -42004,9 +42408,9 @@ function update_upgrade_dialog(dialog) {
         dialog.widgets['icon'].bg_image_offset = vec_add(dialog.data['widgets']['icon']['bg_image_offset'], unit.spec['hero_icon_pos'] || [0,0]);
     }
 
-    dialog.widgets['cost_time'].show = (new_level <= max_level);
+    dialog.widgets['cost_time'].show = (!stats_only && new_level <= max_level);
     for(var res in gamedata['resources']) {
-        var show_res = (new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
+        var show_res = (!stats_only && new_level <= max_level) && (tech ? ('cost_'+res in tech) : ('build_cost_'+res in unit.spec));
         if('resource_'+res+'_icon' in dialog.widgets) {
             dialog.widgets['resource_'+res+'_icon'].show = show_res;
             dialog.widgets['resource_'+res+'_icon'].asset = gamedata['resources'][res]['icon_small'];
@@ -42024,7 +42428,7 @@ function update_upgrade_dialog(dialog) {
         (!tech && (unit.spec['kind'] === 'building') && (get_leveled_quantity(unit.spec['consumes_power']||0, max_level) > 0));
 
     // resource costs
-    if(new_level > max_level) {
+    if(stats_only || new_level > max_level) {
         // don't show resource costs if already at max level
         if(dialog.widgets['cost_power'].show) {
             dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip_maxlevel'] : null);
@@ -42085,10 +42489,18 @@ function update_upgrade_dialog(dialog) {
             var old_cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level);
             cost = get_leveled_quantity(unit.spec['consumes_power'], unit.level+1);
 
-            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1))) : null);
+            dialog.widgets['cost_power'].tooltip.str = (enable_tooltip ? dialog.data['widgets']['cost_power']['ui_tooltip'].replace('%CUR', pretty_print_number(old_cost)).replace('%AFTER', pretty_print_number(cost)).replace('%DURING', pretty_print_number(get_leveled_quantity(unit.spec['consumes_power_while_building'], unit.level+1))) : null);
             dialog.widgets['cost_power'].fixed_tooltip_offset = dialog.data['widgets']['cost_power']['fixed_tooltip_offset'];
 
-            dialog.widgets['cost_power'].str = pretty_print_number(cost);
+            var ui_delta;
+            if(cost > old_cost) {
+                ui_delta = '+' + pretty_print_number(cost-old_cost);
+            } else if(cost < old_cost) {
+                ui_delta = '-' + pretty_print_number(old_cost - cost);
+            } else {
+                ui_delta = '+0';
+            }
+            dialog.widgets['cost_power'].str = dialog.data['widgets']['cost_power']['ui_name'].replace('%AFTER', pretty_print_number(cost)).replace('%DELTA', ui_delta);
 
             // do not display energy text in red for central computer upgrades, because they allow more plants to be built
             if((unit.spec['name'] != gamedata['townhall']) &&
@@ -42211,16 +42623,32 @@ function update_upgrade_dialog(dialog) {
     } else {
         // BUILDING
         if(unit.spec['show_hp_stat']) { feature_list.push('max_hp'); }
+
+        goog.object.forEach(gamedata['resources'], function(resdata, resname) {
+            if(('produces_'+resname) in unit.spec) { feature_list.push('produces_'+resname); }
+            if(('storage_'+resname) in unit.spec && !('provides_space' in unit.spec) /* omit on CC */ ) { feature_list.push('storage_'+resname); }
+            if(('vault_'+resname) in unit.spec) { feature_list.push('vault_'+resname); }
+        });
+        if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
+        if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
+
+        // detect enhanceable stats
+        if(unit.spec['enhancement_categories']) {
+            for(var enh_name in gamedata['enhancements']) {
+                var enh_tech = gamedata['enhancements'][enh_name];
+                if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
+                    var stat = enh_tech['effects'][0]['stat'];
+                    if(!goog.array.contains(feature_list, stat)) {
+                        feature_list.push(stat);
+                    }
+                }
+            }
+        }
+
         if(unit.is_researcher()) { feature_list.push('research_level'); }
         if(unit.is_researcher()) { feature_list.push('research_speed'); }
         if(unit.is_crafter() && !unit.is_emplacement() && !('crafting_speed' in unit.spec)) { feature_list.push('crafting_level'); }
         if(unit.is_crafter() && ('crafting_queue_space' in unit.spec)) { feature_list.push('crafting_queue_space'); }
-        goog.object.forEach(gamedata['resources'], function(resdata, resname) {
-            if(('produces_'+resname) in unit.spec) { feature_list.push('produces_'+resname); }
-            if(('storage_'+resname) in unit.spec && !('provides_space' in unit.spec) /* omit on CC */ ) { feature_list.push('storage_'+resname); }
-        });
-        if('provides_power' in unit.spec) { feature_list.push('provides_power'); }
-        if('provides_foremen' in unit.spec) { feature_list.push('provides_foremen'); }
 
         if('provides_quarry_control' in unit.spec && session.region.map_enabled()) { feature_list.push('provides_quarry_control'); }
         if(player.squads_enabled()) {
@@ -42306,17 +42734,17 @@ function update_upgrade_dialog(dialog) {
             });
         }
 
-        // detect enhanceable stats
-        if(unit.spec['enhancement_categories']) {
-            for(var enh_name in gamedata['enhancements']) {
-                var enh_tech = gamedata['enhancements'][enh_name];
-                if(goog.array.contains(unit.spec['enhancement_categories'], enh_tech['enhancement_category'])) {
-                    var stat = enh_tech['effects'][0]['stat'];
-                    if(!goog.array.contains(feature_list, stat)) {
-                        feature_list.push(stat);
-                    }
+        if(unit.spec['quarry_control_auras']) {
+            var au_list = unit.spec['quarry_control_auras'];
+            goog.array.forEach(au_list, function(au) {
+                var aura_specname = au['spec'];
+                var stat = 'quarry_control_aura:'+aura_specname;
+                if(stat in gamedata['strings']['modstats']['stats'] &&
+                   gamedata['strings']['modstats']['stats'][stat]['display'] !== null &&
+                   !goog.array.contains(feature_list, stat)) {
+                    feature_list.push(stat);
                 }
-            }
+            });
         }
 
     } // END is a building
@@ -42382,6 +42810,9 @@ function update_upgrade_dialog(dialog) {
             feature_list.push('xp');
         }
     }
+
+    // remove duplicates
+    goog.array.removeDuplicates(feature_list);
 
     var item_host_building = null;
     if(tech && tech['associated_item']) {
@@ -42600,7 +43031,7 @@ function update_upgrade_dialog(dialog) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, new_chain, spec, new_chain_level, new_auto_spell, new_spell_level, enable_tooltip);
-        } else if(new_level > max_level) {
+        } else if(stats_only || new_level > max_level) {
             feature_widget(dialog, grid_y, 1).show = true;
             feature_widget(dialog, grid_y, 2).show = false;
             ModChain.display_widget(feature_widget(dialog, grid_y, 1), stat_name, old_chain, spec, old_chain_level, old_auto_spell, old_spell_level, enable_tooltip);
@@ -42642,8 +43073,8 @@ function update_upgrade_dialog(dialog) {
         }
 
         dialog.widgets['mod_bar'+grid_y.toString()].show =
-            dialog.widgets['mod_text'+grid_y.toString()].show =
-            dialog.widgets['mod_button'+grid_y.toString()].show = !!(mod_tech || enh_tech);
+            dialog.widgets['mod_text'+grid_y.toString()].show = !!(mod_tech || enh_tech);
+        dialog.widgets['mod_button'+grid_y.toString()].show = (!stats_only && dialog.widgets['mod_bar'+grid_y.toString()].show);
 
         if(mod_tech || enh_tech) {
             // handler for click on "Modify" button
@@ -42717,7 +43148,7 @@ function update_upgrade_dialog(dialog) {
     } else if(old_level <= 0 && !show_level_0) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name'].replace('%d', new_level);
         dialog.widgets['header1'].show = false;
-    } else if(new_level > max_level) {
+    } else if(stats_only || new_level > max_level) {
         dialog.widgets['header0'].str = dialog.widgets['header0'].data[(old_level <= 0 ? 'ui_name_unmodified' : (tech && tech['affects_unit']) ? 'ui_name_mod' : 'ui_name')].replace('%d', old_level);
         dialog.widgets['header1'].show = false;
     } else {
@@ -42726,6 +43157,31 @@ function update_upgrade_dialog(dialog) {
         if(unit && unit.spec['name'] == gamedata['townhall']) {
             dialog.widgets['upgrade_info_button'].show = true;
             dialog.widgets['upgrade_info_button'].onclick = function(w) { invoke_cc_upgrade_info(); };
+        }
+    }
+
+    // optional webstats link
+    dialog.widgets['webstats_button'].show = false;
+    if(!dialog.widgets['upgrade_info_button'].show) {
+        var webstats_template = eval_cond_or_literal(gamedata['strings']['webstats_url'] || null, player, null);
+        if(webstats_template) {
+            var webstats_url = null;
+            if(!tech && unit && unit.is_building()) {
+                // building upgrade
+                webstats_url = webstats_template.replace('%kind', 'buildings').replace('%spec', unit.spec['name']);
+            } else if(tech && tech['associated_unit']) {
+                webstats_url = webstats_template.replace('%kind', 'units').replace('%spec', tech['associated_unit']);
+            } else if(tech && (techname in gamedata['tech'])) {
+                webstats_url = webstats_template.replace('%kind', 'tech').replace('%spec', tech['name']);
+            } else if(tech && (techname in gamedata['enhancements'])) {
+                webstats_url = webstats_template.replace('%kind', 'enhancements').replace('%spec', tech['name']);
+            }
+            if(webstats_url) {
+                dialog.widgets['webstats_button'].show = true;
+                dialog.widgets['webstats_button'].onclick = (function(_url) { return function(w) {
+                    url_open_in_new_tab(_url);
+                }; })(webstats_url);
+            }
         }
     }
 
@@ -42758,7 +43214,7 @@ function update_upgrade_dialog(dialog) {
                     dialog.widgets['equip_slot'+slot_i].show =
                         dialog.widgets['equip_frame'+slot_i].show = true;
 
-                    dialog.widgets['equip_slot'+slot_i].state = 'normal';
+                    dialog.widgets['equip_slot'+slot_i].state = (stats_only ? 'disabled' : 'normal');
                     dialog.widgets['equip_slot'+slot_i].tooltip.str = null;
 
                     dialog.widgets['equip_frame'+slot_i].onclick = (function (_tech, _unit, _type_name, _n, _slot_i) { return function(w) {
@@ -42853,7 +43309,9 @@ function update_upgrade_dialog(dialog) {
 
     dialog.widgets['predicate_help_button'].show = false;
 
-    if(new_level > max_level) {
+    if(stats_only) {
+        // do nothing
+    } else if(new_level > max_level) {
         req.push(gamedata['errors']['MAX_LEVEL_REACHED']['ui_name']);
     } else if(builder && builder.is_damaged()) {
         // builder needs repair
@@ -42901,6 +43359,57 @@ function update_upgrade_dialog(dialog) {
         }
     }
 
+    // check for ingredients
+    var ingr_list = [];
+    if(!stats_only && new_level <= max_level) {
+        if(tech && ('enhance_time' in tech)) {
+            ingr_list = get_enhancement_ingredients_list(tech, new_level);
+        } else if(tech) {
+            ingr_list = get_tech_ingredients_list(tech, new_level);
+        } else {
+            ingr_list = get_building_ingredients_list(unit.spec, new_level);
+        }
+    }
+    ItemDisplay.display_item_array(dialog, 'requirements_item', ingr_list, {hide_tooltip: true});
+    var ingr_by_specname = {};
+    for(var i = 0; i < dialog.data['widgets']['requirements_item']['array'][0]; i++) {
+        if(i < ingr_list.length) {
+            var ingr = ingr_list[i];
+            var ingr_spec = gamedata['items'][ingr['spec']];
+            var ingr_stack = ('stack' in ingr ? ingr['stack'] : 1);
+            var ingr_level = ('level' in ingr ? ingr['level'] : null);
+            var ui_ingr = ItemDisplay.get_inventory_item_stack_prefix(ingr_spec, ingr_stack) + ItemDisplay.get_inventory_item_ui_name_long(ingr_spec, ingr_level);
+            dialog.widgets['requirements_item'+i.toString()].widgets['frame'].tooltip.str =
+                dialog.data['widgets']['requirements_item']['ui_tooltip'].replace('%ITEM', ui_ingr);
+
+            // group items by spec/level for the tooltip
+            var key = ingr['spec'];
+            if(ingr_level) { key += ':L'+ingr_level.toString(); }
+
+            var has_it = player.inventory_item_quantity(ingr['spec'], ingr['level']) - (ingr_by_specname[key] || 0) >= ingr_stack;
+            ingr_by_specname[key] = (ingr_by_specname[key]||0) + ingr_stack;
+            dialog.widgets['requirements_item'+i.toString()].widgets['frame'].state = (has_it ? 'normal_nohighlight' : 'disabled');
+            dialog.widgets['requirements_item_status'+i.toString()].show = true;
+            dialog.widgets['requirements_item_status'+i.toString()].color = SPUI.make_colorv(dialog.data['widgets']['requirements_item_status'][(has_it ? 'color_present' : 'color_missing')]);
+
+            if(!has_it) {
+                req.push(dialog.data['widgets']['requirements_item']['ui_tooltip'].replace('%ITEM', ui_ingr));
+                use_resources_requirements_ok = instant_requirements_ok = false;
+
+                if(!dialog.widgets['predicate_help_button'].show) {
+                    var helper = (function(_spec, _qty) { return function() {
+                        var s = gamedata['errors']['INSUFFICIENT_ITEMS'];
+                        invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%s',_spec['ui_name_plural'] || _spec['ui_name']).replace('%d',pretty_print_number(_qty)), {'dialog': 'message_dialog_big'});
+                    }; })(ingr_spec, ingr_stack);
+                    dialog.widgets['predicate_help_button'].show = true;
+                    dialog.widgets['predicate_help_button'].onclick = helper;
+                }
+            }
+        } else {
+            dialog.widgets['requirements_item_status'+i.toString()].show = false;
+        }
+    }
+
     dialog.widgets['requirements_text'].set_text_with_linebreaking(req.join(', '));
 
     for(var i = 0; i < req.length; i++) {
@@ -42930,8 +43439,8 @@ function update_upgrade_dialog(dialog) {
 
     // connect button widget onclick() handlers
 
-    if(new_level > max_level) {
-        // already at max level
+    if(stats_only || new_level > max_level) {
+        // hide all buttons
         dialog.widgets['instant_button'].show = dialog.widgets['instant_credits'].show = dialog.widgets['use_resources_button'].show = false;
         // note: timer bar already hidden above
     } else {
@@ -42949,13 +43458,29 @@ function update_upgrade_dialog(dialog) {
             // tell the server to research this tech
             var builder = _dialog.user_data['builder'] || null;
             if(builder) {
-                if('enhance_time' in _dialog.user_data['tech']) {
-                    var cur_level = builder.enhancements ? builder.enhancements[_dialog.user_data['techname']] || 0 : 0;
-                    send_to_server.func(["CAST_SPELL", builder.id, "ENHANCE_FOR_FREE", _dialog.user_data['techname'], cur_level+1]);
+                var tech = _dialog.user_data['tech'];
+                if('enhance_time' in tech) {
+                    var cur_level = builder.enhancements ? builder.enhancements[tech['name']] || 0 : 0;
+                    var ingr_list = get_enhancement_ingredients_list(tech, cur_level+1);
+                    var do_it = (function (__dialog, _builder, _name, _level) { return function() {
+                        send_to_server.func(["CAST_SPELL", _builder.id, "ENHANCE_FOR_FREE", _name, _level]);
+                        invoke_ui_locker(_builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
+
+                    }; })(_dialog, builder, tech['name'], cur_level+1);
+
+                    if(ingr_list && ingr_list.length > 0 && !tech['refund_ingredients']) {
+                        var s = gamedata['strings']['enhance_confirm_ingredient_loss'];
+                        invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                                    {'cancel_button': true,
+                                                     'ok_button_ui_name': s['ui_button'],
+                                                     'on_ok': do_it});
+                    } else {
+                        do_it();
+                    }
                 } else {
-                    send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", _dialog.user_data['techname']]);
+                    send_to_server.func(["CAST_SPELL", builder.id, "RESEARCH_FOR_FREE", tech['name']]);
+                    invoke_ui_locker(builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
                 }
-                invoke_ui_locker(builder.request_sync(), (function (__dialog) { return function() { close_dialog(__dialog); }; })(_dialog));
             } else {
                 close_dialog(_dialog);
             }
@@ -43214,7 +43739,7 @@ function update_upgrade_dialog(dialog) {
 
     update_upgrade_dialog_equipment(dialog);
 
-    if(player.upgrade_bar_enabled()) {
+    if(!stats_only && player.upgrade_bar_enabled()) {
         UpgradeBar.invoke(dialog, (tech ? ('enhance_time' in tech ? 'enhancement' : 'tech') : 'building'),
                           (tech ? techname : (unit ? unit.spec['name'] : null)),
                           new_level, (unit ? unit.id : null));
@@ -44747,6 +45272,14 @@ Store.place_order = function(currency, unit_id, spellname, spellarg, cb, props) 
         return false;
     }
 
+    if(currency == 'fbcredits' || currency == 'kgcredits' ||
+       currency.indexOf('fbpayments:') === 0 || currency.indexOf('xsolla:') === 0) {
+        player.record_client_history('purchase_inits', 1);
+        if((player.history['money_spent'] || 0) <= 0) {
+            player.record_client_history('purchase_inits_preftd', 1);
+        }
+    }
+
     if(currency == 'fbcredits') {
         if(!no_clear) { change_selection(null); }
         Store.place_fbcredits_order(price, unit_id, spellname, spellarg, cb);
@@ -45701,6 +46234,7 @@ function on_ajax_goog(event) {
 
 var ajax_recv_buffer = {};
 var ajax_next_serial = 0;
+var ajax_last_ack = 0; // last ack we sent back to the server
 
 function on_ajax(response, kind) {
     var from_server = JSON.parse(response);
@@ -45712,8 +46246,28 @@ function on_ajax(response, kind) {
     var serial = from_server['serial'];
     var clock = from_server['clock'];
     var messages = from_server['msg'];
+    var do_flush = false;
 
-    return recv_message_bundle(serial, clock, messages, kind);
+    if('ack' in from_server) {
+        retrans_buffer.trim(from_server['ack']);
+
+        // if we haven't sent an ack to the server in a long time,
+        // send something back to keep the server's retrans buffer size down
+        if(message_queue.length() < 1 &&
+           3*(ajax_next_serial - 1 - ajax_last_ack) >= gamedata['client']['ajax_message_buffer']) {
+            send_to_server.func(["PING"]);
+            // ensure that we transmit something, do not rely on window timer since it might be throttled by browser
+            do_flush = true;
+        }
+    }
+
+    var ret = recv_message_bundle(serial, clock, messages, kind);
+
+    if(do_flush) {
+        flush_message_queue(true);
+    }
+
+    return ret;
 }
 
 function recv_message_bundle(serial, clock, messages, kind) {
@@ -45730,7 +46284,10 @@ function recv_message_bundle(serial, clock, messages, kind) {
         handle_server_message_bundle(-1, {'messages':messages, 'kind':'error'});
         return -1;
     }
-    if(serial in ajax_recv_buffer) { throw Error('duplicated server serial '+serial.toString()); }
+    if(serial in ajax_recv_buffer || serial < ajax_next_serial) {
+        // discard retransmission of something we already saw
+        return 0;
+    }
     ajax_recv_buffer[serial] = {'messages':messages, 'kind':kind};
     process_recv_buffer();
     return 0;
@@ -45745,7 +46302,7 @@ function process_recv_buffer() {
     }
 
     if(goog.object.getCount(ajax_recv_buffer) >= gamedata['client']['ajax_message_buffer']) {
-        return invoke_timeout_message('0621_client_died_from_downstream_lag', {}, {});
+        return invoke_timeout_message('0625_client_recv_buffer_overflow', {'len': goog.object.getCount(ajax_recv_buffer)}, {});
     }
 }
 
@@ -45816,6 +46373,7 @@ function handle_server_message(data) {
         player.chat_seen = data[21];
         player.is_chat_mod = data[22];
         var daily_banner = data[23];
+        var fb_likes_preload = data[24];
 
         ChatFilter.init(gamedata['client']['chat_filter']);
 
@@ -45894,6 +46452,12 @@ function handle_server_message(data) {
 
         PlayerCache.init(gamedata['client']['player_cache']);
 
+        if(spin_frame_platform == 'fb' && spin_facebook_enabled) {
+            SPFB.init_watchdog();
+        }
+
+        SPFB.preload_likes(fb_likes_preload);
+
         var need_reflow = false;
 
         // fill header
@@ -45907,11 +46471,15 @@ function handle_server_message(data) {
         }
 
         // fill the footer linkbar
-        var bar = document.getElementById('spin_footer_linkbar_content');
+        var bar = /** @type {HTMLElement} */ (document.getElementById('spin_footer_linkbar_content'));
         if(bar) {
             var inner = eval_cond_or_literal(player.get_any_abtest_value('footer_linkbar_content', gamedata['strings']['footer_linkbar_content'] || null), player, null);
             if(inner) {
                 bar.innerHTML = url_put_info(inner, session.user_id, money_spent);
+                // update "Like" button, if present
+                if(inner.indexOf('class="fb-') >= 0) {
+                    SPFB.XFBML_parse(bar);
+                }
             }
         }
 
@@ -46149,8 +46717,8 @@ function handle_server_message(data) {
         var base_data = data[3];
         var battle_base = new Base.Base(base_data['base_id'], base_data);
         var battle_ladder_state = data[4];
-
         var battle_loot = battle_summary['loot'] || {};
+        var battle_replay_signature = data[5] || null;
 
         var battle_type = (battle_base.base_id === player.home_base_id ? 'home' :
                            (battle_ladder_state ? 'ladder' :
@@ -46171,26 +46739,26 @@ function handle_server_message(data) {
             if(player.tutorial_state != "COMPLETE") {
                 cb = goog.partial(invoke_ai_attack_finish_dialog, battle_loot);
             } else {
-                cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                    invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+                cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature) { return function() {
+                    invoke_defense_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature);
                 }; })(battle_type, battle_base,
                       null, // battle_opponent_user_id,
                       null, // battle_opponent_fbid,
                       -1, // battle_opponent_level,
                       null, // battle_opponent_friend,
                       battle_opponent_name,
-                      battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+                      battle_outcome, battle_loot, battle_summary, battle_ladder_state, battle_replay_signature);
             }
         } else if(battle_outcome != 'none') {
-            cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state) { return function() {
-                invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state);
+            cb = (function (_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature) { return function() {
+                invoke_battle_end_dialog(_type, _base, _uid, _fbid, _level, _fr, _name, out, loot, dmg, ladder_state, replay_signature);
             }; })(battle_type, battle_base,
                   battle_opponent_user_id,
                   null, // battle_opponent_fbid,
                   battle_opponent_level,
                   null, // battle_opponent_friend,
                   battle_opponent_name,
-                  battle_outcome, battle_loot, battle_summary, battle_ladder_state);
+                  battle_outcome, battle_loot, battle_summary, battle_ladder_state, battle_replay_signature);
         }
 
         if(cb) {
@@ -46258,7 +46826,8 @@ function handle_server_message(data) {
                                                 'base_ui_name': data[21],
                                                 'base_type': data[22],
                                                 'base_ncells': data[23],
-                                                'base_last_attack_time': data[27] || -1}),
+                                                'base_last_attack_time': data[27] || -1,
+                                                'base_richness': data[40] || -1}),
                                  session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens']) // enable_citizens
                                 );
 
@@ -46482,27 +47051,37 @@ function handle_server_message(data) {
 
         // deep link to a replay
         var immediate_replay = get_query_string('replay');
-        if(immediate_replay) {
+        var immediate_battle_log =  get_query_string('battle_log');
+        if(immediate_replay || immediate_battle_log) {
             // relies on the server's naming convention: "1457163456-828095-vs-3606753-at-s3606753_42"
-            var fields = immediate_replay.split('-');
+            var fields = (immediate_replay || immediate_battle_log).split('-');
             var battle_time = parseInt(fields[0], 10);
             var attacker_id = parseInt(fields[1], 10);
             var defender_id = parseInt(fields[3], 10);
             var base_id = (fields.length >= 6 ? fields[5] : null);
             var signature = get_query_string('replay_signature');
             if(!signature || signature.length < 1) { signature = null; }
-            download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
-                // failure path
+            if(immediate_replay || player.tutorial_state != "COMPLETE") {
+                download_and_play_replay(battle_time, attacker_id, defender_id, base_id, signature, function() {
+                    // failure path
+                    if(player.tutorial_state != "COMPLETE") {
+                        player.tutorial_hold = false;
+                        tutorial_step(true);
+                    }
+                });
+                // special case for replay on first visit
+
                 if(player.tutorial_state != "COMPLETE") {
-                    player.tutorial_hold = false;
+                    player.tutorial_hold = true;
                     tutorial_step(true);
                 }
-            });
-            // special case for replay on first visit
-
-            if(player.tutorial_state != "COMPLETE") {
-                player.tutorial_hold = true;
-                tutorial_step(true);
+            } else if(immediate_battle_log) {
+                query_battle_history(attacker_id, defender_id, -1, -1, 'any', [battle_time, battle_time+1],
+                                     function(sumlist, siglist, is_final, is_error) {
+                                         if(!is_error && sumlist && sumlist.length >= 1) {
+                                             invoke_battle_log_dialog(sumlist[0], siglist[0], -1);
+                                         }
+                                     });
             }
         }
 
@@ -47070,7 +47649,7 @@ function handle_server_message(data) {
         }
     } else if(msg == "INVITE_FRIENDS_PROMPT") {
         if(read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null)) {
-            notification_queue.push(invoke_invite_friends_prompt);
+            notification_queue.push(function() { invoke_invite_friends_prompt('from_server'); });
         }
     } else if(msg == "YOU_WERE_ATTACKED") {
         var recent_attacks = data[1];
@@ -47848,6 +48427,17 @@ function handle_server_message(data) {
     } else if(msg == "SERVER_MAINTENANCE_WARNING") {
         var s = gamedata['strings']['server_going_down_short'];
         invoke_child_message_dialog(s['ui_title'], s['ui_description'], {'dialog': s['dialog']});
+    } else if(msg == "RECONNECT_COMPLETE") {
+        // wait until the server responds to record 0623_client_reconnected
+        // (the session might have gone invalid)
+        var props = add_demographics({'user_id':spin_user_id,
+                                      'method':(the_websocket ? the_websocket.last_close_ui_method : 'no websocket'),
+                                      'len':(the_websocket ? the_websocket.retry_count : -1),
+                                      'since_connect': (session.connected() ? client_time - session.connect_time : -1),
+                                      'since_pageload': client_time - spin_pageload_begin,
+                                      'connection': gameapi_connection_method()
+                                     });
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0623_client_reconnected', props);
     } else if(msg == "IDLE_CHECK") {
         invoke_idle_check_dialog(data[1]);
     } else if(msg == "UNSUPPORTED_BROWSER_REDIRECT") {
@@ -48058,15 +48648,22 @@ function handle_server_message(data) {
             invoke_login_error_message(name);
         } else if(name == "UNKNOWN_SESSION") {
             // non-reportable error, because it can happen right after an idle kick
-            invoke_timeout_message('0601_client_died_from_unknown_session', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
+            invoke_timeout_message('0601_client_died_from_unknown_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '601'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
+        } else if(name == "KILL_SESSION") {
+            // non-reportable, since it's usually caused by the player logging in simultaneously
+            invoke_timeout_message('0602_client_died_from_killed_session', {}, {'ui_title': display_title, 'ui_description': display_string.replace('%d', '602'), 'ui_button': display_button, 'dialog': gamedata['errors'][name]['dialog'] || null});
         } else if(name == "IDLE_KICK") {
             invoke_timeout_message('0600_client_idle_timeout', {}, {});
         } else if(name == "MAINT_KICK") {
             invoke_timeout_message('0611_client_died_from_maint_kick', {}, {'ui_title': display_title, 'ui_description': display_string, 'ui_button': display_button});
         } else if(name == "SERVER_EXCEPTION") {
             invoke_timeout_message('0610_client_died_from_server_exception', {}, {});
-        } else if(name == "TOO_LAGGED") {
-            invoke_timeout_message('0622_client_died_from_upstream_lag', {}, {});
+        } else if(name == "SERVER_PROTOCOL") {
+            invoke_timeout_message('0609_client_died_from_protocol_error', {}, {});
+        } else if(name == "TOO_LAGGED_UPSTREAM") {
+            invoke_timeout_message('0622_client_died_from_upstream_lag', {'method': 'server'}, {});
+        } else if(name == "TOO_LAGGED_DOWNSTREAM") {
+            invoke_timeout_message('0621_client_died_from_downstream_lag', {'method': 'server'}, {});
         } else if(name == "POWER_LIMIT") {
             var s = gamedata['strings']['requirements_help']['power']['unknown'];
             invoke_message_dialog(s['ui_title'], s['ui_description']);
@@ -48247,6 +48844,11 @@ function invoke_timeout_message(event_name, props, options) {
         client_state = client_states.UNABLE_TO_LOGIN;
     } else if(client_state != client_states.UNABLE_TO_LOGIN) {
         client_state = client_states.TIMED_OUT;
+    }
+
+    // tell websocket not to try reconnecting
+    if(the_websocket) {
+        the_websocket.enable_reconnect = 0;
     }
 
     if(!options['continue_graphics']) {
@@ -48527,7 +49129,7 @@ function event_to_canvas(e) {
             x = e.clientX; /*+ document.body.scrollLeft + document.documentElement.scrollLeft; */
             y = e.clientY; /*+ document.body.scrollTop + document.documentElement.scrollTop; */
         }
-        if(!canvas_is_fullscreen) {
+        if(true || !canvas_is_fullscreen) {
             x -= canvas_div_offsetLeft;
             y -= canvas_div_offsetTop;
         }
@@ -48987,6 +49589,15 @@ function create_mouse_tooltip() {
                         var max_level = get_max_ui_level(gamedata['tech'][item_spec['associated_tech']]);
                         str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', cur_level.toString()).replace('%max', max_level.toString()));
                     }
+
+                    // low power on turret emplacements with heads
+                    var powerfac = obj.combat_power_factor(world.base);
+                    if(powerfac < 1) {
+                        var ui_power_warning = gamedata['strings']['cursors']['low_power_turret']
+                            .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                        str.push(ui_power_warning);
+                    }
+
                     str.push('---'); // separator between head and emplacement
                 }
             }
@@ -48996,6 +49607,17 @@ function create_mouse_tooltip() {
                 nameline += ' '+session.minefield_tags_by_obj_id[obj.id];
             }
             str.push(nameline);
+
+            if(obj.team === 'player' && obj.is_building() && obj.is_shooter() && !obj.is_minefield() && !obj.is_emplacement()) {
+                // low power on ordinary turrets
+                var powerfac = obj.combat_power_factor(world.base);
+                if(powerfac < 1) {
+                    var ui_power_warning = gamedata['strings']['cursors']['low_power_turret']
+                        .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                    str.push(ui_power_warning);
+                }
+            }
+
             if((obj.team === 'player' || gamedata['enemy_tooltip_detail'][obj.spec['kind']]) && (obj.get_max_ui_level() > 1)) {
                 var max_level = obj.get_max_ui_level();
                 str.push(gamedata['strings']['cursors']['level_x_of_y'].replace('%cur', obj.level.toString()).replace('%max', max_level.toString()));
@@ -49036,6 +49658,14 @@ function create_mouse_tooltip() {
                 if(obj.is_upgrading() || obj.is_enhancing()) {
                     str.push(gamedata['strings']['cursors']['upgrading']);
                 } else if(obj.team === 'player') {
+                    // low power on harvesters
+                    var powerfac = world.base.power_factor();
+                    if(powerfac < 1) {
+                        var ui_power_warning = gamedata['strings']['cursors']['low_power_harvester']
+                            .replace('%d', Math.min(99, 100.0*powerfac).toFixed(0));
+                        str.push(ui_power_warning);
+                    }
+
                     var contents = obj.interpolate_contents();
                     var ui_contents = pretty_print_number(Math.floor(contents));
                     if(obj.produce_rate > 0 && obj.produce_rate < 1000 && contents < 10) {
@@ -50850,7 +51480,7 @@ function do_draw() {
             var origin = [5, canvas_height-30];
             var btm = desktop_dialogs['desktop_bottom'];
             if(btm) {
-                origin = [btm.xy[0]+10, btm.xy[1]-33];
+                origin = [btm.xy[0]+10, btm.xy[1]- (session.home_base ? 33 : 120)];
             }
             // draw nonessential art download progress (only for first minute though)
             if(client_art_state != client_art_states.DONE && (player.is_developer() || (client_time - session.connect_time < 60.0))) {
@@ -50867,8 +51497,9 @@ function do_draw() {
                 }
                 lines.push('Client/server clock offset: '+(-1000*server_time_offset).toFixed(0)+'ms');
                 lines.push('Combat tick: '+session.get_real_world().combat_engine.cur_tick.get().toString());
+                lines.push('Retransmit buffer size: client '+retrans_buffer.length().toFixed(0)+'/'+gamedata['client']['ajax_message_buffer'].toFixed(0)+' server est '+(ajax_next_serial - 2 - ajax_last_ack).toFixed(0));
                 ctx.save();
-                var fsize = 21;
+                var fsize = 13;
                 ctx.font = SPUI.make_font(fsize, fsize+6, 'thick').str();
                 goog.array.forEach(lines, function(line, y) {
                     ctx.fillText(line, origin[0], origin[1] + 18 + (fsize+6) * y);
@@ -51678,7 +52309,7 @@ function draw_building_or_inert(world, obj, powerfac) {
             throw Error('missing art asset for '+obj.spec['name']);
         }
 
-        if(obj.is_building() && obj.is_invul()) {
+        if(obj.is_building() && obj.is_invul() && obj.spec['max_hp'] !== 0) {
             var asset = (obj.spec['gridsize'][0] >= 12 ? 'building_shield_big' : 'building_shield_small');
             if(asset in GameArt.assets) { GameArt.assets[asset].draw(xy, facing, client_time, 'normal'); }
         }

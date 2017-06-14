@@ -89,7 +89,10 @@ def feature_expired(feature):
 def pretty_feature(feature):
     base_id = feature.get('base_id', 'unknown')
     base_type = feature.get('base_type', 'unknown')
-    base_ui_name = feature.get('base_ui_name', 'unknown')
+    if base_type in ('quarry','hive','raid') and feature.get('base_template'):
+        base_ui_name = feature['base_template']
+    else:
+        base_ui_name = feature.get('base_ui_name', 'unknown')
     try:
         base_ui_name = base_ui_name.encode('ascii')
     except UnicodeEncodeError:
@@ -256,7 +259,7 @@ def transform_deployment_buffer(m, buf):
         newbuf = buf
     return newbuf
 
-def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0,0]):
+def spawn_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0,0], auto_level = True):
     ret = []
     powerplants = []
     for src in objlist:
@@ -282,21 +285,24 @@ def auto_level_hive_objects(objlist, owner_level, owner_tech, xform = [1,0,0,1,0
         if 'provides_power' in spec:
             powerplants.append(dst)
 
-        level = src.get('force_level', -1)
-        if level <= 0:
-            # auto-compute level by table
-            if 'ai_bases' not in gamedata:
-                gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
+        if auto_level:
+            level = src.get('force_level', -1)
+            if level <= 0:
+                # auto-compute level by table
+                if 'ai_bases' not in gamedata:
+                    gamedata['ai_bases'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_compiled.json"))
 
-            if spec['name'] in gamedata['ai_bases']['auto_level']:
-                ls = gamedata['ai_bases']['auto_level'][spec['name']]
-                index = min(max(owner_level-1, 0), len(ls)-1)
-                level = ls[index]
-            else:
-                level = 1
+                if spec['name'] in gamedata['ai_bases']['auto_level']:
+                    ls = gamedata['ai_bases']['auto_level'][spec['name']]
+                    index = min(max(owner_level-1, 0), len(ls)-1)
+                    level = ls[index]
+                else:
+                    level = 1
 
-            if spec['kind'] == 'mobile':
-                level = max(level, owner_tech.get(spec['level_determined_by_tech'],1))
+                if spec['kind'] == 'mobile':
+                    level = max(level, owner_tech.get(spec['level_determined_by_tech'],1))
+        else:
+            level = src.get('level', 1)
 
         dst['level'] = level
         ret.append(dst)
@@ -504,7 +510,7 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
         for obj in base_objects:
             nosql_client._update_object(region_id,
                                         'mobile' if (obj['spec'] in gamedata['units']) else 'fixed',
-                                        {'obj_id':obj['obj_id'],'owner_id':feature['base_landlord_id']}, True)
+                                        {'obj_id':obj['obj_id'],'owner_id':feature['base_landlord_id']}, True, None)
             #nosql_write_all_objects(region_id, base_id, feature['base_landlord_id'], base_objects)
         nosql_client.update_map_feature(region_id, base_id, new_props)
     lock_manager.release(region_id, base_id, base_generation = base_data.get('base_generation',-1))
@@ -622,12 +628,17 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
     else:
         xform = [1,0,0,1,0,0]
 
+    if SpinConfig.game() == 'fs':
+        base_ui_name = template['ui_name'] # '%s %04d' % (template['ui_name'], id_num)
+    else:
+        base_ui_name = '%s%s-%04d' % (random_letter(), random_letter(), id_num)
+
     base_data = {
         'base_id': base_id,
         'base_landlord_id': owner_id,
         'base_map_loc': None,
         'base_type': 'quarry',
-        'base_ui_name': '%s%s-%04d' % (random_letter(), random_letter(), id_num), # ui_name
+        'base_ui_name': base_ui_name,
         'base_richness': template['base_richness'],
         'base_icon': template['icon'].replace('%RESOURCE', resource),
         'base_climate': assign_climate,
@@ -923,7 +934,73 @@ def update_turf(db, lock_manager, region_id, dry_run = True):
                         print "winner same as before, no chat announcement"
                         pass
 
-def weed_expired_bases(db, lock_manager, region_id, base_types, dry_run = True):
+def update_alliance_bonuses(db, lock_manager, region_id, check_interval = None, dry_run = True):
+    # get all quarries
+    map_cache = get_existing_map_by_type(db, region_id, 'quarry')
+    landlord_ids = list(set([x['base_landlord_id'] for x in map_cache.itervalues() if x.get('base_landlord_id',-1) > 0]))
+    print "LANDLORD_IDS", landlord_ids
+    # get mapping of landlord to alliance_id
+    landlord_alliance_ids = dict(zip(landlord_ids, nosql_client.get_users_alliance(landlord_ids)))
+    print "LANDLORD_ALLIANCE_IDS", landlord_alliance_ids
+
+    awards_by_alliance = {}
+
+    for feature in map_cache.itervalues():
+        # (could be more efficient to just query fixed objects directly, instead of iterating by base)
+        if 'quarry_logistics' in gamedata['buildings']:
+            spec = gamedata['buildings']['quarry_logistics']
+            for obj in nosql_client.get_fixed_objects_by_base(region_id, feature['base_id'], spec_filter = ['quarry_logistics']):
+                alliance_id = landlord_alliance_ids[feature['base_landlord_id']]
+                if alliance_id >= 0:
+                    for aura in spec.get('quarry_control_auras',[]):
+                        strength = get_leveled_quantity(aura['strength'], obj.get('level',1))
+                        if strength > 0:
+                            if alliance_id not in awards_by_alliance:
+                                awards_by_alliance[alliance_id] = {}
+                            if aura['spec'] not in awards_by_alliance[alliance_id]:
+                                awards_by_alliance[alliance_id][aura['spec']] = {'spec': aura['spec'],
+                                                                                 'strength':0,
+                                                                                 'data': {'ui_sources':[]}}
+
+
+                            awards_by_alliance[alliance_id][aura['spec']]['strength'] += strength
+                            awards_by_alliance[alliance_id][aura['spec']]['data']['ui_sources'].append(
+                                {'base_id': feature['base_id'],
+                                 'region_id': region_id,
+                                 'base_map_loc': feature['base_map_loc'],
+                                 'base_landlord_id': feature['base_landlord_id'],
+                                 'level': obj.get('level', 1),
+                                 'strength': strength})
+
+    print "AWARDS_BY_ALLIANCE", awards_by_alliance
+
+    # send award to all members in the region
+    for alliance_id, awards in awards_by_alliance.iteritems():
+        award_players = []
+        member_ids = nosql_client.get_alliance_member_ids(alliance_id)
+
+        # query player cache for home regions (only give awards to players in this region)
+        pcache = dict(zip(member_ids, nosql_client.player_cache_lookup_batch(member_ids, fields=['home_region'])))
+        for player_id, info in pcache.iteritems():
+            if info.get('home_region',None) == region_id:
+                award_players.append(player_id)
+
+        if award_players:
+            for aura in awards.itervalues():
+                end_time = time_now + check_interval
+                if not dry_run:
+                    nosql_client.msg_send([{'to': award_players,
+                                            'type': 'apply_aura',
+                                            'expire_time': end_time,
+                                            'end_time': end_time,
+                                            'remove_by_name_first': True,
+                                            'aura_name': aura['spec'],
+                                            'aura_strength': aura['strength'],
+                                            'aura_data': aura['data']}])
+
+
+def weed_expired_bases(db, lock_manager, region_id, base_types,
+                       dry_run = True):
     for base_id in nosql_client.get_expired_map_feature_ids_by_types(region_id, base_types):
         clear_base(db, lock_manager, region_id, base_id, dry_run = dry_run)
 
@@ -1111,8 +1188,8 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     base_data['base_generation'] = 0
 
     nosql_id_generator.set_time(int(time.time()))
-
-    base_data['my_base'] = auto_level_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech, xform)
+    base_data['my_base'] = spawn_hive_objects(template['buildings'] + template['units'], owner_level, owner_tech,
+                                              xform = xform, auto_level = template.get('auto_level', True))
     if template.get('randomize_defenses',False):
         AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
@@ -1334,7 +1411,8 @@ def spawn_raid(raids, map_cache, db, lock_manager, region_id, id_num, name_idx, 
 
     nosql_id_generator.set_time(int(time.time()))
 
-    base_data['my_base'] = auto_level_hive_objects(template.get('buildings',[]) + template.get('units',[]), 1, {})
+    base_data['my_base'] = spawn_hive_objects(template.get('buildings',[]) + template.get('units',[]), 1, {},
+                                              auto_level = template.get('auto_level', True))
     #if template.get('randomize_defenses',False):
     #    AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
@@ -1652,16 +1730,20 @@ def abandon_quarries_and_remove_player_from_map(db, lock_manager, region_id, use
 
     return True
 
-def weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = False, dry_run = True):
+def weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = False, dry_run = True):
     map_cache = get_existing_map_by_type(db, region_id, 'home')
     if verbose: print len(map_cache), 'players on the map'
     player_ids = sorted([feature['base_landlord_id'] for feature in map_cache.itervalues()])
-    result = nosql_client.player_cache_lookup_batch(player_ids, fields = ['last_login_time'])
+    result = nosql_client.player_cache_lookup_batch(player_ids,
+                                                    fields = ['last_login_time','last_reseed_time','base_damage',
+                                                              gamedata['townhall']+'_level'])
     player_info = {}
     for i in xrange(len(player_ids)):
         player_info[player_ids[i]] = {'user_id': player_ids[i], 'feature': map_cache['h'+str(player_ids[i])], 'pcache': result[i]}
 
     churn_list = []
+    alive_by_townhall_level = dict()
+
     for entry in player_info.itervalues():
         if entry['pcache'] is None: entry['pcache'] = {}
         if ('last_login_time' not in entry['pcache']):
@@ -1675,11 +1757,60 @@ def weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarr
                 entry['pcache']['last_login_time'] = -1 # was probably weeded by clean_player_cache.py
 
         if (time_now - entry['pcache']['last_login_time'] > threshold_days*24*60*60):
+            # unconditionally remove from map
             churn_list.append(entry)
+        else:
+            th = entry['pcache'].get(gamedata['townhall']+'_level', -1)
+            if th >= 1:
+                if th not in alive_by_townhall_level: alive_by_townhall_level[th] = []
+                alive_by_townhall_level[th].append(entry)
 
     if verbose: print len(map_cache) - len(churn_list), 'are still active'
     if verbose or churn_list:
         print len(churn_list), 'have not logged in for at least', threshold_days, 'days'
+
+    if repair_days > 0 and repair_pct > 0:
+        repair_list = []
+
+        # for each townhall level, compute total # of bases and total # of damaged bases
+        for th in sorted(alive_by_townhall_level.keys()):
+            total_bases = 0
+            damaged_bases = 0
+            repair_candidates = []
+
+            for entry in alive_by_townhall_level[th]:
+                total_bases += 1
+                if entry['pcache'].get('base_damage',0) >= 0.01:
+                    damaged_bases += 1
+                    # repair candidate IF no logins for repair_days AND wasn't reseeded very recently
+                    if (time_now - entry['pcache']['last_login_time'] > repair_days * 24*60*60) and \
+                       (time_now - entry['pcache'].get('last_reseed_time', -1) >= 2 * 24*60*60):
+                        repair_candidates.append(entry)
+
+            print 'townhall_level', th, ':', damaged_bases, 'of', total_bases, \
+                  'home bases are damaged (%.0f%%).' % (float(100*damaged_bases)/total_bases), \
+                  len(repair_candidates), 'repair candidates.',
+
+            random.shuffle(repair_candidates)
+            n_to_repair = 0
+
+            while len(repair_candidates) > 0 and \
+               float(damaged_bases) / float(total_bases) >= repair_pct:
+                repair_list.append(repair_candidates.pop())
+                damaged_bases -= 1
+                n_to_repair += 1
+
+            if n_to_repair > 0:
+                print 'Will repair', n_to_repair, 'bases, leaving %.0f%% damaged' % (float(100*damaged_bases)/total_bases)
+            else:
+                print 'No bases to repair.'
+
+        if len(repair_list) > 0:
+            print 'repairing', len(repair_list), 'bases...'
+            for entry in repair_list:
+                if not dry_run:
+                    do_CONTROLAPI({'user_id': entry['user_id'], 'method': 'repair_base'})
+                    nosql_client.player_cache_update(entry['user_id'], {'last_reseed_time': time_now})
 
     for entry in churn_list:
         abandon_quarries_and_remove_player_from_map(db, lock_manager, region_id, entry['user_id'], home_feature = entry['feature'],
@@ -1733,7 +1864,7 @@ def weed_orphan_objects(db, lock_manager, region_id, dry_run = True):
             print num
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=',
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=', 'repair-days=', 'repair-pct=',
                                                        'score-week=', 'event-time-override=', 'quiet',
                                                        'force-rotation', 'skip-quarry-owners', 'yes-i-am-sure'])
     if len(args) < 3:
@@ -1753,6 +1884,8 @@ if __name__ == '__main__':
         print '    --dry-run              Print what changes would be made, but do not make them'
         print '    --throttle SEC         Pause SEC seconds between base manipulations to avoid overloading server'
         print '    --threshold-days NUM   For "weed" action, remove players from map if they have not logged in for at least NUM days (default: 30)'
+        print '    --repair-days NUM      For "weed" action, repair damaged bases that have not logged in for at least NUM days (default: -1)'
+        print '    --repair-pct NUM       For "weed" action, try to leave no more than this percent of bases damaged'
         print '    --base-id ID           Only apply changes to this one base'
         print '    --user-id ID           Only apply changes to this one user'
         print '    --score-week WEEK      Choose week for scores display'
@@ -1764,6 +1897,22 @@ if __name__ == '__main__':
         sys.exit(1)
 
     region_id = args[0]
+
+    if region_id not in gamedata['regions']:
+        sys.stderr.write('region not found: %s\n' % region_id)
+        sys.exit(1)
+
+    if gamedata['regions'][region_id].get('storage','basedb') != 'nosql':
+        print "%s: basedb (non nosql) regions are not supported anymore" % region_id
+        sys.exit(1)
+
+    def get_region_variable(key, default_value):
+        if key in gamedata['regions'][region_id]:
+            return gamedata['regions'][region_id][key]
+        if key in gamedata['territory']:
+            return gamedata['territory'][key]
+        return default_value
+
     base_type = {'hives':'hive','hive':'hive',
                  'quarries':'quarry','quarry':'quarry',
                  'raids':'raid','raid':'raid',
@@ -1773,7 +1922,9 @@ if __name__ == '__main__':
     base_id = None
     user_id = None
     yes_i_am_sure = False
-    threshold_days = 30
+    threshold_days = get_region_variable('weed_churned_players_after', 30*86400)/86400.0
+    repair_days = get_region_variable('repair_churned_players_after', -1)/86400.0
+    repair_pct = get_region_variable('repair_churned_players_leave_damaged_pct', -1)
     skip_quarry_owners = False
     event_time_override = None
     force_rotation = False
@@ -1790,6 +1941,10 @@ if __name__ == '__main__':
             user_id = int(val)
         elif key == '--threshold-days':
             threshold_days = int(val)
+        elif key == '--repair-days':
+            repair_days = int(val)
+        elif key == '--repair-pct':
+            repair_pct = float(val)
         elif key == '--score-week':
             score_week = int(val)
         elif key == '--skip-quarry-owners':
@@ -1802,14 +1957,6 @@ if __name__ == '__main__':
             event_time_override = int(val)
         elif key == '-q' or key == '--quiet':
             verbose = False
-
-    if region_id not in gamedata['regions']:
-        sys.stderr.write('region not found: %s\n' % region_id)
-        sys.exit(1)
-
-    if gamedata['regions'][region_id].get('storage','basedb') != 'nosql':
-        print "%s: basedb (non nosql) regions are not supported anymore" % region_id
-        sys.exit(1)
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
                                          map_update_hook = broadcast_map_update,
@@ -1864,8 +2011,8 @@ if __name__ == '__main__':
                 weed_expired_bases(db, lock_manager, region_id, ['hive','quarry','raid'], dry_run=dry_run)
 
                 # 30. weed churned players
-                print "%s: weeding players churned for more than %d days..." % (region_id, threshold_days)
-                weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
+                print "%s: weeding players churned for more than %d days, repairing to %f if churned for more than %d days..." % (region_id, threshold_days, repair_pct, repair_days)
+                weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
 
                 # 40. weed orphaned squads
                 print "%s: weeding orphan squads..." % region_id
@@ -1886,6 +2033,13 @@ if __name__ == '__main__':
                     print "%s: turf update..." % region_id
                     update_turf(db, lock_manager, region_id, dry_run=dry_run)
 
+                # 65. update alliance-wide bonuses
+                if 'alliance_bonuses' in gamedata['quarries_client']:
+                    print "%s: quarry alliance bonuses..." % region_id
+                    update_alliance_bonuses(db, lock_manager, region_id,
+                                            check_interval = gamedata['quarries_client']['alliance_bonuses']['check_interval'],
+                                            dry_run=dry_run)
+
                 # 70. respawn hives/quarries/raids
                 print "%s: spawning hives..." % region_id
                 spawn_all_hives(db, lock_manager, region_id, force_rotation=force_rotation, dry_run=dry_run)
@@ -1894,6 +2048,11 @@ if __name__ == '__main__':
                 if raids_enabled:
                     print "%s: spawning raids..." % region_id
                     spawn_all_raids(db, lock_manager, region_id, dry_run=dry_run)
+
+        elif action == 'update-alliance-bonuses':
+            update_alliance_bonuses(db, lock_manager, region_id,
+                                    check_interval = gamedata['quarries_client']['alliance_bonuses']['check_interval'],
+                                    dry_run=dry_run)
 
         elif action == 'prune-stale-locks':
             nosql_client.do_region_maint(region_id)
@@ -1910,7 +2069,7 @@ if __name__ == '__main__':
                 else:
                     print 'this is a very destructive operation, add --yes-i-am-sure if you want to proceed!'
             elif action == 'weed':
-                weed_churned_players(db, lock_manager, region_id, threshold_days, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
+                weed_churned_players(db, lock_manager, region_id, threshold_days, repair_days, repair_pct, skip_quarry_owners = skip_quarry_owners, dry_run=dry_run)
             else:
                 print 'unknown action '+action
         elif base_type == 'squad':

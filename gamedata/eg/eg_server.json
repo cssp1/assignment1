@@ -17,7 +17,7 @@
     "session_signature_time_tolerance": 300, // how many seconds out of date a session signature is allowed to be
     // (this also controls for how long the gameserver remembers session invalidations sent from proxyserver to CONTROLAPI)
 
-    "facebook_cache_lifetime": 600, // cache friends/likes for 10min
+    "facebook_cache_lifetime": 60, // cache friends/likes for 1min
     "bg_task_interval": 20, // run server background tasks every 20sec
 
     "log_async_io": false, // log all async I/O traffic
@@ -49,7 +49,7 @@
     // the session or proxy timeout
     "http_connection_timeout": 300,
 
-    "session_message_buffer": 20, // number of out-of-order client AJAX requests to buffer before giving up due to lag/packet loss
+    "session_message_buffer": 50, // number of out-of-order client AJAX requests to buffer before giving up due to lag/packet loss
     "ajax_longpoll_wait": 20, // how many seconds to park a longpoll request before returning it empty
 
     "sprobe": {
@@ -199,7 +199,7 @@
     "log_alt_accounts": 0,  // log detection of possible alt accounts (2 to also log all same-ip logins, not just detector triggers)
     "alt_detect_logins": 5,   // if more than this many logins occur on the same IP, assume the player is an alt (-1 to disable)
     "alt_no_protect_after": 10, // deny damage protection to alt accounts after this # of attacks (-1 to disable)
-    "alt_no_attack_after": 20, // deny ability to attack alt accounts after this # of attacks (-1 to disable)
+    "alt_no_attack_after": 0, // deny ability to attack alt accounts after this # of attacks (-1 to disable)
 
     // don't bother reporting in log unless the defender fits these criteria
     "anti_bullying_defender_filter": { "predicate": "ALWAYS_TRUE" },

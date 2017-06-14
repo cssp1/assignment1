@@ -239,6 +239,10 @@ def MetricsLogFilter(child):
                                   #'4011_quest_complete_again',
                                   '4120_send_gift_completed',
                                   '4056_strategy_guide_opened',
+
+                                  # note: used by FS only, for quarry tracking
+                                  '4030_upgrade_building',
+
                                   '4461_promo_warehouse_upgrade',
                                   #'5130_item_activated',
                                   #'5131_item_trashed',
@@ -252,7 +256,8 @@ def MetricsLogFilter(child):
                                   '5201_insufficient_resources_go_to_store',
                                   '5202_insufficient_resources_topup_dialog',
                                   '5203_insufficient_resources_topup_buy_now',
-                                  '6000_reacquisition_gift_sent',
+                                  '6000_retention_incentive_sent',
+                                  '6001_retention_incentive_claimed',
 
                                   '7150_friendstone_generated',
                                   '7151_friendstone_opened_send_ui',
@@ -420,8 +425,16 @@ def FBOpenGraphLogFilter(child):
                                   ])
 def ClientTroubleLogFilter(child):
     return JSONLogFilter(child, allow = ['0620_client_died_from_client_lag',
-                                         '0621_client_died_from_downstream_lag',
-                                         '0622_client_died_from_upstream_lag',
+
+                                         # These two are redundant with server-side 0955_lagged_out event
+                                         #'0621_client_died_from_downstream_lag',
+                                         #'0622_client_died_from_upstream_lag',
+
+                                         '0623_client_reconnected',
+
+                                         '0624_client_retrans_buffer_overflow',
+                                         '0625_client_recv_buffer_overflow',
+
                                          '0630_client_died_from_ajax_xmit_failure',
                                          '0631_direct_ajax_failure_falling_back_to_proxy',
                                          '0635_client_died_from_ajax_xmit_timeout',
@@ -429,6 +442,7 @@ def ClientTroubleLogFilter(child):
                                          '0640_client_died_from_ajax_recv_failure',
                                          '0641_client_died_from_ws_connect_timeout',
                                          '0642_client_died_from_ws_xmit_failure',
+                                         '0643_client_died_from_ws_shutdown',
                                          '0645_direct_ws_failure_falling_back_to_proxy',
                                          '0649_client_died_from_ws_unknown_failure',
                                          '0650_client_died_from_facebook_api_error',

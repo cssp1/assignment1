@@ -8,15 +8,15 @@
 # and an AsyncHTTPRequester to manage the game server's storage of player portraits.
 
 from twisted.internet import defer
-from twisted.python import failure
 from twisted.web.server import NOT_DONE_YET
-from string import strip
 import functools
+import traceback
 import urllib
 import re
 import SpinConfig
 import SpinFacebook
 import SpinHTTP
+from io import BytesIO
 
 max_age_regexp = re.compile(r'max-age=[\'"]?([0-9]+)[\'"]?', re.IGNORECASE)
 
@@ -78,20 +78,21 @@ class PlayerPortraits(object):
             raise Exception('no async_http requester for frame_platform %r' % frame_platform)
         requester.queue_request(time_now, url, functools.partial(self.update_complete, d, url, frame_platform, time_now, user_id),
                                 error_callback = functools.partial(self.update_complete, d, url, frame_platform, time_now, user_id),
-                                headers = headers, callback_type = requester.CALLBACK_FULL, max_tries = 1)
+                                headers = headers, callback_type = requester.CALLBACK_FULL, max_tries = 1,
+                                accept_http_errors = True)
         return d
 
     def update_complete(self, d, url, frame_platform, time_now, user_id, body = '', headers = {}, status = '500', ui_reason = None):
-        #print status, headers
+        status = int(status)
         try:
-            if int(status) != 200:
+            if status != 200:
                 # log this error as per-frame-platform since it's going to be common on Facebook - don't pollute main log
-                if frame_platform == 'bh' and int(status) == 502:
+                if frame_platform == 'bh' and (status in (404,502)):
                     # don't bother logging BHLogin portrait retrieval failures
                     pass
                 else:
                     func = self.log_exception_func_map.get(frame_platform, self.log_exception_func_map['default'])
-                    func('PlayerPortrait update got non-OK status %r for URL %r: %r' % (status, url, body))
+                    func('PlayerPortrait update got non-OK status %r for platform %r URL %r: %r' % (status, frame_platform, url, body))
                 d.callback((False, 'image/png', unknown_person_portrait_50x50_png))
                 return
             content_type = headers['content-type'][-1] if 'content-type' in headers else None
@@ -113,11 +114,55 @@ class PlayerPortraits(object):
                 expires = max_expires
 
             last_modified = SpinHTTP.parse_http_time(headers['last-modified'][-1]) if 'last-modified' in headers else None
-            self.db_client.player_portrait_add(user_id, bytes(body), time_now, content_type, expires, last_modified)
-            d.callback((True, content_type, bytes(body)))
-        except Exception as e:
-            d.errback(failure.Failure(e))
+            body = bytes(body)
+
+            # resize down to the max size limit
+            if len(body) > self.db_client.player_portrait_max_size:
+                func = self.log_exception_func_map.get(frame_platform, self.log_exception_func_map['default'])
+
+                try:
+                    old_body = body
+                    body, content_type = self.shrink_image(body, content_type)
+                    if len(body) > self.db_client.player_portrait_max_size:
+                        raise Exception('did not shrink small enough! %d -> %d' % (len(old_body), len(body)))
+
+                except:
+                    func('PlayerPortrait shrink_image error for platform %r URL %s: %s' % (frame_platform, url, traceback.format_exc().strip()))
+                    d.callback((False, 'image/png', unknown_person_portrait_50x50_png))
+                    return
+
+            self.db_client.player_portrait_add(user_id, body, time_now, content_type, expires, last_modified)
+            d.callback((True, content_type, body))
+        except Exception:
+            d.errback()
             return
+
+    def shrink_image(self, body, content_type):
+        try:
+            from PIL import Image
+        except ImportError:
+            raise Exception('PIL not available')
+
+        size = (100, 100)
+        img = Image.open(BytesIO(body))
+        img.thumbnail(size, Image.ANTIALIAS)
+        if img.mode == 'RGBA':
+            bg = Image.new('RGBA', size, (0, 0, 0, 0))
+        elif img.mode == 'RGB':
+            bg = Image.new('RGB', size, (0, 0, 0))
+        else:
+            raise Exception('unrecognized input format')
+
+        bg.paste(img, ((size[0] - img.size[0])//2, (size[1] - img.size[1])//2))
+        bg_bytes = BytesIO()
+        if img.mode == 'RGBA':
+            bg.save(bg_bytes, 'PNG')
+            content_type = 'image/png'
+        if img.mode == 'RGB':
+            bg.save(bg_bytes, 'JPEG', quality=90)
+            content_type = 'image/jpeg'
+        return bg_bytes.getvalue(), content_type
+
 
     def get(self, time_now, user_id,
             # all these other parameters are optional, and only used if the local storage is missing the portrait
@@ -150,11 +195,12 @@ class PlayerPortraits(object):
                                   allow_fail = True)
                 if ret:
                     # if fetch fails, record error and return unknown portrait
-                    def on_error(f, self, target_platform):
+                    def on_error(f, self, target_platform, user_id):
                         func = self.log_exception_func_map.get(target_platform, self.log_exception_func_map['default'])
-                        func('PlayerPortrait get() error: '+f.getTraceback().strip())
+                        func('PlayerPortrait get() error for user_id %r: %s\n%s' % \
+                             (user_id, f.getTraceback().strip(), f.getErrorMessage().strip()))
                         return (False, 'image/png', unknown_person_portrait_50x50_png)
-                    ret.addErrback(on_error, self, target_platform)
+                    ret.addErrback(on_error, self, target_platform, user_id)
                     return ret
 
                 # else - cannot retrieve, fall back

@@ -12,6 +12,7 @@ goog.provide('Consequents');
 goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
 goog.require('OfferChoice');
+goog.require('LoginIncentiveDialog');
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but
@@ -350,17 +351,29 @@ function InviteFriendsPromptConsequent(data) {
     goog.base(this, data);
     this.show_close_button = ('show_close_button' in data ? data['show_close_button'] : true);
     this.show_arrow = ('show_arrow' in data ? data['show_arrow'] : true);
+    this.reason = ('reason' in data ? data['reason'] : 'client_consequent');
 }
 goog.inherits(InviteFriendsPromptConsequent, Consequent);
 InviteFriendsPromptConsequent.prototype.execute = function(state) {
-    var dialog = invoke_invite_friends_prompt();
+    var dialog = invoke_invite_friends_prompt(this.reason);
     if(!dialog) { return; }
     dialog.widgets['close_button'].show = this.show_close_button;
     // hack - copy code from tutorial_step_congratulations
     if(this.show_arrow) {
         make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');
+        make_tutorial_arrow_for_button('tutorial_congratulations', 'fb_share_button', 'up');
     }
     GameArt.play_canned_sound('conquer_sound');
+};
+
+/** @constructor @struct
+  * @extends Consequent */
+function BHBookmarkPromptConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(BHBookmarkPromptConsequent, Consequent);
+BHBookmarkPromptConsequent.prototype.execute = function(state) {
+    BHSDK.bh_popup_show_how_to_bookmark();
 };
 
 /** @constructor @struct
@@ -713,6 +726,19 @@ InvokeOfferChoiceConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeLoginIncentiveDialogConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(InvokeLoginIncentiveDialogConsequent, Consequent);
+InvokeLoginIncentiveDialogConsequent.prototype.execute = function(state) {
+    var invoker = (function () { return function() {
+        LoginIncentiveDialog.invoke();
+    }; })();
+    notification_queue.push(invoker);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function EnableCombatResourceBarsConsequent(data) {
     goog.base(this, data);
     this.enabled = data['enable'];
@@ -885,12 +911,14 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_TOP_ALLIANCES_DIALOG') { return new InvokeTopAlliancesDialogConsequent(data); }
     else if(kind === 'INVOKE_INVENTORY_DIALOG') { return new InvokeInventoryDialogConsequent(data); }
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
+    else if(kind === 'BH_BOOKMARK_PROMPT') { return new BHBookmarkPromptConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
     else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
+    else if(kind === 'INVOKE_LOGIN_INCENTIVE_DIALOG') { return new InvokeLoginIncentiveDialogConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }

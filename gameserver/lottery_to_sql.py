@@ -181,7 +181,7 @@ if __name__ == '__main__':
 
             for TABLE in (lottery_table,):
                 if verbose: print 'pruning', TABLE
-                cur.execute("DELETE FROM "+sql_util.sym(TABLE)+" WHERE time < %s", old_limit)
+                cur.execute("DELETE FROM "+sql_util.sym(TABLE)+" WHERE time < %s", [old_limit])
                 if do_optimize:
                     if verbose: print 'optimizing', TABLE
                     cur.execute("OPTIMIZE TABLE "+sql_util.sym(TABLE))

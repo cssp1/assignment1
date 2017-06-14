@@ -16,7 +16,7 @@ from SkynetLib import spin_targets, bid_coeff, \
      encode_one_param, encode_params, decode_params, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
      decode_adgroup_name, adgroup_name_is_bad, make_variable_regexp, adgroup_dtgt_filter_query, mongo_enc
 from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL, \
-     BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
+     BATTLEHOUSE_APP_ID, BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
 
 HTTPLIB = 'requests'
 if HTTPLIB == 'requests':
@@ -518,9 +518,13 @@ def decode_bid_type(c):
 def encode_bid_type(t):
     return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
 
-def adgroup_get_bid(adgroup): return adgroup['bid_amount']
+def adgroup_get_bid(adgroup): return adgroup.get('bid_amount', None)
 
-def adgroup_encode_bid(tgt, bid, conversion_pixels = None):
+def adgroup_encode_bid(tgt, bid):
+    game_id = tgt.get('game', 'tr')
+    game_data = GAMES[game_id]
+    conversion_pixels = game_data['conversion_pixels']
+
     bid_type = tgt['bid_type']
     ret = {}
     if bid_type == 'CPA' or bid_type.startswith('oCPM'):
@@ -531,10 +535,14 @@ def adgroup_encode_bid(tgt, bid, conversion_pixels = None):
             ret['billing_event'] = 'LINK_CLICKS'
             ret['optimization_goal'] = 'LINK_CLICKS'
         else:
-            raise Exception('offsite conversions not implemented for v2.5+ API')
-            #event = '_'.join(bid_type.split('_')[1:])
-            #assert event in conversion_pixels
-            #ret['conversion_specs'] = SpinJSON.dumps([{"action.type":'offsite_conversion','offsite_pixel':int(conversion_pixels[event]['id'])}])
+            event = '_'.join(bid_type.split('_')[1:])
+            assert event in conversion_pixels
+            pixel_data = conversion_pixels[event]
+            ret['billing_event'] = 'IMPRESSIONS'
+            ret['optimization_goal'] = 'OFFSITE_CONVERSIONS'
+            ret['promoted_object'] = SpinJSON.dumps({'pixel_id': pixel_data['fb_pixel'], 'custom_event_type': pixel_data['fb_name']})
+
+
     elif bid_type == 'CPC':
         ret['billing_event'] = 'LINK_CLICKS'
         if True or not tgt.get('exclude_player_audience',True):
@@ -1796,6 +1804,10 @@ def adgroup_targeting(db, tgt):
         # exclude people connected to the game already
         ret['excluded_connections'] = [{'id':game_data['app_id']}]
 
+        # for links going to battlehouse.com, exclude people already using its Facebook login
+        if tgt.get('destination') == 'bh_com':
+            ret['excluded_connections'].append({'id':BATTLEHOUSE_APP_ID})
+
         # optionally also exclude a custom audience containing the entire player base
         if tgt.get('exclude_player_audience',True) and game_data.get('exclude_player_audience',None):
             if 'excluded_custom_audiences' not in ret: ret['excluded_custom_audiences'] = []
@@ -1806,12 +1818,16 @@ def adgroup_targeting(db, tgt):
         if 'excluded_custom_audiences' not in ret: ret['excluded_custom_audiences'] = []
         ret['excluded_custom_audiences'].append(format_custom_audience(db, game_data['ad_account_id'], aud))
 
+    if tgt.get('exclude_game_connections',None) == 'ALL':
+        if 'excluded_connections' not in ret: ret['excluded_connections'] = []
+        ret['excluded_connections'] += [{'id': gd['app_id']} for gd in GAMES.itervalues()]
+
     return ret
 
 def reachestimate_tgt(tgt):
     # strip out the parts of tgt that don't apply to the reach estimate
     reach_tgt = tgt.copy()
-    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','destination','version'):
+    for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','version'):
         if FIELD in reach_tgt: del reach_tgt[FIELD]
     return reach_tgt
 
@@ -1889,12 +1905,13 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
     adgroup = {'name': name,
                'adset_id': campaign_id,
                'creative': SpinJSON.dumps({'creative_id':creative_id}),
-               'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','offsite_pixel':int(pixel['id'])} for pixel in conversion_pixels.itervalues()]),
+               'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','fb_pixel':fb_pixel} for fb_pixel in \
+                                                 set(v['fb_pixel'] for v in conversion_pixels.itervalues())]),
                #'objective': 'PAGE_LIKES' if tgt.get('destination',None)=='app_page' else ('LINK_CLICKS' if tgt.get('include_already_connected_to_game',False) else 'CANVAS_APP_INSTALLS'),
                'redownload':1,
                'fields': AD_FIELDS
                }
-    #adgroup.update(adgroup_encode_bid(tgt, bid, conversion_pixels))
+    #adgroup.update(adgroup_encode_bid(tgt, bid))
 
     return adgroup
 
@@ -1960,7 +1977,11 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
               'campaign_id': campaign_group_id, 'redownload':1}
     if call_to_action_type(tgt) == 'PLAY_GAME':
         params['promoted_object'] = SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
-    params.update(adgroup_encode_bid(tgt, bid, conversion_pixels))
+    elif tgt.get('promoted_event', None):
+        pixel_data = conversion_pixels[tgt['promoted_event'][0]]
+        params['promoted_object'] = SpinJSON.dumps({'pixel_id': pixel_data['fb_pixel'], 'custom_event_type': pixel_data['fb_name']})
+
+    params.update(adgroup_encode_bid(tgt, bid))
 
     result = fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
                     post_params = params)
@@ -2752,7 +2773,10 @@ if __name__ == '__main__':
         if len(adgroup_list) < 1:
             sys.stderr.write('WARNING: did not find any current adgroups to record!\n')
         if count == 0:
-            sys.stderr.write('WARNING: did not record any ads with clicks, impressions, or spend!\n')
+            # alarm that we saw no data, so something might be wrong
+            # but, don't sound this constantly since ads might not be on in the first place
+            if (time_now % 86400) < 7200:
+                sys.stderr.write('WARNING: did not record any ads with clicks, impressions, or spend!\n')
 
     elif mode == 'adcreatives-pull':
         db.fb_adcreatives.drop()

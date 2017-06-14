@@ -34,7 +34,7 @@
         "gridsize": [2,2],
 
         // this string references an asset listed in the GameArt file (art.json)
-        "art_asset": "armyguy",
+        "art_asset": "armyguyx_tnormal",
         "destroyed_inert": "armyguy_dead",
         "walk_period": 1.2, // number of seconds that the walk cycle takes to complete (for walking units only, and only affects graphics)
         "muzzle_height": 0.75, // number of grid units off the ground the gun muzzle is at (for positioning muzzle-flash graphics)
@@ -95,7 +95,7 @@
         "level_determined_by_tech": "stryker_production",
         "gridsize": [4,4],
         "muzzle_height": 1,
-        "art_asset": "stryker",
+        "art_asset": "strykerx_tnormal",
         "manufacture_category": "transports",
         "consumes_space": 65,
         "maxvel": 2.7,
@@ -133,7 +133,7 @@
         "ui_damage_vs": {"rover": 2, "transport": 1, "starcraft": 1, "building": 1},
         "level_determined_by_tech": "oh58_production",
         "gridsize": [2,2],
-        "art_asset": "oh58",
+        "art_asset": "oh58x_tnormal",
         "muzzle_height": -1,
         "manufacture_category": "starcraft",
         "consumes_space": 29,

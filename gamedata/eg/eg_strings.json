@@ -358,6 +358,8 @@
         "upgrading": "Upgrading",
         "removing": "Removing",
         "damaged": "Damaged",
+        "low_power_harvester": "Low Power! Gathering at %d% of normal rate", // for mouseover tooltip
+        "low_power_turret": "Low Power! Firing at %d% of normal rate", // for mouseover tooltip
         "researching": "%tech Level %d",
         "fullness": "%pct% full",
         "mod_types": { // obsolete
@@ -444,6 +446,7 @@
         "all_quarries": "Quarries",
         "quarry": "Quarry %s",
         "strongpoint": "Strongpoint %s",
+        "logistics": "Clan Logistics %s",
         "hive_descr": "Camp",
         "hive_label": "", // no label by default
         "raid_descr": "Raid",
@@ -522,6 +525,7 @@
         "ALL_BUILDINGS_UNDAMAGED": { "ui_name": "All buildings undamaged" },
         "OBJECT_UNDAMAGED": { "ui_name": "Repair %s" },
         "OBJECT_UNBUSY": { "ui_name": "%s not damaged or busy" },
+        "BASE_RICHNESS": { "ui_name": "Max level for this quarry. Upgrade requires quarry size %s or larger" },
         "BUILDING_QUANTITY": { "ui_name": "Build %d %s",
                                "ui_progress": "%d1/%d2 Built"},
         "UNIT_QUANTITY": { "ui_name": "%d %s" },
@@ -1552,5 +1556,7 @@
                       "Juliet", "Kilo", "Lima", "Mike", "November", "October", "Papa", "Quebec", "Romeo",
                       "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-Ray", "Yankee", "Zulu"],
     "months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "days_of_week_short": ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+    "days_of_week": ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
     "unknown": "Unknown"
 }

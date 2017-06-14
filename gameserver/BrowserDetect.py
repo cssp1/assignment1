@@ -78,6 +78,8 @@ def get_browser(ag):
     elif ('Chrome' in ag):
         name = 'Chrome'
         ver = get_version(ag, 'Chrome/')
+        if 'CrOS' in ag:
+            os = 'ChromeOS'
     elif ('Apple' in ag):
         name = 'Safari'
         if ('iPhone' in ag) or ('iPad' in ag) or ('iPod' in ag):

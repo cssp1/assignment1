@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
             if verbose: print 'pruning', chat_reports_table
             cur = con.cursor()
-            cur.execute("DELETE FROM "+sql_util.sym(chat_reports_table)+" WHERE report_time < %s", old_limit)
+            cur.execute("DELETE FROM "+sql_util.sym(chat_reports_table)+" WHERE report_time < %s", [old_limit])
             if do_optimize:
                 if verbose: print 'optimizing', chat_reports_table
                 cur.execute("OPTIMIZE TABLE "+sql_util.sym(chat_reports_table))

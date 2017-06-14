@@ -67,7 +67,7 @@ class MySQLUtil(SQLUtil):
                     ", ".join([(self.sym(key)+" "+type) for key, type in schema['fields']] + \
                               [(("UNIQUE " if idata.get('unique', False) else '') + "KEY %s (" % self.sym(name+'_'+iname)) + ",".join([self.sym(key)+" "+order for key, order in idata['keys']]) + ")" \
                                for iname, idata in schema.get('indices',{}).iteritems()]) + \
-                    ") CHARACTER SET utf8")
+                    ") CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
 
     # string-concat trick to get percentile aggregates
     def percentile(self, expr, fraction):

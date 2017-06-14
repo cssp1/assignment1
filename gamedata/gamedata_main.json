@@ -28,6 +28,8 @@
         // how many pixels to shrink the game canvas vertically to reveal the top of the footer
         "facebook_iframe_footer_peek": 44, // XXX this should be 30, but as of 2015 Dec 4, Facebook imposes a horizontal scrollbar at the bottom of the screen, so we add 14 pixels to ensure the linkbar is fully visible
 
+        "facebook_sdk_load_timeout": 120, // how long to wait for the SDK to load before showing a visible error message
+
         "armorgames_iframe_size_mode": "screen", // initialize AG iframe size based on screen dimensions at connect time
         "armorgames_iframe_margins": [50, 195], // pixels to shrink the iframe relative to the maximum window size, for safety
         "armorgames_iframe_footer_peek": 30, // same as Facebook
@@ -48,6 +50,10 @@
         "invite_prompt_closeable": {"predicate": "NOT", "subpredicates": [
             {"predicate": "FRAME_PLATFORM", "platform":"bh"}
         ]},
+
+        // skip friend selector and just offer to share a "Join the game" link.
+        // NOTE: only works on frame_platform "fb"
+        "invite_prompt_direct_share": {"predicate": "ANY_ABTEST", "key": "invite_prompt_direct_share", "value": 1},
 
         // true if friend bar should be shown at bottom of screen
         "friend_bar_enabled": {"predicate": "OR", "subpredicates" :[
@@ -91,7 +97,18 @@
 
         "websocket_keepalive_interval": 50, // always send something down the websocket this frequently
 
-        "ajax_message_buffer": 30, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
+        // max number of bytes to send in a single Websocket message.
+        // Some browsers (IE) seem to have trouble with 32KB+ messages.
+        // note: applies in upstream direction only.
+        "websocket_max_message": [[{"predicate":"BROWSER_NAME", "names": ["Explorer"]}, 30000],
+                                  [{"predicate":"BROWSER_NAME", "names": ["Safari"]}, 20000],
+                                  [{"predicate": "ALWAYS_TRUE"}, -1]],
+        // min delay between large successive websocket transmissions.
+        // To work around Safari 10.1 bug: https://bugs.webkit.org/show_bug.cgi?id=170463
+        "websocket_min_delay": [[{"predicate":"BROWSER_NAME", "names": ["Safari"]}, 0.05],
+                                [{"predicate": "ALWAYS_TRUE"}, -1]],
+
+        "ajax_message_buffer": 50, // number of out-of-order server AJAX requests to buffer before giving up due to lag/packet loss
 
         "enable_ajax_longpoll": 1, // use longpoll request mechanism
         "ajax_longpoll_timeout": 120, // standard timeout (sec) for longpoll requests - MUST be longer than gamedata.server.ajax_longpoll_wait + bgtask interval
@@ -404,6 +421,12 @@
         "global_audio_volume": 0.36,
 
         "enable_websockets": 1, // use websockets by default, if browser supports them
+        "enable_websocket_reconnect": 2, // flag to turn on reconnection attempts (for meaning see SPWebsockets.js)
+
+        "enable_post_screenshot": 1, // show "post screenshot" feature, on platforms that support it
+
+        // setting to deal with Facebook's broken API. See FBUploadPhoto.js.
+        "post_screenshot_method": "ajax_withCredentials",
 
         // wait until account is at least 2 hours old before showing any of the below popups
         "motd_filter": { "predicate": "RETAINED", "duration": 7200 },
@@ -425,7 +448,16 @@
         ]},
 
         // whether to enable HTMLInputElement-based text input
-        "enable_html_text_input": {"predicate": "BROWSER_OS", "os": ["iOS", "Android"]},
+        "enable_html_text_input": {"predicate": "OR", "subpredicates": [
+            {"predicate": "BROWSER_OS", "os": ["iOS", "Android", "ChromeOS"]},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "mf"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "mf2"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "sg"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "fs"}
+            //{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "dv"},
+            //{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "tr"},
+        ]},
 
         "enable_loot_burst_effects": false,
         // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
@@ -586,6 +618,9 @@
     "skip_quest_claim": 0, // make QUEST_COMPLETED predicates react to goal satisfaction rather than reward claim
 
     "enable_leaderboard": true, // default setting for leaderboard, if no A/B test applies
+    "leaderboard":
+#include "$GAME_ID/$GAME_ID_leaderboard.json"
+    ,
 
     "enable_inventory": 1,
     //    "inventory_available_during_warehouse_upgrade": false,
@@ -598,6 +633,7 @@
 
     "lottery_reseed_cooldown": 900, // reseed lottery on a long cooldown, to avoid cheating by waiting for a good slate before spinning
     "lottery_free_interval": 86400, // how often you get a free lottery scan
+    "lottery_free_origin": 1337274000, // reset lottery at same time each day
 
     //    "lottery_available_during_scanner_upgrade": false,
     //    "lottery_available_during_scanner_repair": false,
@@ -952,6 +988,19 @@
     // if >0, then when doing Facebook friend invites with the v2+ API,
     // instantly invite this many of the top friends instead of showing selector (like Throne Rush)
     "fb_friend_invite_v2_instant": 0,
+
+    // list of Facebook objects whose "Like" status we want to know upon login
+    // since these are fetched asynchronously on first login, they aren't reliably present on first login.
+    // if unknown, we assume the object is NOT "Liked".
+    "fb_likes_preload": [
+        "1479826965653258", // Battlehouse Inc. fan page
+        "235938246460875", // MF fan page
+        "141835099310946", // TR fan page
+        "633274570056000", // MF2 fan page
+        "1436033100000042", // BFM fan page
+        "653216284776703", // SG fan page
+        "1505053499760404" // DV fan page
+    ],
 
     // CURRENCY DISPLAY DATA
     // NOTE! This has nothing at all to do with the actual ordering/payments code!

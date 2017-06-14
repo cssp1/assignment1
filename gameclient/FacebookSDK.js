@@ -1,5 +1,7 @@
 <div id="fb-root"></div>
 <script>
+var spin_facebook_sdk_loaded = false;
+var spin_facebook_sdk_on_init_callbacks = [];
 var spin_facebook_channel = spin_server_protocol+spin_server_host+":"+spin_server_port+"/channel.php";
 window.fbAsyncInit = function() {
     var init_params = {
@@ -19,6 +21,11 @@ window.fbAsyncInit = function() {
         init_params.version = 'v2.4'; // fallback default (sync with: FacebookSDK.js, fb_guest.html, gameserver/SpinFacebook.py, gameclient/clientcode/SPFB.js)
     }
     FB.init(init_params);
+    spin_facebook_sdk_loaded = true;
+    for(var i = 0; i < spin_facebook_sdk_on_init_callbacks; i++) {
+        var cb = spin_facebook_sdk_on_init_callbacks[i];
+        cb();
+    }
     //window.setTimeout(function() { FB.Canvas.setAutoGrow(); }, 250);
 };
 (function(d){

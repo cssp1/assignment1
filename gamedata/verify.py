@@ -61,7 +61,7 @@ def require_art_file(name):
 # CC L6 = 4*L10 storage = 24400000
 # CC L8 = 4*L12 storage = 34000000
 
-MAX_RESOURCE_COST = 34000000
+MAX_RESOURCE_COST = 40000000
 MAX_STORAGE = None
 
 def check_url(url, reason):
@@ -74,11 +74,6 @@ def check_url(url, reason):
             error |= check_url(u, reason = reason)
         return error
 
-    if not url.startswith('//'):
-        if 'on.fb.me' in url:
-            pass # XXX unfortuantely this breaks tons of links - we have to find an HTTPS substitute
-        else:
-            error |= 1; print '%s: URL "%s" needs to be protocol-relative (starts with // not http://)' % (reason, url)
     if 'on.fb.me' in url:
         if (not url.startswith('http://')):
             error |= 1; print '%s: URL "%s" to on.fb.me must use http:// because HTTPS is not supported' % (reason, url)
@@ -423,7 +418,8 @@ def check_levels(specname, spec):
               'max_ui_level',
               'defense_types', 'health_bar_dims', 'show_alliance_at', 'scan_counter_offset', 'research_categories', 'crafting_categories', 'enhancement_categories',
               'harvest_glow_pos', 'hero_icon_pos', 'muzzle_offset', 'limit_requires', 'permanent_auras', 'permanent_modstats',
-              'upgrade_ingredients', 'remove_ingredients', 'research_ingredients')
+              'upgrade_ingredients', 'remove_ingredients', 'research_ingredients',
+              'quarry_control_auras')
     error = 0
 
     histogram = {}
@@ -497,9 +493,10 @@ def check_level_progression(spec, maxlevel):
     tocheck = []
 
     LEVEL_PROGRESSION_FIELDS = \
-                             resource_fields('storage') + resource_fields('provides') + resource_fields('produces') + [
+                             resource_fields('storage') + resource_fields('provides') + resource_fields('produces') + \
+                             resource_fields('vault') + [
         'provides_space', 'provides_donated_space', 'provides_total_space', 'provides_squad_space', 'provides_squads',
-        'provides_inventory', 'provides_power', 'provides_foremen', 'manufacture_speed', 'max_hp'
+        'provides_inventory', 'provides_power', 'provides_foremen', 'manufacture_speed', 'max_hp',
         ]
     for FIELD in LEVEL_PROGRESSION_FIELDS:
         if FIELD in spec:
@@ -643,7 +640,7 @@ def check_enhancement(specname, keyname, spec, maxlevel):
             if effect['code'] != 'modstat':
                 error |= 1
                 print '%s: uses invalid effect code %s' % effect['code']
-            error |= check_modstat(effect, specname)
+            error |= check_modstat(effect, specname, affects = effect.get('affects',None))
 
     # check resource requirement vs CC level
     if verbose:
@@ -903,7 +900,13 @@ def check_continent(name, data):
         print '%s: id mismatch' % name
     return error
 
-def check_leaderboard(leaderboard):
+def check_leaderboard_server(leaderboard):
+    error = 0
+    for name, entry in leaderboard['score_fields'].iteritems():
+        pass
+    return error
+
+def check_leaderboard_client(leaderboard):
     error = 0
     for cat_name, data in leaderboard['categories'].iteritems():
         if 'show_if' in data:
@@ -926,6 +929,8 @@ def check_scores2_stat(stat, reason):
     error = 0
     if stat['name'] not in gamedata['strings']['leaderboard']['categories']:
         error |= 1; print '%s: stat %s not found in gamedata.strings.leaderboard.categories' % (reason, stat['name'])
+    if stat['name'] not in gamedata['leaderboard']['score_fields']:
+        error |= 1; print '%s: stat %s not found in gamedata.leaderboard.score_fields' % (reason, stat['name'])
     if stat['time_scope'] not in ('week','season','ALL'):
         error |= 1; print '%s: bad stat time_scope %s' % (reason, stat['time_scope'])
     if stat['space_scope'] not in ('region','continent','ALL'):
@@ -1152,7 +1157,13 @@ def check_item(itemname, spec):
         error |= check_predicate(spec['refundable_when'], reason = 'item %s: refundable_when' % itemname)
 
     if 'refund' in spec:
-        error |= check_loot_table(spec['refund'], reason = 'refund')
+        refund_list = spec['refund']
+        # per-level list?
+        if len(refund_list) < 1 or not (isinstance(refund_list[0], list) or refund_list[0] is None):
+            refund_list = [refund_list]
+        for tab in refund_list:
+            if tab is not None:
+                error |= check_loot_table(tab, reason = 'refund')
 
     if 'pre_use' in spec:
         error |= check_consequent(spec['pre_use'], reason = 'item %s: pre_use')
@@ -1332,6 +1343,16 @@ def check_item(itemname, spec):
     if 'use_effect' in spec:
         error |= check_visual_effect('%s:use_effect' % itemname, spec['use_effect'])
 
+    if 'expire_into' in spec:
+        if isinstance(spec['expire_into'], list): # cond chain
+            error |= check_cond_chain(spec['expire_into'], reason = 'item %s:expire_into' % (itemname,))
+            result_list = [x[1] for x in spec['expire_into']]
+        else:
+            result_list = [spec['expire_into'],]
+        for result in result_list:
+            if result is not None and result not in gamedata['items']:
+                error |= 1; print '%s: expire_into "%s" is not a valid item' % (itemname, result)
+
     return error
 
 MODIFIABLE_STATS = {'unit/building': set(['max_hp', 'maxvel', 'weapon_damage', 'weapon_range', 'weapon_range_pvp', 'effective_weapon_range', 'ice_effects', 'rate_of_fire',
@@ -1502,7 +1523,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
                    'PURCHASED_RECENTLY', 'SESSION_LENGTH_TREND', 'ARMY_SIZE',
-                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'QUERY_STRING',
+                   'VIEWING_BASE_DAMAGE', 'VIEWING_BASE_OBJECT_DESTROYED', 'BASE_SIZE', 'BASE_TYPE', 'BASE_RICHNESS', 'QUERY_STRING',
                    'HAS_MENTOR'
                    ])
 
@@ -1557,10 +1578,14 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred['building_type'] not in gamedata['buildings']:
             error |= 1
             print '%s: %s predicate refers to nonexistent building "%s"' % (reason, pred['predicate'], pred['building_type'])
-        elif 'trigger_level' in pred:
-            if pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['build_time']):
+        else:
+            if 'trigger_level' in pred and \
+               pred['trigger_level'] > len(gamedata['buildings'][pred['building_type']]['build_time']):
+                    error |= 1
+                    print '%s: %s predicate requires building "%s" level %d (beyond its max)' % (reason, pred['predicate'], pred['building_type'], pred['trigger_level'])
+            if not gamedata['buildings'][pred['building_type']].get('track_level_in_player_history',False):
                 error |= 1
-                print '%s: %s predicate requires building "%s" level %d (beyond its max)' % (reason, pred['predicate'], pred['building_type'], pred['trigger_level'])
+                print '%s: %s predicate requires building "%s" track_level_in_player_history' % (reason, pred['predicate'], pred['building_type'])
     elif pred['predicate'] == 'OBJECT_UNDAMAGED':
         if pred['spec'] not in gamedata['buildings']:
             error |= 1
@@ -1677,6 +1702,12 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
     elif pred['predicate'] == 'QUERY_STRING':
         if ('key' not in pred) or ('value' not in pred) or not isinstance(pred['value'], basestring):
             error |= 1; print '%s: %s predicate needs a key and string value' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'BASE_TYPE':
+        if not ('types' in pred and isinstance(pred['types'], list) and all(x in ('home','quarry','squad','raid') for x in pred['types'])):
+            error |= 1; print '%s: %s predicate has missing or invalid "types"' % (reason, pred['predicate'])
+    elif pred['predicate'] == 'BASE_RICHNESS':
+        if ('min_richness' not in pred):
+            error |= 1; print '%s: %s predicate missing "min_richness"' % (reason, pred['predicate'])
     return error
 
 # check old-style "logic" blocks which are if/then/else compositions of predicates and consequents (used for quest tips)
@@ -1701,9 +1732,9 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FOCUS_CHAT_GUI', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
-                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
+                        'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE',
+                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
                         'ALL_AGGRESSIVE',
                    ])
 
@@ -1725,7 +1756,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
             error |= check_consequent(c, reason = reason, context = context, context_data = context_data)
     elif cons['consequent'] == "GIVE_LOOT":
         error |= check_loot_table(cons['loot'], reason = reason, expire_time = cons.get('item_expire_at',-1), duration = cons.get('item_duration',-1))
-        if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code'):
+        if cons.get('reason',None) != context and cons.get('reason',None) not in ('special', 'promo_code', 'login_incentive'):
             error |= 1
             print '%s: GIVE_LOOT consequent has bad "reason", it should be "%s"' % (reason, context)
         if 'mail_template' in cons:
@@ -1914,9 +1945,9 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                                 'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG',
                                 'TUTORIAL_ARROW', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_CHANGE_REGION_DIALOG',
                                 'FACEBOOK_PERMISSIONS_PROMPT', 'FORCE_SCROLL', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
-                                'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'TAKE_ITEMS',
+                                'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'TAKE_ITEMS',
                                 'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE',
+                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
                                 'NULL']:
         # we recognize these ones, but they don't have detailed sanity checks written for them yet
         pass
@@ -2132,8 +2163,11 @@ def check_hives_and_raids(kind, hives):
         # check future spawn population for abnormally low or high intervals
         if len(spawn_pop) > 1 and gamedata['game_id'] != 'mf': # ignore MF
             i = 0
+
             while spawn_pop[i+1][0] <= past_limit: # ignore intervals before past_limit
                 i += 1
+                if i+1 >= len(spawn_pop):
+                    break
 
             for j in xrange(i, len(spawn_pop)):
                 entry_t, pop, ui_names = spawn_pop[j]
@@ -2328,6 +2362,9 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
     elif not gamedata['ai_bases']['loot_table'] and base_type != 'quarry':
         error |= 1; print 'AI base %s needs a base_resource_loot table' % strid
 
+    # make sure there are buildings that yield the specified base_resouce_loot
+    has_resources = set()
+
     for KIND in ('scenery', 'buildings', 'units'):
         if KIND in base:
             for item in base[KIND]:
@@ -2366,8 +2403,10 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                         if 'produces_'+res in spec:
                             has_this_res = True
                             # is_producer = True
-                        if has_this_res and (res not in ('iron','water')):
-                            has_exotic_resource = (item['spec'], res)
+                        if has_this_res:
+                            has_resources.add(res)
+                            if res not in ('iron','water'):
+                                has_exotic_resource = (item['spec'], res)
 
                     # check that quarries do not have storage buildings (unsupported/exploitable code path)
                     if base_type == 'quarry' and is_storage:
@@ -2430,6 +2469,12 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                                                         print 'ERROR: AI base %s has %s with item %r that spawns security team unit %s not allowed by climate %s' % (strid, item['spec'], slot, secteam_name, climate)
     if 'buildings' in base:
         error |= check_ai_base_contents_power(base['buildings'], strid)
+
+    if 'base_resource_loot' in base and base_type != 'raid':
+        for res in base['base_resource_loot']:
+            if res not in has_resources:
+                error |= 1; print 'AI base %s has base_resource_loot with %s, but no lootable buildings of that type' % (strid, res)
+
     return error
 
 def check_ai_base_contents_power(building_list, strid):
@@ -2711,7 +2756,7 @@ def check_quests(quests):
             if check_predicate(data[PRED], reason = 'quest:'+key+':'+PRED):
                 error |= 1
                 print 'quest %s has bad %s predicate' % (key,PRED)
-        for CONS in ('ui_accept_consequent','completion'):
+        for CONS in ('ui_accept_consequent','completion','completion_server'):
             if (CONS in data) and check_consequent(data[CONS], reason = 'quest:'+key+':'+CONS):
                 error |= 1; print 'quest %s has bad %s consequent' % (key,CONS)
 
@@ -2936,6 +2981,7 @@ def check_events(events):
         if data.get('kind','MISSING') not in ('event_tutorial', # newbie tutorial guy-in-corner
                                               'current_event', # event guy-in-corner
                                               'current_event_store', # event store open
+                                              'current_event_no_store', # event store not open
                                               'current_quarry_contest', # (obsolete) legacy regional quarry tournament
                                               'current_trophy_pve_challenge', # (obsolete) PvE trophy tournament
                                               'current_trophy_pvp_challenge', # PvP point tournament
@@ -3157,6 +3203,7 @@ def check_store_sku(sku_name, sku):
                     expect_library_preds.add(root + ('_unlocked_L%d' % level))
             else: # non-per-level blueprint
                 expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_unlocked')
+                expect_library_preds.add(sku['item'][:-len('_blueprint')]+'_available')
 
 
     for PRED in ('activation', 'requires', 'collected', 'show_if'):
@@ -3410,6 +3457,13 @@ def check_adnetwork(name, data):
         error |= check_predicate(evdata['predicate'], reason='adnetwork:'+name)
     return error
 
+def check_notification(name, data):
+    error = 0
+    reason = 'notification:%s' % name
+    if 'on_send' in data:
+        error |= check_consequent(data['on_send'], reason=reason+':on_send')
+    return error
+
 def check_promo_codes(promo_codes):
     error = 0
     for name, data in promo_codes.iteritems():
@@ -3535,7 +3589,8 @@ def main(args):
     for name, data in gamedata['spells'].iteritems():
         error |= check_spell('spell:'+name, data)
 
-    error |= check_leaderboard(gamedata['strings']['leaderboard'])
+    error |= check_leaderboard_client(gamedata['strings']['leaderboard'])
+    error |= check_leaderboard_server(gamedata['leaderboard'])
 
     for name, data in gamedata['regions'].iteritems():
         error |= check_region(name, data)
@@ -3583,7 +3638,8 @@ def main(args):
     error |= check_hives_and_raids('hive', gamedata['hives'])
     error |= check_hives_and_raids('raid', gamedata['raids'])
 
-    error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
+    if 'alliance_turf' in gamedata['quarries_client']:
+        error |= check_turf_reward(gamedata['quarries_client']['alliance_turf'].get('reward',{"auras":[]}))
 
     if gamedata['territory'].get('enable_quarry_guards', True) and not gamedata.get('enable_defending_units',1):
         error |= 1; print 'territory.enable_quarry_guards should be off if global enable_defending_units setting is off'
@@ -3715,6 +3771,8 @@ def main(args):
         for COND in 'ui_warning', 'metrics_description':
             if COND in data and not isinstance(data[COND], basestring):
                 error |= check_cond_chain(data[COND], reason = 'loot_tables:'+name+':'+COND)
+        if 'item_for_ui' in data and data['item_for_ui']['spec'] not in gamedata['items']:
+            error |= 1; print 'loot table %s has invalid item_for_ui %r' % (name, data['item_for_ui'])
 
     for name, loot in gamedata.get('lottery_slot_tables',{}).iteritems():
         error |= check_loot_table(loot, reason='lottery_slot_tables:'+name)
@@ -3795,6 +3853,10 @@ def main(args):
         error |= check_adnetwork(name, data)
 
     error |= check_loading_screens(gamedata['loading_screens'])
+
+
+    for name, data in gamedata['fb_notifications']['notifications'].iteritems():
+        error |= check_notification(name, data)
 
     # this must come last, because it depends on required_art_assets being filled out by previous code
     error |= check_art(gamedata['art'],

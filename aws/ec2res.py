@@ -6,8 +6,9 @@
 
 # this is a raw standalone script that does not depend on a game checkout
 
-import sys, os, time, calendar, getopt
+import sys, time, datetime, calendar, getopt
 import boto.ec2, boto.rds2
+import boto3
 
 time_now = int(time.time())
 
@@ -26,18 +27,43 @@ class ANSIColor:
     @classmethod
     def yellow(self, x): return self.YELLOW+x+self.ENDC
 
-def decode_time(amztime):
+# Amazon API string time to UTC timestamp
+def decode_time_string(amztime):
     return calendar.timegm(time.strptime(amztime.split('.')[0], '%Y-%m-%dT%H:%M:%S'))
 
+# datetime to UTC timestamp
+
+# come on Python, really?
+ZERO = datetime.timedelta(0)
+class StupidPythonUTC(datetime.tzinfo):
+    def utcoffset(self, dt): return ZERO
+    def tzname(self, dt): return "UTC"
+    def dst(self, dt): return ZERO
+stupid_python_utc = StupidPythonUTC()
+
+def decode_time_datetime(dt):
+    ret = dt - datetime.datetime(1970, 1, 1, tzinfo=stupid_python_utc)
+    if hasattr(ret, 'total_seconds'):
+        return ret.total_seconds()
+    # Python 2.6 compatibility
+    return (ret.microseconds + (ret.seconds + ret.days * 24 * 3600) * 10**6) / 10**6
+
 def ec2_inst_is_vpc(inst): return (inst.vpc_id is not None)
-def ec2_res_is_vpc(res): return ('VPC' in res.description)
+def ec2_res_is_vpc(res): return ('VPC' in res['ProductDescription'])
 
 # return true if this reservation can cover this instance
 def ec2_res_match(res, inst):
-    return res.instance_type == inst.instance_type and \
+    if res['Scope'] == 'Availability Zone':
+        if res['AvailabilityZone'] != inst.placement:
+            return False
+    elif res['Scope'] == 'Region':
+        pass
+    else:
+        raise Exception('unknown scope for %r' % res)
+
+    return res['InstanceType'] == inst.instance_type and \
            ec2_res_is_vpc(res) == ec2_inst_is_vpc(inst) and \
-           res.availability_zone == inst.placement and \
-           res.state == 'active'
+           res['State'] == 'active'
 
 def rds_product_engine_match(product, engine):
     return (product, engine) in (('postgresql','postgres'),
@@ -60,31 +86,39 @@ def rds_res_match(res, inst, rds_offerings):
            res['MultiAZ'] == inst['MultiAZ']
 
 def pretty_print_ec2_res_price(res):
-    yearly = float(res.fixed_price) * (365*86400)/float(res.duration)
-    for charge in res.recurring_charges:
-        assert charge.frequency == 'Hourly'
-        yearly += float(charge.amount) * (365*24)
-    yearly += float(res.usage_price) * (365*24) # ???
+    yearly = float(res['FixedPrice']) * (365*86400)/float(res['Duration'])
+    for charge in res['RecurringCharges']:
+        assert charge['Frequency'] == 'Hourly'
+        yearly += float(charge['Amount']) * (365*24)
+    yearly += float(res['UsagePrice']) * (365*24) # ???
     return '$%.0f/yr' % yearly
 
+def pretty_print_ec2_res_where(res):
+    if res['Scope'] == 'Region':
+        return '(region)'
+    elif res['Scope'] == 'Availability Zone':
+        return res['AvailabilityZone']
+    else:
+        raise Exception('unknown where %r' % res)
+
 def pretty_print_ec2_res(res, override_count = None, my_index = None):
-    assert res.state == 'active'
-    lifetime = decode_time(res.start) + res.duration - time_now
+    assert res['State'] == 'active'
+    lifetime = decode_time_datetime(res['Start']) + res['Duration'] - time_now
     days = lifetime//86400
     is_vpc = '--VPC--' if ec2_res_is_vpc(res) else 'Classic'
-    if my_index is not None and res.instance_count > 1:
-        count = ' (%d of %d)' % (my_index+1, res.instance_count)
+    if my_index is not None and res['InstanceCount'] > 1:
+        count = ' (%d of %d)' % (my_index+1, res['InstanceCount'])
     else:
-        instance_count = override_count if override_count is not None else res.instance_count
+        instance_count = override_count if override_count is not None else res['InstanceCount']
         count = ' (x%d)' % instance_count if (instance_count!=1 or override_count is not None) else ''
-    return '%-10s %-7s %-22s %10s  %3d days left' % (res.availability_zone, is_vpc, res.instance_type+count, pretty_print_ec2_res_price(res), days)
+    return '%-10s %-7s %-22s %10s  %3d days left' % (pretty_print_ec2_res_where(res), is_vpc, res['InstanceType']+count, pretty_print_ec2_res_price(res), days)
 
 def pretty_print_ec2_res_id(res):
-    return res.id.split('-')[0]+'...'
+    return res['ReservedInstancesId'].split('-')[0]+'...'
 
 def pretty_print_ec2_instance(inst):
     is_vpc = '--VPC--' if ec2_inst_is_vpc(inst) else 'Classic'
-    return '%-16s %-10s %-7s %-16s' % (inst.tags['Name'], inst.placement, is_vpc, inst.instance_type)
+    return '%-24s %-10s %-7s %-11s' % (inst.tags['Name'], inst.placement, is_vpc, inst.instance_type)
 
 def pretty_print_rds_offering_price(offer):
     yearly = float(offer['FixedPrice']) * (365*86400)/float(offer['Duration'])
@@ -112,7 +146,7 @@ def pretty_print_rds_res(res, rds_offerings, override_count = None, my_index = N
                                                    days)
 
 def pretty_print_rds_instance(inst):
-    return '%-16s %-10s %s %-16s %-12s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], pretty_print_multiaz(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
+    return '%-16s %-10s %s %-13s %-8s' % (inst['DBInstanceIdentifier'], inst['AvailabilityZone'], pretty_print_multiaz(inst['MultiAZ']), inst['DBInstanceClass'], inst['Engine'])
 
 def get_rds_res_offerings(rds):
     ret = {}
@@ -135,10 +169,11 @@ if __name__ == '__main__':
         elif key == '--region': region = val
 
     conn = boto.ec2.connect_to_region(region)
+    conn3 = boto3.client('ec2')
     rds = boto.rds2.connect_to_region(region)
 
     ec2_instance_list = conn.get_only_instances()
-    ec2_res_list = conn.get_all_reserved_instances()
+    ec2_res_list = conn3.describe_reserved_instances(Filters = [{'Name':'state','Values':['active']}])['ReservedInstances']
     ec2_status_list = conn.get_all_instance_status()
 
     rds_instance_list = rds.describe_db_instances()['DescribeDBInstancesResponse']['DescribeDBInstancesResult']['DBInstances']
@@ -152,7 +187,7 @@ if __name__ == '__main__':
     rds_instance_list.sort(key = lambda x: x['DBInstanceIdentifier'])
 
     # disregard expired reservations
-    ec2_res_list = filter(lambda x: x.state=='active', ec2_res_list)
+    ec2_res_list = filter(lambda x: x['State']=='active', ec2_res_list)
     rds_res_list = filter(lambda x: x['State']=='active', rds_res_list)
 
     # maps instance ID -> reservation
@@ -160,17 +195,17 @@ if __name__ == '__main__':
     rds_res_coverage = dict((inst['DBInstanceIdentifier'], None) for inst in rds_instance_list)
 
     # maps reservation ID -> instances
-    ec2_res_usage = dict((res.id, []) for res in ec2_res_list)
+    ec2_res_usage = dict((res['ReservedInstancesId'], []) for res in ec2_res_list)
     rds_res_usage = dict((res['ReservedDBInstanceId'], []) for res in rds_res_list)
 
     # figure out which instances are covered
     for res in ec2_res_list:
-        for i in xrange(res.instance_count):
+        for i in xrange(res['InstanceCount']):
             for inst in ec2_instance_list:
                 if ec2_res_coverage[inst.id]: continue # instance already covered
                 if ec2_res_match(res, inst):
                     ec2_res_coverage[inst.id] = res
-                    ec2_res_usage[res.id].append(inst)
+                    ec2_res_usage[res['ReservedInstancesId']].append(inst)
                     break
 
     for res in rds_res_list:
@@ -191,7 +226,7 @@ if __name__ == '__main__':
                 if stat.id not in ec2_instance_status: ec2_instance_status[stat.id] = []
                 msg = event.description
                 for timestring in (event.not_before,): # event.not_after):
-                    ts = decode_time(timestring)
+                    ts = decode_time_string(timestring)
                     days_until = (ts - time_now)//86400
                     st = time.gmtime(ts)
                     msg += ' in %d days (%s/%d)' % (days_until, st.tm_mon, st.tm_mday)
@@ -201,7 +236,7 @@ if __name__ == '__main__':
     for inst in ec2_instance_list:
         res = ec2_res_coverage[inst.id]
         if res:
-            my_index = ec2_res_usage[res.id].index(inst)
+            my_index = ec2_res_usage[res['ReservedInstancesId']].index(inst)
             print ANSIColor.green(pretty_print_ec2_instance(inst)+' '+pretty_print_ec2_res(res, my_index = my_index)), pretty_print_ec2_res_id(res),
         else:
             print ANSIColor.red(pretty_print_ec2_instance(inst)+' NOT COVERED'),
@@ -212,12 +247,12 @@ if __name__ == '__main__':
     ec2_any_unused = False
     print 'EC2 UNUSED RESERVATIONS:',
     for res in ec2_res_list:
-        use_count = len(ec2_res_usage[res.id])
-        if use_count >= res.instance_count: continue
+        use_count = len(ec2_res_usage[res['ReservedInstancesId']])
+        if use_count >= res['InstanceCount']: continue
         if not ec2_any_unused:
             print
             ec2_any_unused = True
-        print ANSIColor.red(pretty_print_ec2_res(res, override_count = res.instance_count - use_count)), pretty_print_ec2_res_id(res)
+        print ANSIColor.red(pretty_print_ec2_res(res, override_count = res['InstanceCount'] - use_count)), pretty_print_ec2_res_id(res)
     if not ec2_any_unused:
         print '(none)'
 

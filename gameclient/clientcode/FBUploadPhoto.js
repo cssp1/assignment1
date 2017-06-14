@@ -89,9 +89,67 @@ FBUploadPhoto.upload = function(dataURI, ui_filename, caption, privacy, post_sto
     var props = goog.object.clone(metric_props);
     metric_event('7272_photo_upload_attempted', props);
 
-    goog.net.XhrIo.send(url,
-                        (function (_cb, _metric_props, _caption) { return function(event) { FBUploadPhoto.on_response(event, _cb, _metric_props, _caption); }; })(callback, metric_props, caption),
-                        'POST', fd);
+    // As of 2017 March 19, Facebook requires some kind of cookie on client-side
+    // requests in order to avoid the AppSecret Proof requirement. This means
+    // we have to use a "withCredentials" AJAX request to send the cookies.
+    // This results in a successful post, however, Facebook doesn't respond with
+    // the right Access-Control headers so our code never sees the result.
+
+    if(gamedata['client']['post_screenshot_method'] === 'FacebookSDK') {
+        // try using Facebook's own SDK to make the call
+        SPFB.api('/me/photos',
+                 'POST',
+                 {'privacy': {'value': privacy},
+                  'caption': caption,
+                  'no_story': (post_story ? false : true),
+                  'file': img_blob},
+                 (function (_cb, _metric_props, _caption) { return function(data) {
+                     if(!data['id']) {
+                         console.log(data);
+                         return;
+                     }
+                     var props = goog.object.clone(_metric_props);
+                     props['photo_id'] = data['id'];
+                     if(data['post_id']) { props['post_id'] = data['post_id']; }
+                     if(_caption) { props['caption'] = _caption; }
+                     metric_event('7273_photo_upload_completed', props);
+                     if(_cb) { _cb(true); }
+                 }; })(callback, metric_props, caption)
+                );
+    } else if(gamedata['client']['post_screenshot_method'] === 'ajax_withCredentials') {
+        // fire-and-forget AJAX call with withCredentials option. Won't get a response,
+        // but we'll just trust that it worked...
+        // This WILL cause a red error message about Access-Control-Allow options in the console.
+        var state = {cb: callback,
+                     metric_props: metric_props,
+                     caption: caption,
+                     fired: false};
+        var completion = (function (_state) { return function() {
+            if(_state.fired) { return; }
+            _state.fired = true;
+            var props = goog.object.clone(_state.metric_props);
+            props['photo_id'] = 'unknown';
+            if(_state.caption) { props['caption'] = _state.caption; }
+            metric_event('7273_photo_upload_completed', props);
+            if(_state.cb) { _state.cb(true); }
+        }; })(state);
+
+        goog.net.XhrIo.send(url, completion,
+                            'POST', // method
+                            fd, // content
+                            null, // headers
+                            0, // timeoutInterval
+                            true // withCredentials
+                           );
+        // always call completion within a few seconds, even if the call above fails
+        window.setTimeout(completion, 3000);
+
+    } else {
+        // regular old method
+        goog.net.XhrIo.send(url,
+                            (function (_cb, _metric_props, _caption) { return function(event) { FBUploadPhoto.on_response(event, _cb, _metric_props, _caption); }; })(callback, metric_props, caption),
+                            'POST', fd);
+    }
 };
 
 /** @param {goog.events.Event} event

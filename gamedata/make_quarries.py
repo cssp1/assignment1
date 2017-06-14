@@ -52,8 +52,9 @@ if __name__ == '__main__':
         out = copy.copy(quarries)
         out['templates'] = {} # out-out, include everything, but clean out 'templates'
 
-    if 'alliance_turf' in quarries:
-        out['alliance_turf'] = quarries['alliance_turf']
+    for PROP in ('alliance_turf', 'alliance_bonuses'):
+        if PROP in quarries:
+            out[PROP] = quarries[PROP]
 
     ids = sorted(quarries['templates'].keys())
     for id in ids:

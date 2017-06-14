@@ -9,8 +9,6 @@
 
 "friend_invite_prompt_interval": 432000, // interval between (on login) prompts to invite Facebook friends
 
-"enable_post_screenshot": 1, // enable Post Screenshot (on Facebook) feature
-
 "max_astar_queries_per_tick": 2,
 
 // max number of iterations for A* search, stops pathological cases (units trying to path outside of locked "corrals")
@@ -19,6 +17,7 @@
 "astar_iter_limit": { "pvp": 500, "pve": 10000 },
 
 "enable_upgrade_bar": 1,
+"enable_inventory_restack": 1,
 
 // show "Protection or Home" when applicable on battle history dialog.
 "battle_history_show_attackability": 1,

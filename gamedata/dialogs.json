@@ -205,25 +205,33 @@
     },
 
     "confirm_cancel_dialog": {
-        "dimensions": [451, 151],
+        "dimensions": [451, 171],
         "default_button": "ok_button",
         "widgets": {
-            "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[451,171], "asset": "dialog_resizable", "bg_image_resizable": 1 },
+            "sunken_left": {"kind": "StaticImage", "xy":[9,11], "dimensions":[72,96], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "valentina": { "kind": "StaticImage", "xy": [9,23], "dimensions": [72,72], "clip_to": [13,23,65,72], "asset": "valentina_72x72" },
+            "sunken_right": {"kind": "StaticImage", "xy":[89,11], "dimensions":[352,96], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "title":  { "kind": "TextField", "xy": [108,19], "dimensions": [300, 24], "text_style": "bold", "text_hjustify": "left", "ui_name": "Confirm" },
             "close_button": { "kind": "ActionButton", "xy": [424,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
             "description": { "kind": "TextField", "xy": [108,43], "dimensions": [300,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15,
                              "text_vjustify": "top",
                              "ui_name_upgrade": "Are you sure you want to cancel this upgrade?\nOnly half of your resources will be returned.",
+                             "ui_name_enhance": "Are you sure you want to cancel this upgrade?\nOnly half of your resources will be returned.",
                              "ui_name_research": "Are you sure you want to cancel this research?\nOnly half of your resources will be returned.",
                              "ui_name_crafting": "Are you sure you want to cancel production?\nOnly half of your resources will be returned.",
-                             "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress."
+                             "ui_name_crafting_turret_head": "Are you sure? The weapon will be lost, and only half of your resources will be returned.",
+                             "ui_name_fishing": "Are you sure you want to cancel this dispatch?\nCanceling this dispatch discards its progress.",
+                             "ui_name_ingredient_loss": "Items used for this upgrade will NOT be returned."
                            },
-            "ok_button": { "kind": "ActionButton", "xy": [308,110], "dimensions": [134,28],
+            "ok_button": { "kind": "ActionButton", "xy": [308,130], "dimensions": [134,28],
                            "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                            "ui_name_upgrade": "Cancel Upgrade",
+                           "ui_name_enhance": "Cancel Upgrade",
                            "ui_name_research": "Cancel Research",
                            "ui_name_crafting": "Cancel Work",
+                           "ui_name_crafting_turret_head": "Destroy Weapon",
                            "ui_name_fishing": "Cancel Dispatch" }
         }
     },
@@ -249,7 +257,7 @@
             "title_research":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Laboratory Is Busy" },
             "title_enhance":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
-                                 "ui_name": "Building Is Busy" },
+                                "ui_name": "Building Is Busy" },
             "title_crafting":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                                  "ui_name": "Building Is Busy" },
             "title_removing":  { "show": 0, "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
@@ -484,16 +492,21 @@
                        "layout": {"resizable":1} },
 
             "title": { "kind": "TextField", "xy": [30,10], "dimensions": [221, 41], "text_size": 24, "text_style": "thick", "text_hjustify": "left",
-                       "ui_name": "Confirm Deletion" },
+                       "ui_name": "Confirm Deletion", "ui_name_refund": "Confirm Trade-in" },
             "description": { "kind": "RichTextField", "xy": [34,71], "dimensions": [290, 41], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "text_vjustify": "top",
                              "resize_to_fit_text": 1,
-                             "ui_name": "Are you SURE you want to delete these valuable items PERMANENTLY? There is no way to get them back!\n\n[b][color=#ff8000]%thing[/color][/b]\n\nTo confirm, type \"DELETE\" into the box below and then click \"Confirm\".", "layout": {"vresizable": 1} },
+                             "ui_name": "Are you SURE you want to delete these valuable items PERMANENTLY? There is no way to get them back!\n\n[b][color=#ff8000]%thing[/color][/b]\n\nTo confirm, type \"DELETE\" into the box below and then click \"Confirm\".",
+                             "ui_name_refund": "Are you SURE you want to trade in these valuable items PERMANENTLY? There is no way to get them back!\n\n[b][color=#ff8000]%thing[/color][/b] for %refund\n\nTo confirm, type \"TRADE\" into the box below and then click \"Confirm\".",
+                             "layout": {"vresizable": 1} },
 
             "input_bg": { "kind": "StaticImage", "xy": [30,147], "dimensions": [297,31], "asset": "dialog_sunken_white_resizable", "bg_image_resizable": 1, "layout": {"vjustify": "bottom"} },
             "input": { "kind": "TextInput", "xy": [38,148], "dimensions": [287,30], "text_size": 15, "text_hjustify": "left",
                        //"clip_to": [38,145,287,36], // doesn't work with resizing
                        "max_chars": 6, "disallowed_chars": ["\"","'"],
-                       "text_color": [0,0,0,1], "blank_on_enter": false, "require_string": "DELETE", "layout": {"vjustify": "bottom"} },
+                       "text_color": [0,0,0,1], "blank_on_enter": false,
+                       "require_string": "DELETE",
+                       "require_string_refund": "TRADE",
+                       "layout": {"vjustify": "bottom"} },
             "ok_button": { "kind": "ActionButton", "xy": [195,195], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold",
                            "state": "disabled", "ui_name": "Confirm", "layout": {"vjustify": "bottom"}},
             "close_button": { "kind": "ActionButton", "xy": [30,195], "dimensions": [134,28],  "text_size": 13, "text_style": "bold",
@@ -827,6 +840,11 @@
             "user_abtest_message": { "kind": "TextField", "xy": [250,61], "dimensions": [360,21], "drop_shadow": 1,
                                      "text_color": [1,0.5,0,1], "text_size": 13, "text_hjustify": "center" },
 
+            // mutually exclusive with user_abtest_message
+            "network_trouble_message": { "kind": "TextField", "xy": [201,81], "dimensions": [360,21], "drop_shadow": 1,
+                                         "text_color": [1,0,0,1], "text_size": 13, "text_hjustify": "center",
+                                         "ui_name": "Network trouble! Trying to reconnect..." },
+
             "edit_mode_message": { "show": 0, "kind": "TextField", "xy": [4,200], "dimensions": [136,32], "drop_shadow": 1,
                                    "ui_name": "DEV Edit Mode",
                                    "text_color": [1,0.5,0,1], "text_size": 17, "text_hjustify": "center" },
@@ -982,6 +1000,11 @@
             "reset_time_icon": { "kind": "StaticImage", "xy": [325,69], "dimensions": [21,21], "asset": "resource_icon_reset_time" },
             "reset_time_amount": { "kind": "TextField", "xy": [356,69], "dimensions": [75,21], "ui_name": "xxm xxs", "text_size": 13,
                                    "text_hjustify": "center" },
+
+            "network_trouble_message": { "kind": "TextField", "xy": [201,81], "dimensions": [360,21], "drop_shadow": 1,
+                                         "text_color": [1,0,0,1], "text_size": 13, "text_hjustify": "center",
+                                         "ui_name": "Network trouble! Trying to reconnect..." },
+
             "edit_mode_micro_message": { "show": 0, "kind": "TextField", "xy": [245,100], "dimensions": [370,21], "drop_shadow": 1,
                                          "ui_name": "You are in DEV Edit Mode - unit micro ENABLED for testing purposes!",
                                          "text_color": [1,0,0,1], "text_size": 17, "text_hjustify": "center" }
@@ -1265,7 +1288,7 @@
                     "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset":[0,-53] },
 
             "unit": { "kind": "ActionButton", "xy": [0,0], "dimensions": [57,57], "bg_image_offset": [0,3], "bg_image_justify": "center",
-                      "bg_image": "inventory_unknown", "state": "icon" },
+                      "state": "icon" },
             "counter": { "kind": "TextField", "xy": [0,74], "dimensions": [59,19],
                          "text_size": 13, "text_style": "bold", "ui_name": "99/99" },
             "cancel": { "kind": "ActionButton", "xy": [39,1], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1},
@@ -2174,6 +2197,9 @@
             "label_new": { "kind": "TextField", "xy": [211,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon:" },
             "label_new_detail": { "kind": "TextField", "xy": [360,74], "dimensions": [714,33], "text_size": 13, "text_hjustify": "left", "ui_name": "New Weapon Detail:" },
 
+            "label_downleveled": { "kind": "TextField", "xy": [360,74], "dimensions": [342,33], "text_size": 13, "text_hjustify": "right", "ui_name": "* Max level limited by Quarry size", "text_color":[1,1,0], "show": 0 },
+
+
             "recipe_slot": { "kind": "ActionButton", "xy": [213,126], "dimensions": [50,50], "bg_image": "inventory_slot",
                              "array": [2,3], "array_offset": [59,57] },
             "recipe_icon": { "kind": "StaticImage", "xy": [213,126], "dimensions": [50,50],
@@ -2283,7 +2309,7 @@
                            "ui_tooltip": "%QTY %RES needed to mount this weapon", "tooltip_delay": 0, "fixed_tooltip_offset": [250,73] },
 
             "resource_power_icon": { "kind": "StaticImage", "xy": [250,72], "dimensions": [21,21], "asset": "resource_icon_power" },
-            "cost_power": { "kind": "TextField", "xy": [250,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+            "cost_power": { "kind": "TextField", "xy": [250,72], "dimensions": [100,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
                             "ui_tooltip": "%AFTER power needed after mounting\n%DURING power needed during mounting process\n(Current weapon power usage: %CUR)",
                             "ui_tooltip_maxlevel": "Power needed", "tooltip_delay": 0, "fixed_tooltip_offset": [250,102] },
 
@@ -2605,7 +2631,10 @@
                                         "full_color": [0.189,0.710,0.905,1],
                                         "empty_color": [0.3,0.3,0.3,1] },
             "in_production_time": { "kind": "TextField", "xy": [296,349], "dimensions": [103,17], "text_size": 13,
-                                    "text_hjustify": "left", "text_style": "bold", "ui_name": "" },
+                                    "text_hjustify": "left", "text_style": "bold" },
+            "in_production_level": { "show": 0, "kind": "TextField", "xy": [296,284], "dimensions": [103,17], "text_size": 13,
+                                     "text_hjustify": "left", "ui_name": "L%d" },
+
             "in_production_cancel": { "kind": "ActionButton", "xy": [382,270], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1},
 
             // manufacturing queue
@@ -2623,6 +2652,10 @@
             "queue_counter": { "kind": "ActionButton", "xy": [447,307], "dimensions": [24,19],
                                "text_size": 13, "text_style": "bold",
                                "array": [4,1], "array_offset": [64,0] },
+            "queue_level": { "show": 0, "kind": "ActionButton", "xy": [447,272], "dimensions": [24,19],
+                             "text_size": 13, "ui_name": "L%d", "drop_shadow": 1,
+                             "array": [4,1], "array_offset": [64,0] },
+
             "queue_cancel": { "kind": "ActionButton", "xy": [483,272], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                               "array": [4,1], "array_offset": [64,0] },
 
@@ -2658,7 +2691,7 @@
                              "transparent_to_mouse": false },
             "coverup_queue": { "show": 0, "kind": "SolidRect", "xy": [285,256], "dimensions": [428,150], "color": [0.0354,0.0517,0.0797,1] },
             "click_to_produce_arrow": { "show": 0, "kind": "StaticImage", "xy": [293,120], "dimensions": [69,46], "asset": "tutorial_arrow_left" },
-            "click_to_produce": { "show": 0, "kind": "TextField", "xy":[292,120], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "Click on unit to %VERB" },
+            "click_to_produce": { "show": 0, "kind": "TextField", "xy":[292,110], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "Click unit to %VERB\n(Click more than once to queue)" },
             "click_to_unlock": { "show": 0, "kind": "TextField", "xy":[292,287], "dimensions": [410,46], "text_size": 15, "text_style": "bold", "ui_name": "This unit is locked" },
             "click_to_unlock_button": { "show": 0, "kind": "ActionButton", "xy":[430,343], "dimensions": [134,28], "text_size": 13, "text_style": "bold", "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Unlock" }
         }
@@ -2676,6 +2709,7 @@
             "title_bold": { "kind": "TextField", "xy": [30,8], "dimensions": [123, 48], "text_size": 30, "text_style": "bold",
                             "text_hjustify": "center",
                             "ui_name": "Upgrade",
+                            "ui_name_research": "Research",
                             "ui_name_unlock": "Unlock",
                             "ui_name_stats": "Stats" },
 
@@ -2710,8 +2744,12 @@
                         "ui_name_unmodified": "No Mod", "ui_name_mod": "Mod L%d",
                         "ui_name": "Level %d",
                         "array": [2,1], "array_offset": [67,0] },
-            "upgrade_info_button": {"kind": "ActionButton", "xy":[234,75], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1, "show": 0 },
 
+            "upgrade_info_button": {"kind": "ActionButton", "xy":[234,75], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1, "show": 0 },
+            // mutually exclusive with upgrade_info_button
+            "webstats_button": {"kind": "RichTextField", "xy":[244,75], "dimensions":[86,26],
+                                "text_size": 13,
+                                "ui_name": "[color=#ffff00][u]More stats...[/u][/color]", "show": 0 },
 
             "col0,": { "kind": "TextField", "xy": [50,100], "dimensions": [58,18], "text_size": 13, "text_hjustify": "right", "delta_color": [1.0,0.5,0.05,1],
                        "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [35,132],
@@ -2776,38 +2814,46 @@
                             "show": 0
                           },
 
-            "requirements": { "kind": "TextField", "xy": [588,78], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
+            "requirements": { "kind": "TextField", "xy": [588,75], "dimensions": [135,26], "text_size": 13, "text_style": "thick", "text_hjustify": "left", "ui_name": "REQUIREMENTS" },
 
-            "resource_water_button": { "kind": "ActionButton", "xy": [543,111], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_water_icon": { "kind": "StaticImage", "xy": [578,110], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
-            "cost_water": { "kind": "TextField", "xy": [578,110], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
+            "resource_water_button": { "kind": "ActionButton", "xy": [543,103], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_water_icon": { "kind": "StaticImage", "xy": [578,102], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
+            "cost_water": { "kind": "TextField", "xy": [578,102], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
                             "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [570,144], "show": 0 },
 
 
-            "resource_iron_button": { "kind": "ActionButton", "xy": [543,136], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_iron_icon": { "kind": "StaticImage", "xy": [578,135], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
+            "resource_iron_button": { "kind": "ActionButton", "xy": [543,128], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_iron_icon": { "kind": "StaticImage", "xy": [578,127], "dimensions": [21,21], "asset": "resource_icon_iron", "show": 0 },
 
-            "cost_iron": { "kind": "TextField", "xy": [578,135], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
+            "cost_iron": { "kind": "TextField", "xy": [578,127], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx,xxx,xxx",
                            "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [570,169], "show": 0 },
 
 
-            "resource_power_button": { "kind": "ActionButton", "xy": [543,161], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "resource_power_icon": { "kind": "StaticImage", "xy": [578,160], "dimensions": [21,21], "asset": "resource_icon_power" },
-            "cost_power": { "kind": "TextField", "xy": [578,160], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "xxx",
-                            "ui_tooltip": "Shows power needed after upgrade\nCurrent power usage: %CUR\nPower needed during upgrade: %DURING",
+            "resource_power_button": { "kind": "ActionButton", "xy": [543,153], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "resource_power_icon": { "kind": "StaticImage", "xy": [578,152], "dimensions": [21,21], "asset": "resource_icon_power" },
+            "cost_power": { "kind": "TextField", "xy": [578,152], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left", "ui_name": "%AFTER (%DELTA)",
+                            "ui_tooltip": "Current power usage: %CUR\nPower needed during upgrade: %DURING\nPower needed after upgrade: %AFTER",
                             "ui_tooltip_maxlevel": "Power needed",
                             "tooltip_delay": 0, "fixed_tooltip_offset": [500,194], "fixed_tooltip_offset_maxlevel": [590,194]
                           },
 
-            "resource_res3_button": { "kind": "ActionButton", "xy": [619,111], "dimensions": [0,0], "show": 0 }, // placeholder for code only
-            "resource_res3_icon": { "kind": "StaticImage", "xy": [654,110], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
+            "resource_res3_button": { "kind": "ActionButton", "xy": [619,103], "dimensions": [0,0], "show": 0 }, // placeholder for code only
+            "resource_res3_icon": { "kind": "StaticImage", "xy": [654,102], "dimensions": [21,21], "asset": "resource_icon_water", "show": 0 },
 
-            "cost_res3": { "kind": "TextField", "xy": [654,110], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
+            "cost_res3": { "kind": "TextField", "xy": [654,102], "dimensions": [136,21], "text_offset": [31,0], "text_size": 13, "text_hjustify": "left",
                            "ui_tooltip": "%QTY %RES needed for upgrade", "tooltip_delay": 0, "fixed_tooltip_offset": [646,144], "show": 0 },
 
+            "requirements_item_status": { "kind": "SolidRect", "xy": [576,253], "dimensions": [54,54],
+                                          "outline_width": 1,
+                                          "color_present": [0,1,0,0.5],
+                                          "color_missing": [1,0,0,0.5],
+                                          "array": [2,1], "array_offset": [66,0] },
+            "requirements_item": { "kind": "Dialog", "dialog": "item_display", "xy": [578,255], "dimensions": [50,50],
+                                   "ui_tooltip": "Item required in Warehouse: %ITEM",
+                                   "array": [2,1], "array_offset": [66,0] },
 
-            "predicate_help_button": { "kind": "ActionButton", "xy": [543,194], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
-            "requirements_text":  { "kind": "TextField", "xy": [574,196], "dimensions": [140,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
+            "predicate_help_button": { "kind": "ActionButton", "xy": [543,178], "dimensions": [22,20], "bg_image": "resource_bar_add_button", "show": 0 },
+            "requirements_text":  { "kind": "TextField", "xy": [574,179], "dimensions": [140,74], "text_size": 13, "text_leading": 17, "text_hjustify": "left", "text_vjustify": "top",
                                     "ui_name": "Test 1\nTest 2\nTest 3",
                                     "ui_name_needs_repair": "%s needs repair",
                                     "ui_name_busy": "%s busy",
@@ -3124,7 +3170,8 @@
 
             "selected_row": { "kind": "StaticImage", "xy": [45,77], "dimensions": [219,28], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1 },
 
-            "row": { "kind": "ActionButton", "xy": [75,81], "dimensions": [186,24], "text_hjustify": "left", "text_size": 13,
+            "row": { "kind": "ActionButton", "xy": [75,81], "dimensions": [186,24],
+                     "clip_to": [75,81,186,24], "text_hjustify": "left", "text_size": 13,
                      "mouseover_sound": 1, "ui_name": "Mission", "array": [1,11], "array_offset": [0,26], "max_len": 24 },
             "row_icon": { "kind": "StaticImage", "xy": [52,85], "dimensions": [14,14], "asset": "ok_icon",
                           "array": [1,11], "array_offset": [0,26] },
@@ -3136,10 +3183,11 @@
             "attach_rect": { "kind": "SolidRect", "xy": [289,296], "dimensions": [404,105], "color": [0,0,0,0.5], "bevel": 3 },
 
             "from_label": { "kind": "TextField", "xy": [298,80], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "From:" },
-            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13,
+            "from_name": { "kind": "TextField", "xy": [361,80], "dimensions": [304,17], "text_hjustify": "left", "text_size": 13,
                            "clip_to": [361,80,294,21] },
             "subj_label": { "kind": "TextField", "xy": [298,97], "dimensions": [60,17], "text_hjustify": "left", "text_size": 13, "text_color":[0.33,0.33,0.33,1], "ui_name": "Subject:" },
-            "subj_name": { "kind": "TextField", "xy": [361,97], "dimensions": [334,17], "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
+            "subj_name": { "kind": "TextField", "xy": [361,97], "dimensions": [304,17],
+                           "clip_to": [361,97,304,21], "text_hjustify": "left", "text_size": 13, "text_style": "thick" },
 
             "delete_button": { "kind": "ActionButton", "xy":[665,88], "dimensions":[19,19], "push_bg_image":1, "bg_image": "delete_mail_button",
                                "ui_tooltip": "Delete message", "tooltip_delay": 0 },
@@ -3682,41 +3730,43 @@
             "sunken_base": {"kind": "StaticImage", "xy":[40,57], "dimensions":[656,407],
                             "asset": "dialog_sunken_resizable", "bg_image_resizable": 1, "alpha": 0.7 },
 
-            "sunken_top": {"kind": "StaticImage", "xy":[48,63], "dimensions":[640,74], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "sunken_top": {"kind": "StaticImage", "xy":[48,63], "dimensions":[640,124], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
 
             "alliance_logo":  {"kind": "StaticImage", "xy":[63,74], "dimensions":[50,50] },
             "alliance_logo_frame": {"kind": "StaticImage", "xy":[63,74], "dimensions":[50,50], "asset": "inventory_frame", "state": "normal_nohighlight" },
 
-            "alliance_name": { "kind": "TextField", "xy": [126,73], "dimensions": [306, 20], "text_size": 19, "text_style": "thick",
-                               "clip_to": [126,73,306,20],
+            "alliance_name": { "kind": "TextField", "xy": [126,85], "dimensions": [306, 20], "text_size": 19, "text_style": "thick",
+                               "clip_to": [126,85,306,20],
                                "text_hjustify": "left", "ui_name": "-", "ui_name_invalid": "Invalid Alliance" },
-            "join_type": { "kind": "TextField", "xy": [126,97], "dimensions": [145, 17], "text_size": 13, "text_hjustify": "left",
+            "join_type": { "kind": "TextField", "xy": [65,133], "dimensions": [145, 17], "text_size": 13, "text_hjustify": "left",
                            "ui_name": "Type: " },
-            "num_members_label":  { "kind": "TextField", "xy": [280,97], "dimensions": [88, 17], "text_size": 13, "text_hjustify": "right",
+            "num_members_label":  { "kind": "TextField", "xy": [215,133], "dimensions": [88, 17], "text_size": 13, "text_hjustify": "right",
                                     "ui_name": "Members:" },
-            "num_members":        { "kind": "TextField", "xy": [280,97], "dimensions": [132, 17], "text_size": 13, "text_hjustify": "right",
+            "num_members":        { "kind": "TextField", "xy": [215,133], "dimensions": [132, 17], "text_size": 13, "text_hjustify": "right",
                                     "ui_name": "" },
 
             "points_label":  { "show": 0,
-                               "kind": "TextField", "xy": [126,114], "dimensions": [300, 18], "text_size": 13, "text_hjustify": "left",
+                               "kind": "TextField", "xy": [65,150], "dimensions": [300, 18], "text_size": 13, "text_hjustify": "left",
                                "ui_tooltip": "Alliance Tournament Points is a weighted sum of points\ncontributed by individual alliance members.\n\nPoint leaders #1-10 contribute 50% of their Tournament Points\nPoint leaders #11-20 contribute 25% of their Tournament Points\nPoint leaders #21-30 contribute 12% of their Tournament Points\nPoint leaders #31-40 contribute 10% of their Tournament Points\nPoint leaders #41-50 contribute 3% of their Tournament Points", "tooltip_delay": 0,
                                "ui_tooltip_togo": "\n\nTournament ends in %s",
-                               "fixed_tooltip_offset": [100,144],
                                "ui_name": "Alliance Tournament Points:" },
             "points_icon": { "show": 0,
-                             "kind": "StaticImage", "xy": [417,115], "dimensions": [15,15], "asset": "trophy_15x15" },
+                             "kind": "StaticImage", "xy": [352,151], "dimensions": [15,15], "asset": "trophy_15x15" },
             "points":        { "show": 0,
-                               "kind": "TextField", "xy": [280,114], "dimensions": [132, 18], "text_size": 13, "text_hjustify": "right",
+                               "kind": "TextField", "xy": [215,150], "dimensions": [132, 18], "text_size": 13, "text_hjustify": "right",
                                "ui_name": "?" },
 
-            "alliance_description":  { "kind": "TextField", "xy": [437,71], "dimensions": [150, 55], "text_size": 12, "text_hjustify": "left",
-                                       "clip_to": [437,71,150,50],
+            "alliance_description":  { "kind": "TextField", "xy": [395,133], "dimensions": [200, 50], "text_size": 12, "text_hjustify": "left",
+                                       "clip_to": [395,133,200,50],
                                        "text_vjustify": "top" },
 
             "members": { "kind": "Dialog", "dialog": "alliance_member_row",
-                         "xy": [48,143], "array": [1,6], "array_offset": [0,50] },
+                         "xy": [48,193], "array": [1,5], "array_offset": [0,50] },
 
-            "join_button": { "kind": "ActionButton", "xy": [604,85], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "view_battles_button": { "kind": "ActionButton", "xy": [470,70], "dimensions": [120,28],"bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                                     "show": 0, "ui_name": "Battle History"},
+
+            "join_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "show": 0,
                              "ui_name": "Join", "ui_name_request_sent": "Waiting",
                              "ui_tooltip": "", "tooltip_delay": 0,
@@ -3729,10 +3779,10 @@
                              "ui_tooltip_unmet_requirement": "Unmet requirement: %s"
                            },
 
-            "leave_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "leave_button": { "kind": "ActionButton", "xy": [604,70], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                               "show": 0, "ui_name": "Leave", "ui_name_disband": "Disband" },
 
-            "edit_button": { "kind": "ActionButton", "xy": [604,102], "dimensions": [78,28], "bg_image": "action_button_78px", "text_size": 13, "text_style": "bold",
+            "edit_button": { "kind": "ActionButton", "xy": [604,102], "dimensions": [78,28], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
                              "show": 0, "ui_name": "Settings", "ui_tooltip": "", "tooltip_delay": 0 },
 
             "scroll_left": { "kind": "ActionButton", "xy": [13,195], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left_bright", "push_bg_image":1 },
@@ -3976,7 +4026,7 @@
                                   "array": [1,5], "array_offset": [0,56] },
 
             "row_ai_difficulty": {"kind": "TextField", "xy":[315,130], "dimensions": [157,43],"text_size": 13,"text_hjustify":"left","text_vjustify":"top",
-                                  "ui_name_easy":"Easy", "ui_name_medium": "Challenging", "ui_name_hard": "Hard", "ui_name_monstrous": "Monstrous", "ui_name_extreme": "Extreme", "ui_name_obsolete": "Obsolete",
+                                  "ui_name_easy":"Easy", "ui_name_medium": "Challenging", "ui_name_hard": "Hard", "ui_name_monstrous": "Monstrous", "ui_name_extreme": "Extreme", "ui_name_obsolete": "Very Easy",
                                   "show": 0, "array": [1,5], "array_offset": [0,56] },
 
             "row_info_button": {"kind": "ActionButton", "xy":[325,118], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
@@ -4362,6 +4412,13 @@
                   ] } }
             ],
 
+            "fb_share_button": [{ "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
+                                { "type": "SPFX",
+                                  "effect": { "layer": "ui", "translate": [0,3,0], "type": "explosion", "sprite": "fx/glow_static",
+                                              "delay": 1.2, "duration": 1.0, "fade": 0.5,
+                                              "composite_mode": "lighter", "opacity": 0.5, "sprite_scale": [5,1.7], "offset":[0,0,0] }
+                                }],
+            "fb_share_icon": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
 
             //////////////////////////////////////////////////////////////////////////////////////////////
             //   WINNER / LOSER effects
@@ -4394,10 +4451,6 @@
             //   KILLS & LOSSES
             //////////////////////////////////////////////////////////////////////////////////////////////
 
-            "units_killed_label": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
-            "units_lost_label": { "type": "fadein", "start_time": 1.4, "end_time": 1.6 },
-            "units_killed": { "type": "same_as", "ref": "units_killed_label" },
-            "units_lost": { "type": "same_as", "ref": "units_lost_label" },
             "battle_stars_bg": { "type": "fadein", "start_time": 1.2, "end_time": 1.4 },
             "battle_stars_base_damage": { "type": "same_as", "ref": "battle_stars_bg", "delay": 0.2 },
             "battle_stars_hole0": { "type": "same_as", "ref": "battle_stars_bg", "delay": 0.3 },
@@ -4425,11 +4478,9 @@
             //          "separator_btm": { "type": "same_as", "ref": "separator_top" },
 
 
-            "row_name": { "type": "same_as", "ref": "you_gained", "delay": 0.2 },
-            "row_defense": [{"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
-                            { "type": "same_as", "ref": "row_name" }],
+            "row_battle_stats": [// not supported with RichTextField: {"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
+                { "type": "fadein", "start_time": 2.5, "end_time": 3.0 }],
 
-            "row_bullet": { "type": "same_as", "ref": "row_name" },
             "row_water_icon": { "type": "same_as", "ref": "loot_xp_icon", "delay": 0.2 },
             "row_water_amount": { "type": "same_as", "ref": "loot_xp_amount", "delay": 0.2 },
             "row_iron_icon": { "type": "same_as", "ref": "row_water_icon" },
@@ -4444,22 +4495,15 @@
             //          "total_iron_amount": { "type": "same_as", "ref": "total_water_amount" },
             "you_spent": { "type": "same_as", "ref": "you_gained", "delay": 0.9 },
 
-            "spent_unit0,0": [{ "type": "fadein", "start_time": 2.0, "end_time": 2.2 },
-                              { "type": "transform", "start_time": 1.2, "end_time": 2.4,
-                                "start_transform": [4,0,0,4,-10,-10]}],
+            "spent_unit0": [{ "type": "fadein", "start_time": 2.0, "end_time": 2.2 },
+                            { "type": "transform", "start_time": 1.2, "end_time": 2.4,
+                              "start_transform": [4,0,0,4,-10,-10]}],
 
-            "spent_unit1,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.2 },
-            "spent_unit2,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.4 },
-            "spent_unit3,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.6 },
-            "spent_unit4,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.8 },
-            "spent_unit5,0": { "type": "same_as", "ref": "spent_unit0,0", "delay": 1.0 },
-
-            "spent_unit0,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.1 },
-            "spent_unit1,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.3 },
-            "spent_unit2,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.5 },
-            "spent_unit3,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.7 },
-            "spent_unit4,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 0.9 },
-            "spent_unit5,1": { "type": "same_as", "ref": "spent_unit0,0", "delay": 1.1 },
+            "spent_unit1": { "type": "same_as", "ref": "spent_unit0", "delay": 0.2 },
+            "spent_unit2": { "type": "same_as", "ref": "spent_unit0", "delay": 0.4 },
+            "spent_unit3": { "type": "same_as", "ref": "spent_unit0", "delay": 0.6 },
+            "spent_unit4": { "type": "same_as", "ref": "spent_unit0", "delay": 0.8 },
+            "spent_unit5": { "type": "same_as", "ref": "spent_unit0", "delay": 1.0 },
 
             "trophy_label": { "type": "same_as", "ref": "row_water_icon", "delay": 0.2 },
             "trophy_bg": [{ "type": "same_as", "ref": "trophy_label", "delay": 0 },
@@ -4566,72 +4610,61 @@
             "winner_portrait_frame": {"kind": "StaticImage", "xy":[229,46], "dimensions":[50,50], "asset": "dialog_portrait_frame" },
             "loser_portrait_frame": {"kind": "StaticImage", "xy":[229,92], "dimensions":[50,50], "asset": "dialog_portrait_frame" },
 
-            "winner_glow": { "kind": "StaticImage", "xy": [276,45], "dimensions": [287,48], "asset": "dialog_glow_thinner",
+            "winner_glow": { "kind": "StaticImage", "xy": [276,45], "dimensions": [247,48], "asset": "dialog_glow_thinner",
                              "bg_image_resizable": 1, "opacity": 0.4, "composite_mode": "lighter"},
-            "winner_bg": { "kind": "SolidRect", "xy": [287,56], "dimensions": [265,26], "color": [0.03,0.03,0.03,1], "bevel": 3 },
-            "winner_inner": { "kind": "SolidRect", "xy": [290,60], "dimensions": [259,18], "color": [0.9,0.9,0.9,1], "bevel": 2 },
+            "winner_bg": { "kind": "SolidRect", "xy": [287,56], "dimensions": [225,26], "color": [0.03,0.03,0.03,1], "bevel": 3 },
+            "winner_inner": { "kind": "SolidRect", "xy": [290,60], "dimensions": [219,18], "color": [0.9,0.9,0.9,1], "bevel": 2 },
 
             "winner_plate": { "kind": "StaticImage", "xy": [290,58], "dimensions": [84,22], "asset": "win_nameplate", "opacity": 0.9 },
 
-            "loser_bg": { "kind": "SolidRect", "xy": [287,101], "dimensions": [265,26], "color": [0.02,0.02,0.02,1], "bevel": 3 },
+            "loser_bg": { "kind": "SolidRect", "xy": [287,103], "dimensions": [225,26], "color": [0.02,0.02,0.02,1], "bevel": 3 },
 
             // note: width is rescaled in invoke_fancy_victory_dialog() to correspond to loser's kill/death ratio
-            "loser_inner": { "kind": "SolidRect", "xy": [290,105], "dimensions": [259,18], "color": [0.1,0.1,0.1,1], "bevel": 2 },
+            "loser_inner": { "kind": "SolidRect", "xy": [290,107], "dimensions": [219,18], "color": [0.1,0.1,0.1,1], "bevel": 2 },
 
-            "loser_plate": { "kind": "StaticImage", "xy": [290,103], "dimensions": [84,22], "asset": "loss_nameplate", "opacity": 0.6 },
+            "loser_plate": { "kind": "StaticImage", "xy": [290,105], "dimensions": [84,22], "asset": "loss_nameplate", "opacity": 0.6 },
 
-            "winner_label":  { "kind": "TextField", "xy": [294,60], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
+            "winner_label":  { "kind": "TextField", "xy": [294,60], "dimensions": [125,17], "text_size": 15, "text_style": "bold italic",
                                "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 1 },
-            "loser_label":  { "kind": "TextField", "xy": [296,106], "dimensions": [117,17], "text_size": 15, "text_style": "bold italic",
+            "loser_label":  { "kind": "TextField", "xy": [296,108], "dimensions": [125,17], "text_size": 15, "text_style": "bold italic",
                               "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 1 },
 
-            "winner_name":  { "kind": "TextField", "xy": [377,60], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0,0,0,1],
+            "winner_name":  { "kind": "TextField", "xy": [377,60], "dimensions": [125,17],
+                              "clip_to": [377,60,125,17],
+                              "text_size": 13, "text_style": "thick", "text_color": [0,0,0,1],
                               "text_hjustify": "left", "ui_name": "Winner", "drop_shadow": 0 },
-            "loser_name":  { "kind": "TextField", "xy": [377,106], "dimensions": [117,17], "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
+            "loser_name":  { "kind": "TextField", "xy": [377,108], "dimensions": [125,17],
+                             "clip_to": [377,108,125,17],
+                             "text_size": 13, "text_style": "thick", "text_color": [0.7,0.7,0.7,1],
                              "text_hjustify": "left", "ui_name": "Loser", "drop_shadow": 0 },
 
-            "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [574,56],"dimensions": [174,69], "color": [0.04,0.04,0.04,1],
+            "battle_stars_bg": { "show":0, "kind": "SolidRect", "xy": [547,56],"dimensions": [174,69], "color": [0.04,0.04,0.04,1],
                                  "bevel": 3, "outline_color": [0.8,0.8,0.8,1], "outline_width": 1 },
-            "battle_stars_hole": { "show": 0, "kind": "StaticImage", "xy": [606,63], "dimensions": [30,30], "asset": "battle_star_hole",
+            "battle_stars_hole": { "show": 0, "kind": "StaticImage", "xy": [579,63], "dimensions": [30,30], "asset": "battle_star_hole",
                                    "array": [3,1], "array_offset": [40,0] },
-            "battle_stars_star": { "show": 0, "kind": "StaticImage", "xy": [606,63], "dimensions": [30,30], "asset": "battle_star",
+            "battle_stars_star": { "show": 0, "kind": "StaticImage", "xy": [579,63], "dimensions": [30,30], "asset": "battle_star",
                                    "array": [3,1], "array_offset": [40,0] },
 
-            "battle_stars_base_damage": { "show":0, "kind": "TextField", "xy": [574,55], "dimensions": [174,71],
+            "battle_stars_base_damage": { "show":0, "kind": "TextField", "xy": [547,55], "dimensions": [174,71],
                                           "text_size": 15, "text_style": "thick", "text_vjustify": "bottom", "text_hjustify": "center",
                                           "text_color": [0.9,0.4,0.01,1], "drop_shadow": 1, "text_offset": [0,-11],
                                           "ui_name": "%d% Base Damage" },
 
-            "units_killed_label":  { "kind": "TextField", "xy": [560,62], "dimensions": [116,17], "text_size": 13, "text_style": "thick",
-                                     "text_hjustify": "right", "ui_name": "Kills" },
-            "units_killed":  { "kind": "TextField", "xy": [695,62], "dimensions": [86,17], "text_size": 13, "text_style": "thick",
-                               "text_hjustify": "left", "ui_name": "%d" },
-            "units_lost_label":  { "kind": "TextField", "xy": [560,90], "dimensions": [116,17], "text_size": 13, "text_style": "thick",
-                                   "text_hjustify": "right", "ui_name": "Losses" },
-            "units_lost":  { "kind": "TextField", "xy": [695,90], "dimensions": [86,17], "text_size": 13, "text_style": "thick",
-                             "text_hjustify": "left", "ui_name": "%d" },
-
-            "you_won":  { "kind": "TextField", "xy": [18,59], "dimensions": [202,46], "text_size": 40,
+            "you_won":  { "kind": "TextField", "xy": [18,42], "dimensions": [202,46], "text_size": 40,
                           "ui_name": "You Won!", "text_style": "bold italic", "drop_shadow": 1 },
+
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [36,98], "dimensions": [174,37], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[45,102], "dimensions":[32,32], "asset": "facebook_icon"},
 
             "sunken_l":  {"kind": "StaticImage", "xy":[21,145], "dimensions":[491,212], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "sunken_r":  {"kind": "StaticImage", "xy":[518,145], "dimensions":[231,212], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
             "sunken_val":  {"kind": "StaticImage", "xy":[21,364], "dimensions":[80,80], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
 
-            "you_gained":  { "kind": "TextField", "xy": [45,160], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
+            "you_gained":  { "kind": "TextField", "xy": [45,160], "dimensions": [187,21], "text_size": 15, "text_style": "bold",
                              "text_hjustify": "left", "ui_name": "Gain:" },
             "loot_xp_icon": { "kind": "StaticImage", "xy": [236,161], "dimensions": [21,21], "asset": "resource_icon_xp" },
 
             "loot_xp_amount": { "kind": "TextField", "xy": [266,161], "dimensions": [70,19],"text_size": 15, "text_style": "bold", "ui_name": "xxx,xxx,xxx" },
-
-            "separator_top": {"kind": "Line", "xy": [45,221], "xy_home": [45,221], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
-
-            "row_defense": { "show": 0, "max_lines": 5,
-                             "kind": "TextField", "xy": [45,230], "dimensions": [400,250], "text_size": 15, "text_hjustify": "left", "text_vjustify": "top", "text_style": "thick",
-                             "ui_name": "Enemy Units Destroyed:" },
-
-            "row_name": { "show": 0, "kind": "TextField", "xy": [74,212], "dimensions": [157,25], "text_size": 15, "text_hjustify": "left", "text_style": "thick", "ui_name": "Loot" },
-            "row_bullet":  { "show": 0, "kind": "StaticImage", "xy": [46,212], "dimensions": [21,21], "asset": "resource_icon_bullet" },
 
             "row_water_icon": { "kind": "StaticImage", "xy": [145,160], "dimensions": [21,21], "asset": "resource_icon_water" },
             "row_water_amount": { "kind": "TextField", "xy": [175,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
@@ -4640,28 +4673,28 @@
             "row_res3_icon": { "show": 0, "kind": "StaticImage", "xy": [256,160], "dimensions": [21,21], "asset": "resource_icon_res3" },
             "row_res3_amount": { "show": 0, "kind": "TextField", "xy": [286,160], "dimensions": [65,19],"text_size": 15, "text_style": "bold" },
 
-            "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,237], "dimensions": [187,21], "text_size": 16, "text_style": "bold",
+            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [360,160], "dimensions": [125,42], "color": [0,0,0,0.4], "bevel": 3 },
+            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [365,166], "dimensions": [30,30], "asset": "trophy_30x30" },
+            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [402,171], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
+            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [359,160], "dimensions": [62,13], "asset": "button_shine" },
+
+            "separator_top": {"kind": "Line", "xy": [45,218], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
+
+            // offense, disposable-unit-games only
+            "you_spent":  { "show": 0, "kind": "TextField", "xy": [45,227], "dimensions": [187,21], "text_size": 15, "text_style": "bold",
                             "text_hjustify": "left", "ui_name": "Spend:" },
-            "spent_unit": { "show": 0, "kind": "Dialog", "xy": [144,235], "dimensions": [50,50], "dialog": "item_display",
-                            "array": [6,2], "array_offset": [55,53] },
+            "spent_unit": { "show": 0, "kind": "Dialog", "xy": [144,225], "dimensions": [50,50], "dialog": "item_display",
+                            "array": [6,1], "array_offset": [57,53] },
 
-            //          "separator_btm": {"kind": "Line", "xy": [45,255], "dimensions": [438,0], "color":  [1,1,1,1], "stroke_width": 1 },
-
-            //          "total_name": { "kind": "TextField", "xy": [74,261], "dimensions": [157,25], "text_size": 15, "text_hjustify": "left", "text_style": "thick", "ui_name": "Total" },
-            //          "total_water_icon": { "kind": "StaticImage", "xy": [236,263], "dimensions": [21,21], "asset": "resource_icon_water" },
-            //          "total_water_amount": { "kind": "TextField", "xy": [266,263], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
-            //          "total_iron_icon": { "kind": "StaticImage", "xy": [371,263], "dimensions": [21,21], "asset": "resource_icon_iron" },
-            //          "total_iron_amount": { "kind": "TextField", "xy": [401,263], "dimensions": [70,19],"text_size": 15, "text_style": "bold"},
+            "row_battle_stats": { "show": 0, "max_lines": 4,
+                                  "kind": "RichTextField", "xy": [45,273], "dimensions": [435,60], "text_size": 13, "text_hjustify": "left", "text_vjustify": "top",
+                                  "ui_name": "[color=#ffff00][b]Battle Stats:[/b][/color]\n[b]Duration:[/b] %DURATION",
+                                  "ui_name_units_killed": "\n[b]Enemy Units Destroyed:[/b] %KILLED" },
 
             "trophy_label": { "show": 0,
                               "kind": "TextField", "xy": [209,379], "dimensions": [223,62], "text_size": 15, "text_style": "thick",
                               "text_hjustify": "left", "text_vjustify": "top",
                               "ui_name": "" },
-
-            "trophy_bg": { "show": 0, "kind": "SolidRect", "xy": [360,160], "dimensions": [125,42], "color": [0,0,0,0.4], "bevel": 3 },
-            "trophy_icon":  { "show": 0, "kind": "StaticImage", "xy": [365,166], "dimensions": [30,30], "asset": "trophy_30x30" },
-            "trophy_amount":  { "show": 0, "kind": "TextField", "xy": [402,171], "dimensions": [70,19], "text_size": 17, "text_style": "bold" },
-            "trophy_shine": { "show": 0, "alpha": 0.85, "kind": "StaticImage", "xy": [359,160], "dimensions": [62,13], "asset": "button_shine" },
 
             "trophy_expires": { "show": 0, "kind": "TextField", "xy": [288,417], "dimensions": [135, 17], "text_size": 13,
                                 "text_color": [1,0,0,1],
@@ -5397,27 +5430,45 @@
     "tutorial_congratulations": {
         // also used for on-login friend invite prompt
         "dimensions": [487, 337],
-        "default_button": "ok_button",
         "widgets": {
             "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[487,337],"asset":"dialog_resizable","bg_image_resizable":1},
             "sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_153x315"},
             "sidebar_splash":{"kind":"StaticImage","xy":[14,17],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
 
-            // note: this text is over-ridden by values from tutorial.json
-            "title":  { "kind": "TextField", "xy": [181,23], "dimensions": [300, 35], "text_style": "thick", "text_size": 17, "text_hjustify": "left" },
-            "description": { "kind": "TextField", "xy": [181,57], "dimensions": [300,160], "text_size": 13, "text_leading": 16, "text_hjustify": "left",
-                             "text_vjustify": "top" },
+            "title":  { "kind": "TextField", "xy": [181,23], "dimensions": [300, 25], "text_style": "thick", "text_size": 17, "text_hjustify": "left",
+                        "ui_name": "Battle with Friends in %game" },
 
-            "friend_icon0": { "kind": "FriendIcon", "xy": [191, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon1": { "kind": "FriendIcon", "xy": [245, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon2": { "kind": "FriendIcon", "xy": [299, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon3": { "kind": "FriendIcon", "xy": [353, 163], "dimensions": [50,73], "state": "disabled" },
-            "friend_icon4": { "kind": "FriendIcon", "xy": [407, 163], "dimensions": [50,73], "state": "disabled" },
+            "value_prop": { "kind": "TextField", "xy": [181,57], "dimensions": [290,160], "text_size": 15,
+                            "text_vjustify": "top", "text_hjustify": "left",
+                            "ui_name": "Build your armies together, and fight to control the land!",
+                            "ui_name_fb": "- Trade free gifts every day\n- Protect each other from attacks\n- Take revenge on your enemies together!",
+                            "ui_name_bh": "Recruit trainees to earn exclusive bonus items and free daily gifts!"
+                          },
+
+            "friend_icon": { "kind": "FriendIcon", "xy": [191, 146], "dimensions": [50,73], "state": "disabled",
+                             "array": [5,1], "array_offset": [54, 0] },
+
+            "social_proof": { "kind": "TextField", "xy": [193,223], "dimensions": [262,160], "text_size": 13,
+                              "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.5,0.5,0.5],
+                              "ui_name_has_no_friends": "You're the first of your friends to play %game",
+                              "ui_name_has_one_friend": "%s also plays %game",
+                              "ui_name_has_two_friends": "%s and %d other friend also play %game",
+                              "ui_name_has_many_friends": "%s and %d other friends also play %game"
+                            },
 
             "close_button": { "kind": "ActionButton", "xy": [458,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1, "show": 0 },
 
-            "ok_button": { "kind": "ActionButton", "xy": [257,278], "dimensions": [134,28], "text_offset": [0,1],
-                           "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends", "ui_name_bh": "More Info" }
+            // "ok_button" and "fb_share_button/icon" are mutually exclusive
+            "ok_button": { "kind": "ActionButton", "xy": [230,268], "dimensions": [200,40],
+                           "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                           "text_size": 13, "text_style": "bold", "ui_name": "Invite Friends",
+                           "ui_name_bh": "More Info" },
+            "fb_share_button": { "kind": "ActionButton", "xy": [230,268], "dimensions": [200,40],
+                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
+                                 "text_offset": [10,0],
+                                 "text_size": 13, "text_style": "bold", "ui_name": "Share Game Invite"
+                               },
+            "fb_share_icon": { "kind": "StaticImage", "xy":[240,273], "dimensions":[32,32], "asset": "facebook_icon"}
         }
     },
 
@@ -5470,12 +5521,6 @@
             "friend_icon1": { "kind": "FriendIcon", "xy": [138, 230], "dimensions": [50,73], "state": "disabled" },
             "friend_icon2": { "kind": "FriendIcon", "xy": [221, 230], "dimensions": [50,73], "state": "disabled" },
             //
-
-            // markers and replay buttons are mutually exclusive
-            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
-                                     "bg_image_resizable": 1,
-                                     "bg_image": "action_button_resizable", "ui_name": "Show Deployments",
-                                     "ui_tooltip": "Show where the latest attacker deployed units","tooltip_delay": 0},
 
             "replay_button": { "show": 0, "kind": "ActionButton", "xy": [466,343], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
                                "bg_image_resizable": 1,
@@ -6446,20 +6491,23 @@
             "sunken_left": {"kind": "StaticImage", "xy":[37,67], "dimensions":[662,344], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
             "row_bg": { "kind": "SolidRect", "xy":[47,104], "dimensions":[638,52], "color": [0,0,0,0.1], "outline_color": [0,0,0,0.5], "outline_width": 1, "array": [1,5], "array_offset": [0,56] },
 
-            "title": { "kind": "TextField", "xy": [37,14], "dimensions": [345, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [37,4], "dimensions": [345, 41], "text_size": 30, "text_style": "thick",
                        //"clip_to": [37,14,345,41],
                        "text_hjustify": "left", "ui_name_all": "Battle History", "ui_name_vs": "Battle History vs %s" },
+            "subtitle": { "kind": "TextField", "xy": [39,32], "dimensions": [345, 41], "text_size": 13, "text_style": "thick", "text_color": [0.6,0.6,0.6],
+                          "text_hjustify": "left"},
+
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
 
-            "single_player_button": { "kind": "ActionButton", "xy": [254,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "single_player_button": { "kind": "ActionButton", "xy": [254,12], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                       "bg_image": "menu_button_136px", "state": "active", "ui_name": "Single Player",
                                       "ui_tooltip": "Show battles against computer opponents", "tooltip_delay": 0 },
-            "multiplayer_button": { "kind": "ActionButton", "xy": [398,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "multiplayer_button": { "kind": "ActionButton", "xy": [398,12], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                     "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Multiplayer",
                                     "ui_tooltip": "Show battles against human rivals", "tooltip_delay": 0 },
-            "alliance_button": { "kind": "ActionButton", "xy": [542,20], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
+            "alliance_button": { "kind": "ActionButton", "xy": [542,12], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                  "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Alliance",
-                                 "ui_tooltip": "Show multiplayer battles involving your alliance",
+                                 "ui_tooltip": "Show multiplayer battles involving alliancemates",
                                  "ui_tooltip_no_alliance": "To join an alliance, use the\n\"A\" button at top of window.",
                                  "tooltip_delay": 0 },
 
@@ -6471,7 +6519,7 @@
                                         "text_hjustify": "left", "ui_name": "Location", "show": 1 },
             "column_header_status": { "kind": "TextField", "xy": [422,79], "dimensions": [187,23],"text_size": 13, "text_style": "bold",
                                       "text_hjustify": "left", "ui_name": "Status", "ui_name_loot": "Loot" }, // this becomes "Loot" when the Location column is disabled (since "Status" is mainly for Regional Map stuff)
-            "column_header_time": { "kind": "TextField", "xy": [527,79], "dimensions": [154,23],"text_size": 13, "text_style": "bold",
+            "column_header_time": { "kind": "TextField", "xy": [523,79], "dimensions": [154,23],"text_size": 13, "text_style": "bold",
                                     "text_hjustify": "left", "ui_name": "Time" },
 
             "scroll_left": { "kind": "ActionButton", "xy": [10,170], "dimensions": [22,100], "bg_image": "dialog_scroll_arrow_left" },
@@ -6512,11 +6560,11 @@
                              "ui_name_points": "%d Points",
                              "array": [1,5], "array_offset": [0,56] },
 
-            "row_loot": {"kind": "TextField", "xy":[422,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
-                         "text_hjustify":"left","text_vjustify":"top",
-                         "ui_name":"%si %IRON\n%sw %WATER", // all-caps here gets replaced by resource ui_name in JavaScript, as well as the %s-first-initial
+            "row_loot": {"kind": "TextField", "xy":[422,105], "dimensions": [37,32],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
+                         "text_hjustify":"left","text_vjustify":"center",
+                         "ui_name":"", // all-caps here gets replaced by resource ui_name in JavaScript, as well as the %s-first-initial
                          "array": [1,5], "array_offset": [0,56] },
-            "row_time": {"kind": "TextField", "xy":[527,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
+            "row_time": {"kind": "TextField", "xy":[523,112], "dimensions": [37,43],"text_size": 13,"text_color":[0.8,0.8,0.8,1],
                          "text_hjustify":"left","text_vjustify":"top","ui_name":"%s", "array": [1,5], "array_offset": [0,56] },
 
             "row_log_button": { "kind": "ActionButton", "xy": [586,105], "dimensions": [94,24], "bg_image": "menu_button_94px", "text_size": 13, "text_style": "bold",
@@ -6546,25 +6594,24 @@
             "sunken": {"kind": "StaticImage", "xy":[36,66], "dimensions":[665,344], "asset": "dialog_sunken_665x344" },
             "title": { "kind": "TextField", "xy": [37,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Battle Log" },
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[210,26], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Battle Log"},
 
-            "replay_button": { "show": 0, "kind": "ActionButton", "xy": [352,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [450,15], "dimensions": [140, 41], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[456,21], "dimensions":[32,32], "asset": "facebook_icon"},
+
+            "replay_button": { "show": 0, "kind": "ActionButton", "xy": [270,15], "dimensions": [140,41], "text_size": 13, "text_style": "bold",
                                "bg_image_resizable": 1,
                                "bg_image": "action_button_resizable", "ui_name": "View Replay", "ui_tooltip_unavailable": "Replay not available",
                                "ui_tooltip": "", "tooltip_color": [1,0,0], "tooltip_delay": 0},
-            "show_markers_button": { "show": 0, "kind": "ActionButton", "xy": [540,20], "dimensions": [140,32], "text_size": 13, "text_style": "bold",
-                                     "bg_image_resizable": 1,
-                                     "bg_image": "menu_button_resizable", "ui_name": "Show Deployments",
-                                     "ui_tooltip": "Show where the attacker deployed units","tooltip_delay": 0},
 
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "base_damage_label": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
+            "base_damage_label": { "show": 0, "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 13, "text_style": "bold",
                                    "text_hjustify": "left", "ui_name": "Base Damage" },
-            "base_damage": { "kind": "TextField", "xy": [61,98], "dimensions": [105,30], "text_size": 32, "text_style": "bold",
+            "base_damage": { "show": 0, "kind": "TextField", "xy": [61,98], "dimensions": [105,30], "text_size": 32, "text_style": "bold",
                              "text_hjustify": "left", "ui_name": "" },
 
-            "location": { "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 15, "text_style": "bold",
+            "location": { "show": 0, "kind": "TextField", "xy": [57,82], "dimensions": [105,19],"text_size": 15, "text_style": "bold",
                           "text_hjustify": "left", "ui_name": "Location" },
 
             "outcome": { "kind": "TextField", "xy": [58,126], "dimensions": [105,38],"text_size": 16, "text_style": "bold",
@@ -7013,7 +7060,7 @@
             "grid_health_bg": {"kind": "SolidRect", "xy":[58,133], "dimensions":[54,10], "color": [0.034,0.05,0.078,1], "bevel": 2,
                                "outline_color": [0,0,0,1], "outline_width": 0.3, "array": [10,2], "array_offset": [63,70] },
 
-            "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
+            "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "%s\nLevel %cur of %max", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
             "grid_health": { "array": [10,2], "array_offset": [63,70], "kind": "ProgressBar", "xy": [61, 135], "dimensions": [48, 6],
                              "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
             "grid_wrench": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [86,105], "dimensions": [24,24], "asset_active": "repair_wrench_green", "asset_queued": "repair_wrench_gray" },
@@ -7579,6 +7626,93 @@
         }
     },
 
+    "login_incentive_reward": {
+        "dimensions": [54,146],
+        "widgets": {
+            "day": { "kind": "TextField", "xy": [0,-2], "dimensions": [54,32], "text_size": 17, "text_hjustify": "center",
+                     "text_color_future": [0.66,0.66,0.66,1],
+                     "text_color_today": [1,1,1,1],
+                     "text_color_day7": [1,1,0,1],
+                     "text_color_claimed": [0.2,0.2,0.2],
+                     "drop_shadow": 1,
+                     "ui_name": "Day %stack"
+                   },
+
+            "border": { "kind": "SolidRect", "xy": [0,39], "dimensions": [54,54],
+                        "color": [0,0,0,0.5], "bevel": 3,
+                        "outline_color_claimed": [0.2,0.2,0.2,1],
+                        "outline_color_future": [0.4,0.4,0.4,1],
+                        "outline_color_day7": [0.4,0.4,0.4,1],
+                        "outline_color_today": [1,1,0,1],
+                        "outline_width": 2 },
+            "item": { "kind": "Dialog", "xy": [2,41], "dimensions": [50,50],
+                      "dialog": "item_display"
+                    },
+            "label": { "kind": "TextField", "xy": [0,101], "dimensions": [54,32], "text_size": 13, "text_hjustify": "center",
+                       "text_color_future": [0.66,0.66,0.66,1],
+                       "text_color_today": [1,1,1,1],
+                       "text_color_day7": [1,1,0,1],
+                       "text_color_claimed": [0.2,0.2,0.2],
+                       "drop_shadow": 1,
+                       "ui_name": "%dayofweek\n%date"
+                     },
+            "glow": { "show": 0, "kind": "StaticImage", "xy":[-23,16], "dimensions":[100,100],
+                      "asset": "dialog_glow_resizable",
+                      "bg_image_resizable": 1, "alpha": 0.7, "composite_mode": "lighter"}
+        }
+    },
+
+    "login_incentive_dialog": {
+        "clip_children": 0,
+        "dimensions": [736,423],
+        "default_button": "claim_button",
+        "widgets": {
+            "glow": { "show": 0, "kind":"StaticImage","xy":[-30,-30],"dimensions":[796,496],"bg_image_resizable":1,"asset":"dialog_glow_resizable", "composite_mode": "lighter",
+                      "sound": "success_sound_exploding_glass_01",
+                      "fade":1, "duration": 1.5, "fade_peak": 0.2, "delay": -0.2},
+            "bg": { "kind":"StaticImage", "xy":[0,0], "dimensions": [736,423], "transparent_to_mouse":0, "asset": "dialog_resizable", "bg_image_resizable": 1},
+            "title": { "kind": "TextField", "xy": [29,14], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+                       "text_hjustify": "left", "ui_name": "Daily Login Reward" },
+
+            "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "sunken": {"kind": "StaticImage", "xy":[26,66], "dimensions":[685,344], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [27,68], "dimensions":[683,32], "color": [0,0,0,0.25] },
+            "topbar_text": { "kind": "TextField", "xy": [237,68], "dimensions": [419, 32], "text_size": 13, "text_color":[0.8,0.8,0.8,1],
+                             "text_style": "thick", "text_hjustify": "center", "drop_shadow":1,
+                             "ui_name": "Claim one free reward each consecutive day you log in" },
+
+            "sunken_left":{"kind":"StaticImage","xy":[38,84],"dimensions":[153,315],"asset":"dialog_sunken_resizable","bg_image_resizable":1},
+            "sidebar_splash":{"kind":"StaticImage","xy":[42,89],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+
+
+            "sunken2": {"kind": "StaticImage", "xy":[200,112], "dimensions":[500,166], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+
+            "rewards": { "kind": "Dialog", "xy": [230,122], "dimensions": [54,146], "dialog": "login_incentive_reward",
+                         "array": [7,1], "array_offset": [63,0] },
+
+            "scroll_left": { "show": 0, "kind": "ActionButton", "xy": [209,162], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_left", "push_bg_image": 1 },
+
+            "scroll_right": { "show": 0, "kind": "ActionButton", "xy": [677,162], "dimensions": [11,50], "bg_image": "inventory_scroll_arrow_right", "push_bg_image": 1 },
+
+            "claim_button": { "kind": "ActionButton", "xy": [381,308], "dimensions": [134,32], "text_offset": [0,0], "text_size": 13,
+                              "bg_image": "action_button_resizable", "text_style": "bold",
+                              "bg_image_resizable": 1, "push_bg_image": 1,
+                              "ui_name": "Claim",
+                              "ui_name_cooldown": "Claimed",
+                              "ui_name_pending": "Claiming..." },
+
+            "status": { "kind": "TextField", "xy": [237,355], "dimensions": [420,33], "text_size": 13,
+                        "text_hjustify": "center", "text_vjustify": "center", "text_offset":[0,1],
+                        // stack = 1
+                        "ui_name": "Claim today's reward within %togo to keep your progress!",
+                        // on cooldown
+                        "ui_name_cooldown": "Next reward available at midnight GMT (in %togo)",
+                        "text_color": [1,1,0,1]
+                      }
+        }
+    },
+
     "buy_gamebucks_dialog": {
         "dimensions": [756,423],
         "default_button": "no_focus_button",  // buy_button
@@ -7915,14 +8049,14 @@
 
             "sale_bg": { "show": 0, "kind": "SolidRect", "xy": [0,57], "dimensions": [1,1], "color": [0.8,0,0,1],
                          "path": [[16,242], [33,225], [57,225], [16,264]] },
-            "sale_label": { "show": 0, "kind": "TextField", "xy": [29.5,258], "dimensions": [20,100], "color": [1,1,1,1],
+            "sale_label": { "show": 0, "kind": "TextField", "xy": [27,255], "dimensions": [20,100], "color": [1,1,1,1],
                             "text_style": "bold", "text_size": 12, "text_hjustify": "center", "text_angle": -45, "ui_name": "SALE", "xy_shift": { "NEW": [0,-1] } },
 
             "buy_upperleft_shine": { "kind": "StaticImage", "xy": [15,282], "dimensions": [62,13], "asset": "button_shine", "alpha": 1 },
 
-            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,262], "color": [0,0,0,0.6], "bevel": 2 },
+            "hider": { "show": 0, "kind": "SolidRect", "xy":[10,11], "dimensions":[190,314], "color": [0,0,0,0.6], "bevel": 2 },
 
-            "loading_spinner": { "kind": "StaticImage", "xy":[55,151], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
+            "loading_spinner": { "kind": "StaticImage", "xy":[96,151], "dimensions":[16,16], "asset":"loading_spinner", "show": 0 },
 
             "jewel": { "show": 0, "kind": "Dialog", "xy": [177,20], "dimensions": [17,14], "dialog": "notification_jewel" }
         }
@@ -7938,6 +8072,8 @@
                         "asset_rarity4": "dialog_glow_thin_legendary",
                         "bg_image_resizable": 1, "composite_mode": "lighter",
                         "transform": [0.5,0,0,0.5,0,0] },
+            "icon_slot": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_slot",
+                           "transform": [0.5,0,0,0.5,0,0] },
             "icon": { "kind": "StaticImage", "xy": [5,2], "dimensions": [25,25], "asset": "inventory_unknown",
                       "transform": [0.5,0,0,0.5,0,0] },
             "icon_frame": { "kind": "SolidRect", "xy": [5,2], "dimensions": [25,25],
@@ -8199,8 +8335,8 @@
                          "gradient": "hinout", "gradient_midpoint": 0.7 },
 
             // MAIN TITLES
-            "mission_title": { "kind": "TextField", "xy": [17,43], "dimensions": [175, 45], "text_size": 17, "text_style": "thick", "text_hjustify": "center", "text_color": [1, 0.55, 0.01, 1], "drop_shadow": 1 },
-            "subtitle": { "kind": "TextField", "xy": [17,65], "dimensions": [175, 45], "text_size": 11, "text_style": "normal", "text_hjustify": "center", "text_color": [0.5,0.5,0.5,1], "drop_shadow": 1 },
+            "mission_title": { "kind": "TextField", "xy": [17,38], "dimensions": [175, 39], "text_size": 17, "text_style": "thick", "text_hjustify": "center", "text_color": [1, 0.55, 0.01, 1], "drop_shadow": 1 },
+            "subtitle": { "kind": "TextField", "xy": [17,90], "dimensions": [175, 17], "text_size": 11, "text_style": "normal", "text_hjustify": "center", "text_color": [0.5,0.5,0.5,1], "drop_shadow": 1 },
 
             // AI
             "ai_frame": { "kind": "SolidRect", "xy": [25,113], "dimensions": [157,168], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
@@ -8244,8 +8380,8 @@
             "progression_rewards": { "show":0, "kind": "Dialog", "dialog": "item_display", "xy": [243,130], "dimensions": [50,50],
                                      "array": [8,1], "array_offset": [-1,0], "array_max_dimensions": [476,121], "blink_period": 3, "blink_offset": 0.06 },
 
-            "progression_rewards_count": { "show": 0, "kind": "TextField", "xy": [243,132], "dimensions": [46,19], "text_size": 17, "drop_shadow": 1,
-                                           "text_style": "thick", "text_hjustify": "right",
+            "progression_rewards_count": { "show": 0, "kind": "TextField", "xy": [243,157], "dimensions": [46,19], "text_size": 17, "drop_shadow": 1,
+                                           "text_style": "bold", "text_hjustify": "right",
                                            "ui_name_constant": "x%d", "ui_name_range": "x%d-%d",
                                            "array": [8,1], "array_offset": [0,121], "array_max_dimensions": [476,121]},
 
@@ -8530,12 +8666,14 @@
                              "ui_name_raid": "Find Raid Site",
                              "ui_name_strongpoint": "Find Strongpoint",
                              "ui_name_quarry": "Find %s Quarry",
+                             "ui_name_quarry_logistics": "Find Clan Logistics Quarry",
                              "ui_tooltip_attacker": "Find the nearest player who attacked you recently",
                              "ui_tooltip_hive_token": "Find the nearest base you can attack to win special event rewards",
                              "ui_tooltip_hive_res3": "Find the nearest base you can attack to loot %s",
                              "ui_tooltip_raid": "Find the nearest site you can raid for resources",
                              "ui_tooltip_strongpoint": "Find the nearest Strongpoint quarry you can attack for resources and Alliance bonuses", // see localiziation for Alliance->Clan
                              "ui_tooltip_quarry": "Find the nearest quarry you can conquer to collect %s over time",
+                             "ui_tooltip_quarry_logistics": "Find the nearest conquerable Clan Logistics Quarry that provides Clan-wide bonuses",
                              "ui_tooltip": "", "tooltip_delay": 0.1,
                              "ui_tooltip_locked": "To fight:\n%s",
                              "array": [1,7], "array_offset": [0,-36],
@@ -8622,13 +8760,14 @@
                         "transparent_to_mouse":0 },
             "icon": { "kind":"Dialog", "xy":[3,4], "dimensions": [50,50], "dialog": "unit_icon" },
             "name":  { "kind": "TextField", "xy": [58,5], "dimensions": [100,17], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
+                       "clip_to": [58,5,100,17],
                        "text_hjustify": "left", "text_vjustify": "top" },
             "coords":  { "kind": "TextField", "xy": [58,21], "dimensions": [100,17], "text_size": 13, "text_style": "normal", "drop_shadow": 0,
                          "text_hjustify": "left", "text_vjustify": "top", "text_color": [0.7,0.7,0.7,1],
                          "ui_name": "(%x,%y)", "ui_name_unknown": "?" },
 
-            "qicon": {"kind": "ActionButton", "xy": [120,18], "dimensions": [21,21], "bg_image": "resource_icon_water" },
-            "qsize": {"kind": "TextField", "xy":[134,19], "dimensions": [37,43],"text_size": 15,"text_hjustify":"center","text_vjustify":"top","text_style":"bold","drop_shadow":1 },
+            "qicon": {"kind": "ActionButton", "xy": [120,24], "dimensions": [21,21], "bg_image": "resource_icon_water" },
+            "qsize": {"kind": "TextField", "xy":[134,25], "dimensions": [37,43],"text_size": 15,"text_hjustify":"center","text_vjustify":"top","text_style":"bold","drop_shadow":1 },
 
             "squad_hp_bar": { "kind": "ProgressBar", "xy": [57,40], "dimensions": [50,9], "outline_width": 1,
                               "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
@@ -8820,20 +8959,19 @@
     },
 
     "replay_overlay_dialog": {
-        "dimensions": [436, 122],
+        "dimensions": [363, 90],
         "clip_children": 0, "transparent_to_mouse": 1,
         "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[436,122], "asset": "tooltip_bg", "bg_image_resizable": 1 },
-            "valentina": { "kind": "StaticImage", "xy": [8,9], "dimensions": [72,72], "clip_to": [12,11,65,67], "asset": "valentina_72x72" },
-            "close_button": { "kind": "ActionButton", "xy": [411,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "RichTextField", "xy": [93,14], "dimensions": [313,68], "clip_to": [93,14,313,68],
-                             "text_hjustify": "left",  "text_size": 15,
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[363,90], "asset": "tooltip_bg", "bg_image_resizable": 1 },
+            "description": { "kind": "RichTextField", "xy": [12,6], "dimensions": [339,44], "clip_to": [12,6,339,44],
+                             "text_hjustify": "left",  "text_size": 13,
                              "text_vjustify": "top",
-                             //"ui_name": "Replay: %attacker vs %defender\nTime %cur_time of %total_time. Click \"X\" to exit."
                              "ui_name": "Replay: %attacker vs %defender\nTime step %cur_tick of %num_ticks. Click \"X\" to exit."
                            },
-            "share_button": { "kind": "ActionButton", "xy": [150,83], "dimensions": [134, 28], "bg_image": "action_button_134px", "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
-            "get_link_button": { "kind": "ActionButton", "xy": [290,83], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Get Link"}
+            "fb_share_button": { "kind": "ActionButton", "xy": [12,47], "dimensions": [140, 37], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_offset": [14,0], "text_size": 13, "text_style": "bold", "ui_name": "Share Replay"},
+            "fb_share_icon": { "kind": "StaticImage", "xy":[16,51], "dimensions":[32,32], "asset": "facebook_icon"},
+            "get_link_button": { "kind": "ActionButton", "xy": [212,47], "dimensions": [140, 37], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Get Link"},
+            "close_button": { "kind": "ActionButton", "xy": [338,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
         }
     },
 
@@ -8952,14 +9090,17 @@
             "topbar": { "kind": "SolidRect", "xy": [200,68], "dimensions": [500,32], "color": [0,0,0,0.4] },
             "leftbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [163,340], "color": [0,0,0,1] },
 
-            "loot_arrow": { "kind": "StaticImage", "xy": [188,137], "dimensions": [24,24], "asset": "arrow_e" },
-
             "loot_label": { "kind": "TextField", "xy": [55,76], "dimensions": [145,60], "text_size": 13,
                             "ui_name": "Click to store loot\nin Warehouse",
                             "text_color": [1,1,1,1], "text_hjustify": "left", "text_vjustify": "top" },
 
             "warehouse_label": { "kind": "TextField", "xy": [200,69], "dimensions": [490,32], "text_size": 13, "ui_name": "Warehouse (Level %d)",
                                  "text_color": [1,1,1,1], "text_hjustify": "center", "text_vjustify": "center" },
+
+            "restack_spinner": { "kind": "StaticImage", "xy":[606,76], "dimensions":[16,16], "asset":"loading_spinner"},
+
+            "restack_button": {"kind": "ActionButton", "xy":[628,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
+                            "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
 
             "help_button": {"kind": "ActionButton", "xy":[659,72], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
                             "ui_tooltip": "How Loot works", "tooltip_delay": 0 },
@@ -9067,7 +9208,11 @@
                                 "ui_name_repair": "Resolve", // "Repair"
                                 "ui_name_repair_speedup": "Resolve", // "Speed Up",
                                 "ui_name_upgrade_speedup": "Resolve" // "Speed Up"
-                              }
+                              },
+            "pending_all_mask": { "show": 0, "kind": "SolidRect", "color": [0,0,0,0.5],
+                              "xy": [200,100], "dimensions": [500,309], "transparent_to_mouse": false },
+
+            "loot_arrow": { "kind": "StaticImage", "xy": [188,137], "dimensions": [24,24], "asset": "arrow_e" }
         }
     },
 
@@ -9093,6 +9238,10 @@
             "topbar": { "kind": "SolidRect", "xy": [37,68], "dimensions": [663,32], "color": [0,0,0,0.25] },
             "section": { "kind": "TextField", "xy": [37,68], "dimensions": [663,32], "text_size": 13, "ui_name": "Items",
                          "text_color": [0.66,0.66,0.66,1], "text_hjustify": "center", "text_vjustify": "center" },
+
+            "restack_spinner": { "kind": "StaticImage", "xy":[642,76], "dimensions":[16,16], "asset":"loading_spinner"},
+            "restack_button": {"kind": "ActionButton", "xy":[664,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
+                               "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
 
             // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
             "slot": { "kind": "ActionButton", "xy": [48,110], "dimensions": [50,50], "bg_image": "inventory_slot",
@@ -9147,7 +9296,10 @@
             "instructions_expire": { "kind": "TextField", "xy": [50,350], "dimensions": [663,16], "text_size": 13,
                                      "ui_name": "Items that expire marked with",
                                      "text_color": [0.66,0.66,0.66,1], "text_hjustify": "left" },
-            "instructions_expire_icon": {"kind": "StaticImage", "xy":[227,351], "dimensions":[13,13], "asset": "pacman_icon" }
+            "instructions_expire_icon": {"kind": "StaticImage", "xy":[227,351], "dimensions":[13,13], "asset": "pacman_icon" },
+
+            "pending_all_mask": { "show": 0, "kind": "SolidRect", "bevel": 2, "color": [0,0,0,0.5],
+                                  "xy": [37,100], "dimensions": [663,309], "transparent_to_mouse": false }
         }
     },
 
@@ -9684,30 +9836,6 @@
         }
     },
 
-    "bh_invite_code_dialog": {
-        "dimensions": [636, 214],
-        "widgets": {
-            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[636,220], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "sunken": {"kind": "StaticImage", "xy":[8,32], "dimensions":[620,130], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
-
-            "close_button": { "kind": "ActionButton", "xy": [608,4], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "description": { "kind": "TextField", "xy": [8,48], "dimensions": [620,18],
-                             "text_hjustify": "center", "text_size": 17,
-                             "ui_name": "↓ Here is your invite link ↓"
-                           },
-            "link": { "kind": "ActionButton", "xy": [8,86], "dimensions": [620,18],
-                      "text_hjustify": "center", "text_size": 17, "text_color": [1,1,0],
-                      "ui_name": "https://www.battlehouse.com/play/refitskier/?bh_invite=3184818234823"
-                    },
-            "copied": { "kind": "ActionButton", "xy": [0,119], "dimensions": [620,18],
-                        "text_hjustify": "center", "text_size": 15, "text_color": [0.8,0.8,0.8],
-                        "ui_name": "↑ Click to copy link ↑",
-                        "ui_name_after": "Link copied to clipboard! Use Ctrl-V to paste elsewhere."
-                      },
-            "ok_button": { "kind": "ActionButton", "xy": [488,175], "dimensions": [134, 28], "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Dismiss"}
-        }
-    },
-
     "bh_invite_dialog_invite_tab": {
         "dimensions": [736,423],
         "clip_children": 0,
@@ -9722,22 +9850,39 @@
             "instructions_label": { "kind": "TextField", "xy": [36,115], "dimensions": [460,33], "text_hjustify": "left", "text_style": "bold", "text_size": 15, "ui_name": "Instructions" },
 
             "instructions": { "kind": "TextField", "xy": [36,155], "dimensions": [246,200], "text_hjustify": "left", "text_vjustify": "top", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Click \"Get Invite Link\" to see your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
-            "get_link_button": { "kind": "ActionButton", "xy": [60,294], "dimensions": [198,38],
-                                 "bg_image": "action_button_resizable", "bg_image_resizable": 1,
-                                 "ui_name": "Get Invite Link", "text_size": 15, "text_style": "bold"},
+                              "ui_name": "Click below to get your personal invite link. When a friend uses this link to join %game, they become your trainee.\n\nReward unlocks when trainee reaches %req." },
+
+            "invite_code_error": { "show": 0, "kind": "TextField", "xy": [41,278], "dimensions": [230,44],
+                                   "text_hjustify": "center", "text_vjustify": "center",
+                                   "text_size": 13, "text_color": [1,0,0],
+                                   "ui_name": "Error retrieving invite code: %s"
+                                 },
+
+            "copy_link_button": { "show": 0, "kind": "ActionButton", "xy": [41,338], "dimensions": [230,44],
+                                  "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                                  "text_hjustify": "center", "text_vjustify": "center",
+                                  "text_size": 13, "text_style": "bold",
+                                  "ui_name": "Copy Invite Link",
+                                  "ui_message": "Copied!\n\nUse Ctrl-V or Paste to share this link:\n\n%url"
+                                },
+
+            "fb_share_button": { "show": 0, "kind": "ActionButton", "xy": [41,274], "dimensions": [230, 44], "bg_image": "action_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold", "ui_name": "Share Invite Link", "ui_description": "Click to start your battle training. We'll both earn free %gamebucks plus daily gifts!"},
+            "fb_share_icon": { "show": 0, "kind": "StaticImage", "xy":[50,281], "dimensions":[32,32], "asset": "facebook_icon"},
+
+            // for async BH invite code retrieval
+            "loading_spinner": { "kind": "StaticImage", "xy":[145,288], "dimensions":[16,16], "asset":"loading_spinner"},
 
             "next_sunken": {"kind": "StaticImage", "xy":[299,108], "dimensions":[214,248], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
             "next_label": { "kind": "TextField", "xy": [299,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Next: Trainee #%d" },
             "next_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [321,157], "dimensions": [50,50],
-                           "array": [3,2], "array_offset":[60,70] },
+                            "array": [3,2], "array_offset":[60,70] },
             "next_description": { "kind": "TextField", "xy": [317,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Rewards you will earn when your next trainee reaches %req" },
+                                  "ui_name": "Rewards you will earn when your next trainee reaches %req" },
             "bonus_label": { "kind": "TextField", "xy": [510,115], "dimensions": [214,33], "text_hjustify": "center", "text_style": "bold", "text_size": 15, "ui_name": "Trainee #%d Bonus" },
             "bonus_items": { "show": 0, "kind": "Dialog", "dialog": "item_display", "xy": [528,157], "dimensions": [50,50],
                              "array": [3,2], "array_offset":[60,70] },
             "bonus_description": { "kind": "TextField", "xy": [528,284], "dimensions": [178,40], "text_hjustify": "center", "text_size": 13, "text_color": [0.8,0.8,0.8],
-                              "ui_name": "Recruit %more more trainees for this powerful bonus!" }
+                                   "ui_name": "Recruit %more more trainees for this powerful bonus!" }
         }
     },
 
@@ -9801,7 +9946,7 @@
                        "text_hjustify": "left", "ui_name": "Mentorship Rewards" },
 
             "invite_tab_button": { "kind": "ActionButton", "xy": [418,15],  "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                    "bg_image": "menu_button_136px", "ui_name": "Your Rewards" },
+                                   "bg_image": "menu_button_136px", "ui_name": "Your Rewards" },
             "gifts_tab_button": { "kind": "ActionButton", "xy": [556,15], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
                                   "bg_image": "menu_button_136px", "ui_name": "Daily Gifts" },
             "gifts_jewel": { "kind": "Dialog", "xy": [672,13], "dimensions": [17,14], "dialog": "notification_jewel" },

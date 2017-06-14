@@ -42,7 +42,7 @@ Showcase.append_bbcode_text_with_line_breaking = function(widget, big_string, pr
 
 Showcase.apply_showcase_hacks = function(dialog, hack) {
     if('ui_title' in hack) {
-        dialog.widgets['mission_title'].str = eval_cond_or_literal(hack['ui_title'], player, null);
+        dialog.widgets['mission_title'].set_text_with_linebreaking(eval_cond_or_literal(hack['ui_title'], player, null));
     }
     if('ui_subtitle' in hack) {
         dialog.widgets['subtitle'].str = eval_cond_or_literal(hack['ui_subtitle'], player, null);
@@ -173,51 +173,52 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
     }
 
     if('achievement_keys' in hack) {
-        dialog.widgets['achievements_text'].show = 1;
-
-        var text = dialog.data['widgets']['achievements_text']['ui_name_achievements'];
-
         var total_complete = Showcase.count_achievements(hack['achievement_keys']);
-        text = text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
 
-        // find an achievement containing these keys so that we can link to it (preferring incomplete ones)
-        var achievement = null;
-        for (var name in gamedata['achievements']) {
-            var ach = gamedata['achievements'][name];
-            var cat = gamedata['achievement_categories'][ach['category']];
+        if(total_complete[0] >= 1) { // only continue if there is >=1 possible achievement to display
+            dialog.widgets['achievements_text'].show = 1;
+            var text = dialog.data['widgets']['achievements_text']['ui_name_achievements'];
+            text = text.replace('%d1', total_complete[1].toString()).replace('%d2', total_complete[0].toString());
 
-            if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player, null)) { continue; }
-            if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player, null)) { continue; }
-            if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player, null)) { continue; }
-            if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player, null)) { continue; }
+            // find an achievement containing these keys so that we can link to it (preferring incomplete ones)
+            var achievement = null;
+            for (var name in gamedata['achievements']) {
+                var ach = gamedata['achievements'][name];
+                var cat = gamedata['achievement_categories'][ach['category']];
 
-            if(Showcase.predicate_reads_keys(ach['goal'], hack['achievement_keys'])) {
-                if (!goog.object.containsKey(player.achievements, name)) {
-                    // find the first incomplete achievement
-                    achievement = ach;
-                    break;
-                } else if (achievement == null) {
-                    // or fall back to the first completed one if no incomplete ones are found
-                    achievement = ach;
-                }
-            }
-        }
+                if('activation' in cat && !read_predicate(cat['activation']).is_satisfied(player, null)) { continue; }
+                if('show_if' in cat && !read_predicate(cat['show_if']).is_satisfied(player, null)) { continue; }
+                if('activation' in ach && !read_predicate(ach['activation']).is_satisfied(player, null)) { continue; }
+                if('show_if' in ach && !read_predicate(ach['show_if']).is_satisfied(player, null)) { continue; }
 
-        var bbcode_click_handler = {
-            'achievements': {
-                'onclick': function() {
-                    return function() {
-                        if (achievement != null) {
-                            PlayerInfoDialog.invoke(session.user_id, function(dialog) {
-                                PlayerInfoDialog.invoke_achievements_tab(dialog, achievement['category'], achievement['name']);
-                            });
-                        }
+                if(Showcase.predicate_reads_keys(ach['goal'], hack['achievement_keys'])) {
+                    if (!goog.object.containsKey(player.achievements, name)) {
+                        // find the first incomplete achievement
+                        achievement = ach;
+                        break;
+                    } else if (achievement == null) {
+                        // or fall back to the first completed one if no incomplete ones are found
+                        achievement = ach;
                     }
                 }
             }
-        };
 
-        dialog.widgets['achievements_text'].set_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handler));
+            var bbcode_click_handler = {
+                'achievements': {
+                    'onclick': function() {
+                        return function() {
+                            if (achievement != null) {
+                                PlayerInfoDialog.invoke(session.user_id, function(dialog) {
+                                    PlayerInfoDialog.invoke_achievements_tab(dialog, achievement['category'], achievement['name']);
+                                });
+                            }
+                        }
+                    }
+                }
+            };
+
+            dialog.widgets['achievements_text'].set_text(SPText.cstring_to_ablocks_bbcode(text, null, bbcode_click_handler));
+        }
     }
 
     if('conquest_key' in hack) {
@@ -390,7 +391,8 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
             if(loot === null) {
                 return [0, 0];
             } else if('spec' in loot) {
-                return [1, 1];
+                var stack = ('stack' in loot ? loot['stack'] : 1);
+                return [stack, stack];
             } else if('multi' in loot) {
                 var ret = [0, 0];
 
@@ -518,11 +520,13 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
 
                         if(progression_item.count[0] == progression_item.count[1]) {
                             // this level drops a set number of items
-                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_constant'].replace('%d', progression_item.count[0]);
+                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_constant']
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[0]));
                         } else {
                             // this level can drop a variable number of items
-                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_range'].replace('%d', progression_item.count[0])
-                                                                                                               .replace('%d', progression_item.count[1]);
+                            count.str = dialog.data['widgets']['progression_rewards_count']['ui_name_range']
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[0]))
+                                .replace('%d', pretty_print_qty_brief(progression_item.count[1]));
                         }
                     }
                 }

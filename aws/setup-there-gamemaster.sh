@@ -112,6 +112,7 @@ echo "pip install --upgrade pyOpenSSL service_identity certifi" # override syste
 echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"
+echo "pip install --upgrade Pillow" # for image manipulation (player portraits etc)
 
 echo "MISSING: /etc/cron scripts for production. /var/tmp/swap setup. Home dirs in /media/aux"
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."

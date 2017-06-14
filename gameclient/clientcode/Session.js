@@ -386,7 +386,10 @@ Session.Session.prototype.get_item_spec_forced_expiration = function(spec, prev_
 /** Query a loot table for what items you'd get (just for GUI purposes, has nothing to do with actual looting mechanics).
     @return {!LootTable.Result} */
 Session.Session.prototype.get_loot_items = function(player, loot_table) {
-    return LootTable.get_loot(gamedata['loot_tables_client'], loot_table, function(pred) { return read_predicate(pred).is_satisfied(player, null); });
+    return LootTable.get_loot(gamedata['loot_tables_client'], loot_table,
+                              (function (_player) { return function(pred) {
+                                  return read_predicate(pred).is_satisfied(_player, null);
+                              }; })(player));
 };
 
 // note: to preserve balance, attack_finish_time might have to be adjusted according to the player_combat_time_scale!

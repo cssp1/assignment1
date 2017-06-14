@@ -6,6 +6,9 @@
 
 import twisted.python.failure
 import twisted.internet.defer
+import twisted.internet.ssl
+from twisted.internet._sslverify import ClientTLSOptions
+from twisted.python.compat import nativeString
 import twisted.internet.protocol
 import twisted.internet.reactor
 import twisted.web.client
@@ -15,6 +18,15 @@ import time
 from collections import deque
 from urllib import urlencode
 from copy import copy
+
+class TLSSNIContextFactory(twisted.internet.ssl.ClientContextFactory):
+    # A custom context factory to add a server name for TLS connections.
+    def __init__(self, sni_host, *args, **kwargs):
+        self.sni_host = sni_host
+    def getContext(self, hostname=None, port=None):
+        ctx = twisted.internet.ssl.ClientContextFactory.getContext(self)
+        ClientTLSOptions(self.sni_host, ctx)
+        return ctx
 
 class AsyncHTTPRequester(object):
     # there are two "modes" for the callbacks on a request:
@@ -29,7 +41,7 @@ class AsyncHTTPRequester(object):
     CALLBACK_FULL = 'full'
 
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors):
             self.method = method
             self.url = url
             self.headers = headers
@@ -42,6 +54,7 @@ class AsyncHTTPRequester(object):
             self.fire_time = qtime
             self.max_tries = max_tries
             self.callback_type = callback_type
+            self.accept_http_errors = accept_http_errors
             self.tries = 1
         def __hash__(self): return hash((self.url, self.method, self.fire_time, self.callback))
         def __repr__(self): return self.method + ' ' + self.url
@@ -115,7 +128,7 @@ class AsyncHTTPRequester(object):
             cb()
 
     # wrapper for queue_request that returns a Deferred
-    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
         d = twisted.internet.defer.Deferred()
 
         if callback_type == self.CALLBACK_BODY_ONLY:
@@ -129,10 +142,11 @@ class AsyncHTTPRequester(object):
 
         self.queue_request(qtime, url, success_cb, method=method, headers=headers, postdata=postdata,
                            error_callback = error_cb,
-                           preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type)
+                           preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type,
+                           accept_http_errors=accept_http_errors)
         return d
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -163,7 +177,7 @@ class AsyncHTTPRequester(object):
                     headers = {}
                 headers['Content-Type'] = 'application/x-www-form-urlencoded'
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -201,10 +215,21 @@ class AsyncHTTPRequester(object):
     # We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
     # SSL negotiation.
 
-    def make_web_getter(self, request, *args, **kwargs):
+    def make_web_getter(self, request, url, factoryFactory, contextFactory=None,
+                       *args, **kwargs):
         # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
         # and not just its .deferred member, since we want to access the response headers as well as the body.
-        getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
+        #getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
+        uri = twisted.web.client.URI.fromBytes(url)
+        factory = factoryFactory(url, *args, **kwargs)
+        if uri.scheme == b'https':
+            if contextFactory is None:
+                contextFactory = TLSSNIContextFactory(uri.host)
+            self.reactor.connectSSL(nativeString(uri.host), uri.port, factory, contextFactory)
+        else:
+            self.reactor.connectTCP(nativeString(uri.host), uri.port, factory)
+        getter = factory
+
         assert not getter.deferred.called
 
         if kwargs and 'timeout' in kwargs:
@@ -283,6 +308,9 @@ class AsyncHTTPRequester(object):
             elif http_code == 204:
                 # 204 is not actually an error, just an empty body
                 return self.on_response('', getter, request)
+            elif request.accept_http_errors:
+                # pass through HTTP error responses without raising an exception
+                return self.on_response(reason.value.response, getter, request)
 
         self.on_wire.remove(request)
 
@@ -409,6 +437,7 @@ if __name__ == '__main__':
     req.queue_request(server_time, 'http://localhost:8000/clientcode/SPay.js', lambda x: log.msg('RESPONSE B'))
     req.queue_request(server_time, 'http://localhost:8005/', lambda x: log.msg('RESPONSE C'))
     req.queue_request(server_time, 'http://localhost:8000/', lambda x: log.msg('RESPONSE D'))
+    req.queue_request(server_time, 'https://www.battlehouse.com/feed/atom/', lambda x: log.msg('RESPONSE E'))
     print req.get_stats_html(time.time())
     reactor.run()
 

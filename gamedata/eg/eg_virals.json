@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 {
-    "facebook_api": "share", // use old "feed" or new "share" API (default: "feed", but that requires "publish_actions" permission)
-
     // when sending Facebok messages to another Example Game player, a random tagline is chosen from this array
     "facebook_message_text": [
         "I'm gonna beat you!"

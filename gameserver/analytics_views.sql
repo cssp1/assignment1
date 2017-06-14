@@ -101,13 +101,20 @@ BEGIN
         ELSEIF frame_platform = 'ag' THEN
            RETURN 'Armor Games';
         ELSEIF frame_platform = 'bh' THEN
-           RETURN 'Battlehouse';
+       RETURN CASE camp
+       WHEN 'bh_invite' THEN 'BH Invite'
+       WHEN 'google' THEN 'BH Google Paid'
+       WHEN '7124_GG' THEN 'BH Google Paid'
+       WHEN '7120_SRD' THEN 'BH FB Paid'
+       ELSE IF(camp LIKE '%_bx_%', 'BH Cross-Promo',
+               IF(camp LIKE '712%', 'BH Free (BH.com Link)', 'BH Other')) END;
         ELSEIF frame_platform = 'fb' THEN
            -- if camp maps to facebook_free or game_viral, return those
            -- if camp maps to MISSING, then ignore (!) this user (this is what ANALYTICS2 does - maybe we should report it as 'FB MISSING' instead?)
            -- otherwise, map to 'paid'
-           RETURN (CASE (SELECT remap_facebook_campaigns(camp))
+           RETURN (CASE (SELECT remap_facebook_campaigns(camp)) COLLATE utf8mb4_unicode_ci
            WHEN 'facebook_free' THEN 'FB Free (Facebook)'
+           WHEN 'fb_page' THEN 'FB Free (Fan Page)'
            WHEN 'game_viral' THEN 'FB Free (Game Viral)'
            WHEN 'cross_promo' THEN 'Cross Promo (Paid)' -- legacy data
            WHEN 'cross_promo_paid' THEN 'Cross Promo (Paid)'

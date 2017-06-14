@@ -34,7 +34,8 @@ RETENTION_FIELDS = ["retained_%dd" % days for days in DAY_MARKS]
 SPEND_FIELDS = ["spend_%dd" % days for days in DAY_MARKS]
 VISITS_FIELDS = ["visits_%dd" % days for days in DAY_MARKS]
 
-CLIENT_FIELDS = ["client:"+x for x in ["purchase_ui_opens","purchase_ui_opens_preftd"]]
+CLIENT_FIELDS = ["client:"+x for x in ["purchase_ui_opens","purchase_ui_opens_preftd",
+                                       "purchase_inits", "purchase_inits_preftd"]]
 FEATURE_USE_FIELDS = ["feature_used:"+x for x in ["drag_select",
                                                   "scrolling",
                                                   "double_click_select",
@@ -121,7 +122,7 @@ def get_csv_fields(gamedata):
           "adotomi_context", "dauup_context",
           "last_login_time", "logged_in_times", "last_purchase_time",
           "facebook_id", "country", "country_tier", "currency", "facebook_permissions_str",
-          "gender", "locale", "birth_year", "birthday", "facebook_name", "email", "link",
+          "gender", "locale", "birth_year", "birthday", "facebook_name", "facebook_first_name", "email", "link",
           "tutorial_state", "player_level", "completed_quests", "lock_state",
           'payer_promo_offered', 'promo_gamebucks_earned', 'payer_promo_gamebucks_earned', 'fb_gift_cards_redeemed',
           "money_spent", "money_refunded", "gamebucks_refunded", "largest_purchase", "time_in_game"] + \
@@ -222,19 +223,25 @@ FACEBOOK_CAMPAIGN_MAP = {
     'appcenter_search_typeahead': 'facebook_free',
     'appcenter_toplist': 'facebook_free',
     'desktop_app': 'facebook_free', # seems to have replaced "appcenter"
+    'facebook_arcade': 'facebook_free',
 
     'bgl_featured': 'facebook_free', # this is a new source for special features that Facebook runs for us manually
 
     # game-sourced viral acquisition
+    'sp_game_viral': 'game_viral',
     'achievement_brag': 'game_viral',
     'appcenter_request': 'game_viral',
     'cheeve': 'game_viral',
     'facebook_app_request': 'game_viral',
     'facebook_friend_invite': 'game_viral',
     'facebook_message': 'game_viral',
-    'fbpage': 'game_viral', # not sure on this one
-    'fbpage_button': 'game_viral', # not sure on this one
-    'fbpage_gameinfo': 'game_viral', # not sure on this one
+    'fanpage': 'fb_page',
+    'fb_page_promo_code': 'fb_page',
+    'fb_page_call_to_action': 'fb_page',
+    'fbpage': 'fb_page',
+    'fbpage_button': 'fb_page',
+    'fbpage_gameinfo': 'fb_page',
+    '7125_BH_post': 'fb_page',
     'feed': 'game_viral',
     'feed_achievement': 'game_viral',
     'feed_aggregated': 'game_viral',
@@ -247,11 +254,12 @@ FACEBOOK_CAMPAIGN_MAP = {
     'feed_playing': 'game_viral',
     'feed_thanks': 'game_viral',
     'notification': 'game_viral',
-    'promo_code': 'game_viral',
+    'promo_code': 'fb_page',
     'request': 'game_viral',
     'reminders': 'game_viral', # this is a reminder *about* a request
-    'search': 'game_viral',
+    'search': 'fb_page',
     'stats_share': 'game_viral',
+    'replay': 'game_viral',
     'timeline': 'game_viral',
     'timeline_collection': 'game_viral',
     'timeline_og': 'game_viral',
@@ -1119,6 +1127,11 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             obj['gamebucks_balance'] = resources.get('gamebucks', 0) # note: this is redundant with a player history field of the same name filled in by TIME_CURRENT_FIELDS. Added just to be sure it's here even if we don't have that player history field.
             obj['lock_state'] = data.get('lock_state', 0)
 
+            if data.get('alias'):
+                obj['alias'] = data['alias']
+            elif 'alias' in obj:
+                del obj['alias']
+
             # note: override userdb facebook_permissions with playerdb facebook_permissions
             if 'facebook_permissions' in data and type(data['facebook_permissions']) is list:
                 obj['facebook_permissions_str'] = string.join(data['facebook_permissions'], ',')
@@ -1628,8 +1641,8 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                             retained = 0
                         obj['retained_%dd' % days] = retained
 
-        # compute returned_x-yh metrics
-        for begin, end in ((24,48), (168,192), (672,696)):
+        # compute returned_x-yh metrics (returned 1d, 2d, 3d, 5d, 7d, 30d)
+        for begin, end in ((24,48), (48,72), (72,96), (120,144), (168,192), (672,696)):
             if time_now >= (account_creation_time + end*60*60):
                 obj['returned_%d-%dh' % (begin,end)] = 1 if visits_within(obj, end//24, after=begin//24) else 0
 

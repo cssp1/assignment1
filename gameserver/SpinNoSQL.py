@@ -168,7 +168,7 @@ class NoSQLClient (object):
 
     # how long to keep old lock generation counters around - this should be longer than
     # the longest period of time a server could hold stale (spied but not locked) player/base data
-    LOCK_GEN_TIME = 12*3600
+    LOCK_GEN_TIME = 1*3600 # not actually sure 1h is safe, but seems like the downside is not as bad as the upside (Fixing S3 recovery faster)
 
     ROLE_DEFAULT = 0
     ROLE_LEADER = 4
@@ -1207,10 +1207,13 @@ class NoSQLClient (object):
 
     # this is for internal use only
     # it is allowed to return an iterator
-    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False):
+    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False, force_last_mtime_index = False):
         result = self.player_cache().find(qs, {'_id':1})
 
-        if force_player_level_index:
+        if force_last_mtime_index:
+            # this takes priority since it is likely to be more restrictive
+            result = result.hint([('last_mtime',pymongo.ASCENDING)])
+        elif force_player_level_index:
             result = result.hint([('player_level',pymongo.ASCENDING)])
 
         if randomize_quality > 0:
@@ -1233,16 +1236,17 @@ class NoSQLClient (object):
         return map(lambda x: x['_id'], result)
 
     # special case for use by notification checker
-    def player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(self, mtime_ranges, ctime_ranges,
-                                                                                townhall_name = None, min_townhall_level = None,
-                                                                                include_home_regions = None,
-                                                                                exclude_home_regions = None,
-                                                                                min_known_alt_count = None,
-                                                                                min_idle_check_fails = None,
-                                                                                min_idle_check_last_fail_time = None,
-                                                                                reason = None):
-        qs = {'$or': [{'tutorial_complete':1,'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
-                     [{'tutorial_complete':1,'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
+    def player_cache_query_mtime_or_ctime_between(self, mtime_ranges, ctime_ranges,
+                                                  townhall_name = None, min_townhall_level = None,
+                                                  include_home_regions = None,
+                                                  exclude_home_regions = None,
+                                                  min_known_alt_count = None,
+                                                  min_idle_check_fails = None,
+                                                  min_idle_check_last_fail_time = None,
+                                                  require_tutorial_complete = True,
+                                                  reason = None):
+        qs = {'$or': [{'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
+                     [{'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
         if townhall_name and min_townhall_level:
             qs = {'$and': [qs, {townhall_name+'_level': {'$gte': min_townhall_level}}]}
         if min_known_alt_count:
@@ -1255,7 +1259,13 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {'home_region': {'$in': include_home_regions}}]}
         if exclude_home_regions:
             qs = {'$and': [qs, {'home_region': {'$nin': exclude_home_regions}}]}
-        return self.instrument('player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between(%s)'%reason,
+        if require_tutorial_complete:
+            qs = {'$and': [qs, {'tutorial_complete':1}]}
+
+        # don't include AI players
+        qs = {'$and': [qs, {'social_id': {'$ne': 'ai'}}]}
+
+        return self.instrument('player_cache_query_mtime_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
     def player_cache_query_ladder_rival(self, query, maxret, randomize_quality = 1, reason = None):
@@ -1265,6 +1275,7 @@ class NoSQLClient (object):
         # translate legacy query syntax to MongoDB
 
         references_player_level = False
+        references_last_mtime = False
 
         # need to emulate a join on player_scores for the score range
         score_first = False # whether to perform the score query before the player cache query
@@ -1278,6 +1289,7 @@ class NoSQLClient (object):
             key = '_id' if (item[0] == 'user_id') else item[0]
 
             if item[0] == 'player_level': references_player_level = True
+            elif item[0] == 'last_mtime': references_last_mtime = True
 
             if type(key) is tuple:
                 assert key[0] == 'scores2' # scores1 is obsolete now
@@ -1320,6 +1332,7 @@ class NoSQLClient (object):
             cache_qs = {'$and':qand}
             ret = []
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
+                                                                    force_last_mtime_index = references_last_mtime,
                                                                     force_player_level_index = references_player_level):
                 # check if candidate's score is within the specified range
                 if score_stat and \
@@ -1331,6 +1344,18 @@ class NoSQLClient (object):
                 if len(ret) >= maxret: break
 
             return ret
+
+    # only used for PCHECK customer support purposes. NOT INDEXED!
+    def player_cache_query_by_social_id(self, social_id, reason = None):
+        return self.instrument('player_cache_query_by_social_id(%s)'%reason, self._player_cache_query_by_social_id, (social_id,))
+    def _player_cache_query_by_social_id(self, social_id):
+        # blank out some fields that should not be sent to the client
+        fields = {'LOCK_HOLDER':0,'LOCK_GENERATION':0,'LOCK_TIME':0}
+
+        result = self.player_cache().find_one({'social_id':social_id}, fields)
+        if result:
+            result = self.decode_player_cache(result)
+        return result
 
     ###### PLAYER LOCKING (embedded in player_cache) ######
     # note: extra unused parameters are for drop-in compatibility with old dbserver API
@@ -1494,11 +1519,13 @@ class NoSQLClient (object):
             row['data'] = bytes(row['data'])
         return row
 
+    player_portrait_max_size = 64*1024 # 64KB max
+
     def player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified, reason=''):
         return self.instrument('player_portrait_add(%s)'%reason, self._player_portrait_add, (user_id, data, retrieved, content_type, expires, last_modified))
     def _player_portrait_add(self, user_id, data, retrieved, content_type, expires, last_modified):
         assert isinstance(data, bytes)
-        assert len(data) < 64*1024 # 64KB max
+        assert len(data) <= self.player_portrait_max_size
         binary_data = bson.Binary(data)
         if content_type is not None:
             content_type = unicode(content_type)
@@ -1992,7 +2019,12 @@ class NoSQLClient (object):
     def get_mobile_objects_by_owner(self, region, user_id, reason=''): return self.instrument('get_mobile_objects_by_owner(%s)'%reason, self._find_objects, (region,'mobile',{'owner_id':user_id},))
 
     def get_mobile_objects_by_base(self, region, base_id, reason=''): return self.instrument('get_mobile_objects_by_base(%s)'%reason, self._find_objects, (region,'mobile',{'base_id':base_id},))
-    def get_fixed_objects_by_base(self, region, base_id, reason=''): return self.instrument('get_fixed_objects_by_base(%s)'%reason, self._find_objects, (region,'fixed',{'base_id':base_id},))
+    def get_fixed_objects_by_base(self, region, base_id, spec_filter = None, reason=''):
+        qs = {'base_id':base_id}
+        if spec_filter:
+            assert isinstance(spec_filter, list)
+            qs['spec'] = {'$in': spec_filter}
+        return self.instrument('get_fixed_objects_by_base(%s)'%reason, self._find_objects, (region,'fixed',qs))
 
     def _find_objects(self, region, table_name, query):
         ret = []
@@ -2007,14 +2039,15 @@ class NoSQLClient (object):
     def _get_base_ids_referenced_by_objects(self, region):
         return self.region_table(region, 'mobile').find().distinct('base_id') + self.region_table(region, 'fixed').find().distinct('base_id')
 
-    def update_mobile_object(self, region, obj, partial=False, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial))
-    def update_fixed_object(self, region, obj, partial=False, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial))
-    def _update_object(self, region, table_name, obj, partial):
+    def update_mobile_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial,unset))
+    def update_fixed_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial,unset))
+    def _update_object(self, region, table_name, obj, partial, unset):
         if not partial:
             assert 'obj_id' in obj
             assert 'owner_id' in obj
             assert 'base_id' in obj
             # optional now: assert 'kind' in obj
+            assert unset is None
 
         # temporary swap the obj_id field for the _id field
         obj['_id'] = self.encode_object_id(obj['obj_id'])
@@ -2024,7 +2057,13 @@ class NoSQLClient (object):
             if partial:
                 _id = obj['_id']
                 del obj['_id']
-                self.region_table(region, table_name).update_one({'_id':_id}, {'$set': obj}, upsert = False)
+                qs = {}
+                if len(obj) > 0:
+                    qs['$set'] = obj
+                if unset: # list of properties to unset
+                    qs['$unset'] = dict((f, 1) for f in unset)
+                if len(qs) > 0:
+                    self.region_table(region, table_name).update_one({'_id':_id}, qs, upsert = False)
             else:
                 self.region_table(region, table_name).replace_one({'_id':obj['_id']}, obj, upsert = True)
         finally:
@@ -2191,7 +2230,7 @@ class NoSQLClient (object):
 
     @classmethod
     def alliance_query_fields(cls, member_access):
-        FIELDS = ['ui_name', 'ui_description', 'chat_tag', 'join_type', 'founder_id', 'leader_id', 'logo', 'num_members_cache', 'continent']
+        FIELDS = ['ui_name', 'ui_description', 'chat_tag', 'join_type', 'founder_id', 'leader_id', 'logo', 'num_members_cache', 'continent', 'creation_time']
         if member_access: FIELDS += ['chat_motd']
         return dict(((field,1) for field in FIELDS))
 
@@ -2480,10 +2519,10 @@ if __name__ == '__main__':
 
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks',
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
                                                         'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
-                                                        'recache-alliance-scores', 'test'])
+                                                        'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
     send_prizes = False
@@ -2496,6 +2535,7 @@ if __name__ == '__main__':
     spend_week = None
     time_now = int(time.time())
     maint_region = None
+    config_name = None
 
     for key, val in opts:
         if key == '--reset': mode = 'reset'
@@ -2538,6 +2578,8 @@ if __name__ == '__main__':
         elif key == '--spend-week': spend_week = int(val)
         elif key == '--recache-alliance-scores': mode = 'recache-alliance-scores'
         elif key == '--test': mode = 'test'
+        elif key == '--benchmark': mode = 'benchmark'
+        elif key == '--config-name': config_name = val
         elif key == '-g' or key == '--game-id':
             game_instance = val
 
@@ -2551,10 +2593,11 @@ if __name__ == '__main__':
         print '    --recache-alliance-scores --week N --season S  Recalculate all alliance scores for week N season S'
         print '    --winners --week N --season N --tournament-stat STAT  Report Alliance Tournament winners for week N (or season N) and trophy type TYPE (pve or pvp)'
         print '                       ^ if season is missing or < 0, then weekly score is used for standings, otherwise seasonal score is used'
+        print '    --benchmark                Run MongoDB benchmark'
         print '    --test                     Run regression test code (DESTROYS DATA)'
         sys.exit(1)
 
-    client = NoSQLClient(SpinConfig.get_mongodb_config(game_instance))
+    client = NoSQLClient(SpinConfig.get_mongodb_config(config_name or game_instance))
     client.set_time(time_now)
     id_generator = SpinNoSQLId.Generator()
     id_generator.set_time(time_now)
@@ -2770,6 +2813,20 @@ if __name__ == '__main__':
                 for cmd in commands:
                     subprocess.check_call(cmd, stdout=open(os.devnull,"w"))
                 print "PRIZES ALL SENT OK"
+
+
+    elif mode == 'benchmark':
+        # micro-benchmark to check worst-case impact of network latency
+        # make many small reads that involve a round trip
+        tbl = client._table('zzz_benchmark')
+        n_iterations = 5000
+        start_time = time.time()
+        for i in xrange(n_iterations):
+            unused = list(tbl.find({'_id':random.randint(80000000,90000000)},
+                                   {'_id':1,'ui_name':1,'player_level':1}))
+        end_time = time.time()
+        print '%d iterations, %.2f ms per iteration' % \
+              (n_iterations, 1000.0*(end_time - start_time)/(n_iterations))
 
     elif mode == 'test':
         print 'TEST'

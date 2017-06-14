@@ -580,8 +580,10 @@ def do_lookup(args):
         cmd_args += [str(user_id)]
     elif 'facebook_id' in args:
         cmd_args += ['--facebook-id', args['facebook_id']]
+    elif 'battlehouse_id' in args:
+        cmd_args += ['--battlehouse-id', args['battlehouse_id']]
     else:
-        raise Exception('must pass user_id or facebook_id')
+        raise Exception('must pass user_id, facebook_id, or battlehouse_id')
     p = subprocess.Popen(['./check_player.py'] + cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
     if err:

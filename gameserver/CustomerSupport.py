@@ -14,14 +14,23 @@
 import SpinJSON
 import SpinConfig
 import random
+import math
 #import copy
+import traceback
 from Region import Region
+import Consequents
 import SpinNoSQLLockManager
 from Raid import recall_squad, RecallSquadException, \
      army_unit_is_mobile, army_unit_spec, army_unit_is_alive, army_unit_hp, \
      calc_max_cargo, resolve_raid, make_battle_summary, get_denormalized_summary_props_from_pcache
 import ResLoot
+import Notification2
 from Predicates import read_predicate
+
+def get_leveled_quantity(qty, level): # XXX duplicate
+    if type(qty) == list:
+        return qty[level-1]
+    return qty
 
 # encapsulate the return value from CONTROLAPI support calls, to be interpreted by cgipcheck.html JavaScript
 # basically, we return a JSON dictionary that either has a "result" (for successful calls) or an "error" (for failures).
@@ -124,6 +133,16 @@ class Handler(object):
         json_user.clear(); json_user.update(new_json_user)
         json_player.clear(); json_player.update(new_json_player)
 
+        return ret
+
+    def get_denormalized_summary_props_offline(self, user, player):
+        ret = {'cc': player['history'].get(self.gamedata['townhall']+'_level',1),
+               'plat': user.get('frame_platform','fb'),
+               'rcpt': player['history'].get('money_spent', 0),
+               'ct': user.get('country','unknown'),
+               'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
+        if user.get('developer'):
+            ret['developer'] = 1
         return ret
 
 class HandleGetRaw(Handler):
@@ -533,6 +552,7 @@ class HandleAuraActive(Handler):
         return ReturnValue(result = self.aura_active(player.get('player_auras', []), self.args['aura_name']))
     def aura_active(self, player_auras, aura_name):
         for aura in player_auras:
+            if aura.get('start_time',-1) > self.time_now: continue
             if aura.get('end_time',-1) > 0 and aura['end_time'] < self.time_now: continue
             if aura['spec'] == aura_name:
                 return True
@@ -682,6 +702,64 @@ class HandleSquadDockUnits(Handler):
         for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
             if FIELD in squad: del squad[FIELD]
 
+        return ReturnValue(result = 'ok')
+
+class HandleRepairBase(Handler):
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+    def do_exec_online(self, session, retmsg): return ReturnValue(result = 'ok') # no-op
+    def do_exec_offline(self, user, player):
+        # do building repairs
+
+        # calculate total resource storage space
+        res_storage = dict((resname, 0) for resname in self.gamedata['resources'])
+        # for metrics purposes, record how much resources we add
+        res_added = dict((resname, 0) for resname in self.gamedata['resources'])
+
+        for obj in player['my_base']:
+            for FIELD in ('hp', 'hp_ratio', 'repair_finish_time', 'disarmed'):
+                if FIELD in obj:
+                    del obj[FIELD]
+
+            # fill harvesters with some resources
+            level = obj.get('level', 1)
+            spec = None
+            if obj['spec'] in self.gamedata['buildings']:
+                spec = self.gamedata['buildings'][obj['spec']]
+            if spec:
+                for resname in self.gamedata['resources']:
+                    if 'produces_'+resname in spec:
+                        max_cap = get_leveled_quantity(spec['production_capacity'], level)
+                        amount_to_add = int(random.random() * max_cap) - obj.get('contents',0)
+                        if amount_to_add > 0:
+                            obj['contents'] = obj.get('contents',0) + amount_to_add
+                            res_added[resname] += amount_to_add
+                    if 'storage_'+resname in spec:
+                        res_storage[resname] += get_leveled_quantity(spec['storage_'+resname], level)
+
+        player['unit_repair_queue'] = []
+
+        # fill resource storage
+        fullness = math.pow(random.random(), 2.0)
+        for resname in self.gamedata['resources']:
+            max_cap = res_storage[resname]
+            if max_cap > 0:
+                amount_to_add = int(fullness * max_cap) - player['resources'].get(resname,0)
+                if amount_to_add > 0:
+                    player['resources'][resname] = player['resources'].get(resname,0) + amount_to_add
+                    res_added[resname] += amount_to_add
+
+        # record resource generation for economy metrics
+        summary_props = self.get_denormalized_summary_props_offline(user, player)
+        self.gamesite.admin_stats.econ_flow(self.user_id, summary_props, 'external', 'repair_base', res_added)
+
+        # update the player cache entry
+        cache_props = {'base_damage': 0, # so that base won't show as crater
+                       'base_repair_time': -1,
+                       #'last_login_time': self.time_now, # so that maptool won't purge the map
+                       'last_defense_time': self.time_now - random.randint(1,10) * 86400 # for "Last defended..."
+                       }
+        self.gamesite.pcache_client.player_cache_update(self.user_id, cache_props, reason = 'repair_base')
         return ReturnValue(result = 'ok')
 
 class HandleResolveHomeRaid(Handler):
@@ -1190,7 +1268,7 @@ class HandleChangeRegion(Handler):
 
     # then after complete_attack...
     def do_exec_online2(self, change_session_result, session, retmsg):
-        success = session.player.change_region(self.new_region, None, session, retmsg, reason = 'CustomerSupport')
+        success = session.player.change_region(self.new_region, None, None, session, retmsg, reason = 'CustomerSupport')
         if success:
             ret = ReturnValue(result = 'ok')
         else:
@@ -1270,6 +1348,7 @@ class HandleChangeRegion(Handler):
 
         new_region = self.new_region
         new_loc = None
+        new_loc_precision = None
 
         base_id = 'h'+str(self.user_id) # copy of server.py: home_base_id()
 
@@ -1375,7 +1454,7 @@ class HandleChangeRegion(Handler):
 
         self.gamesite.metrics_log.event(self.time_now, {'user_id': self.user_id,
                                                         'event_name': '4701_change_region_success',
-                                                        'request_region':new_region, 'request_loc':new_loc,
+                                                        'request_region':new_region, 'request_loc':new_loc, 'request_precision':new_loc_precision,
                                                         'new_region': player['base_region'], 'new_loc': player['base_map_loc'],
                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':'CustomerSupport'})
         # drop lock from create_map_feature()
@@ -1523,8 +1602,11 @@ class HandleSendNotification(Handler):
             self.config = self.gamedata['fb_notifications']['notifications'].get(self.config_name, None)
             if self.config is None:
                 raise Exception('notification config not found in gamedata.fb_notifications')
+
         else:
             self.config = None # arbitrary message
+
+        self.n2_stream = Notification2.ref_to_stream(self.config['ref'] if self.config else None)
 
         # "force" means "ignore all frequency checks, just send it!" (e.g. for payment confirmations)
         self.force = bool(int(self.args.get('force','0')))
@@ -1545,6 +1627,9 @@ class HandleSendNotification(Handler):
             self.replacements = SpinJSON.loads(self.args['replacements'])
         else:
             self.replacements = None
+
+        # suffix for the "ref" parameter, used for A/B testing
+        self.ref_suffix = self.args.get('ref_suffix', '')
 
         # optional override of the "ref" referer parameter. Only used if no "config" is selected.
         self.ref_override = self.args.get('ref',None)
@@ -1578,44 +1663,70 @@ class HandleSendNotification(Handler):
            (not session.player.player_preferences.get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
             return ReturnValue(result = 'disabled by player preference')
 
-        is_elder = (len(session.player.history.get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+        elder_suffix = ''
 
-        if not self.force: # "soft" enable/disable checks
+        if session.player.abtests.get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs','bfm',):
+            # NEW Notification2 path
+            n2_class = Notification2.get_user_class(session.player.history, self.gamedata['townhall'])
+            elder_suffix = '_%s' % n2_class
 
-            if self.config and \
-               (is_elder and (not self.config.get('enable_elder', True))) or \
-               ((not is_elder) and (not self.config.get('enable_newbie', True))):
-                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+            timezone = session.user.timezone if (session.user.timezone is not None) else Notification2.DEFAULT_TIMEZONE
 
-            if not self.multi_per_logout:
-                last_logout = session.player.last_logout_time()
-                if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
-                    return ReturnValue(result = 'already notified since last logout')
+            if not self.force:
+                can_send, reason = Notification2.can_send(self.time_now, timezone,
+                                                          self.n2_stream,
+                                                          self.config['ref'] if self.config else None,
+                                                          session.player.history,
+                                                          session.player.cooldowns,
+                                                          n2_class)
+                if not can_send:
+                    return ReturnValue(result = reason)
 
-            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
-            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
-            if self.config and \
-               (self.time_now - session.player.history.get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+        else:
+            # OLD path
+            is_elder = (len(session.player.history.get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+            elder_suffix = '_e' if is_elder else '_n'
 
-            if self.config and self.config.get('auto_mute',0) > 0:
-                mute_key = 'notification:'+self.config['ref']+':unacked'
-                if session.player.history.get(mute_key,0) >= self.config['auto_mute']:
-                    session.player.player_preferences[self.config['mute_preference_key']] = 0
-                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
+            if not self.force: # "soft" enable/disable checks
+
+                if self.config and \
+                   (is_elder and (not self.config.get('enable_elder', True))) or \
+                   ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                    return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+                if not self.multi_per_logout:
+                    last_logout = session.player.last_logout_time()
+                    if last_logout < 0 or session.player.last_fb_notification_time > last_logout:
+                        return ReturnValue(result = 'already notified since last logout')
+
+                # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
+                # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+                if self.config and \
+                   (self.time_now - session.player.history.get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                    return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+                if self.config and self.config.get('auto_mute',0) > 0:
+                    mute_key = 'notification:'+self.config['ref']+':unacked'
+                    if session.player.history.get(mute_key,0) >= self.config['auto_mute']:
+                        session.player.player_preferences[self.config['mute_preference_key']] = 0
+                        return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
-            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+            fb_ref = self.config['ref'] + elder_suffix
         elif self.config:
             fb_ref = self.config['ref']
         else:
             assert self.ref_override
             fb_ref = self.ref_override
+        fb_ref += self.ref_suffix
+
+        # BH users should also get Facebook notifications, where applicable
+        mirror_to_facebook = (session.user.frame_platform == 'bh')
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
                                                            session.player.get_denormalized_summary_props('brief'),
-                                                           replacements = self.replacements) or self.simulate:
+                                                           replacements = self.replacements, mirror_to_facebook = mirror_to_facebook) or self.simulate:
             session.player.last_fb_notification_time = self.time_now
             session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
             if self.config:
@@ -1625,6 +1736,14 @@ class HandleSendNotification(Handler):
                 session.player.history[key] = session.player.history.get(key,0)+1
                 key = 'notification:'+self.config['ref']+':last_time'
                 session.player.history[key] = self.time_now
+
+                if session.player.abtests.get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs','bfm',):
+                    Notification2.record_send(self.time_now, timezone, self.n2_stream,
+                                              self.config['ref'],
+                                              session.player.history, session.player.cooldowns)
+
+                if 'on_send' in self.config:
+                    session.execute_consequent_safe(self.config['on_send'], session.player, retmsg, reason='send_notification')
 
         return ReturnValue(result = 'ok')
 
@@ -1637,47 +1756,73 @@ class HandleSendNotification(Handler):
            (not player['player_preferences'].get('enable_fb_notifications', self.gamedata['strings']['settings']['enable_fb_notifications']['default_val'])): # note: doesn't handle predicate chains
             return ReturnValue(result = 'disabled by player preference')
 
-        is_elder = (len(player['history'].get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+        elder_suffix = ''
 
-        if not self.force: # "soft" enable/disable checks
+        if player.get('abtests',{}).get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs','bfm'):
+            # NEW Notification2 path
+            n2_class = Notification2.get_user_class(player['history'], self.gamedata['townhall'])
+            elder_suffix = '_%s' % n2_class
 
-            if self.config and \
-               (is_elder and (not self.config.get('enable_elder', True))) or \
-               ((not is_elder) and (not self.config.get('enable_newbie', True))):
-                return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+            timezone = user['timezone'] if (user.get('timezone') is not None) else Notification2.DEFAULT_TIMEZONE
 
-            if not self.multi_per_logout:
-                last_logout = -1
-                if player['history'].get('sessions'):
-                    last_logout = player['history']['sessions'][-1][1]
-                if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
-                    return ReturnValue(result = 'already notified since last logout')
+            if not self.force:
+                can_send, reason = Notification2.can_send(self.time_now, timezone,
+                                                          self.n2_stream,
+                                                          self.config['ref'] if self.config else None,
+                                                          player['history'],
+                                                          player['cooldowns'],
+                                                          n2_class)
+                if not can_send:
+                    return ReturnValue(result = reason)
 
-            # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
-            # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
-            if self.config and \
-               (self.time_now - player['history'].get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
-                return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+        else:
+            # OLD path
+            is_elder = (len(player['history'].get('sessions', [])) >= self.gamedata['fb_notifications']['elder_threshold'])
+            elder_suffix = '_e' if is_elder else '_n'
 
-            if self.config and self.config.get('auto_mute',0) > 0:
-                mute_key = 'notification:'+self.config['ref']+':unacked'
-                if player['history'].get(mute_key,0) >= self.config['auto_mute']:
-                    if 'player_preferences' not in player: player['player_preferences'] = {}
-                    player['player_preferences'][self.config['mute_preference_key']] = 0
-                    return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
+            if not self.force: # "soft" enable/disable checks
+
+                if self.config and \
+                   (is_elder and (not self.config.get('enable_elder', True))) or \
+                   ((not is_elder) and (not self.config.get('enable_newbie', True))):
+                    return ReturnValue(result = 'disabled by elder/newbie status in the notification config')
+
+                if not self.multi_per_logout:
+                    last_logout = -1
+                    if player['history'].get('sessions'):
+                        last_logout = player['history']['sessions'][-1][1]
+                    if last_logout < 0 or player.get('last_fb_notification_time',-1) > last_logout:
+                        return ReturnValue(result = 'already notified since last logout')
+
+                # do not send notification if one *WITH SAME REF* was sent since min_minterval ago
+                # note: config-specific min_interval overrides the global one here, unlike in retention_newbie.py
+                if self.config and \
+                   (self.time_now - player['history'].get('notification:'+self.config['ref']+':last_time',-1)) < self.config.get('min_interval', self.gamedata['fb_notifications']['min_interval']):
+                    return ReturnValue(result = 'too frequent, same notification sent within min_interval ago')
+
+                if self.config and self.config.get('auto_mute',0) > 0:
+                    mute_key = 'notification:'+self.config['ref']+':unacked'
+                    if player['history'].get(mute_key,0) >= self.config['auto_mute']:
+                        if 'player_preferences' not in player: player['player_preferences'] = {}
+                        player['player_preferences'][self.config['mute_preference_key']] = 0
+                        return ReturnValue(result = 'too many unacknowledged %s notifications, auto-muting' % (self.config['ref']))
 
         # going to send!
         if self.gamedata['fb_notifications']['elder_suffix'] and self.config and self.config.get('elder_suffix',True):
-            fb_ref = self.config['ref'] + ('_e' if is_elder else '_n')
+            fb_ref = self.config['ref'] + elder_suffix
         elif self.config:
             fb_ref = self.config['ref']
         else:
             assert self.ref_override
             fb_ref = self.ref_override
+        fb_ref += self.ref_suffix
+
+        # BH users should also get Facebook notifications, where applicable
+        mirror_to_facebook = (user.get('frame_platform') == 'bh')
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
                                                            self.get_denormalized_summary_props_offline(user, player),
-                                                           replacements = self.replacements) or self.simulate:
+                                                           replacements = self.replacements, mirror_to_facebook = mirror_to_facebook) or self.simulate:
             player['last_fb_notification_time'] = self.time_now
             player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1
             if self.config:
@@ -1688,17 +1833,20 @@ class HandleSendNotification(Handler):
                 key = 'notification:'+self.config['ref']+':last_time'
                 player['history'][key] = self.time_now
 
-        return ReturnValue(result = 'ok')
+                if player.get('abtests',{}).get('T330_notification2') == 'on' or self.gamedata['game_id'] in ('dv','fs','bfm'):
+                    Notification2.record_send(self.time_now, timezone, self.n2_stream,
+                                              self.config['ref'],
+                                              player['history'], player['cooldowns'])
 
-    def get_denormalized_summary_props_offline(self, user, player):
-        ret = {'cc': player['history'].get(self.gamedata['townhall']+'_level',1),
-               'plat': user.get('frame_platform','fb'),
-               'rcpt': player['history'].get('money_spent', 0),
-               'ct': user.get('country','unknown'),
-               'tier': SpinConfig.country_tier_map.get(user.get('country','unknown'), 4)}
-        if user.get('developer'):
-            ret['developer'] = 1
-        return ret
+                if 'on_send' in self.config:
+                    reason = 'send_notification'
+                    cons = self.config['on_send']
+                    try:
+                        Consequents.read_consequent(cons).execute_offline(self.gamesite, user, player)
+                    except Exception:
+                        self.gamesite.exception_log.event(self.time_now, 'Consequent exception off-line player %d from %s:\n%s\n%s' % (self.user_id, reason, repr(cons), traceback.format_exc().strip()))
+
+        return ReturnValue(result = 'ok')
 
 class HandleApplyAllianceLeavePointLoss(Handler):
     def __init__(self, *pargs, **pkwargs):
@@ -1807,6 +1955,7 @@ methods = {
     'give_item': HandleGiveItem,
     'send_message': HandleSendMessage,
     'squad_dock_units': HandleSquadDockUnits,
+    'repair_base': HandleRepairBase,
     'resolve_home_raid': HandleResolveHomeRaid,
     'change_region': HandleChangeRegion,
     'demote_alliance_leader': HandleDemoteAllianceLeader,

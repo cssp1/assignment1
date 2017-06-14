@@ -515,7 +515,11 @@ def generate_showcase_consequent(data, fd):
         # LOGIN_SHOWCASE
         # make "login" version - delete random items, add NEW THIS WEEK text
         # note: this adds the extra_key_suffix to the consequent name since the tip name should be changed for each event release
-        tip_name = 'ai_%s%s%s_login_showcase' % (data['event_name'], data['key_suffix'][diff], data['extra_key_suffix'][diff])
+        if 'extra_key_suffix' in data:
+            extra_key_suffix = data['extra_key_suffix'][diff]
+        else:
+            extra_key_suffix = ''
+        tip_name = 'ai_%s%s%s_login_showcase' % (data['event_name'], data['key_suffix'][diff], extra_key_suffix)
         fd.write('"%s": ' % tip_name)
         login_showcase = copy.deepcopy(showcase)
         for FIELD in ('ui_random_rewards_text','feature_random_items','feature_random_item_count','corner_token_mode'):
@@ -1025,7 +1029,7 @@ if __name__ == '__main__':
 
             ui_priority = data['map_ui_priority'][diff]
             default_ui_priority = {'mf':300}.get(game_id,100)
-            if ui_priority != default_ui_priority:
+            if game_id != 'fs' and (ui_priority != default_ui_priority):
                 raise Exception('event %s should have map_ui_priority = %d' % (data['event_name'], default_ui_priority))
 
             if len(data['difficulties']) > 1:
@@ -1046,6 +1050,9 @@ if __name__ == '__main__':
                 is_first_base = unskipped_count == 0
 
                 ui_map_name = data['event_ui_name'] + (" (%s)" % diff if len(data['difficulties']) > 1 else '')
+
+                if game_id == 'fs' and data.get('repeatable'):
+                    ui_map_name = 'EVENT: '+ui_map_name+''
 
                 print >> out_fd, '''
     ////////////////////////////////////////////////////////////
@@ -1098,7 +1105,7 @@ if __name__ == '__main__':
                 if game_id != 'fs':
                     json.append(('auto_level',1))
 
-                for FIELD in ('ui_info_url', 'analytics_tag'):
+                for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
                     if FIELD in data: json.append((FIELD, data[FIELD]))
 
                 if is_first_base:
@@ -1116,7 +1123,12 @@ if __name__ == '__main__':
                 if is_first_base:
                     # first base in series
 
-                    show_pred['subpredicates'] += [{ "predicate": "NOT", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname}]}]
+                    show_pred['subpredicates'] += [{"predicate": "OR", "subpredicates": [
+                        # either cooldown is inactive
+                        {"predicate": "COOLDOWN_INACTIVE", "name": instance_cdname},
+                        # OR it's active and progress_now is zero
+                        {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
+                        ]}]
 
                     if diff == 'Normal':
                         show_pred['subpredicates'] += [
@@ -1134,6 +1146,17 @@ if __name__ == '__main__':
                             ]
                     else:
                         raise Exception('unhandled case')
+
+                    if 'max_cc_level_to_see' in data:
+                        # note: this only applies to the first base, and only if the instance cooldown
+                        # is inactive (allow players who started fighting this sequence and promote CC
+                        # level during the same week to finish the sequence)
+                        show_pred['subpredicates'] += [
+                            {"predicate": "OR", "subpredicates": [{"predicate": "COOLDOWN_ACTIVE", "name": instance_cdname},
+                                                                  {"predicate": "NOT", "subpredicates": [
+                            {"predicate": "BUILDING_LEVEL", "building_type": gamedata['townhall'], "trigger_level": data['max_cc_level_to_see'][diff]+1}]}
+                            ]}
+                            ]
                 else:
                     # not first base
                     show_pred['subpredicates'] += [{ "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname }]
@@ -1242,7 +1265,7 @@ if __name__ == '__main__':
 
                 # get on_visit cutscene consequents
                 on_visit_cutscene = None
-                if cutscenes:
+                if cutscenes and cutscenes[i]:
                     on_visit_cutscene = cutscenes[i].get('on_visit', None)
 
                 speaker_msg = []
@@ -1323,6 +1346,13 @@ if __name__ == '__main__':
                 attack_pred = None
                 trophy_pred = None
 
+                if is_first_base:
+                    # start the cooldown on attack of first level, and (re)initialize progress_now
+                    attack_pred = {"consequent": "AND", "subconsequents": [
+                        { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },
+                        { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "set", "value": i }
+                        ]}
+
                 # add "attempted" progress key
                 attempt_pred = { "consequent": "AND", "subconsequents": [
                     { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_attempted", "method": "max", "value": i+1 },
@@ -1387,7 +1417,7 @@ if __name__ == '__main__':
                 if visit_pred:
                     json += [("on_visit", visit_pred)]
 
-                if kind == 'ai_attack' and attack_pred:
+                if attack_pred:
                     json += [('on_attack', attack_pred)]
 
                 completion = { "consequent": "AND", "subconsequents": [] }
@@ -1424,11 +1454,16 @@ if __name__ == '__main__':
                             ]
 
                 elif i == (data['bases_per_difficulty']-1):
+                    # final base
                     completion['subconsequents'] += [
                         { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_times_completed", "method": "increment", "value": 1 },
                         ]
                     if ('extra_key_suffix' in data):
                         completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_times_completed", "method": "increment", "value": 1 }]
+
+                    if data.get('repeatable'):
+                        # reset progres_now back to zero
+                        completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "set", "value": 0 }]
 
                     if speedrun_aura:
                         if_i_win = [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_speedrun", "method": "max", "value": 1 },]
@@ -1460,7 +1495,7 @@ if __name__ == '__main__':
 
                 # get completion cutscene consequents
                 completion_cutscene = []
-                if cutscenes:
+                if cutscenes and cutscenes[i]:
                     completion_cutscene += cutscenes[i].get('completion', [])
 
                 # append auto_cutscenes after any manually-defined cutscenes
@@ -1582,6 +1617,13 @@ if __name__ == '__main__':
                                 '--tier=%d' % (data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base']),
                                 '--ui-name=%s %s L%d' % (data['event_name'], diff, i+1),
                                 base_file_path]
+                        if 'show_off_unit_in_bases' in data:
+                            args.insert(len(args)-1, '--show-off-unit=%s' % data['show_off_unit_in_bases'])
+                        if 'skew_flavor_in_bases' in data:
+                            args.insert(len(args)-1, '--skew-flavor=%s' % data['skew_flavor_in_bases'])
+                        if 'difficulty_index_in_bases' in data:
+                            args.insert(len(args)-1, '--difficulty-index=%r' % data['difficulty_index_in_bases'][diff][i])
+
                         #sys.stderr.write('\n'.join(args) + '\n')
                         subprocess.check_call(args)
 
@@ -1663,7 +1705,7 @@ if __name__ == '__main__':
             if 'villain_map_portrait' in data:
                 json += [("map_portrait", data['villain_map_portrait'][diff])]
 
-            for FIELD in ('ui_info_url', 'analytics_tag'):
+            for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
                 if FIELD in data: json.append((FIELD, data[FIELD]))
 
             assert unskipped_count == num_unskipped_bases

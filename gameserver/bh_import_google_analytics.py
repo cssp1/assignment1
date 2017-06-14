@@ -21,6 +21,7 @@ def bh_summary_schema(sql_util):
                        ('pageviews', 'INT8 NOT NULL'),
                        ('sessions', 'INT8 NOT NULL'),
                        ('new_users', 'INT8 NOT NULL'),
+                       ('dau', 'INT8 NOT NULL'),
                        ],
             'indices': {'by_interval': {'unique':False, 'keys': [('day','ASC')]}}
             }
@@ -43,6 +44,7 @@ def bh_login_campaign_summary_schema(sql_util):
     return {'fields': [('day', 'INT8 NOT NULL'),
                        ('event_name', 'VARCHAR(1024) NOT NULL'),
                        ('event_data', 'VARCHAR(1024)'),
+                       ('campaign_name', 'VARCHAR(1024)'),
                        ('campaign_source', 'VARCHAR(1024)'),
                        ('campaign_id', 'VARCHAR(1024)'),
                        ('count', 'INT4 NOT NULL'),
@@ -113,12 +115,13 @@ def get_report(analytics, day_start, dt, list_of_metrics, list_of_dimensions = N
         return [dict((met, int(row['metrics'][0]['values'][i])) for i, met in enumerate(list_of_metrics)) for row in rows]
 
 def get_summary_report(analytics, day_start, dt):
-    report = get_report(analytics, day_start, dt, ['ga:pageviews','ga:sessions','ga:newUsers'])
+    assert dt == 86400 # ga:newUsers requires one-day query
+    report = get_report(analytics, day_start, dt, ['ga:pageviews','ga:sessions','ga:newUsers','ga:1dayUsers'], ['ga:date'])
     return report
 def get_detail_report(analytics, day_start, dt):
     report = get_report(analytics, day_start, dt, ['ga:pageviews'], ['ga:fullReferrer', 'ga:hostname', 'ga:pagePath'])
     return report
-def get_event_report(analytics, categories, day_start, dt, extra_dimensions = []):
+def get_event_report(analytics, categories, day_start, dt, extra_dimensions = [], extra_filters = []):
     filter_clause = {'dimensionName': 'ga:eventCategory',
                      'expressions': categories}
     if len(categories) > 1:
@@ -127,7 +130,7 @@ def get_event_report(analytics, categories, day_start, dt, extra_dimensions = []
         filter_clause['operator'] = 'EXACT'
 
     report = get_report(analytics, day_start, dt, ['ga:totalEvents'], ['ga:eventAction', 'ga:eventLabel'] + extra_dimensions,
-                        dimension_filter_clauses = [{'filters': [filter_clause]}])
+                        dimension_filter_clauses = [{'filters': [filter_clause] + extra_filters}])
     return report
 
 def print_response(response):
@@ -193,44 +196,86 @@ if __name__ == '__main__':
         if table == bh_summary_table:
             report = get_summary_report(analytics, day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
-                            "("+sql_util.sym(interval)+",pageviews,sessions,new_users) " + \
-                            "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers']) for row in report))
+                            "("+sql_util.sym(interval)+",pageviews,sessions,new_users,dau) " + \
+                            "VALUES(%s,%s,%s,%s,%s)",
+                            [(day_start, row['ga:pageviews'], row['ga:sessions'], row['ga:newUsers'], row['ga:1dayUsers']) for row in report])
 
         elif table == bh_detail_table:
             report = get_detail_report(analytics, day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",referer,path,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start, row['ga:fullReferrer'], row['ga:hostname']+row['ga:pagePath'], row['ga:pageviews']) for row in report))
+                            [(day_start, row['ga:fullReferrer'], row['ga:hostname']+row['ga:pagePath'], row['ga:pageviews']) for row in report])
 
         elif table == bh_clicks_table:
             report = get_event_report(analytics, ["outbound-article","outbound-widget"], day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",click,count) " + \
                             "VALUES(%s,%s,%s)",
-                            ((day_start, '"%s" (%s)' % (row['ga:eventLabel'],row['ga:eventAction']), row['ga:totalEvents']) for row in report))
+                            [(day_start, '"%s" (%s)' % (row['ga:eventLabel'],row['ga:eventAction']), row['ga:totalEvents']) for row in report])
         elif table == bh_login_summary_table:
             report = get_event_report(analytics, ["bhlogin"], day_start, dt)
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
                             "("+sql_util.sym(interval)+",event_name,event_data,count) " + \
                             "VALUES(%s,%s,%s,%s)",
-                            ((day_start,
+                            [(day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
-                              row['ga:totalEvents']) for row in report))
+                              row['ga:totalEvents']) for row in report])
         elif table == bh_login_campaign_summary_table:
+
+            # need two separate queries here, due to quirkiness of the Google Analytics Reporting API
+
+            # it silently drops rows that don't have values along extra_dimensions
+
+            # first, query NON-Google Adwords events, which use campaign/source/code to disambiguate
             report = get_event_report(analytics, ["bhlogin"], day_start, dt,
-                                      extra_dimensions = ['ga:source', 'ga:campaignCode'])
+                                      extra_dimensions = ['ga:campaign', 'ga:source', 'ga:campaignCode'],
+                                      extra_filters =[{'dimensionName': 'ga:source',
+                                                       'expressions': ['google'],
+                                                       'not': True,
+                                                       'operator': 'EXACT'},
+                                                      {'dimensionName': 'ga:medium',
+                                                       'expressions': ['cpc'],
+                                                       'not': True,
+                                                       'operator': 'EXACT'}])
             cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
-                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_source,campaign_id,count) " + \
-                            "VALUES(%s,%s,%s,%s,%s,%s)",
-                            ((day_start,
+                            "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
+                            "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+                            [(day_start,
                               row['ga:eventAction'],
                               row.get('ga:eventLabel',None),
+                              row.get('ga:campaign',None),
                               row.get('ga:source',None),
                               row.get('ga:campaignCode',None),
-                              row['ga:totalEvents']) for row in report))
+                              row['ga:totalEvents']) for row in report])
+
+            # second, grab ONLY Google Adwords events (as identified by google/cpc source/medium)
+            report = get_event_report(analytics, ["bhlogin"], day_start, dt,
+                                      extra_dimensions = ['ga:campaign'],
+                                      extra_filters =[{'dimensionName': 'ga:source',
+                                                       'expressions': ['google'],
+                                                       'operator': 'EXACT'},
+                                                      {'dimensionName': 'ga:medium',
+                                                       'expressions': ['cpc'],
+                                                       'operator': 'EXACT'}])
+
+            try:
+                to_insert = [(day_start,
+                              row['ga:eventAction'],
+                              row.get('ga:eventLabel',None),
+                              'google', # campaign
+                              'google', # source
+                              row.get('ga:campaign',None), # note: Google Adwords Campaign name ->Code
+                              row['ga:totalEvents']) for row in report]
+                cur.executemany("INSERT INTO "+sql_util.sym(table)+" " + \
+                                "("+sql_util.sym(interval)+",event_name,event_data,campaign_name,campaign_source,campaign_id,count) " + \
+                                "VALUES(%s,%s,%s,%s,%s,%s,%s)",
+                                to_insert)
+            except:
+                print cur._last_executed
+                print '\n'.join(map(repr, to_insert))
+                raise
 
     for table, affected, interval, dt in ((bh_summary_table, set(), 'day', 86400),
                                           (bh_detail_table, set(), 'day', 86400),

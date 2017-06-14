@@ -814,7 +814,7 @@
                 // item in inventory
                 "then": { "if": {"predicate": "DIALOG_OPEN", "dialog_name": "inventory_dialog" },
                           "then": {"consequent": "AND", "subconsequents": [
-                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "inventory_dialog", "widget_name": "frame0,0", "direction": "down"},
+                              {"consequent": "TUTORIAL_ARROW", "arrow_type": "button", "dialog_name": "inventory_dialog", "widget_name": "INVENTORY:packaged_tutorial_droid", "direction": "down"},
                               {"consequent": "MESSAGE_BOX", "widgets": { "description": { "ui_name": "Click the item, then click \"Activate\" to use it." } } } ] },
                           "else": { "if": {"predicate": "AND", "subpredicates": [ {"predicate": "SELECTED", "type": "warehouse"},
                                                                                   {"predicate": "DIALOG_OPEN", "dialog_name": "context_menu"} ] },

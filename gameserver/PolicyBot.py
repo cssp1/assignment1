@@ -85,13 +85,13 @@ class AntiRefreshPolicy(Policy):
     # query for candidate violators from player cache
     @classmethod
     def player_cache_query(cls, db_client, time_range):
-        return db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([time_range], [],
-                                                                                                 townhall_name = gamedata['townhall'],
-                                                                                                 min_townhall_level = 3,
-                                                                                                 # use exclude to catch un-regioned players
-                                                                                                 exclude_home_regions = allow_refresh_region_names,
-                                                                                                 min_idle_check_fails = cls.MIN_FAILS,
-                                                                                                 min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 3,
+                                                                   # use exclude to catch un-regioned players
+                                                                   exclude_home_regions = allow_refresh_region_names,
+                                                                   min_idle_check_fails = cls.MIN_FAILS,
+                                                                   min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
     def check_player(self, user_id, player):
 
         # possible race condition after player cache lookup (?)
@@ -260,11 +260,11 @@ class AntiAltPolicy(Policy):
     # query for candidate violators from player cache
     @classmethod
     def player_cache_query(cls, db_client, time_range):
-        return db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([time_range], [],
-                                                                                                 townhall_name = gamedata['townhall'],
-                                                                                                 min_townhall_level = 3,
-                                                                                                 include_home_regions = anti_alt_region_names,
-                                                                                                 min_known_alt_count = 1)
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 3,
+                                                                   include_home_regions = anti_alt_region_names,
+                                                                   min_known_alt_count = 1)
 
 
     def check_player(self, user_id, player):

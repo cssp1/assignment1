@@ -1,3 +1,0 @@
-escape ^\\
-termcapinfo xterm* ti@:te@
-defshell -bash

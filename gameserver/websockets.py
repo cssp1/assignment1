@@ -30,16 +30,20 @@ factory.
 from base64 import b64encode, b64decode
 from hashlib import sha1
 from struct import pack, unpack
+from collections import deque
+import time
 
 from twisted.protocols.policies import ProtocolWrapper, WrappingFactory
 from twisted.python import log
 from twisted.web.resource import IResource
+import twisted.web.http
 from twisted.web.server import NOT_DONE_YET
 from twisted.internet.address import IPv4Address
 from zope.interface import implements
 
 import BrowserDetect
 import SpinHTTP
+import binascii
 
 import twisted.web.error, twisted.web.resource # DJM
 # handle different Twisted versions that moved NoResource around
@@ -55,6 +59,14 @@ class WSException(Exception):
     If this class escapes txWS, then something stupid happened in multiple
     places.
     """
+    def __init__(self, reason, raw_data = None):
+        Exception.__init__(self, reason)
+        self.raw_data = raw_data
+    def __str__(self):
+        ret = Exception.__str__(self)
+        if 0: # self.raw_data:
+            ret += (' Hex data (len %d):\n' % len(self.raw_data)) + binascii.hexlify(self.raw_data[:100]) + '...'
+        return ret
 
 # Control frame specifiers. Some versions of WS have control signals sent
 # in-band. Adorable, right?
@@ -109,6 +121,8 @@ def mask(buf, key):
     The key must be exactly four bytes long.
     """
 
+    assert len(key) == 4
+
 #    key = [ord(i) for i in key]
 #    buf = list(buf)
 #    for i, char in enumerate(buf):
@@ -161,7 +175,6 @@ def parse_hybi07_frames(buf):
     """
 
     start = 0
-    frames = []
 
     while True:
         # If there's not at least two bytes in the buffer, bail.
@@ -178,17 +191,15 @@ def parse_hybi07_frames(buf):
         # Check if any of the reserved flags are set.
         if header & 0x70:
             # At least one of the reserved flags is set. Pork chop sandwiches!
-            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header)
-            frames.append(("", CLOSE, fin))
-            return frames, buf
+            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header, raw_data = buf[start:])
 
         # Get the opcode, and translate it to a local enum which we actually
         # care about.
-        opcode = header & 0xf
+        raw_opcode = header & 0xf
         try:
-            opcode = opcode_types[opcode]
+            opcode = opcode_types[raw_opcode]
         except KeyError:
-            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode)
+            raise WSException("Unknown opcode %d in HyBi-07 frame" % raw_opcode, raw_data = buf[start:])
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -228,6 +239,8 @@ def parse_hybi07_frames(buf):
 
             key = buf[start + offset:start + offset + 4]
             offset += 4
+        else:
+            key = None
 
         if len(buf) - (start + offset) < length:
             break
@@ -236,6 +249,7 @@ def parse_hybi07_frames(buf):
 
         if masked:
             data = mask(data, key)
+            assert len(data) == length
 
         if opcode == CLOSE:
             if len(data) >= 2:
@@ -245,10 +259,10 @@ def parse_hybi07_frames(buf):
                 # No reason given; use generic data.
                 data = 1000, "No reason given"
 
-        frames.append((opcode, data, fin))
         start += offset + length
-
-    return frames, buf[start:]
+        future_data = buf[start:] # for debugging only
+        #log.err('HERE fin %d length %d buf %d' % (fin, length, len(buf) - start))
+        yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, future_data, key, data), start
 
 class WebSocketsProtocol(ProtocolWrapper):
     """
@@ -261,12 +275,39 @@ class WebSocketsProtocol(ProtocolWrapper):
     codec = None
     dumb_pong = False # temporary hack to work around Chrome v39+ Websockets code that doesn't like to receive data with a PONG
 
+    # DJM - for returning something in the Close frame
+    close_code = None
+    close_reason = ""
+
     # capture the peer address here since parsing it from a proxied HTTP request is complex
     # (see calls to SpinHTTP.* below) and we don't want to repeat that work.
-    def __init__(self, factory, wrappedProtocol, spin_peer_addr = None):
+    def __init__(self, factory, wrappedProtocol, spin_peer_addr = None, spin_headers = None):
         ProtocolWrapper.__init__(self, factory, wrappedProtocol)
         self.pending_frames = []
         self.spin_peer_addr = spin_peer_addr
+        self.spin_headers = spin_headers
+
+        # list of last couple of frames parsed, for debugging only
+        self.debug_frames = deque([], 5)
+
+    def dump_debug_frames(self, abbreviate = True):
+        return '\n'.join(self.dump_debug_frame(x, abbreviate) for x in self.debug_frames)
+    def dump_debug_frame(self, debug_frame, abbreviate):
+        parse_time, frame = debug_frame
+        opcode, raw_opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
+        if abbreviate and len(data) > 100:
+            # abbreviate the data
+            ui_data = data[0:16] + '...' + data[-16:]
+        else:
+            ui_data = data
+
+        if abbreviate and len(buffered_data) > 100:
+            ui_buffered_data =  buffered_data[0:16] + '...' + buffered_data[-16:]
+        else:
+            ui_buffered_data = buffered_data
+
+        return '%.7f opcode %3d fin %d len %d key %r buffered %d data %r buf %r' % \
+               (parse_time, raw_opcode, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -277,17 +318,37 @@ class WebSocketsProtocol(ProtocolWrapper):
         Find frames in incoming data and pass them to the underlying protocol.
         """
 
+        frames = []
+
         try:
-            frames, self.buf = parse_hybi07_frames(self.buf)
-        except WSException:
+            newstart = 0
+
+            for frame, newstart in parse_hybi07_frames(self.buf):
+                frames.append(frame)
+                self.debug_frames.append((time.time(), frame))
+
+            if newstart > 0:
+                self.buf = self.buf[newstart:]
+
+        except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
-            log.err(_why = 'while communicating with '+str(self.spin_peer_addr))
+            log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s\n%.7f (exception)' % \
+                    (self.spin_peer_addr, self.spin_headers, self.dump_debug_frames(), time.time()))
+            try:
+                with open("/tmp/websocket-debug-%d.txt" % int(time.time()), "w") as fd:
+                    fd.write(self.dump_debug_frames(abbreviate = False))
+                    fd.write("\n")
+            except:
+                pass
+
+            self.close_code = 1002 # protocol error
+            self.close_reason = e.args[0]
             self.loseConnection()
             return
 
         for frame in frames:
-            opcode, data, fin = frame
+            opcode, _0, fin, _1, _2, _3, _4, _5, data = frame
             if opcode == NORMAL:
                 # Business as usual. Decode the frame, if we have a decoder.
                 if self.codec:
@@ -320,6 +381,8 @@ class WebSocketsProtocol(ProtocolWrapper):
                     pong_data = ""
 
                 self.transport.write(make_hybi07_frame(pong_data, opcode=PONG)) # DJM - this used to say make_hybi07_packet() but there is no definition for that!
+            elif opcode == PONG:
+                pass # log.err("PONG! %r" % (self.spin_peer_addr,))
 
     def sendFrames(self):
         # DJM - this shouldn't happen
@@ -338,6 +401,10 @@ class WebSocketsProtocol(ProtocolWrapper):
             packet = make_hybi07_frame(frame)
             self.transport.write(packet)
         self.pending_frames = []
+
+    def sendPing(self):
+        # log.err("PING! %r" % (self.spin_peer_addr,))
+        self.transport.write(make_hybi07_frame("", opcode=PING))
 
     def dataReceived(self, data):
         self.buf += data
@@ -387,7 +454,11 @@ class WebSocketsProtocol(ProtocolWrapper):
         # Send a closing frame. It's only polite. (And might keep the browser
         # from hanging.)
         if not self.disconnecting:
-            frame = make_hybi07_frame("", opcode=CLOSE)
+            if self.close_code:
+                body = "%s%s" % (pack(">H", self.close_code), self.close_reason)
+            else:
+                body = ""
+            frame = make_hybi07_frame(body, opcode=CLOSE)
             self.transport.write(frame)
 
             ProtocolWrapper.loseConnection(self)
@@ -411,9 +482,9 @@ class WebSocketsFactory(WrappingFactory):
 
     protocol = WebSocketsProtocol
 
-    # pass extra addr parameter to WebsocketsProtocol to remember the peer address
-    def buildProtocol(self, addr):
-        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr)
+    # pass extra addr parameter to WebsocketsProtocol to remember the peer address and headers
+    def buildProtocol(self, addr, headers):
+        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr, spin_headers = headers)
 
 class WebSocketsResource(object):
     """
@@ -534,9 +605,13 @@ class WebSocketsResource(object):
             peer_port = request.transport.getPeer().port
         peer = IPv4Address('TCP', peer_ip, peer_port)
 
+        # DJM - for debugging only, remember the websocket headers that were sent with the request
+        headers = dict((k, v) for k, v in request.requestHeaders.getAllRawHeaders() \
+                       if k.startswith('Sec-Websocket-') or k == 'User-Agent')
+
         # Create the protocol. This could fail, in which case we deliver an
         # error status. Status 502 was decreed by glyph; blame him.
-        protocol = self._factory.buildProtocol(peer)
+        protocol = self._factory.buildProtocol(peer, headers)
         if not protocol:
             request.setResponseCode(502)
             return ""
@@ -544,6 +619,14 @@ class WebSocketsResource(object):
             protocol.codec = codec
 
         protocol.dumb_pong = dumb_pong
+
+        # prevent Twisted from going into chunked mode and adding "Content-Encoding: chunked" header,
+        # which doesn't seem to be correct for WebSockets
+        # (and breaks CloudFlare)
+        twisted.web.http.NO_BODY_CODES = (204, 304, 101)
+
+        # prevent Twisted from returning a "Content-Type" header, which breaks CloudFlare WebSockets
+        request.defaultContentType = None
 
         # Provoke request into flushing headers and finishing the handshake.
         request.write("")

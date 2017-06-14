@@ -59,6 +59,7 @@ echo "switch /etc/alternatives/python,pip,python-config to v2.7"
 echo "pip install --upgrade pip" # upgrade the upgrader
 echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
 echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
+echo "pip install --upgrade ndg-httpsclient pyasn1 urllib3" # for SNI support in requests
 echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
 echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
 echo "pip install --upgrade pyxDamerauLevenshtein"

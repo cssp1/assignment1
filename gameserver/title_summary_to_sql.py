@@ -29,7 +29,7 @@ def title_summary_schema(sql_util, interval):
             }
 
 # we need to query the upcache and metrics tables for each game
-GAMES = ['mf','tr','mf2','bfm','sg','dv']
+GAMES = ['mf','tr','mf2','bfm','sg','dv','fs']
 
 if __name__ == '__main__':
     commit_interval = 1000

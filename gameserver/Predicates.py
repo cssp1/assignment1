@@ -258,6 +258,21 @@ class ForemanIsBusyPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return player.foreman_is_busy()
 
+class BaseRichnessPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.min_richness = data['min_richness']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return (session.viewing_base.base_type == 'quarry') and \
+               session.viewing_base.base_richness >= self.min_richness
+
+class BaseTypePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.types = data['types']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.viewing_base.base_type in self.types
+
 class BuildingQuantityPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -355,19 +370,20 @@ class AuraActivePredicate(Predicate):
         Predicate.__init__(self, data)
         self.aura_name = data['aura_name']
         self.min_stack = data.get('min_stack',1)
+        self.min_level = data.get('min_level',-1)
         self.match_data = data.get('match_data', None)
     def is_satisfied(self, player, qdata):
         return self.is_satisfied2(None, player, qdata)
     def is_satisfied2(self, session, player, qdata, override_time = None):
         player.prune_player_auras()
-        aura_list = player.player_auras
+        aura_list = player.player_auras_iter_const()
         if override_time is not None:
             # also check against recently-expired auras (e.g. for sales)
-            aura_list = aura_list + player.get_player_auras_recently_expired(override_time)
+            aura_list = list(aura_list) + player.get_player_auras_recently_expired(override_time)
         for aura in aura_list:
             if override_time is not None and aura.get('start_time',-1) > override_time: continue
 
-            if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack:
+            if aura['spec'] == self.aura_name and aura.get('stack',1) >= self.min_stack and aura.get('level',1) >= self.min_level:
                 if self.match_data is not None:
                     is_matched = True
                     for k, v in self.match_data.iteritems():
@@ -966,6 +982,8 @@ def read_predicate(data):
     elif kind == 'OBJECT_UNDAMAGED': return ObjectUndamagedPredicate(data)
     elif kind == 'OBJECT_UNBUSY': return ObjectUnbusyPredicate(data)
     elif kind == 'FOREMAN_IS_BUSY': return ForemanIsBusyPredicate(data)
+    elif kind == 'BASE_TYPE': return BaseTypePredicate(data)
+    elif kind == 'BASE_RICHNESS': return BaseRichnessPredicate(data)
     elif kind == 'BUILDING_QUANTITY': return BuildingQuantityPredicate(data)
     elif kind == 'BUILDING_LEVEL': return BuildingLevelPredicate(data)
     elif kind == 'UNIT_QUANTITY': return UnitQuantityPredicate(data)

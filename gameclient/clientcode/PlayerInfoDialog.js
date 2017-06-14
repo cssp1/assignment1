@@ -596,7 +596,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         };
 
         // see all battles from OPPONENT'S perspective (developer only)
-        dialog.widgets['dev_battles_button'].show = player.is_developer();
+        dialog.widgets['dev_battles_button'].show = !gamedata['battle_logs_public'] && player.is_developer();
         dialog.widgets['dev_battles_button'].onclick = (function(_uid) { return function() {
             invoke_battle_history_dialog(_uid, -1, -1, '(DEV-ALL)', -1);
         }; })(user_id);
@@ -742,6 +742,10 @@ PlayerInfoDialog.update_profile_tab = function(dialog) {
             dialog.widgets['battles_button'].show = true;
             if(user_id === session.user_id) {
                 dialog.widgets['battles_button'].onclick = function() { invoke_battle_history_dialog(session.user_id, -1, session.alliance_id, '', -1); };
+            } else if(gamedata['battle_logs_public']) {
+                dialog.widgets['battles_button'].onclick = (function (_uid, _alliance_id) { return function() {
+                    invoke_battle_history_dialog(_uid, -1, _alliance_id, '', -1);
+                }; })(user_id, r['alliance_id'] || -1);
             } else {
                 if(session.is_in_alliance() && session.alliance_id === r['alliance_id']) {
                     // same alliance: see battles involving this player (while they were in the alliance)

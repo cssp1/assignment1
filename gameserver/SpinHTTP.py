@@ -6,7 +6,7 @@
 
 # HTTP utilities
 
-import time
+import time, re
 
 # create RFC2822 timestamp
 def format_http_time(stamp):
@@ -166,6 +166,18 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
                     return request.getClientIP()
 
     return request.getClientIP()
+
+ipv6_re = re.compile(r'([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4})')
+
+def ip_matching_key(ip):
+    """ Return the value to compare against to detect if clients are 'alts' of each other.
+    For IPv4, it's the raw address. But for IPv6, it's the /64 part, since it seems like
+    multiple devices on a home network often have different IPv6 addresses within the /64. """
+    if len(ip) > 16:
+        match = ipv6_re.match(ip)
+        if match:
+            return ':'.join(match.groups()[0:4]) + '::/64'
+    return ip
 
 def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = True): # XXXXXX temporary
     if proxy_secret:

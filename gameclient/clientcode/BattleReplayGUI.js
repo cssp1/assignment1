@@ -38,10 +38,11 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
             var link_url = dialog.user_data['link_url'];
             var s = gamedata['strings']['copy_replay_link_success'];
             SPUI.copy_text_to_clipboard(link_url);
-            invoke_child_message_dialog(s['ui_title'],
-                                        s['ui_description'].replace('%URL', link_url)
-                                       // {'dialog': 'message_dialog_big'}
-                                       );
+            var child = invoke_child_message_dialog(s['ui_title'],
+                                                    s['ui_description'].replace('%URL', link_url)
+                                                    // {'dialog': 'message_dialog_big'}
+                                                   );
+            child.xy = vec_add(child.xy, [0,100]);
             return;
         };
     } else {
@@ -49,9 +50,10 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
     }
 
     // FB share button
-    if(link_qs && spin_frame_platform === 'fb') {
-        dialog.widgets['share_button'].show = true;
-        dialog.widgets['share_button'].onclick = function(w) {
+    if(link_qs && FBShare.supported()) {
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = true;
+        dialog.widgets['fb_share_button'].onclick = function(w) {
             var dialog = w.parent;
             FBShare.invoke({link_qs: dialog.user_data['link_qs'],
                             name: gamedata['virals']['replay']['ui_post_headline']
@@ -61,7 +63,8 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
                            });
         };
     } else {
-        dialog.widgets['share_button'].show = false;
+        dialog.widgets['fb_share_button'].show =
+            dialog.widgets['fb_share_icon'].show = false;
     }
 
     dialog.ondraw = BattleReplayGUI.update;
@@ -72,7 +75,7 @@ BattleReplayGUI.invoke = function(replay_player, link_url, link_qs) {
 BattleReplayGUI.update = function(dialog) {
     var replay_player = dialog.user_data['player'];
     dialog.xy = [Math.floor((SPUI.canvas_width - dialog.wh[0])/2),
-                 Math.max(15, Math.floor(0.05*SPUI.canvas_height))];
+                 Math.max(10, Math.floor(0.04*SPUI.canvas_height))];
     // update description text
     var total_seconds = Math.max(replay_player.num_ticks()-1, 1) * TICK_INTERVAL;
     var total_minutes = Math.floor(total_seconds/60.0);
@@ -100,4 +103,5 @@ BattleReplayGUI.update = function(dialog) {
                                                   .replace('%attacker', replay_player.header['attacker_name'] || '?')
                                                   .replace('%defender', replay_player.header['defender_name'] || '?'),
                                                   null, system_chat_bbcode_click_handlers); // for [url] handling
+    dialog.widgets['description'].clip_to_max_lines(2, '');
 };

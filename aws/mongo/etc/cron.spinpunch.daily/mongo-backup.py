@@ -84,7 +84,7 @@ if __name__ == '__main__':
         elif key == '-v': verbose = True
 
     # get list of databases
-    databases = filter(lambda x: bool(x), subprocess.Popen(mongo_cmd + ['admin', '--quiet', '--eval', "db.adminCommand('listDatabases')['databases'].forEach(function(x) { print(x['name']); });"], stdout=subprocess.PIPE).stdout.read().split('\n'))
+    databases = filter(lambda x: bool(x), subprocess.Popen(mongo_cmd + ['admin', '--quiet', '--eval', "rs.slaveOk(); db.adminCommand('listDatabases')['databases'].forEach(function(x) { print(x['name']); });"], stdout=subprocess.PIPE).stdout.read().split('\n'))
 
     if verbose: print 'host databases:', databases
 

@@ -14,8 +14,8 @@ import SpinSingletonProcess
 # load gamedata
 gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
-critical_re = re.compile('([0-9]+)h')
-retain_re = re.compile('retain_([0-9]+)h')
+critical_re = re.compile('^([0-9]+)h$')
+retain_re = re.compile('^retain_([0-9]+)h$')
 
 # skip users last modified a long time ago
 MAX_MTIME_AGE = 3*24*60*60 # 3 days
@@ -113,6 +113,18 @@ def check_retain(pcache, player, config):
     if (time_now - pcache.get('last_login_time',-1)) >= num_hours*3600:
         return config['ref'], '', None # send it
     return None, None, None
+
+def check_login_incentive_expiring(pcache, player, config):
+    aura_list = player.get('player_auras', [])
+    for aura in aura_list:
+        if aura['spec'] == 'login_incentive_ready' and \
+           time_now >= aura.get('start_time',-1) and \
+           time_now < aura['end_time'] and \
+           time_now >= aura['end_time'] - 8 * 3600: # XXX A/B test how soon to start sending these
+            ui_time_togo = '%.1f hrs' % ((aura['end_time']-time_now)/3600.0)
+            return config['ref'], ui_time_togo, None
+    return None, None, None
+
 def check_fishing_complete(pcache, player, config):
     prefs = player.get('player_preferences', {})
     if type(prefs) is dict and (not prefs.get('enable_fishing_notifications',True)): return None, None, None
@@ -158,6 +170,7 @@ CHECKERS = {
     'production_complete': check_production_complete,
     'army_repaired': check_army_repaired,
     'fishing_complete': check_fishing_complete,
+    'login_incentive_expiring': check_login_incentive_expiring,
     'retain_': check_retain,
     }
 
@@ -265,6 +278,7 @@ class Sender(object):
             return
 
         # cannot re-notify a player notified since last login, except for critical windows
+        # and note that retain_* notifications do NOT update last_fb_notification_time
         if pcache.get('last_fb_notification_time', -1) >= pcache.get('last_login_time', -1):
             can_notify_again = False
             if 'account_creation_time' in pcache:
@@ -277,11 +291,17 @@ class Sender(object):
                 print >> self.msg_fd, '(player_cache says) has already been notified since last login, and is not in critical window'
                 return
 
-        player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
+        try:
+            player = SpinJSON.loads(SpinUserDB.driver.sync_download_player(user_id))
 
-#        if (player['abtests'].get("T125_newbie_notification", None) == "control"):
-#            print >> self.msg_fd, '(player says) in non-notification control group'
-#            return
+        except SpinS3.S3404Exception:
+            # missing playerdb - might be due to an S3 failure
+            print >> self.msg_fd, '(playerDB data missing)'
+            return
+
+        if (player['abtests'].get('T330_notification2', None) == "on") or gamedata['game_id'] in ('dv','fs','bfm'):
+            print >> self.msg_fd, '(player says) in T330_notification2, skipping'
+            return
 
         prefs = player.get('player_preferences', {})
         if type(prefs) is dict and (not prefs.get('enable_fb_notifications', gamedata['strings']['settings']['enable_fb_notifications']['default_val'])):
@@ -423,7 +443,11 @@ class Sender(object):
                                   'ui_cta': email_conf['ui_cta'].encode('utf-8'),
                                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (config['ref'], config['ref'] + ref_suffix),
                                   'tags': SpinConfig.game()+'_'+config['ref']+ref_suffix,
+
+                                  # BH users should also get Facebook notifications, where applicable
+                                  'facebook': '1'
                                   }
+
                     else:
                         raise Exception('unexpected frame_platform %r' % frame_platform)
 
@@ -543,8 +567,8 @@ if __name__ == '__main__':
 
         if not test:
             if verbose: print 'querying player_cache...'
-            id_list += db_client.player_cache_query_tutorial_complete_and_mtime_between_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
-                                                                                                         [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
+            id_list += db_client.player_cache_query_mtime_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
+                                                                           [[time_now - r[1], time_now - r[0]] for r in CRITICALS.itervalues()])
 
         id_list.sort(reverse=True)
         total_count = len(id_list)

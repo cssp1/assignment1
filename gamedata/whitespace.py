@@ -23,7 +23,7 @@ def dir_filter(name):
 
 # don't bother checking raw AI base contents
 def is_ai_base_dir(name):
-    return ('_ai_bases_' in name) or ('_hives_' in name) or name.endswith('_quarries') or name.endswith('_hives') \
+    return ('_ai_bases_' in name) or ('_hives_' in name) or name.endswith('_quarries') or name.endswith('_hives') or name.endswith('_quarries_source') or name.endswith('_ai_bases_source') \
            or name == 'ai_base_generator'
 
 # only process files named with these endings

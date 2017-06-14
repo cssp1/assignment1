@@ -26,8 +26,8 @@ def get_issues(data, game_id):
         if data['browser_fails'] and float(data['browser_fails'])/hau >= 0.2:
             issues.append('Browser Issues per HAU >= 0.2')
 
-        # alert only on 5k+/day notifications. SG has auto-targeting enabled, so no warning is needed.
-        if data['fb_notifications_sent_24h'] > 5000 and game_id != 'sg':
+        # alert only on 7k+/day notifications. SG has auto-targeting enabled, so no warning is needed.
+        if data['fb_notifications_sent_24h'] > 7000 and game_id != 'sg':
             ctr = float(data['fb_notifications_clicked_24h'])/float(data['fb_notifications_sent_24h'])
 
             # Add an 8% "fudge factor" to account for notification clicks that don't result
@@ -86,10 +86,11 @@ if __name__ == '__main__':
     raw_data['hau'] = rows[0]['hau']
 
     # get the browser-issues data points
-    cur.execute('''SELECT SUM(IF(event_name = '0660_asset_load_fail',1,0)) AS cdn_fails,
-                          SUM(IF(event_name NOT IN ('0660_asset_load_fail','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy','0673_client_cannot_log_in_under_attack'),1,0)) AS browser_fails
-                   FROM %s WHERE time >= %%s AND time < %%s''' % sql_util.sym(client_trouble_table),
+    cur.execute("""SELECT SUM(IF(event_name = '0660_asset_load_fail',1,0)) AS cdn_fails,
+                          SUM(IF(event_name NOT IN ('0660_asset_load_fail','0623_client_reconnected','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy','0643_client_died_from_ws_shutdown','0673_client_cannot_log_in_under_attack'),1,0)) AS browser_fails
+                   FROM %s WHERE time >= %%s AND time < %%s AND ip NOT in ('208.114.165.109')""" % sql_util.sym(client_trouble_table),
                 [last_valid_hour, last_valid_hour + 3600])
+    # (exclude some folks with bad internet connections)
     rows = cur.fetchall()
     if rows and rows[0]:
         raw_data['cdn_fails'] = rows[0]['cdn_fails']

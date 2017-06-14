@@ -128,9 +128,10 @@ var spin_try_to_log_in = function() {
         spin_login_in_progress = false;
         console.log('spin_try_to_log_in response:');
         console.log(response);
-        if(response && response.authResponse) {
+        if(response && response.authResponse && response.authResponse['signedRequest'] && response.authResponse['accessToken']) {
             spin_login_metric('0032_request_permission_prompt_success', {'social_id': 'fb'+response.authResponse.userID.toString()});
-            top.location.href = spin_game_container_url; // redirect to game
+            // redirect to game
+            spin_redirect_to_game_with_credentials(response.authResponse);
             return;
         } else {
             spin_login_metric('0033_request_permission_prompt_fail');
@@ -157,12 +158,55 @@ var spin_try_to_log_in = function() {
 var spin_on_login_status = function(response) {
     console.log('spin_on_login_status response:');
     console.log(response);
-    if(response && response.authResponse) {
+    if(response && response.authResponse &&
+       response.authResponse['signedRequest'] && response.authResponse['accessToken']) {
         spin_login_metric('0034_request_permission_prompt_unnecessary');
-        top.location.href = spin_game_container_url; // already logged in - redirect to game
+        // already logged in - redirect to game
+        spin_redirect_to_game_with_credentials(response.authResponse);
     } else {
         spin_try_to_log_in();
     }
+};
+
+var spin_redirect_to_game_with_credentials = function(authResponse) {
+    var signed_request = authResponse['signedRequest'];
+    var oauth_token = authResponse['accessToken'];
+    var new_url = location.href;
+    // chop off anchor
+    if(new_url.indexOf('#') >= 0) {
+        new_url = new_url.slice(0, new_url.indexOf('#'));
+    }
+
+    // send credentials in URL so that proxyserver will see them
+    new_url = update_url_parameter(new_url, 'signed_request', null);
+    new_url = update_url_parameter(new_url, 'spin_signed_request', signed_request);
+    new_url = update_url_parameter(new_url, 'spin_oauth_token', oauth_token);
+    location.href = new_url;
+};
+
+var update_url_parameter = function(uri, key, value) {
+    // remove the hash part before operating on the uri
+    var i = uri.indexOf('#');
+    var hash = i === -1 ? ''  : uri.substr(i);
+    uri = i === -1 ? uri : uri.substr(0, i);
+
+    var re = new RegExp("([?&])" + key + "=.*?(&|$)", "i");
+    var separator = uri.indexOf('?') !== -1 ? "&" : "?";
+
+    if (!value) {
+        // remove key-value pair if value is empty
+        uri = uri.replace(new RegExp("([?&]?)" + key + "=[^&]*", "i"), '');
+        if (uri.slice(-1) === '?') {
+            uri = uri.slice(0, -1);
+        }
+        // replace first occurrence of & by ? if no ? is present
+        if (uri.indexOf('?') === -1) uri = uri.replace(/&/, '?');
+    } else if (uri.match(re)) {
+        uri = uri.replace(re, '$1' + key + "=" + encodeURIComponent(value) + '$2');
+    } else {
+        uri = uri + separator + key + "=" + encodeURIComponent(value);
+    }
+    return uri + hash;
 };
 
 FB.getLoginStatus(spin_on_login_status);
