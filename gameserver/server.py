@@ -1518,26 +1518,6 @@ class User:
                 if gamedata['server'].get('log_fb_conversion_pixels',1):
                     gamesite.exception_log.event(server_time, 'got fb_conversion_pixels context for user %d: "%s"' % (self.user_id, repr(self.fb_conversion_pixels_context)))
 
-            # increment history counters for app notification clicks
-            if player and ('notif_t=app_notification' in data.get('url','')) and ('fb_ref' in data):
-                # strip suffixes applied by retention_newbie.py
-                ref = data['fb_ref']
-
-                # strip A/B test suffix
-                if len(ref) >= 3 and ref[-2] == '_' and ref[-1] >= 'A' and ref[-1] <= 'Z': ref = ref[:-2]
-                # strip n2_class suffix
-                if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
-
-                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, player.history)
-
-                for IGNORE in ('_24h', '_168h'):
-                    ref = ref.replace(IGNORE, '')
-
-                dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
-                # reset unacked counter
-                if 'notification:'+ref+':unacked' in player.history:
-                    del player.history['notification:'+ref+':unacked']
-
             if 'skynet_retarget' in data:
                 if self.skynet_retargets is None: self.skynet_retargets = []
                 # append but do not allow duplicates
@@ -14829,7 +14809,7 @@ def get_acquisition_data_from_url(url, user_id):
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': q['fb_source'][0] }
         if q.has_key('fb_ref'):
             ret['fb_ref'] = q['fb_ref'][0]
-        if (q.has_key('notif_t') and q['notif_t'][0] == 'app_notification'):
+        if q['fb_source'][0] == 'notification' and (not q.has_key('app_request_type') or q['app_request_type'][0] != 'user_to_user'):
             ret['useless'] = 1 # app-to-user notification - already acquired
     elif q.has_key('is_arcade') and q['is_arcade'][0] == '1':
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'facebook_arcade' }
@@ -14858,7 +14838,7 @@ def get_acquisition_data_from_url(url, user_id):
         # mark super-common FB bookmark clicks as useless for acquisition tracking purposes,
         # to avoid userdb bloat
         if ('fb_source' in q and q['fb_source'][0].endswith('bookmark')) or \
-           ('notif_t' in q and q['notif_t'][0] == 'app_request') or \
+           ('app_request_type' in q and q['app_request_type'][0] == 'user_to_user') or \
            ('ref' in q and q['ref'][0] == 'bookmarks'):
             ret['useless'] = 1
 
@@ -26415,10 +26395,32 @@ class GAMEAPI(resource.Resource):
 
             # record FB notification hits
             if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
-               ('app_request_type' not in url_qs) and ('fb_ref' in url_qs):
+               ('app_request_type' not in url_qs or url_qs['app_request_type'][0] != 'user_to_user') and \
+               ('fb_ref' in url_qs):
+                fb_ref = url_qs['fb_ref'][0]
+
+                # strip suffixes applied by retention_newbie.py
+                ref = fb_ref
+
+                # strip A/B test suffix
+                if len(ref) >= 3 and ref[-2] == '_' and ref[-1] >= 'A' and ref[-1] <= 'Z': ref = ref[:-2]
+                # strip n2_class suffix
+                if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
+
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
-                                    'fb_ref': url_qs['fb_ref'][0]})
+                                    'fb_ref': fb_ref, 'ref': ref})
+
+                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, session.player.history)
+
+                # legacy ack tracking
+                for IGNORE in ('_24h', '_168h'):
+                    ref = ref.replace(IGNORE, '')
+
+                dict_increment(session.player.history, 'fb_notification:'+ref+':clicked', 1)
+                # reset unacked counter
+                if 'notification:'+ref+':unacked' in session.player.history:
+                    del session.player.history['notification:'+ref+':unacked']
 
             # record FB request (invite or gift) hits
             if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
