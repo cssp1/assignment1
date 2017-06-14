@@ -288,7 +288,7 @@ class Sender(object):
         if last_logout_time < 0:
             print >> self.msg_fd, '(player_cache says) no last_logout_time'
             return
-        if (time_now - last_logout_time) < MIN_MTIME_AGE:
+        if (not test_mode) and (time_now - last_logout_time) < MIN_MTIME_AGE:
             print >> self.msg_fd, '(player_cache says) player logged out less than %d minutes ago' % (MIN_MTIME_AGE/60)
             return
 
@@ -315,7 +315,7 @@ class Sender(object):
         # note: trust pcache on timezone - it's not really critical
         timezone = pcache.get('timezone', Notification2.DEFAULT_TIMEZONE)
 
-        if (last_logout_time < 0 or (time_now - last_logout_time) < MIN_MTIME_AGE):
+        if (not test_mode) and (last_logout_time < 0 or (time_now - last_logout_time) < MIN_MTIME_AGE):
             print >> self.msg_fd, '(player says) played less than %d mins ago' % (MIN_MTIME_AGE/60)
             return
 
@@ -334,6 +334,10 @@ class Sender(object):
                                                       Notification2.ref_to_stream(key), key, player['history'],
                                                       player['cooldowns'], n2_class)
             if not can_send:
+                if test_mode and key == 'login_incentive_expiring':
+                    can_send = True
+                    ref, replace_s, checker_state = config['ref'], '1.0 hrs', None
+                    break
                 #print >> self.msg_fd, '%s: Notification2.can_send False because %s...' % (key, reason)
                 continue
 
@@ -465,7 +469,7 @@ if __name__ == '__main__':
 
         id_list = []
         if test_mode:
-            id_list += [1112, 1114, 1115, 1179934, 1179935]
+            id_list += [1111, 1112, 1114, 1115, 1179934, 1179935]
 
         if not test_mode:
             if verbose: print 'querying player_cache...'
