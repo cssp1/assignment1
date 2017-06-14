@@ -26397,6 +26397,8 @@ class GAMEAPI(resource.Resource):
             if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
                ('app_request_type' not in url_qs or url_qs['app_request_type'][0] != 'user_to_user') and \
                ('fb_ref' in url_qs):
+
+                medium = url_qs['utm_medium'][0] if 'utm_medium' in url_qs else None
                 fb_ref = url_qs['fb_ref'][0]
 
                 # strip suffixes applied by retention_newbie.py
@@ -26409,7 +26411,7 @@ class GAMEAPI(resource.Resource):
 
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
-                                    'fb_ref': fb_ref, 'ref': ref})
+                                    'fb_ref': fb_ref, 'ref': ref, 'medium': medium})
 
                 Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, session.player.history)
 
@@ -26461,10 +26463,12 @@ class GAMEAPI(resource.Resource):
             if ('bh_source' in url_qs) and (url_qs['bh_source'][0] == 'notification') and \
                ('ref' in url_qs) and ('fb_ref' in url_qs) and url_qs['ref'][0]:
                 ref = url_qs['ref'][0]
+                fb_ref = url_qs['fb_ref'][0]
+                medium = url_qs['utm_medium'][0] if 'utm_medium' in url_qs else None
+
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
-                                    'ref': ref,
-                                    'fb_ref': url_qs['fb_ref'][0]})
+                                    'fb_ref': fb_ref, 'ref': ref, 'medium': medium})
                 dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
                 # reset unacked counter
                 if 'notification:'+ref+':unacked' in player.history:
