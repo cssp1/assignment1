@@ -14023,7 +14023,7 @@ class LivePlayer(Player):
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
-        cur_notification2_gen = Predicates.eval_cond_or_literal(gamedata['fb_notifications']['notification2_gen'], session, self)
+        cur_notification2_gen = Predicates.eval_cond_or_literal(gamedata['fb_notifications'].get('notification2_gen',None), session, self)
         do_reset_notification2 = ('notification2_gen' in gamedata['fb_notifications'] and \
                                   self.history.get('notification2_gen',None) != cur_notification2_gen)
 
