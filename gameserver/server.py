@@ -239,6 +239,10 @@ def is_valid_alias(name):
 # recognize obsolete time-series history fields for deletion
 obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$|^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
 
+# recognize notification2 state counters for clearing
+# note: do not clear :last_time, since that is required to avoid unnecessary repetition
+notification2_state_re = re.compile('^notification2:.+:(sent|clicked|unacked)$')
+
 SCORES2_MIGRATION_VERSION = 9
 
 def conceal_protection_time(x):
@@ -8831,6 +8835,8 @@ class Player(AbstractPlayer):
                        # also mark this account as not needing an XP migration
                        'xp_gen': gamedata['player_xp'].get('xp_migrate_to', gamedata['player_xp'].get('xp_gen',0))
                        }
+        if 'notification2_gen' in gamedata['fb_notifications']:
+            new_history['notification2_gen'] = Predicates.eval_cond_or_literal(gamedata['fb_notifications']['notification2_gen'], None, self)
 
         # NOTE: carry over certain metrics even across tutorial restarts
         save_fields = ['logged_in_times', 'time_in_game', 'longest_play_session']
@@ -14017,10 +14023,18 @@ class LivePlayer(Player):
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
-        # get rid of obsolete Scores1 time series history fields
+        cur_notification2_gen = Predicates.eval_cond_or_literal(gamedata['fb_notifications']['notification2_gen'], session, self)
+        do_reset_notification2 = ('notification2_gen' in gamedata['fb_notifications'] and \
+                                  self.history.get('notification2_gen',None) != cur_notification2_gen)
+
+        # get rid of obsolete history fields
         for k in self.history.keys():
-            if obsolete_time_series_re.match(k):
+            if (obsolete_time_series_re.match(k) or \
+                (do_reset_notification2 and notification2_state_re.match(k))):
                 del self.history[k]
+
+        if do_reset_notification2:
+            self.history['notification2_gen'] = cur_notification2_gen
 
         # fix bad intro mails
         if self.history.get('inventory_intro_mail_sent',0) < 2:
