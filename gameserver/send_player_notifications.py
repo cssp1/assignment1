@@ -440,7 +440,7 @@ class Sender(object):
                                    ui_body_html = ui_body_html,
                                    tags = ['%s_%s%s' % (config['ref'], n2_class, ref_suffix)])
 
-                if dry_run:
+                if self.dry_run:
                     print >> self.msg_fd, '(dry-run) mailgun: %r' % req
                 else:
                     mg_response = getattr(self.requests_session, req['method'].lower())(req['url'], data = req['params'], headers = req['headers'])
