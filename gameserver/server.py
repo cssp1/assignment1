@@ -1522,6 +1522,10 @@ class User:
             if player and ('notif_t=app_notification' in data.get('url','')) and ('fb_ref' in data):
                 # strip suffixes applied by retention_newbie.py
                 ref = data['fb_ref']
+
+                # strip A/B test suffix
+                if len(ref) >= 3 and ref[-2] == '_' and ref[-1] >= 'A' and ref[-1] <= 'Z': ref = ref[:-2]
+                # strip n2_class suffix
                 if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
 
                 Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, player.history)
