@@ -21,7 +21,7 @@ retain_re = re.compile('^retain_([0-9]+)h(_incentive)?$')
 MAX_MTIME_AGE = 8*86400 # 8+ days
 
 # skip users last modified fewer than this many seconds ago
-MIN_MTIME_AGE = 30*60 # 30min
+MIN_MTIME_AGE = 60*60 # 60min
 
 # process batches of this many users at once
 BATCH_SIZE = 100
