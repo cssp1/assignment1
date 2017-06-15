@@ -853,7 +853,7 @@ def check_spell(spellname, spec):
     for PRED in ('requires', 'show_if'):
         if PRED in spec:
             error |= check_predicate(spec[PRED], reason = spellname+':'+PRED)
-    for CONS in ('pre_activation', 'consequent'):
+    for CONS in ('pre_activation', 'consequent', 'on_purchase'):
         if CONS in spec:
             error |= check_consequent(spec[CONS], reason = spellname+':'+CONS)
 

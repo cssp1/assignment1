@@ -17581,9 +17581,16 @@ class Store(object):
                         price_description.append(extra_description)
 
                 # very important to do this last, since it may change the loot/description
+
+                # consequent on a loot table attached to the spell
                 on_purchase_cons = Store.buy_gamebucks_sku_get_loot_table_parameter(session, session.player, loot_table, 'on_purchase')
                 if on_purchase_cons:
                      session.execute_consequent_safe(on_purchase_cons, session.player, retmsg, reason=spellname+':loot_table')
+
+            # consequent on the spell itself
+            if 'on_purchase' in spell:
+                session.execute_consequent_safe(spell['on_purchase'], session.player, retmsg, reason=spellname+':on_purchase')
+
 
             # show "additional" gamebucks earned for purchase as if it were an item
             if 'nominal_quantity' in spell and spell['nominal_quantity'] < spell['quantity'] and \
