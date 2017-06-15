@@ -454,8 +454,8 @@
             {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "mf2"},
             {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"},
             {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "sg"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "fs"}
-            //{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "dv"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "fs"},
+            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "dv"}
             //{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "tr"},
         ]},
 

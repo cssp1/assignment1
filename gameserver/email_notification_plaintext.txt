@@ -1,0 +1,16 @@
+{{ UI_BODY }}
+
+{{ UI_CTA }}
+
+{{ GAME_URL }}
+
+-----
+
+Don't want emails? Unsubscribe here:
+{{ UNSUBSCRIBE_URL }}
+
+Privacy Policy:
+https://www.battlehouse.com/privacy-policy/
+
+(c) Battlehouse
+7357 Woodbine Ave, Suite 119, Markham, ON, L3R6L3 Canada

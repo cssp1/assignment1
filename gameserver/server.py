@@ -239,6 +239,10 @@ def is_valid_alias(name):
 # recognize obsolete time-series history fields for deletion
 obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_manufactured_at_time$|^(.+)recycled_at_time$|^(.+)_wk([0-9]+)_at_time$|^(.+)_s([0-9]+)_at_time$')
 
+# recognize notification2 state counters for clearing
+# note: do not clear :last_time, since that is required to avoid unnecessary repetition
+notification2_state_re = re.compile('^notification2:.+:(sent|clicked|unacked)$')
+
 SCORES2_MIGRATION_VERSION = 9
 
 def conceal_protection_time(x):
@@ -1517,22 +1521,6 @@ class User:
                                                                       'context':self.fb_conversion_pixels_context, 'url':data.get('url','unknown')})
                 if gamedata['server'].get('log_fb_conversion_pixels',1):
                     gamesite.exception_log.event(server_time, 'got fb_conversion_pixels context for user %d: "%s"' % (self.user_id, repr(self.fb_conversion_pixels_context)))
-
-            # increment history counters for app notification clicks
-            if player and ('notif_t=app_notification' in data.get('url','')) and ('fb_ref' in data):
-                # strip suffixes applied by retention_newbie.py
-                ref = data['fb_ref']
-                if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
-
-                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, player.history)
-
-                for IGNORE in ('_24h', '_168h'):
-                    ref = ref.replace(IGNORE, '')
-
-                dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
-                # reset unacked counter
-                if 'notification:'+ref+':unacked' in player.history:
-                    del player.history['notification:'+ref+':unacked']
 
             if 'skynet_retarget' in data:
                 if self.skynet_retargets is None: self.skynet_retargets = []
@@ -8847,6 +8835,8 @@ class Player(AbstractPlayer):
                        # also mark this account as not needing an XP migration
                        'xp_gen': gamedata['player_xp'].get('xp_migrate_to', gamedata['player_xp'].get('xp_gen',0))
                        }
+        if 'notification2_gen' in gamedata['fb_notifications']:
+            new_history['notification2_gen'] = Predicates.eval_cond_or_literal(gamedata['fb_notifications']['notification2_gen'], None, self)
 
         # NOTE: carry over certain metrics even across tutorial restarts
         save_fields = ['logged_in_times', 'time_in_game', 'longest_play_session']
@@ -14033,10 +14023,18 @@ class LivePlayer(Player):
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
-        # get rid of obsolete Scores1 time series history fields
+        cur_notification2_gen = Predicates.eval_cond_or_literal(gamedata['fb_notifications'].get('notification2_gen',None), session, self)
+        do_reset_notification2 = ('notification2_gen' in gamedata['fb_notifications'] and \
+                                  self.history.get('notification2_gen',None) != cur_notification2_gen)
+
+        # get rid of obsolete history fields
         for k in self.history.keys():
-            if obsolete_time_series_re.match(k):
+            if (obsolete_time_series_re.match(k) or \
+                (do_reset_notification2 and notification2_state_re.match(k))):
                 del self.history[k]
+
+        if do_reset_notification2:
+            self.history['notification2_gen'] = cur_notification2_gen
 
         # fix bad intro mails
         if self.history.get('inventory_intro_mail_sent',0) < 2:
@@ -14825,7 +14823,7 @@ def get_acquisition_data_from_url(url, user_id):
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': q['fb_source'][0] }
         if q.has_key('fb_ref'):
             ret['fb_ref'] = q['fb_ref'][0]
-        if (q.has_key('notif_t') and q['notif_t'][0] == 'app_notification'):
+        if q['fb_source'][0] == 'notification' and (not q.has_key('app_request_type') or q['app_request_type'][0] != 'user_to_user'):
             ret['useless'] = 1 # app-to-user notification - already acquired
     elif q.has_key('is_arcade') and q['is_arcade'][0] == '1':
         ret = {'type': 'ad_click', 'url': url, 'campaign_name': 'facebook_arcade' }
@@ -14854,7 +14852,7 @@ def get_acquisition_data_from_url(url, user_id):
         # mark super-common FB bookmark clicks as useless for acquisition tracking purposes,
         # to avoid userdb bloat
         if ('fb_source' in q and q['fb_source'][0].endswith('bookmark')) or \
-           ('notif_t' in q and q['notif_t'][0] == 'app_request') or \
+           ('app_request_type' in q and q['app_request_type'][0] == 'user_to_user') or \
            ('ref' in q and q['ref'][0] == 'bookmarks'):
             ret['useless'] = 1
 
@@ -26411,10 +26409,34 @@ class GAMEAPI(resource.Resource):
 
             # record FB notification hits
             if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
-               ('app_request_type' not in url_qs) and ('fb_ref' in url_qs):
+               ('app_request_type' not in url_qs or url_qs['app_request_type'][0] != 'user_to_user') and \
+               ('fb_ref' in url_qs):
+
+                medium = url_qs['utm_medium'][0] if 'utm_medium' in url_qs else None
+                fb_ref = url_qs['fb_ref'][0]
+
+                # strip suffixes applied by retention_newbie.py
+                ref = fb_ref
+
+                # strip A/B test suffix
+                if len(ref) >= 3 and ref[-2] == '_' and ref[-1] >= 'A' and ref[-1] <= 'Z': ref = ref[:-2]
+                # strip n2_class suffix
+                if ref.endswith('_n') or ref.endswith('_e') or ref.endswith('_m'): ref = ref[:-2]
+
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
-                                    'fb_ref': url_qs['fb_ref'][0]})
+                                    'fb_ref': fb_ref, 'ref': ref, 'medium': medium})
+
+                Notification2.ack(server_time, Notification2.ref_to_stream(ref), ref, session.player.history)
+
+                # legacy ack tracking
+                for IGNORE in ('_24h', '_168h'):
+                    ref = ref.replace(IGNORE, '')
+
+                dict_increment(session.player.history, 'fb_notification:'+ref+':clicked', 1)
+                # reset unacked counter
+                if 'notification:'+ref+':unacked' in session.player.history:
+                    del session.player.history['notification:'+ref+':unacked']
 
             # record FB request (invite or gift) hits
             if ('fb_source' in url_qs) and (url_qs['fb_source'][0] == 'notification') and \
@@ -26455,10 +26477,12 @@ class GAMEAPI(resource.Resource):
             if ('bh_source' in url_qs) and (url_qs['bh_source'][0] == 'notification') and \
                ('ref' in url_qs) and ('fb_ref' in url_qs) and url_qs['ref'][0]:
                 ref = url_qs['ref'][0]
+                fb_ref = url_qs['fb_ref'][0]
+                medium = url_qs['utm_medium'][0] if 'utm_medium' in url_qs else None
+
                 metric_event_coded(user.user_id, '7131_fb_notification_hit',
                                    {'sum': session.player.get_denormalized_summary_props('brief'),
-                                    'ref': ref,
-                                    'fb_ref': url_qs['fb_ref'][0]})
+                                    'fb_ref': fb_ref, 'ref': ref, 'medium': medium})
                 dict_increment(player.history, 'fb_notification:'+ref+':clicked', 1)
                 # reset unacked counter
                 if 'notification:'+ref+':unacked' in player.history:

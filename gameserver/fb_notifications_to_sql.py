@@ -21,6 +21,7 @@ def fb_notifications_schema(sql_util): return {
               sql_util.summary_in_dimensions() + \
               [('ref', 'VARCHAR(128)'),
                ('fb_ref', 'VARCHAR(128)'),
+               ('medium', 'VARCHAR(32)'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
     }
@@ -30,6 +31,7 @@ def fb_notifications_summary_schema(sql_util): return {
               [('event_name', 'VARCHAR(128) NOT NULL'),
                ('ref', 'VARCHAR(128)'),
                ('fb_ref', 'VARCHAR(128)'),
+               ('medium', 'VARCHAR(32)'),
                ('count', 'INT4'),
                ('unique_players', 'INT4')],
     'indices': {'by_day': {'keys': [('day','ASC')]}}
@@ -100,7 +102,7 @@ if __name__ == '__main__':
                            ('user_id',row['user_id']),
                            ('event_name',row['event_name'])] + \
                            sql_util.parse_brief_summary(row['sum'])
-                for FIELD in ('ref','fb_ref'):
+                for FIELD in ('ref','fb_ref','medium'):
                     if FIELD in row:
                         keyvals.append((FIELD, row[FIELD]))
 
@@ -160,11 +162,12 @@ if __name__ == '__main__':
                             "       event_name AS event_name, " + \
                             "       ref AS ref, " + \
                             "       fb_ref AS fb_ref, " + \
+                            "       medium AS medium, " + \
                             "       COUNT(1) AS count, " + \
                             "       COUNT(DISTINCT(user_id)) AS unique_players " + \
                             "FROM " + sql_util.sym(fb_notifications_table) + " inv " + \
                             "WHERE time >= %s AND time < %s+86400 " + \
-                            "GROUP BY day, frame_platform, country_tier, townhall_level, spend_bracket, event_name, ref, fb_ref ORDER BY NULL", [day_start,]*2)
+                            "GROUP BY day, frame_platform, country_tier, townhall_level, spend_bracket, event_name, ref, fb_ref, medium ORDER BY NULL", [day_start,]*2)
 
                 con.commit() # one commit per day
         else:
