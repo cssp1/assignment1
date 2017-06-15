@@ -1232,6 +1232,9 @@ if __name__ == '__main__':
 
             sku_name = 'BUY_GAMEBUCKS_%d' % data['alloy'] + ('_UNITS' if unit_bonus else '') + '_FBP_'+slate_name
 
+            nom = data['nominal_alloy'] if 'nominal_alloy' in data else data['alloy']
+            loot_level = {1050: 1000}.get(nom, nom) # typically 500, 1000, 5000, 10000, 20000
+
             # perform some sanity checks on pricing
             if last_sku is not None:
                 # make sure SKUs are listed in descending order
@@ -1270,8 +1273,6 @@ if __name__ == '__main__':
             if 'nominal_alloy' in data: sku['nominal_quantity'] = data['nominal_alloy']
             if 'loot_table' in data:
                 # check for typos in loot table specification
-                nom = data['nominal_alloy'] if 'nominal_alloy' in data else data['alloy']
-                loot_level = {1050: 1000}.get(nom, nom)
                 expected_loot_table = 'item_bundle_%d' % loot_level
                 if data['loot_table'] != expected_loot_table:
                     raise Exception('unexpected loot_table: %s %s vs. %s' % (sku_name, data['loot_table'], expected_loot_table))
@@ -1297,11 +1298,37 @@ if __name__ == '__main__':
             if 'FALLBACK' in slate_name:
                 sku['requires'] = {'predicate': 'ALWAYS_FALSE'} # not used anymore
             else:
+                # select an entire SKU slate
+                slate_match_predicate = {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': slate_kind or 'UNUSED'}
+
+                # allow enabling individual FLASH SKUs by predicate, outside of normal FLASH whole-slate sale
+                if slate_kind == 'FLASH25' and loot_level in (500,1000,5000,10000,20000) and game_id in ('tr','dv'):
+
+                    sku_match_predname = 'buy_gamebucks_%s_%d_available' % (slate_kind, loot_level)
+                    #print sku_name, sku_match_predname
+
+                    slate_match_predicate = {'predicate': 'OR', 'subpredicates':[
+                        slate_match_predicate,
+                        {'predicate': 'LIBRARY', 'name': sku_match_predname}
+                        ]}
+
+                    # special on_purchase consequent that fires only when this SKU is selected by predicate
+                    sku['on_purchase'] = {'consequent':'IF',
+                                          'if': {'predicate': 'LIBRARY', 'name': sku_match_predname},
+                                          'then': {'consequent': 'LIBRARY', 'name': 'buy_gamebucks_%s_%d_on_purchase' % (slate_kind, loot_level)}}
+
+                    # XXX temporary hack for testing - special version of ui_bonus that adds "Limit 1 per player"
+                    if 'ui_bonus' in sku:
+                        assert isinstance(sku['ui_bonus'], basestring)
+                        sku['ui_bonus'] = [[{'predicate': 'LIBRARY', 'name': sku_match_predname}, sku['ui_bonus'] + \
+                                            ' - Limit 1 per player'],
+                                           [{'predicate': 'ALWAYS_TRUE'}, sku['ui_bonus']]]
+
                 sku['requires'] = {'predicate': 'AND', 'subpredicates':[
                     # Facebook only
                     {'predicate': 'FRAME_PLATFORM', 'platform': 'fb'},
                     {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_currency', 'value': val['currency']},
-                    {'predicate': 'GAMEDATA_VAR', 'name': 'store.buy_gamebucks_sku_kind', 'value': val.get('kind','UNUSED')},
+                    slate_match_predicate,
                     ]}
 
             out[sku_name] = sku
