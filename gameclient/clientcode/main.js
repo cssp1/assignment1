@@ -38753,9 +38753,16 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 
     spell_list.sort(function (a,b) {
         var sa = gamedata['spells'][a['spellname']], sb = gamedata['spells'][b['spellname']];
+
         // put loot-bearing SKUs first
         var la = !!a['expect_loot'], lb = !!b['expect_loot'];
         if(la && !lb) { return -1; } else if(!la && lb) { return 1; }
+
+        // put bannered SKUs first
+        var ba = eval_cond_or_literal(sa['ui_banner'] || null, player, null),
+            bb = eval_cond_or_literal(sb['ui_banner'] || null, player, null);
+        if(ba && !bb) { return -1; } else if(!ba && bb) { return 1; }
+
         var va = sa['quantity'], vb = sb['quantity'];
         if(va > vb) { return 1; } else if(va < vb) { return -1; } else { return 0; }
     });
