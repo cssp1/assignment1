@@ -853,9 +853,13 @@ def check_spell(spellname, spec):
     for PRED in ('requires', 'show_if'):
         if PRED in spec:
             error |= check_predicate(spec[PRED], reason = spellname+':'+PRED)
-    for CONS in ('pre_activation', 'consequent'):
+    for CONS in ('pre_activation', 'consequent', 'on_purchase'):
         if CONS in spec:
             error |= check_consequent(spec[CONS], reason = spellname+':'+CONS)
+
+    for CHAIN in ('ui_bonus', 'ui_banner'):
+        if CHAIN in spec and isinstance(spec[CHAIN], list):
+            error |= check_cond_chain(spec[CHAIN], reason = spellname+':'+CHAIN)
 
     if 'price_currency' in spec:
         error |= 1; print 'spell %s has "price_currency" but this should just be "currency"' % spellname

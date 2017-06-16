@@ -38459,7 +38459,7 @@ function buy_gamebucks_dialog_select(dialog, num) {
         dialog.widgets['icon'+i].bg_image = player.get_any_abtest_value('gamebucks_resource_icon', gamedata['store']['gamebucks_resource_icon']);
 
         dialog.widgets['comment'+i].str = ('ui_comment' in spell ? spell['ui_comment'] : '');
-        dialog.widgets['bonus'+i].str = ('ui_bonus' in spell ? spell['ui_bonus'] : '');
+        dialog.widgets['bonus'+i].str = ('ui_bonus' in spell ? eval_cond_or_literal(spell['ui_bonus'], player, null) : '');
 
         var give_units = ('give_units' in spell && (dialog.user_data['chapter'] != 'gifts')); // no bonus units in gifts
 
@@ -38724,9 +38724,10 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
             dialog.user_data['max_displayed_quantity'] = Math.max(dialog.user_data['max_displayed_quantity'], spell['quantity']);
             var bonus_lines = 0;
             if(spell['ui_bonus']) {
-                bonus_lines += spell['ui_bonus'].split('\n').length;
+                var b = eval_cond_or_literal(spell['ui_bonus'], player, null);
+                bonus_lines += b.split('\n').length;
                 // special-case hack for backwards compatibility with old SKUs ("Unit Bonus" -> "BONUS:\nUnits")
-                if(spell['ui_bonus'].indexOf('Unit Bonus') !== -1) { bonus_lines += 1; }
+                if(b.indexOf('Unit Bonus') !== -1) { bonus_lines += 1; }
             }
             if((('nominal_quantity' in spell) && spell['nominal_quantity'] < spell['quantity'])) {
                 bonus_lines += gamedata['dialogs'][dialog.data['widgets']['sku']['dialog']]['widgets']['name2']['ui_name_bonus_quantity'].split('\n').length;
@@ -38752,9 +38753,16 @@ function invoke_buy_gamebucks_dialog23(ver, reason, amount, order, options) {
 
     spell_list.sort(function (a,b) {
         var sa = gamedata['spells'][a['spellname']], sb = gamedata['spells'][b['spellname']];
+
         // put loot-bearing SKUs first
         var la = !!a['expect_loot'], lb = !!b['expect_loot'];
         if(la && !lb) { return -1; } else if(!la && lb) { return 1; }
+
+        // put bannered SKUs first
+        var ba = eval_cond_or_literal(sa['ui_banner'] || null, player, null),
+            bb = eval_cond_or_literal(sb['ui_banner'] || null, player, null);
+        if(ba && !bb) { return -1; } else if(!ba && bb) { return 1; }
+
         var va = sa['quantity'], vb = sb['quantity'];
         if(va > vb) { return 1; } else if(va < vb) { return -1; } else { return 0; }
     });
@@ -39102,7 +39110,7 @@ function update_buy_gamebucks_sku23(dialog) {
                     bonus_list.push(dialog.data['widgets'][wname]['ui_name_bonus_quantity'].replace('%qty', pretty_print_number(spell['quantity'] - spell['nominal_quantity'])).replace('%GAMEBUCKS_NAME', Store.gamebucks_ui_name()));
                 }
                 if(spell['ui_bonus']) {
-                    var b = spell['ui_bonus'];
+                    var b = eval_cond_or_literal(spell['ui_bonus'], player, null);
                     // special-case hack for backwards compatibility with old SKUs ("Unit Bonus" -> "BONUS:\nUnits")
                     if(b.indexOf('Unit Bonus') != -1) {
                         b = b.replace('Unit Bonus', 'BONUS:\nUnits');
@@ -39449,7 +39457,7 @@ function buy_gamebucks_sku2_metrics_description(spell, spellarg) {
 function buy_gamebucks_sku2_ui_warning(spell, spellarg) {
     var ret = buy_gamebucks_sku2_get_loot_table_parameter(spell, spellarg, 'ui_warning');
     if(!ret && 'ui_bonus' in spell) {
-        ret = spell['ui_bonus'];
+        ret = eval_cond_or_literal(spell['ui_bonus'], player, null);
     }
     return ret;
 }

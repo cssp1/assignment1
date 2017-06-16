@@ -438,7 +438,7 @@ class Sender(object):
                                    config['email']['ui_subject'],
                                    ui_body_plaintext,
                                    ui_body_html = ui_body_html,
-                                   tags = ['%s_%s%s' % (config['ref'], n2_class, ref_suffix)])
+                                   tags = ['%s_%s_%s%s' % (SpinConfig.game().upper(), config['ref'], n2_class, ref_suffix)])
 
                 if self.dry_run:
                     print >> self.msg_fd, '(dry-run) mailgun: %r' % req
