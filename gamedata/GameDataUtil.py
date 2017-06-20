@@ -66,7 +66,7 @@ def get_cc_requirement_predicate(gamedata, pred):
     elif pred['predicate'] == 'BASE_RICHNESS':
         return pred['min_richness']//10 # keep in sync with balance.py
     elif pred['predicate'] in ('ALWAYS_TRUE', 'ANY_ABTEST', 'OR', 'BUILDING_QUANTITY', 'HOME_REGION',
-                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE'):
+                               'LADDER_PLAYER', 'PLAYER_HISTORY', 'ABSOLUTE_TIME', 'QUEST_COMPLETED', 'AURA_INACTIVE','TRUST_LEVEL'):
         pass
     else:
         raise Exception('unhandled upgrade requirement: %s' % repr(pred))

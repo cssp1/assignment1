@@ -1290,6 +1290,7 @@ class User:
         self.bh_profile = None
         self.bh_hit_time = -1
         self.bh_username = None
+        self.bh_trust_level = None
         self.bh_mentor_player_id_cache = None
         self.bh_trainee_player_ids_cache = None
 
@@ -1348,6 +1349,16 @@ class User:
         # that contains data from a future version of the server
         self.foreign_data = {}
 
+    def get_trust_level(self):
+        # any login from KG, AG, or FB counts as "verified"
+        if self.frame_platform in ('fb','kg','ag'):
+            return 10 # loginserver.py TRUST_VERIFIED
+
+        elif self.frame_platform == 'bh':
+            if self.bh_trust_level is not None:
+                return self.bh_trust_level
+
+        return 0 # loginserver.py TRUST_ANONYMOUS_GUEST
 
     # for the various get_name() functions, Player must be passed in
     # since we might want the alias/title to override the
@@ -1739,12 +1750,16 @@ class User:
             self.birthday = int(server_time - (data['user_vars']['age']*365+180)*86400)
         self.kg_hit_time = server_time
 
+        # sync duplicate fields into Player
+        if session: session.player.sync_with_user(self)
+
         if retmsg is None:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+            retmsg.append(["PLAYER_TRUST_LEVEL_UPDATE", self.get_trust_level()])
 
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {'kg_avatar_url':self.kg_avatar_url}, 'kg', 'kg'+str(self.kg_id), None)
@@ -1786,13 +1801,16 @@ class User:
         if 'birthday' in data: pass # no birthday data
         self.mm_hit_time = server_time
 
+        # sync duplicate fields into Player
+        if session: session.player.sync_with_user(self)
+
         if retmsg is None:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
-
+            retmsg.append(["PLAYER_TRUST_LEVEL_UPDATE", self.get_trust_level()])
 
     def retrieve_bh_info(self, session, retmsg):
         if (None not in (self.bh_username,)) and \
@@ -1832,14 +1850,21 @@ class User:
         if 'timezone' in data and isinstance(data['timezone'], int):
             self.timezone = data['timezone']
         if 'birthday' in data: pass # no birthday data
+        if 'trust_level' in data:
+            self.bh_trust_level = data['trust_level']
+
         last_hit_time, self.bh_hit_time = self.bh_hit_time, server_time
+
+        # sync duplicate fields into Player
+        if session: session.player.sync_with_user(self)
 
         if last_hit_time < 0:
             # on very first hit, force player cache update to publish ui_name
             gamesite.gameapi.send_player_cache_update(session, 'retrieve_bh_info_complete')
 
         session.send([["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]],
-                      ["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player), 'retrieve_bh_info_complete']],
+                      ["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player), 'retrieve_bh_info_complete'],
+                      ["PLAYER_TRUST_LEVEL_UPDATE", self.get_trust_level()]],
                      flush_now = True)
 
         d.callback(True)
@@ -2086,12 +2111,16 @@ class User:
                 self.birthday = SpinConfig.cal_to_unix((y,m,d))
         self.ag_hit_time = server_time
 
+        # sync duplicate fields into Player
+        if session: session.player.sync_with_user(self)
+
         if retmsg is None:
             if self.active_session:
                 retmsg = self.active_session.outgoing_messages
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [gamesite.gameapi.get_player_cache_props(self, session.player, session.alliance_id_cache)]])
             retmsg.append(["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)])
+            retmsg.append(["PLAYER_TRUST_LEVEL_UPDATE", self.get_trust_level()])
 
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {'ag_avatar_url':self.ag_avatar_url}, 'ag', 'ag'+str(self.ag_id), None)
@@ -2929,6 +2958,10 @@ class User:
                 self.facebook_name = '(Facebook API error)'
                 self.facebook_first_name = 'Unknown(fbapierr)'
 
+            # sync duplicate fields into Player
+            session.player.sync_with_user(self)
+
+            session.send([["PLAYER_TRUST_LEVEL_UPDATE", self.get_trust_level()]])
             session.send([["FACEBOOK_NAME_UPDATE", self.facebook_name]])
             session.send([["PLAYER_UI_NAME_UPDATE", self.get_ui_name(session.player)]])
             session.send([["FACEBOOK_CURRENCY_UPDATE", self.facebook_currency]])
@@ -8739,6 +8772,7 @@ class Player(AbstractPlayer):
         self.country_tier = 4
         self.frame_platform = None # set during login
         self.birthday = None # UNIX timestamp of midnight of the player's birthday, None if no birthday info available
+        self.trust_level = None
         self.developer = None
 
         self.mentor_player_id_cache = None
@@ -8938,6 +8972,7 @@ class Player(AbstractPlayer):
         self.price_region = SpinConfig.price_region_map.get(self.country, 'unknown')
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
+        self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
         self.trainee_player_ids_cache = user.bh_trainee_player_ids_cache
 

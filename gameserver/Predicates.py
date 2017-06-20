@@ -963,6 +963,16 @@ class HomeBasePredicate(Predicate):
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return bool(session.home_base)
 
+class TrustLevelPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        # sync with loginserver.py
+        self.min_level = {'TRUST_ANONYMOUS_GUEST': 0,
+                          'TRUST_UNVERIFIED': 5,
+                          'TRUST_VERIFIED': 10}[data['min_level']]
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.player.trust_level >= self.min_level
+
 # instantiate a Predicate object from JSON
 def read_predicate(data):
     kind = data['predicate']
@@ -1092,6 +1102,8 @@ def read_predicate(data):
         return HomeBasePredicate(data)
     elif kind == 'ARMY_SIZE':
         return ArmySizePredicate(data)
+    elif kind == 'TRUST_LEVEL':
+        return TrustLevelPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]

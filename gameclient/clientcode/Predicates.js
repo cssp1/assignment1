@@ -1523,6 +1523,25 @@ HomeBasePredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function TrustLevelPredicate(data) {
+    goog.base(this, data);
+    // sync with loginserver.py
+    this.min_level = {'TRUST_ANONYMOUS_GUEST': 0,
+                      'TRUST_UNVERIFIED': 5,
+                      'TRUST_VERIFIED': 10}[data['min_level']];
+}
+goog.inherits(TrustLevelPredicate, Predicate);
+TrustLevelPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.trust_level >= this.min_level;
+};
+TrustLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+TrustLevelPredicate.prototype.do_ui_describe = function(player) {
+    return new PredicateUIDescription(gamedata['strings']['predicates'][this.kind]['ui_name']
+                                      .replace('%s', gamedata['strings']['predicates'][this.kind]['ui_min_level'][this.data['min_level']]));
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function HasAttackedPredicate(data) {
     goog.base(this, data);
 }
@@ -2084,6 +2103,8 @@ function read_predicate(data) {
         return new QuestClaimablePredicate(data);
     } else if(kind === 'HOME_BASE') {
         return new HomeBasePredicate(data);
+    } else if(kind === 'TRUST_LEVEL') {
+        return new TrustLevelPredicate(data);
     } else if(kind === 'HAS_ATTACKED') {
         return new HasAttackedPredicate(data);
     } else if(kind === 'HAS_DEPLOYED') {
