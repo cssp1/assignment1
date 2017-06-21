@@ -41619,13 +41619,10 @@ function classify_unit_space_shortage() {
 function get_requirements_help(kind, arg, options) {
     if(!options) { options = {}; }
     var force_short_circuit = false; // this overrides options.short_circuit if true
+    var force_even_if_tutorial_incomplete = false; // overrides options.even_if_tutorial_incomplete if true
 
     if(!player.get_any_abtest_value('plus_buttons', gamedata['client']['plus_buttons'])) { return null; }
     if(player.tutorial_state != "COMPLETE") { return null; }
-    if(!(options && options.even_if_tutorial_incomplete) &&
-       !read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null) && player.quest_tracked) {
-        return null;
-    }
 
     var noun = null, verb = null, target = null;
     var ui_arg_s = null, ui_arg_d = null, ui_override_title = null, ui_override_description = null, unit_icon = null;
@@ -42101,6 +42098,7 @@ function get_requirements_help(kind, arg, options) {
             });
         };
     } else if(noun == 'trust_level') {
+        force_even_if_tutorial_incomplete = true;
         help_function = (function (_verb) { return function() {
             if(spin_frame_platform !== 'bh') {
                 throw Error('trust_level help not available on platform '+spin_frame_platform);
@@ -42116,6 +42114,14 @@ function get_requirements_help(kind, arg, options) {
             // send this command to the outer iframe
             window.top.postMessage(msg, '*');
         }; })(verb);
+    }
+
+    // don't offer requirements help before extended_tutorial_complete, to avoid breaking tutorial GUI
+    if(!force_even_if_tutorial_incomplete &&
+       !(options && options.even_if_tutorial_incomplete) &&
+       !read_predicate({'predicate':'LIBRARY', 'name': 'extended_tutorial_complete'}).is_satisfied(player,null) &&
+       player.quest_tracked) {
+        return null;
     }
 
     if(options.short_circuit || force_short_circuit) {

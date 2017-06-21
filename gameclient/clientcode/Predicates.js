@@ -1545,7 +1545,7 @@ TrustLevelPredicate.prototype.do_ui_help = function(player) {
     } else { // ANONYMOUS_GUEST -> UNVERIFIED -> VERIFIED
         return {'noun': 'trust_level', 'verb': 'associate' };
     }
-    return null;
+    //return null;
 };
 
 /** @constructor @struct
