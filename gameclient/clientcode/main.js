@@ -42100,6 +42100,22 @@ function get_requirements_help(kind, arg, options) {
                 */
             });
         };
+    } else if(noun == 'trust_level') {
+        help_function = (function (_verb) { return function() {
+            if(spin_frame_platform !== 'bh') {
+                throw Error('trust_level help not available on platform '+spin_frame_platform);
+            }
+            change_selection_ui(null);
+
+            var msg = null;
+            if(_verb === 'verify') {
+                msg = 'bh_popup_account_verify';
+            } else if(_verb === 'associate') {
+                msg = 'bh_popup_account_associate';
+            }
+            // send this command to the outer iframe
+            window.top.postMessage(msg, '*');
+        }; })(verb);
     }
 
     if(options.short_circuit || force_short_circuit) {
