@@ -448,16 +448,7 @@
         ]},
 
         // whether to enable HTMLInputElement-based text input
-        "enable_html_text_input": {"predicate": "OR", "subpredicates": [
-            {"predicate": "BROWSER_OS", "os": ["iOS", "Android", "ChromeOS"]},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "mf"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "mf2"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "bfm"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "sg"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "fs"},
-            {"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "dv"}
-            //{"predicate": "GAMEDATA_VAR", "name": "game_id", "value": "tr"},
-        ]},
+        "enable_html_text_input": {"predicate": "ALWAYS_TRUE"},
 
         "enable_loot_burst_effects": false,
         // color of loot-related SPFX.CombatText rising out of harvesters and looted buildings
