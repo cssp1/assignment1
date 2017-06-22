@@ -1543,6 +1543,7 @@ TrustLevelPredicate.prototype.do_ui_describe = function(player) {
                                       .replace('%s', gamedata['strings']['predicates'][this.kind]['ui_min_level'][this.data['min_level']]));
 };
 TrustLevelPredicate.prototype.do_ui_help = function(player) {
+    if(player.trust_level >= this.min_level) { return null; }
     if(player.trust_level >= 5) { // UNVERIFIED -> VERIFIED
         return {'noun': 'trust_level', 'verb': 'verify' };
     } else { // ANONYMOUS_GUEST -> UNVERIFIED -> VERIFIED
