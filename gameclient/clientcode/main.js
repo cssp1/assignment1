@@ -14477,18 +14477,14 @@ function update_combat_item_bar(dialog) {
                 // note: the 'pending'/'pending_time' flags will only be taken from one item, the next one "in line" to be used
                 var index = indices_by_spec[item['spec']];
                 entry_list[index]['stack'] += (item['stack']||1);
-
-                // prefer using items coming from smaller stacks first,
-                // to help players use inventory slots more efficiently
-                if((item['stack']||1) < entry_list[index]['smallest_stack']) {
-                    entry_list[index]['smallest_stack'] = (item['stack']||1);
-                    // this particular item should be used before others of its spec - swap it into the 'item' field and repoint slot to it
-                    entry_list[index]['item'] = item;
-                    entry_list[index]['slot'] = i;
-                }
+                entry_list[index]['individual_stacks'].push([item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]);
             } else {
                 indices_by_spec[item['spec']] = entry_list.length;
-                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1), 'smallest_stack': (item['stack']||1)});
+                entry_list.push({'item': item, 'slot': i, 'stack': (item['stack']||1),
+                                 // list of data on about stack contributing to this entry: [item, slot, stack count, expire time]
+                                 // will be used for sorting later
+                                 'individual_stacks': [[item, i, (item['stack']||1), ('expire_time' in item ? item['expire_time'] : -1)]]
+                                });
             }
         }
     }
@@ -14499,6 +14495,42 @@ function update_combat_item_bar(dialog) {
         add_item(entry['item'], entry);
     });
 
+    // when there's more than one stack of same-spec items, choose the right one to use first
+    goog.array.forEach(entry_list, function(entry) {
+        if(entry['individual_stacks'].length > 1) {
+            entry['individual_stacks'].sort(function(a,b) {
+                var a_slot = a[1], b_slot = b[1];
+                var a_stack = a[2], b_stack = b[2];
+                var a_expire = (a[3] < 0 ? Infinity : a[3]), b_expire = (b[3] < 0 ? Infinity : b[3]);
+
+
+                // first, prefer using items coming from earlier-expiring stacks.
+                // then, prefer using items coming from smaller stacks.
+
+                if(a_expire < b_expire) {
+                    return -1;
+                } else if(a_expire > b_expire ) {
+                    return 1;
+                } else if(a_stack < b_stack) {
+                    return -1;
+                } else if(a_stack > b_stack) {
+                    return 1;
+                } else if(a_slot < b_slot) { // tie-breaker
+                    return -1;
+                } else {
+                    return 1;
+                }
+            });
+
+            // the particular stack at the head of this list should be used before others of its spec
+            // swap it into the 'item' field and repoint slot to it
+            entry['item'] = entry['individual_stacks'][0][0];
+            entry['slot'] = entry['individual_stacks'][0][1];
+            //console.log(entry['individual_stacks'][0][0]);
+        }
+    });
+
+    // choose order to display these in the GUI
     entry_list.sort(function(a,b) {
         var a_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(a['item']['spec']), session);
         var b_prio = inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(b['item']['spec']), session);
