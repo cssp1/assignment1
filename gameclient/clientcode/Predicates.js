@@ -1421,6 +1421,9 @@ FramePlatformPredicate.prototype.is_satisfied = function(player, qdata) {
 };
 /** @override */
 FramePlatformPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+/** @override
+    Never relevant mentioning this to the player. */
+FramePlatformPredicate.prototype.do_ui_describe = function(player) { return null; };
 
 /** @constructor @struct
   * @extends Predicate */
