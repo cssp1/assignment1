@@ -1798,6 +1798,18 @@ FUNNEL_BASIC = [
 #    {'name': 'A04C Retained at least One Day', 'mandatory_age': 2*24*60*60,
 #     'func':         lambda user: user.get('last_login_time',0) - user.get('account_creation_time',0) >= 24*60*60, 'show_p': True },
 
+    # visits
+    {'name': 'A04V2 Visited 2 Times', 'func': lambda user: len(user.get('sessions',[])) >= 2, 'show_p': True },
+    {'name': 'A04V3 %CONV% Visited 3 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 2,
+     'func': lambda user: len(user.get('sessions',[])) >= 3, 'show_p': True },
+    {'name': 'A04V5 %CONV% Visited 5 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 3,
+     'func': lambda user: len(user.get('sessions',[])) >= 5, 'show_p': True },
+    {'name': 'A04V7 %CONV% Visited 7 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 5,
+     'func': lambda user: len(user.get('sessions',[])) >= 7, 'show_p': True },
+    {'name': 'A04V50 %CONV% Visited 50 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 7,
+     'func': lambda user: len(user.get('sessions',[])) >= 50, 'show_p': True },
+    {'name': 'A04V99 Visits 50:7 Ratio', 'mandatory_func': lambda user: len(user.get('sessions',[])) >= 7, 'func': lambda user: len(user.get('sessions',[])) >= 50 },
+
     {'name': 'A05 %CONV% Spent 5hr in game within 10 Days of acct creation', 'mandatory_age': 10*24*60*60,
      'func': lambda user: SpinUpcache.playtime_within(user, 10) >= 5*60*60, 'show_p': True },
     {'name': 'A06 Central Computer L3 within 10 Days of acct creation', 'mandatory_age': 10*24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 3, 10), 'show_p': True},
@@ -2162,19 +2174,6 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 
     {'name': 'S99 Mean Total Hours in Game', 'aggregate': 'mean', 'func': lambda user: user.get('time_in_game',0)/3600.0 },
 
-    # visits
-
-    {'name': 'V02 Visited 2 Times', 'func': lambda user: len(user.get('sessions',[])) >= 2, 'show_p': True },
-    {'name': 'V03 %CONV% Visited 3 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 2,
-     'func': lambda user: len(user.get('sessions',[])) >= 3, 'show_p': True },
-    {'name': 'V05 %CONV% Visited 5 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 3,
-     'func': lambda user: len(user.get('sessions',[])) >= 5, 'show_p': True },
-    {'name': 'V07 %CONV% Visited 7 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 5,
-     'func': lambda user: len(user.get('sessions',[])) >= 7, 'show_p': True },
-    {'name': 'V50 %CONV% Visited 50 Times', 'convert_from': lambda user: len(user.get('sessions',[])) >= 7,
-     'func': lambda user: len(user.get('sessions',[])) >= 50, 'show_p': True },
-
-    {'name': 'V99 Visits 50:7 Ratio', 'mandatory_func': lambda user: len(user.get('sessions',[])) >= 7, 'func': lambda user: len(user.get('sessions',[])) >= 50 },
 #    {'name': '800 Saw Payer Promo Offer (in-game)', 'func': lambda user: user.get('payer_promo_offered',0) > 0 },
     {'name': 'X01A Accepted Payer Promo Offer', 'func': lambda user: user.get('promo_gamebucks_earned',0) > 0 },
 #    {'name': 'X02 Payer Promo Conversion Rate', 'mandatory_func': lambda user: user.get('payer_promo_offered',0) > 0, 'func': lambda user: user.get('promo_gamebucks_earned',0) > 0 },
