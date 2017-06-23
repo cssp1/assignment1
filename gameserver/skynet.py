@@ -1559,8 +1559,11 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         link_url = base_link_url + '?' + link_qs
         #creative['call_to_action_type'] = 'OPEN_LINK' # 'PLAY_GAME'
         link_caption = game_data['app_name']
-    elif link_destination == 'bh_com':
-        base_link_url = 'https://www.battlehouse.com/play/'+game_data['namespace']
+    elif link_destination in ('bh_com', 'bh_com_autoplay'):
+        if link_destination == 'bh_com_autoplay':
+            base_link_url = 'https://www.battlehouse.com/playnow/'+game_data['namespace']
+        else:
+            base_link_url = 'https://www.battlehouse.com/play/'+game_data['namespace']
         link_url = base_link_url + '?' + link_qs
         link_caption = None # FB requires that this include the domain of the link game_data['app_name']
         link_description = 'Multiplayer - Free-to-play - Clan Wars'
@@ -1595,7 +1598,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         elif ad_type in (4,32,432):
             #creative['actor_name'] = title_text # but this gets ignored
 
-            if link_destination == 'bh_com':
+            if link_destination in ('bh_com', 'bh_com_autoplay'):
                 page_id = BATTLEHOUSE_PAGE_ID
                 page_token = BATTLEHOUSE_PAGE_TOKEN
             else:
@@ -1805,7 +1808,7 @@ def adgroup_targeting(db, tgt):
         ret['excluded_connections'] = [{'id':game_data['app_id']}]
 
         # for links going to battlehouse.com, exclude people already using its Facebook login
-        if tgt.get('destination') == 'bh_com':
+        if tgt.get('destination') in ('bh_com', 'bh_com_autoplay'):
             ret['excluded_connections'].append({'id':BATTLEHOUSE_APP_ID})
 
         # optionally also exclude a custom audience containing the entire player base
