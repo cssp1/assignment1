@@ -36,7 +36,9 @@ VISITS_FIELDS = ["visits_%dd" % days for days in DAY_MARKS]
 
 CLIENT_FIELDS = ["client:"+x for x in ["purchase_ui_opens","purchase_ui_opens_preftd",
                                        "purchase_inits", "purchase_inits_preftd"]]
-FEATURE_USE_FIELDS = ["feature_used:"+x for x in ["drag_select",
+FEATURE_USE_FIELDS = ["feature_used:"+x for x in ["client_ingame",
+                                                  "first_action",
+                                                  "drag_select",
                                                   "scrolling",
                                                   "double_click_select",
                                                   "shift_select",

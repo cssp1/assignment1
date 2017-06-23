@@ -1782,6 +1782,10 @@ FUNNEL_BASIC = [
 
     # These first stages are fixed to match the ad network KPIs
     {'name': 'A00 Account Created', 'func': lambda user: 1 },
+
+    {'name': 'A00A Client Ingame', 'func': lambda user: user.get('feature_used:client_ingame',False), 'show_p': True },
+    {'name': 'A00B First Action', 'func': lambda user: user.get('feature_used:first_action',False), 'show_p': True },
+
     {'name': 'A01 Tutorial Complete', 'func': lambda user: user.get('completed_tutorial',False), 'show_p':True },
     {'name': 'A02 Central Computer L2 within 1 Day of acct creation', 'mandatory_age': 24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 2, 1), 'show_p': True },
     {'name': 'A04A Returned between 24-48 hrs after acct creation', 'mandatory_age': 48*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 2, after=1) >= 1, 'show_p':True },

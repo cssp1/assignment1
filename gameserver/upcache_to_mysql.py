@@ -74,7 +74,7 @@ abtest_filter = re.compile('^T[0-9]+')
 
 # "ALL" mode
 # always accept these keys
-accept_filter = re.compile('^feature_used:playfield_speed|ai_tutorial.*_progress$|^achievement:.*blitz')
+accept_filter = re.compile('^feature_used:playfield_speed|^feature_used:client_ingame|^feature_used:first_action|ai_tutorial.*_progress$|^achievement:.*blitz')
 # then, always reject these keys
 reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_hour|account_creation_wday|^fb_notification:|^feature_used:|^achievement:|^quest:|_conquests$|_progress$|_attempted$|days_since_joined|days_since_last_login|lock_state|^visits_[0-9]+d$|^retained_[0-9]+d$|oauth_token|facebook_permissions_str|acquisition_type|^link$|_context$|^item:|^unit:.+:(killed|lost)|_times_(started|completed)$')
 

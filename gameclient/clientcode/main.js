@@ -7247,7 +7247,7 @@ player.flashy_loot = function() {
 player.record_feature_use = function(name) {
     var key = 'feature_used:'+name;
     if(!(key in player.history) || player.history[key] < 1) {
-        player.history[key] = 1;
+        player.history[key] = 1; // client-side predict
         send_to_server.func(["RECORD_FEATURE_USE", name]);
 
         // update quest status, because some quests are completed by a feature_used: value going nonzero
@@ -47164,6 +47164,7 @@ function handle_server_message(data) {
         }
 
         SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({'splash_image':spin_loading_screen_name}));
+        player.record_feature_use('client_ingame');
 
     } else if(msg == "OBJECT_REMOVED" || msg == "OBJECT_REMOVED2") {
         var id = data[1];
@@ -50206,6 +50207,9 @@ function register_player_input() {
        (client_state != client_states.LOADING)) { // wait until logged in (or prevented from logging in, after successful connection attempt) before sending
         SPINPUNCHGAME.first_action_sent = true;
         SPLWMetrics.send_event(spin_metrics_anon_id, '0125_first_action', add_demographics({}));
+        if(session.connected()) {
+            player.record_feature_use('first_action');
+        }
     }
 }
 
