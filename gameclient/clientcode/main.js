@@ -10755,7 +10755,11 @@ SPINPUNCHGAME.init = function() {
     // see http://www.dbp-consulting.com/tutorials/canvas/CanvasKeyEvents.html
     canvas.setAttribute('tabindex', '0');
     canvas.focus();
-    canvas.addEventListener("mouseover", function(e) { canvas.focus(); }, false);
+    canvas.addEventListener("mouseover", function(e) {
+        // auto-refocus on all mouseover events, unless there is an active HTML text input
+        if(SPUI.keyboard_focus && SPUI.keyboard_focus.want_html_focus()) { return; }
+        canvas.focus();
+    }, false);
     canvas.addEventListener("mouseout", on_mouseout, false);
     canvas.addEventListener("mouseout", function(e) { canvas.blur(); }, false);
     canvas.addEventListener("keydown", on_keydown, false);

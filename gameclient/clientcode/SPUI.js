@@ -3086,6 +3086,10 @@ goog.inherits(SPUI.TextInput, SPUI.ActionButton);
 SPUI.TextInput.prototype.input_activate = function() {};
 SPUI.TextInput.prototype.input_deactivate = function() {};
 
+// return true to disable the canvas' always-focus-on-mouseover behavior
+SPUI.TextInput.prototype.want_html_focus = function() { return false; };
+
+
 SPUI.TextInput.prototype.reset_left_char = function() {
     if(this.multiline) { return; }
 
@@ -3290,6 +3294,9 @@ SPUI.HTMLTextInput.inject_css = function() {
     }
     document.getElementsByTagName('head')[0].appendChild(style);
 };
+
+/** @override */
+SPUI.HTMLTextInput.prototype.want_html_focus = function() { return this.input_active; };
 
 // make the HTMLInputElement "live"
 SPUI.HTMLTextInput.prototype.input_activate = function() {
