@@ -2520,12 +2520,18 @@ if __name__ == '__main__':
     sys.stdout = codecs.getwriter('utf8')(sys.stdout)
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
-                                                        'winners', 'send-prizes', 'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
+                                                        'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=',
+                                                        'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
                                                         'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
     mode = None
     send_prizes = False
+    prize_item = 'gamebucks'
+    prize_qty = -1
+    in_the_money_players = -1 # number of players to split the prize within each winning alliance
+    in_the_money_alliances = -1 # number of alliances that place for prizes
+    min_participation = -1 # minimum points earned this week to be eligible for prizes
     week = -1
     season = -1
     tournament_stat = None
@@ -2546,6 +2552,11 @@ if __name__ == '__main__':
         elif key == '--region-maint': mode = 'region-maint'; maint_region = val # region maintenance
         elif key == '--winners': mode = 'winners'
         elif key == '--send-prizes': send_prizes = True
+        elif key == '--prize-item': prize_item = val
+        elif key == '--prize-qty': prize_qty = int(val)
+        elif key == '--in-the-money-players': in_the_money_players = int(val)
+        elif key == '--in-the-money-alliances': in_the_money_alliances = int(val)
+        elif key == '--min-participation': min_participation = int(val)
         elif key == '--leaders': mode = 'leaders'
         elif key == '--week': week = int(val)
         elif key == '--season': season = int(val)
@@ -2672,6 +2683,10 @@ if __name__ == '__main__':
 
         stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc))
 
+        # same as stat_axes but with the time_scope forced to WEEK
+        if week >= 0:
+            participation_stat_axes = (tournament_stat, Scores2.make_point(Scores2.FREQ_WEEK, week, score_space_scope, score_space_loc))
+
         if mode == 'leaders':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources damage_inflicted_pve trainee_completions; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
 
@@ -2697,7 +2712,14 @@ if __name__ == '__main__':
         elif mode == 'winners':
             assert tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv', 'strongpoint_resources', 'hive_kill_points', 'damage_inflicted_pve', 'trainee_completions')
 
-            top_alliances = s2.alliance_scores2_get_leaders([stat_axes], 5)[0]
+            if in_the_money_alliances > 0:
+                PRIZES = [10000,] * in_the_money_alliances
+            else:
+                PRIZES = [10*x for x in gamedata['events']['challenge_pvp_ladder_with_prizes']['prizes']] # multiply by 10x to convert from FB Credits to gamebucks # [10000, 5000, 3000]
+
+            WINNERS = in_the_money_players if in_the_money_players > 0 else 10 # number of players to split the prize within each winning alliance
+
+            top_alliances = s2.alliance_scores2_get_leaders([stat_axes], max(len(PRIZES), 5))[0]
 
             ui_score_time_scope = {Scores2.FREQ_ALL: 'ALL-TIME',
                                    Scores2.FREQ_SEASON: 'SEASONAL',
@@ -2708,8 +2730,7 @@ if __name__ == '__main__':
                    (' IN '+gamedata['continents'][score_space_loc]['ui_name']) if score_space_scope == Scores2.SPACE_CONTINENT else '')
 
             data = client.get_alliance_info([x['alliance_id'] for x in top_alliances])
-            PRIZES = [10*x for x in gamedata['events']['challenge_pvp_ladder_with_prizes']['prizes']] # multiply by 10x to convert from FB Credits to gamebucks # [10000, 5000, 3000]
-            WINNERS = 10 # number of players to split the prize within each winning alliance
+
             commands = []
 
             for i in xrange(len(top_alliances)):
@@ -2727,9 +2748,40 @@ if __name__ == '__main__':
                 if i >= len(PRIZES): continue
                 alliance_prize = PRIZES[i]
 
-                scores = s2.player_scores2_get(members, [stat_axes], rank = False)
+                scores = s2.player_scores2_get(members, [stat_axes, participation_stat_axes], rank = False)
 
-                scored_members = [{'user_id': members[x], 'absolute': scores[x][0]['absolute'] if scores[x][0] is not None else 0} for x in xrange(len(members))]
+                scored_members = [{'user_id': members[x],
+                                   'absolute': scores[x][0]['absolute'] if scores[x][0] is not None else 0,
+                                   'participation': scores[x][1]['absolute'] if scores[x][1] is not None else 0,
+                                   } for x in xrange(len(members))]
+
+                # XXX super dirty hack - since trophies_pvp weekly stats are anchored to the value at
+                # the beginning of the week, we have to use the battles table to find the true participation
+                if tournament_stat == 'trophies_pvp' and min_participation > 0:
+                    # overwrite bogus Scores2 values
+                    for m in scored_members: m['participation'] = 0
+
+                    week_start = gamedata['matchmaking']['week_origin'] + 7*86400*week
+
+                    agg_attackers = client.battles_table().aggregate([
+                        {'$match':{'time':{'$gte':week_start,'$lt':week_start + 7*86400},
+                                   'attacker_id': {'$in': members},
+                                   'loot.trophies_pvp':{'$gte':1}}},
+                        {'$project':{'_id':0,'attacker_id':1,'loot_trophies_pvp':'$loot.trophies_pvp'}},
+                        {'$group':{'_id':'$attacker_id','loot_trophies_pvp':{'$sum':'$loot_trophies_pvp'}}}])
+
+                    for row in agg_attackers:
+                        scored_members[members.index(row['_id'])]['participation'] += row['loot_trophies_pvp']
+
+                    agg_defenders = client.battles_table().aggregate([
+                        {'$match':{'time':{'$gte':week_start,'$lt':week_start + 7*86400},
+                                   'defender_id': {'$in': members},
+                                   'loot.viewing_trophies_pvp':{'$gte':1}}},
+                        {'$project':{'_id':0,'defender_id':1,'loot_viewing_trophies_pvp':'$loot.viewing_trophies_pvp'}},
+                        {'$group':{'_id':'$defender_id','loot_viewing_trophies_pvp':{'$sum':'$loot_viewing_trophies_pvp'}}}])
+
+                    for row in agg_defenders:
+                        scored_members[members.index(row['_id'])]['participation'] += row['loot_viewing_trophies_pvp']
 
                 pc = client.player_cache_lookup_batch([member['user_id'] for member in scored_members])
                 for j in xrange(len(pc)):
@@ -2739,7 +2791,10 @@ if __name__ == '__main__':
                                 scored_members[j][FIELD] = pc[j][FIELD]
 
                 # note: use player level as tiebreaker, higher level wins
-                scored_members.sort(key = lambda x: 100*x['absolute'] + x.get('player_level',1), reverse = True)
+                scored_members.sort(key = lambda x: \
+                                    (0 if (min_participation > 0 and x['participation'] < min_participation) else \
+                                    (1000*x['absolute'] + x.get('player_level',1))),
+                                    reverse = True)
 
                 player_prize = alliance_prize / min(len(scored_members), WINNERS)
                 print '[COLOR="#FFFFFF"]Winners receive %s %s each:[/COLOR]' % (player_prize, gamedata['store']['gamebucks_ui_name'])
@@ -2748,7 +2803,10 @@ if __name__ == '__main__':
                     member = scored_members[j]
 
                     is_tie = (j >= WINNERS and (member['absolute'] == scored_members[WINNERS-1]['absolute']) and (member.get('player_level',1) >= scored_members[WINNERS-1].get('player_level',1)))
-                    if j < WINNERS or is_tie:
+
+                    if min_participation > 0 and member['participation'] < min_participation:
+                        my_prize = 0 # XXX won't divide uneven prizes correctly?
+                    elif j < WINNERS or is_tie:
                         my_prize = player_prize
                     else:
                         my_prize = 0
@@ -2791,15 +2849,26 @@ if __name__ == '__main__':
                         spend_data = '$%05.02f' % member.get('money_spent',0)
 
                     if my_prize <= 0: # or (not ladder_player):
-                        print "    #%2d %-24s with %5d points does not win %s (id %7d continent %s spend %s)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data)
+                        print "    #%2d %-24s with %5d points does not win %s (id %7d continent %s spend %s participaton %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
                     else:
-                        print "    #%2d%s %-24s with %5d points WINS %6d %s (id %7d continent %s spend %s)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
-                                                                                        detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data)
+                        print "    #%2d%s %-24s with %5d points WINS %6d %s (id %7d continent %s spend %s participation %d)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
+                                                                                        detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
+                        {Scores2.FREQ_ALL: 'ALL-TIME',
+                                   Scores2.FREQ_SEASON: 'SEASONAL',
+                                   Scores2.FREQ_WEEK: 'WEEKLY'}[score_time_scope]
+
+                        if season >= 0:
+                            ui_time = ' for Season %d' % (season+gamedata['matchmaking']['season_ui_offset'])
+                            if score_time_scope == Scores2.FREQ_WEEK:
+                                ui_time += ' Week %d' % week
+                        else:
+                            ui_time = ''
+
                         commands.append(['./check_player.py', '%d' % member['user_id'],
-                                         '--give-item', 'gamebucks', '--melt-hours', '-1',
-                                         '--item-stack', '%d' % my_prize,
+                                         '--give-item', prize_item, '--melt-hours', '-1',
+                                         '--item-stack', '%d' % (prize_qty if prize_qty > 0 else my_prize),
                                          '--give-item-subject', 'Tournament Prize',
-                                         '--give-item-body', 'Congratulations, here is your Tournament prize for %sWeek %d! Click the prize to collect it.' % (('Season %d ' % (season+gamedata['matchmaking']['season_ui_offset'])) if season >= 0 else '', week),
+                                         '--give-item-body', 'Congratulations, here is your Tournament prize%s! Click the prize to collect it.' % (ui_time,),
                                          '--item-log-reason', 'tournament_prize_s%d_w%d' % (season, week)])
 
             print "COMMANDS"
