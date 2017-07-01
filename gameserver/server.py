@@ -15357,6 +15357,22 @@ class STATSAPI(resource.Resource):
             elif 'associated_spell' in spec:
                 data['spells'] = {spec['associated_spell']: gamedata['spells'][spec['associated_spell']]}
 
+            # provide ingredient item data, if possible
+            for prop in ('ingredients',):
+                raw_entry = spec.get(prop)
+                if raw_entry:
+                    if isinstance(raw_entry, list) and len(raw_entry) >= 1 and \
+                       isinstance(raw_entry[0], list):
+                        list_of_item_lists = raw_entry
+                    else:
+                        list_of_item_lists = [raw_entry,]
+                    for item_list in list_of_item_lists:
+                        for item in item_list:
+                            if 'items' not in data:
+                                data['items'] = {}
+                            if item['spec'] not in data['items']:
+                                data['items'][item['spec']] = gamedata['items'][item['spec']]
+
             # provide art URLs, if possible
             for prop in ('icon','splash_image','art_asset'):
                 raw_entry = spec.get(prop)
