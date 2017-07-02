@@ -1049,6 +1049,7 @@ class UserTable:
               ('bh_hit_time', int),
               ('bh_profile', None),
               ('bh_username', None),
+              ('bh_trust_level', None),
               ('bh_mentor_player_id_cache', int), # not authoritative - must query bhlogin server
               ('bh_trainee_player_ids_cache', None), # not authoritative - must query bhlogin server
               ('mm_id', str),
