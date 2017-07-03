@@ -1515,6 +1515,8 @@ def page_feed_post_make(db, page_id, page_token, link, caption, description, tit
         return entry['id']
 
 def call_to_action_type(tgt):
+    if tgt.get('destination','app') in ('bh_com','bh_com_autoplay',):
+        return 'SIGN_UP' # 20170703 - switched from OPEN_LINK
     if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC'):
         return 'OPEN_LINK' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
     return 'PLAY_GAME'
