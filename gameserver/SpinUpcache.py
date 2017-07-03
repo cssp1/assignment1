@@ -38,6 +38,8 @@ CLIENT_FIELDS = ["client:"+x for x in ["purchase_ui_opens","purchase_ui_opens_pr
                                        "purchase_inits", "purchase_inits_preftd"]]
 FEATURE_USE_FIELDS = ["feature_used:"+x for x in ["client_ingame",
                                                   "first_action",
+                                                  "bh_associate_prompt",
+                                                  "bh_verify_prompt",
                                                   "drag_select",
                                                   "scrolling",
                                                   "double_click_select",

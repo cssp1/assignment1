@@ -42139,16 +42139,26 @@ function get_requirements_help(kind, arg, options) {
             if(spin_frame_platform !== 'bh') {
                 throw Error('trust_level help not available on platform '+spin_frame_platform);
             }
-            change_selection_ui(null);
 
-            var msg = null;
+            var msg = null, feature_name = null;
             if(_verb === 'verify') {
                 msg = 'bh_popup_account_verify';
+                feature_name = 'bh_verify_prompt';
             } else if(_verb === 'associate') {
                 msg = 'bh_popup_account_associate';
+                feature_name = 'bh_associate_prompt';
             }
-            // send this command to the outer iframe
-            window.top.postMessage(msg, '*');
+
+            if(msg) {
+                change_selection_ui(null);
+                player.record_feature_use(feature_name);
+
+                // flush immediately, because we might redirect right here
+                flush_message_queue(true);
+
+                // send this command to the outer iframe
+                window.top.postMessage(msg, '*');
+            }
         }; })(verb);
     }
 

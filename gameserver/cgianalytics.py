@@ -1787,6 +1787,27 @@ FUNNEL_BASIC = [
     {'name': 'A00B First Action', 'func': lambda user: user.get('feature_used:first_action',False), 'show_p': True },
 
     {'name': 'A01 Tutorial Complete', 'func': lambda user: user.get('completed_tutorial',False), 'show_p':True },
+
+    {'name': 'A03A bh.com associate prompt',
+     'func': lambda user: user.get('feature_used:bh_associate_prompt',False),
+     'mandatory_func': lambda user: user.get('frame_platform','fb') == 'bh'
+     },
+    {'name': 'A03B %CONV% bh.com associated (after prompt)',
+     'func': lambda user: user.get('bh_trust_level',0) >= 5, # TRUST_UNVERIFIED
+     'mandatory_func': lambda user: user.get('feature_used:bh_associate_prompt',False),
+     'convert_from': lambda user: user.get('feature_used:bh_associate_prompt',False),
+     },
+
+    {'name': 'A03C bh.com verify prompt',
+     'func': lambda user: user.get('feature_used:bh_verify_prompt',False),
+     'mandatory_func': lambda user: user.get('frame_platform','fb') == 'bh'
+     },
+    {'name': 'A03D %CONV% bh.com verified (after prompt)',
+     'func': lambda user: user.get('bh_trust_level',0) >= 10, # TRUST_VERIFIED
+     'mandatory_func': lambda user: user.get('feature_used:bh_verify_prompt',False),
+     'convert_from': lambda user: user.get('feature_used:bh_verify_prompt',False),
+     },
+
     {'name': 'A02 Central Computer L2 within 1 Day of acct creation', 'mandatory_age': 24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 2, 1), 'show_p': True },
     {'name': 'A04A Returned between 24-48 hrs after acct creation', 'mandatory_age': 48*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 2, after=1) >= 1, 'show_p':True },
     {'name': 'A04A1 Returned between 48-72 hrs after acct creation', 'mandatory_age': 72*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 3, after=2) >= 1, 'show_p':True },
