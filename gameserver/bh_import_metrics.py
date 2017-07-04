@@ -33,6 +33,7 @@ def bh_metrics_schema(sql_util):
                        ('campaign_medium', 'VARCHAR(255)'),
                        ('campaign_code', 'VARCHAR(255)'),
                        ('service_url', 'VARCHAR(1024)'),
+                       ('service', 'VARCHAR(64)'),
                        ],
             'indices': {'by_time': {'unique':False, 'keys': [('time','ASC')]}}
             }
