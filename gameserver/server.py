@@ -5248,6 +5248,7 @@ class Session(object):
                              ('dauup2', self.user.dauup2_context),
                              ('adparlor', self.user.adparlor_context),
                              ('liniad', self.user.liniad_context),
+                             ('battlehouse', self.user.bh_id),
                              ('fb_conversion_pixels', self.user.fb_conversion_pixels_context),
                              ('fb_app_events', True if (self.user.frame_platform == 'fb') else None),
                              ('kg_conversion_pixels', self.user.kg_conversion_pixels_context),
@@ -5410,9 +5411,17 @@ class Session(object):
         elif api == 'liniad':
             if post_fbtax_dollars is not None: params['sum'] = str('%.2f' % post_fbtax_dollars)
 
+        if api == 'battlehouse':
+            url = SpinConfig.config['battlehouse_api_path'] + '/metrics_event'
+            params['service'] = SpinConfig.game()
+            headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        else:
+            url = data['url']
+            headers = None
+
         query = urllib.urlencode(params)
 
-        url = data['url']+'?'+query
+        url += '?'+query
 
         log_props = {'user_id': self.user.user_id, 'kpi': name, 'context': context, 'url': url}
         if post_fbtax_dollars is not None: log_props['post_fbtax_dollars'] = post_fbtax_dollars
@@ -5424,7 +5433,7 @@ class Session(object):
                                          (api, self.user.user_id, name, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            gamesite.AsyncHTTP_metrics.queue_request(server_time, url, lambda result: None)
+            gamesite.AsyncHTTP_metrics.queue_request(server_time, url, lambda result: None, headers = headers)
             return True
         else:
             return False
@@ -8885,6 +8894,7 @@ class Player(AbstractPlayer):
                    key.startswith('dauup2:') or \
                    key.startswith('adparlor:') or \
                    key.startswith('liniad:') or \
+                   key.startswith('battlehouse:') or \
                    key.startswith('fb_conversion_pixels:') or \
                    key.startswith('kg_conversion_pixels:'):
                     new_history[key] = val
