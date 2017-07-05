@@ -7654,7 +7654,8 @@
                        "text_color_day7": [1,1,0,1],
                        "text_color_claimed": [0.2,0.2,0.2],
                        "drop_shadow": 1,
-                       "ui_name": "%dayofweek\n%date"
+                       "ui_name": "%dayofweek\n%date",
+                       "ui_name_today": "Today\n%date"
                      },
             "glow": { "show": 0, "kind": "StaticImage", "xy":[-23,16], "dimensions":[100,100],
                       "asset": "dialog_glow_resizable",
