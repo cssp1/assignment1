@@ -1809,6 +1809,8 @@ FUNNEL_BASIC = [
      },
 
     {'name': 'A02 Central Computer L2 within 1 Day of acct creation', 'mandatory_age': 24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 2, 1), 'show_p': True },
+    {'name': 'A02A Central Computer L2 (time-independent)', 'func': lambda user: user.get(gamedata['townhall']+'_level', 1) >= 2 },
+
     {'name': 'A04A Returned between 24-48 hrs after acct creation', 'mandatory_age': 48*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 2, after=1) >= 1, 'show_p':True },
     {'name': 'A04A1 Returned between 48-72 hrs after acct creation', 'mandatory_age': 72*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 3, after=2) >= 1, 'show_p':True },
     {'name': 'A04A2 Returned between 72-96 hrs after acct creation', 'mandatory_age': 96*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 4, after=3) >= 1, 'show_p':True },
@@ -1834,6 +1836,7 @@ FUNNEL_BASIC = [
     {'name': 'A05 %CONV% Spent 5hr in game within 10 Days of acct creation', 'mandatory_age': 10*24*60*60,
      'func': lambda user: SpinUpcache.playtime_within(user, 10) >= 5*60*60, 'show_p': True },
     {'name': 'A06 Central Computer L3 within 10 Days of acct creation', 'mandatory_age': 10*24*60*60, 'func': lambda user: SpinUpcache.player_history_within(user, gamedata['townhall']+'_level', 3, 10), 'show_p': True},
+    {'name': 'A06A Central Computer L3 (time-independent)', 'func': lambda user: user.get(gamedata['townhall']+'_level', 1) >= 3 },
 
     {'name': 'A07B Made A Payment within 3 Days of acct creation', 'mandatory_age': 3*24*60*60, 'func': lambda user: num_purchases_within(user,3) >= 1, 'show_p':True },
     {'name': 'A07C Made A Payment within 7 Days of acct creation', 'mandatory_age': 7*24*60*60, 'func': lambda user: num_purchases_within(user,7) >= 1, 'show_p':True },

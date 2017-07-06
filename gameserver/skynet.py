@@ -1148,6 +1148,14 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     variable = 'actual_installs'
                     variable_key = 'yes'
                     variable_coeff = 1
+                elif stage['stage'] == 'A02A Central Computer L2 (time-independent)':
+                    variable = 'townhall2'
+                    variable_key = 'yes'
+                    variable_coeff = 1
+                elif stage['stage'] == 'A06A Central Computer L3 (time-independent)':
+                    variable = 'townhall3'
+                    variable_key = 'yes'
+                    variable_coeff = 1
                 elif stage['stage'] == 'A99 Total Receipts':
                     variable = 'actual_receipts'
                     variable_key = 'value'
@@ -1314,12 +1322,21 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                         # this was the old way of evaluating CPC bids - now we use Ratio for CPC as well as oCPM
                         bid_perf_ratio = -1
                         bid_perf = 'Target %s' % target_cpi
+                    # new in 2017
+                    elif group['actual_installs'] > 0 and group['actual_cpi'] > 0:
+                        bid_perf = 'CC2 %4d %15s CC3 %3d %15s' % (group['townhall2'],
+                                                                  ANSIColor.yellow(
+                            (pretty_cents(float(group['spent']) / group['townhall2'])) if group['townhall2'] > 0 else '-'),
+                                                                  group['townhall3'],
+                                                                   ANSIColor.yellow(
+                            (pretty_cents(float(group['spent']) / group['townhall3'])) if group['townhall3'] > 0 else '-'),
+                                                                  )
                     elif group['actual_installs'] > 0 and group['actual_cpi'] > 0 and best_skynet_ltv > 0:
                         bid_perf_ratio = (1 + group['viral_benefit']) * (best_skynet_ltv / group['actual_cpi'])
-                        bid_perf = 'Ratio%s   %0.2f' % ('*' if group['viral_benefit'] else ' ', bid_perf_ratio)
+                        bid_perf = 'Ratio%s                    %0.2f' % ('*' if group['viral_benefit'] else ' ', bid_perf_ratio)
                     else:
                         bid_perf_ratio = -1
-                        bid_perf = '             '
+                        bid_perf = '                              '
 
                     # receipts curve
                     #rec = ' '.join([('%d ' % day) + pretty_ltv(group, 'actual_receipts_d%d' % day, color = False) for day in [1,3]]) # ,7,14,30,60,90]])
@@ -1404,9 +1421,10 @@ def adstats_analyze(db, min_clicks = 0, stgt_filter = None, group_by = None,
                     else:
                         ui_tactical = ''
 
-                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s (E90 %s%s) Spent %9s Rcpt %9s (N=%3d) \"ROI\" %3.0f%% %s" % \
+                    # (E90 %s %s) % (skynet_ltvs, final_ltvs)
+                    print "%s%s Ads %3d Imp %7d Clicks %4d CTR %s Installs %s (EST %4d) CPI %s %s Spent %9s Rcpt %9s (N=%3d) \"ROI\" %3.0f%% %s" % \
                           ((time_sample['ui_name']+' ') if time_sample['ui_name'] else '',
-                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, skynet_ltvs, final_ltvs, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), group['payers'], roi_pct, ui_tactical)
+                           ui_groupname, len(group['adgroups']), group['impressions'], group['clicks'], ctr, actual_installs, group['installs'], cpi, bid_perf, pretty_cents(group['spent']), pretty_cents(group['actual_receipts']), group['payers'], roi_pct, ui_tactical)
 
     if tactical_actions:
         print 'PLAN:\n' + '\n'.join(map(repr, tactical_actions))
