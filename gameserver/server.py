@@ -27165,6 +27165,16 @@ class GAMEAPI(resource.Resource):
                 if (not session.player.can_use_quarries()):
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
                     return
+
+                # check squad order cooldown
+                if dest_base_id[0] == 's':
+                    owner_id, squad_id = map(int, dest_base_id[1:].split('_'))
+                    if owner_id == session.player.user_id:
+                        cdname = 'squad_order:%d' % squad_id
+                        if session.player.cooldown_active(cdname):
+                            retmsg.append(["ERROR", "CANNOT_SPY_SQUAD_ON_COOLDOWN"])
+                            return
+
             elif arg[0] == "VISIT_LADDER_RIVAL":
                 force_switch = bool(arg[1]) or gamedata['matchmaking']['ladder_match_life'] <= 0
                 exclude_user_ids = set()
