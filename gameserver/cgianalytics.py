@@ -2748,7 +2748,7 @@ def do_funnel(qlist, significance_test, use_stages, conversion_rates):
 
             retmsg['skynet_queries'].append(qs)
 
-            agg_result_cursor = skynet_db.fb_adstats_hourly.aggregate([
+            agg_result_cursor = skynet_db.fb_adstats_daily.aggregate([
                 {'$match': qs},
                 {'$group':{'_id':'ALL', 'spent':{'$sum':'$spent'}}}
                 ])
