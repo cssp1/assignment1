@@ -29,7 +29,7 @@ class ControlAPIGameException(Exception):
         Exception.__init__(self)
         self.ret_error = ret_error # from the CustomerSupport ReturnValue error
     def __str__(self):
-        return 'CONTROLAPI bad request: %r' + (self.ret_error if isinstance(self.ret_error, basestring) else repr(self.ret_error))
+        return 'CONTROLAPI bad request: ' + (self.ret_error if isinstance(self.ret_error, basestring) else repr(self.ret_error))
 
 # makes no assumption about return value conventions - used for legacy non-CustomerSupport methods
 def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_port = None,
