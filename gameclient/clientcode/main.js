@@ -48489,7 +48489,7 @@ function handle_server_message(data) {
         bars.user_data['base_damage_server_flags'] = damage_flags;
     } else if(msg == "MANUFACTURE_OVERFLOW_TO_RESERVES") {
         if(!session.manufacture_overflow_warned && session.home_base && !session.has_attacked &&
-           !player.quest_tracked['tips']) {
+           !(player.quest_tracked && player.quest_tracked['tips'])) {
             session.manufacture_overflow_warned = true;
             notification_queue.push(function() { invoke_ingame_tip('manufacture_overflow_to_reserves_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED}); });
         }
