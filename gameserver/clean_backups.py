@@ -10,6 +10,7 @@ import SpinParallel
 
 TASKS = [
     {'bucket': 'spinpunch-forums', 'pattern': 'spinpunch-forums-backup-YYYYMMDD.tar.gz'},
+    {'bucket': 'battlehouse-bhlogin-backups', 'pattern': 'battlehouse-bhlogin-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-vbulletin-backups', 'pattern': 'battlehouse-vbulletin-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-wordpress-backups', 'pattern': 'battlehouse-wordpress-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-mattermost-backups', 'pattern': 'battlehouse-mattermost-YYYYMMDD.tar.gz'},
