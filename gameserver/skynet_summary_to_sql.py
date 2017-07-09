@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config('skynet')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    adstats_hourly_table = cfg['table_prefix']+'adstats_hourly'
+    adstats_daily_table = cfg['table_prefix']+'adstats_daily'
     conversions_table = cfg['table_prefix']+'conversions'
     skynet_daily_summary_table = cfg['table_prefix']+'v_daily_summary'
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
         start_time = min(start_time, row['start']) if start_time >= 0 else row['start']
 
     cur.execute("SELECT MIN(time) AS start, MAX(time) AS end " + \
-                "FROM "+sql_util.sym(adstats_hourly_table))
+                "FROM "+sql_util.sym(adstats_daily_table))
     row = cur.fetchone()
     if row and row['start'] and row['end']:
         if verbose: print 'adstats', row['start'], row['end']
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                     "    0 AS cohort_installs," + \
                     "    0 AS daily_receipts_cents," + \
                     "    0 AS daily_installs " + \
-                    "FROM " + sql_util.sym(adstats_hourly_table) + " " + \
+                    "FROM " + sql_util.sym(adstats_daily_table) + " " + \
                     "WHERE time >= %s AND time < %s " + \
                     "GROUP BY "+sql_util.sym(interval)+",tgt_game,tgt_version,tgt_bid_type,tgt_ad_type,tgt_country,tgt_age_range,ad_purpose ORDER BY NULL",
                     [day_start, day_start, day_start+dt])
