@@ -53,17 +53,15 @@ def get_adgroup_name(id):
     return ret
 
 if __name__ == '__main__':
-    game_id = SpinConfig.game()
     commit_interval = 1000
     verbose = True
     dry_run = False
     fix_missing_data = False
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['dry-run','fix-missing-data'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'c:q', ['dry-run','fix-missing-data'])
 
     for key, val in opts:
-        if key == '-g': game_id = val
-        elif key == '-c': commit_interval = int(val)
+        if key == '-c': commit_interval = int(val)
         elif key == '-q': verbose = False
         elif key == '--dry-run': dry_run = True
         elif key == '--fix-missing-data': fix_missing_data = True
@@ -71,14 +69,14 @@ if __name__ == '__main__':
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
 
-    cfg = SpinConfig.get_mysql_config('skynet' if fix_missing_data else 'skynet_readonly')
+    cfg = SpinConfig.get_mysql_config('skynet')
     con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    adstats_table = cfg['table_prefix']+'adstats_hourly'
+    adstats_table = cfg['table_prefix']+'adstats_daily'
 
-    nosql_config = SpinConfig.get_mongodb_config('skynet')
+    nosql_config = SpinConfig.get_mongodb_config('skynet' if fix_missing_data else 'skynet_readonly')
     nosql_client = pymongo.MongoClient(*nosql_config['connect_args'], **nosql_config['connect_kwargs'])
     nosql_db = nosql_client[nosql_config['dbname']]
-    nosql_tbl = nosql_db['fb_adstats_hourly']
+    nosql_tbl = nosql_db['fb_adstats_daily']
 
     cur = con.cursor()
     if not dry_run:
@@ -87,16 +85,18 @@ if __name__ == '__main__':
 
     # find most recent entry
     start_time = -1
-    end_time = time_now - 4*3600 # skip entries too close to "now" to ensure that all entries are present
+    end_time = time_now
     cur = con.cursor(MySQLdb.cursors.DictCursor)
     if dry_run:
         row = None
     else:
-        cur.execute("SELECT time FROM "+sql_util.sym(adstats_table)+" ORDER BY time DESC LIMIT 1")
+        cur.execute("SELECT MAX(time) AS maxtime FROM "+sql_util.sym(adstats_table))
         row = cur.fetchone()
-    if row:
-        start_time = row['time']
-    qs = {'start_time': {'$gt': start_time, '$lt': end_time}}
+    if row and row['maxtime']:
+        start_time = row['maxtime']
+        # re-import last 2 full days of data
+        start_time = 86400*((start_time//86400) - 1)
+    qs = {'start_time': {'$gte': start_time, '$lt': end_time}}
 
     # for fixing bad data
     #qs = {'$or': [{'dtgt': {'$exists':False}},
@@ -196,7 +196,7 @@ if __name__ == '__main__':
             continue
 
         if not dry_run:
-            cur.execute("DELETE FROM "+sql_util.sym(adstats_table)+" WHERE _id = %s", row['_id'])
+            cur.execute("DELETE FROM "+sql_util.sym(adstats_table)+" WHERE _id = %s", (row['_id'],))
             sql_util.do_insert(cur, adstats_table, keyvals)
         total += 1
         batch += 1
