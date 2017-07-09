@@ -30,8 +30,12 @@ def skynet_summary_schema(sql_util, interval):
                        ('cohort_receipts_cents', 'INT8 NOT NULL'),
                        ('cohort_receipts_d90_cents', 'INT8 NOT NULL'),
                        ('cohort_installs', 'INT8 NOT NULL'),
+                       ('cohort_cc2_by_day_1', 'INT8 NOT NULL'),
+                       ('cohort_returned_24_48h', 'INT8 NOT NULL'),
                        ('daily_receipts_cents', 'INT8 NOT NULL'),
                        ('daily_installs', 'INT8 NOT NULL'),
+                       ('daily_cc2_by_day_1', 'INT8 NOT NULL'),
+                       ('daily_returned_24_48h', 'INT8 NOT NULL'),
                        ],
             'indices': {'by_interval': {'unique':False, 'keys': [(interval,'ASC')]}}
             }
@@ -97,8 +101,12 @@ if __name__ == '__main__':
                     "    0 AS cohort_receipts_cents," + \
                     "    0 AS cohort_receipts_d90_cents," + \
                     "    0 AS cohort_installs," + \
+                    "    0 AS cohort_cc2_by_day_1," + \
+                    "    0 AS cohort_returned_24_48h," + \
                     "    0 AS daily_receipts_cents," + \
-                    "    0 AS daily_installs " + \
+                    "    0 AS daily_installs, " + \
+                    "    0 AS daily_cc2_by_day_1," + \
+                    "    0 AS daily_returned_24_48h " + \
                     "FROM " + sql_util.sym(adstats_daily_table) + " " + \
                     "WHERE time >= %s AND time < %s " + \
                     "GROUP BY "+sql_util.sym(interval)+",tgt_game,tgt_version,tgt_bid_type,tgt_ad_type,tgt_country,tgt_age_range,ad_purpose ORDER BY NULL",
@@ -119,8 +127,12 @@ if __name__ == '__main__':
                     "    SUM(IFNULL(usd_receipts_cents,0)) AS cohort_receipts_cents," + \
                     "    SUM(IF(time - account_creation_time < 90*86400, IFNULL(usd_receipts_cents,0), 0)) AS cohort_receipts_d90_cents," + \
                     "    SUM(IF(kpi='acquisition_event',1,0)) AS cohort_installs," + \
+                    "    SUM(IF(kpi='cc2_by_day_1',1,0)) AS cohort_cc2_by_day_1," + \
+                    "    SUM(IF(kpi='returned_24_48h',1,0)) AS cohort_returned_24_48h," + \
                     "    0 AS daily_receipts_cents," + \
-                    "    0 AS daily_installs " + \
+                    "    0 AS daily_installs, " + \
+                    "    0 AS daily_cc2_by_day_1," + \
+                    "    0 AS daily_returned_24_48h " + \
                     "FROM " + sql_util.sym(conversions_table) + " " + \
                     "WHERE account_creation_time >= %s AND account_creation_time < %s " + \
                     "GROUP BY "+sql_util.sym(interval)+",tgt_game,tgt_version,tgt_bid_type,tgt_ad_type,tgt_country,tgt_age_range,ad_purpose ORDER BY NULL",
@@ -142,8 +154,12 @@ if __name__ == '__main__':
                     "    0 AS cohort_receipts_cents," + \
                     "    0 AS cohort_receipts_d90_cents," + \
                     "    0 AS cohort_installs," + \
+                    "    0 AS cohort_cc2_by_day_1," + \
+                    "    0 AS cohort_returned_24_48h," + \
                     "    SUM(IFNULL(usd_receipts_cents,0)) AS daily_receipts_cents," + \
-                    "    SUM(IF(kpi='acquisition_event',1,0)) AS daily_installs " + \
+                    "    SUM(IF(kpi='acquisition_event',1,0)) AS daily_installs, " + \
+                    "    SUM(IF(kpi='cc2_by_day_1',1,0)) AS daily_cc2_by_day_1," + \
+                    "    SUM(IF(kpi='returned_24_48h',1,0)) AS daily_returned_24_48h " + \
                     "FROM " + sql_util.sym(conversions_table) + " " + \
                     "WHERE time >= %s AND time < %s " + \
                     "GROUP BY "+sql_util.sym(interval)+",tgt_game,tgt_version,tgt_bid_type,tgt_ad_type,tgt_country,tgt_age_range,ad_purpose ORDER BY NULL",
