@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
@@ -10,6 +11,7 @@
 import re
 import collections
 import unicodedata
+import codepoints
 
 class ChatFilter(object):
     def __init__(self, config):
@@ -152,10 +154,15 @@ class ChatFilter(object):
 
     # scan for non-letter "graphics" like smiley faces
     def is_graphical(self, input):
-        for i in xrange(len(input)):
-            codepoint = ord(input[i])
+        for codepoint in codepoints.from_unicode(input):
             # see https://en.wikipedia.org/wiki/Unicode_block
             if codepoint >= 0x2100 and codepoint <= 0x2bff:
+                return True
+            if codepoint >= 0x16fe0 and codepoint <= 0x16fff:
+                return True
+            if codepoint >= 0x1d000 and codepoint <= 0x1f2ff:
+                return True
+            if codepoint >= 0x1f300 and codepoint <= 0x1f9ff:
                 return True
         return False
 
@@ -163,9 +170,11 @@ class ChatFilter(object):
     def is_ugly(self, input):
         nonspacing_run = 0 # don't allow very long runs of nonspacing characters
 
+        input = tuple(codepoints.from_unicode(input))
+
         for i in xrange(len(input)):
-            codepoint = ord(input[i])
-            next_codepoint = ord(input[i+1]) if i < len(input)-1 else None
+            codepoint = input[i]
+            next_codepoint = input[i+1] if i < len(input)-1 else None
 
             # disallow nonsense duplications of nonspacing marks (e.g. Arabic diacritics)
             if self.is_diacritic(codepoint):
@@ -187,6 +196,7 @@ class ChatFilter(object):
         # see http://www.unicode.org/reports/tr44/tr44-4.html#General_Category_Values
         if codepoint < 0x80: return False # ASCII stuff is OK
         if codepoint in (0xbf, 0xa1, 0x61f, 0x60c): return False # Spanish/Arabic question/exclamation/comma marks are OK
+        if codepoint >= 0x10000: return False # narrow python build: assume not diacritic
         return unicodedata.category(unichr(codepoint)) in ('Mn','Po')
 
         # see https://en.wikipedia.org/wiki/Arabic_(Unicode_block)
@@ -248,4 +258,5 @@ if __name__ == '__main__':
     assert not cf.is_ugly(u'\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0634\u0628\u0627\u0628\u060c\u060c \u0627\u0634\u0648 \u0645\u0627\u0643\u0648 \u0644\u0627 \u062a\u0631\u0642\u064a\u0647 \u0644\u0627 \u0634\u064a \u0628\u0647\u0630\u0627 \u0627\u0644\u0643\u0644\u064a\u0646 \u0628\u0633 \u0627\u062f\u0627\u0641\u0639 \u0648 \u0627\u0633\u0647\u0631 \u0648 \u0643\u0644\u0634\u064a \u0645\u0627\u0643\u0648')
     assert not cf.is_ugly(u'\u0e1a\u0e2d\u0e01\u0e1e\u0e35\u0e35\u0e48\u0e21\u0e32\u0e0b\u0e34')
 
+    assert cf.is_graphical(u'🖕🖕🖕')
     print 'OK'
