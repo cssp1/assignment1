@@ -10,7 +10,7 @@
 # see https://github.com/bhamiltoncx/pycodepoints/blob/pycodepoints/codepoints/__init__.py
 
 from __future__ import unicode_literals
-from builtins import chr
+#from builtins import chr
 import sys
 
 def is_leading_surrogate(code_unit):
