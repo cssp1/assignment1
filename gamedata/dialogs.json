@@ -8521,8 +8521,9 @@
             // big_icon/splash_icon are mutually exclusive
             "big_icon": { "kind": "StaticImage", "xy": [525,209], "dimensions": [150,125], "bg_image_offset": [0,32],
                           "state": "hero", "bg_image_justify": "center" },
-            "splash_icon_bg": { "show":0, "kind": "SolidRect", "xy": [476,173], "dimensions": [254,204], "color": [0,0,0,0.4] },
-            "splash_icon": { "kind": "StaticImage", "xy": [478,175], "dimensions": [250,200] },
+            "splash_icon_bg": { "show":0, "kind": "SolidRect", "xy": [476,173], "bevel": 3, "dimensions": [254,204], "color": [0,0,0,0.4] },
+            "splash_icon": { "kind": "StaticImage", "xy": [478,175], "dimensions": [250,200],
+                             "bg_image_justify": "center" },
 
             "small_icon": { "kind": "StaticImage", "xy": [273,261], "dimensions": [112,100],
                             "bg_image_offset": [0,8], "bg_image_justify": "center", "state": "normal", "rotating": 1 },

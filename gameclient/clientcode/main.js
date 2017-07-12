@@ -38090,6 +38090,12 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
         unit_spec = gamedata['units'][tech_spec['associated_unit']];
     } else if('associated_item' in tech_spec) {
         // tech for unlocking/upgrading an item (via crafting recipe)
+    } else if('associated_tech' in tech_spec) {
+        // possibly a mod tech
+        var associated_tech_spec = gamedata['tech'][tech_spec['associated_tech']];
+        if('associated_unit' in associated_tech_spec) {
+            unit_spec = gamedata['units'][associated_tech_spec['associated_unit']];
+        }
     } else {
         return;
     }
@@ -38116,6 +38122,8 @@ function invoke_blueprint_congrats(item_spec_name, tech_spec_name) {
 
     if('splash_image' in tech_spec) {
         dialog.widgets['splash_icon'].asset = get_leveled_quantity(tech_spec['splash_image'],1);
+        dialog.widgets['splash_icon'].state = GameArt.assets[dialog.widgets['splash_icon'].asset].has_state('hero') ? 'hero' : 'normal';
+
         dialog.widgets['splash_icon_bg'].show = true;
     } else {
         dialog.widgets['big_icon'].asset = dialog.widgets['small_icon'].asset; // might be null
