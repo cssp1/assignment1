@@ -40626,10 +40626,12 @@ function update_new_store_sku(d) {
             if(formula.indexOf('resource_boost') == 0) {
                 shown_price = -1; // do not show "FREE" for unpurchaseable resource boosts
             }
-        } else if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks') {
+        } else if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks' || formula === 'resource_boost_constant') {
             var resource = spell['resource'];
             var amount;
-            if(spell['boost_amount'] < 1) {
+            if('give_amount' in spell) {
+                amount = spell['give_amount'];
+            } else if(spell['boost_amount'] < 1) {
                 amount = Math.floor(spell['boost_amount'] * player.resource_state[resource][0]);
             } else {
                 // full 100% boost
@@ -44683,6 +44685,10 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
     }
 
     var formula = spell['price_formula'];
+    if(!formula) {
+        throw Error('bad price_formula for spell '+spell['name']);
+    }
+
     if(formula === 'constant') {
         if('currency' in spell) { p_currency = spell['currency']; }
         return [spell['price'], p_currency];
@@ -45201,12 +45207,17 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
 
         return [price, p_currency];
 
-    } else if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks') {
+    } else if(formula === 'resource_boost' || formula === 'resource_boost_gamebucks' || formula === 'resource_boost_constant') {
         if(formula === 'resource_boost_gamebucks') { p_currency = 'gamebucks'; }
 
         var resource = spell['resource'];
         var amount;
-        if(spell['boost_amount'] < 1) {
+        if('give_amount' in spell) { // constant boosts
+            amount = spell['give_amount'];
+            if((player.resource_state[resource][1] + amount) > player.resource_state[resource][0] && !ignore_error) {
+                return [-1, spell['currency']];
+            }
+        } else if(spell['boost_amount'] < 1) { // percentage boosts
             amount = Math.floor(spell['boost_amount'] * player.resource_state[resource][0]);
             // only allow purchase of sub-100% boosts if there is storage room
             if((player.resource_state[resource][1] + amount) > player.resource_state[resource][0] && !ignore_error) {
@@ -45226,8 +45237,11 @@ Store.get_base_price = function(unit_id, spell, spellarg, ignore_error) {
                 amount = player.resource_state[resource][0] - player.resource_state[resource][1];
             }
         }
-
-        return [Store.get_resource_price(resource, amount, p_currency), p_currency];
+        if(formula === 'resource_boost_constant') {
+            return [spell['price'], spell['currency']];
+        } else {
+            return [Store.get_resource_price(resource, amount, p_currency), p_currency];
+        }
     } else if(formula === 'resource_topup') {
         p_currency = 'gamebucks'; // only option for this
         var price = 0;

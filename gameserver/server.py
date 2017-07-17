@@ -16739,7 +16739,7 @@ class Store(object):
                         price = int((factor*price)+0.5) # round()
             return price, p_currency
 
-        elif (formula == 'resource_boost') or formula == ('resource_boost_gamebucks'):
+        elif formula in ('resource_boost','resource_boost_gamebucks','resource_boost_constant'):
             if formula == 'resource_boost_gamebucks': p_currency = 'gamebucks'
 
             snap = session.player.resources.calc_snapshot()
@@ -16749,18 +16749,28 @@ class Store(object):
             else:
                 raise Exception('Unknown resource type '+spell['resource'])
 
-            if spell['boost_amount'] < 1:
+            if 'give_amount' in spell: # constant boosts
+                amount = spell['give_amount']
+                if (cur_res + amount) > max_res:
+                    error_reason.append('no room for constant boost')
+                    return -1, spell['currency']
+
+            elif spell['boost_amount'] < 1: # percentage boosts
                 amount = int(spell['boost_amount'] * max_res)
                 if (cur_res + amount) > max_res:
                     error_reason.append('no room for partial boost')
                     return -1, p_currency
-            else:
+            else: # full boost
                 if cur_res >= max_res:
                     error_reason.append('no room for full boost')
                     return -1, p_currency
                 amount = max_res - cur_res
 
-            return ResPrice.get_resource_price(gamedata, session, spell['resource'], amount, p_currency), p_currency
+            if formula == 'resource_boost_constant':
+                return spell['price'], spell['currency']
+            else:
+                return ResPrice.get_resource_price(gamedata, session, spell['resource'], amount, p_currency), p_currency
+
         elif (formula == 'resource_topup'):
             p_currency = 'gamebucks'
             price = 0
