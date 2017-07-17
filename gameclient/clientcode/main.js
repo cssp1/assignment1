@@ -40650,6 +40650,9 @@ function update_new_store_sku(d) {
                     shown_price = -1; // don't show "FREE" for a full boost when resources are already full
                 }
                 info_high = info_small = false;
+                var increment = {};
+                increment[resource] = Math.max(1,amount);
+                helper = get_requirements_help('resources', increment);
             }
 
         } else if(formula.indexOf('grow_base_perimeter') === 0) {
