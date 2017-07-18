@@ -21,6 +21,7 @@ TASKS = [
     {'bucket': 'spinpunch-backups', 'pattern': 'skynet/YYYYMMDD-.*'},
     {'bucket': 'spinpunch-backups', 'pattern': 'spinpunch-svn/spinpunch-corp-backup-YYYYMMDD.tar.gz'},
     {'bucket': 'spinpunch-mongolith-backups', 'pattern': 'mongolith-mongodb-YYYYMMDD.*', 'is_dir': True},
+    {'bucket': 'spinpunch-mongolith-backups', 'pattern': 'sgprod-mongo-mongodb-YYYYMMDD.*', 'is_dir': True},
 
     # per-title userdb/playerdb backups
     {'bucket': 'spinpunch-backups', 'pattern': 'marsfrontier-player-data-YYYYMMDD.*', 'is_dir': True},
