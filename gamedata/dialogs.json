@@ -4479,7 +4479,7 @@
 
 
             "row_battle_stats": [// not supported with RichTextField: {"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
-                { "type": "fadein", "start_time": 2.5, "end_time": 3.0 }],
+                                 { "type": "fadein", "start_time": 2.5, "end_time": 3.0 }],
 
             "row_water_icon": { "type": "same_as", "ref": "loot_xp_icon", "delay": 0.2 },
             "row_water_amount": { "type": "same_as", "ref": "loot_xp_amount", "delay": 0.2 },
@@ -9102,7 +9102,7 @@
             "restack_spinner": { "kind": "StaticImage", "xy":[606,76], "dimensions":[16,16], "asset":"loading_spinner"},
 
             "restack_button": {"kind": "ActionButton", "xy":[628,74], "dimensions":[22,20], "bg_image": "refresh_button", "push_bg_image": 1,
-                            "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
+                               "ui_tooltip": "Sort and re-stack items to save space.\nClick again to reverse item order.", "tooltip_delay": 0, "fixed_tooltip_offset": [480,105] },
 
             "help_button": {"kind": "ActionButton", "xy":[659,72], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,
                             "ui_tooltip": "How Loot works", "tooltip_delay": 0 },
@@ -9212,7 +9212,7 @@
                                 "ui_name_upgrade_speedup": "Resolve" // "Speed Up"
                               },
             "pending_all_mask": { "show": 0, "kind": "SolidRect", "color": [0,0,0,0.5],
-                              "xy": [200,100], "dimensions": [500,309], "transparent_to_mouse": false },
+                                  "xy": [200,100], "dimensions": [500,309], "transparent_to_mouse": false },
 
             "loot_arrow": { "kind": "StaticImage", "xy": [188,137], "dimensions": [24,24], "asset": "arrow_e" }
         }
