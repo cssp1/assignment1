@@ -1,3 +1,5 @@
+RANDOM_DELAY=10	# 10-minute slop offset
+
 # run daily tasks at 0700 UTC time (usually lowest load)
 # XXX enable manually 0 7 * * * ec2-user run-parts /etc/cron.spinpunch.daily
 
