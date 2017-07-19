@@ -593,8 +593,8 @@ def pretty_cents(cents):
 # numeric counters inside adstats that we care about
 ADSTATS_COUNTERS_QUERY = \
 ['spend', 'frequency',
- 'clicks', 'unique_clicks', 'impressions', 'unique_impressions', 'reach',
- 'social_clicks', 'unique_social_clicks', 'social_impressions', 'unique_social_impressions', 'social_reach']
+ 'clicks', 'unique_clicks', 'impressions', 'reach',
+ 'social_clicks', 'unique_social_clicks', 'social_impressions', 'social_reach']
 ADSTATS_COUNTERS = ADSTATS_COUNTERS_QUERY + ['spent'] # since we internally use "spent", which is deprecated by Facebook
 ADSTATS_DATA_FIELDS = ['relevance_score', 'actions'] # JSON object fields from adstats we want to store
 
@@ -799,7 +799,8 @@ def adstats_record(db, adgroup_list, time_range):
             if 'clicks' in stat: del stat['clicks'] # get rid of bad data
             for a in stat['actions']:
                 if a['action_type'] == 'link_click':
-                    obj['clicks'] = int(a['value'])
+                    # could differentiate by a['action_link_click_destination'] : click_to_app_store, click_to_app_deeplink, click_to_website, click_to_canvas, click_to_call, unknown
+                    obj['clicks'] += int(a['value'])
 
         elif 'clicks' not in stat:
             # oh dear, Facebook made click counting really complicated now
@@ -2858,7 +2859,7 @@ if __name__ == '__main__':
             print 'getting stats...'
             # query adstats
             time_range = None
-            if max_frequency > 0: # must snap to 1/7/28-day boundary to get valid unique_impressions data
+            if max_frequency > 0: # must snap to 1/7/28-day boundary to get valid reach data
                 # snap to next UTC day end, in Pacific time
                 # seems weird, but this is what the Facebook API wants...
                 local_ts = 86400*(time_now//86400) + 86400
@@ -2873,7 +2874,7 @@ if __name__ == '__main__':
             if max_frequency > 0:
                 for adgroup in adgroup_list:
                     stat = stats[adgroup['id']]
-                    if stat and (stat['impressions'] > 150) and (stat.get('unique_impressions',0) <= 0):
+                    if stat and (stat['impressions'] > 150) and (stat.get('reach',0) <= 0):
                         raise Exception('did not get valid unique_ adstats for ad %s - time range boundaries are wrong:\n%s' % (adgroup['name'], stat))
 
 
@@ -2883,11 +2884,11 @@ if __name__ == '__main__':
                 adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']]['impressions'] < min_impressions, adgroup_list)
             if max_frequency > 0:
                 #print '\n'.join(map(repr, (stats[adgroup['id']] for adgroup in adgroup_list)))
-                print 'frequency:\n' + '\n'.join(['%-100s %.1f' % (adgroup['name'], stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions']) if stats[adgroup['id']].get('unique_impressions',0) > 0 else 0) \
+                print 'frequency:\n' + '\n'.join(['%-100s %.1f' % (adgroup['name'], stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['reach']) if stats[adgroup['id']].get('reach',0) > 0 else 0) \
                                                   for adgroup in adgroup_list if stats[adgroup['id']]])
 
-                adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']].get('unique_impressions',0) > 0 and \
-                                      (stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['unique_impressions'])) >= max_frequency, adgroup_list)
+                adgroup_list = filter(lambda adgroup: stats[adgroup['id']] and stats[adgroup['id']].get('reach',0) > 0 and \
+                                      (stats[adgroup['id']]['impressions'] / float(stats[adgroup['id']]['reach'])) >= max_frequency, adgroup_list)
             if min_age > 0:
                 adgroup_list = filter(lambda adgroup: 'created_time' in adgroup and time_now - SpinFacebook.parse_fb_time(adgroup['created_time']) >= min_age, adgroup_list)
 
