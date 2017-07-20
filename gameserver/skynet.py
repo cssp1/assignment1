@@ -2825,9 +2825,45 @@ if __name__ == '__main__':
     elif mode == 'delivery-estimate-pull':
         tgt = decode_params(standin_spin_params, stgt)
         reach_tgt = delivery_estimate_tgt(tgt)
-        print tgt, 'delivery_estimate:'
+        print reach_tgt, 'delivery_estimate:'
         print delivery_estimate_get_and_store(db, GAMES[cmd_game_id]['ad_account_id'], reach_tgt)
         compute_bid(db, standin_spin_params, tgt, 100, ad_account_id = GAMES[cmd_game_id]['ad_account_id']) # dollars to cents
+
+
+        if 1:
+            # get curve
+            if 0:
+                for FIELD in ('excluded_custom_audiences','excluded_connections'):
+                    if FIELD in reach_tgt:
+                        del reach_tgt[FIELD]
+
+            curve = None
+
+            if 0:
+                # this API doesn't seem to be returning data yet
+                temp = fb_api(SpinFacebook.versioned_graph_endpoint('delivery_estimate', 'act_'+GAMES[cmd_game_id]['ad_account_id']+'/delivery_estimate'),
+                              url_params = {'fields': DELIVERY_ESTIMATE_FIELDS + ',daily_outcomes_curve',
+                                            'optimization_goal': adgroup_encode_bid(reach_tgt, 0)['optimization_goal'],
+                                            'targeting_spec': SpinJSON.dumps(adgroup_targeting(db, reach_tgt))})
+                if len(temp['data']) > 0 and temp['data'][0]['estimate_ready']:
+                    curve = temp['data'][0]['daily_outcomes_curve']
+            else:
+                # this API stops working after v2.8
+                temp = fb_api(SpinFacebook.versioned_graph_endpoint('reachestimate', 'act_'+GAMES[cmd_game_id]['ad_account_id']+'/reachestimate'),
+                              url_params = {'fields': 'bid_estimations,estimate_ready',
+                                            'optimize_for': adgroup_encode_bid(reach_tgt, 0)['optimization_goal'],
+                                            'targeting_spec': SpinJSON.dumps(adgroup_targeting(db, reach_tgt))})
+                if temp['data']['estimate_ready']:
+                    curve = temp['data']['bid_estimations'][0]['curve']
+
+            if curve and len(curve) > 1:
+                print '%5s %9s %7s %7s' % ('bid', 'reach', 'actions', 'USD/action')
+                for p in curve:
+                    print '%5d %9d %7d %7.2f' % (p['bid'], p['reach'], p['actions'], ((0.01*p['spend'])/float(p['actions']) if (p['actions'] > 0) else -1))
+
+            else:
+                print 'daily_outcomes_curve not available :('
+                print reach_tgt
 
     elif mode == 'manual-bid':
         assert bid > 0 and adgroup_name
