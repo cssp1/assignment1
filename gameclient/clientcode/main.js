@@ -29105,13 +29105,21 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
 
                     // keep the dialog locked for a while longer to prevent ape-on-crack spam
                     window.setTimeout((function (___d, _r) { return function() {
-                        // sort by name (level?)
+                        // sort by name, then level
                         _r.sort(function (a,b) {
-                            var na = PlayerCache.get_ui_name(PlayerCache.query_sync(a));
-                            var nb = PlayerCache.get_ui_name(PlayerCache.query_sync(b));
+                            var data_a = PlayerCache.query_sync(a);
+                            var data_b = PlayerCache.query_sync(b);
+                            var na = PlayerCache.get_ui_name(data_a);
+                            var nb = PlayerCache.get_ui_name(data_b);
+                            var la = ('player_level' in data_a ? data_a['player_level'] : 1);
+                            var lb = ('player_level' in data_b ? data_b['player_level'] : 1);
                             if(na < nb) {
                                 return -1;
                             } else if(na > nb) {
+                                return 1;
+                            } else if(la > lb) {
+                                return -1;
+                            } else if(la < lb) {
                                 return 1;
                             } else {
                                 return 0;
