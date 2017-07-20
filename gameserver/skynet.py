@@ -37,7 +37,7 @@ s3_image_path = 'skynet/'
 
 time_now = int(time.time())
 
-MAX_CACHE_AGE = 3600 # lifetime of reachestimate cache
+MAX_CACHE_AGE = 3600 # lifetime of delivery_estimate cache
 NEW_CAMPAIGN_BUDGET = 2000000 # budget for newly-created campaigns, cents/day
 
 # LOADING CREATIVES
@@ -1638,8 +1638,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             else: # inline creation
                 cr_params = {'page_id': page_id,
                              'link_data': {'call_to_action': {'type': call_to_action_type(tgt),
-                                                              'value': {'link':base_link_url,
-                                                                        'link_title':title_text}},
+                                                              'value': {'link':base_link_url}},
                                            'message': body_text,
                                            'name': title_text,
                                            'link': base_link_url,
@@ -1848,30 +1847,32 @@ def adgroup_targeting(db, tgt):
 
     return ret
 
-def reachestimate_tgt(tgt):
+def delivery_estimate_tgt(tgt):
     # strip out the parts of tgt that don't apply to the reach estimate
     reach_tgt = tgt.copy()
     for FIELD in ('body','title','image','creative_object_id','creative_story_id','creative_action_spec','version'):
         if FIELD in reach_tgt: del reach_tgt[FIELD]
     return reach_tgt
 
-def reachestimate_decode(data):
-    if not data: return False
-    data = data['data']
-    return {'N': data['users'],
-            'bid_amount_min': data['bid_estimations'][0]['bid_amount_min'],
-            'bid_amount_median': data['bid_estimations'][0]['bid_amount_median'],
-            'bid_amount_max': data['bid_estimations'][0]['bid_amount_max'],
+DELIVERY_ESTIMATE_FIELDS = 'estimate_ready,estimate_dau,bid_estimate'
+
+def delivery_estimate_decode(data):
+    if not data or len(data['data']) < 1: return False
+    data = data['data'][0]
+    if data['estimate_ready'] not in (True, 'true'): return False
+    return {'N': data['estimate_dau'],
+            'bid_amount_min': data['bid_estimate']['min_bid'],
+            'bid_amount_median': data['bid_estimate']['median_bid'],
+            'bid_amount_max': data['bid_estimate']['max_bid'],
             }
 
-def reachestimate_get(db, ad_account_id, tgt):
-    # main thing we want is data.users, data.bid_estimations.cpc_min/median/max
-    return reachestimate_decode(fb_api(SpinFacebook.versioned_graph_endpoint('reachestimate', 'act_'+ad_account_id+'/reachestimate'),
-                                       url_params = {'currency': 'USD',
-                                                      'optimize_for': adgroup_encode_bid(tgt, 0)['optimization_goal'],
+def delivery_estimate_get(db, ad_account_id, tgt):
+    return delivery_estimate_decode(fb_api(SpinFacebook.versioned_graph_endpoint('delivery_estimate', 'act_'+ad_account_id+'/delivery_estimate'),
+                                       url_params = {'fields': DELIVERY_ESTIMATE_FIELDS,
+                                                     'optimization_goal': adgroup_encode_bid(tgt, 0)['optimization_goal'],
                                                      'targeting_spec': SpinJSON.dumps(adgroup_targeting(db, tgt))}))
 
-def reachestimate_store(db, stgt, targeting, data):
+def delivery_estimate_store(db, stgt, targeting, data):
     assert 'bid_amount_min' in data # make sure it's the right format
     data['time'] = time_now
     data['targeting_spec'] = mongo_enc(copy.deepcopy(targeting)) # since action specs have "." in them
@@ -1879,8 +1880,8 @@ def reachestimate_store(db, stgt, targeting, data):
     data['_id'] = stgt
     db.fb_reachestimates.replace_one({'_id':stgt}, data, upsert=True)
 
-# retrieve reachestimate and then store it both as a current value per targeting, and a historical time series
-def reachestimate_get_and_store(db, ad_account_id, reach_tgt):
+# retrieve estimate and then store it both as a current value per targeting, and a historical time series
+def delivery_estimate_get_and_store(db, ad_account_id, reach_tgt):
     targeting = adgroup_targeting(db, reach_tgt)
     reach_stgt = encode_params(spin_targets, reach_tgt)
 
@@ -1889,12 +1890,12 @@ def reachestimate_get_and_store(db, ad_account_id, reach_tgt):
         #print "CACHE HIT", stgt
         return entry
 
-    data = reachestimate_get(db, ad_account_id, reach_tgt)
+    data = delivery_estimate_get(db, ad_account_id, reach_tgt)
     if data:
-        reachestimate_store(db, reach_stgt, targeting, data)
+        delivery_estimate_store(db, reach_stgt, targeting, data)
     return data
 
-def reachestimate_ensure_cached(db, ad_account_id, tgt_list):
+def delivery_estimate_ensure_cached(db, ad_account_id, tgt_list):
     query_list = []
     for tgt in tgt_list:
         stgt = encode_params(spin_targets, tgt)
@@ -1902,20 +1903,21 @@ def reachestimate_ensure_cached(db, ad_account_id, tgt_list):
         targeting = adgroup_targeting(db, tgt)
         query_list.append([stgt, targeting,
                            {'method':'GET',
-                            'relative_url': 'act_'+ad_account_id+'/reachestimate?' + \
+                            'relative_url': 'act_'+ad_account_id+'/delivery_estimate?' + \
                             urllib.urlencode({'currency':'USD',
-                                              'optimize_for': adgroup_encode_bid(tgt, 0)['optimization_goal'],
+                                              'fields': DELIVERY_ESTIMATE_FIELDS,
+                                              'optimization_goal': adgroup_encode_bid(tgt, 0)['optimization_goal'],
                                               'targeting_spec':SpinJSON.dumps(targeting)})}])
     if not query_list: return
 
     i = 0
-    for result in fb_api_batch(SpinFacebook.versioned_graph_endpoint('reachestimate', ''),
+    for result in fb_api_batch(SpinFacebook.versioned_graph_endpoint('delivery_estimate', ''),
                                [x[2] for x in query_list], limit = 10, read_only = True): # , ignore_errors = True):
         stgt, targeting, query = query_list[i]
         if result:
-            reachestimate_store(db, stgt, targeting, reachestimate_decode(result))
+            delivery_estimate_store(db, stgt, targeting, delivery_estimate_decode(result))
         else:
-            raise Exception('bad reachestimate result for: '+stgt)
+            raise Exception('bad delivery_estimate result for: '+stgt)
         i += 1
 
 def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tgt, name):
@@ -2055,8 +2057,8 @@ def adcampaigns_garbage_collect(db):
             if result:
                 db.fb_adcampaigns.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).delete_one({'_id':campaign_id})
 
-def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reachestimate = True, explain = True):
-    if use_reachestimate: assert ad_account_id
+def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_delivery_estimate = True, explain = True):
+    if use_delivery_estimate: assert ad_account_id
     if quiet: explain = False
     bid_type = tgt.get('bid_type', 'CPC')
 
@@ -2076,22 +2078,22 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reache
         print '    LTV-based bid =', bid, '(base %d * %s)' % (base_bid, ui_info)
         print '    expected install rate', install_rate
 
-    if use_reachestimate:
-        reachestimate = reachestimate_get_and_store(db, ad_account_id, reachestimate_tgt(tgt))
-        assert reachestimate
+    if use_delivery_estimate:
+        delivery_estimate = delivery_estimate_get_and_store(db, ad_account_id, delivery_estimate_tgt(tgt))
+        assert delivery_estimate
         if tgt.get('bid_type','CPC') in ('CPM',): # ,'oCPM'):
             cp = 'cpm'; CP = 'CPM'
         else:
             cp = 'cpc'; CP = 'CPC'
 
-        if reachestimate:
-            if explain: print '    reachestimate: %s %3d ... %3d ... %3d   N %10d' % (CP, reachestimate['bid_amount_min'], reachestimate['bid_amount_median'], reachestimate['bid_amount_max'], reachestimate['N'])
-            if reachestimate['N'] < 200 and ('custom_audiences' not in tgt):
+        if delivery_estimate:
+            if explain: print '    delivery_estimate: %s %3d ... %3d ... %3d   N %10d' % (CP, delivery_estimate['bid_amount_min'], delivery_estimate['bid_amount_median'], delivery_estimate['bid_amount_max'], delivery_estimate['N'])
+            if delivery_estimate['N'] < 200 and ('custom_audiences' not in tgt):
                 if explain: print 'audience too small!'
                 return 1
 
 
-            # cap on bids, relative to median or max reported by the reachestimate
+            # cap on bids, relative to median or max reported by the delivery_estimate
             CAP_BID_AT = { 'oCPM_CLICK': 999.0,
                            'oCPM_INSTALL': 999.0,
                            'oCPM_acquisition_event': 999.0,
@@ -2127,14 +2129,14 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_reache
                     raise Exception('unhandled oCPM bid type '+bid_type)
 
                 # not sure if we should incorporate bid shade into caps?
-                cap_at = max(1, int(cap_coeff * factor * reachestimate['bid_amount_'+cap_level]))
+                cap_at = max(1, int(cap_coeff * factor * delivery_estimate['bid_amount_'+cap_level]))
                 cap_ui = 'BID_CAP(%.2f)%s*%s_%s' % (cap_coeff,ui_factor,cp,cap_level)
-#              cap_at = max(1, int(factor * reachestimate['bid_amount_'+cap_level]))
+#              cap_at = max(1, int(factor * delivery_estimate['bid_amount_'+cap_level]))
 #              cap_ui = '%s*%s_%s' % (ui_factor,cp,cap_level)
 
             else:
                 # for regular CPM and CPC bids, just reference against the median
-                cap_at = max(1, int(cap_coeff * reachestimate['bid_amount_'+cap_level]))
+                cap_at = max(1, int(cap_coeff * delivery_estimate['bid_amount_'+cap_level]))
                 cap_ui = ('%.2f*' % cap_coeff) + 'bid_amount_'+cap_level
 
             if bid > cap_at and ('custom_audiences' not in tgt):
@@ -2161,7 +2163,7 @@ def get_campaign_data(spin_campaigns, template):
                     m[k] = v
         return ret
 
-def control_ads(db, spin_campaigns, campaign_name, group_by = None, do_reachestimates = True, stgt_filter = None, enable_campaign_creation = False, enable_ad_creation = True, enable_bid_updates = True):
+def control_ads(db, spin_campaigns, campaign_name, group_by = None, do_delivery_estimates = True, stgt_filter = None, enable_campaign_creation = False, enable_ad_creation = True, enable_bid_updates = True):
     spin_params = dict(get_creatives(asset_path).items()+spin_targets.items())
     if campaign_name:
         if '*' in campaign_name:
@@ -2202,10 +2204,10 @@ def control_ads(db, spin_campaigns, campaign_name, group_by = None, do_reachesti
             groups = {name: campaign_data}
 
         for n, data in sorted(groups.items()):
-            control_ad_campaign(db, spin_params, n, data, do_reachestimates = do_reachestimates,
+            control_ad_campaign(db, spin_params, n, data, do_delivery_estimates = do_delivery_estimates,
                                 stgt_filter = stgt_filter, enable_campaign_creation = enable_campaign_creation, enable_ad_creation = enable_ad_creation, enable_bid_updates = enable_bid_updates)
 
-def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reachestimates = True,
+def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_delivery_estimates = True,
                         stgt_filter = None, enable_campaign_creation = False, enable_ad_creation = True, enable_bid_updates = True):
     game_id = campaign_data['matrices'][0]['game'][0]
     game_data = GAMES[game_id]
@@ -2220,7 +2222,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     # as of 2015, Facebook now requires all adgroups within a single adcampaign to share the same targeting
     campaign_tgt = None
     for ad_stgt in ad_stgt_list:
-        ad_tgt = reachestimate_tgt(decode_params(spin_params, ad_stgt))
+        ad_tgt = delivery_estimate_tgt(decode_params(spin_params, ad_stgt))
         if campaign_tgt is None:
             campaign_tgt = ad_tgt
         else:
@@ -2241,7 +2243,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     else:
         campaign_bid = compute_bid(db, spin_params, campaign_tgt, 100 * campaign_data.get('bid_shade',1), # convert dollars to cents
                                    ad_account_id = game_data['ad_account_id'],
-                                   use_reachestimate = do_reachestimates and (('custom_audiences' not in campaign_tgt) or campaign_tgt['custom_audiences'][0].startswith('like-')))
+                                   use_delivery_estimate = do_delivery_estimates and (('custom_audiences' not in campaign_tgt) or campaign_tgt['custom_audiences'][0].startswith('like-')))
         if len(fb_campaign_list) == 1:
             fb_campaign = fb_campaign_list[0]
 
@@ -2325,15 +2327,15 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
     # Check for new ads that need to be created
     new_ads = sorted([stgt2 for stgt2 in ad_stgt_list if (stgt2 not in seen_ads)]) if enable_ad_creation else []
 
-    if do_reachestimates and (estimates_needed or new_ads):
-        # Get reachestimates for new and existing ads
+    if do_delivery_estimates and (estimates_needed or new_ads):
+        # Get delivery_estimates for new and existing ads
         # Build set of unique stgts for reach estimate fetching
-        reach_estimate_stgts = sorted(list(set(map(lambda x: encode_params(spin_params, reachestimate_tgt(x)),
+        reach_estimate_stgts = sorted(list(set(map(lambda x: encode_params(spin_params, delivery_estimate_tgt(x)),
                                                    # do not pull reach estimates for retention/xptarget ads, but do pull for lookalikes
                                                    filter(lambda x: ('custom_audiences' not in x) or x['custom_audiences'][0].startswith('like-'),
                                                           map(lambda x: decode_params(spin_params, x), estimates_needed + new_ads))))))
         if not quiet: print "getting reach estimates for:", reach_estimate_stgts
-        reachestimate_ensure_cached(db, game_data['ad_account_id'], map(lambda x: decode_params(spin_params, x), reach_estimate_stgts))
+        delivery_estimate_ensure_cached(db, game_data['ad_account_id'], map(lambda x: decode_params(spin_params, x), reach_estimate_stgts))
 
     if enable_ad_creation:
         # Create new ads
@@ -2346,13 +2348,13 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
 
             adgroup_name = 'Sky '+stgt
 
-#            if not do_reachestimates:
-#                print 'NOT creating new ad "%-80s" since we skipped reachestimates (and therefore cannot skip tiny audiences)' % (adgroup_name)
+#            if not do_delivery_estimates:
+#                print 'NOT creating new ad "%-80s" since we skipped delivery_estimates (and therefore cannot skip tiny audiences)' % (adgroup_name)
 #                continue
 
             new_bid = compute_bid(db, spin_params, tgt, 100 * campaign_data.get('bid_shade',1), # convert dollars to cents
                                   ad_account_id = game_data['ad_account_id'],
-                                  use_reachestimate = do_reachestimates and (('custom_audiences' not in tgt) or tgt['custom_audiences'][0].startswith('like-')))
+                                  use_delivery_estimate = do_delivery_estimates and (('custom_audiences' not in tgt) or tgt['custom_audiences'][0].startswith('like-')))
             if new_bid <= 1:
                 if not quiet: print 'bid would be <=1 for "%s", skipping' % adgroup_name
                 continue
@@ -2401,7 +2403,7 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_reache
 
             new_bid = compute_bid(db, spin_params, tgt, 100 * campaign_data.get('bid_shade',1), # convert dollars to cents
                                   ad_account_id = game_data['ad_account_id'],
-                                  use_reachestimate = do_reachestimates and (('custom_audiences' not in tgt) or tgt['custom_audiences'][0].startswith('like-')))
+                                  use_delivery_estimate = do_delivery_estimates and (('custom_audiences' not in tgt) or tgt['custom_audiences'][0].startswith('like-')))
             new_bid = max(new_bid, 1)
 
             if new_bid >= 0 and cur_bid != new_bid and (abs(cur_bid-new_bid)/float(cur_bid) > 0.04): # ignore very small deltas
@@ -2486,12 +2488,12 @@ def control_adgroups(db, spin_campaigns, stgt_filter = None, tactical = 'legacy'
 
             if verbose: print 'Checking', tgt['bid_type'], 'bid on', adgroup['name'], '(currently %d)' % cur_bid
             new_bid = max(1, compute_bid(db, params, tgt, 100 * tactical_bid_shade, # convert dollars to cents
-                                         use_reachestimate = False, explain = explain))
+                                         use_delivery_estimate = False, explain = explain))
 
         elif tactical == 'freeze':
             # read current bids and set tactical_bid_shade to whatever value would cause us to produce it
             would_bid = max(1, compute_bid(db, params, tgt, 100, # convert dollars to cents
-                                           use_reachestimate = False, explain = explain))
+                                           use_delivery_estimate = False, explain = explain))
             if would_bid > 1:
                 tactical_bid_shade = float(cur_bid) / would_bid
                 print 'Putting', adgroup['name'], 'tactical_bid_shade', tactical_bid_shade
@@ -2509,7 +2511,7 @@ def control_adgroups(db, spin_campaigns, stgt_filter = None, tactical = 'legacy'
                 print 'no tactical bid_shade, not updating', adgroup['name']
                 continue
             new_bid = max(1, compute_bid(db, params, tgt, 100 * tactical_bid_shade, # convert dollars to cents
-                                         use_reachestimate = False, explain = explain))
+                                         use_delivery_estimate = False, explain = explain))
 
         if new_bid >= 0 and cur_bid != new_bid and (abs(cur_bid-new_bid)/float(cur_bid) > 0.046): # ignore very small deltas
             if explain: print "    changing bid from", cur_bid, "to", new_bid
@@ -2567,7 +2569,7 @@ if __name__ == '__main__':
     campaign_name = None
     campaign_group_name = None
     cmd_game_id = None
-    do_reachestimates = True
+    do_delivery_estimates = True
     enable_campaign_creation = False
     enable_ad_creation = True
     enable_bid_updates = True
@@ -2597,7 +2599,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['db=', 'game-id=', 'mode=', 'tactical=', 'image-file=', 'dry-run', 'min-clicks=', 'min-impressions=', 'max-frequency=', 'min-age=',
                                                       'bid=', 'coeff=', 'adgroup-name=', 'campaign-name=', 'campaign-group-name=', 'stgt=', 'filter=', 'group-by=',
                                                       'use-analytics=', 'use-regexp-ltv', 'use-record=', 'date-range=', 'time-range=', 'output-format=', 'output-frequency=',
-                                                      'skip-reachestimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
+                                                      'skip-delivery_estimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
                                                       'verbose', 'quiet'])
 
     for key, val in opts:
@@ -2641,7 +2643,7 @@ if __name__ == '__main__':
             assert len(time_range) == 2
 
         elif key == '--output-frequency': output_frequency = val
-        elif key == '--skip-reachestimates': do_reachestimates = False
+        elif key == '--skip-delivery_estimates': do_delivery_estimates = False
         elif key == '--enable-campaign-creation': enable_campaign_creation = True
         elif key == '--disable-ad-creation': enable_ad_creation = False
         elif key == '--disable-bid-updates': enable_bid_updates = False
@@ -2662,7 +2664,7 @@ if __name__ == '__main__':
         import SkynetCampaigns
 
         if mode == 'control-ads':
-            control_ads(db, SkynetCampaigns.spin_campaigns, campaign_name, group_by = group_by, do_reachestimates = do_reachestimates,
+            control_ads(db, SkynetCampaigns.spin_campaigns, campaign_name, group_by = group_by, do_delivery_estimates = do_delivery_estimates,
                         stgt_filter = stgt_filter, enable_campaign_creation = enable_campaign_creation, enable_ad_creation = enable_ad_creation, enable_bid_updates = enable_bid_updates)
         elif mode == 'control-adgroups':
             control_adgroups(db, SkynetCampaigns.spin_campaigns, stgt_filter = stgt_filter, tactical = tactical)
@@ -2820,11 +2822,11 @@ if __name__ == '__main__':
     elif mode == 'adimage-get-hash':
         print adimage_get_hash(db, GAMES[cmd_game_id]['ad_account_id'], image_file)
 
-    elif mode == 'reachestimate-pull':
+    elif mode == 'delivery-estimate-pull':
         tgt = decode_params(standin_spin_params, stgt)
-        reach_tgt = reachestimate_tgt(tgt)
-        print tgt, 'reachestimate:'
-        print reachestimate_get_and_store(db, GAMES[cmd_game_id]['ad_account_id'], reach_tgt)
+        reach_tgt = delivery_estimate_tgt(tgt)
+        print tgt, 'delivery_estimate:'
+        print delivery_estimate_get_and_store(db, GAMES[cmd_game_id]['ad_account_id'], reach_tgt)
         compute_bid(db, standin_spin_params, tgt, 100, ad_account_id = GAMES[cmd_game_id]['ad_account_id']) # dollars to cents
 
     elif mode == 'manual-bid':
