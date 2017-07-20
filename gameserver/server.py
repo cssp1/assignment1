@@ -3134,6 +3134,7 @@ class PlayerTable:
                       ('base_size', None, None),
                       ('deployment_buffer', None, None),
                       ('base_resource_loot', None, None),
+                      ('base_res_looter_state', None, None),
                       ('my_base',
                        lambda mybase: [x.persist_state() for x in mybase],
                        lambda player, observer, data: filter(lambda x: x is not None, (reconstitute_object(observer, player, state, context='PlayerTable:parse(home)') for state in PlayerTable.filter_duplicate_obj_ids(data, player.user_id)))
@@ -3347,6 +3348,7 @@ class AIInstanceTable:
         if 'base_creation_time' in jsonobj: player.my_home.base_creation_time = jsonobj['base_creation_time']
         if 'base_times_attacked' in jsonobj: player.my_home.base_times_attacked = jsonobj['base_times_attacked']
         if 'base_resource_loot' in jsonobj: player.my_home.base_resource_loot = jsonobj['base_resource_loot']
+        if 'base_res_looter_state' in jsonobj: player.my_home.base_res_looter_state = jsonobj['base_res_looter_state']
 
         for state in jsonobj['my_base']:
             obj = reconstitute_object(observer, player, state, context='AIInstanceTable:parse')
@@ -3406,6 +3408,7 @@ class AIInstanceTable:
                     'base_times_attacked': player.my_home.base_times_attacked,
                     'user_id': ai_id }
         if player.my_home.base_resource_loot: jsonobj['base_resource_loot'] = player.my_home.base_resource_loot
+        if player.my_home.base_res_looter_state: jsonobj['base_res_looter_state'] = player.my_home.base_res_looter_state
 
         with admin_stats.latency_measurer('ai_instance_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
@@ -7913,6 +7916,7 @@ class Base(object):
 
         # this is used for AI bases that have explicit loot amounts, and player bases to save state across attacks
         self.base_resource_loot = None # dictionary of {"resource": amount} remaining to be looted
+        self.base_res_looter_state = None # ResLooter can persist state here
 
         # list of GameObjects
         self.my_base = []
@@ -8417,6 +8421,7 @@ class Base(object):
         if self.base_creator_id > 0: props['base_creator_id'] = self.base_creator_id
         if self.base_size != 0: props['base_size'] = self.base_size
         if self.base_resource_loot: props['base_resource_loot'] = self.base_resource_loot
+        if self.base_res_looter_state: props['base_res_looter_state'] = self.base_res_looter_state
 
         if self.base_type == 'home':
             townhall_level = self.get_townhall_level()
@@ -26433,6 +26438,7 @@ class GAMEAPI(resource.Resource):
         player.prune_player_auras(is_session_change = True, is_login = True)
 
         player.my_home.base_resource_loot = None # reset base_resource_loot state on login
+        player.my_home.base_res_looter_state = None # dump ResLooter state on login
 
         # check the data proxyserver attached to the session to see if there are other players logging in from the same IP
         # note: must be done AFTER migrate() since the format of known_alt_accounts has changed
