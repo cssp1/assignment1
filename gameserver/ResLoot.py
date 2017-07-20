@@ -193,64 +193,130 @@ class SpecificPvEResLoot(BaseResLoot):
         # compute total contribution coefficient of all buildings
 
         # for buildings that are capacity-weighted
-        total_contribution = {} # {resource: total_amount}
+        total_contribution_undestroyed = {} # {resource: sum(contrib)}, counting only undestroyed buildings
+        total_contribution_original = {} # {resource: sum(contrib)}, counting ALL buildings, even if destroyed
 
         # for buildings that take a fraction of the total loot pool instead of being capacity-weighted
-        fractions_taken = {} # {resource: total_fraction}
+        total_fractions = {} # {resource: total_fraction}, counting only undestroyed buildings
+        fractions_by_id = {} # {obj_id: {resource: fraction}}, counting only undestroyed buildings
 
         last_ids = {} # keep track of last building seen (per resource), to deposit rounded-off amounts on
 
+        # effective contribution for each building (fractions are folded into this down below)
+        contrib_by_id = {} # {obj_id: {resource: contrib}}, only undestroyed buildings
+
         for p in self.base.iter_objects():
-            if p.is_building() and (not p.is_destroyed()):
+            if p.is_building():
                 fraction = p.specific_pve_loot_fraction()
                 contrib = p.resource_loot_contribution()
+
                 if fraction or contrib:
                     for res in gamedata['resources']:
                         if fraction and res in fraction:
-                            fractions_taken[res] = fractions_taken.get(res,0) + fraction[res]
+                            if not p.is_destroyed():
+                                total_fractions[res] = total_fractions.get(res,0) + fraction[res]
+                                if p.obj_id not in fractions_by_id:
+                                    fractions_by_id[p.obj_id] = {}
+                                fractions_by_id[p.obj_id][res] = fraction[res]
                         elif contrib and res in contrib:
-                            total_contribution[res] = total_contribution.get(res,0) + contrib[res]
+                            total_contribution_original[res] = total_contribution_original.get(res,0) + contrib[res]
+                            if not p.is_destroyed():
+                                total_contribution_undestroyed[res] = total_contribution_undestroyed.get(res,0) + contrib[res]
+                                if p.obj_id not in contrib_by_id:
+                                    contrib_by_id[p.obj_id] = {}
+                                contrib_by_id[p.obj_id][res] = contrib[res]
                         else:
                             continue
-                        last_ids[res] = p.obj_id
+
+                        if not p.is_destroyed():
+                            last_ids[res] = p.obj_id
+
+        # loot is either in total_fractions[res] or contrib_by_id[id][res]/total_contribution_undestroyed[res]
+
+        # now fold fractions into contrib_by_id
+
+        # for compatibility with previous bug:
+        # old code re-applied fractions relative to the loot at start of battle (not the initial amount at base creation),
+        # which resulted in loot "leaking" away from fraction-using buildings.
+
+        loot_specific_fraction_bug = gamedata.get('loot_specific_fraction_bug', {}) # {resname: boolean}
+
+        # number >= 1.0 that scales up fractions to account for contrib-based buildings that are already destroyed
+        fraction_scale = dict((res, 1.0) for res in total_fractions)
+
+        # scale up total_contribution_undestroyed to represent contrib-based PLUS fraction-based buildings
+        for res in total_contribution_undestroyed:
+            if total_fractions.get(res,0) > 0:
+                if not loot_specific_fraction_bug.get(res, False):
+                    # account for contrib-based buildings that are already destroyed
+
+                    # this results in 1.0 if all contrib buildings are intact, and >1.0 if some are destroyed
+                    # if all are destroyed, this becomes 1.0 / total_fractions[res]
+                    fraction_scale[res] = 1.0 / (total_fractions[res] + (1.0-total_fractions[res])*(total_contribution_undestroyed[res]/float(total_contribution_original[res])))
+                    total_fractions[res] *= fraction_scale[res]
+
+                total_contribution_undestroyed[res] *= 1.0 / (1.0 - total_fractions[res])
+
+        # transfer fractions into contrib amounts
+        for id, fraction in fractions_by_id.iteritems():
+            if id not in contrib_by_id:
+                contrib_by_id[id] = {}
+
+            for res in fraction:
+                assert res not in contrib_by_id[id] # make sure we don't overwrite any existing contrib value
+                if total_contribution_undestroyed.get(res,0) > 0:
+                    contrib_by_id[id][res] = total_contribution_undestroyed[res] * fraction[res] * fraction_scale[res]
+                else:
+                    # degenerate case where only fraction-based buildings are left
+                    assert total_fractions.get(res,0) > 0
+                    contrib_by_id[id][res] = (fraction[res] * fraction_scale[res]) / total_fractions[res]
+
+        # normalize contrib_by_id amounts to 1
+        for id, contrib in contrib_by_id.iteritems():
+            for res in contrib:
+                if total_contribution_undestroyed.get(res,0) > 0:
+                    contrib[res] /= float(total_contribution_undestroyed[res])
+                else:
+                    pass # degenerate case, normalized above
+
+        # don't need these anymore
+        del total_fractions
+        del fractions_by_id
+        del total_contribution_original
+        del total_contribution_undestroyed
 
         # divide out starting loot among the buildings, weighted by each building's contribution coefficient
-        if (fractions_taken or total_contribution) and last_ids:
+        if last_ids:
             total_so_far = {} # keep track of how much resource loot was assigned so far
             # (we need to ensure it adds up to starting_base_resource_loot when all buildings are destroyed)
 
             for p in self.base.iter_objects():
-                if p.is_building() and (not p.is_destroyed()):
-                    fraction = p.specific_pve_loot_fraction()
-                    contrib = p.resource_loot_contribution()
-                    if fraction or contrib:
-                        amount_by_res = {}
-                        for res in gamedata['resources']:
-                            if res in last_ids and p.obj_id == last_ids[res]:
-                                # add any left-over amount from rounding remainders onto the last building for this resource type
-                                amount = self.starting_base_resource_loot.get(res,0) - total_so_far.get(res,0)
+                if p.obj_id in contrib_by_id and p.is_building() and (not p.is_destroyed()):
+                    contrib = contrib_by_id[p.obj_id]
+
+                    amount_by_res = {}
+                    for res in gamedata['resources']:
+                        if res in last_ids and p.obj_id == last_ids[res]:
+                            # add any left-over amount from rounding remainders onto the last building for this resource type
+                            amount = self.starting_base_resource_loot.get(res,0) - total_so_far.get(res,0)
+                        else:
+                            # note: this needs to multiply the base_loot the AI had at the *start* of the battle, not the current value
+                            if res in contrib:
+                                amount = int( float(contrib[res]) * self.starting_base_resource_loot.get(res, 0) + 0.5)
                             else:
-                                # note: this needs to multiply the base_loot the AI had at the *start* of the battle, not the current value
+                                amount = 0
 
-                                if fraction and res in fraction:
-                                    amount = int( fraction[res] * self.starting_base_resource_loot.get(res, 0) + 0.5)
-                                elif contrib and res in contrib:
-                                    # take what's left after fractions_taken is removed from available loot
-                                    amount = int( (contrib[res]/float(total_contribution[res])) * (1 - fractions_taken.get(res,0)) * self.starting_base_resource_loot.get(res, 0) + 0.5)
-                                else:
-                                    amount = 0
+                            total_so_far[res] = total_so_far.get(res,0) + amount
 
-                                total_so_far[res] = total_so_far.get(res,0) + amount
-
-                            if amount > 0:
-                                amount_by_res[res] = amount
-                        if amount_by_res:
-                            self.by_building_id[p.obj_id] = PerBuildingGradualLoot(gamedata, p, amount_by_res)
+                        if amount > 0:
+                            amount_by_res[res] = amount
+                    if amount_by_res:
+                        self.by_building_id[p.obj_id] = PerBuildingGradualLoot(gamedata, p, amount_by_res)
 
     def send_update(self, retmsg):
         # return the starting and current amounts of loot the base has to offer the player
         retmsg.append(["RES_LOOTER_UPDATE", {'starting': self.starting_base_resource_loot,
-                                             # 'by_id': copy.deepcopy(self.by_building_id), # for debugging only
+                                             'by_id': copy.deepcopy(self.by_building_id), # for debugging only
                                              'cur': copy.deepcopy(self.remaining_base_resource_loot),
                                              'looted_uncapped': copy.deepcopy(self.total_looted_uncapped)}])
 
@@ -452,6 +518,8 @@ class SpecificPvPResLoot(PvPResLoot):
     def __init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor):
         BaseResLoot.__init__(self, gamedata, session, attacker, defender, base, attacker_loot_factor)
 
+        # XXX needs the loot_specific_fraction_bug fix
+
         if base.base_resource_loot is None:
             # we're going to persist this between logins to remember the amount of resources still "unexposed" to looting
             base.base_resource_loot = dict((res, max(0,
@@ -498,7 +566,7 @@ class SpecificPvPResLoot(PvPResLoot):
         total_storage_fractions_taken = {} # {resource: total_fraction}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage() and (not p.is_destroyed()):
+            if p.is_building() and p.is_storage() and (not p.is_destroyed()): # XXX remove is_storage()?
                 fraction = p.specific_pvp_loot_fraction()
                 contrib = p.resource_loot_contribution()
                 if fraction or contrib:
@@ -513,7 +581,7 @@ class SpecificPvPResLoot(PvPResLoot):
         self.storage_building_amounts = {}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage() and (not p.is_destroyed()):
+            if p.is_building() and p.is_storage() and (not p.is_destroyed()): # XXX remove is_storage()?
                 loot_amounts = {}
                 lost_amounts = {}
                 orig_amounts = {}
