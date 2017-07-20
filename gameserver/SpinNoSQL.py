@@ -1203,6 +1203,9 @@ class NoSQLClient (object):
         cur = self.player_cache().find(qs, {'_id':1,'player_level':1}).sort([('player_level', pymongo.DESCENDING)])
         if limit >= 1:
             cur = cur.limit(limit)
+        if not name.isdigit() and name_field == 'ui_name_searchable':
+            # force use of name index here - sometimes MongoDB decides to use player_level index and this wrecks performance
+            cur = cur.hint([(name_field,pymongo.ASCENDING)])
         return [x['_id'] for x in cur]
 
     # this is for internal use only
