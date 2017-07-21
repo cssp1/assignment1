@@ -14970,7 +14970,7 @@ class OGPAPI(resource.Resource):
         ret = catch_all('OGPAPI request %s args %r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
         if ret is None:
             request.setResponseCode(http.BAD_REQUEST)
-            ret = 'spinpunch error'
+            ret = 'OGPAPI request error'
         return ret
 
     @admin_stats.measure_latency('OGPAPI')
@@ -14981,7 +14981,7 @@ class OGPAPI(resource.Resource):
         if 'type' not in request.args:
             # bad hit, like from a web crawler
             request.setResponseCode(http.BAD_REQUEST)
-            return 'spinpunch error'
+            return 'OGPAPI request error: "type" missing'
 
         ret = '<!DOCTYPE html>\n<html>\n'
         type = request.args['type'][0]
@@ -15147,7 +15147,12 @@ class OGPAPI(resource.Resource):
             if ('spin_link_qs' in request.args):
                 # fix possibly-malformed input JSON from browsers here
                 spin_link_qs_raw = MalformedJSON.fix(request.args['spin_link_qs'][0])
-                my_spin_link_qs = SpinJSON.loads(spin_link_qs_raw)
+                try:
+                    my_spin_link_qs = SpinJSON.loads(spin_link_qs_raw)
+                except ValueError:
+                    gamesite.exception_log.event(server_time, 'OGPAPI request with malformed spin_link_qs:\n%s\n%r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))
+                    request.setResponseCode(http.BAD_REQUEST)
+                    return 'OGPAPI syntax error'
                 assert isinstance(my_spin_link_qs, dict)
             my_url = self.get_object_endpoint(dict([(key, val[0]) for key, val in request.args.iteritems()]))
 
