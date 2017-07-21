@@ -131,7 +131,7 @@ BHInvites.init_invite_tab = function(dialog, mentor, trainee_list) {
     }
 
     // begin async fetch of invite code
-    BHSDK.bh_invite_code_get(gamedata['game_id'], (function (_dialog) { return function(result) {
+    Battlehouse.invite_code_get(gamedata['game_id'], (function (_dialog) { return function(result) {
         var dialog = _dialog;
 
         if('error' in result) {

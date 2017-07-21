@@ -13,6 +13,7 @@ goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
 goog.require('OfferChoice');
 goog.require('LoginIncentiveDialog');
+goog.require('Battlehouse');
 
 // depends on global player/selection stuff from clientcode.js
 // note: this parallel's Consequents.py on the server side, but
@@ -373,7 +374,8 @@ function BHBookmarkPromptConsequent(data) {
 }
 goog.inherits(BHBookmarkPromptConsequent, Consequent);
 BHBookmarkPromptConsequent.prototype.execute = function(state) {
-    BHSDK.bh_popup_show_how_to_bookmark();
+    if(spin_frame_platform !== 'bh') { return; }
+    Battlehouse.show_how_to_bookmark();
 };
 
 /** @constructor @struct
