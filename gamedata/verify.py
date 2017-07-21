@@ -2478,6 +2478,9 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
         for res in base['base_resource_loot']:
             if res not in has_resources:
                 error |= 1; print 'AI base %s has base_resource_loot with %s, but no lootable buildings of that type' % (strid, res)
+        for res in has_resources:
+            if base['base_resource_loot'].get(res,0) <= 0 and res not in ('iron','water',):
+                error |= 1; print 'AI base %s has buildings that store %s, but no base_resource_loot for them' % (strid, res)
 
     return error
 
