@@ -1289,8 +1289,13 @@ class NoSQLClient (object):
                 assert key[0] == 'scores2' # scores1 is obsolete now
                 assert s2 is None # once only
 
-                # if score=0 is included, then do the player_cache query first, otherwise do the score query first
-                score_first = (not (item[1] <= 0 and item[2] >= 0))
+                if item[1] <= 0 and item[2] >= 0:
+                    # score=0 is included - do the player_cache query first
+                    pass
+                else:
+                    # score=0 is NOT included - do the score query first
+                    score_first = True
+
                 score_range_qs = {'$gte':item[1], '$lte':item[2]}
                 score_stat, score_axes = key[1]
                 import Scores2 # awkward
@@ -1310,31 +1315,44 @@ class NoSQLClient (object):
             else:
                 raise Exception('cannot parse query item %s' % repr(item))
 
+        cache_qs = {'$and':qand}
+
         if score_first:
-            # return list of candidates who have scores within the specified range
+            # return list of candidates who have scores within the specified range (which never includes 0)
             candidate_ids = [x['user_id'] for x in s2._scores2_table('player', score_stat, score_axes).find({'key': s2._scores2_key(score_stat, score_axes),
                                                                                                              'val': score_range_qs},
                                                                                                             {'_id':0,'user_id':1})]
-            qand.append({'_id':{'$in':candidate_ids}})
-            cache_qs = {'$and':qand}
+            cache_qs['$and'].append({'_id':{'$in':candidate_ids}})
             ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1, randomize_quality = randomize_quality)
             if ret_list:
                 return ret_list[0]
             return None
 
-        else:
-            cache_qs = {'$and':qand}
-            for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
+        elif score_stat:
+            for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1,
+                                                                    randomize_quality = randomize_quality,
                                                                     force_last_mtime_index = references_last_mtime,
                                                                     force_player_level_index = references_player_level):
-                # check if candidate's score is within the specified range
-                if score_stat and \
-                   (s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
-                                                                                  'val': score_range_qs,
-                                                                                  'user_id': candidate_id},{'_id':0}) is None):
-                    continue
-                return candidate_id
+                # check if candidate's score is within the specified range (which does include 0)
+                score_row = s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
+                                                                                          'user_id': candidate_id},{'_id':0,'val':1})
+                if score_row:
+                    score_val = score_row['val']
+                else:
+                    score_val = 0
 
+                if score_val >= score_range_qs['$gte'] and \
+                   score_val <= score_range_qs['$lte']:
+                    return candidate_id
+            return None
+
+        else:
+            ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1,
+                                                           randomize_quality = randomize_quality,
+                                                           force_last_mtime_index = references_last_mtime,
+                                                           force_player_level_index = references_player_level)
+            if ret_list:
+                return ret_list[0]
             return None
 
     # only used for PCHECK customer support purposes. NOT INDEXED!
