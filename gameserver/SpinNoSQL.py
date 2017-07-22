@@ -1219,22 +1219,13 @@ class NoSQLClient (object):
         elif force_player_level_index:
             result = result.hint([('player_level',pymongo.ASCENDING)])
 
-        if randomize_quality > 0:
-            # accurate randomization - do full query (ignore maxret), then shuffle, then truncate
-            result = list(result)
-            random.shuffle(result)
-            if maxret > 0:
-                result = result[:maxret]
-        else:
-            # XXX do not use this anymore, becausesort({'$natural':1}) forces a full table scan as of MongoDB 2.4.6!
+        assert randomize_quality > 0
 
-            # bad quick randomization - obey maxret
-            result = result.sort([('$natural',-1)])
-            if maxret > 0:
-                result = result.limit(maxret)
-
-            result = list(result)
-            random.shuffle(result)
+        # accurate randomization - do full query (ignore maxret), then shuffle, then truncate
+        result = list(result)
+        random.shuffle(result)
+        if maxret > 0:
+            result = result[:maxret]
 
         return map(lambda x: x['_id'], result)
 
@@ -1271,9 +1262,9 @@ class NoSQLClient (object):
         return self.instrument('player_cache_query_mtime_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
-    def player_cache_query_ladder_rival(self, query, maxret, randomize_quality = 1, reason = None):
-        return self.instrument('player_cache_query_ladder_rival(%s)'%reason, self._player_cache_query_ladder_rival, (query,maxret,randomize_quality))
-    def _player_cache_query_ladder_rival(self, query, maxret, randomize_quality):
+    def player_cache_query_ladder_rival(self, query, randomize_quality = 1, reason = None):
+        return self.instrument('player_cache_query_ladder_rival(%s)'%reason, self._player_cache_query_ladder_rival, (query,randomize_quality))
+    def _player_cache_query_ladder_rival(self, query, randomize_quality):
         qand = []
         # translate legacy query syntax to MongoDB
 
@@ -1319,9 +1310,6 @@ class NoSQLClient (object):
             else:
                 raise Exception('cannot parse query item %s' % repr(item))
 
-        # note: when it comes to handling maxret, the limit must be applied only to the FINAL
-        # query, in order to guarantee that we will not miss any valid possible users to return.
-
         if score_first:
             # return list of candidates who have scores within the specified range
             candidate_ids = [x['user_id'] for x in s2._scores2_table('player', score_stat, score_axes).find({'key': s2._scores2_key(score_stat, score_axes),
@@ -1329,11 +1317,13 @@ class NoSQLClient (object):
                                                                                                             {'_id':0,'user_id':1})]
             qand.append({'_id':{'$in':candidate_ids}})
             cache_qs = {'$and':qand}
-            return self._player_cache_query_randomized(cache_qs, maxret = maxret, randomize_quality = randomize_quality)
+            ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1, randomize_quality = randomize_quality)
+            if ret_list:
+                return ret_list[0]
+            return None
 
         else:
             cache_qs = {'$and':qand}
-            ret = []
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1, randomize_quality = randomize_quality,
                                                                     force_last_mtime_index = references_last_mtime,
                                                                     force_player_level_index = references_player_level):
@@ -1343,10 +1333,9 @@ class NoSQLClient (object):
                                                                                   'val': score_range_qs,
                                                                                   'user_id': candidate_id},{'_id':0}) is None):
                     continue
-                ret.append(candidate_id)
-                if len(ret) >= maxret: break
+                return candidate_id
 
-            return ret
+            return None
 
     # only used for PCHECK customer support purposes. NOT INDEXED!
     def player_cache_query_by_social_id(self, social_id, reason = None):

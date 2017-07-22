@@ -11199,24 +11199,19 @@ class Player(AbstractPlayer):
 
         if gamedata['server']['log_ladder_pvp'] >= 3:
             start_time = time.time()
-            gamesite.exception_log.event(server_time, 'find_suitable_ladder_match: %d query %s pool %d' %
-                                         (self.user_id, repr(query), gamedata['matchmaking']['ladder_match_pool_size']))
+            gamesite.exception_log.event(server_time, 'find_suitable_ladder_match: %d query %s' %
+                                         (self.user_id, repr(query)))
 
-        candidate_list = gamesite.db_client.player_cache_query_ladder_rival(query, gamedata['matchmaking']['ladder_match_pool_size'],
-                                                                            randomize_quality = gamedata['matchmaking'].get('ladder_match_randomize_quality', 1),
-                                                                            reason = 'ladder')
-
-        # note: request more than 1 match, and shuffle, to get rid of repeats for non-evenly-distributed user_ids
-        if len(candidate_list) > 1:
-            random.shuffle(candidate_list)
+        candidate_id = gamesite.db_client.player_cache_query_ladder_rival(query,
+                                                                          randomize_quality = gamedata['matchmaking'].get('ladder_match_randomize_quality', 1),
+                                                                          reason = 'ladder')
 
         if gamedata['server']['log_ladder_pvp'] >= 3:
             end_time = time.time()
-            gamesite.exception_log.event(server_time, 'find_suitable_ladder_match: %d %.0fms candidates %s' %
-                                         (self.user_id, 1000.0*(end_time-start_time), repr(candidate_list)))
+            gamesite.exception_log.event(server_time, 'find_suitable_ladder_match: %d %.0fms candidate %r' %
+                                         (self.user_id, 1000.0*(end_time-start_time), repr(candidate_id)))
 
-        id = candidate_list[0] if candidate_list else None
-        return id
+        return candidate_id
 
     @admin_stats.measure_latency('find_suitable_ladder_match')
     def find_suitable_ladder_match(self, exclude_user_ids = [], exclude_alliance_ids = []):

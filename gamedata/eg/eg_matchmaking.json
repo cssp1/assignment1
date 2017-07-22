@@ -69,8 +69,6 @@
                             [0.75, 0.5], // 150% points
                             [0.00, 0]],
 
-    "ladder_match_pool_size": 1, // number of matches requested from dbserver before shuffling/filtering
-
     // number of levels above/below player level that will be considered for matching
     // this is a "soft" limit that applies to the initial matchmaking query, NOT a "hard" limit like max_pvp_level_gap
     "ladder_match_down_levels": -1, // no restriction - max_pvp_level_gap takes care of this
