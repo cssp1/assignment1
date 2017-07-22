@@ -1210,24 +1210,60 @@ class NoSQLClient (object):
 
     # this is for internal use only
     # it is allowed to return an iterator
-    def _player_cache_query_randomized(self, qs, maxret = -1, randomize_quality = 1, force_player_level_index = False, force_last_mtime_index = False):
-        result = self.player_cache().find(qs, {'_id':1})
+    def _player_cache_query_randomized(self, qs,
+                                       maxret = -1, randomize_quality = 1,
+                                       force_player_level_index = False,
+                                       force_last_mtime_index = False):
 
-        if force_last_mtime_index:
-            # this takes priority since it is likely to be more restrictive
-            result = result.hint([('last_mtime',pymongo.ASCENDING)])
-        elif force_player_level_index:
-            result = result.hint([('player_level',pymongo.ASCENDING)])
+        # attempt to optimize this query
+        # if true, use a MongoDB aggregation pipeline instead of a plain find() query...
+        USE_AGGREGATE = SpinConfig.config.get('ladder_query_use_aggregate', True)
+        # ... which enables this option to be used to request a random $sample on the
+        # server side, instead of doing a full query-then-shuffle on the client.
+        USE_SAMPLE = SpinConfig.config.get('ladder_query_use_sample', True)
 
-        assert randomize_quality > 0
+        if not USE_AGGREGATE:
+            # accurate randomization - do full query (ignore maxret), then shuffle, then truncate
+            result = self.player_cache().find(qs, {'_id':1})
 
-        # accurate randomization - do full query (ignore maxret), then shuffle, then truncate
-        result = list(result)
-        random.shuffle(result)
-        if maxret > 0:
-            result = result[:maxret]
+            if force_last_mtime_index:
+                # this takes priority since it is likely to be more restrictive
+                result = result.hint([('last_mtime',pymongo.ASCENDING)])
+            elif force_player_level_index:
+                result = result.hint([('player_level',pymongo.ASCENDING)])
 
-        return map(lambda x: x['_id'], result)
+            result = list(result)
+            if result:
+                if maxret == 1:
+                    return [random.choice(result)['_id']]
+                else:
+                    random.shuffle(result)
+                    return map(lambda x: x['_id'], result)
+            else:
+                return []
+
+        else:
+            pipeline = [{'$match': qs},
+                        {'$project': {'_id': 1}}]
+            if maxret > 0 and USE_SAMPLE:
+                pipeline.append({'$sample': {'size': maxret}})
+
+            agg_cur = self.player_cache().aggregate(pipeline)
+            result = list(agg_cur)
+
+            if result:
+                if maxret == 1:
+                    if USE_SAMPLE:
+                        # assume the result is properly randomized
+                        return [result[0]['_id']]
+                    else:
+                        return [random.choice(result)['_id']]
+                else:
+                    # could not have used $sample, must shuffle
+                    random.shuffle(result)
+                    return map(lambda x: x['_id'], result)
+            else:
+                return []
 
     # special case for use by notification checker
     def player_cache_query_mtime_or_ctime_between(self, mtime_ranges, ctime_ranges,
@@ -1270,6 +1306,13 @@ class NoSQLClient (object):
 
         references_player_level = False
         references_last_mtime = False
+
+        # this is an attempt to optimize queries that accept score=0 players
+        # by first querying scores database for un-acceptable players, then
+        # doing a single maxret=1 query to player_cache. Otherwise, we do
+        # a full player_cache query and then check one by one if score is in range.
+        # probably only a benefit if aggregate/sample are enabled.
+        USE_NEG_SCORE = SpinConfig.config.get('ladder_query_use_neg_score', True)
 
         # need to emulate a join on player_scores for the score range
         score_first = False # whether to perform the score query before the player cache query
@@ -1322,18 +1365,47 @@ class NoSQLClient (object):
             candidate_ids = [x['user_id'] for x in s2._scores2_table('player', score_stat, score_axes).find({'key': s2._scores2_key(score_stat, score_axes),
                                                                                                              'val': score_range_qs},
                                                                                                             {'_id':0,'user_id':1})]
-            cache_qs['$and'].append({'_id':{'$in':candidate_ids}})
-            ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1, randomize_quality = randomize_quality)
+            if candidate_ids:
+                cache_qs['$and'].append({'_id':{'$in':candidate_ids}})
+                ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1, randomize_quality = randomize_quality)
+            else:
+                ret_list = []
+
             if ret_list:
                 return ret_list[0]
             return None
 
         elif score_stat:
+
+            if USE_NEG_SCORE:
+                # find the (hopefully small) set of players whose scores are OUTSIDE
+                # the accepted range (where the "outside" never includes 0)
+                exclude_user_ids = [x['user_id'] for x in \
+                                    s2._scores2_table('player', score_stat, score_axes) \
+                                    .find({'key': s2._scores2_key(score_stat, score_axes),
+                                           '$or': [{'val': {'$lt': score_range_qs['$gte']}},
+                                                   {'val': {'$gt': score_range_qs['$lte']}}]},
+                                          {'_id':0,'user_id':1})]
+
+                # return any one random player maching the cache_qs query, but exclude those with unacceptable scores
+                if exclude_user_ids:
+                    #open('/tmp/ladder-debug.txt','ab').write('%d\n' % len(exclude_user_ids))
+                    cache_qs['$and'].append({'_id':{'$nin':exclude_user_ids}})
+
+                ret_list = self._player_cache_query_randomized(cache_qs, maxret = 1,
+                                                               randomize_quality = randomize_quality,
+                                                               force_last_mtime_index = references_last_mtime,
+                                                               force_player_level_index = references_player_level)
+                if ret_list:
+                    return ret_list[0]
+                return None
+
+            # non-neg-score case
             for candidate_id in self._player_cache_query_randomized(cache_qs, maxret = -1,
                                                                     randomize_quality = randomize_quality,
                                                                     force_last_mtime_index = references_last_mtime,
                                                                     force_player_level_index = references_player_level):
-                # check if candidate's score is within the specified range (which does include 0)
+                # check if candidate's score is within the specified range (which always includes 0)
                 score_row = s2._scores2_table('player', score_stat, score_axes).find_one({'key': s2._scores2_key(score_stat, score_axes),
                                                                                           'user_id': candidate_id},{'_id':0,'val':1})
                 if score_row:
