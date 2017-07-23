@@ -1092,6 +1092,9 @@ class NoSQLClient (object):
             coll.create_index('ui_name_searchable') # help with search-by-name
             coll.create_index('last_mtime') # to help with get_users_modified_since()
             coll.create_index('account_creation_time') # for Facebook notification queries
+            # it may help TR ladder queries to add
+            # coll.create_index('ladder_player', background = True, partialFilterExpression = {'ladder_player':1})
+            # (because only a small subset of players have ladder_player:1)
             self.seen_player_cache = True
         return coll
 
