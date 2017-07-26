@@ -18294,11 +18294,29 @@ class XSAPI(resource.Resource):
         xs_id = request_data['user']['id']
         session = get_session_by_xsolla_id(xs_id)
         if not session:
-            gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
-            request.setResponseCode(http.BAD_REQUEST)
-            # do not send INVALID_USER, because Xsolla caches this, and we don't want to cache "invalid" for a valid
-            # user who does not happen to be logged in right now.
-            return SpinJSON.dumps({'error': {'code':'INCORRECT_INVOICE', 'message': 'session not found (by server)'}})
+            if 0: # old path, drops order (subject to race condition from proxyserver dispatching here)
+                gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s)' % xs_id)
+                request.setResponseCode(http.BAD_REQUEST)
+                # do not send INVALID_USER, because Xsolla caches this, and we don't want to cache "invalid" for a valid
+                # user who does not happen to be logged in right now.
+                return SpinJSON.dumps({'error': {'code':'INCORRECT_INVOICE', 'message': 'session not found (by server)'}})
+
+            else: # new path, queues
+                user_id = gamesite.social_id_table.social_id_to_spinpunch(xs_id, False)
+                if user_id:
+                    gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s user_id %d), queueing' % (xs_id, user_id))
+                    gamesite.msg_client.msg_send([{'to':[user_id],
+                                                   'type':'XSAPI_payment',
+                                                   'time':server_time,
+                                                   'expire_time': server_time + SpinConfig.config['proxyserver'].get('XSAPI_payment_msg_duration', 30*24*60*60),
+                                                   'response': request_data}])
+                    pass # payment accepted from Xsolla now; will be handled when player logs in
+                else:
+                    gamesite.exception_log.event(server_time, 'session not found for XSAPI order (xs_id %s), NOT queueing!' % xs_id)
+                    request.setResponseCode(http.BAD_REQUEST)
+                    # do not send INVALID_USER, because Xsolla caches this, and we don't want to cache "invalid" for a valid
+                    # user who does not happen to be logged in right now.
+                    return SpinJSON.dumps({'error': {'code':'INCORRECT_INVOICE', 'message': 'session not found (by server)'}})
 
         if request_data['notification_type'] == 'user_validation':
             # since we found the session, the user is already considered valid
