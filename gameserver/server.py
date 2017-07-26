@@ -24202,14 +24202,21 @@ class GAMEAPI(resource.Resource):
             else:
                 raise Exception('notification needs either "text" or a valid "ref"')
 
+            self.has_email = False # whether bh notifications should have email method enabled
+            self.ui_subject = None
+            self.ui_headline = None
+            self.ui_cta = None
+
             if conf:
                 email_conf = gamedata['fb_notifications']['notifications'][sp_ref].get('email')
                 if email_conf:
+                    self.has_email = True
                     self.ui_subject = self.apply_replacements(replacements, email_conf['ui_subject'])
                     self.ui_headline = self.apply_replacements(replacements, email_conf['ui_headline'])
                     self.ui_cta = self.apply_replacements(replacements, email_conf['ui_cta'])
                 elif frame_platform == 'bh':
-                    raise Exception('need full "email" data for notification ref %s' % sp_ref)
+                    if sp_ref != 'bh_web_push_incentive': # special case
+                        raise Exception('need full "email" data for notification ref %s' % sp_ref)
 
         def serialize(self): # return JSON format to send to client
             ret = {'format': self.format,
@@ -24228,15 +24235,19 @@ class GAMEAPI(resource.Resource):
 
     def send_offline_notification_bh(self, to_user_id, to_bh_id, message, mirror_to_facebook = False):
         params = {'service': SpinConfig.game(),
-                  'ui_subject': message.ui_subject.encode('utf-8'),
-                  'ui_headline': message.ui_headline.encode('utf-8'),
                   'ui_body': message.ui_body.encode('utf-8'),
-                  'ui_cta': message.ui_cta.encode('utf-8'),
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
                   'tags': SpinConfig.game()+'_'+message.fb_ref,
                   }
+        if message.ui_subject: params['ui_subject'] = message.ui_subject.encode('utf-8'),
+        if message.ui_headline: params['ui_headline'] = message.ui_headline.encode('utf-8')
+        if message.ui_cta: params['ui_cta'] = message.ui_cta.encode('utf-8')
+
         if mirror_to_facebook:
             params['facebook'] = '1'
+
+        if not message.has_email:
+            params['email'] = '0'
 
         url = SpinConfig.config['battlehouse_api_path'] + '/user/' + to_bh_id + '/notify'
 
@@ -29454,6 +29465,35 @@ class GAMEAPI(resource.Resource):
             eval_str = arg[1]
             result = arg[2]
             gamesite.exception_log.event(server_time, 'user %d eval %s -> %s' % (session.user.user_id, str(eval_str), str(result)))
+
+        elif arg[0] == "BH_WEB_PUSH_PROMPT":
+            session.increment_player_metric('bh_web_push_prompt', 1, time_series = False)
+            session.deferred_history_update = True
+
+        elif arg[0] == "BH_WEB_PUSH_PROMPT_OK":
+            session.increment_player_metric('bh_web_push_prompt_ok', 1)
+            session.deferred_history_update = True
+
+            config = gamedata['fb_notifications']['notifications'].get('bh_web_push_incentive',None)
+            if config and session.player.history.get('bh_web_push_incentive',0) < 1:
+                notif_text = config['ui_name']
+                self.send_offline_notification(session.player.user_id, session.user.social_id,
+                                               notif_text, 'bh_web_push_incentive', config['ref'],
+                                               session.player.get_denormalized_summary_props('brief'),
+                                               mirror_to_facebook = False)
+                if 'on_send' in config:
+                    session.execute_consequent_safe(config['on_send'], session.player, retmsg,
+                                                    reason='bh_web_push_prompt_ok')
+                session.increment_player_metric('bh_web_push_incentive', 1)
+
+            metric_event_coded(session.player.user_id, '6410_web_push_sub_created', {})
+
+        elif arg[0] == "BH_WEB_PUSH_PROMPT_FAILED":
+            session.player.cooldown_trigger('bh_web_push_prompt', gamedata['client']['bh_web_push_prompt_interval'])
+            session.increment_player_metric('bh_web_push_prompt_failed', 1)
+            session.deferred_history_update = True
+            session.deferred_player_cooldowns_update = True
+
 
         elif arg[0] == "CLIENT_TRACKING_PIXEL_RESULT":
             pass

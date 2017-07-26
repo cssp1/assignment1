@@ -19573,6 +19573,9 @@ function invoke_child_message_dialog(title_text, body_text, props) {
     if('close_button' in props && !props['close_button']) {
         dialog.widgets['close_button'].show = false;
     }
+    if('ok_button' in props && !props['ok_button']) {
+        dialog.widgets['ok_button'].show = false;
+    }
     if('cancel_button' in props && props['cancel_button']) {
         dialog.widgets['cancel_button'].show = true;
     }

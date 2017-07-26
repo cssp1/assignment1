@@ -30,6 +30,12 @@ Battlehouse.remote_method_call = function(method_name) {
     });
 };
 
+/** @return {boolean} */
+Battlehouse.web_push_supported = function() {
+    // duplicate this code here to avoid needing to load BHSDK
+    return ('serviceWorker' in navigator) && ('PushManager' in window);
+};
+
 /** @return {!Promise} */
 Battlehouse.web_push_subscription_check = function() {
     return Battlehouse.remote_method_call('bh_web_push_subscription_check');

@@ -154,6 +154,7 @@ def get_csv_fields(gamedata):
           "browser_supports_canvas", "browser_supports_webgl", "browser_supports_websocket",
           "browser_supports_audio_element", "browser_supports_audio_ogg",
           "browser_supports_audio_wav", "browser_supports_audio_mp3", "browser_supports_audio_aac", "browser_supports_audio_context",
+          "bh_web_push_prompt", "bh_web_push_prompt_ok", "bh_web_push_prompt_failed", "bh_web_push_incentive",
           "friends_in_game", "initial_friends_in_game", ] + \
           ['likes_'+x for x in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iterkeys()] + \
           ["timezone", "last_fb_notification_time",

@@ -381,7 +381,13 @@ def FBPermissionsLogFilter(child):
 def FBNotificationsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['7130_fb_notification_sent',
-                                  '7131_fb_notification_hit'])
+                                  '7131_fb_notification_hit',
+
+                                  '6400_web_push_sub_prompt',
+                                  '6401_web_push_sub_prompt_ok',
+                                  '6402_web_push_sub_prompt_fail',
+                                  '6410_web_push_sub_created',
+                                  ])
 def FBRequestsLogFilter(child):
     return JSONLogFilter(child,
                          allow = [
