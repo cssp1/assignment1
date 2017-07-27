@@ -995,6 +995,10 @@ def ascdebug(msg):
         print msg
         gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
+def log_player_io(category, action, id, generation):
+    if gamedata['server'].get('log_player_io', False):
+        gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r' % (time.time(), spin_server_name, category, action, id, generation))
+
 # mapping of game user IDs to User objects
 class UserTable:
     # note: these are updated from the login code, so don't read them from the file
@@ -3241,6 +3245,9 @@ class PlayerTable:
 
         with admin_stats.latency_measurer('player_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+
+        log_player_io('PLAYER', 'WRITE', player.user_id, player.generation)
+
         return ret
 
     def parse(self, buf, observer, user_id, live):
@@ -3255,7 +3262,11 @@ class PlayerTable:
             return None
 
         with admin_stats.latency_measurer('player_table:parse'):
-            return self.unjsonize(jsonobj, observer, user_id, live)
+            player = self.unjsonize(jsonobj, observer, user_id, live)
+
+        log_player_io('PLAYER', 'READ', player.user_id, player.generation)
+
+        return player
 
     def unjsonize(self, jsonobj, observer, user_id, live):
 
@@ -3317,7 +3328,7 @@ class AIInstanceTable:
         io_system.async_delete_aistate(user_id, game_id, ai_id, cb)
 
     @admin_stats.measure_latency('ai_instance_table:parse')
-    def parse(self, buf, observer, ai_id):
+    def parse(self, buf, observer, user_id, ai_id):
         jsonobj = None
 
         try:
@@ -3358,6 +3369,7 @@ class AIInstanceTable:
         player.read_only = True # never write into the "real" PlayerTable
         player.my_home.init_production(player)
 
+        log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
         return player, False
 
     class AsyncRead:
@@ -3372,7 +3384,7 @@ class AIInstanceTable:
             if buf == 'NOTFOUND':
                 ret = None
             else:
-                ret, has_expired = self.parent.parse(buf, self.observer, self.ai_id)
+                ret, has_expired = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
                 if has_expired:
                     # trash the file
                     self.parent.delete_async(self.user_id, self.ai_id, lambda: None)
@@ -3388,10 +3400,10 @@ class AIInstanceTable:
         if ai_id == LION_STONE_ID:
             reactor.callLater(0, cb)
             return
-        buf = self.unparse(ai_id, player)
+        buf = self.unparse(user_id, ai_id, player)
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
 
-    def unparse(self, ai_id, player):
+    def unparse(self, user_id, ai_id, player):
         player.ai_generation += 1
         jsonobj = { 'expiration_time': player.expiration_time,
                     'ai_generation': player.ai_generation,
@@ -3413,6 +3425,7 @@ class AIInstanceTable:
         with admin_stats.latency_measurer('ai_instance_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
 
+        log_player_io('AI', 'WRITE', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
         return ret
 
     def collect_garbage(self):
@@ -31089,7 +31102,7 @@ class GameSite(server.Site):
         # log ALL exceptions to local exceptions.txt, plus interesting ones to log_exceptions table
         self.exception_log = SpinLog.MultiLog([SpinLog.DailyRawLog(spin_log_dir+'/', '-exceptions.txt'),
                                                SpinLog.ServerExceptionLogFilter(SpinNoSQLLog.NoSQLRawLog(self.nosql_client, 'log_exceptions'))])
-
+        self.player_io_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-player-io.txt')
         self.controlapi_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-controlapi.txt')
         self.facebook_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-facebook.txt')
         self.armorgames_log = SpinLog.DailyRawLog(spin_log_dir+'/', '-armorgames.txt')
