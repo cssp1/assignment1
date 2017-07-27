@@ -820,7 +820,7 @@ def read_consequent(data):
     elif kind in ('INVOKE_UPGRADE_DIALOG',
                   'INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','INVOKE_LOTTERY_DIALOG',
                   'INVOKE_OFFER_CHOICE','INVOKE_MISSIONS_DIALOG','INVOKE_MAIL_DIALOG',
-                  'START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI','BH_BOOKMARK_PROMPT',
+                  'START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI','BH_BOOKMARK_PROMPT','BH_WEB_PUSH_INIT',
                   'INVOKE_LOGIN_INCENTIVE_DIALOG',
                   ): return ClientConsequent(data)
     else:
