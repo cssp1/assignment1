@@ -1668,7 +1668,8 @@ EXTENDED_TUTORIAL_QUESTS = {
            'unlock_aircraft_tier_1',
            'new_unit_attack',
            'activate_an_item',
-           'upgrade_toc_level_2'],
+           'upgrade_toc_level_2',
+           'build_and_mount_turret'],
     }
 
 TUTORIAL_AI = {
