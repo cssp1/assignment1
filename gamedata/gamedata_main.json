@@ -55,9 +55,6 @@
         // NOTE: only works on frame_platform "fb"
         "invite_prompt_direct_share": {"predicate": "ANY_ABTEST", "key": "invite_prompt_direct_share", "value": 1},
 
-        // interval between prompts to enable Web Push, where available
-        "bh_web_push_prompt_interval": 72000,
-
         // "parallel": run browser prompt at same time as in-game GUI
         // "sequential": run in-game GUI, then "OK" click triggers browser prompt
         "bh_web_push_prompt_mode": "sequential",

@@ -382,14 +382,11 @@ BHBookmarkPromptConsequent.prototype.execute = function(state) {
   * @extends Consequent */
 function BHWebPushInitConsequent(data) {
     goog.base(this, data);
-    this.force = data['force'] || false;
 }
 goog.inherits(BHWebPushInitConsequent, Consequent);
 BHWebPushInitConsequent.prototype.execute = function(state) {
     if(spin_frame_platform !== 'bh') { return; }
     if(!Battlehouse.web_push_supported()) { return; }
-
-    var ignore_cooldown = this.force;
 
     Battlehouse.web_push_subscription_check()
         .then(function(result) {
@@ -400,10 +397,6 @@ BHWebPushInitConsequent.prototype.execute = function(state) {
                 Battlehouse.web_push_subscription_ensure();
             } else if(result === 'prompt') {
                 // GUI prompt
-                if(!ignore_cooldown && player.cooldown_active('bh_web_push_prompt')) {
-                    // don't bother player too often
-                    return;
-                }
 
                 send_to_server.func(["BH_WEB_PUSH_PROMPT"]);
                 metric_event('6400_web_push_sub_prompt', {});
@@ -420,9 +413,6 @@ BHWebPushInitConsequent.prototype.execute = function(state) {
                         }, function(error) {
                             // permission was denied (error == 'bh_web_push_subscription_error')
                             metric_event('6402_web_push_sub_prompt_fail', {'method': error});
-
-                            // client-side predict
-                            player.cooldown_client_trigger('bh_web_push_prompt', gamedata['client']['bh_web_push_prompt_interval']);
 
                             send_to_server.func(["BH_WEB_PUSH_PROMPT_FAILED", error]);
                             return error;
