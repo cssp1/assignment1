@@ -29520,6 +29520,15 @@ class GAMEAPI(resource.Resource):
             metric_event_coded(session.player.user_id, '6410_web_push_sub_created', {})
 
         elif arg[0] == "BH_WEB_PUSH_PROMPT_FAILED":
+            if len(arg) >= 4:
+                cdname, cduration = arg[2], arg[3]
+
+            if cdname: # trigger anti-annoyance cooldown
+                assert cdname == 'bh_web_push_prompt'
+                cduration = int(cduration)
+                assert cduration > 0
+                session.player.cooldown_trigger(cdname, cduration)
+
             session.increment_player_metric('bh_web_push_prompt_failed', 1)
             session.deferred_history_update = True
             session.deferred_player_cooldowns_update = True

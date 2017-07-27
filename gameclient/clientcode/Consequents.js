@@ -382,8 +382,88 @@ BHBookmarkPromptConsequent.prototype.execute = function(state) {
   * @extends Consequent */
 function BHWebPushInitConsequent(data) {
     goog.base(this, data);
+    /** @type {Object|null} */
+    this.notification_params = data['notification_params'] || null;
+    /** @type {string|null} */
+    this.prompt_cooldown_name = data['prompt_cooldown_name'] || null;
+    /** @type {number|null} */
+    this.prompt_cooldown_duration = data['prompt_cooldown_duration'] || null;
 }
 goog.inherits(BHWebPushInitConsequent, Consequent);
+
+/** @private
+    Run the actual browser prompt flow.
+    Returns Promise yielding same result as web_push_subscription_ensure().
+    @return {!Promise} */
+BHWebPushInitConsequent.prototype.do_bh_prompt = function() {
+    return Battlehouse.web_push_subscription_ensure()
+        .then(function(result) {
+            // result === 'ok'
+            // new subscription!
+            metric_event('6401_web_push_sub_prompt_ok', {});
+            send_to_server.func(["BH_WEB_PUSH_PROMPT_OK", result]);
+            return result;
+        }.bind(this), function(error) {
+            // permission was denied (error == 'bh_web_push_subscription_error')
+            metric_event('6402_web_push_sub_prompt_fail', {'method': error});
+
+            // client-side predict
+            if(this.prompt_cooldown_name) {
+                player.cooldown_client_trigger(this.prompt_cooldown_name, this.prompt_cooldown_duration);
+            }
+
+            send_to_server.func(["BH_WEB_PUSH_PROMPT_FAILED", error,
+                                 this.prompt_cooldown_name, this.prompt_cooldown_duration]);
+            return error;
+        }.bind(this));
+};
+
+/** @private
+    Run the in-game GUI flow, which will lead to the browser flow. */
+BHWebPushInitConsequent.prototype.do_gui = function() {
+    send_to_server.func(["BH_WEB_PUSH_PROMPT"]);
+    metric_event('6400_web_push_sub_prompt', {});
+
+    // start GUI here
+    var s = player.get_any_abtest_value('bh_web_push_prompt_text',
+                                        gamedata['strings']['bh_web_push_prompt_text']);
+
+    change_selection_ui(null);
+
+    var prompt_mode = player.get_any_abtest_value('bh_web_push_prompt_mode',
+                                                  gamedata['client']['bh_web_push_prompt_mode']);
+    var lock_gui = player.get_any_abtest_value('bh_web_push_prompt_lock_gui',
+                                               gamedata['client']['bh_web_push_prompt_lock_gui']);
+
+    if(prompt_mode === 'sequential') { // sequential in-game dialog
+        invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                    {'dialog': 'message_dialog_big',
+                                     'close_button': false,
+                                     'ok_button_ui_name': s['ui_button_sequential'],
+                                     'on_ok': function() {
+                                         var locker = (lock_gui ? invoke_ui_locker_until_closed() : null);
+                                         this.do_bh_prompt()
+                                             .then(function(_) {
+                                                 if(locker) { close_dialog(locker); }
+                                             });
+                                     }.bind(this)
+                                    });
+    } else if(prompt_mode === 'parallel') { // parallel in-game dialog
+        var dialog = invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                                 {'dialog': 'message_dialog_big',
+                                                  'close_button': false,
+                                                  'ok_button': !lock_gui,
+                                                  'ok_button_ui_name': s['ui_button_parallel']});
+        this.do_bh_prompt()
+            .then(function(_) {
+                // clear GUI here
+                close_dialog(dialog);
+            });
+    } else {
+        throw Error('unexpected bh_web_push_prompt_mode '+prompt_mode);
+    }
+};
+
 BHWebPushInitConsequent.prototype.execute = function(state) {
     if(spin_frame_platform !== 'bh') { return; }
     if(!Battlehouse.web_push_supported()) { return; }
@@ -398,70 +478,19 @@ BHWebPushInitConsequent.prototype.execute = function(state) {
             } else if(result === 'prompt') {
                 // GUI prompt
 
-                send_to_server.func(["BH_WEB_PUSH_PROMPT"]);
-                metric_event('6400_web_push_sub_prompt', {});
-
-                // run the actual browser prompt flow. Returns Promise.
-                var do_web_push_prompt = function() {
-                    return Battlehouse.web_push_subscription_ensure()
-                        .then(function(result) {
-                            // result === 'ok'
-                            // new subscription!
-                            metric_event('6401_web_push_sub_prompt_ok', {});
-                            send_to_server.func(["BH_WEB_PUSH_PROMPT_OK", result]);
-                            return result;
-                        }, function(error) {
-                            // permission was denied (error == 'bh_web_push_subscription_error')
-                            metric_event('6402_web_push_sub_prompt_fail', {'method': error});
-
-                            send_to_server.func(["BH_WEB_PUSH_PROMPT_FAILED", error]);
-                            return error;
-                        });
-                };
-
-                // start GUI here
-                var s = player.get_any_abtest_value('bh_web_push_prompt_text',
-                                                    gamedata['strings']['bh_web_push_prompt_text']);
-
-                change_selection_ui(null);
-
-                var prompt_mode = player.get_any_abtest_value('bh_web_push_prompt_mode',
-                                                              gamedata['client']['bh_web_push_prompt_mode']);
-                var lock_gui = player.get_any_abtest_value('bh_web_push_prompt_lock_gui',
-                                                           gamedata['client']['bh_web_push_prompt_lock_gui']);
-
-                if(prompt_mode === 'sequential') { // sequential in-game dialog
-                    invoke_child_message_dialog(s['ui_title'], s['ui_description'],
-                                                {'dialog': 'message_dialog_big',
-                                                 'close_button': false,
-                                                 'ok_button_ui_name': s['ui_button_sequential'],
-                                                 'on_ok': function() {
-                                                     var locker = (lock_gui ? invoke_ui_locker_until_closed() : null);
-                                                     do_web_push_prompt()
-                                                         .then(function(_) {
-                                                             if(locker) { close_dialog(locker); }
-                                                         });
-                                                 }
-                                                });
-                } else if(prompt_mode === 'parallel') { // parallel in-game dialog
-                    var dialog = invoke_child_message_dialog(s['ui_title'], s['ui_description'],
-                                                             {'dialog': 'message_dialog_big',
-                                                              'close_button': false,
-                                                              'ok_button': !lock_gui,
-                                                              'ok_button_ui_name': s['ui_button_parallel']});
-                    do_web_push_prompt()
-                        .then(function(_) {
-                            // clear GUI here
-                            close_dialog(dialog);
-                        });
-                } else {
-                    throw Error('unexpected bh_web_push_prompt_mode '+prompt_mode);
+                if(this.prompt_cooldown_name && player.cooldown_active(this.prompt_cooldown_name)) {
+                    return;
                 }
 
+                if(this.notification_params) {
+                    notification_queue.push(goog.bind(this.do_gui, this), this.notification_params);
+                } else {
+                    this.do_gui();
+                }
             } else {
                 throw Error('unexpected web_push_subscription_check() status '+result);
             }
-        });
+        }.bind(this));
 };
 
 /** @constructor @struct
