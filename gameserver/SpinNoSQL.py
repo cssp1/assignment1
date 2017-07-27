@@ -168,7 +168,7 @@ class NoSQLClient (object):
 
     # how long to keep old lock generation counters around - this should be longer than
     # the longest period of time a server could hold stale (spied but not locked) player/base data
-    LOCK_GEN_TIME = 1*3600 # not actually sure 1h is safe, but seems like the downside is not as bad as the upside (Fixing S3 recovery faster)
+    LOCK_GEN_TIME = 3*3600 # not actually sure 3 hours is safe, but seems like the downside is not as bad as the upside (Fixing S3 recovery faster)
 
     ROLE_DEFAULT = 0
     ROLE_LEADER = 4
