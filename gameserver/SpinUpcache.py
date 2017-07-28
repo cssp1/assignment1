@@ -154,7 +154,6 @@ def get_csv_fields(gamedata):
           "browser_supports_canvas", "browser_supports_webgl", "browser_supports_websocket",
           "browser_supports_audio_element", "browser_supports_audio_ogg",
           "browser_supports_audio_wav", "browser_supports_audio_mp3", "browser_supports_audio_aac", "browser_supports_audio_context",
-          "bh_web_push_prompt", "bh_web_push_prompt_ok", "bh_web_push_prompt_failed", "bh_web_push_incentive",
           "friends_in_game", "initial_friends_in_game", ] + \
           ['likes_'+x for x in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iterkeys()] + \
           ["timezone", "last_fb_notification_time",
@@ -1423,7 +1422,10 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              # YOU MUST ALSO ADD THEM ABOVE AS WELL! SEARCH FOR "ai_ambush_progress"!
 
                              'resources_looted_from_ai', 'resources_looted_from_human', 'resources_stolen_by_human',
-                             'fb_notifications_sent'
+                             'fb_notifications_sent',
+
+                             "bh_web_push_prompt", "bh_web_push_prompt_ok", "bh_web_push_prompt_failed", "bh_web_push_incentive",
+
                              ] + FEATURE_USE_FIELDS + CLIENT_FIELDS + get_unit_fields(gamedata) + get_item_fields(gamedata):
                     if name in history:
                         obj[name] = history[name]
