@@ -2028,6 +2028,10 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
     {'name': 'F41 Saw Strongpoint Finder', 'func': lambda user: user.get('feature_used:strongpoint_finder_seen',False) },
     {'name': 'F42 Used Strongpoint Finder', 'func': lambda user: user.get('feature_used:strongpoint_finder_used',False) },
 
+    {'name': 'F43A BH Web Push prompt seen', 'func': lambda user: user.get('bh_web_push_prompt',0) > 0 },
+    {'name': 'F43B %CONV% BH Web Push prompt accepted', 'func': lambda user: user.get('bh_web_push_prompt_ok',0) > 0,
+     'convert_from': lambda user: user.get('bh_web_push_prompt',0) > 0},
+
     {'name': 'G01 Browser Supports WebGL', 'func': lambda user: user.get('browser_supports_webgl',False) },
     {'name': 'G02 Browser Supports WebSockets', 'func': lambda user: user.get('browser_supports_websocket',False) },
     {'name': 'G03 Browser Supports HTML5 AudioContext', 'func': lambda user: user.get('browser_supports_audio_context',False) },
