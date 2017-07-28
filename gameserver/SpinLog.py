@@ -259,6 +259,11 @@ def MetricsLogFilter(child):
                                   '6000_retention_incentive_sent',
                                   '6001_retention_incentive_claimed',
 
+                                  '6400_web_push_sub_prompt',
+                                  '6401_web_push_sub_prompt_ok',
+                                  '6402_web_push_sub_prompt_fail',
+                                  '6410_web_push_sub_created',
+
                                   '7150_friendstone_generated',
                                   '7151_friendstone_opened_send_ui',
                                   '7153_friendstone_sent',
@@ -382,11 +387,6 @@ def FBNotificationsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['7130_fb_notification_sent',
                                   '7131_fb_notification_hit',
-
-                                  '6400_web_push_sub_prompt',
-                                  '6401_web_push_sub_prompt_ok',
-                                  '6402_web_push_sub_prompt_fail',
-                                  '6410_web_push_sub_created',
                                   ])
 def FBRequestsLogFilter(child):
     return JSONLogFilter(child,
