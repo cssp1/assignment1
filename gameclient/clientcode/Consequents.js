@@ -438,6 +438,7 @@ BHWebPushInitConsequent.prototype.do_gui = function() {
     if(prompt_mode === 'sequential') { // sequential in-game dialog
         invoke_child_message_dialog(s['ui_title'], s['ui_description'],
                                     {'dialog': 'message_dialog_big',
+                                     'use_bbcode': true,
                                      'close_button': false,
                                      'ok_button_ui_name': s['ui_button_sequential'],
                                      'on_ok': function() {
