@@ -194,6 +194,10 @@ if __name__ == '__main__':
                                        '5201_insufficient_resources_go_to_store',
                                        '5202_insufficient_resources_topup_dialog',
                                        '5203_insufficient_resources_topup_buy_now',
+                                       '6400_web_push_sub_prompt',
+                                       '6401_web_push_sub_prompt_ok',
+                                       '6402_web_push_sub_prompt_fail',
+                                       '6410_web_push_sub_created',
                                        ):
                 pass # include this
             else:
