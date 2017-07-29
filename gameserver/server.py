@@ -1847,7 +1847,11 @@ class User:
 
     def retrieve_bh_info_complete(self, session, d, result):
         data = SpinJSON.loads(result)
-        assert data['user_id'] == self.bh_id
+        if data['user_id'] != self.bh_id:
+            gamesite.exception_log.event(server_time, 'retrieve_bh_info_complete(%s): mismatched user_id: %r' % \
+                                         (self.bh_id, data))
+            d.callback(True)
+            return
 
         self.bh_profile = data # store entire profile
 
