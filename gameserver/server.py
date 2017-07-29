@@ -24270,7 +24270,7 @@ class GAMEAPI(resource.Resource):
                   'query': 'bh_source=notification&ref=%s&fb_ref=%s' % (message.sp_ref, message.fb_ref),
                   'tags': SpinConfig.game()+'_'+message.fb_ref,
                   }
-        if message.ui_subject: params['ui_subject'] = message.ui_subject.encode('utf-8'),
+        if message.ui_subject: params['ui_subject'] = message.ui_subject.encode('utf-8')
         if message.ui_headline: params['ui_headline'] = message.ui_headline.encode('utf-8')
         if message.ui_cta: params['ui_cta'] = message.ui_cta.encode('utf-8')
 
