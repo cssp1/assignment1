@@ -1435,6 +1435,45 @@ class User:
             return self.ag_profile['email']
         return None
 
+    def get_mailchimp_context(self):
+        if not SpinConfig.config.get('mailchimp_api_key'):
+            return None
+
+        email = self.get_email()
+        if not email: return None
+
+        # rough name
+        full_name = self.get_real_name()
+        if ' ' in full_name:
+            names = full_name.split(' ')
+            first_name = names[0]
+            last_name = ' '.join(names[1:])
+        else:
+            first_name = full_name
+            last_name = ''
+
+        # better name from FB profile
+        if self.facebook_profile:
+            if 'short_name' in self.facebook_profile:
+                first_name = self.facebook_profile['short_name']
+            elif 'first_name' in self.facebook_profile:
+                first_name = self.facebook_profile['first_name']
+            if 'last_name' in self.facebook_profile:
+                last_name = self.facebook_profile['last_name']
+
+        ret =  {'email_address': email,
+                'merge_fields':
+                {"FNAME": first_name,
+                 "LNAME": last_name,
+                 "ACCT_CREAT": time.strftime('%d/%m/%Y', self.account_creation_time),
+                 "FULLNAME": full_name}
+                }
+        if self.locale: ret['language'] = self.locale[0:2]
+        if self.country:
+            ret['merge_fields']['COUNTRY'] = self.country
+            ret['merge_fields']['TIER'] = SpinConfig.country_tier_map.get(self.country, 4)
+        return ret
+
     def chat_can_interact(self):
         if not self.active_session: return False
         return True
@@ -5265,6 +5304,7 @@ class Session(object):
                              ('adparlor', self.user.adparlor_context),
                              ('liniad', self.user.liniad_context),
                              ('battlehouse', self.user.bh_id),
+                             ('mailchimp', self.user.get_mailchimp_context()),
                              ('fb_conversion_pixels', self.user.fb_conversion_pixels_context),
                              ('fb_app_events', True if (self.user.frame_platform == 'fb') else None),
                              ('kg_conversion_pixels', self.user.kg_conversion_pixels_context),
