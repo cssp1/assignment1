@@ -92,6 +92,7 @@
 
     "CANNOT_CALL_INVALID_AI_ATTACK": { "ui_title": "Invalid AI Attack",  "ui_name": "You are not eligible to access this AI attack" },
     "CANNOT_SPY_INVALID_AI": { "ui_title": "Invalid AI Base", "ui_name": "This AI base is not available to attack, or has already been conquered." },
+    "CANNOT_SPY_STALE_AI": { "ui_title": "Temporary Database Error", "ui_name": "There seems to be a temporary glitch with the AI database. Please wait a few seconds, then try again." },
     "CANNOT_SPY_PLAYER_NOT_FOUND": { "ui_title": "Player Not Found", "ui_name": "The player you were attempting to spy on (ID %d) does not exist, or has not completed the tutorial and logged out for the first time yet." },
 
     "CANNOT_SPY_MAP_THEM": { "ui_title": "Cannot scout this player", "ui_name": "The player you were attempting to spy on is in a different region.\n\nTo spy or attack, you must relocate to the same region and move a battalion next to their base." },

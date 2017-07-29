@@ -3033,6 +3033,7 @@ class PlayerTable:
 
     PLAYER_RW_FIELDS = [
               ('generation', None, None),
+              ('ai_instance_generations', None, None),
               ('read_only', None, None),
               ('alias', None, None),
               ('title', None, None), # string value of current title to use
@@ -3330,7 +3331,8 @@ def safe_unlink(filename):
 # similar to PlayerTable, but this is a cut-down version for maintaining the temporary
 # state of damaged AI bases. Basically like PvE instances in WoW...
 class AIInstanceTable:
-    def delete_async(self, user_id, ai_id, cb):
+    def delete_async(self, observer, user_id, ai_id, cb):
+        observer.ai_instance_generation_clear(ai_id)
         io_system.async_delete_aistate(user_id, game_id, ai_id, cb)
 
     @admin_stats.measure_latency('ai_instance_table:parse')
@@ -3343,11 +3345,21 @@ class AIInstanceTable:
             pass
 
         if not jsonobj:
-            return None, False # no AI present
+            return None, 'json_error' # corrupt AI file?
 
         # has it expired?
         if server_time >= jsonobj['expiration_time']:
-            return None, True
+            # AI present, but expired
+            observer.ai_instance_generation_clear(ai_id)
+            return None, 'expired'
+
+        # is this a stale generation?
+        expected_gen = observer.ai_instance_generation_get(ai_id)
+        if expected_gen >= 0:
+            if jsonobj.get('ai_generation',0) < expected_gen:
+                gamesite.exception_log.event(server_time, 'AIInstanceTable: %d-vs-%d loaded stale generation %d, expected %d' % \
+                                             (user_id, ai_id, jsonobj.get('ai_generation',0), expected_gen))
+                return None, 'stale_gen'
 
         player = ProxyPlayer(ai_id)
         player.expiration_time = jsonobj['expiration_time']
@@ -3376,7 +3388,7 @@ class AIInstanceTable:
         player.my_home.init_production(player)
 
         log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation, 'AIInstanceTable')
-        return player, False
+        return player, 'ok'
 
     class AsyncRead:
         def __init__(self, parent, observer, user_id, ai_id, cb):
@@ -3385,32 +3397,37 @@ class AIInstanceTable:
             self.user_id = user_id
             self.ai_id = ai_id
             self.cb = cb
-        def fail(self, reason): self.cb(False, None)
+        def fail(self, reason): self.cb('io_error', None)
         def success(self, buf):
             if buf == 'NOTFOUND':
                 ret = None
+                status = 'missing'
             else:
-                ret, has_expired = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
-                if has_expired:
+                ret, status = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
+                if status == 'expired':
                     # trash the file
                     self.parent.delete_async(self.user_id, self.ai_id, lambda: None)
-            self.cb(True, ret)
+            self.cb(status, ret)
 
     def lookup_async(self, observer, user_id, game_id, ai_id, cb, reason):
         request = self.AsyncRead(self, observer, user_id, ai_id, cb)
         io_system.async_read_aistate(user_id, game_id, ai_id, request.success, request.fail)
 
-    def store_async(self, user_id, ai_id, player, cb, fsync, reason):
+    def store_async(self, observer, user_id, ai_id, player, cb, fsync, reason):
         # special case - never store Lion Stone state to avoid bloating aistate storage
         # (client is only allowed to visit once during the tutorial)
         if ai_id == LION_STONE_ID:
             reactor.callLater(0, cb)
             return
-        buf = self.unparse(user_id, ai_id, player)
+        buf = self.unparse(observer, user_id, ai_id, player)
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
 
-    def unparse(self, user_id, ai_id, player):
+    def unparse(self, observer, user_id, ai_id, player):
         player.ai_generation += 1
+
+        # make sure we don't read an old version within a short period of time
+        observer.ai_instance_generation_put(ai_id, player.ai_generation, player.expiration_time)
+
         jsonobj = { 'expiration_time': player.expiration_time,
                     'ai_generation': player.ai_generation,
                     'my_base': [x.persist_state() for x in player.home_base_iter() if (x is not None)],
@@ -3438,7 +3455,10 @@ class AIInstanceTable:
         io_system.collect_aistate_garbage()
 
     # perform any necessary one-time initialization the first time a fresh AI instance is created for a player
-    def init_fresh_instance(self, ai_player, observer):
+    def init_fresh_instance(self, ai_id, ai_player, observer):
+
+        observer.ai_instance_generation_clear(ai_id)
+
         base_data = gamedata['ai_bases_server']['bases'][str(ai_player.user_id)]
 
         # perform auto-leveling of AI base buildings and units
@@ -5839,6 +5859,7 @@ class SessionChangeOld(SessionChange): # non-map path
         self.got_player = False
         self.got_user = False
         self.is_ai = is_ai_user_id_range(self.dest_user_id)
+        self.ai_instance_error_status = None
 
     def really_begin(self):
         self.d.add_debug_data('really_begin')
@@ -5852,7 +5873,7 @@ class SessionChangeOld(SessionChange): # non-map path
             player_table.lookup_async(self.session.player, self.dest_user_id, False, self.player_cb, 'change_session')
         user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
 
-    def ai_instance_cb(self, success, player):
+    def ai_instance_cb(self, status, player):
         self.d.add_debug_data('ai_instance_cb(%r)' % bool(player))
 
         # fails gracefully if player is None
@@ -5860,6 +5881,12 @@ class SessionChangeOld(SessionChange): # non-map path
             # got instance - do not auto-level
             self.got_player = True
             self.dest_player = player
+            self.try_finish()
+        elif status == 'stale_gen':
+            # stale AI generation. Going to fail back to home base.
+            self.ai_instance_error_status = status
+            self.got_player = True
+            # dest_player stays None
             self.try_finish()
         else:
             # get a fresh copy of the base
@@ -5872,7 +5899,7 @@ class SessionChangeOld(SessionChange): # non-map path
         self.got_player = True
         self.dest_player = player
         if self.is_ai and self.dest_player:
-            ai_instance_table.init_fresh_instance(player, self.session.player)
+            ai_instance_table.init_fresh_instance(self.dest_user_id, player, self.session.player)
         self.try_finish()
 
     def user_cb(self, success, user):
@@ -5888,7 +5915,16 @@ class SessionChangeOld(SessionChange): # non-map path
         if (not self.got_player) or (not self.got_user):
             self.d.add_debug_data('try_finish(False)')
             return
+
         self.d.add_debug_data('try_finish(True)')
+
+        if self.ai_instance_error_status:
+            assert self.ai_instance_error_status == 'stale_gen'
+            # abort change, return to home base
+            SessionChange.master_set.remove(self)
+            self.retmsg.append(["ERROR", "CANNOT_SPY_STALE_AI", self.dest_user_id, 'SessionChangeOld'])
+            self.d.callback(None)
+            return
 
         if self.dest_player:
             if self.dest_user:
@@ -8778,8 +8814,14 @@ class Player(AbstractPlayer):
         # generation number for checking validity of read->write lock transition
         self.generation = 0
 
-        # AI instance generation
+        # AI instance generation (of THIS AI player)
         self.ai_generation = 0
+
+        # AI instance generations of this human player's opponents
+        # (ai_id -> {'time': 1234567, 'generation': 5})
+        # this has nothing to do with the game mechanics of AI base expirations
+        # it is only to defend against race conditions (stale reads) in the storage back-end
+        self.ai_instance_generations = {}
 
         # this flag indicates that we have permission to write out updates to Player's state
         self.has_write_lock = True
@@ -12848,6 +12890,27 @@ class LivePlayer(Player):
         self.browser_hardware = user.browser_hardware
         self.browser_caps = user.browser_caps
         self.user_facebook_likes = user.facebook_likes
+
+    def ai_instance_generation_put(self, ai_id, gen, base_expiration_time):
+        gen_expiration_time = server_time + gamedata['server'].get('ai_instance_generation_duration', 60)
+        if base_expiration_time > 0:
+            gen_expiration_time = min(gen_expiration_time, base_expiration_time)
+
+        self.ai_instance_generations[str(ai_id)] = {'time': server_time, 'expire_time': gen_expiration_time, 'gen': gen}
+    def ai_instance_generation_clear(self, ai_id):
+        key = str(ai_id)
+        if key in self.ai_instance_generations:
+            del self.ai_instance_generations[key]
+    def prune_ai_instance_generations(self):
+        self.ai_instance_generations = dict(filter(lambda k_v: k_v[1]['expire_time'] > server_time,
+                                                   self.ai_instance_generations.iteritems()))
+    def ai_instance_generation_get(self, ai_id):
+        # throw out expired entries while we do this
+        self.prune_ai_instance_generations()
+        key = str(ai_id)
+        if key in self.ai_instance_generations:
+            return self.ai_instance_generations[key]['gen']
+        return -1
 
     def unit_repair_send(self, retmsg):
         retmsg.append(["UNIT_REPAIR_UPDATE", self.unit_repair_queue])
@@ -19510,9 +19573,9 @@ class GAMEAPI(resource.Resource):
         if io_type is None:
             reactor.callLater(0, post_result)
         elif io_type == 'store_ai_instance':
-            ai_instance_table.store_async(session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
+            ai_instance_table.store_async(session.player, session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
         elif io_type == 'del_ai_instance':
-            ai_instance_table.delete_async(session.user.user_id, session.viewing_user.user_id, post_result)
+            ai_instance_table.delete_async(session.player, session.user.user_id, session.viewing_user.user_id, post_result)
         elif io_type == 'store_viewing_player':
             player_table.store_async(session.viewing_player, post_result, True, 'complete_attack')
         elif io_type == 'store_viewing_base':
@@ -26500,6 +26563,7 @@ class GAMEAPI(resource.Resource):
 
         # get rid of old combat debris
         player.update_inerts()
+        player.prune_ai_instance_generations()
         player.prune_inventory(session)
         player.prune_mailbox()
         player.prune_cooldowns()
