@@ -15809,14 +15809,14 @@ class CONTROLAPI(resource.Resource):
             if self.handler.read_only:
                 self.wrote_player = self.wrote_user = True # prevent writes from happening
             else:
-                if self.handler.need_player:
+                if self.handler.need_player and not self.wrote_player:
                     assert player_json
                     player_json['generation'] = player_json.get('generation',-1)+1
                     player_buf = SpinJSON.dumps(player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
                     io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
                 else:
                     self.wrote_player = True
-                if self.handler.need_user:
+                if self.handler.need_user and not self.wrote_user:
                     assert user_json
                     user_buf = SpinJSON.dumps(user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
                     io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
