@@ -29,7 +29,7 @@ last_event_time = -1
 
 for line in sys.stdin.xreadlines():
     event_time_rounded, event_date, event_daytime, event_time, \
-                        server_name, category, action, id, gen = line.strip().split(' ')
+                        server_name, category, action, id, gen = line.strip().split(' ')[:9]
     event_time = float(event_time)
     gen = int(gen)
 

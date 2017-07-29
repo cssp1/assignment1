@@ -759,6 +759,7 @@ class IOSystem (object):
 
     def start(self): pass
     def overloaded(self): return False
+    def get_post_write_delay(self): return 0
     def get_stats(self): return None
 
     # PUBLIC API
@@ -940,6 +941,7 @@ class S3IOSystem (IOSystem):
         limit = gamedata['server']['io_backends']['s3'].get('max_in_flight', 50)
         current = self.s3_req.num_on_wire()
         return (current >= limit)
+    def get_post_write_delay(self): return self.post_write_delay
     def get_stats(self):
         return self.s3_req.get_stats_html(server_time)
 
@@ -995,9 +997,9 @@ def ascdebug(msg):
         print msg
         gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
-def log_player_io(category, action, id, generation):
+def log_player_io(category, action, id, generation, context):
     if gamedata['server'].get('log_player_io', False):
-        gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r' % (time.time(), spin_server_name, category, action, id, generation))
+        gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r (%s)' % (time.time(), spin_server_name, category, action, id, generation, context))
 
 # mapping of game user IDs to User objects
 class UserTable:
@@ -3250,7 +3252,7 @@ class PlayerTable:
         with admin_stats.latency_measurer('player_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
 
-        log_player_io('PLAYER', 'WRITE', player.user_id, player.generation)
+        log_player_io('PLAYER', 'WRITE', player.user_id, player.generation, 'PlayerTable')
 
         return ret
 
@@ -3268,7 +3270,7 @@ class PlayerTable:
         with admin_stats.latency_measurer('player_table:parse'):
             player = self.unjsonize(jsonobj, observer, user_id, live)
 
-        log_player_io('PLAYER', 'READ', player.user_id, player.generation)
+        log_player_io('PLAYER', 'READ', player.user_id, player.generation, 'PlayerTable')
 
         return player
 
@@ -3373,7 +3375,7 @@ class AIInstanceTable:
         player.read_only = True # never write into the "real" PlayerTable
         player.my_home.init_production(player)
 
-        log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
+        log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation, 'AIInstanceTable')
         return player, False
 
     class AsyncRead:
@@ -3429,7 +3431,7 @@ class AIInstanceTable:
         with admin_stats.latency_measurer('ai_instance_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
 
-        log_player_io('AI', 'WRITE', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
+        log_player_io('AI', 'WRITE', '%d-vs-%d' % (user_id, ai_id), player.ai_generation, 'AIInstanceTable')
         return ret
 
     def collect_garbage(self):
@@ -15709,7 +15711,7 @@ class CONTROLAPI(resource.Resource):
 
         return ret
 
-    # encapsulate state needed to load, mutate, then store player and user JSON structs
+    # encapsulate state needed to load, lock, mutate, then store player and user JSON structs
     class AsyncSupport(object):
         def __init__(self, user_id, method_name, handler, d):
             self.user_id = user_id
@@ -15722,6 +15724,10 @@ class CONTROLAPI(resource.Resource):
             self.has_user = False
             self.wrote_player = False
             self.wrote_user = False
+
+            # if not None, we hold the lock (-1 = any generation, otherwise current generation)
+            self.player_lock_gen = None
+
             self.error = None
             self.val = None # return value
         def start(self):
@@ -15769,13 +15775,44 @@ class CONTROLAPI(resource.Resource):
                     player_json = None
                     user_json = None
                     self.val = self.handler.exec_offline_raw(self.user_raw, self.player_raw)
+
+                    # note: no lock here - we assume there is no mutation
+                    assert self.handler.read_only
+
                 else:
                     if self.handler.need_player:
                         player_json = SpinJSON.loads(self.player_raw)
+                        gen = player_json.get('generation', 0)
+
+                        log_player_io('PLAYER', 'READ', self.user_id, gen, 'CustomerSupport')
+
+                        if not self.handler.read_only:
+                            state, lock_gen = gamesite.lock_client.player_lock_acquire_detailed(self.user_id, gen, Player.LockState.being_attacked, -1, reason='CustomerSupport')
+                            if state != Player.LockState.being_attacked:
+                                self.d.callback(CustomerSupport.ReturnValue(error = 'player %d offline but locked, or gen mismatch %r vs %r' % \
+                                                                            (self.user_id, gen, lock_gen),
+                                                                            http_status = 503, # service unavailable
+                                                                            retry_after = 15))
+                                return # abort the sequence
+                            self.player_lock_gen = gen # we have the lock!
+
                     else:
                         player_json = None
+
                     if self.handler.need_user:
                         user_json = SpinJSON.loads(self.user_raw)
+
+                        # grab lock. Don't care about generation counter.
+                        if not self.handler.read_only and self.player_lock_gen is None:
+                            state = gamesite.lock_client.player_lock_acquire_attack(self.user_id, -1, owner_id=-1, reason='CustomerSupport')
+                            if state != Player.LockState.being_attacked:
+                                self.d.callback(CustomerSupport.ReturnValue(error = 'player %d offline but locked' % \
+                                                                            (self.user_id,),
+                                                                            http_status = 503, # service unavailable
+                                                                            retry_after = 15))
+                                return # abort the sequence
+                            self.player_lock_gen = -1 # we have the lock!
+
                     else:
                         user_json = None
                     self.val = self.handler.exec_offline(user_json, player_json)
@@ -15784,6 +15821,7 @@ class CONTROLAPI(resource.Resource):
 
             except:
                 gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r: %s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc().strip())) # OK
+                self.unlock()
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
 
@@ -15791,7 +15829,7 @@ class CONTROLAPI(resource.Resource):
                 assert isinstance(self.val.async, defer.Deferred) # sanity check
 
                 def offline_error(fail, self):
-                    gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r: %s' % \
+                    gamesite.exception_log.event(server_time, 'CustomerSupport offline async exception player %d method %r args %r: %s' % \
                                                  (self.user_id, self.method_name, self.handler.args, fail.getTraceback().strip())) # OK
                     self.wrote_player = self.wrote_user = True # prevent writes from happening
                     # turn exception into a regular result
@@ -15811,8 +15849,11 @@ class CONTROLAPI(resource.Resource):
             else:
                 if self.handler.need_player and not self.wrote_player:
                     assert player_json
-                    player_json['generation'] = player_json.get('generation',-1)+1
+                    assert self.player_lock_gen is not None
+                    if self.player_lock_gen != -1:
+                        self.player_lock_gen = player_json['generation'] = self.player_lock_gen + 1
                     player_buf = SpinJSON.dumps(player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    log_player_io('PLAYER', 'WRITE', self.user_id, self.player_lock_gen, 'CustomerSupport')
                     io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
                 else:
                     self.wrote_player = True
@@ -15831,8 +15872,13 @@ class CONTROLAPI(resource.Resource):
         def user_write_success(self):
             self.wrote_user = True
             self.try_finish()
+        def unlock(self):
+            if self.player_lock_gen is not None:
+                gamesite.lock_client.player_lock_release(self.user_id, self.player_lock_gen, Player.LockState.being_attacked, expected_owner_id = -1)
+                self.player_lock_gen = None
         def try_finish(self):
             if (not self.wrote_player) or (not self.wrote_user): return # I/O not done yet
+            self.unlock()
             assert isinstance(self.val, CustomerSupport.ReturnValue) and (not self.val.async)
             self.d.callback(self.val)
 
@@ -15907,30 +15953,10 @@ class CONTROLAPI(resource.Resource):
 
             else:
                 # OFFLINE edit
-                ret = None
                 d = make_deferred('CustomerSupport:'+method_name+'(offline)')
-
-                if not handler.read_only:
-                    # get lock
-                    state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
-                    if state != Player.LockState.being_attacked:
-                        return_val = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id,
-                                                                 http_status = 503, # service unavailable
-                                                                 retry_after = 15)
-                        ret = return_val.as_body()
-                        if return_val.http_status:
-                            request.setResponseCode(return_val.http_status)
-                    else:
-                        def unlock(val, uid):
-                            gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
-                            return val
-                        d.addBoth(unlock, user_id) # OK
-
-                if ret is None: # no lock error
-                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request, http_status = val.http_status))
-
-                    self.AsyncSupport(user_id, method_name, handler, d).start()
-                    ret = server.NOT_DONE_YET
+                d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request, http_status = val.http_status))
+                self.AsyncSupport(user_id, method_name, handler, d).start()
+                ret = server.NOT_DONE_YET
 
         else:
 
@@ -18907,7 +18933,8 @@ class GAMEAPI(resource.Resource):
 
                     # send the notification AFTER the victim's lock is dropped! otherwise it'll just hit an offline-locked error
                     def sendit(result, session, notif_args):
-                        gamesite.do_CONTROLAPI(session.user.user_id, notif_args)
+                        # and, delay the call a bit to allow S3 write to propagate, so we don't hit a lock gen error
+                        reactor.callLater(io_system.get_post_write_delay(), gamesite.do_CONTROLAPI, session.user.user_id, notif_args)
                         return result # pass through
 
                     session.complete_attack_d.addCallback(sendit, session, notif_args)
