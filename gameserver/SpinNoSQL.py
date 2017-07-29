@@ -1476,6 +1476,8 @@ class NoSQLClient (object):
         return self.instrument('player_lock_acquire_login(%s)'%reason, self._player_lock_acquire, (player_id,owner_id,-1,self.LOCK_LOGGED_IN))
     def player_lock_acquire_attack(self, player_id, generation, owner_id = -1, reason=''):
         return self.instrument('player_lock_acquire_attack(%s)'%reason, self._player_lock_acquire, (player_id,owner_id,generation,self.LOCK_BEING_ATTACKED))[0]
+    def player_lock_acquire_detailed(self, player_id, generation, want_state, owner_id, reason=''):
+        return self.instrument('player_lock_acquire_detailed(%s)'%reason, self._player_lock_acquire, (player_id,owner_id,generation,want_state))
 
     # return (state, prev generation) where prev_generation is only valid for acquire_login
     def _player_lock_acquire(self, player_id, owner_id, generation, want_state):

@@ -759,6 +759,7 @@ class IOSystem (object):
 
     def start(self): pass
     def overloaded(self): return False
+    def get_post_write_delay(self): return 0
     def get_stats(self): return None
 
     # PUBLIC API
@@ -940,6 +941,7 @@ class S3IOSystem (IOSystem):
         limit = gamedata['server']['io_backends']['s3'].get('max_in_flight', 50)
         current = self.s3_req.num_on_wire()
         return (current >= limit)
+    def get_post_write_delay(self): return self.post_write_delay
     def get_stats(self):
         return self.s3_req.get_stats_html(server_time)
 
@@ -995,9 +997,9 @@ def ascdebug(msg):
         print msg
         gamesite.exception_log.event(server_time, 'ASC: '+spin_server_name+' '+msg)
 
-def log_player_io(category, action, id, generation):
+def log_player_io(category, action, id, generation, context):
     if gamedata['server'].get('log_player_io', False):
-        gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r' % (time.time(), spin_server_name, category, action, id, generation))
+        gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r (%s)' % (time.time(), spin_server_name, category, action, id, generation, context))
 
 # mapping of game user IDs to User objects
 class UserTable:
@@ -1886,7 +1888,11 @@ class User:
 
     def retrieve_bh_info_complete(self, session, d, result):
         data = SpinJSON.loads(result)
-        assert data['user_id'] == self.bh_id
+        if data['user_id'] != self.bh_id:
+            gamesite.exception_log.event(server_time, 'retrieve_bh_info_complete(%s): mismatched user_id: %r' % \
+                                         (self.bh_id, data))
+            d.callback(True)
+            return
 
         self.bh_profile = data # store entire profile
 
@@ -3066,6 +3072,7 @@ class PlayerTable:
 
     PLAYER_RW_FIELDS = [
               ('generation', None, None),
+              ('ai_instance_generations', None, None),
               ('read_only', None, None),
               ('alias', None, None),
               ('title', None, None), # string value of current title to use
@@ -3285,7 +3292,7 @@ class PlayerTable:
         with admin_stats.latency_measurer('player_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
 
-        log_player_io('PLAYER', 'WRITE', player.user_id, player.generation)
+        log_player_io('PLAYER', 'WRITE', player.user_id, player.generation, 'PlayerTable')
 
         return ret
 
@@ -3303,7 +3310,7 @@ class PlayerTable:
         with admin_stats.latency_measurer('player_table:parse'):
             player = self.unjsonize(jsonobj, observer, user_id, live)
 
-        log_player_io('PLAYER', 'READ', player.user_id, player.generation)
+        log_player_io('PLAYER', 'READ', player.user_id, player.generation, 'PlayerTable')
 
         return player
 
@@ -3363,7 +3370,8 @@ def safe_unlink(filename):
 # similar to PlayerTable, but this is a cut-down version for maintaining the temporary
 # state of damaged AI bases. Basically like PvE instances in WoW...
 class AIInstanceTable:
-    def delete_async(self, user_id, ai_id, cb):
+    def delete_async(self, observer, user_id, ai_id, cb):
+        observer.ai_instance_generation_clear(ai_id)
         io_system.async_delete_aistate(user_id, game_id, ai_id, cb)
 
     @admin_stats.measure_latency('ai_instance_table:parse')
@@ -3376,11 +3384,21 @@ class AIInstanceTable:
             pass
 
         if not jsonobj:
-            return None, False # no AI present
+            return None, 'json_error' # corrupt AI file?
 
         # has it expired?
         if server_time >= jsonobj['expiration_time']:
-            return None, True
+            # AI present, but expired
+            observer.ai_instance_generation_clear(ai_id)
+            return None, 'expired'
+
+        # is this a stale generation?
+        expected_gen = observer.ai_instance_generation_get(ai_id)
+        if expected_gen >= 0:
+            if jsonobj.get('ai_generation',0) < expected_gen:
+                gamesite.exception_log.event(server_time, 'AIInstanceTable: %d-vs-%d loaded stale generation %d, expected %d' % \
+                                             (user_id, ai_id, jsonobj.get('ai_generation',0), expected_gen))
+                return None, 'stale_gen'
 
         player = ProxyPlayer(ai_id)
         player.expiration_time = jsonobj['expiration_time']
@@ -3408,8 +3426,8 @@ class AIInstanceTable:
         player.read_only = True # never write into the "real" PlayerTable
         player.my_home.init_production(player)
 
-        log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
-        return player, False
+        log_player_io('AI', 'READ', '%d-vs-%d' % (user_id, ai_id), player.ai_generation, 'AIInstanceTable')
+        return player, 'ok'
 
     class AsyncRead:
         def __init__(self, parent, observer, user_id, ai_id, cb):
@@ -3418,32 +3436,37 @@ class AIInstanceTable:
             self.user_id = user_id
             self.ai_id = ai_id
             self.cb = cb
-        def fail(self, reason): self.cb(False, None)
+        def fail(self, reason): self.cb('io_error', None)
         def success(self, buf):
             if buf == 'NOTFOUND':
                 ret = None
+                status = 'missing'
             else:
-                ret, has_expired = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
-                if has_expired:
+                ret, status = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
+                if status == 'expired':
                     # trash the file
                     self.parent.delete_async(self.user_id, self.ai_id, lambda: None)
-            self.cb(True, ret)
+            self.cb(status, ret)
 
     def lookup_async(self, observer, user_id, game_id, ai_id, cb, reason):
         request = self.AsyncRead(self, observer, user_id, ai_id, cb)
         io_system.async_read_aistate(user_id, game_id, ai_id, request.success, request.fail)
 
-    def store_async(self, user_id, ai_id, player, cb, fsync, reason):
+    def store_async(self, observer, user_id, ai_id, player, cb, fsync, reason):
         # special case - never store Lion Stone state to avoid bloating aistate storage
         # (client is only allowed to visit once during the tutorial)
         if ai_id == LION_STONE_ID:
             reactor.callLater(0, cb)
             return
-        buf = self.unparse(user_id, ai_id, player)
+        buf = self.unparse(observer, user_id, ai_id, player)
         io_system.async_write_aistate(user_id, game_id, ai_id, buf, cb, fsync)
 
-    def unparse(self, user_id, ai_id, player):
+    def unparse(self, observer, user_id, ai_id, player):
         player.ai_generation += 1
+
+        # make sure we don't read an old version within a short period of time
+        observer.ai_instance_generation_put(ai_id, player.ai_generation, player.expiration_time)
+
         jsonobj = { 'expiration_time': player.expiration_time,
                     'ai_generation': player.ai_generation,
                     'my_base': [x.persist_state() for x in player.home_base_iter() if (x is not None)],
@@ -3464,14 +3487,17 @@ class AIInstanceTable:
         with admin_stats.latency_measurer('ai_instance_table:serialize'):
             ret = SpinJSON.dumps(jsonobj, pretty = True, newline = True, size_hint = 65536, double_precision = 5)
 
-        log_player_io('AI', 'WRITE', '%d-vs-%d' % (user_id, ai_id), player.ai_generation)
+        log_player_io('AI', 'WRITE', '%d-vs-%d' % (user_id, ai_id), player.ai_generation, 'AIInstanceTable')
         return ret
 
     def collect_garbage(self):
         io_system.collect_aistate_garbage()
 
     # perform any necessary one-time initialization the first time a fresh AI instance is created for a player
-    def init_fresh_instance(self, ai_player, observer):
+    def init_fresh_instance(self, ai_id, ai_player, observer):
+
+        observer.ai_instance_generation_clear(ai_id)
+
         base_data = gamedata['ai_bases_server']['bases'][str(ai_player.user_id)]
 
         # perform auto-leveling of AI base buildings and units
@@ -5873,6 +5899,7 @@ class SessionChangeOld(SessionChange): # non-map path
         self.got_player = False
         self.got_user = False
         self.is_ai = is_ai_user_id_range(self.dest_user_id)
+        self.ai_instance_error_status = None
 
     def really_begin(self):
         self.d.add_debug_data('really_begin')
@@ -5886,7 +5913,7 @@ class SessionChangeOld(SessionChange): # non-map path
             player_table.lookup_async(self.session.player, self.dest_user_id, False, self.player_cb, 'change_session')
         user_table.lookup_async(self.dest_user_id, self.user_cb, 'change_session')
 
-    def ai_instance_cb(self, success, player):
+    def ai_instance_cb(self, status, player):
         self.d.add_debug_data('ai_instance_cb(%r)' % bool(player))
 
         # fails gracefully if player is None
@@ -5894,6 +5921,12 @@ class SessionChangeOld(SessionChange): # non-map path
             # got instance - do not auto-level
             self.got_player = True
             self.dest_player = player
+            self.try_finish()
+        elif status == 'stale_gen':
+            # stale AI generation. Going to fail back to home base.
+            self.ai_instance_error_status = status
+            self.got_player = True
+            # dest_player stays None
             self.try_finish()
         else:
             # get a fresh copy of the base
@@ -5906,7 +5939,7 @@ class SessionChangeOld(SessionChange): # non-map path
         self.got_player = True
         self.dest_player = player
         if self.is_ai and self.dest_player:
-            ai_instance_table.init_fresh_instance(player, self.session.player)
+            ai_instance_table.init_fresh_instance(self.dest_user_id, player, self.session.player)
         self.try_finish()
 
     def user_cb(self, success, user):
@@ -5922,7 +5955,16 @@ class SessionChangeOld(SessionChange): # non-map path
         if (not self.got_player) or (not self.got_user):
             self.d.add_debug_data('try_finish(False)')
             return
+
         self.d.add_debug_data('try_finish(True)')
+
+        if self.ai_instance_error_status:
+            assert self.ai_instance_error_status == 'stale_gen'
+            # abort change, return to home base
+            SessionChange.master_set.remove(self)
+            self.retmsg.append(["ERROR", "CANNOT_SPY_STALE_AI", self.dest_user_id, 'SessionChangeOld'])
+            self.d.callback(None)
+            return
 
         if self.dest_player:
             if self.dest_user:
@@ -8812,8 +8854,14 @@ class Player(AbstractPlayer):
         # generation number for checking validity of read->write lock transition
         self.generation = 0
 
-        # AI instance generation
+        # AI instance generation (of THIS AI player)
         self.ai_generation = 0
+
+        # AI instance generations of this human player's opponents
+        # (ai_id -> {'time': 1234567, 'generation': 5})
+        # this has nothing to do with the game mechanics of AI base expirations
+        # it is only to defend against race conditions (stale reads) in the storage back-end
+        self.ai_instance_generations = {}
 
         # this flag indicates that we have permission to write out updates to Player's state
         self.has_write_lock = True
@@ -12883,6 +12931,27 @@ class LivePlayer(Player):
         self.browser_caps = user.browser_caps
         self.user_facebook_likes = user.facebook_likes
 
+    def ai_instance_generation_put(self, ai_id, gen, base_expiration_time):
+        gen_expiration_time = server_time + gamedata['server'].get('ai_instance_generation_duration', 60)
+        if base_expiration_time > 0:
+            gen_expiration_time = min(gen_expiration_time, base_expiration_time)
+
+        self.ai_instance_generations[str(ai_id)] = {'time': server_time, 'expire_time': gen_expiration_time, 'gen': gen}
+    def ai_instance_generation_clear(self, ai_id):
+        key = str(ai_id)
+        if key in self.ai_instance_generations:
+            del self.ai_instance_generations[key]
+    def prune_ai_instance_generations(self):
+        self.ai_instance_generations = dict(filter(lambda k_v: k_v[1]['expire_time'] > server_time,
+                                                   self.ai_instance_generations.iteritems()))
+    def ai_instance_generation_get(self, ai_id):
+        # throw out expired entries while we do this
+        self.prune_ai_instance_generations()
+        key = str(ai_id)
+        if key in self.ai_instance_generations:
+            return self.ai_instance_generations[key]['gen']
+        return -1
+
     def unit_repair_send(self, retmsg):
         retmsg.append(["UNIT_REPAIR_UPDATE", self.unit_repair_queue])
 
@@ -15745,7 +15814,7 @@ class CONTROLAPI(resource.Resource):
 
         return ret
 
-    # encapsulate state needed to load, mutate, then store player and user JSON structs
+    # encapsulate state needed to load, lock, mutate, then store player and user JSON structs
     class AsyncSupport(object):
         def __init__(self, user_id, method_name, handler, d):
             self.user_id = user_id
@@ -15758,6 +15827,10 @@ class CONTROLAPI(resource.Resource):
             self.has_user = False
             self.wrote_player = False
             self.wrote_user = False
+
+            # if not None, we hold the lock (-1 = any generation, otherwise current generation)
+            self.player_lock_gen = None
+
             self.error = None
             self.val = None # return value
         def start(self):
@@ -15805,13 +15878,44 @@ class CONTROLAPI(resource.Resource):
                     player_json = None
                     user_json = None
                     self.val = self.handler.exec_offline_raw(self.user_raw, self.player_raw)
+
+                    # note: no lock here - we assume there is no mutation
+                    assert self.handler.read_only
+
                 else:
                     if self.handler.need_player:
                         player_json = SpinJSON.loads(self.player_raw)
+                        gen = player_json.get('generation', 0)
+
+                        log_player_io('PLAYER', 'READ', self.user_id, gen, 'CustomerSupport')
+
+                        if not self.handler.read_only:
+                            state, lock_gen = gamesite.lock_client.player_lock_acquire_detailed(self.user_id, gen, Player.LockState.being_attacked, -1, reason='CustomerSupport')
+                            if state != Player.LockState.being_attacked:
+                                self.d.callback(CustomerSupport.ReturnValue(error = 'player %d offline but locked, or gen mismatch %r vs %r' % \
+                                                                            (self.user_id, gen, lock_gen),
+                                                                            http_status = 503, # service unavailable
+                                                                            retry_after = 15))
+                                return # abort the sequence
+                            self.player_lock_gen = gen # we have the lock!
+
                     else:
                         player_json = None
+
                     if self.handler.need_user:
                         user_json = SpinJSON.loads(self.user_raw)
+
+                        # grab lock. Don't care about generation counter.
+                        if not self.handler.read_only and self.player_lock_gen is None:
+                            state = gamesite.lock_client.player_lock_acquire_attack(self.user_id, -1, owner_id=-1, reason='CustomerSupport')
+                            if state != Player.LockState.being_attacked:
+                                self.d.callback(CustomerSupport.ReturnValue(error = 'player %d offline but locked' % \
+                                                                            (self.user_id,),
+                                                                            http_status = 503, # service unavailable
+                                                                            retry_after = 15))
+                                return # abort the sequence
+                            self.player_lock_gen = -1 # we have the lock!
+
                     else:
                         user_json = None
                     self.val = self.handler.exec_offline(user_json, player_json)
@@ -15820,6 +15924,7 @@ class CONTROLAPI(resource.Resource):
 
             except:
                 gamesite.exception_log.event(server_time, 'CustomerSupport offline exception player %d method %r args %r: %s' % (self.user_id, self.method_name, self.handler.args, traceback.format_exc().strip())) # OK
+                self.unlock()
                 self.d.callback(CustomerSupport.ReturnValue(error = traceback.format_exc().strip())) # OK
                 return
 
@@ -15827,7 +15932,7 @@ class CONTROLAPI(resource.Resource):
                 assert isinstance(self.val.async, defer.Deferred) # sanity check
 
                 def offline_error(fail, self):
-                    gamesite.exception_log.event(server_time, 'CustomerSupport online async exception player %d method %r args %r: %s' % \
+                    gamesite.exception_log.event(server_time, 'CustomerSupport offline async exception player %d method %r args %r: %s' % \
                                                  (self.user_id, self.method_name, self.handler.args, fail.getTraceback().strip())) # OK
                     self.wrote_player = self.wrote_user = True # prevent writes from happening
                     # turn exception into a regular result
@@ -15845,14 +15950,17 @@ class CONTROLAPI(resource.Resource):
             if self.handler.read_only:
                 self.wrote_player = self.wrote_user = True # prevent writes from happening
             else:
-                if self.handler.need_player:
+                if self.handler.need_player and not self.wrote_player:
                     assert player_json
-                    player_json['generation'] = player_json.get('generation',-1)+1
+                    assert self.player_lock_gen is not None
+                    if self.player_lock_gen != -1:
+                        self.player_lock_gen = player_json['generation'] = self.player_lock_gen + 1
                     player_buf = SpinJSON.dumps(player_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+                    log_player_io('PLAYER', 'WRITE', self.user_id, self.player_lock_gen, 'CustomerSupport')
                     io_system.async_write_player(self.user_id, player_buf, self.player_write_success, False, reason='CustomerSupport')
                 else:
                     self.wrote_player = True
-                if self.handler.need_user:
+                if self.handler.need_user and not self.wrote_user:
                     assert user_json
                     user_buf = SpinJSON.dumps(user_json, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
                     io_system.async_write_user(self.user_id, user_buf, self.user_write_success, False, reason='CustomerSupport')
@@ -15867,8 +15975,13 @@ class CONTROLAPI(resource.Resource):
         def user_write_success(self):
             self.wrote_user = True
             self.try_finish()
+        def unlock(self):
+            if self.player_lock_gen is not None:
+                gamesite.lock_client.player_lock_release(self.user_id, self.player_lock_gen, Player.LockState.being_attacked, expected_owner_id = -1)
+                self.player_lock_gen = None
         def try_finish(self):
             if (not self.wrote_player) or (not self.wrote_user): return # I/O not done yet
+            self.unlock()
             assert isinstance(self.val, CustomerSupport.ReturnValue) and (not self.val.async)
             self.d.callback(self.val)
 
@@ -15943,30 +16056,10 @@ class CONTROLAPI(resource.Resource):
 
             else:
                 # OFFLINE edit
-                ret = None
                 d = make_deferred('CustomerSupport:'+method_name+'(offline)')
-
-                if not handler.read_only:
-                    # get lock
-                    state = gamesite.lock_client.player_lock_acquire_attack(user_id, -1, owner_id=-1)
-                    if state != Player.LockState.being_attacked:
-                        return_val = CustomerSupport.ReturnValue(error = 'player %d offline but locked' % user_id,
-                                                                 http_status = 503, # service unavailable
-                                                                 retry_after = 15)
-                        ret = return_val.as_body()
-                        if return_val.http_status:
-                            request.setResponseCode(return_val.http_status)
-                    else:
-                        def unlock(val, uid):
-                            gamesite.lock_client.player_lock_release(uid, -1, Player.LockState.being_attacked, expected_owner_id = -1)
-                            return val
-                        d.addBoth(unlock, user_id) # OK
-
-                if ret is None: # no lock error
-                    d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request, http_status = val.http_status))
-
-                    self.AsyncSupport(user_id, method_name, handler, d).start()
-                    ret = server.NOT_DONE_YET
+                d.addCallback(lambda val, request=request: SpinHTTP.complete_deferred_request(val.as_body(), request, http_status = val.http_status))
+                self.AsyncSupport(user_id, method_name, handler, d).start()
+                ret = server.NOT_DONE_YET
 
         else:
 
@@ -18943,7 +19036,8 @@ class GAMEAPI(resource.Resource):
 
                     # send the notification AFTER the victim's lock is dropped! otherwise it'll just hit an offline-locked error
                     def sendit(result, session, notif_args):
-                        gamesite.do_CONTROLAPI(session.user.user_id, notif_args)
+                        # and, delay the call a bit to allow S3 write to propagate, so we don't hit a lock gen error
+                        reactor.callLater(io_system.get_post_write_delay(), gamesite.do_CONTROLAPI, session.user.user_id, notif_args)
                         return result # pass through
 
                     session.complete_attack_d.addCallback(sendit, session, notif_args)
@@ -19519,9 +19613,9 @@ class GAMEAPI(resource.Resource):
         if io_type is None:
             reactor.callLater(0, post_result)
         elif io_type == 'store_ai_instance':
-            ai_instance_table.store_async(session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
+            ai_instance_table.store_async(session.player, session.user.user_id, session.viewing_user.user_id, session.viewing_player, post_result, True, 'complete_attack')
         elif io_type == 'del_ai_instance':
-            ai_instance_table.delete_async(session.user.user_id, session.viewing_user.user_id, post_result)
+            ai_instance_table.delete_async(session.player, session.user.user_id, session.viewing_user.user_id, post_result)
         elif io_type == 'store_viewing_player':
             player_table.store_async(session.viewing_player, post_result, True, 'complete_attack')
         elif io_type == 'store_viewing_base':
@@ -26509,6 +26603,7 @@ class GAMEAPI(resource.Resource):
 
         # get rid of old combat debris
         player.update_inerts()
+        player.prune_ai_instance_generations()
         player.prune_inventory(session)
         player.prune_mailbox()
         player.prune_cooldowns()
