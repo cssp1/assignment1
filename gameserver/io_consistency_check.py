@@ -61,8 +61,15 @@ for line in sys.stdin.xreadlines():
     elif action == 'READ':
         if id in id_to_gen:
             if gen < id_to_gen[id]:
-                err_list.append('read a generation < stored one: (%.6f %5d %.6f %5d)' % \
-                                (id_to_time[id], id_to_gen[id], event_time, gen))
+                msg = 'read a generation < stored one: (%.6f %5d %.6f %5d) gap %.2f sec' % \
+                      (id_to_time[id], id_to_gen[id], event_time, gen, event_time - id_to_time[id])
+                # this race condition is expected - due to S3's eventual consistency
+                # Player lock generation counters handle it properly, so consider this a warning, not an error
+                if category == 'PLAYER' and id_to_gen[id] - gen == 1:
+                    warn_list.append(msg)
+                else:
+                    err_list.append(msg)
+
             elif gen > id_to_gen[id]:
                 warn_list.append('read a generation > stored one (unlogged write?): (%.6f %5d %.6f %5d)' % \
                                  (id_to_time[id], id_to_gen[id], event_time, gen))
