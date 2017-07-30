@@ -3447,7 +3447,7 @@ class AIInstanceTable:
                 ret, status = self.parent.parse(buf, self.observer, self.user_id, self.ai_id)
                 if status == 'expired':
                     # trash the file
-                    self.parent.delete_async(self.user_id, self.ai_id, lambda: None)
+                    self.parent.delete_async(self.observer, self.user_id, self.ai_id, lambda: None)
             self.cb(status, ret)
 
     def lookup_async(self, observer, user_id, game_id, ai_id, cb, reason):
