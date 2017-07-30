@@ -46,6 +46,7 @@ TABLES = {
     'dauup2': { 's3_name': 'dauup2', 'table_name': 'log_dauup2', 'compression': 'zip', 'retain_for': 30*86400 },
     'adparlor': { 's3_name': 'adparlor', 'table_name': 'log_adparlor', 'compression': 'zip', 'retain_for': 30*86400 },
     'liniad': { 's3_name': 'liniad', 'table_name': 'log_liniad', 'compression': 'zip', 'retain_for': 30*86400 },
+    'mailchimp': { 's3_name': 'mailchimp', 'table_name': 'log_mailchimp', 'compression': 'zip', 'retain_for': 30*86400 },
 
     # pcheck action log
     'pcheck': { 's3_name': 'pcheck', 'table_name': 'log_pcheck', 'compression': 'zip', 'retain_for': 30*86400 },

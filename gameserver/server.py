@@ -1427,8 +1427,8 @@ class User:
         return self.social_id
 
     def get_email(self):
-        if self.bh_profile and self.bh_profile.get('email'):
-            return self.bh_profile['email']
+        if self.bh_profile and self.bh_profile.get('ui_email') and self.bh_profile.get('email_verified'):
+            return self.bh_profile['ui_email']
         if self.mm_profile and self.mm_profile.get('email'):
             return self.mm_profile['email']
         if self.facebook_profile and self.facebook_profile.get('email'):
@@ -1467,10 +1467,12 @@ class User:
                 'merge_fields':
                 {"FNAME": first_name,
                  "LNAME": last_name,
-                 "ACCT_CREAT": time.strftime('%d/%m/%Y', self.account_creation_time),
                  "FULLNAME": full_name}
                 }
         if self.locale: ret['language'] = self.locale[0:2]
+        if self.account_creation_time > 0:
+            ret['merge_fields']['ACCT_CREAT'] = time.strftime('%m/%d/%Y', time.gmtime(self.account_creation_time))
+
         if self.country:
             ret['merge_fields']['COUNTRY'] = self.country
             ret['merge_fields']['TIER'] = SpinConfig.country_tier_map.get(self.country, 4)
@@ -5455,7 +5457,7 @@ class Session(object):
         # construct query string
         params = {}
 
-        context_key = data.get('context_key', gamedata['adnetworks'][api]['context_key'])
+        context_key = data.get('context_key', gamedata['adnetworks'][api].get('context_key',None))
         if context_key:
             if type(context_key) is dict:
                 for k, v in context_key.iteritems():
@@ -5493,17 +5495,26 @@ class Session(object):
         elif api == 'liniad':
             if post_fbtax_dollars is not None: params['sum'] = str('%.2f' % post_fbtax_dollars)
 
+        postdata = None
+        headers = None
+
         if api == 'battlehouse':
             url = SpinConfig.config['battlehouse_api_path'] + '/metrics_event'
             params['service'] = SpinConfig.game()
             headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        elif api == 'mailchimp':
+            api_key = SpinConfig.config['mailchimp_api_key']
+            datacenter = api_key.split('-')[1]
+            url = data['url'].replace('%DC%', datacenter)
+            headers = {'Authorization': 'Bearer '+api_key}
+            if data['mailchimp_action'] == 'subscribe':
+                context['status'] = 'subscribed'
+            postdata = SpinJSON.dumps(context)
         else:
             url = data['url']
-            headers = None
 
-        query = urllib.urlencode(params)
-
-        url += '?'+query
+        if params:
+            url += '?'+urllib.urlencode(params)
 
         log_props = {'user_id': self.user.user_id, 'kpi': name, 'context': context, 'url': url}
         if post_fbtax_dollars is not None: log_props['post_fbtax_dollars'] = post_fbtax_dollars
@@ -5515,7 +5526,8 @@ class Session(object):
                                          (api, self.user.user_id, name, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            gamesite.AsyncHTTP_metrics.queue_request(server_time, url, lambda result: None, headers = headers)
+            gamesite.AsyncHTTP_metrics.queue_request(server_time, url, lambda result: None,
+                                                     headers = headers, postdata = postdata)
             return True
         else:
             return False
