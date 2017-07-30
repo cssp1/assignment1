@@ -24338,23 +24338,33 @@ class GAMEAPI(resource.Resource):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
+        # the individual send_offline_notification_*() calls return Deferreds that resolve to a list
+        # of the utm_media names on which notifications were sent, or None if a notification will not be sent.
+
         if to_social_id.startswith('fb'):
             message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'fb')
-            sent = self.send_offline_notification_fb(to_user_id, to_social_id[2:], message)
+            d_sent = self.send_offline_notification_fb(to_user_id, to_social_id[2:], message)
         elif to_social_id.startswith('bh'):
             message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'bh')
-            sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message, mirror_to_facebook = mirror_to_facebook)
+            d_sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message, mirror_to_facebook = mirror_to_facebook)
         else:
-            sent = False
+            d_sent = None
 
-        if sent:
+        if d_sent:
             # update last_mtime so ETL script picks up the user next time around
             gamesite.pcache_client.player_cache_update(to_user_id, {'last_mtime': server_time})
 
-            metric_event_coded(to_user_id, '7130_fb_notification_sent', {'sum': summary_props,
-                                                                         'ref': sp_ref,
-                                                                         'fb_ref': fb_ref})
-        return sent
+            # wait for the notification request to finish, then record which media it was sent on
+            d_sent.addCallback(lambda media_list, to_user_id=to_user_id, \
+                               summary_props=summary_props, sp_ref=sp_ref, fb_ref=fb_ref: \
+                               (not media_list) or \
+                               metric_event_coded(to_user_id,
+                                                  '7130_fb_notification_sent',
+                                                  {'sum': summary_props,
+                                                   'ref': sp_ref,
+                                                   'fb_ref': fb_ref,
+                                                   'media': media_list}))
+        return bool(d_sent)
 
     # pack up the localized ui_* parameters for an outgoing notification
     # messages can have
@@ -24430,11 +24440,25 @@ class GAMEAPI(resource.Resource):
 
         if not SpinConfig.config['enable_battlehouse']:
             gamesite.exception_log.event(server_time, 'Battlehouse disabled: BH notification POST %s query %r' % (url, params))
-            return False
+            return None
 
         params['api_secret'] = SpinConfig.config['battlehouse_api_secret'] # add secret at the last moment
-        gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
-        return True
+        d = gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, method = 'POST', postdata = params)
+
+        # success: return media list
+        def on_success(response_raw):
+            response = SpinJSON.loads(response_raw)
+            if 'result' in response:
+                return response['result'].keys() # list of media that succeeded
+            return []
+        # failure: report and return empty list
+        def on_fail(fail):
+            gamesite.battlehouse_log.event(server_time, 'send_offline_notification_bh exception: %s\n%s' % \
+                                           (fail.getTraceback().strip(), fail.getErrorMessage().strip()))
+            return []
+        d.addCallbacks(on_success, on_fail)
+
+        return d
 
     def send_offline_notification_fb(self, to_user_id, to_facebook_id, message):
         # see http://developers.facebook.com/docs/app_notifications/
@@ -24445,10 +24469,19 @@ class GAMEAPI(resource.Resource):
 
         if not SpinConfig.config['enable_facebook']:
             gamesite.exception_log.event(server_time, 'Facebook disabled: FB notification POST %s query %r' % (to_facebook_id, params))
-            return False
+            return None
 
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, url, lambda result: None, method = 'POST', postdata = urllib.urlencode(params))
-        return True
+        d = gamesite.AsyncHTTP_Facebook.queue_request_deferred(server_time, url, method = 'POST',
+                                                               postdata = urllib.urlencode(params))
+
+        # failure: report and return empty list
+        def on_fail(fail):
+            gamesite.facebook_log.event(server_time, 'send_offline_notification_fb exception: %s\n%s' % \
+                                        (fail.getTraceback().strip(), fail.getErrorMessage().strip()))
+            return []
+        d.addCallbacks(lambda _: ['facebook'], on_fail)
+
+        return d
 
     def do_send_gifts_bh(self, session, client_id_list):
         if session.user.frame_platform != 'bh':

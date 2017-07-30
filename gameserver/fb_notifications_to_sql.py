@@ -106,6 +106,9 @@ if __name__ == '__main__':
                     if FIELD in row:
                         keyvals.append((FIELD, row[FIELD]))
 
+                if 'media' in row and isinstance(row['media'], list) and len(row['media']) >= 1:
+                    keyvals.append(('medium', ','.join(row['media'])))
+
                 sql_util.do_insert(cur, fb_notifications_table, keyvals)
 
                 batch += 1
