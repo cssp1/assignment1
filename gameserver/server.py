@@ -5527,12 +5527,18 @@ class Session(object):
         self.user.log_adnetwork_event(api, log_props)
 
         if gamedata['server'].get('log_'+api,1):
-            gamesite.exception_log.event(server_time, '%s API for user %d (%s): GET %s %s' % \
-                                         (api, self.user.user_id, name, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
+            gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s %s' % \
+                                         (api, self.user.user_id, name, method, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            gamesite.AsyncHTTP_metrics.queue_request(server_time, url, lambda result: None,
-                                                     headers = headers, postdata = postdata)
+            def log_result(api, user_id, name, method, url, result):
+                if gamedata['server'].get('log_'+api,1) >= 2:
+                    gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s RESULT\n%r' % \
+                                                 (api, user_id, name, method, url, result))
+
+            gamesite.AsyncHTTP_metrics.queue_request(server_time, url,
+                                                     functools.partial(log_result, api, self.user.user_id, name, method, url),
+                                                     method = method, headers = headers, postdata = postdata)
             return True
         else:
             return False
