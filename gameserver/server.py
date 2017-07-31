@@ -25617,6 +25617,8 @@ class GAMEAPI(resource.Resource):
                     gamesite.exception_log.event(server_time, 'nosql_update player %d for %d: DSTROY_OBJECT %s' % \
                                                  (session.player.user_id, owning_player.user_id, repr(nosql_state)))
                 gamesite.nosql_client.update_mobile_object(session.viewing_base.base_region, nosql_state, reason='DSTROY_OBJECT')
+                if not gamedata.get('resurrectable_squad_objects_bug', False):
+                    session.resurrectable_objects.append([obj, death_location])
 
         if xp_reason:
             xp = int(obj.level * gamedata['player_xp'][xp_reason])
