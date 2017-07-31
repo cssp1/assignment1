@@ -3217,7 +3217,8 @@ class FlashXDResource(static.Data):
 class SpinCGIScript(twcgi.CGIScript):
     def render(self, request):
         # when server is in secure_mode, do not respond unless it's HTTPS
-        if SpinConfig.config.get('secure_mode',0) and (not SpinHTTP.twisted_request_is_ssl(request)):
+        if SpinConfig.config.get('secure_mode',0) and (not SpinHTTP.twisted_request_is_ssl(request)) \
+           and not SpinGoogleAuth.twisted_request_is_local(request):
             return TwistedNoResource().render(request)
         return twcgi.CGIScript.render(self, request)
 
