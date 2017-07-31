@@ -5497,19 +5497,24 @@ class Session(object):
 
         postdata = None
         headers = None
+        method = None
 
         if api == 'battlehouse':
             url = SpinConfig.config['battlehouse_api_path'] + '/metrics_event'
             params['service'] = SpinConfig.game()
             headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+            method = 'POST'
         elif api == 'mailchimp':
             api_key = SpinConfig.config['mailchimp_api_key']
             datacenter = api_key.split('-')[1]
             url = data['url'].replace('%DC%', datacenter)
-            headers = {'Authorization': 'Bearer '+api_key}
+            headers = {'Authorization': 'Bearer '+api_key,
+                       'Accept': '*/*',
+                       'Content-Type': 'application/x-www-form-urlencoded'}
             if data['mailchimp_action'] == 'subscribe':
                 context['status'] = 'subscribed'
             postdata = SpinJSON.dumps(context)
+            method = 'POST'
         else:
             url = data['url']
 
