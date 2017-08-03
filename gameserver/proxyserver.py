@@ -3079,13 +3079,15 @@ class CachedJSFile(resource.Resource):
 
     def set_cdn_headers(self, request):
         max_age = SpinConfig.config['proxyserver'].get('js_files_max_cache_age', 90*24*60*60)
-        request.setHeader('Cache-Control', 'max-age='+str(max_age))
+        request.setHeader('Cache-Control', 'public, max-age='+str(max_age))
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
             request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time + max_age))
         # IE<10 requires text/plain for CORS requests to work
         content_type = 'text/plain' if SpinConfig.config['proxyserver'].get('xhr_js_files', False) else 'text/javascript'
         request.setHeader('Content-Type', content_type)
         SpinHTTP.set_access_control_headers_for_cdn(request, max_age)
+        if self.checksum_value:
+            request.setHeader('ETag', self.checksum_value.encode('utf-8'))
 
     def render_OPTIONS(self, request):
         self.set_cdn_headers(request)
@@ -3093,6 +3095,17 @@ class CachedJSFile(resource.Resource):
 
     def render(self, request):
         self.set_cdn_headers(request)
+
+        if_none_match = SpinHTTP.get_twisted_header(request, 'if-none-match')
+        if if_none_match and if_none_match == self.checksum_value:
+            request.setResponseCode(twisted.web.http.NOT_MODIFIED)
+            request.setHeader('Content-Length', b'%d' % self.length())
+
+            # note! twisted.web.server over-writes Content-Length header - we want to override this
+            # We can disable this behavior by not returning body here...
+            reactor.callLater(0, SpinHTTP.complete_deferred_request_safe, b'', request)
+            return twisted.web.server.NOT_DONE_YET
+
         accept_encoding = request.getHeader('Accept-Encoding')
         if accept_encoding:
             encodings = accept_encoding.split(',')
