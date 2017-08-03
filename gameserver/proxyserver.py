@@ -3118,7 +3118,7 @@ class UncachedJSFile(static.File):
 class ArtFile(static.File):
     def set_cdn_headers(self, request):
         max_age = SpinConfig.config['proxyserver'].get('art_assets_max_cache_age', 90*24*60*60)
-        request.setHeader('Cache-Control', 'max-age='+str(max_age))
+        request.setHeader('Cache-Control', 'public, max-age='+str(max_age))
         if SpinConfig.config['proxyserver'].get('cdn_expires_header', False):
             request.setHeader('Expires', SpinHTTP.format_http_time(proxy_time + max_age))
 
