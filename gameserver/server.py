@@ -5497,7 +5497,7 @@ class Session(object):
 
         postdata = None
         headers = None
-        method = None
+        method = 'GET'
 
         if api == 'battlehouse':
             url = SpinConfig.config['battlehouse_api_path'] + '/metrics_event'
