@@ -5531,14 +5531,28 @@ class Session(object):
                                          (api, self.user.user_id, name, method, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            def log_result(api, user_id, name, method, url, result):
+            def log_result(api, user_id, name, method, url, body = '', headers = {}, status = '500'):
+                status = int(status)
                 if gamedata['server'].get('log_'+api,1) >= 2:
-                    gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s RESULT\n%r' % \
-                                                 (api, user_id, name, method, url, result))
+                    gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s RESULT\nHTTP %d\n%r' % \
+                                                 (api, user_id, name, method, url, status, body))
+                # interpret known errors
+                if status >= 200 and status <= 299:
+                    return body # good, done!
+
+                if api == 'mailchimp' and status == 400 and 'already a list member' in body:
+                    return body # ignore double-adds
+
+                gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s RESULT\nnon-OK HTTP status %d\n%r' % \
+                                                 (api, user_id, name, method, url, status, body))
+                return None
 
             gamesite.AsyncHTTP_metrics.queue_request(server_time, url,
                                                      functools.partial(log_result, api, self.user.user_id, name, method, url),
-                                                     method = method, headers = headers, postdata = postdata)
+                                                     method = method, headers = headers, postdata = postdata,
+                                                     callback_type = gamesite.AsyncHTTP_metrics.CALLBACK_FULL,
+                                                     accept_http_errors = True)
+
             return True
         else:
             return False
