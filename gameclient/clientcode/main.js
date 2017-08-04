@@ -30831,7 +30831,9 @@ player.squad_travel_speed = function(squad_id) {
 player.squad_travel_time_per_hex = function(squad_id, raid_mode) {
     var squad_data = player.squads[squad_id.toString()];
     var travel_speed = player.squad_travel_speed(squad_id);
-    return (1.0/(gamedata['territory'][(squad_data['raid'] || raid_mode) ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor']*get_player_stat(player.stattab,'travel_speed')*travel_speed));
+    var speed_factor_key = (squad_data['raid'] || raid_mode) ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor';
+    var speed_factor = player.get_territory_setting(speed_factor_key);
+    return (1.0/(speed_factor*get_player_stat(player.stattab,'travel_speed')*travel_speed));
 };
 /** @param {number} squad_id
     @param {!Array<!Array<number>>} path
@@ -31160,8 +31162,11 @@ player.squad_move = function(squad_id, path) {
         var map_path = [{'xy': squad_data['map_loc'], 'eta': next_eta}];
 
         var travel_speed = player.squad_travel_speed(squad_id);
+        var speed_factor_key = (squad_data['raid'] ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor');
+        var speed_factor = player.get_territory_setting(speed_factor_key);
+
         for(var i = 0; i < path.length; i++) {
-            next_eta += 1.0 / (gamedata['territory'][(squad_data['raid'] ? 'raid_travel_speed_factor' : 'unit_travel_speed_factor')]*get_player_stat(player.stattab, 'travel_speed')*travel_speed);
+            next_eta += 1.0 / (speed_factor*get_player_stat(player.stattab, 'travel_speed')*travel_speed);
             map_path.push({'xy': path[i], 'eta': next_eta});
         }
 

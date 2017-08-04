@@ -10381,7 +10381,7 @@ class Player(AbstractPlayer):
         gamesite.nosql_client.map_feature_lock_release(self.home_region, feature['base_id'], self.user_id, do_hook=False, reason='squad_enter_map')
         gamesite.gameapi.broadcast_map_update(self.home_region, feature['base_id'], feature, self.user_id)
 
-        cdtime = gamedata['territory'].get('squad_order_cooldown', 0)
+        cdtime = self.get_territory_setting('squad_order_cooldown')
         if cdtime > 0:
             cdname = 'squad_order:%d' % squad_id
             self.cooldown_trigger(cdname, cdtime)
@@ -10568,7 +10568,9 @@ class Player(AbstractPlayer):
                     return False, [rollback_feature], ["INVALID_MAP_LOCATION", squad_id, 'waypoint', waypoint]
 
                 # construct new path
-                next_eta += 0 if self.travel_override else float(1.0/(gamedata['territory']['raid_travel_speed_factor' if (raid_mode or squad.get('raid')) else 'unit_travel_speed_factor']*self.stattab.get_player_stat('travel_speed')*squad.get('travel_speed',1.0)))
+                speed_factor_key = 'raid_travel_speed_factor' if (raid_mode or squad.get('raid')) else 'unit_travel_speed_factor'
+                speed_factor = self.get_territory_setting(speed_factor_key)
+                next_eta += 0 if self.travel_override else float(1.0/(speed_factor*self.stattab.get_player_stat('travel_speed')*squad.get('travel_speed',1.0)))
                 new_path.append({'xy': waypoint, 'eta': next_eta})
 
         else:
@@ -10706,7 +10708,7 @@ class Player(AbstractPlayer):
 
         if not bypass_cooldown:
             # adjust squad_order cooldown to finish after end of movement
-            cdtime = gamedata['territory'].get('squad_order_cooldown', 0)
+            cdtime = self.get_territory_setting('squad_order_cooldown')
             if cdtime > 0:
                 cdname = 'squad_order:%d' % squad_id
                 self.cooldown_trigger(cdname, new_path[-1]['eta'] + cdtime - server_time)
