@@ -6634,6 +6634,8 @@ player.squad_combat_enabled = function() { return player.get_territory_setting('
 /** @return {boolean} */
 player.squad_speedups_enabled = function() { return player.get_territory_setting('enable_squad_speedups'); };
 /** @return {boolean} */
+player.squad_speedup_items_enabled = function() { return player.get_territory_setting('enable_squad_speedup_items'); };
+/** @return {boolean} */
 player.map_home_combat_enabled = function() { return player.get_territory_setting('enable_map_home_combat'); };
 /** @return {boolean} */
 player.quarry_guards_enabled = function() { return player.get_territory_setting('enable_quarry_guards'); };

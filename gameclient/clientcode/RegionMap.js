@@ -1085,6 +1085,17 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                         RegionMap.invoke_squad_speedup_dialog(_squad_id);
                     }; })(mapwidget, squad_id), 'normal']);
                 }
+                if(player.squad_is_moving(squad_id) && player.squad_speedup_items_enabled()) {
+                    var spell = gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_ITEM'];
+                    var has_it = player.has_item(spell['currency'].split(':')[1]);
+                    buttons.push([spell['ui_name'], (function(_mapwidget, _squad_id) { return function() {
+                        _mapwidget.set_popup(null);
+                        RegionMap.invoke_squad_speedup_item_dialog(_squad_id);
+                    }; })(mapwidget, squad_id),
+                                  (has_it ? 'normal' : 'disabled'),
+                                  (has_it ? spell['ui_description'] : spell['ui_insufficient']),
+                                  (has_it ? SPUI.default_text_color : SPUI.error_text_color)]);
+                }
 
                 // VISIT button
                 if(!player.squad_is_moving(squad_id) && player.squad_combat_enabled() && !feature['raid']) {
@@ -3016,4 +3027,29 @@ RegionMap.update_squad_speedup_dialog = function(dialog) {
     var price = Store.get_user_currency_price(GameObject.VIRTUAL_ID, gamedata['spells']['SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY'], squad_id);
     dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
     dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+};
+
+/** @param {number} squad_id */
+RegionMap.invoke_squad_speedup_item_dialog = function(squad_id) {
+    var squad_data = player.squads[squad_id.toString()];
+    if(!squad_data) {
+        return null;
+    }
+
+    var do_it = (function (_squad_id) { return function() {
+        var spellname = 'SQUAD_MOVEMENT_SPEEDUP_FOR_ITEM';
+        var spell = gamedata['spells'][spellname];
+        if(Store.place_order(spell['currency'], GameObject.VIRTUAL_ID, spellname, squad_id)) {
+            invoke_ui_locker(synchronizer.request_sync());
+        }
+    }; })(squad_id);
+
+    var tip = gamedata['strings']['squad_speedup_item_confirm'];
+    var dialog = invoke_child_message_dialog(tip['ui_title'], tip['ui_description'],
+                                             {'dialog':'message_dialog_big',
+                                              'ok_button_ui_name': tip['ui_button'],
+                                              'cancel_button': true,
+                                              'on_ok': do_it});
+
+    return dialog;
 };

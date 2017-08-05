@@ -9709,6 +9709,7 @@ class Player(AbstractPlayer):
     def auto_resolve_enabled(self): return self.get_territory_setting('enable_auto_resolve')
     def squad_combat_enabled(self): return self.get_territory_setting('enable_squad_combat')
     def squad_speedups_enabled(self): return self.get_territory_setting('enable_squad_speedups')
+    def squad_speedup_items_enabled(self): return self.get_territory_setting('enable_squad_speedup_items')
     def map_home_combat_enabled(self): return self.get_territory_setting('enable_map_home_combat')
     def quarry_guards_enabled(self): return self.get_territory_setting('enable_quarry_guards')
     def raids_enabled(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('enable_raids'), None, self)
@@ -17495,7 +17496,12 @@ class Store(object):
             session.increment_player_metric('building:'+object.spec.name+':'+hist_type+'_speedups_purchased', 1, time_series = False)
             session.increment_player_metric('building:'+object.spec.name+':'+record_spend_type+'_spent_on_'+hist_type+'_speedups', record_amount, time_series = False)
 
-        elif spellname == "SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY":
+        elif spellname.startswith("SQUAD_MOVEMENT_SPEEDUP_FOR_"):
+            if spellname == 'SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY':
+                assert session.player.squad_speedups_enabled()
+            elif spellname == 'SQUAD_MOVEMENT_SPEEDUP_FOR_ITEM':
+                assert session.player.squad_speedup_items_enabled()
+
             squad_id = spellarg
 
             squad = session.player.verify_squad(squad_id, require_at_home = False, require_away = True)
@@ -17509,13 +17515,13 @@ class Store(object):
             for waypt in new_path:
                 waypt['eta'] += delta
 
-            state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, session.player.squad_base_id(squad_id), session.player.user_id, do_hook = False, reason='SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY')
+            state = gamesite.nosql_client.map_feature_lock_acquire(session.player.home_region, session.player.squad_base_id(squad_id), session.player.user_id, do_hook = False, reason=spellname)
             if state != Player.LockState.being_attacked: # mutex locked
                 raise Exception('unable to lock squad')
 
             try:
                 # verify that the squad in map_cache matches where the playerdb state says it is
-                entry = gamesite.nosql_client.get_map_feature_by_base_id(session.player.home_region, session.player.squad_base_id(squad_id), reason='SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY')
+                entry = gamesite.nosql_client.get_map_feature_by_base_id(session.player.home_region, session.player.squad_base_id(squad_id), reason=spellname)
                 if not entry:
                     raise Exception('squad not found on map')
 
@@ -17532,7 +17538,7 @@ class Store(object):
                 new_entry['base_map_path'] = new_path
                 if not gamesite.nosql_client.move_map_feature(session.player.home_region, new_entry['base_id'], new_entry,
                                                               old_loc=entry['base_map_loc'], old_path=entry.get('base_map_path',None),
-                                                              originator=session.player.user_id, reason='SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY'):
+                                                              originator=session.player.user_id, reason=spellname):
                     raise Exception('database update failed')
 
                 new_lock_gen = entry.get('LOCK_GENERATION',-1)+1
@@ -17545,7 +17551,7 @@ class Store(object):
             finally:
                 gamesite.nosql_client.map_feature_lock_release(session.player.home_region, session.player.squad_base_id(squad_id), session.player.user_id,
                                                                generation = new_lock_gen,
-                                                               do_hook = False, reason='SQUAD_MOVEMENT_SPEEDUP_FOR_MONEY')
+                                                               do_hook = False, reason=spellname)
 
         elif spellname == "PLAYER_AURA_SPEEDUP_FOR_MONEY":
             aura_name = spellarg
