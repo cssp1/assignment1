@@ -100,10 +100,19 @@ def pretty_feature(feature):
     map_loc = feature.get('base_map_loc', None)
     if not map_loc: map_loc = [-1,-1]
     base_landlord_id = str(feature.get('base_landlord_id', 'unknown'))
+
+    if base_type == 'quarry':
+        battle_info = ', changed hands %d times' % feature.get('base_times_conquered',0)
+        if feature.get('base_last_conquer_time',-1) > 0:
+            battle_info += ', last %.2f days ago' % ((time_now - feature['base_last_conquer_time'])/86400.0)
+
+    else:
+        battle_info = ''
+
     base_expire_time = feature.get('base_expire_time', -1)
     exp_hours = (base_expire_time - time_now)/3600.0 if base_expire_time > 0 else -1
     expired = 'EXPIRED' if feature_expired(feature) else ''
-    return '%s%5s %s %-14s [%3d,%3d] (owner %6s) exp in %5.1f hrs' % (expired, base_id, base_type, base_ui_name, map_loc[0], map_loc[1], base_landlord_id, exp_hours)
+    return '%s%5s %s %-14s [%3d,%3d] (owner %6s%s) exp in %5.1f hrs' % (expired, base_id, base_type, base_ui_name, map_loc[0], map_loc[1], base_landlord_id, battle_info, exp_hours)
 
 def get_leveled_quantity(qty, level):
     if type(qty) == list:
