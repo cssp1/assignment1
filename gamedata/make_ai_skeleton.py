@@ -1117,6 +1117,7 @@ if __name__ == '__main__':
                 show_pred = {"predicate": "AND", "subpredicates": [ ] }
                 if time_pred: show_pred['subpredicates'] += [ time_pred ]
                 if abtest_pred: show_pred['subpredicates'] += [ abtest_pred ]
+                if 'show_if' in data: show_pred['subpredicates'] += [ data['show_if'] ]
 
                 if skip: show_pred['subpredicates'] += [{"predicate": "ALWAYS_FALSE"}]
 
