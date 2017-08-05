@@ -24758,6 +24758,8 @@ class GAMEAPI(resource.Resource):
                             if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
                                                          duration = end_time - server_time, ignore_limit = True):
                                 session.deferred_player_auras_update = True
+                                session.deferred_stattab_update = True
+
                     to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'chat_report':
