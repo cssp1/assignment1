@@ -746,7 +746,7 @@ def spawn_quarry(quarries, map_cache, db, lock_manager, region_id, id_num, id_se
             cap = region_data.get('pop_hard_cap',-1)
             if cap > 0:
                 # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
-                fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+                fullness = region_player_pop / float(cap * region_data.get('centralize_below_pop', gamedata['territory'].get('centralize_below_pop', 0.5)))
                 if fullness < 1:
                     # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
                     maxranges = [max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * x)) for x in maxranges]
@@ -1225,7 +1225,7 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
         cap = region_data.get('pop_hard_cap',-1)
         if cap > 0:
             # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
-            fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+            fullness = region_player_pop / float(cap * region_data.get('centralize_below_pop', gamedata['territory'].get('centralize_below_pop', 0.5)))
             if fullness < 1:
                 # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
                 maxrange = max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * maxrange))
@@ -1442,7 +1442,7 @@ def spawn_raid(raids, map_cache, db, lock_manager, region_id, id_num, name_idx, 
         cap = region_data.get('pop_hard_cap',-1)
         if cap > 0:
             # "fullness": ratio of the current population to centralize_below_pop * pop_hard_cap
-            fullness = region_player_pop / float(cap * gamedata['territory'].get('centralize_below_pop', 0.5))
+            fullness = region_player_pop / float(cap * region_data.get('centralize_below_pop', gamedata['territory'].get('centralize_below_pop', 0.5)))
             if fullness < 1:
                 # keep radius above a minimum, and raise it with the square root of fullness since open area grows as radius^2
                 maxrange = max(gamedata['territory'].get('centralize_min_radius',10), int(math.sqrt(fullness) * maxrange))
