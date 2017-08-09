@@ -51,7 +51,7 @@ class BaseResLoot(object):
     def loot_building(self, gamedata, session, obj, old_hp, new_hp,
                       owning_player, # usually obj.owner, but may be None for "virtual" owners like Rogue/Environment
                       attacker):
-        if obj.spec.worth_less_xp or (not (obj.is_storage() or obj.is_producer())): return None, None, None # not lootable
+        if not obj.may_contain_loot(): return None, None, None # not lootable
 
         # call into subclass to determine amounts and to subtract lost resources
         looted, lost = self.do_loot_building(gamedata, session, obj, old_hp, new_hp, owning_player, attacker)
@@ -206,7 +206,7 @@ class SpecificPvEResLoot(BaseResLoot):
         contrib_by_id = {} # {obj_id: {resource: contrib}}, only undestroyed buildings
 
         for p in self.base.iter_objects():
-            if p.is_building():
+            if p.is_building() and p.may_contain_loot():
                 fraction = p.specific_pve_loot_fraction()
                 contrib = p.resource_loot_contribution()
 
@@ -317,6 +317,10 @@ class SpecificPvEResLoot(BaseResLoot):
         # return the starting and current amounts of loot the base has to offer the player
         retmsg.append(["RES_LOOTER_UPDATE", {'starting': self.starting_base_resource_loot,
                                              'by_id': copy.deepcopy(self.by_building_id), # for debugging only
+#                                             'temp': dict((b.spec.name+'_'+b.obj_id,
+#                                                           {'fraction': b.specific_pve_loot_fraction(),
+#                                                            'contrib': b.resource_loot_contribution()})
+#                                                          for b in self.base.iter_objects() if b.is_building()),
                                              'cur': copy.deepcopy(self.remaining_base_resource_loot),
                                              'looted_uncapped': copy.deepcopy(self.total_looted_uncapped)}])
 

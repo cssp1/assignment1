@@ -7626,6 +7626,13 @@ class Building(MapBlockingGameObject):
     def specific_pve_loot_fraction(self): return self._specific_loot_fraction('pve')
     def specific_pvp_loot_fraction(self): return self._specific_loot_fraction('pvp')
 
+    def may_contain_loot(self):
+        if self.spec.worth_less_xp: return False
+        return self.is_storage() or \
+               self.is_producer() or \
+               any(getattr(self.spec, 'specific_pve_loot_fraction_'+res) for res in gamedata['resources']) or \
+               any(getattr(self.spec, 'specific_pvp_loot_fraction_'+res) for res in gamedata['resources'])
+
     def affects_power(self):
         return bool(self.spec.provides_power) or \
                bool(self.spec.consumes_power) or \
