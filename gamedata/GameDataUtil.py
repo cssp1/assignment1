@@ -111,3 +111,16 @@ def calc_max_storage_for_resource(gamedata, res):
     return calc_max_building_attribute(gamedata, gamedata['resources'][res]['storage_building'], 'storage_'+res)
 def calc_max_harvest_rate_for_resource(gamedata, res):
     return calc_max_building_attribute(gamedata, gamedata['resources'][res]['harvester_building'], 'produces_'+res)
+
+def diff_game_objects(ga, gb):
+    ret = {}
+
+    for name in ga:
+        spec_a = ga[name]
+        spec_b = gb[name]
+        for k, v in spec_a.iteritems():
+            if spec_b[k] != v:
+                if name not in ret: ret[name] = {}
+                ret[name][k] = spec_b[k]
+
+    return ret
