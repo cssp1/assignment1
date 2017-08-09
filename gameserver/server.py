@@ -28672,7 +28672,10 @@ class GAMEAPI(resource.Resource):
             if success:
                 metric_event_coded(session.user.user_id,
                                    '4650_alliance_member_join_request_accepted' if accept else '4660_alliance_member_join_request_rejected',
-                                   {'alliance_id':alliance_id, 'target_id': invitee})
+                                   {'alliance_id':alliance_id,
+                                    'alliance_ui_name': info['ui_name'],
+                                    'alliance_chat_tag': info.get('chat_tag'),
+                                    'target_id': invitee})
 
             retmsg.append(["ALLIANCE_ACK_JOIN_REQUEST_RESULT", alliance_id, invitee, success, tag])
 
@@ -28729,13 +28732,19 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
                 success = False
 
+            info = gamesite.sql_client.get_alliance_info(alliance_id, get_roles = True, reason = 'ALLIANCE_KICK')
+            assert info
+
             if success:
                 success = gamesite.sql_client.kick_from_alliance(session.user.user_id, alliance_id, kickee,
                                                                  reason='ALLIANCE_KICK')
             if success:
                 session.player.update_alliance_score_cache(alliance_id, reason='ALLIANCE_KICK')
                 gamesite.pcache_client.player_cache_update(kickee, {'alliance_id': -1}, reason = 'ALLIANCE_KICK')
-                metric_event_coded(session.user.user_id, '4625_alliance_member_kicked', {'alliance_id':alliance_id, 'target_id':kickee})
+                metric_event_coded(session.user.user_id, '4625_alliance_member_kicked', {'alliance_id':alliance_id,
+                                                                                         'alliance_ui_name': info['ui_name'],
+                                                                                         'alliance_chat_tag': info.get('chat_tag'),
+                                                                                         'target_id':kickee})
 
             if success and session.alliance_chat_channel and gamedata['server']['chat_alliance_membership']:
                 data = self.do_query_player_cache(session, [kickee], reason = 'ALLIANCE_KICK', get_trophies = False)[0] or {}
@@ -28744,7 +28753,6 @@ class GAMEAPI(resource.Resource):
                                                                                                                                 })
 
             if success:
-                info = gamesite.sql_client.get_alliance_info(alliance_id, get_roles = True, reason = 'ALLIANCE_KICK')
                 my_role_info = info['roles'][str(session.alliance_membership_cache.get('role',gamesite.sql_client.ROLE_DEFAULT))]
                 if info and ('ui_name' in info):
                     msg = gamedata['strings']['alliance_kick_mail']
@@ -28798,8 +28806,12 @@ class GAMEAPI(resource.Resource):
                 success = gamesite.sql_client.promote_alliance_member(alliance_id, session.user.user_id, promotee_id, old_role, new_role, reason='ALLIANCE_PROMOTE')
 
             if success:
-                metric_event_coded(session.user.user_id, '4626_alliance_member_promoted', {'alliance_id':alliance_id, 'target_id':promotee_id, 'role':new_role})
                 info = gamesite.sql_client.get_alliance_info(alliance_id, get_roles = True, reason = 'ALLIANCE_PROMOTE')
+                metric_event_coded(session.user.user_id, '4626_alliance_member_promoted', {'alliance_id':alliance_id,
+                                                                                           'alliance_ui_name': info['ui_name'],
+                                                                                           'alliance_chat_tag': info.get('chat_tag'),
+                                                                                           'target_id':promotee_id,
+                                                                                           'role':new_role})
                 new_role_info = info['roles'][str(new_role)]
                 pcache_data = self.do_query_player_cache(session, [promotee_id], reason = 'ALLIANCE_PROMOTE', get_trophies = False)[0] or {}
                 if session.alliance_chat_channel and gamedata['server']['chat_alliance_membership']:
@@ -28878,7 +28890,10 @@ class GAMEAPI(resource.Resource):
                     session.increment_player_metric('alliances_joined', 1, time_series = False)
                     session.deferred_history_update = True
 
-                    metric_event_coded(session.user.user_id, '4610_alliance_member_joined', {'alliance_id': new_alliance_info['id'], 'role': gamesite.sql_client.ROLE_DEFAULT,
+                    metric_event_coded(session.user.user_id, '4610_alliance_member_joined', {'alliance_id': new_alliance_info['id'],
+                                                                                             'alliance_ui_name': new_alliance_info['ui_name'],
+                                                                                             'alliance_chat_tag': new_alliance_info.get('chat_tag'),
+                                                                                             'role': gamesite.sql_client.ROLE_DEFAULT,
                                                                                              'sum':session.player.get_denormalized_summary_props('brief')})
                     metric_event_coded(session.user.user_id, '4602_alliance_num_members_updated', {'alliance_id': new_alliance_info['id'], 'num_members_cache': new_alliance_info['num_members']})
 
@@ -28915,6 +28930,8 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
                     session.increment_player_metric('alliances_left', 1, time_series = False)
                     metric_event_coded(session.user.user_id, '4620_alliance_member_left', {'alliance_id': info['id'],
+                                                                                           'alliance_ui_name': info['ui_name'],
+                                                                                           'alliance_chat_tag': info.get('chat_tag'),
                                                                                            'sum':session.player.get_denormalized_summary_props('brief')})
                     metric_event_coded(session.user.user_id, '4602_alliance_num_members_updated', {'alliance_id': info['id'], 'num_members_cache': info['num_members']-1})
 
