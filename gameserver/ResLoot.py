@@ -570,7 +570,7 @@ class SpecificPvPResLoot(PvPResLoot):
         total_storage_fractions_taken = {} # {resource: total_fraction}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage() and (not p.is_destroyed()): # XXX remove is_storage()?
+            if p.is_building() and p.may_contain_loot() and (not p.is_producer()) and (not p.is_destroyed()):
                 fraction = p.specific_pvp_loot_fraction()
                 contrib = p.resource_loot_contribution()
                 if fraction or contrib:
@@ -585,7 +585,7 @@ class SpecificPvPResLoot(PvPResLoot):
         self.storage_building_amounts = {}
 
         for p in self.base.iter_objects():
-            if p.is_building() and p.is_storage() and (not p.is_destroyed()): # XXX remove is_storage()?
+            if p.is_building() and p.may_contain_loot() and (not p.is_producer()) and (not p.is_destroyed()):
                 loot_amounts = {}
                 lost_amounts = {}
                 orig_amounts = {}
@@ -670,7 +670,7 @@ class SpecificPvPResLoot(PvPResLoot):
         looted = {}
         lost = {}
 
-        if obj.is_storage():
+        if obj.may_contain_loot() and (not obj.is_producer()):
             if obj.obj_id in self.storage_building_amounts:
                 self.storage_building_amounts[obj.obj_id][0].grab(new_hp, looted)
                 self.storage_building_amounts[obj.obj_id][1].grab(new_hp, lost)
