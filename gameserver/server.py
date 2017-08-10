@@ -20638,8 +20638,8 @@ class GAMEAPI(resource.Resource):
             # drop cold_events that have duplicate _ids with hot_events
             hot_ids = set(ev['_id'] for ev in hot_events)
             cold_events = filter(lambda ev: ev['_id'] not in hot_ids, cold_events)
-            gamesite.exception_log.event(server_time, 'hot_events:\n' + '\n'.join(map(repr,hot_events)))
-            gamesite.exception_log.event(server_time, 'cold_events:\n' + '\n'.join(map(repr,cold_events)))
+            #gamesite.exception_log.event(server_time, 'hot_events:\n' + '\n'.join(map(repr,hot_events)))
+            #gamesite.exception_log.event(server_time, 'cold_events:\n' + '\n'.join(map(repr,cold_events)))
             return hot_events + cold_events
 
         cold_events_d.addCallback(merge_hot_and_cold, hot_events)
