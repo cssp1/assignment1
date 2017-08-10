@@ -22626,6 +22626,8 @@ function query_map_log(region_id, time_range, callback) {
     send_to_server.func(["QUERY_MAP_LOG", region_id, time_range, tag]);
 };
 
+var player_alliance_membership_history_receiver = new goog.events.EventTarget();
+
 function invoke_map_ladder_pvp() {
     var template = 'map_ladder_pvp_dialog';
     var transition = false;
@@ -48286,6 +48288,9 @@ function handle_server_message(data) {
     } else if(msg == "QUERY_MAP_LOG_RESULT") {
         var tag = data[1], result = data[2];
         map_log_receiver.dispatchEvent({type: tag, result:result});
+    } else if(msg == "QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT") {
+        var tag = data[1], result = data[2];
+        player_alliance_membership_history_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT" || msg == "GET_BATTLE_REPLAY_RESULT") {
         var tag = data[1], result = data[2];
         if(tag in battle_log_receivers) {

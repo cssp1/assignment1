@@ -678,7 +678,7 @@ class NoSQLClient (object):
         return None
 
     # retrieve log entries either by time or ObjectID range (useful for paging)
-    def log_retrieve(self, log_name, time_range = [-1,-1], id_range = [None, None], inclusive = True, code = None, limit = None, sort_direction = 1, reason=''):
+    def log_retrieve(self, log_name, time_range = [-1,-1], id_range = [None, None], inclusive = True, code = None, limit = None, sort_direction = 1, extra_qs = None, reason=''):
         # convert strings to oids
         id_range = map(lambda x: self.encode_object_id(x) if x else None, id_range)
         # convert time range to ObjectID range
@@ -686,11 +686,11 @@ class NoSQLClient (object):
         # intersection of both ranges
         id_range[0] = time_id_range[0] if (id_range[0] is None) else (id_range[0] if time_id_range[0] is None else  max(id_range[0], time_id_range[0]))
         id_range[1] = time_id_range[1] if (id_range[1] is None) else (id_range[1] if time_id_range[1] is None else min(id_range[1], time_id_range[1]))
-        return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code, limit, sort_direction))
+        return self.instrument('log_retrieve(%s)'%(log_name+':'+reason), self._log_retrieve, (log_name, id_range, inclusive, code, limit, sort_direction, extra_qs))
     def decode_log(self, x):
         if '_id' in x: x['_id'] = self.decode_object_id(x['_id']) # convert to plain strings
         return x
-    def _log_retrieve(self, log_name, id_range, inclusive, code, limit, sort_direction):
+    def _log_retrieve(self, log_name, id_range, inclusive, code, limit, sort_direction, extra_qs):
         qs = {}
         if id_range[0] or id_range[1]:
             qs['_id'] = {}
@@ -698,6 +698,8 @@ class NoSQLClient (object):
             if id_range[1]: qs['_id']['$lt'] = id_range[1]
         if code is not None:
             qs['code'] = code
+        if extra_qs:
+            qs.update(extra_qs)
 
         # XXX maybe better to sort on time before _id - this relies on MongoDB timestamp linearity
         cur = self.log_buffer_table(log_name).find(qs).sort([('_id',sort_direction)]).batch_size(999999)

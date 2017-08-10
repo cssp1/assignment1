@@ -73,6 +73,7 @@ import SpinNoSQL
 import SpinNoSQLLog
 import SpinNoSQLLockManager
 import SpinSQLBattles
+import SpinSQLAllianceEvents
 import MalformedJSON
 import PlayerPortraits
 import Raid
@@ -20608,6 +20609,48 @@ class GAMEAPI(resource.Resource):
 
         return session.start_async_request(d) # async
 
+    def query_player_alliance_membership_history(self, session, arg):
+        tag = arg[1]
+        target_id = arg[2]
+
+        # remove fields the client shouldn't see
+        def censor_event(event):
+            for FIELD in ('sum','code','ident'):
+                if FIELD in event: del event[FIELD]
+            return event
+
+        hot_events = map(censor_event,
+                         gamesite.nosql_client.log_retrieve('log_alliance_members',
+                                                            sort_direction = -1,
+                                                            extra_qs = {'$or': [{'user_id': target_id},
+                                                                                {'target_id': target_id}]}))
+
+        if gamesite.sql_alliance_events_client:
+            cold_events_d = gamesite.sql_alliance_events_client.player_alliance_membership_history_get_async(target_id, reason='query_player_alliance_membership_history')
+        else:
+            cold_events_d = defer.succeed([])
+
+        cold_events_d.addCallback(lambda event_list: map(censor_event, event_list))
+        cold_events_d.addErrback(report_and_reraise_deferred_failure, session)
+        cold_events_d.addErrback(lambda _: []) # in case of error, return empty list
+
+        def merge_hot_and_cold(cold_events, hot_events):
+            # drop cold_events that have duplicate _ids with hot_events
+            hot_ids = set(ev['_id'] for ev in hot_events)
+            cold_events = filter(lambda ev: ev['_id'] not in hot_ids, cold_events)
+            gamesite.exception_log.event(server_time, 'hot_events:\n' + '\n'.join(map(repr,hot_events)))
+            gamesite.exception_log.event(server_time, 'cold_events:\n' + '\n'.join(map(repr,cold_events)))
+            return hot_events + cold_events
+
+        cold_events_d.addCallback(merge_hot_and_cold, hot_events)
+
+        def complete(all_events, tag):
+            session.send([["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT", tag, all_events]], flush_now = True)
+
+        cold_events_d.addCallback(complete, tag)
+
+        return None # note: asynchronous with other session traffic!
+
     # simulate player cache query results by just reading from the in-memory player
     def get_player_cache_props(self, user, player, alliance_id):
         #base_damage, base_repair_time = player.my_home.report_base_damage_and_repair_time_for_ladder(player)
@@ -28424,6 +28467,8 @@ class GAMEAPI(resource.Resource):
             self.query_scout_reports(session, retmsg, arg)
         elif arg[0] == "QUERY_RECENT_ATTACKERS":
             self.query_recent_attackers(session, retmsg, arg)
+        elif arg[0] == "QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY":
+            return self.query_player_alliance_membership_history(session, arg)
         elif arg[0] == "QUERY_BATTLE_HISTORY":
             return self.query_battle_history(session, retmsg, arg)
         elif arg[0] == "GET_BATTLE_LOG3":
@@ -31478,6 +31523,7 @@ class GameSite(server.Site):
                                                                                      verbosity = 0,
                                                                                      log_exception_func = self.log_exception_func))
         self.sql_battles_client = None
+        self.sql_alliance_events_client = None
         if ((game_id+'_battles') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             if self.sql_scores2_client and \
@@ -31489,10 +31535,12 @@ class GameSite(server.Site):
                                                  verbosity = 0,
                                                  log_exception_func = self.log_exception_func)
             self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg)
+            self.sql_alliance_events_client = SpinSQLAllianceEvents.SQLAllianceEventsClient(pg)
 
     def sql_shutdown(self):
         self.sql_scores2_client = None
         self.sql_battles_client = None
+        self.sql_alliance_events_client = None
 
     def nosql_init(self, is_startup = False):
         if self.nosql_client: return
