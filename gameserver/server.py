@@ -27245,6 +27245,18 @@ class GAMEAPI(resource.Resource):
 
         # close final session
         session.player.history['sessions'][-1][1] = logout_time
+
+        # record un-merged list of most recent (completed) sessions, for login abuse detection
+        KEEP_RECENT_SESSIONS = gamedata['server'].get('track_last_raw_sessions', 200)
+        if KEEP_RECENT_SESSIONS > 0:
+            if 'last_raw_sessions' not in session.player.history:
+                session.player.history['last_raw_sessions'] = []
+            if len(session.player.history['last_raw_sessions']) > KEEP_RECENT_SESSIONS:
+                del session.player.history['last_raw_sessions'][:-KEEP_RECENT_SESSIONS]
+            session.player.history['last_raw_sessions'].append([session.login_time, logout_time])
+        elif 'last_raw_sessions' in session.player.history:
+            del session.player.history['last_raw_sessions']
+
         session.user.last_logout_time = logout_time
 
         metric_event_coded(session.user.user_id, '0900_logged_out',
@@ -30194,6 +30206,7 @@ class GAMEAPI(resource.Resource):
                     session.player.reset()
                     init_game(session.player, 0)
                     session.player.history['sessions'] = [[server_time,-1],]
+                    session.player.history['last_raw_sessions'] = []
                     session.player.creation_time = session.user.account_creation_time = server_time
                     retmsg.append(["ABTEST_UPDATE", session.player.abtests])
 
