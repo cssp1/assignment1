@@ -25,4 +25,8 @@ if __name__ == '__main__':
         if diff:
             ret[top] = diff
 
+    crafting_recipes_diff = GameDataUtil.diff_game_objects(gamedata_a['crafting']['recipes'], gamedata_b['crafting']['recipes'])
+    if crafting_recipes_diff:
+        ret['crafting'] = {'recipes': crafting_recipes_diff}
+
     SpinJSON.dump(ret, sys.stdout, pretty = True, newline = True)
