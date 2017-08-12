@@ -66,83 +66,8 @@ class Policy(object):
         self.policy_bot_log = open_log(self.db_client)
 
 class AntiRefreshPolicy(Policy):
-    # ignore anything that happened more than a week ago
-    # note: server.json idle_check keep_history_for setting should be at least this long
-    IGNORE_AGE = 7*86400
-
-    # don't take action until this many tests (regardless of success or failure)
-    MIN_TESTS = 4
-
-    # don't take action until this many failures
-    MIN_FAILS = 2
-
-    # don't take action unless failure rate is this high
-    MIN_FAIL_RATE = 0.51
-
     # cooldown that identifies a player as a repeat offender
     REPEAT_OFFENDER_COOLDOWN_NAME = 'idle_check_violation'
-
-    # query for candidate violators from player cache
-    @classmethod
-    def player_cache_query(cls, db_client, time_range):
-        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
-                                                                   townhall_name = gamedata['townhall'],
-                                                                   min_townhall_level = 3,
-                                                                   # use exclude to catch un-regioned players
-                                                                   exclude_home_regions = allow_refresh_region_names,
-                                                                   min_idle_check_fails = cls.MIN_FAILS,
-                                                                   min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
-    def check_player(self, user_id, player):
-
-        # possible race condition after player cache lookup (?)
-        if player['home_region'] in allow_refresh_region_names: return
-
-        if self.test:
-            idle_check = {'history': [
-                {'time': time_now - 6000, 'result': 'fail', 'seen': 1},
-                {'time': time_now - 5000, 'result': 'fail'},
-                {'time': time_now - 4000, 'result': 'fail'},
-                {'time': time_now - 3000, 'result': 'fail'},
-                {'time': time_now - 2000, 'result': 'fail'},
-                {'time': time_now - 1000, 'result': 'success'},
-                ]}
-        else:
-            idle_check = player.get('idle_check', {})
-
-        history = idle_check.get('history', [])
-
-        num_tests = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0)), 0)
-        if num_tests < self.MIN_TESTS:
-            return # not enough tests
-
-        num_fails = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'fail'), 0)
-        num_successes = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'success'), 0)
-        if num_fails < self.MIN_FAILS:
-            return # not enough fails
-        fail_rate = (1.0*num_fails) / (num_fails + num_successes)
-
-        last_fail_time = -1
-        for i in xrange(len(history)-1, -1, -1):
-            if not history[i].get('seen',0) and history[i]['result'] == 'fail':
-                last_fail_time = history[i]['time']
-                break
-
-        if self.verbose >= 2:
-            print >> self.msg_fd, 'num_fails %d num_successes %d fail_rate %.1f last_fail_time %d' % (num_fails, num_successes, fail_rate, last_fail_time)
-
-        if last_fail_time < time_now - self.IGNORE_AGE:
-            return # last failure was too long ago
-
-        if fail_rate < self.MIN_FAIL_RATE:
-            return # not enough failures to worry about
-
-        try:
-            new_region_name = self.punish_player(user_id, player['home_region'])
-            if self.verbose >= 2:
-                print >> self.msg_fd, 'moved to region %s' % (new_region_name)
-
-        except:
-            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
 
     def punish_player(self, user_id, cur_region_name):
 
@@ -224,9 +149,6 @@ class AntiRefreshPolicy(Policy):
                                       'duration': self.REGION_BANISH_DURATION,
                                       'data':SpinJSON.dumps({'tag':'anti_refresh'})}) == 'ok'
 
-            # always give player a fresh start on the idle check
-            assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'}) == 'ok'
-
             if message_body:
                 assert do_CONTROLAPI({'user_id':user_id, 'method':'send_message',
                                       'message_body': message_body,
@@ -246,6 +168,186 @@ class AntiRefreshPolicy(Policy):
 
         return new_region['id'] if new_region else None
 
+class LoginPatternAntiRefreshPolicy(AntiRefreshPolicy):
+    # cooldown that triggers when we take action, to avoid punishing player twice for the same behavior
+    HOLDOFF_COOLDOWN_NAME = 'login_pattern_violation'
+    HOLDOFF_COOLDOWN_DURATION = 24*3600
+
+    # ignore anything that happened more than 12 hours ago
+    IGNORE_AGE = 12*3600
+
+    assert HOLDOFF_COOLDOWN_DURATION > IGNORE_AGE
+
+    IGNORE_SESSIONS_LONGER_THAN = 1500
+    IGNORE_SESSIONS_SHORTER_THAN = 10
+
+    # don't take action until this many logins fit in the same time bucket
+    MIN_N = 50
+
+    # group logins into histogram with this bucket width
+    TIME_BUCKET = 10
+
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
+        # get all CC3+ players, outside of refresh-allowed regions, who were seen playing during the time_range
+        seen_players = set(db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                               townhall_name = gamedata['townhall'],
+                                                                               min_townhall_level = 3,
+                                                                               # use exclude to catch un-regioned players
+                                                                               exclude_home_regions = allow_refresh_region_names))
+
+        if verbose >= 2:
+            print 'LoginPatternAntiRefreshPolicy', 'seen_players', len(seen_players)
+
+        # speed optimization:
+        # filter out players who didn't start at least MIN_N sessions within the time range
+        if gamedata['server'].get('log_sessions_in_nosql', True):
+            events = db_client.log_buffer_table('log_sessions') \
+                     .aggregate([{'$match': {'time': {'$gte': min(time_range[0], time_now - cls.IGNORE_AGE),
+                                                      '$lt': time_range[1]}}},
+                                 {'$project': {'user_id': 1}},
+                                 {'$group': {'_id': '$user_id', 'count': {'$sum': 1}}},
+                                 {'$match': {'count': {'$gte': cls.MIN_N}}}])
+            active_players = set(ev['_id'] for ev in events)
+
+            if verbose >= 2:
+                print 'LoginPatternAntiRefreshPolicy', 'active_players', len(active_players)
+
+            seen_players = seen_players.intersection(active_players)
+
+        if verbose >= 2:
+            print 'LoginPatternAntiRefreshPolicy', 'final_players', len(seen_players)
+
+        return list(seen_players)
+
+    def check_player(self, user_id, player):
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] in allow_refresh_region_names: return
+
+        # note: must use un-merged version
+        sessions = player['history'].get('last_raw_sessions',[])
+        buckets = {}
+        max_n = 0
+
+        for i in xrange(len(sessions)-1, -1, -1):
+            s = sessions[i]
+            if s[1] < 0: continue
+            if s[0] < time_now - self.IGNORE_AGE: break
+            slen = s[1] - s[0]
+            if slen < self.IGNORE_SESSIONS_SHORTER_THAN: continue
+            if slen > self.IGNORE_SESSIONS_LONGER_THAN: continue
+
+            b = self.TIME_BUCKET * (slen // self.TIME_BUCKET)
+            buckets[b] = buckets.get(b,0) + 1
+            max_n = max(max_n, buckets[b])
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, '\n'.join(['bucket %4ds %4d' % (k, buckets[k]) for k in buckets if buckets[k] >= 30])
+
+        if max_n < self.MIN_N:
+            return # no violation
+
+        holdoff = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_active', 'name':self.HOLDOFF_COOLDOWN_NAME})
+        if holdoff > 0:
+            # already took action
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'holdoff is active'
+            return
+
+        try:
+            new_region_name = self.punish_player(user_id, player['home_region'])
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+
+            # trigger the holdoff
+            if not self.dry_run:
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'trigger_cooldown',
+                                      'name':self.HOLDOFF_COOLDOWN_NAME,
+                                      'duration': self.HOLDOFF_COOLDOWN_DURATION}) == 'ok'
+        except:
+            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
+
+class IdleCheckAntiRefreshPolicy(AntiRefreshPolicy):
+    # ignore anything that happened more than a week ago
+    # note: server.json idle_check keep_history_for setting should be at least this long
+    IGNORE_AGE = 7*86400
+
+    # don't take action until this many tests (regardless of success or failure)
+    MIN_TESTS = 4
+
+    # don't take action until this many failures
+    MIN_FAILS = 2
+
+    # don't take action unless failure rate is this high
+    MIN_FAIL_RATE = 0.51
+
+    # query for candidate violators from player cache
+    @classmethod
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
+        return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
+                                                                   townhall_name = gamedata['townhall'],
+                                                                   min_townhall_level = 3,
+                                                                   # use exclude to catch un-regioned players
+                                                                   exclude_home_regions = allow_refresh_region_names,
+                                                                   min_idle_check_fails = cls.MIN_FAILS,
+                                                                   min_idle_check_last_fail_time = time_now - cls.IGNORE_AGE)
+
+    def check_player(self, user_id, player):
+
+        # possible race condition after player cache lookup (?)
+        if player['home_region'] in allow_refresh_region_names: return
+
+        if self.test:
+            idle_check = {'history': [
+                {'time': time_now - 6000, 'result': 'fail', 'seen': 1},
+                {'time': time_now - 5000, 'result': 'fail'},
+                {'time': time_now - 4000, 'result': 'fail'},
+                {'time': time_now - 3000, 'result': 'fail'},
+                {'time': time_now - 2000, 'result': 'fail'},
+                {'time': time_now - 1000, 'result': 'success'},
+                ]}
+        else:
+            idle_check = player.get('idle_check', {})
+
+        history = idle_check.get('history', [])
+
+        num_tests = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0)), 0)
+        if num_tests < self.MIN_TESTS:
+            return # not enough tests
+
+        num_fails = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'fail'), 0)
+        num_successes = sum((1 for x in history if x['time'] >= time_now - self.IGNORE_AGE and not x.get('seen',0) and x['result'] == 'success'), 0)
+        if num_fails < self.MIN_FAILS:
+            return # not enough fails
+        fail_rate = (1.0*num_fails) / (num_fails + num_successes)
+
+        last_fail_time = -1
+        for i in xrange(len(history)-1, -1, -1):
+            if not history[i].get('seen',0) and history[i]['result'] == 'fail':
+                last_fail_time = history[i]['time']
+                break
+
+        if self.verbose >= 2:
+            print >> self.msg_fd, 'num_fails %d num_successes %d fail_rate %.1f last_fail_time %d' % (num_fails, num_successes, fail_rate, last_fail_time)
+
+        if last_fail_time < time_now - self.IGNORE_AGE:
+            return # last failure was too long ago
+
+        if fail_rate < self.MIN_FAIL_RATE:
+            return # not enough failures to worry about
+
+        try:
+            new_region_name = self.punish_player(user_id, player['home_region'])
+            if self.verbose >= 2:
+                print >> self.msg_fd, 'moved to region %s' % (new_region_name)
+
+            if not self.dry_run:
+                # always give player a fresh start on the idle check
+                assert do_CONTROLAPI({'user_id':user_id, 'method':'reset_idle_check_state'}) == 'ok'
+
+        except:
+            sys.stderr.write(('error punishing player %d: '%(user_id)) + traceback.format_exc())
 
 class AntiAltPolicy(Policy):
     # min number of simultaneous logins to trigger action
@@ -259,7 +361,7 @@ class AntiAltPolicy(Policy):
 
     # query for candidate violators from player cache
     @classmethod
-    def player_cache_query(cls, db_client, time_range):
+    def player_cache_query(cls, db_client, time_range, verbose = 0):
         return db_client.player_cache_query_mtime_or_ctime_between([time_range], [],
                                                                    townhall_name = gamedata['townhall'],
                                                                    min_townhall_level = 3,
@@ -456,7 +558,7 @@ def open_log(db_client):
 class NullFD(object):
     def write(self, stuff): pass
 
-POLICIES = [AntiAltPolicy, AntiRefreshPolicy]
+POLICIES = [AntiAltPolicy, IdleCheckAntiRefreshPolicy, LoginPatternAntiRefreshPolicy]
 
 def my_slave(input):
     msg_fd = sys.stderr if input['verbose'] else NullFD()
@@ -546,7 +648,7 @@ if __name__ == '__main__':
                 id_list += [1112,]
             else:
                 if verbose: print 'querying player_cache...'
-                id_list += sum((pol.player_cache_query(db_client, [start_time, time_now]) for pol in POLICIES), [])
+                id_list += sum((pol.player_cache_query(db_client, [start_time, time_now], verbose=verbose) for pol in POLICIES), [])
 
         id_list = list(set(id_list)) # uniquify
         id_list.sort(reverse=True)
