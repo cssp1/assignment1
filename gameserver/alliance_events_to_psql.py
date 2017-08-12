@@ -116,7 +116,12 @@ if __name__ == '__main__':
         total = 0
 
         if source == 's3':
-            start_time = calendar.timegm(source_ymd + [0,0,0])
+            s3_start_time = calendar.timegm(source_ymd + [0,0,0]) - 1
+            if start_time < 0:
+                start_time = s3_start_time
+            else:
+                start_time = max(start_time, s3_start_time)
+
             if verbose: print 'Source = S3, starting at', start_time
             row_iter = SpinETL.iterate_from_s3(SpinConfig.game(), 'spinpunch-logs',
                                                'alliance_member_events',
