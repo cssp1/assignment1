@@ -1436,6 +1436,12 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
     // tack on account creation event at the end
     if(pcache_info && 'account_creation_time' in pcache_info) {
         var account_creation_time = pcache_info['account_creation_time'];
+
+        // for very old accounts, add a note that early history won't be in the database
+        if(account_creation_time < 1427846400) {
+            dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.widgets['output'].data['events']['ui_data_incomplete']));
+        }
+
         var ui_account_creation = dialog.widgets['output'].data['ui_event_line']
             .replace('%date', pretty_print_date_utc(account_creation_time))
             .replace('%event', dialog.widgets['output'].data['events']['ui_0110_created_new_account']
