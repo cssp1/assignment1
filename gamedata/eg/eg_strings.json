@@ -243,6 +243,8 @@
         // chat messages sent by current turf winners
         "turf_winner": "[color=#ffff00][player=%sender_id]%sender_name%tag[/player]:[/color] [color=#ff80ff]%body[/color]",
 
+        "alliance": "[color=#ffff00][alliance=%alliance_id]%alliance_name[/alliance][/color]",
+
         // alliance tags - note, use \u005c (which becomes a '\' when parsed) to escape the [] brackets
         "alliance_tag": " [color=#ff8000][alliance=%alliance_id]\u005c[%alliance_tag\u005c][/alliance][/color]",
 

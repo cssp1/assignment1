@@ -15707,6 +15707,9 @@ msgstr "Note: Clanmates can only receive gifts\nif they have played within the l
 msgid "Alliance Info"
 msgstr "Clan Info"
 
+msgid "Alliance History"
+msgstr "Clan History"
+
 msgid "Show multiplayer battles involving your alliance"
 msgstr "Show multiplayer battles involving your Clan"
 
