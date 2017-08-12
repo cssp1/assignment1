@@ -82,6 +82,9 @@ def do_throttle():
 def random_letter():
     return chr(ord('A') + int(26*random.random()))
 
+def is_ai_user_id_range(id):
+    return id > 0 and id <= gamedata.get('max_ai_user_id', 1100)
+
 def feature_expired(feature):
     base_expire_time = feature.get('base_expire_time', -1)
     return (base_expire_time > 0 and time_now >= base_expire_time)
@@ -512,16 +515,29 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
     # if refund_units() is used, need to individual drop the returned ones
 
     if not dry_run:
-        new_props = {'base_landlord_id':base_data['base_landlord_id'],
-                     'base_last_conquer_time':base_data['base_last_conquer_time'],
-                     'base_last_landlord_id':base_data['base_last_landlord_id']}
-        # update objects with new owner
+        # update base objects with new owner
+        # optionally, also repair defenses, cancel upgrades, and restart production
+        set_props = {'owner_id': feature['base_landlord_id']}
+        unset_props = ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients',
+                       'enhancing','crafting']
+        if gamedata['territory'].get('quarry_repair_on_abandon', False):
+            unset_props += ['repair_finish_time','hp','hp_ratio','disarmed']
+        if gamedata['territory'].get('quarry_dump_on_abandon', False):
+            unset_props += ['produce_start_time', 'produce_rate', 'contents']
+
         for obj in base_objects:
+            set_props['obj_id'] = obj['obj_id']
             nosql_client._update_object(region_id,
                                         'mobile' if (obj['spec'] in gamedata['units']) else 'fixed',
-                                        {'obj_id':obj['obj_id'],'owner_id':feature['base_landlord_id']}, True, None)
+                                        set_props, True, unset_props)
             #nosql_write_all_objects(region_id, base_id, feature['base_landlord_id'], base_objects)
-        nosql_client.update_map_feature(region_id, base_id, new_props)
+
+        # update feature with new owner
+        new_base_props = {'base_landlord_id':base_data['base_landlord_id'],
+                          'base_last_conquer_time':base_data['base_last_conquer_time'],
+                          'base_last_landlord_id':base_data['base_last_landlord_id']}
+        nosql_client.update_map_feature(region_id, base_id, new_base_props)
+
     lock_manager.release(region_id, base_id, base_generation = base_data.get('base_generation',-1))
     print 'ABANDONED', pretty_feature(base_data)
     return True
@@ -1849,6 +1865,20 @@ def weed_orphan_squads(db, lock_manager, region_id, dry_run = True):
             print 'recalling orphan squad', squad_id
             recall_squad(db, lock_manager, region_id, owner_id, squad_id, dry_run=dry_run)
 
+def abandon_orphan_quarries(db, lock_manager, region_id, dry_run = True):
+    # abandon quarries whose player owners are not on the map anymore
+    players_in_map = set(int(x[1:]) for x in nosql_client.get_map_feature_ids_by_type(region_id, 'home'))
+    orphan_quarries = []
+    for x in nosql_client.get_map_features_by_type(region_id, 'quarry'):
+        landlord_id = int(x['base_landlord_id'])
+        if not is_ai_user_id_range(landlord_id) and (landlord_id not in players_in_map):
+            orphan_quarries.append(x)
+
+    for quarry in orphan_quarries:
+        print 'abandoning orphan quarry', quarry['base_id'], 'owner', quarry['base_landlord_id']
+        abandon_quarry(db, lock_manager, region_id, quarry['base_id'], feature = quarry, dry_run=dry_run)
+
+
 def weed_orphan_objects(db, lock_manager, region_id, dry_run = True):
     # clear out any mobile or fixed objects whose bases are not on the map anymore
     referenced_base_ids = set(nosql_client.get_base_ids_referenced_by_objects(region_id))
@@ -2014,6 +2044,10 @@ if __name__ == '__main__':
                 # 10. run low-level database maintenance (bust stale locks)
                 print "%s: busting stale map feature locks..." % region_id
                 nosql_client.do_region_maint(region_id)
+
+                # 15. abandon orphan quarries
+                print "%s: abandoning orphan quarries..." % region_id
+                abandon_orphan_quarries(db, lock_manager, region_id, dry_run=dry_run)
 
                 # 20. weed expired bases
                 print "%s: weeding expired hives/quarries/raids..." % region_id
