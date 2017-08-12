@@ -6,7 +6,7 @@ goog.provide('PlayerInfoDialog');
 
 /** @fileoverview
     @suppress {reportUnknownTypes} XXX we are not typesafe yet
-    Player Info dialog with Profile, Statistics, and Achievements tabs.
+    Player Info dialog with Profile, Statistics, and Alliance History, and Achievements tabs.
     This references a ton of stuff from main.js. It's not a self-contained module.
 */
 
@@ -15,6 +15,7 @@ goog.require('SPHTTP');
 goog.require('SPText');
 goog.require('FBShare');
 goog.require('PlayerCache');
+goog.require('AllianceCache');
 goog.require('goog.array');
 goog.require('goog.object');
 
@@ -68,6 +69,7 @@ PlayerInfoDialog._invoke = function(user_id, info) {
                                make_post_screenshot_caption(dialog.data['widgets']['screenshot_button']['ui_caption'], dialog.user_data['info']));
     };
 
+    dialog.widgets['alliance_history_button'].onclick = function(w) { PlayerInfoDialog.invoke_alliance_history_tab(w.parent); };
     dialog.widgets['statistics_button'].onclick = function(w) { PlayerInfoDialog.invoke_statistics_tab(w.parent); };
     dialog.widgets['achievements_button'].onclick = function(w) { PlayerInfoDialog.invoke_achievements_tab(w.parent); };
     dialog.widgets['profile_button'].onclick = function(w) { PlayerInfoDialog.invoke_profile_tab(w.parent); };
@@ -103,9 +105,11 @@ PlayerInfoDialog.invoke_statistics_tab = function(parent, preselect) {
         delete parent.widgets['tab'];
     }
 
-    parent.widgets['statistics_button'].state = 'active';
+    parent.widgets['statistics_button'].state = 'pressed';
     parent.widgets['profile_button'].state = 'normal';
     parent.widgets['achievements_button'].state = 'normal';
+    parent.widgets['alliance_history_button'].state = 'normal';
+    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['player_info_statistics_tab']);
     dialog.transparent_to_mouse = true;
@@ -450,8 +454,12 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
         delete parent.widgets['tab'];
     }
 
-    parent.widgets['profile_button'].state = 'active';
+    parent.widgets['profile_button'].state = 'pressed';
+    parent.widgets['achievements_button'].state = 'normal';
     parent.widgets['achievements_button'].show = player.get_any_abtest_value('enable_ingame_achievements', gamedata['client']['enable_ingame_achievements'] || false);
+    parent.widgets['alliance_history_button'].state = 'normal';
+    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+
     parent.widgets['statistics_button'].state = 'normal';
     parent.widgets['statistics_button'].show = player.get_any_abtest_value('enable_score_history', gamedata['client']['enable_score_history']);
 
@@ -1095,7 +1103,9 @@ PlayerInfoDialog.invoke_achievements_tab = function(parent, preselect_category, 
     parent.widgets['statistics_button'].state = 'normal';
     parent.widgets['statistics_button'].show = player.get_any_abtest_value('enable_score_history', gamedata['client']['enable_score_history']);
     parent.widgets['profile_button'].state = 'normal';
-    parent.widgets['achievements_button'].state = 'active';
+    parent.widgets['alliance_history_button'].state = 'normal';
+    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+    parent.widgets['achievements_button'].state = 'pressed';
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['player_info_achievements_tab']);
     dialog.transparent_to_mouse = true;
@@ -1287,4 +1297,152 @@ PlayerInfoDialog.achievement_rowfunc = function(dialog, row, rowdata) {
         achievement_widget_setup(dialog.widgets['ach'+row], rowdata, dialog.parent.user_data['player_achievements'],
                                  (dialog.parent.user_data['user_id'] == session.user_id ? player.history : null));
     }
+};
+
+/** @param {!SPUI.Dialog} parent
+    @return {!SPUI.Dialog} */
+PlayerInfoDialog.invoke_alliance_history_tab = function(parent) {
+    var user_id = parent.user_data['user_id'];
+    var knowledge = parent.user_data['info'];
+
+    player.record_feature_use(user_id === session.user_id ? 'own_alliance_history' : 'other_alliance_history');
+
+    if('tab' in parent.widgets) {
+        if(parent.widgets['tab'].user_data['dialog'] == 'player_info_alliance_history_tab') {
+            // we're already up
+            return parent.widgets['tab'];
+        }
+        parent.remove(parent.widgets['tab']);
+        delete parent.widgets['tab'];
+    }
+
+    parent.widgets['statistics_button'].state = 'normal';
+    parent.widgets['profile_button'].state = 'normal';
+    parent.widgets['achievements_button'].state = 'normal';
+    parent.widgets['alliance_history_button'].state = 'pressed';
+
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['player_info_alliance_history_tab']);
+    dialog.transparent_to_mouse = true;
+    dialog.user_data['dialog'] = 'player_info_alliance_history_tab';
+    dialog.user_data['user_id'] = user_id;
+
+    dialog.widgets['player_name'].str = PlayerInfoDialog.format_name_with_level(knowledge);
+    dialog.widgets['player_id'].str = dialog.data['widgets']['player_id']['ui_name'].replace('%d', user_id.toString());
+
+    parent.widgets['tab'] = dialog;
+    parent.add(dialog);
+
+    dialog.widgets['loading_rect'].show =
+        dialog.widgets['loading_text'].show =
+        dialog.widgets['loading_spinner'].show = true;
+
+    dialog.widgets['output'].clear_text();
+
+    // note: it's OK to use the statistics_tab_scroll() functions since the widget names are the same
+    dialog.widgets['scroll_up'].onclick = function (w) { PlayerInfoDialog.statistics_tab_scroll(w.parent, -1); };
+    dialog.widgets['scroll_down'].onclick = function (w) { PlayerInfoDialog.statistics_tab_scroll(w.parent, 1); };
+    PlayerInfoDialog.statistics_tab_scroll(dialog, 0);
+
+    query_player_alliance_membership_history(user_id, (function (_dialog) { return function(data) {
+        PlayerInfoDialog.alliance_history_tab_receive(_dialog, data);
+    }; })(dialog));
+
+    return dialog;
+};
+
+/** @param {!SPUI.Dialog} dialog
+    @param {?} data */
+PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
+    if(!dialog.parent) { return; } // dialog got closed asynchronously
+
+    if(!data || data.length < 1) {
+        dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
+        dialog.widgets['loading_spinner'].show = false;
+        return;
+    }
+
+    dialog.widgets['loading_rect'].show =
+        dialog.widgets['loading_text'].show =
+        dialog.widgets['loading_spinner'].show = false;
+
+    dialog.widgets['output'].clear_text();
+
+    var event_list = data;
+
+    // newest events first
+    event_list.sort(function(a, b) {
+        if(a['time'] < b['time']) { return 1; }
+        if(a['time'] > b['time']) { return -1;}
+        return 0;
+    });
+
+    var user_id = dialog.parent.user_data['user_id'];
+    var pcache_info = dialog.parent.user_data['info'];
+
+    goog.array.forEach(event_list, function(ev) {
+        if(!('ui_'+ev['event_name'] in dialog.widgets['output'].data['events'])) { return; }
+
+        if(ev['event_name'] == '4625_alliance_member_kicked' ||
+           ev['event_name'] == '4650_alliance_member_join_request_accepted') {
+            // exclude events that don't apply to the player
+            if(user_id != ev['target_id']) { return; }
+        } else {
+            if(user_id != ev['user_id']) { return; }
+        }
+
+        var msg = dialog.widgets['output'].data['events']['ui_'+ev['event_name']];
+
+        function format_alliance(alliance_id, name, tag) {
+            var bb_text = gamedata['strings']['chat_templates']['alliance']
+                .replace('%alliance_name', name)
+                .replace('%alliance_id', alliance_id.toString());
+            if(tag) {
+                bb_text += gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', tag).replace('%alliance_id', alliance_id.toString());
+            }
+            return bb_text;
+        }
+
+        var alliance_id = ev['alliance_id'];
+        var alliance_info = AllianceCache.query_info_sync(alliance_id);
+
+        // get former alliance name/tag from event
+        var alliance_ui_name_former = ev['alliance_ui_name'] || null;
+        var alliance_chat_tag_former = ev['alliance_chat_tag'] || null;
+
+        var alliance_ui_name = (alliance_info ? alliance_info['ui_name'] : '?');
+        var alliance_chat_tag = (alliance_info ? (alliance_info['chat_tag'] || null) : null);
+
+        var ui_alliance;
+
+        // alliance has different name now
+        if(alliance_ui_name_former && (alliance_ui_name != alliance_ui_name_former || alliance_chat_tag != alliance_chat_tag_former)) {
+            ui_alliance = dialog.widgets['output'].data['ui_alliance_former']
+                .replace('%now', format_alliance(alliance_id, alliance_ui_name, alliance_chat_tag))
+                .replace('%former', format_alliance(alliance_id, alliance_ui_name_former, alliance_chat_tag_former));
+        } else {
+            ui_alliance = format_alliance(alliance_id, alliance_ui_name, alliance_chat_tag);
+        }
+
+        msg = msg.replace('%alliance', ui_alliance);
+
+        var line = dialog.widgets['output'].data['ui_event_line'];
+        line = line.replace('%date', pretty_print_date_and_time_utc(ev['time']));
+        line = line.replace('%event', msg);
+        line = line.replace('%alliance', ui_alliance);
+
+        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, null, system_chat_bbcode_click_handlers));
+    });
+
+    // tack on account creation event at the end
+    if(pcache_info && 'account_creation_time' in pcache_info) {
+        var account_creation_time = pcache_info['account_creation_time'];
+        var ui_account_creation = dialog.widgets['output'].data['ui_event_line']
+            .replace('%date', pretty_print_date_utc(account_creation_time))
+            .replace('%event', dialog.widgets['output'].data['events']['ui_0110_created_new_account']
+                     .replace('%game', gamedata['strings']['game_name']));
+        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(ui_account_creation));
+    }
+
+    dialog.widgets['output'].scroll_to_top();
+    PlayerInfoDialog.statistics_tab_scroll(dialog, 0);
 };

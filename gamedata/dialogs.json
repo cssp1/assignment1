@@ -6174,17 +6174,55 @@
         "default_button": "close_button",
         "widgets": {
             "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[736,480], "asset": "dialog_resizable", "bg_image_resizable": 1 },
-            "title": { "kind": "TextField", "xy": [37,13], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
+            "title": { "kind": "TextField", "xy": [30,12], "dimensions": [221, 41], "text_size": 30, "text_style": "thick",
                        "text_hjustify": "left", "ui_name": "Player Info" },
             "close_button": { "kind": "ActionButton", "xy": [706,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
-            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[212,24], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
+            "screenshot_button": {"show": 0, "kind": "ActionButton", "xy":[189,24], "dimensions":[23,23], "bg_image": "photo_button", "push_bg_image": 1,
                                   "ui_caption": "%PLAYER - Player Info"},
-            "statistics_button": { "show": 0, "kind": "ActionButton", "xy": [268,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                   "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Statistics" },
-            "profile_button": { "kind": "ActionButton", "xy": [412,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Profile" },
-            "achievements_button": { "kind": "ActionButton", "xy": [556,18], "dimensions": [136,32], "text_size": 13, "text_style": "bold",
-                                     "bg_image": "menu_button_136px", "state": "normal", "ui_name": "Achievements" }
+            "profile_button": { "kind": "ActionButton", "xy": [234,18], "dimensions": [110,32], "text_size": 13, "text_style": "bold",
+                                "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Profile" },
+            "achievements_button": { "kind": "ActionButton", "xy": [348,18], "dimensions": [110,32], "text_size": 13, "text_style": "bold",
+                                     "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Achievements" },
+            "statistics_button": { "show": 0, "kind": "ActionButton", "xy": [462,18], "dimensions": [110,32], "text_size": 13, "text_style": "bold",
+                                   "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Statistics" },
+            "alliance_history_button": { "kind": "ActionButton", "xy": [576,18], "dimensions": [110,32], "text_size": 13, "text_style": "bold",
+                                         "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Alliance History" }
+        }
+    },
+
+    "player_info_alliance_history_tab": {
+        "dimensions": [736,480],
+        "widgets": {
+            "sunken": {"kind": "StaticImage", "xy":[10,62], "dimensions":[716,405], "asset": "dialog_sunken_resizable", "bg_image_resizable":1 },
+
+            "player_name": { "kind": "TextField", "xy": [45,70], "dimensions": [716, 28], "text_size": 22, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "center", "ui_name": "Loading...", "drop_shadow": 1 },
+            "player_id": { "kind": "TextField", "xy": [45,70], "dimensions": [658, 30], "text_size": 15, "text_style": "normal",
+                           "text_hjustify": "right", "text_vjustify": "center", "ui_name": "Player ID: %d", "drop_shadow": 1 },
+
+            "sunken2": {"kind": "StaticImage", "xy":[25,105], "dimensions":[686,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
+
+            "output": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [630,285], "text_size": 15, "text_style": "normal",
+                        "text_hjustify": "left", "text_vjustify": "top",
+                        "ui_alliance_former": "%now (at the time named %former)",
+                        "ui_event_line": "[color=#d0d0d0]%date:[/color] %event",
+                        "events": {"ui_0110_created_new_account": "Started playing [color=#ffff00]%game[/color]",
+                                   "ui_4610_alliance_member_joined": "Joined %alliance",
+                                   "ui_4620_alliance_member_left": "Left %alliance",
+                                   "ui_4625_alliance_member_kicked": "Was kicked from %alliance",
+                                   "ui_4650_alliance_member_join_request_accepted": "Joined %alliance"}
+//                        "ui_group_header": "[b]%group[/b]",
+//                        "ui_stat": "%stat: [color=#1eff66]%val[/color]",
+//                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
+//                        "ui_name_nostats": "No stats available for this time period."
+                      },
+            "scroll_up": { "kind": "ActionButton", "xy": [670,115], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
+            "scroll_down": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
+
+            "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
+            "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
+                              "ui_name": "Loading...", "ui_name_unavailable": "No info available" },
+            "loading_spinner": { "show": 0, "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },
 
