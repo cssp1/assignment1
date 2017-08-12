@@ -20662,6 +20662,7 @@ class GAMEAPI(resource.Resource):
                 'pvp_player': int(player.is_pvp_player()),
                 'home_region': player.home_region,
                 'home_base_loc': player.my_home.base_map_loc,
+                'account_creation_time': user.account_creation_time,
                 'protection_end_time': conceal_protection_time(player.resources.protection_end_time),
                 'base_damage':player.my_home.calc_base_damage(),
 #                'base_repair_time':base_repair_time,
@@ -20688,7 +20689,7 @@ class GAMEAPI(resource.Resource):
             fields = ['user_id', 'player_level', gamedata['townhall']+'_level',
                       'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
                       'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
-                      'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time',
+                      'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time', 'account_creation_time',
                       'facebook_id', 'kg_id', 'ag_id', 'bh_id', 'mm_id',
                       'facebook_name', 'facebook_first_name', 'last_fb_notification_time', 'enable_fb_notifications', # remove later
                       'alliance_id'] # note: alliance_id is cached, not ground truth
