@@ -6204,6 +6204,7 @@
 
             "output": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [630,285], "text_size": 15, "text_style": "normal",
                         "text_hjustify": "left", "text_vjustify": "top",
+                        "ui_alliance_disbanded": "(Disbanded Alliance)",
                         "ui_alliance_former": "%now (at the time named %former)",
                         "ui_event_line": "[color=#d0d0d0]%date:[/color] %event",
                         "events": {"ui_0110_created_new_account": "Started playing [color=#ffff00]%game[/color]",

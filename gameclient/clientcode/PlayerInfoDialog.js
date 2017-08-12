@@ -1409,7 +1409,7 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
         var alliance_ui_name_former = ev['alliance_ui_name'] || null;
         var alliance_chat_tag_former = ev['alliance_chat_tag'] || null;
 
-        var alliance_ui_name = (alliance_info ? alliance_info['ui_name'] : '?');
+        var alliance_ui_name = (alliance_info ? alliance_info['ui_name'] : dialog.widgets['output'].data['ui_alliance_disbanded']);
         var alliance_chat_tag = (alliance_info ? (alliance_info['chat_tag'] || null) : null);
 
         var ui_alliance;

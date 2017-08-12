@@ -48299,8 +48299,10 @@ function handle_server_message(data) {
         var tag = data[1], result = data[2], alinfo_list = data[3];
         if(alinfo_list) {
             goog.array.forEach(alinfo_list, function(alinfo) {
-                // note: ID field is returned as 'id' not 'alliance_id'!
-                AllianceCache.update(alinfo['id'], alinfo);
+                if(alinfo) {
+                    // note: ID field is returned as 'id' not 'alliance_id'!
+                    AllianceCache.update(alinfo['id'], alinfo);
+                }
             });
         }
         player_alliance_membership_history_receiver.dispatchEvent({type: tag, result:result});
