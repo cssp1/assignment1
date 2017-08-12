@@ -21084,6 +21084,8 @@ class GAMEAPI(resource.Resource):
 
             if success:
                 admin_stats.econ_flow_player(session.player, reason, 'boost', {spell['resource']:amount_added})
+                session.deferred_player_state_update = True
+
             else:
                 retmsg.append(["ERROR", "STORAGE_LIMIT", spell['resource']])
                 return False
