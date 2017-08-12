@@ -22627,6 +22627,13 @@ function query_map_log(region_id, time_range, callback) {
 };
 
 var player_alliance_membership_history_receiver = new goog.events.EventTarget();
+function query_player_alliance_membership_history(user_id, callback) {
+    last_query_tag += 1;
+    var tag = 'qpamh'+last_query_tag.toString();
+    // need this adaptor to pull the .result property out of the event object
+    player_alliance_membership_history_receiver.listenOnce(tag, (function (_cb) { return function(event) { _cb(event.result); }; })(callback));
+    send_to_server.func(["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY", tag, user_id]);
+};
 
 function invoke_map_ladder_pvp() {
     var template = 'map_ladder_pvp_dialog';
@@ -48289,7 +48296,13 @@ function handle_server_message(data) {
         var tag = data[1], result = data[2];
         map_log_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT") {
-        var tag = data[1], result = data[2];
+        var tag = data[1], result = data[2], alinfo_list = data[3];
+        if(alinfo_list) {
+            goog.array.forEach(alinfo_list, function(alinfo) {
+                // note: ID field is returned as 'id' not 'alliance_id'!
+                AllianceCache.update(alinfo['id'], alinfo);
+            });
+        }
         player_alliance_membership_history_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT" || msg == "GET_BATTLE_REPLAY_RESULT") {
         var tag = data[1], result = data[2];

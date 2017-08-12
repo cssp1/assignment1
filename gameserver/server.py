@@ -20645,7 +20645,13 @@ class GAMEAPI(resource.Resource):
         cold_events_d.addCallback(merge_hot_and_cold, hot_events)
 
         def complete(all_events, tag):
-            session.send([["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT", tag, all_events]], flush_now = True)
+            # query alliance info for all alliances seen
+            alid_set = set(ev['alliance_id'] for ev in all_events if ev.get('alliance_id',-1) >= 0)
+            if alid_set:
+                alinfo_list = gamesite.sql_client.get_alliance_info(list(alid_set), member_access = False, get_roles = False, reason = 'QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY')
+            else:
+                alinfo_list = []
+            session.send([["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT", tag, all_events, alinfo_list]], flush_now = True)
 
         cold_events_d.addCallback(complete, tag)
 
