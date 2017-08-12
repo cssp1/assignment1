@@ -85,7 +85,7 @@ def iterate_from_s3(game_id, bucket, logname, start_time, end_time, verbose = Tr
 
             for line in unzipper.stdout.xreadlines():
                 row = SpinJSON.loads(line)
-                if row['time'] < start_time: continue # skip ahead
+                if row['time'] <= start_time: continue # skip ahead (note: do not include start_time - same as iterate_from_mongodb)
                 elif row['time'] >= end_time: break
 
                 if '_id' not in row:
