@@ -31539,13 +31539,17 @@ class GameSite(server.Site):
 
     def sql_init(self):
         self.sql_scores2_client = None
+        self.sql_alliance_events_client = None
         if ((game_id+'_scores2') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
-            self.sql_scores2_client = Scores2.SQLScores2(AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
-                                                                                     verbosity = 0,
-                                                                                     log_exception_func = self.log_exception_func))
+            pg = AsyncPostgres.AsyncPostgres(SpinConfig.get_pgsql_config(game_id+'_scores2'),
+                                             verbosity = 0,
+                                             log_exception_func = self.log_exception_func)
+            self.sql_scores2_client = Scores2.SQLScores2(pg)
+            # tie alliance events to the scores2 config for now (later: merge all pgsql configs)
+            self.sql_alliance_events_client = SpinSQLAllianceEvents.SQLAllianceEventsClient(pg)
+
         self.sql_battles_client = None
-        self.sql_alliance_events_client = None
         if ((game_id+'_battles') in SpinConfig.config.get('pgsql_servers',{})):
             import AsyncPostgres
             if self.sql_scores2_client and \
@@ -31557,7 +31561,6 @@ class GameSite(server.Site):
                                                  verbosity = 0,
                                                  log_exception_func = self.log_exception_func)
             self.sql_battles_client = SpinSQLBattles.SQLBattlesClient(pg)
-            self.sql_alliance_events_client = SpinSQLAllianceEvents.SQLAllianceEventsClient(pg)
 
     def sql_shutdown(self):
         self.sql_scores2_client = None
