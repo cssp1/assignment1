@@ -20627,31 +20627,32 @@ class GAMEAPI(resource.Resource):
 
         if gamesite.sql_alliance_events_client:
             cold_events_d = gamesite.sql_alliance_events_client.player_alliance_membership_history_get_async(target_id, reason='query_player_alliance_membership_history')
+            # censor and return as {'result':...}
+            cold_events_d.addCallback(lambda event_list: {'result': map(censor_event, event_list)})
+            cold_events_d.addErrback(report_and_reraise_deferred_failure, session)
+            cold_events_d.addErrback(lambda _: {'result': [], 'error':'database_error'}) # in case of error, return empty list
         else:
-            cold_events_d = defer.succeed([])
+            cold_events_d = defer.succeed({'result': [], 'error':'database_error'})
 
-        cold_events_d.addCallback(lambda event_list: map(censor_event, event_list))
-        cold_events_d.addErrback(report_and_reraise_deferred_failure, session)
-        cold_events_d.addErrback(lambda _: []) # in case of error, return empty list
-
-        def merge_hot_and_cold(cold_events, hot_events):
+        def merge_hot_and_cold(cold_result, hot_events):
             # drop cold_events that have duplicate _ids with hot_events
             hot_ids = set(ev['_id'] for ev in hot_events)
-            cold_events = filter(lambda ev: ev['_id'] not in hot_ids, cold_events)
-            #gamesite.exception_log.event(server_time, 'hot_events:\n' + '\n'.join(map(repr,hot_events)))
-            #gamesite.exception_log.event(server_time, 'cold_events:\n' + '\n'.join(map(repr,cold_events)))
-            return hot_events + cold_events
+            cold_result['result'] = filter(lambda ev: ev['_id'] not in hot_ids, cold_result['result'])
+            ret = {'result': hot_events + cold_result['result']}
+            if 'error' in cold_result:
+                ret['error'] = cold_result['error']
+            return ret
 
         cold_events_d.addCallback(merge_hot_and_cold, hot_events)
 
-        def complete(all_events, tag):
+        def complete(all_result, tag):
             # query alliance info for all alliances seen
-            alid_set = set(ev['alliance_id'] for ev in all_events if ev.get('alliance_id',-1) >= 0)
+            alid_set = set(ev['alliance_id'] for ev in all_result['result'] if ev.get('alliance_id',-1) >= 0)
             if alid_set:
                 alinfo_list = gamesite.sql_client.get_alliance_info(list(alid_set), member_access = False, get_roles = False, reason = 'QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY')
             else:
                 alinfo_list = []
-            session.send([["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT", tag, all_events, alinfo_list]], flush_now = True)
+            session.send([["QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT", tag, all_result, alinfo_list]], flush_now = True)
 
         cold_events_d.addCallback(complete, tag)
 

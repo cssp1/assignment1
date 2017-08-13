@@ -6208,6 +6208,7 @@
                         "ui_alliance_former": "%now (at the time named %former)",
                         "ui_event_line": "[color=#d0d0d0]%date:[/color] %event",
                         "events": {"ui_data_incomplete": "(note: Membership history prior to April 2015 is not available)",
+                                   "ui_data_none": "No memberships found",
                                    "ui_0110_created_new_account": "Started playing [color=#ffff00]%game[/color]",
                                    "ui_4610_alliance_member_joined": "Joined %alliance",
                                    "ui_4620_alliance_member_left": "Left %alliance",
@@ -6223,7 +6224,7 @@
 
             "loading_rect": { "show": 0, "kind": "SolidRect", "xy": [11,63], "dimensions": [713,402], "color":[0,0,0,0.33], "alpha": 0 }, // not used for now
             "loading_text": { "show": 0, "kind": "TextField", "xy": [11,63], "dimensions": [713,402], "text_size": 15, "text_style": "bold", "text_color":[1,1,1,1],
-                              "ui_name": "Loading...", "ui_name_unavailable": "No info available" },
+                              "ui_name": "Loading...", "ui_name_unavailable": "Membership history database is temporarily off-line.\nPlease check back later." },
             "loading_spinner": { "show": 0, "kind": "StaticImage", "xy":[305,256], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },

@@ -1361,19 +1361,20 @@ PlayerInfoDialog.invoke_alliance_history_tab = function(parent) {
 PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
     if(!dialog.parent) { return; } // dialog got closed asynchronously
 
-    if(!data || data.length < 1) {
+    // data is {'result':event_list} or {'error': ...}
+    if(!data || data['error']) {
         dialog.widgets['loading_text'].str = dialog.data['widgets']['loading_text']['ui_name_unavailable'];
         dialog.widgets['loading_spinner'].show = false;
         return;
     }
+
+    var event_list = data['result'];
 
     dialog.widgets['loading_rect'].show =
         dialog.widgets['loading_text'].show =
         dialog.widgets['loading_spinner'].show = false;
 
     dialog.widgets['output'].clear_text();
-
-    var event_list = data;
 
     // newest events first
     event_list.sort(function(a, b) {
@@ -1438,6 +1439,10 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
 
         dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, null, system_chat_bbcode_click_handlers));
     });
+
+    if(event_list.length < 1) {
+        dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(dialog.widgets['output'].data['events']['ui_data_none']));
+    }
 
     // tack on account creation event at the end
     if(pcache_info && 'account_creation_time' in pcache_info) {
