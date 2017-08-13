@@ -70,12 +70,12 @@ if __name__ == '__main__':
 
     if not verbose: sql_util.disable_warnings()
 
-    if SpinConfig.config['game_id']+'_battles' not in SpinConfig.config.get('pgsql_servers',{}):
+    if SpinConfig.config['game_id']+'_scores2' not in SpinConfig.config.get('pgsql_servers',{}):
         if verbose:
-            print SpinConfig.config['game_id']+'_battles', 'not present in config.json'
+            print SpinConfig.config['game_id']+'_scores2', 'not present in config.json'
         sys.exit(0)
 
-    cfg = SpinConfig.get_pgsql_config(SpinConfig.config['game_id']+'_battles')
+    cfg = SpinConfig.get_pgsql_config(SpinConfig.config['game_id']+'_scores2')
 
     if (not force) and \
        (SpinConfig.in_maintenance_window(cfg, time_now = time_now) or SpinConfig.in_maintenance_window(cfg, time_now = time_now + 1800)): # allow for 30min to operate
