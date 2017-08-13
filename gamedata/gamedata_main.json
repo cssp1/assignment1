@@ -141,8 +141,6 @@
         "enable_score_history": 1, // whether to show scores from past weeks/seasons in GUI (requires server enable_scores2_read_sql to be on)
         "score_history_show_other_url": null, // URL for "Show other stats" button (can be overridden by A/B tests)
 
-        "enable_player_alliance_membership_history": 0, // whether to show alliance membership history in the Player Info GUI
-
         "player_cache": {
             "query_max": 150, // max # of player cache entries to query in a single batch
             "query_interval": 3.0 // min # of seconds between queries

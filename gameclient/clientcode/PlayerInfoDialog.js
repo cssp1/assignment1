@@ -19,6 +19,12 @@ goog.require('AllianceCache');
 goog.require('goog.array');
 goog.require('goog.object');
 
+/** @return {boolean} */
+PlayerInfoDialog.player_alliance_membership_history_enabled = function(player) {
+    var val = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+    return eval_cond_or_literal(val, player, null);
+};
+
 /** @typedef {!Object.<string,?>} */
 PlayerInfoDialog.CachedInfo;
 
@@ -109,7 +115,7 @@ PlayerInfoDialog.invoke_statistics_tab = function(parent, preselect) {
     parent.widgets['profile_button'].state = 'normal';
     parent.widgets['achievements_button'].state = 'normal';
     parent.widgets['alliance_history_button'].state = 'normal';
-    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+    parent.widgets['alliance_history_button'].show = PlayerInfoDialog.player_alliance_membership_history_enabled(player);
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['player_info_statistics_tab']);
     dialog.transparent_to_mouse = true;
@@ -458,7 +464,7 @@ PlayerInfoDialog.invoke_profile_tab = function(parent) {
     parent.widgets['achievements_button'].state = 'normal';
     parent.widgets['achievements_button'].show = player.get_any_abtest_value('enable_ingame_achievements', gamedata['client']['enable_ingame_achievements'] || false);
     parent.widgets['alliance_history_button'].state = 'normal';
-    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+    parent.widgets['alliance_history_button'].show = PlayerInfoDialog.player_alliance_membership_history_enabled(player);
 
     parent.widgets['statistics_button'].state = 'normal';
     parent.widgets['statistics_button'].show = player.get_any_abtest_value('enable_score_history', gamedata['client']['enable_score_history']);
@@ -1104,7 +1110,7 @@ PlayerInfoDialog.invoke_achievements_tab = function(parent, preselect_category, 
     parent.widgets['statistics_button'].show = player.get_any_abtest_value('enable_score_history', gamedata['client']['enable_score_history']);
     parent.widgets['profile_button'].state = 'normal';
     parent.widgets['alliance_history_button'].state = 'normal';
-    parent.widgets['alliance_history_button'].show = player.get_any_abtest_value('enable_player_alliance_membership_history', gamedata['client']['enable_player_alliance_membership_history']);
+    parent.widgets['alliance_history_button'].show = PlayerInfoDialog.player_alliance_membership_history_enabled(player);
     parent.widgets['achievements_button'].state = 'pressed';
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['player_info_achievements_tab']);

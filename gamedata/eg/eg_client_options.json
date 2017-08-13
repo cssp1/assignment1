@@ -45,6 +45,9 @@
     {"predicate": "ANY_ABTEST", "key": "enable_replay_playback", "value": 1}
 ]},
 
+// whether to show alliance membership history in the Player Info GUI
+"enable_player_alliance_membership_history": 1,
+
 "report_damage_attribution": 1, // enable damage attribution data collection
 
 // client/server connection settings
