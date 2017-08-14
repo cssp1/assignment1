@@ -92,7 +92,7 @@ if [ ! -e ${SPIN_GAMEDATA}/$GAME_ID/built/deps ]; then
 fi
 
 # do everything in one make invocation!
-(cd $SPIN_GAMEDATA && make -f $GAME_ID/Makefile PROCESSOR_ARGS="$PROCESSOR_ARGS" DO_VERIFY="$DO_VERIFY" VERIFY_ARGS="$VERIFY_ARGS" -j all $MYTARGETS)
+(cd $SPIN_GAMEDATA && make -f $GAME_ID/Makefile PROCESSOR_ARGS="$PROCESSOR_ARGS" DO_VERIFY="$DO_VERIFY" VERIFY_ARGS="$VERIFY_ARGS" -j8 all $MYTARGETS)
 if [[ $? != 0 ]]; then
     echo "Error in gamedata! Aborting build."
     exit 1
