@@ -4,12 +4,14 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# this script scans upcache and prints out a list of Facebook IDs for players
+# this script scans upcache (or the Battlehouse user database from bh_import_user_data.py)
+# and prints out a list of Facebook IDs for players
 # who meet specific spend or churn criteria. Used for building custom audiences
 # for Facebook ads.
 
 import sys, time, getopt, copy
 import SpinS3, SpinUpcacheIO, SpinConfig, SpinParallel
+import SpinSQLUtil, MySQLdb
 
 time_now = int(time.time())
 
@@ -29,6 +31,67 @@ def open_output_fd(aud):
         return open(filename, 'a')
 
 def do_slave(input):
+    if input['game_id'] == 'bh':
+        return do_slave_bh(input)
+    else:
+        return do_slave_upcache(input)
+
+def do_slave_bh(input):
+    # scan bh.com accounts via the SQL table created by bh_import_user_data.py
+    sql_util = SpinSQLUtil.MySQLUtil()
+    if not input['verbose']: sql_util.disable_warnings()
+
+    cfg = SpinConfig.get_mysql_config('skynet')
+    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    bh_users_table = cfg['table_prefix']+'bh_users'
+    cur = con.cursor(MySQLdb.cursors.DictCursor)
+
+    auds = input['auds']
+    outputs = [{'aud': copy.deepcopy(aud), 'count':0} for aud in auds]
+    fds = [open_output_fd(aud) for aud in auds]
+
+    cur.execute("SELECT user_id, facebook_id, last_login_time FROM " + sql_util.sym(bh_users_table) + \
+                " WHERE facebook_id IS NOT NULL")
+
+    for user in cur.fetchall():
+        for i, aud in enumerate(auds):
+            min_spend = aud['min_spend']
+            churned_for_days = aud['churned_for_days']
+            played_within_days = aud.get('played_within_days', -1)
+
+            fd = fds[i]
+
+            if min_spend > 0:
+                raise Exception('no money_spent info for bh.com')
+
+            net_spend = -1
+
+            if aud.get('country'):
+                raise Exception('country is unreliable')
+
+            if aud.get('country',None) and (user.get('country','unknown').lower() != aud['country'].lower()):
+                if verbose: print >> sys.stderr, user['user_id'], 'country mismatch'
+                continue
+
+            last_login_time = user['last_login_time']
+            lapsed = time_now - last_login_time
+            if churned_for_days > 0:
+                if lapsed < churned_for_days*24*60*60:
+                    if verbose: print >> sys.stderr, user['user_id'], 'logged in recently'
+                    continue
+            if played_within_days > 0:
+                if lapsed > played_within_days*24*60*60:
+                    if verbose: print >> sys.stderr, user['user_id'], 'did not play recently'
+                    continue
+
+            if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
+            print >> fd, user['facebook_id']
+            outputs[i]['count'] += 1
+
+    return {'result':outputs}
+
+def do_slave_upcache(input):
+    # scan game players via per-game upcache
     cache = stream_upcache(input['game_id'], input['cache_info'])
     auds = input['auds']
     verbose = input['verbose']
@@ -125,6 +188,8 @@ if __name__ == '__main__':
         for gid in ('mf','tr','mf2','bfm','sg','dv','fs'):
             auds += auds_for_game(gid)
 
+        auds += [{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1}]
+
     else:
         auds = [{'game_id':game_id, 'filename':filename, 'min_spend':min_spend, 'churned_for_days':churned_for_days, 'country':country}]
 
@@ -134,12 +199,18 @@ if __name__ == '__main__':
     # group auds by game so that we can run all auds from that game in one pass through upcache
     auds_by_game = dict((gid, filter(lambda aud: aud['game_id'] == gid, auds)) for gid in set([aud['game_id'] for aud in auds]))
 
+    # note: 'bh' is handled as if it were a "game", but it uses a separate scan method
+
     # get cache info per game
-    caches_by_game = dict((gid, stream_upcache(gid)) for gid in auds_by_game)
+    caches_by_game = dict((gid, stream_upcache(gid)) for gid in auds_by_game if gid != 'bh')
 
     tasks = [{'game_id':gid, 'cache_info':caches_by_game[gid].info, 'verbose':verbose,
-              'auds': auds_by_game[gid], 'segnum': segnum} for gid in auds_by_game
+              'auds': auds_by_game[gid], 'segnum': segnum} for gid in auds_by_game if gid != 'bh'
              for segnum in range(0, caches_by_game[gid].num_segments())]
+
+    if 'bh' in auds_by_game:
+        tasks.append({'game_id': 'bh', 'verbose': verbose,
+                      'auds': auds_by_game['bh']})
 
     if parallel <= 1:
         outputs = [do_slave(task) for task in tasks]
