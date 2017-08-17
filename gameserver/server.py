@@ -4947,8 +4947,11 @@ class Session(object):
     def spawn_new_units_for_player(self, player, retmsg, units, temporary = False,
                                    limit_break = False,
                                    limit_reduce_qty = False,
-                                   xyloc = None, xyscatter = None, persist = False):
-        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist)
+                                   xyloc = None, xyscatter = None, persist = False,
+                                   ai_state = None, ai_aggressive = None,
+                                   pack_id = None, behaviors = None):
+        new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist,
+                                  ai_state = ai_state, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -4990,7 +4993,9 @@ class Session(object):
 
         return taken_objects
 
-    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist):
+    def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist,
+                            ai_state = None, ai_aggressive = None,
+                            pack_aggro = False, behaviors = None):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
             if spread < 0: spread = 0
@@ -5000,7 +5005,19 @@ class Session(object):
             if spread < 0: spread = 1
             scatter = [spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[0]//2,
                        spread*gamedata['guard_deploy_spread']*source_obj.spec.unit_collision_gridsize[1]//2]
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist)
+
+        if pack_aggro:
+            # set up pack aggro for the whole team
+            pack_id = 'pack-%d-%d-%d' % (server_time, xyloc[0], xyloc[1])
+            if behaviors is None:
+                behaviors = ['pack_aggro']
+            else:
+                assert 'pack_aggro' in behaviors
+
+        else:
+            pack_id = None
+
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -8721,7 +8738,9 @@ def get_spawn_location_for_unit(specname, base):
 def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
-                xyloc = None, xyscatter = None, observer = None, persist = False):
+                xyloc = None, xyscatter = None, observer = None, persist = False,
+                ai_state = None, ai_aggressive = None,
+                pack_id = None, behaviors = None):
     if not observer: observer = owner
     if temporary: assert xyloc
 
@@ -8806,11 +8825,31 @@ def spawn_units(owner, base, units, temporary = False,
             newobj = instantiate_object_for_player(observer, owner, name, x=newobj_x, y=newobj_y, level=level, obj_id = newobj_id, temporary = temporary)
             newobj.squad_id = destination_squad
             if temporary:
-                # put object into aggressive state
-                newobj.orders = [{'dest':[newobj.x,newobj.y], 'state':2, 'aggressive':1}]
+                # put object into aggressive state by default
+                if ai_aggressive is None:
+                    ai_aggressive = 1
+                if ai_state is None:
+                    ai_state = 2
+
+                newobj.orders = [{'dest':[newobj.x,newobj.y], 'state':ai_state}]
+                if ai_aggressive:
+                    newobj.orders[0]['aggressive'] = 1
+
+                if pack_id is not None:
+                    newobj.pack_id = pack_id
+                if behaviors is not None:
+                    if newobj.behaviors is None:
+                        newobj.behaviors = []
+                    for b in behaviors:
+                        if b not in newobj.behaviors:
+                            newobj.behaviors.append(b)
 
             if not temporary:
                 assert base is owner.my_home
+                assert ai_aggressive is None
+                assert ai_state is None
+                assert pack_id is None
+                assert behaviors is None
                 cur_space_usage['ALL'] += space
                 cur_space_usage[str(destination_squad)] += space
 
