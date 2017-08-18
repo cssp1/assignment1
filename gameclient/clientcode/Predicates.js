@@ -1648,7 +1648,13 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
     var distance = ('distance' in qdata ? qdata['distance'] : this.data['distance']);
 
     if(obj.ai_target) {
-        return vec_distance(obj.raw_pos(), obj.ai_target.raw_pos()) < distance;
+        if(vec_distance(obj.raw_pos(), obj.ai_target.raw_pos()) < distance) {
+            // mutate qdata with the hostile object found
+            qdata['hostile_obj'] = obj.ai_target;
+            return true;
+        } else {
+            return false;
+        }
     }
     var obj_list = session.get_real_world().query_objects_within_distance(obj.raw_pos(), distance,
                                                  { ignore_object: obj,
@@ -1661,7 +1667,12 @@ HostileUnitNearPredicate.prototype.is_satisfied = function(player, qdata) {
                                                    exclude_invisible_to: obj.team,
                                                    tag: 'HOSTILE_UNIT_NEAR'
                                                  });
-    return obj_list.length > 0;
+    if(obj_list.length > 0) {
+        // mutate qdata with the hostile object found
+        qdata['hostile_obj'] = obj_list[0].obj;
+        return true;
+    }
+    return false;
 };
 
 /** @constructor @struct

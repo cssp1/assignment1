@@ -198,11 +198,16 @@ class SpawnSecurityTeamConsequent(Consequent):
         self.ai_state = data.get('ai_state',None)
         self.ai_aggressive = data.get('ai_aggressive',None)
         self.pack_aggro = data.get('pack_aggro',False)
+        self.aggro_trigger_obj = data.get('aggro_trigger_obj',False)
         self.behaviors = data.get('behaviors',None)
 
     def execute(self, session, player, retmsg, context=None):
+        ai_target = None
+        if self.aggro_trigger_obj:
+            ai_target = context['trigger_obj']
+
         session.spawn_security_team(player, retmsg, context['source_obj'], context['xy'], self.units, self.spread, self.persist,
-                                    ai_state = self.ai_state, ai_aggressive = self.ai_aggressive,
+                                    ai_state = self.ai_state, ai_target = ai_target, ai_aggressive = self.ai_aggressive,
                                     pack_aggro = self.pack_aggro, behaviors = self.behaviors)
 
 class DisplayMessageConsequent(Consequent):

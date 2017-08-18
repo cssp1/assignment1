@@ -4628,13 +4628,15 @@ GameObject.prototype.run_ai = function(world) {
 
     if(!session.is_replay() && on_approach && !this.on_approach_fired) {
         var pred = read_predicate({'predicate': 'HOSTILE_UNIT_NEAR'});
-        if(pred.is_satisfied(player, {'source_obj': this,
-                                      'distance': gamedata['map']['aggro_radius'][this.team]['defense']
-                                     })) {
+        // note: rely on the predicate check below mutating qdata with 'hostile_obj' to record the triggerer
+        var qdata = {'source_obj': this,
+                     'distance': gamedata['map']['aggro_radius'][this.team]['defense']
+                    };
+        if(pred.is_satisfied(player, qdata)) {
             goog.array.forEach(on_approach, function(cons) {
                 if(this.on_approach_fired) { return; }
                 if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
-                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos()]);
+                    send_to_server.func(["ON_APPROACH", this.id, this.raw_pos(), qdata['hostile_obj'].id]);
                     this.on_approach_fired = true;
                 }
             }, this);

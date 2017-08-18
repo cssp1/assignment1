@@ -4948,10 +4948,10 @@ class Session(object):
                                    limit_break = False,
                                    limit_reduce_qty = False,
                                    xyloc = None, xyscatter = None, persist = False,
-                                   ai_state = None, ai_aggressive = None,
+                                   ai_state = None, ai_target = None, ai_aggressive = None,
                                    pack_id = None, behaviors = None):
         new_objects = spawn_units(player, self.viewing_base if temporary else player.my_home, units, temporary = temporary, limit_break = limit_break, limit_reduce_qty = limit_reduce_qty, xyloc = xyloc, xyscatter = xyscatter, observer = self.player, persist = persist,
-                                  ai_state = ai_state, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+                                  ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
         for obj in new_objects:
             if (not temporary) and (player is self.player):
                 player.send_army_update_one(obj, retmsg)
@@ -4994,7 +4994,7 @@ class Session(object):
         return taken_objects
 
     def spawn_security_team(self, player, retmsg, source_obj, xyloc, unit_dic, spread, persist,
-                            ai_state = None, ai_aggressive = None,
+                            ai_state = None, ai_target = None, ai_aggressive = None,
                             pack_aggro = False, behaviors = None):
         if source_obj.is_mobile():
             event_name = '3971_security_team_spawned_from_unit'
@@ -5017,7 +5017,7 @@ class Session(object):
         else:
             pack_id = None
 
-        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
+        units = self.spawn_new_units_for_player(player, retmsg, unit_dic, temporary = True, xyloc = xyloc, xyscatter = scatter, persist = persist, ai_state = ai_state, ai_target = ai_target, ai_aggressive = ai_aggressive, pack_id = pack_id, behaviors = behaviors)
         self.log_attack_units(player.user_id, units, event_name,
                               props = {'source_obj_specname': source_obj.spec.name,
                                        'source_obj_level': source_obj.level})
@@ -8739,7 +8739,7 @@ def spawn_units(owner, base, units, temporary = False,
                 limit_break = False, # if true, give full quantity of units even if it breaks space limit
                 limit_reduce_qty = False, # if true, reduce quantity of units to fit in unit space
                 xyloc = None, xyscatter = None, observer = None, persist = False,
-                ai_state = None, ai_aggressive = None,
+                ai_state = None, ai_target = None, ai_aggressive = None,
                 pack_id = None, behaviors = None):
     if not observer: observer = owner
     if temporary: assert xyloc
@@ -8834,6 +8834,8 @@ def spawn_units(owner, base, units, temporary = False,
                 newobj.orders = [{'dest':[newobj.x,newobj.y], 'state':ai_state}]
                 if ai_aggressive:
                     newobj.orders[0]['aggressive'] = 1
+                if ai_target:
+                    newobj.orders[0]['target'] = ai_target.obj_id
 
                 if pack_id is not None:
                     newobj.pack_id = pack_id
@@ -8848,6 +8850,7 @@ def spawn_units(owner, base, units, temporary = False,
                 assert base is owner.my_home
                 assert ai_aggressive is None
                 assert ai_state is None
+                assert ai_target is None
                 assert pack_id is None
                 assert behaviors is None
                 cur_space_usage['ALL'] += space
@@ -25592,11 +25595,15 @@ class GAMEAPI(resource.Resource):
                 if update_viewing_player and session.has_attacked:
                     retmsg.append(["ENEMY_STATE_UPDATE", session.viewing_player.resources.calc_snapshot().serialize(enemy = True)])
 
-    def fire_on_approach(self, session, retmsg, id, xy):
+    def fire_on_approach(self, session, retmsg, id, xy, trigger_obj_id):
         if not session.has_object(id): return
         obj = session.get_object(id)
         if obj.on_approach_fired: return
         if obj.is_destroyed(): return
+
+        trigger_obj = None
+        if trigger_obj_id and session.has_object(trigger_obj_id):
+            trigger_obj = session.get_object(trigger_obj_id)
 
         cons_list = None
         if obj.is_building():
@@ -25607,7 +25614,7 @@ class GAMEAPI(resource.Resource):
         if cons_list:
             obj.on_approach_fired = True
             for cons in cons_list:
-                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy)}, reason='on_approach(%s)' % obj.spec.name)
+                session.execute_consequent_safe(cons, obj.owner, retmsg, context = {'source_obj': obj, 'xy': [obj.x,obj.y] if obj.is_building() else map(int, xy), 'trigger_obj': trigger_obj}, reason='on_approach(%s)' % obj.spec.name)
 
     def recycle_unit(self, session, retmsg, id):
         obj = session.player.get_object_by_obj_id(id, fail_missing = False)
@@ -28146,7 +28153,7 @@ class GAMEAPI(resource.Resource):
             self.object_combat_updates(session, retmsg, arg[1])
 
         elif arg[0] == "ON_APPROACH":
-            self.fire_on_approach(session, retmsg, arg[1], arg[2])
+            self.fire_on_approach(session, retmsg, arg[1], arg[2], arg[3])
 
         elif arg[0] == "AUTO_RESOLVE":
             self.auto_resolve(session, retmsg)
