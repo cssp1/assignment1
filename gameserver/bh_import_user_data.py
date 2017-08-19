@@ -28,6 +28,9 @@ def bh_users_schema(sql_util):
                        ('last_login_time', 'INT8'),
                        ('last_login_ip', 'VARCHAR(64)'),
                        ('facebook_id', 'VARCHAR(64)'), # might be null: facebook ID for the battlehouse.com login app
+                       ('country', 'VARCHAR(2)'),
+                       ('locale', 'VARCHAR(16)'),
+                       ('timezone', 'INT4'),
                        ],
             'indices': {'by_creation_time': {'unique':False, 'keys': [('creation_time','ASC')]}}
             }
