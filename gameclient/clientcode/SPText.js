@@ -203,7 +203,7 @@ SPText.cstring_to_ablocks_bbcode = function(str, props, plugins) {
             if(state == SPText.BBCODE_STATES.CODE_OPEN) {
                 var root_and_arg = code.split('=');
                 var root = root_and_arg[0];
-                var arg = (root_and_arg.length > 1 ? root_and_arg[1] : null);
+                var arg = (root_and_arg.length > 1 ? root_and_arg.slice(1).join('=') : null);
 
                 prop_stack.push(word_props);
                 code_stack.push(root);

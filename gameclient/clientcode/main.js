@@ -15885,6 +15885,7 @@ var user_chat_bbcode_click_handlers = {
 // server-controlled messages
 var system_chat_bbcode_click_handlers = {
     'url': { 'onclick': function(_url) { return function(w, mloc) {
+        _url = url_put_info(_url, session.user_id, player.history['money_spent']||0);
         var handle = window.open(_url, '_blank');
         if(handle) { handle.focus(); }
     }; } },
