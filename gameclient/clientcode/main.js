@@ -36738,15 +36738,22 @@ function map_dialog_change_page(dialog, chapter, page) {
                             dialog.widgets['row_ai_difficulty'+row].show = false;
                         }
 
-                        dialog.widgets['row_progress'+row].show = true;
-                        dialog.widgets['row_progress_str'+row].show = true;
-                        dialog.widgets['row_progress'+row].progress = base['ui_progress']['cur']/base['ui_progress']['max'];
-                        if(base['ui_progress']['cur'] >= base['ui_progress']['max']) {
-                            dialog.widgets['row_progress'+row].full_color = SPUI.make_colorv(dialog.data['widgets']['row_progress']['full_color_complete']);
-                            dialog.widgets['row_progress_str'+row].str = dialog.data['widgets']['row_progress_str']['ui_name_complete'];
+                        if('cur' in base['ui_progress']) {
+                            // show progress bar
+                            dialog.widgets['row_progress'+row].show = true;
+                            dialog.widgets['row_progress_str'+row].show = true;
+                            dialog.widgets['row_progress'+row].progress = base['ui_progress']['cur']/base['ui_progress']['max'];
+                            if(base['ui_progress']['cur'] >= base['ui_progress']['max']) {
+                                dialog.widgets['row_progress'+row].full_color = SPUI.make_colorv(dialog.data['widgets']['row_progress']['full_color_complete']);
+                                dialog.widgets['row_progress_str'+row].str = dialog.data['widgets']['row_progress_str']['ui_name_complete'];
+                            } else {
+                                dialog.widgets['row_progress'+row].full_color = SPUI.make_colorv(dialog.data['widgets']['row_progress']['full_color']);
+                                dialog.widgets['row_progress_str'+row].str = dialog.data['widgets']['row_progress_str']['ui_name'].replace('%cur', base['ui_progress']['cur'].toString()).replace('%max', base['ui_progress']['max'].toString());
+                            }
                         } else {
-                            dialog.widgets['row_progress'+row].full_color = SPUI.make_colorv(dialog.data['widgets']['row_progress']['full_color']);
-                            dialog.widgets['row_progress_str'+row].str = dialog.data['widgets']['row_progress_str']['ui_name'].replace('%cur', base['ui_progress']['cur'].toString()).replace('%max', base['ui_progress']['max'].toString());
+                            // do not show progress bar
+                            dialog.widgets['row_progress'+row].show = false;
+                            dialog.widgets['row_progress_str'+row].show = false;
                         }
                     }
 
