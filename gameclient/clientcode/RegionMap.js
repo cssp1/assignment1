@@ -1606,7 +1606,7 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     }
     ui.widgets['description'].set_text_with_linebreaking_and_shrink_font_to_fit(descr);
     // only clip description if quarry stat widgets are showing
-    ui.widgets['description'].clip_to = (ui.widgets['qstat'].show ? ui.data['widgets']['description']['clip_to'] : null);
+    ui.widgets['description'].clip_to = ui.data['widgets']['description'][ui.widgets['qstat'].show ?  'clip_to_qstat' : 'clip_to'];
 
     // set squad health/space widgets
     if(feature['base_type'] == 'squad' && feature['base_landlord_id'] == session.user_id) {
