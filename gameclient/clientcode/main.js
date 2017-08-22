@@ -43011,6 +43011,8 @@ function update_upgrade_dialog(dialog) {
             spec = gamedata['buildings'][tech['associated_building']];
         } else if('enhance_time' in tech) {
             spec = unit.spec;
+            // modchain base stats should be derived from the host building's level, not the mod tech's level
+            old_chain_level = new_chain_level = unit.level;
         } else {
             throw Error('cannot display feature '+stat_name+' for upgrade that has no building or associated unit or item');
         }
