@@ -8704,6 +8704,7 @@
             "misc_finder": { "show": 0, "kind": "ActionButton", "xy": [209, 313], "dimensions": [180,30], "bg_image": "action_button_resizable", "bg_image_resizable": 1,
                              "text_size": 14, "text_style": "bold",
                              "ui_name_attacker": "Find Attacker",
+                             "ui_name_hive": "Find AI Base",
                              "ui_name_hive_token": "Find %s Base",
                              "ui_name_hive_res3": "Find %s Base",
                              "ui_name_raid": "Find Raid Site",
@@ -8711,6 +8712,7 @@
                              "ui_name_quarry": "Find %s Quarry",
                              "ui_name_quarry_logistics": "Find Clan Logistics Quarry",
                              "ui_tooltip_attacker": "Find the nearest player who attacked you recently",
+                             "ui_tooltip_hive": "Find the nearest AI-controlled base you can attack for resources",
                              "ui_tooltip_hive_token": "Find the nearest base you can attack to win special event rewards",
                              "ui_tooltip_hive_res3": "Find the nearest base you can attack to loot %s",
                              "ui_tooltip_raid": "Find the nearest site you can raid for resources",
@@ -8719,7 +8721,7 @@
                              "ui_tooltip_quarry_logistics": "Find the nearest conquerable Clan Logistics Quarry that provides Clan-wide bonuses",
                              "ui_tooltip": "", "tooltip_delay": 0.1,
                              "ui_tooltip_locked": "To fight:\n%s",
-                             "array": [1,7], "array_offset": [0,-36],
+                             "array": [1,9], "array_offset": [0,-36],
                              "layout": { "hjustify": "left", "vjustify": "bottom" } },
 
             // END FINDER BUTTONS

@@ -21869,6 +21869,7 @@ function invoke_region_map(target_loc) {
     dialog.user_data['finder_expanded'] = false;
     dialog.user_data['finder_states'] = {
         'attacker': region_map_finder_state_init(),
+        'hive': region_map_finder_state_init(),
         'hive_token': region_map_finder_state_init(),
         'raid': region_map_finder_state_init(),
         'strongpoint': region_map_finder_state_init(),
@@ -22241,9 +22242,11 @@ function update_region_map(dialog) {
     dialog.user_data['finder_button_indexes'] = {};
     if(dialog.user_data['finder_expanded']) {
         var kinds = goog.object.getKeys(finder_updates);
-        // note: sort order must match update_p
+
+        // establish the order they will appear in the GUI, bottom-to-top
         kinds.sort();
-        goog.array.forEach(kinds, function(kind, i) {
+
+        goog.array.forEach(kinds, function(kind) {
             if(kind == 'attacker') { return; }
             var update = finder_updates[kind];
             if(!update) { return; }
@@ -22363,7 +22366,8 @@ function region_map_finder_update(dialog, kind, state) {
                    (kind_root == 'raid' ||
                     (kind_res == 'token' && ('base_template' in f) && (f['base_template'] in gamedata[kind_root+'s_client']['templates']) &&
                      gamedata[kind_root+'s_client']['templates'][f['base_template']]['ui_tokens2']) ||
-                    (kind_res && kind_res in gamedata['resources'] && ('base_resource_loot' in f) && f['base_resource_loot'][kind_res] || 0)
+                    (kind_res && kind_res in gamedata['resources'] && ('base_resource_loot' in f) && f['base_resource_loot'][kind_res] || 0) ||
+                    kind_res === null
                    )) {
                     var pred = (!player.is_cheater && ('activation' in gamedata[kind_root+'s_client']['templates'][f['base_template']]) ? read_predicate(gamedata[kind_root+'s_client']['templates'][f['base_template']]['activation']) : null);
                     if(pred && !pred.is_satisfied(player, null)) {
