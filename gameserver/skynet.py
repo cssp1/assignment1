@@ -1535,7 +1535,8 @@ def page_feed_post_make(db, page_id, page_token, link, caption, description, tit
 
 def call_to_action_type(tgt):
     if tgt.get('destination','app') in ('bh_com','bh_com_autoplay',):
-        return 'SIGN_UP' # 20170703 - switched from OPEN_LINK
+        #return 'SIGN_UP' # 20170703 - switched from OPEN_LINK
+        return 'PLAY_GAME' # 20170823 - switched to PLAY_GAME
     if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC'):
         return 'OPEN_LINK' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
     return 'PLAY_GAME'
@@ -2001,7 +2002,7 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
     params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'status':CAMPAIGN_STATUS_CODES['active'],
               'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
               'campaign_id': campaign_group_id, 'redownload':1}
-    if call_to_action_type(tgt) == 'PLAY_GAME':
+    if call_to_action_type(tgt) == 'PLAY_GAME' and tgt.get('destination','app') == 'app':
         params['promoted_object'] = SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
     elif tgt.get('promoted_event', None):
         pixel_data = conversion_pixels[tgt['promoted_event'][0]]
