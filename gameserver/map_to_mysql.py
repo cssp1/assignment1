@@ -227,7 +227,11 @@ if __name__ == '__main__':
             KEEP_DAYS = 360
             old_limit = time_now - KEEP_DAYS * 86400
 
-            for table in (map_summary_table, map_upgrades_table, map_features_table):
+            to_prune = [map_summary_table, map_upgrades_table]
+            if do_features:
+                to_prune.append(map_features_table)
+
+            for table in to_prune:
                 if verbose: print 'pruning', table
                 cur.execute("DELETE FROM "+sql_util.sym(table)+" WHERE time < %s", [old_limit])
                 con.commit()
