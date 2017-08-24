@@ -1667,8 +1667,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         var togo = feature['base_expire_time'] - mapwidget.time;
         var stat, str;
         if(mapwidget.region.data['show_precise_quarry_expiration'] == 1 || togo < mapwidget.region.data['show_precise_quarry_expiration']) {
-            if(togo <  gamedata['territory']['depletes_soon_time']) {
+            if(togo < 7200) { // less than 1 hour (but really 0-2h because map maintenance script runs hourly)
                 stat = 'depletes_soon_';
+            } else if(togo < 86400) { // less than 1 day - show hour count only, not minutes
+                stat = 'depletes_in_';
+                str = pretty_print_time_very_brief(Math.max(togo, 7200));
             } else {
                 stat = 'depletes_in_';
                 str = pretty_print_time_brief(togo);
