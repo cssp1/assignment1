@@ -15638,7 +15638,8 @@ class STATSAPI(resource.Resource):
     def render_player(self, args):
         player_id = int(args.get('player_id', -1))
         player_info = self.gameapi.do_query_player_cache(None, [player_id],
-                                                         fields = ['ui_name', 'player_level','alliance_id'],
+                                                         fields = ['ui_name', 'player_level','alliance_id',
+                                                                   'home_region', 'home_base_loc'],
                                                          get_trophies = True,
                                                          reason = 'STATSAPI(player)')[0]
         if not player_info:
@@ -15656,7 +15657,12 @@ class STATSAPI(resource.Resource):
                                      'ui_name': alinfo.get('ui_name')}
 
             ret = {'result': {'player': player_info,
-                              'alliance': alliance_info}}
+                              'alliance': alliance_info,
+                              'region': None}}
+
+            if player_info.get('home_region') in gamedata['regions']:
+                rdata = gamedata['regions'][player_info['home_region']]
+                ret['result']['region'] = {'id': rdata['id'], 'ui_name': rdata['ui_name']}
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
 
