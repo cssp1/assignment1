@@ -13,6 +13,7 @@ TASKS = [
     {'bucket': 'battlehouse-bhlogin-backups', 'pattern': 'battlehouse-bhlogin-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-vbulletin-backups', 'pattern': 'battlehouse-vbulletin-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-wordpress-backups', 'pattern': 'battlehouse-wordpress-YYYYMMDD.tar.gz'},
+    {'bucket': 'battlehouse-wordpress-backups', 'pattern': 'battlehouse-seopress-wordpress-YYYYMMDD.tar.gz'},
     {'bucket': 'battlehouse-mattermost-backups', 'pattern': 'battlehouse-mattermost-YYYYMMDD.tar.gz'},
     {'bucket': 'spinpunch-mattermost-backups', 'pattern': 'spinpunch-mattermost-YYYYMMDD.tar.gz'},
     {'bucket': 'spinpunch-www', 'pattern': 'about-battlehouse-backup-YYYYMMDD.tar.gz'},
