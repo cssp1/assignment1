@@ -15645,16 +15645,24 @@ class STATSAPI(resource.Resource):
         if not player_info:
             ret = {'error': 'Player %r not found' % player_id}
         else:
+            alliance_membership = gamesite.sql_client.get_users_alliance_membership(player_id,
+                                                                                    reason = 'STATSAPI(player)')
             alliance_info = None
-            alliance_id = player_info.get('alliance_id', -1)
+            alliance_id = alliance_membership['alliance_id'] if alliance_membership else -1
+
             if alliance_id > 0:
                 alinfo = gamesite.sql_client.get_alliance_info([alliance_id],
+                                                               get_roles=True,
                                                                reason = 'STATSAPI(player)')[0]
                 if alinfo:
                     alliance_info = {'alliance_id': alliance_id,
                                      'logo': alinfo.get('logo'),
                                      'chat_tag': alinfo.get('chat_tag'),
-                                     'ui_name': alinfo.get('ui_name')}
+                                     'ui_name': alinfo.get('ui_name'),
+                                     'roles': alinfo.get('roles')}
+                    player_info['alliance_id'] = alliance_id
+                    player_info['alliance_role'] = alliance_membership.get('role',0)
+                    player_info['alliance_join_time'] = alliance_membership.get('join_time',-1)
 
             ret = {'result': {'player': player_info,
                               'alliance': alliance_info,
@@ -15669,6 +15677,7 @@ class STATSAPI(resource.Resource):
     def render_alliance(self, args):
         alliance_id = int(args.get('alliance_id', -1))
         alinfo = gamesite.sql_client.get_alliance_info([alliance_id],
+                                                       get_roles=True,
                                                        reason = 'STATSAPI(alliance)')[0]
         if not alinfo:
             ret = {'error': '%s %r not found' % (gamedata['strings']['alliance'], alliance_id)}
@@ -15684,14 +15693,15 @@ class STATSAPI(resource.Resource):
             for i in xrange(len(pcache_data)):
                 r = pcache_data[i]
                 if r:
-                    # fill in alliance_id
+                    # fill in alliance_id and role
                     r['alliance_id'] = alliance_id
+                    r['alliance_role'] = members[i]['role']
 
-            FIELDS = ('alliance_id', 'logo', 'chat_tag', 'ui_name', 'ui_description',
-                      'join_type', 'num_members', 'creation_time', 'continent')
+            ALLIANCE_FIELDS = ('alliance_id', 'logo', 'chat_tag', 'ui_name', 'ui_description',
+                               'join_type', 'num_members', 'creation_time', 'continent', 'roles')
 
             ret = {'result': {'ui_alliance': gamedata['strings']['alliance'],
-                              'alliance': dict((field, alinfo.get(field)) for field in FIELDS),
+                              'alliance': dict((field, alinfo.get(field)) for field in ALLIANCE_FIELDS),
                               'members': pcache_data}}
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
