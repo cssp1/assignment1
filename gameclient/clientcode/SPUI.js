@@ -10,6 +10,7 @@ goog.provide('SPUI');
 
 goog.require('goog.array');
 goog.require('goog.object');
+goog.require('goog.string');
 goog.require('GameArt');
 goog.require('SPText');
 goog.require('PortraitCache');
@@ -3324,10 +3325,16 @@ SPUI.HTMLTextInput.prototype.input_activate = function() {
     this.input.maxLength = this.max_chars;
 
     // set validation pattern
+    // note: the .pattern attribute doesn't like some of these RegExp escapes when inside of []
+    function my_escape(c) {
+        if(c == ':' || c == '[' || c == '<' || c == ',' || c == '#' || c == '!') { return c; }
+        return goog.string.regExpEscape(c);
+    }
+
     if(this.disallowed_chars) {
-        this.input.pattern = '[^'+this.disallowed_chars.join('')+']*';
+        this.input.pattern = '[^'+goog.array.map(this.disallowed_chars, my_escape).join('')+']*';
     } else if(this.allowed_chars) {
-        this.input.pattern = '['+this.allowed_chars.join('')+']*';
+        this.input.pattern = '['+goog.array.map(this.allowed_chars, my_escape).join('')+']*';
     } else {
         this.input.pattern = null;
     }
