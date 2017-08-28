@@ -9464,7 +9464,7 @@ class Player(AbstractPlayer):
             if level != 1:
                 aura['level'] = level
             if duration > 0:
-                aura['end_time'] = aura['start_time'] + duration
+                aura['end_time'] = (start_time if start_time > 0 else server_time) + duration
             if stack > 0:
                 aura['stack'] = stack
             if data is not None:
