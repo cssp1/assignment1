@@ -31513,7 +31513,7 @@ class GameSite(server.Site):
         # will be fired when last connection drops
         self.clients_stopped_deferred = None
         self.active_clients = set()
-        self.active_requests = set()
+        self.active_requests = dict()
 
         signal.signal(signal.SIGUSR1, self.handle_SIGUSR1)
         signal.signal(signal.SIGUSR2, self.handle_SIGUSR2)
@@ -31578,8 +31578,11 @@ class GameSite(server.Site):
             self.clients_stopped_deferred = None
             d.callback(None)
     def getResourceFor(self, request):
-        self.active_requests.add(request)
-        request.notifyFinish().addBoth(lambda _, self=self, request=request: self.active_requests.discard(request)) # OK
+        self.active_requests[id(request)] = request
+        def remove_from_active(_, self, request):
+            del self.active_requests[id(request)]
+            return _
+        request.notifyFinish().addBoth(remove_from_active, self, request)
         return server.Site.getResourceFor(self, request)
 
     def stop_all_clients(self):
@@ -31591,7 +31594,7 @@ class GameSite(server.Site):
             self.clients_stopped_deferred = d
 
             # tell any keep-alive requests that we're closing down
-            for request in self.active_requests:
+            for request in self.active_requests.itervalues():
                 request.setHeader('Connection', 'close')
 
             for client in self.active_clients:
@@ -32239,7 +32242,7 @@ class WS_GAMEAPI(websockets.WebSocketsResource):
         if ret is server.NOT_DONE_YET:
             # success - drop the GameProtocol client since it's been swapped to WS_GAMEAPI_Protocol
             old_protocol.site.lostClient(old_protocol)
-            old_protocol.site.active_requests.discard(request)
+            del old_protocol.site.active_requests[id(request)]
         return ret
 
 class AdminResource(resource.Resource):
