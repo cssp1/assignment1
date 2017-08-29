@@ -28,7 +28,7 @@ def is_ai_base_dir(name):
 
 # only process files named with these endings
 FILE_EXTENSIONS = set(['html','js','json','php','pl','po','pot','py','sh','skel','sql','txt'])
-IGNORE_FILES = set(['config.json', 'ses-send-email.pl'])
+IGNORE_FILES = set(['config.json', 'ses-send-email.pl', 'email_notification_html.html'])
 
 def file_filter(name):
     return ('.' in name) and \

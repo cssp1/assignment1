@@ -6214,10 +6214,10 @@
                                    "ui_4620_alliance_member_left": "Left %alliance",
                                    "ui_4625_alliance_member_kicked": "Was kicked from %alliance",
                                    "ui_4650_alliance_member_join_request_accepted": "Joined %alliance"}
-//                        "ui_group_header": "[b]%group[/b]",
-//                        "ui_stat": "%stat: [color=#1eff66]%val[/color]",
-//                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
-//                        "ui_name_nostats": "No stats available for this time period."
+                        //                        "ui_group_header": "[b]%group[/b]",
+                        //                        "ui_stat": "%stat: [color=#1eff66]%val[/color]",
+                        //                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",
+                        //                        "ui_name_nostats": "No stats available for this time period."
                       },
             "scroll_up": { "kind": "ActionButton", "xy": [670,115], "dimensions": [27,46], "bg_image": "chat_scroll_up", "push_bg_image": 1 },
             "scroll_down": { "kind": "ActionButton", "xy": [670,145], "dimensions": [27,46], "bg_image": "chat_scroll_down", "push_bg_image": 1 },
