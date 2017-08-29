@@ -3037,10 +3037,11 @@
 
             "selected_row": { "kind": "StaticImage", "xy": [45,77], "dimensions": [219,28], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable": 1 },
 
-            "row": { "kind": "ActionButton", "xy": [75,81], "dimensions": [147,24], "text_hjustify": "left", "text_size": 13, "mouseover_sound": 1, "ui_name": "Mission",
-                     "array": [1,11], "array_offset": [0,26] },
             "row_icon": { "kind": "StaticImage", "xy": [52,85], "dimensions": [14,14], "asset": "ok_icon",
-                          "array": [1,11], "array_offset": [0,26] },
+                          "array": [1,11], "array_offset": [0,26], "transparent_to_mouse": 1 },
+
+            "row": { "kind": "ActionButton", "xy": [47,81], "dimensions": [212,24], "text_hjustify": "left", "text_size": 13, "mouseover_sound": 1, "ui_name": "Mission", "text_offset": [28,0],
+                     "array": [1,11], "array_offset": [0,26] },
 
             "noquests":  { "kind": "TextField", "xy": [296,128], "dimensions": [388,142], "text_size": 15, "text_leading": 19,
                            "text_hjustify": "center", "text_vjustify": "center", "ui_name": "You have no missions", "show": 0 },

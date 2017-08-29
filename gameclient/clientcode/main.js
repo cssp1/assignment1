@@ -35591,8 +35591,10 @@ function missions_dialog_scroll(dialog, first_row) {
         var rowname = 'row'+ui_row.toString();
         dialog.widgets[rowname].show = true;
         dialog.widgets[rowname].str = quest['ui_name'];
-        dialog.widgets[rowname].onclick = (function (rownum) { return function (w) {
-            missions_dialog_select_mission(w.parent, rownum); }; })(i);
+        dialog.widgets[rowname].onclick =
+            dialog.widgets['row_icon'+ui_row.toString()].onclick =
+            (function (rownum) { return function (w) {
+                missions_dialog_select_mission(w.parent, rownum); }; })(i);
         dialog.widgets['row_icon'+ui_row.toString()].show = player.can_complete_quest(quest);
 
         ui_row += 1;
