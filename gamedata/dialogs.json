@@ -1765,9 +1765,9 @@
         "xy": [95,128],
         "dimensions": [180,231],
         "widgets": {
-            "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[180,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
-            "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[176,30], "color": [0,0,0,0.5] },
-            "name": { "kind": "TextField", "xy": [2,2], "dimensions": [176,30], "text_size": 15, "text_style": "thick", "drop_shadow": 1,
+            "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[185,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[181,30], "color": [0,0,0,0.5] },
+            "name": { "kind": "TextField", "xy": [2,2], "dimensions": [181,30], "text_size": 15, "text_style": "thick", "drop_shadow": 1,
                       "text_hjustify": "center", "text_vjustify": "center" },
 
             "icon": { "kind": "StaticImage", "xy": [15,44], "dimensions": [50,50] },
@@ -1781,13 +1781,13 @@
                            "ui_tooltip": "", "tooltip_delay": 0,
                            "array": [4,1], "array_offset": [26,0], "show": 0 },
 
-            "descriptionL0": { "kind": "TextField", "xy": [13,111], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
+            "descriptionL0": { "kind": "TextField", "xy": [10,111], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
                                "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [0,140] },
-            "descriptionR0": { "kind": "TextField", "xy": [88,111], "dimensions": [80,50], "text_size": 13, "text_style": "normal",
+            "descriptionR0": { "kind": "TextField", "xy": [94,111], "dimensions": [80,50], "text_size": 13, "text_style": "normal",
                                "text_hjustify": "right", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [50,140] },
-            "descriptionL1": { "kind": "TextField", "xy": [13,128], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
+            "descriptionL1": { "kind": "TextField", "xy": [10,128], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
                                "text_hjustify": "left", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [0,157] },
-            "descriptionR1": { "kind": "TextField", "xy": [88,128], "dimensions": [80,50], "text_size": 13, "text_style": "normal",
+            "descriptionR1": { "kind": "TextField", "xy": [94,128], "dimensions": [80,50], "text_size": 13, "text_style": "normal",
                                "text_hjustify": "right", "text_vjustify": "top", "ui_tooltip": "", "tooltip_delay": 0, "fixed_tooltip_offset": [50,157] },
 
             "requirements_icon": { "kind": "StaticImage", "xy": [14,162], "dimensions": [21,21], "asset": "resource_icon_water",
