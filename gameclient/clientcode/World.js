@@ -697,13 +697,30 @@ World.World.prototype.hurt_object = function(target, damage, vs_table, source) {
     target.state_dirty |= obj_state_flags.HP;
     target.serialization_dirty = true;
 
-    if(!was_damaged && damage > 0) {
-        // first damage
-        if('on_first_damage' in target.spec) {
-            var cons = target.get_leveled_quantity(target.spec['on_first_damage']);
-            if(cons) {
-                read_consequent(cons).execute({'source_obj': target});
+    if(damage > 0) {
+        if(!was_damaged) {
+            // first damage
+            if('on_first_damage' in target.spec) {
+                var cons = target.get_leveled_quantity(target.spec['on_first_damage']);
+                if(cons) {
+                    read_consequent(cons).execute({'source_obj': target});
+                }
             }
+        }
+
+        // on_approach needs to fire here, if it hasn't already
+        // @type {Array<Object<string,?>>|null} List of consequents
+        var on_approach = (target.is_mobile() ? get_unit_stat(target.team === 'player' ? player.stattab : enemy.stattab,
+                                                              target.spec['name'], 'on_approach', null) :
+                           target.is_building() ? target.get_stat('on_approach', null) : null);
+        if(!session.is_replay() && on_approach && !target.on_approach_fired) {
+            goog.array.forEach(on_approach, function(cons) {
+                if(target.on_approach_fired) { return; }
+                if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+                    send_to_server.func(["ON_APPROACH", target.id, target.raw_pos(), (source ? source.id : null)]);
+                    target.on_approach_fired = true;
+                }
+            });
         }
     }
 
