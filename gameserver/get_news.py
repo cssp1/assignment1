@@ -115,7 +115,8 @@ if __name__ == '__main__':
         for metric in ('news_loot_value',
                        'news_unit_damage',):
             qs = {'time': {'$gte': server_time - 86400},
-                  'base_region': {'$exists': 1}, # map battles only
+                  'base_region': {'$exists': 1, # map battles only
+                                  '$ne': 'sector200'}, # exclude FS test region
                   'defender_type': 'human', # PvP only
                   }
 
