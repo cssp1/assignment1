@@ -9,7 +9,7 @@
 from math import sqrt
 import re
 import SpinConfig
-from GameDataUtil import get_max_level # get_leveled_quantity
+from GameDataUtil import get_max_level, ResourceValuation # get_leveled_quantity
 
 gamedata = None # will be loaded later
 
@@ -245,22 +245,9 @@ class TechTable(Table):
 
         Table.__init__(self, ui_name, data, tiers = tiers, tier_data = tier_data)
 
-class ResourceValuation(object):
-    def __init__(self):
-        # get implied relative value of resources
-        cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
-                                  for resname in gamedata['resources'])
-        self.relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
-                                 for resname in gamedata['resources'])
-        self.res_internal_weight = gamedata['store']['resource_internal_weight']
-
-    def unsplit_res(self,amounts):
-        return sum((self.relative_res[resname]*amounts[resname]*self.res_internal_weight[resname] for resname in amounts), 0)
-
-
 def get_tier_summary(building_names, tech_names):
     n_tiers = get_max_level(gamedata['buildings'][gamedata['townhall']])
-    resval = ResourceValuation()
+    resval = ResourceValuation(gamedata)
 
     summary = {'power_consumed':[0]*n_tiers,
                'power_produced':[0]*n_tiers,
@@ -427,7 +414,7 @@ def get_tier_summary(building_names, tech_names):
     return summary
 
 def get_resource_summary(n_tiers):
-    resval = ResourceValuation()
+    resval = ResourceValuation(gamedata)
 
     return dict((resname, [resval.unsplit_res(dict([(resname,1)])) for tier in range(1, n_tiers+1)]) for resname in gamedata['resources'])
 

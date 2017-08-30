@@ -124,3 +124,17 @@ def diff_game_objects(ga, gb):
                 ret[name][k] = spec_b[k]
 
     return ret
+
+class ResourceValuation(object):
+    def __init__(self, gamedata):
+        # get implied relative value of resources
+        cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
+                                  for resname in gamedata['resources'])
+        self.relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
+                                 for resname in gamedata['resources'])
+        self.res_internal_weight = gamedata['store']['resource_internal_weight']
+
+    def unsplit_res(self,amounts):
+        return sum((self.relative_res[resname]*amounts[resname]*self.res_internal_weight[resname] for resname in amounts), 0)
+    def get_weights(self):
+        return dict((resname, self.relative_res[resname]*self.res_internal_weight[resname]) for resname in self.relative_res)
