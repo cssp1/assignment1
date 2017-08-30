@@ -125,66 +125,66 @@ if __name__ == '__main__':
             elif metric == 'news_unit_damage':
                 qs['damage'] = {'$exists': 1}
 
-                pipeline = [{'$match': qs},
-                            # censor some non-visible data
-                            {'$project': {'_id':0, 'attacker_summary':0, 'defender_summary':0,
-                                          'attacker_facebook_id':0, 'defender_facebook_id':0, 'logfile':0}},
-                            {'$addFields': {'battle_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
-                                                                      '-',
-                                                                      {'$substr':['$attacker_id', 0, -1 ]},
-                                                                      '-vs-',
-                                                                      {'$substr':['$defender_id', 0, -1 ]},
-                                                                      ]},
+            pipeline = [{'$match': qs},
+                        # censor some non-visible data
+                        {'$project': {'_id':0, 'attacker_summary':0, 'defender_summary':0,
+                                      'attacker_facebook_id':0, 'defender_facebook_id':0, 'logfile':0}},
+                        {'$addFields': {'battle_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
+                                                                  '-',
+                                                                  {'$substr':['$attacker_id', 0, -1 ]},
+                                                                  '-vs-',
+                                                                  {'$substr':['$defender_id', 0, -1 ]},
+                                                                  ]},
 
-                                            'news_loot_value':
-                                            # dot product of loot.res[*] with res_weights[*]
-                                            {'$add': [{'$multiply':[{'$ifNull':['$loot.%s' % resname,0]}, res_weights[resname]]} \
-                                              for resname in gamedata['resources']] },
+                                        'news_loot_value':
+                                        # dot product of loot.res[*] with res_weights[*]
+                                        {'$add': [{'$multiply':[{'$ifNull':['$loot.%s' % resname,0]}, res_weights[resname]]} \
+                                          for resname in gamedata['resources']] },
 
-                                            # sum of repair times of all units/buildings listed in 'damage'
-                                            'news_unit_damage':
-                                            # total sum of...
-                                            {'$reduce':
-                                             {'input':
+                                        # sum of repair times of all units/buildings listed in 'damage'
+                                        'news_unit_damage':
+                                        # total sum of...
+                                        {'$reduce':
+                                         {'input':
 
-                                            # [attacker_dmg_0, attacker_dmg_1, defender_dmg_0, ... ]
-                                            {'$reduce':
-                                             {'input':
+                                        # [attacker_dmg_0, attacker_dmg_1, defender_dmg_0, ... ]
+                                        {'$reduce':
+                                         {'input':
 
-                                            #  [[attacker_dmg_0, attacker_dmg_1, ...], [defender_dmg_0, ...] ]
-                                            {'$map': {'input':
+                                        #  [[attacker_dmg_0, attacker_dmg_1, ...], [defender_dmg_0, ...] ]
+                                        {'$map': {'input':
 
-                                                      # [[{'k': spec, 'v': {'time': ...}}, ...], ... ]
-                                                      {'$map': {'input':
-                                                                # [[{'k': attacker_id, 'v': {spec: {'time': ...}}}]]
-                                                                {'$objectToArray':'$damage'},
-                                                                'in': {'$objectToArray': '$$this.v'}}},
-                                                      'as': 'temp',
-                                                      'in': {'$map': {'input': '$$temp',
-                                                                      'as': 'temp2',
-                                                                      'in': '$$temp2.v.time'}}}
-                                             },
-                                             'initialValue': [],
-                                             'in': {'$concatArrays': ['$$this', '$$value']}
-                                             }
-                                             },
+                                                  # [[{'k': spec, 'v': {'time': ...}}, ...], ... ]
+                                                  {'$map': {'input':
+                                                            # [[{'k': attacker_id, 'v': {spec: {'time': ...}}}]]
+                                                            {'$objectToArray':'$damage'},
+                                                            'in': {'$objectToArray': '$$this.v'}}},
+                                                  'as': 'temp',
+                                                  'in': {'$map': {'input': '$$temp',
+                                                                  'as': 'temp2',
+                                                                  'in': '$$temp2.v.time'}}}
+                                         },
+                                         'initialValue': [],
+                                         'in': {'$concatArrays': ['$$this', '$$value']}
+                                         }
+                                         },
 
-                                              'initialValue': 0,
-                                              'in': {'$add': ['$$this', '$$value']}
-                                              }
-                                             }
+                                          'initialValue': 0,
+                                          'in': {'$add': ['$$this', '$$value']}
+                                          }
+                                         }
 
-                                            }},
+                                        }},
 
-                            # prune big fields to cut bloat
-                            {'$project': {'damage': 0}},
+                        # prune big fields to cut bloat
+                        {'$project': {'damage': 0}},
 
-                            # sort and pick top 10
-                            {'$sort': {metric: -1}},
-                            {'$limit': 10}]
+                        # sort and pick top 10
+                        {'$sort': {metric: -1}},
+                        {'$limit': 10}]
 
-                battle_list = list(client.battles_table().aggregate(pipeline))
-                news['big_battles'][metric] = battle_list
+            battle_list = list(client.battles_table().aggregate(pipeline))
+            news['big_battles'][metric] = battle_list
 
     news_str = SpinJSON.dumps(news, pretty = True, newline = True)
 
