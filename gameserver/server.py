@@ -15672,6 +15672,21 @@ class STATSAPI(resource.Resource):
                 rdata = gamedata['regions'][player_info['home_region']]
                 ret['result']['region'] = {'id': rdata['id'], 'ui_name': rdata['ui_name']}
 
+            if gamedata.get('battle_logs_public',False):
+                # look up recent battles
+                # note: could use gamesite.gameapi.query_battle_history() here
+                summaries = gamesite.nosql_client.battles_get(
+                    player_id, -1, -1, -1, limit = 10,
+                    ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
+                    fields = gamesite.gameapi.BATTLE_HISTORY_FIELDS, # + ['damage',] ?
+                    reason = 'render_player')
+                for s in summaries:
+                    if s['base_type'] != 'home':
+                        s['battle_log_id'] = '%d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
+                    else:
+                        s['battle_log_id'] = '%d-%d-vs-%d' % (s['time'], s['attacker_id'], s['defender_id'])
+                ret['result']['recent_battles_pvp'] = summaries
+
         return SpinJSON.dumps(ret, newline=True, pretty=False)
 
     def render_alliance(self, args):
@@ -15703,6 +15718,21 @@ class STATSAPI(resource.Resource):
             ret = {'result': {'ui_alliance': gamedata['strings']['alliance'],
                               'alliance': dict((field, alinfo.get(field)) for field in ALLIANCE_FIELDS),
                               'members': pcache_data}}
+
+            if gamedata.get('battle_logs_public',False):
+                # look up recent battles
+                # note: could use gamesite.gameapi.query_battle_history() here
+                summaries = gamesite.nosql_client.battles_get(
+                    -1, -1, alliance_id, -1, limit = 20,
+                    ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
+                    fields = gamesite.gameapi.BATTLE_HISTORY_FIELDS, # + ['damage',] ?
+                    reason = 'render_alliance')
+                for s in summaries:
+                    if s['base_type'] != 'home':
+                        s['battle_log_id'] = '%d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
+                    else:
+                        s['battle_log_id'] = '%d-%d-vs-%d' % (s['time'], s['attacker_id'], s['defender_id'])
+                ret['result']['recent_battles_pvp'] = summaries
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
 

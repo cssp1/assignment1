@@ -130,12 +130,12 @@ if __name__ == '__main__':
                         # censor some non-visible data
                         {'$project': {'_id':0, 'attacker_summary':0, 'defender_summary':0,
                                       'attacker_facebook_id':0, 'defender_facebook_id':0, 'logfile':0}},
-                        {'$addFields': {'battle_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
-                                                                  '-',
-                                                                  {'$substr':['$attacker_id', 0, -1 ]},
-                                                                  '-vs-',
-                                                                  {'$substr':['$defender_id', 0, -1 ]},
-                                                                  ]},
+                        {'$addFields': {'battle_log_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
+                                                                      '-',
+                                                                      {'$substr':['$attacker_id', 0, -1 ]},
+                                                                      '-vs-',
+                                                                      {'$substr':['$defender_id', 0, -1 ]},
+                                                                      ]},
 
                                         'news_loot_value':
                                         # dot product of loot.res[*] with res_weights[*]
