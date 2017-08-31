@@ -15515,6 +15515,9 @@ class STATSAPI(resource.Resource):
                            'object_kinds': gamedata['strings']['object_kinds'],
                            'manufacture_categories': gamedata['strings']['manufacture_categories'],
                            },
+                # subset of region data
+                'regions': dict((rid, {'ui_name': r['ui_name']}) \
+                                for rid, r in gamedata['regions'].iteritems()),
                 'resources': gamedata['resources']}
         return SpinJSON.dumps({'result': data}, newline=True, pretty=False)
 
@@ -15680,12 +15683,7 @@ class STATSAPI(resource.Resource):
                     ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
                     fields = gamesite.gameapi.BATTLE_HISTORY_FIELDS, # + ['damage',] ?
                     reason = 'render_player')
-                for s in summaries:
-                    if s['base_type'] != 'home':
-                        s['battle_log_id'] = '%d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
-                    else:
-                        s['battle_log_id'] = '%d-%d-vs-%d' % (s['time'], s['attacker_id'], s['defender_id'])
-                ret['result']['recent_battles_pvp'] = summaries
+                ret['result']['recent_battles_pvp'] = map(self.augment_battle_summary, summaries)
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
 
@@ -15727,12 +15725,7 @@ class STATSAPI(resource.Resource):
                     ai_or_human = SpinNoSQL.NoSQLClient.BATTLES_HUMAN_ONLY,
                     fields = gamesite.gameapi.BATTLE_HISTORY_FIELDS, # + ['damage',] ?
                     reason = 'render_alliance')
-                for s in summaries:
-                    if s['base_type'] != 'home':
-                        s['battle_log_id'] = '%d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
-                    else:
-                        s['battle_log_id'] = '%d-%d-vs-%d' % (s['time'], s['attacker_id'], s['defender_id'])
-                ret['result']['recent_battles_pvp'] = summaries
+                ret['result']['recent_battles_pvp'] = map(self.augment_battle_summary, summaries)
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
 
@@ -15883,10 +15876,47 @@ class STATSAPI(resource.Resource):
             if not hot_summaries:
                 ret = {'error': 'Battle %s not found' % (battle_id)}
             else:
-                summary = hot_summaries[0]
+                summary = self.augment_battle_summary(hot_summaries[0])
                 ret = {'result': {'summary': summary}}
 
         return SpinJSON.dumps(ret, newline=True, pretty=False)
+
+    def augment_battle_summary(self, s):
+        # add a few extra derived fields to the battle summary that front-ends will find useful
+
+        # battle_log_id, for retrieving the battle log or replay
+        if s['base_type'] != 'home' and s.get('base_id'):
+            s['battle_log_id'] = '%d-%d-vs-%d-at-%s' % (s['time'], s['attacker_id'], s['defender_id'], s['base_id'])
+        else:
+            s['battle_log_id'] = '%d-%d-vs-%d' % (s['time'], s['attacker_id'], s['defender_id'])
+
+        # total res1-equivalent value of resource loot
+        if 'resource_price_formula_by_townhall_level' in gamedata['store'] and \
+           'resource_internal_weight' in gamedata['store']:
+            # FS-type resources with varying weights
+            # (also see GameDataUtil.ResourceValuation)
+            cheapest_value = max(gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1] \
+                                 for resname in gamedata['resources'])
+            relative_res = dict((resname, cheapest_value / gamedata['store']['resource_price_formula_by_townhall_level'][resname][-1]) \
+                                for resname in gamedata['resources'])
+            res_internal_weight = gamedata['store']['resource_internal_weight']
+
+            res_weights = dict((resname, relative_res[resname]*res_internal_weight[resname]) \
+                               for resname in gamedata['resources'])
+
+        else:
+            res_weights = dict((resname, 1) for resname in gamedata['resources'])
+
+        # news_* values: see get_news.py for explanation
+        if 'loot' in s:
+            s['news_loot_value'] = sum(((s['loot'].get(resname,0) * res_weights[resname]) for resname in gamedata['resources']), 0)
+        if 'damage' in s:
+            s['news_unit_damage'] = 0
+            for uid, udamage in s['damage'].iteritems():
+                for specname, damage in udamage.iteritems():
+                    s['news_unit_damage'] += damage.get('time', 0)
+
+        return s
 
 # REST interface used by proxyserver, PCHECK, and other game servers to communicate with us
 class CONTROLAPI(resource.Resource):
@@ -20474,7 +20504,7 @@ class GAMEAPI(resource.Resource):
 
     # fields we care about for battle history (summary) queries
     BATTLE_HISTORY_FIELDS = ('time', 'duration', 'battle_type', 'ladder_state',
-                             'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_map_loc', 'base_type',
+                             'attacker_id', 'defender_id', 'base_id', 'base_ui_name', 'base_region', 'base_map_loc', 'base_type',
                              'attacker_alliance_id', 'attacker_alliance_ui_name', 'attacker_alliance_chat_tag',
                              'defender_alliance_id', 'defender_alliance_ui_name', 'defender_alliance_chat_tag',
                              'facebook_friends',
