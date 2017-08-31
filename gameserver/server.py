@@ -15699,7 +15699,8 @@ class STATSAPI(resource.Resource):
             # XXX could get scores here
 
             pcache_data = self.gameapi.do_query_player_cache(None, [m['user_id'] for m in members],
-                                                             fields = ['ui_name', 'player_level'],
+                                                             fields = ['ui_name', 'player_level',
+                                                                       'home_region', 'home_base_loc'],
                                                              get_trophies = True,
                                                              reason = 'STATSAPI(alliance)')
             pcache_data = filter(lambda x: bool(x), pcache_data) # throw out null entries
