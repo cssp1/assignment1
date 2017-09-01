@@ -21470,6 +21470,10 @@ function invoke_building_context_menu(mouse_xy) {
                     var upgr_spell = gamedata['spells']['RESEARCH_FOR_FREE'];
                     special_buttons['head'].push(new ContextMenuButton({ui_name: upgr_spell['ui_name_building_context_emplacement'],
                                                                         onclick: (function (_techname) { return function() {
+                                                                            // hack (?) to work around issues with upgrade dialog
+                                                                            // when looking at a weapon tech with selection.unit still set
+                                                                            // (it incorrectly keys the level off the unit, not player.tech)
+                                                                            change_selection_unit(null);
                                                                             invoke_upgrade_tech_dialog(_techname, null);
                                                                         }; })(item_spec['associated_tech']), asset: (under_leveled ? 'menu_button_resizable' : 'action_button_resizable')}));
                 }
@@ -42994,6 +42998,10 @@ function update_upgrade_dialog(dialog) {
 
         // levels keying the auto_spell stats we are displaying
         // will be the same in most cases, except when weapon_level is set by a modstat (i.e. turret heads)
+
+        // XXX - I'm not sure this is correct anymore; in the case where 'tech' is a turret head level-enabling tech,
+        // we want the spell levels to correspond to old/new_level, not the unit's modded weapon_level!
+
         var old_spell_level, new_spell_level;
         if(unit && unit.is_building() && unit.modstats['weapon_level']) {
             old_spell_level = ModChain.get_stat(unit.modstats['weapon_level'], unit.level);
