@@ -14698,6 +14698,8 @@ function update_combat_item_bar(dialog) {
                 }; })(slot, item);
 
                 dialog.widgets['frame'+i].onclick = (function (_i, _slot, _item) { return function(w) {
+                    // try to sync damage first, so repairs don't overlap
+                    flush_dirty_objects({});
                     if(inventory_action(_item, _slot, "INVENTORY_USE", {trigger_gcd: true})) {
                         // clear the tooltip if activation succeeds
                         invoke_inventory_context(w.parent, w, -1, null, false);
