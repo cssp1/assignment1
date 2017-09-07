@@ -13494,7 +13494,7 @@ class LivePlayer(Player):
         all_pageable_tips_seen = True
 
         for tip in gamedata['daily_tips']:
-            if ('show_if' in tip) and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
+            if ('show_if' in tip) and (not Predicates.read_predicate(tip['show_if']).is_satisfied2(session, self, None)): continue
 
             key = self.get_daily_tip_key('daily_tip', tip, ref_time)
             already_understood = (self.history.get(key, 0) >= 2)
@@ -13545,7 +13545,7 @@ class LivePlayer(Player):
                 expire_time = -1
             if expire_time > 0 and ref_time >= expire_time: continue
 
-            if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied(self, None)): continue
+            if 'show_if' in tip and (not Predicates.read_predicate(tip['show_if']).is_satisfied2(session, self, None)): continue
             msg = {'type': 'mail',
                    'expire_time': expire_time,
                    'msg_id': generate_mail_id(),
