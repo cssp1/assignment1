@@ -106,6 +106,11 @@ BEGIN
        WHEN 'google' THEN 'BH Google Paid'
        WHEN '7124_GG' THEN 'BH Google Paid'
        WHEN '7120_SRD' THEN 'BH FB Paid'
+       WHEN '7130_YT' THEN 'BH YouTube Free'
+       WHEN '7131_MC' THEN 'BH MailChimpFree'
+       WHEN '7132_YT_cpc' THEN 'BH YouTube Paid'
+       WHEN '7133_GG' THEN 'BH Bing Paid'
+       WHEN '7133_BG' THEN 'BH Bing Paid'
        ELSE IF(camp LIKE '%_bx_%', 'BH Cross-Promo',
                IF(camp LIKE '712%', 'BH Free (BH.com Link)', 'BH Other')) END;
         ELSEIF frame_platform = 'fb' THEN
