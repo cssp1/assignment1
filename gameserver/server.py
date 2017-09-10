@@ -1927,8 +1927,7 @@ class User:
         assert self.bh_auth_token
         url = SpinConfig.config['battlehouse_api_path']+ '/user/'+self.bh_id+'/invites?' + \
               urllib.urlencode({'service': SpinConfig.game()})
-        headers = {'Authorization': 'Bearer '+self.bh_auth_token,
-                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
         response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
         response = SpinJSON.loads(response_raw)
         if 'result' in response:
