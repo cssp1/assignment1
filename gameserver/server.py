@@ -15472,6 +15472,9 @@ class STATSAPI(resource.Resource):
             request.setResponseCode(http.BAD_REQUEST)
             return u'{"error":"Unauthorized"}\n'.encode('utf-8')
 
+        # get "Referer:" header, for debugging where the request came from
+        referer = SpinHTTP.get_twisted_header(request, 'Referer') or 'unspecified'
+
         if 'method' not in request.args:
             request.setResponseCode(http.BAD_REQUEST)
             return u'{"error":"Missing method"}\n'.encode('utf-8')
@@ -15501,7 +15504,7 @@ class STATSAPI(resource.Resource):
                     ret = func(func_args)
 
         except BaseException:
-            gamesite.exception_log.event(server_time, 'STATSAPI method=%s error:\n%s' % (method, traceback.format_exc()))
+            gamesite.exception_log.event(server_time, 'STATSAPI error: method=%s referer=%s\n%s' % (method, referer, traceback.format_exc()))
             request.setResponseCode(http.INTERNAL_SERVER_ERROR)
             ret = u'{"error":"Internal server error"}\n'
 
