@@ -15517,6 +15517,7 @@ class STATSAPI(resource.Resource):
                            'object_kinds': gamedata['strings']['object_kinds'],
                            'manufacture_categories': gamedata['strings']['manufacture_categories'],
                            },
+                'leaderboard': gamedata['leaderboard'],
                 # subset of region data
                 'regions': dict((rid, {'ui_name': r['ui_name']}) \
                                 for rid, r in gamedata['regions'].iteritems()),

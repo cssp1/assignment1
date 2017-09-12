@@ -16,6 +16,90 @@ import sys, time, getopt
 sys.path += ['../gamedata/'] # oh boy...
 from GameDataUtil import ResourceValuation
 
+def query_big_battles(gamedata, metric, time_range, player_level_range = None):
+    # weights for making a composite all-resouce loot value
+    res_weights = ResourceValuation(gamedata).get_weights()
+
+
+    qs = {'time': {'$gte': time_range[0],
+                   '$lt': time_range[1]},
+          'base_region': {'$exists': 1, # map battles only
+                          '$ne': 'sector200'}, # XXX exclude FS test region
+          'defender_type': 'human', # PvP only
+          }
+
+    if player_level_range:
+        qs['attacker_level'] = {'$gte': player_level_range[0],
+                                '$lte': player_level_range[1]}
+
+    if metric == 'news_loot_value':
+        qs['$or'] = [{'loot.%s' % resname: {'$gte': 1}} \
+                     for resname in gamedata['resources']]
+    elif metric == 'news_unit_damage':
+        qs['damage'] = {'$exists': 1}
+
+    pipeline = [{'$match': qs},
+                # censor some non-visible data
+                {'$project': {'_id':0, 'attacker_summary':0, 'defender_summary':0,
+                              'attacker_facebook_id':0, 'defender_facebook_id':0, 'logfile':0}},
+
+                # add fields - see server's STATSAPI.augment_battle_summary()
+                {'$addFields': {'battle_log_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
+                                                              '-',
+                                                              {'$substr':['$attacker_id', 0, -1 ]},
+                                                              '-vs-',
+                                                              {'$substr':['$defender_id', 0, -1 ]},
+                                                              ]},
+
+                                'news_loot_value':
+                                # dot product of loot.res[*] with res_weights[*]
+                                {'$add': [{'$multiply':[{'$ifNull':['$loot.%s' % resname,0]}, res_weights[resname]]} \
+                                  for resname in gamedata['resources']] },
+
+                                # sum of repair times of all units/buildings listed in 'damage'
+                                'news_unit_damage':
+                                # total sum of...
+                                {'$reduce':
+                                 {'input':
+
+                                # [attacker_dmg_0, attacker_dmg_1, defender_dmg_0, ... ]
+                                {'$reduce':
+                                 {'input':
+
+                                #  [[attacker_dmg_0, attacker_dmg_1, ...], [defender_dmg_0, ...] ]
+                                {'$map': {'input':
+
+                                          # [[{'k': spec, 'v': {'time': ...}}, ...], ... ]
+                                          {'$map': {'input':
+                                                    # [[{'k': attacker_id, 'v': {spec: {'time': ...}}}]]
+                                                    {'$objectToArray':'$damage'},
+                                                    'in': {'$objectToArray': '$$this.v'}}},
+                                          'as': 'temp',
+                                          'in': {'$map': {'input': '$$temp',
+                                                          'as': 'temp2',
+                                                          'in': '$$temp2.v.time'}}}
+                                 },
+                                 'initialValue': [],
+                                 'in': {'$concatArrays': ['$$this', '$$value']}
+                                 }
+                                 },
+
+                                  'initialValue': 0,
+                                  'in': {'$add': ['$$this', '$$value']}
+                                  }
+                                 }
+
+                                }},
+
+                # prune big fields to cut bloat
+                {'$project': {'damage': 0}},
+
+                # sort and pick top 10
+                {'$sort': {metric: -1}},
+                {'$limit': 10}]
+
+    return list(client.battles_table().aggregate(pipeline))
+
 if __name__ == '__main__':
     dry_run = False
     game_id = SpinConfig.game()
@@ -106,88 +190,22 @@ if __name__ == '__main__':
                          'end_time': event_end_time}
 
     # big battles
+    BIG_BATTLE_SORT_METRICS = ('news_loot_value',
+                               'news_unit_damage',)
+
     if game_id == 'fs': # temporary
         news['big_battles'] = {}
+        for metric in BIG_BATTLE_SORT_METRICS:
+            news['big_battles'][metric] = query_big_battles(gamedata, metric, [server_time - 86400, server_time])
 
-        # weights for making a composite all-resouce loot value
-        res_weights = ResourceValuation(gamedata).get_weights()
-
-        for metric in ('news_loot_value',
-                       'news_unit_damage',):
-            qs = {'time': {'$gte': server_time - 86400},
-                  'base_region': {'$exists': 1, # map battles only
-                                  '$ne': 'sector200'}, # exclude FS test region
-                  'defender_type': 'human', # PvP only
-                  }
-
-            if metric == 'news_loot_value':
-                qs['$or'] = [{'loot.%s' % resname: {'$gte': 1}} \
-                             for resname in gamedata['resources']]
-            elif metric == 'news_unit_damage':
-                qs['damage'] = {'$exists': 1}
-
-            pipeline = [{'$match': qs},
-                        # censor some non-visible data
-                        {'$project': {'_id':0, 'attacker_summary':0, 'defender_summary':0,
-                                      'attacker_facebook_id':0, 'defender_facebook_id':0, 'logfile':0}},
-
-                        # add fields - see server's STATSAPI.augment_battle_summary()
-                        {'$addFields': {'battle_log_id': {'$concat': [{'$substr':['$time', 0, -1 ]},
-                                                                      '-',
-                                                                      {'$substr':['$attacker_id', 0, -1 ]},
-                                                                      '-vs-',
-                                                                      {'$substr':['$defender_id', 0, -1 ]},
-                                                                      ]},
-
-                                        'news_loot_value':
-                                        # dot product of loot.res[*] with res_weights[*]
-                                        {'$add': [{'$multiply':[{'$ifNull':['$loot.%s' % resname,0]}, res_weights[resname]]} \
-                                          for resname in gamedata['resources']] },
-
-                                        # sum of repair times of all units/buildings listed in 'damage'
-                                        'news_unit_damage':
-                                        # total sum of...
-                                        {'$reduce':
-                                         {'input':
-
-                                        # [attacker_dmg_0, attacker_dmg_1, defender_dmg_0, ... ]
-                                        {'$reduce':
-                                         {'input':
-
-                                        #  [[attacker_dmg_0, attacker_dmg_1, ...], [defender_dmg_0, ...] ]
-                                        {'$map': {'input':
-
-                                                  # [[{'k': spec, 'v': {'time': ...}}, ...], ... ]
-                                                  {'$map': {'input':
-                                                            # [[{'k': attacker_id, 'v': {spec: {'time': ...}}}]]
-                                                            {'$objectToArray':'$damage'},
-                                                            'in': {'$objectToArray': '$$this.v'}}},
-                                                  'as': 'temp',
-                                                  'in': {'$map': {'input': '$$temp',
-                                                                  'as': 'temp2',
-                                                                  'in': '$$temp2.v.time'}}}
-                                         },
-                                         'initialValue': [],
-                                         'in': {'$concatArrays': ['$$this', '$$value']}
-                                         }
-                                         },
-
-                                          'initialValue': 0,
-                                          'in': {'$add': ['$$this', '$$value']}
-                                          }
-                                         }
-
-                                        }},
-
-                        # prune big fields to cut bloat
-                        {'$project': {'damage': 0}},
-
-                        # sort and pick top 10
-                        {'$sort': {metric: -1}},
-                        {'$limit': 10}]
-
-            battle_list = list(client.battles_table().aggregate(pipeline))
-            news['big_battles'][metric] = battle_list
+        if 'level_bands' in gamedata['leaderboard']:
+            news['big_battles_by_level_band'] = {}
+            for band_name, band_data in gamedata['leaderboard']['level_bands'].iteritems():
+                news['big_battles_by_level_band'][band_name] = {}
+                for metric in BIG_BATTLE_SORT_METRICS:
+                    battle_list = query_big_battles(gamedata, metric, [server_time - 86400, server_time],
+                                                    player_level_range = band_data['level_range'])
+                    news['big_battles_by_level_band'][band_name][metric] = battle_list
 
     news_str = SpinJSON.dumps(news, pretty = True, newline = True)
 
