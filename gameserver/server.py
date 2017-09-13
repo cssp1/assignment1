@@ -3647,6 +3647,9 @@ class DamageLog(object):
             # treat all consumable units used as if they were completely destroyed
             if entry.get('consumable',False): entry['cur_health'] = 0
 
+            # ignore damage to temporary units
+            if entry.get('temporary',False): continue
+
             if ('cur_health' not in entry): continue # no change
             spec = GameObjectSpec.lookup(entry['spec'])
             orig_cost = spec.cost_to_repair(entry['level'], entry['orig_health'], self.observer, obj_id)
@@ -3674,18 +3677,19 @@ class DamageLog(object):
         return ret
 
 class GameObjectDamageLog(DamageLog):
-    def init(self, obj, consumable = False):
+    def init(self, obj):
         if (not (obj.is_building() or obj.is_mobile())) or \
            obj.max_hp == 0: return # ignore scenery etc
         sowner_id = str(obj.owner.user_id)
         if sowner_id not in self.state: self.state[sowner_id] = {}
-        self._init(self.state[sowner_id], obj, consumable = consumable)
-    def _init(self, state, obj, consumable = False):
+        self._init(self.state[sowner_id], obj)
+    def _init(self, state, obj):
         if obj.obj_id in state:
             if gamedata['server'].get('log_damage_log',1) >= 1:
                 gamesite.exception_log.event(server_time, 'DamageLog: _init() on already-registered object obs %d owner %d: %s' % (self.observer.user_id, obj.owner.user_id, obj.spec.name))
         state[obj.obj_id] = {'spec':obj.spec.name, 'level':obj.level, 'orig_health': obj.hp/float(obj.max_hp)}
-        if consumable: state[obj.obj_id]['consumable'] = 1
+        if obj.spec.consumable: state[obj.obj_id]['consumable'] = 1
+        if obj.is_mobile() and obj.temporary: state[obj.obj_id]['temporary'] = 1
     def record(self, obj):
         if (not (obj.is_building() or obj.is_mobile())) or \
            obj.max_hp == 0: return # ignore scenery etc
@@ -3704,18 +3708,22 @@ class GameObjectDamageLog(DamageLog):
 
 class ArmyUnitDamageLog(DamageLog):
     # similar to DamageLog, but operates on raw army units instead of GameObjects
-    def init(self, unit, consumable = False):
+    def init(self, unit):
         if (not (unit['spec'] in gamedata['buildings'] or unit['spec'] in gamedata['units'])): return # ignore scenery etc
         sowner_id = str(unit['owner_id'])
         if sowner_id not in self.state: self.state[sowner_id] = {}
-        self._init(self.state[sowner_id], unit, consumable = consumable)
-    def _init(self, state, unit, consumable = False):
+        self._init(self.state[sowner_id], unit)
+    def _init(self, state, unit):
         if unit['obj_id'] in state:
             if gamedata['server'].get('log_damage_log',1) >= 1:
                 gamesite.exception_log.event(server_time, 'DamageLog: _init() on already-registered object owner %d: %s' % (unit['owner_id'], unit['spec']))
         cur_hp, max_hp = army_unit_hp(unit)
         state[unit['obj_id']] = {'spec':unit['spec'], 'level':unit.get('level',1), 'orig_health': cur_hp/float(max_hp)}
-        if consumable: state[unit['obj_id']]['consumable'] = 1
+        if unit['spec'] in gamedata['units'] and \
+           gamedata['units'][unit['spec']].get('consumable',False):
+            state[unit['obj_id']]['consumable'] = 1
+        if unit.get('temporary',False):
+            state[unit['obj_id']]['temporary'] = 1
     def record(self, unit):
         if (not (unit['spec'] in gamedata['buildings'] or unit['spec'] in gamedata['units'])): return # ignore scenery etc
         sowner_id = str(unit['owner_id'])
@@ -24535,7 +24543,7 @@ class GAMEAPI(resource.Resource):
             session.log_attack_unit(session.user.user_id, unit, '3910_unit_deployed', fake_xy = loc, props = props)
             if session.damage_log:
                 # need to think about how to track donated units (props['method']=='donated')
-                session.damage_log.init(unit, consumable = unit.spec.consumable)
+                session.damage_log.init(unit)
 
             # record for analytics
             session.deployed_units[unit.spec.name] = session.deployed_units.get(unit.spec.name,0) + 1
