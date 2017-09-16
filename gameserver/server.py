@@ -13559,7 +13559,8 @@ class LivePlayer(Player):
                    'from_name': tip['ui_sender'],
                    'subject': tip['ui_subject'],
                    'body': tip['ui_body']}
-            if 'attachments' in tip:
+
+            if 'attachments' in tip: # raw item array
                 msg['attachments'] = []
                 for a in tip['attachments']:
                     attachment = copy.deepcopy(a)
@@ -13568,6 +13569,11 @@ class LivePlayer(Player):
                                                                                             prev_expire_time = attachment['item_duration'] + server_time)
                         del attachment['item_duration']
                     msg['attachments'].append(attachment)
+            elif 'attachments_loot' in tip: # loot table
+               attachments = session.get_loot_items(self, tip['attachments_loot'], -1, -1)
+               if attachments:
+                  msg['attachments'] = copy.deepcopy(attachments)
+
             if 'on_send' in tip:
                session.execute_consequent_safe(tip['on_send'], self, retmsg,
                                                context = {'home_region': self.home_region},

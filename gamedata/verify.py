@@ -2954,11 +2954,20 @@ def check_daily_message(msg):
         if check_predicate(msg['show_if'], reason='%s:show_if' % msg['name']):
             error |= 1
             print 'daily message %s has bad show_if predicate' % (msg['name'])
+
+    if ('attachments' in msg) and ('attachments_loot' in msg):
+        error |= 1
+        print 'daily message %s should not have both attachments and attachments_loot' % (msg['name'],)
+
     if 'attachments' in msg:
         for att in msg['attachments']:
             if att['spec'] not in gamedata['items']:
                 error |= 1
                 print 'daily message %s has bad attachment item %s' % (msg['name'], att['spec'])
+
+    if 'attachments_loot' in msg:
+        error |= check_loot_table(msg['attachments_loot'], reason = 'daily_message:'+msg['name'])
+
     return error
 
 def check_daily_banner(ban):
