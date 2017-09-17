@@ -42266,6 +42266,39 @@ function get_requirements_help(kind, arg, options) {
     }; })(title, descr, button, cancel_button, help_function, unit_icon, options, open_function);
 }
 
+/** Get all player-visible modtechs that are associated with a given named tech
+    and have a first "effect" of modifying some stat. Returned as a mapping from stat_name -> modtech.
+    @param {string} tech_name
+    @return {!Object<string,!Object>} */
+function get_mod_techs_for_tech_by_stat_name(tech_name) {
+    var ret = {};
+    for(var other_name in gamedata['tech']) {
+        var other_tech = gamedata['tech'][other_name];
+        if(other_tech['associated_tech'] == tech_name &&
+           other_tech['effects'] && other_tech['effects'][0]['stat'] &&
+           (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
+            ret[other_tech['effects'][0]['stat']] = other_tech;
+        }
+    }
+    return ret;
+}
+
+/** Similar to above, but return all enhancements that affect enhancement_categories
+    @param {!Array<string>} enhancement_categories
+    @return {!Object<string,!Object>} */
+function get_enhancements_for_categories_by_stat_name(enhancement_categories) {
+    var ret = {};
+    for(var other_name in gamedata['enhancements']) {
+        var other_tech = gamedata['enhancements'][other_name];
+        if(goog.array.contains(enhancement_categories, other_tech['enhancement_category']) &&
+           other_tech['effects'] && other_tech['effects'][0]['stat'] &&
+           (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
+            ret[other_tech['effects'][0]['stat']] = other_tech;
+        }
+    }
+    return ret;
+}
+
 // upgrade a specific building (if preselect_building is null, use selection.unit)
 /** @param {(GameObject|null)=} preselect_building */
 function invoke_upgrade_building_dialog(preselect_building) { return invoke_upgrade_dialog_generic('BUILDING', null, preselect_building || null); }
@@ -42900,6 +42933,16 @@ function update_upgrade_dialog(dialog) {
                             });
     }
 
+    // gather stats affected by mod techs or enhancements that don't already appear in the list
+    if(tech) {
+        var moddable_stats = goog.object.getKeys(get_mod_techs_for_tech_by_stat_name(tech['name']));
+        feature_list = feature_list.concat(moddable_stats);
+    } else if(unit && unit.is_building() && unit.spec['enhancement_categories']) {
+        var enhable_stats = goog.object.getKeys(get_enhancements_for_categories_by_stat_name(unit.spec['enhancement_categories']));
+        feature_list = feature_list.concat(enhable_stats);
+    }
+
+
     // XP AMOUNT
     var xp_amount = 0;
     if(new_level <= max_level) {
@@ -43183,27 +43226,11 @@ function update_upgrade_dialog(dialog) {
         // status bar/buttons for mod techs and enhancements
         var mod_tech = null;
         var enh_tech = null;
-        // XXXXXX inefficient
+
         if(tech) {
-            for(var other_name in gamedata['tech']) {
-                var other_tech = gamedata['tech'][other_name];
-                if(other_tech['associated_tech'] == tech['name'] &&
-                   other_tech['effects'] && other_tech['effects'][0]['stat'] == stat_name &&
-                   (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
-                    mod_tech = other_tech;
-                    break;
-                }
-            }
+            mod_tech = get_mod_techs_for_tech_by_stat_name(tech['name'])[stat_name] || null;
         } else if(unit && unit.is_building() && unit.spec['enhancement_categories']) {
-            for(var other_name in gamedata['enhancements']) {
-                var other_tech = gamedata['enhancements'][other_name];
-                if(goog.array.contains(unit.spec['enhancement_categories'], other_tech['enhancement_category']) &&
-                   other_tech['effects'] && other_tech['effects'][0]['stat'] == stat_name &&
-                   (!other_tech['show_if'] || read_predicate(other_tech['show_if']).is_satisfied(player,null))) {
-                    enh_tech = other_tech;
-                    break;
-                }
-            }
+            enh_tech = get_enhancements_for_categories_by_stat_name(unit.spec['enhancement_categories'])[stat_name] || null;
         }
 
         dialog.widgets['mod_bar'+grid_y.toString()].show =
