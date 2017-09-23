@@ -13255,7 +13255,8 @@ class LivePlayer(Player):
     # remove "total" number of items of spec "specname" from item_list (loot_buffer or inventory)
     # throws exception if insufficient quantity is present
     # returns number removed.
-    def item_remove_by_type(self, item_list, specname, total, event_name, level=None, reason=None):
+    # if "use_priority", then sort items to prefer short expiration times, small stacks, etc XXX not implemented
+    def item_remove_by_type(self, item_list, specname, total, event_name, level=None, use_priority=False, reason=None):
         assert self.get_item_quantity(item_list, specname, level=level) >= total
         n_removed = 0
         while total > 0:
@@ -13273,7 +13274,7 @@ class LivePlayer(Player):
         return n_removed
 
     def loot_buffer_remove_by_type(self, specname, total, event_name, level=None, reason=None): return self.item_remove_by_type(self.loot_buffer, specname, total, event_name, level=level, reason=reason)
-    def inventory_remove_by_type(self, specname, total, event_name, level=None, reason=None): return self.item_remove_by_type(self.inventory, specname, total, event_name, level=level, reason=reason)
+    def inventory_remove_by_type(self, specname, total, event_name, level=None, use_priority=False, reason=None): return self.item_remove_by_type(self.inventory, specname, total, event_name, level=level, use_priority=use_priority, reason=reason)
 
     # remove a quantity of "item" from "item_list" (which must contain it), and log inventory metric
     def item_remove(self, item_list, item, qty_to_rem, event_name, reason=None):
@@ -28111,7 +28112,9 @@ class GAMEAPI(resource.Resource):
                                     unit_id, spellname, spellarg,
                                     server_time_according_to_client)
                 # at this point the order has changed player state, so go ahead and take the items
-                session.player.inventory_remove_by_type(item_name, client_price, '5130_item_activated', reason='purchase')
+                session.player.inventory_remove_by_type(item_name, client_price, '5130_item_activated',
+                                                        use_priority = True,
+                                                        reason='purchase')
                 success = True
 
             except:
