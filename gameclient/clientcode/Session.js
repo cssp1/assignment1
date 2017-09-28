@@ -334,6 +334,7 @@ Session.Session.prototype.on_real_world_object_removed = function(event) {
 };
 
 Session.Session.prototype.clear_building_idle_state_caches = function() {
+    if(!this.has_world()) { return; }
     this.for_each_real_object(function(obj) {
         if(obj.is_building()) { obj.idle_state_cache = null; }
     }, this);
