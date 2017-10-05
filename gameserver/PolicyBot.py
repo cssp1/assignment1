@@ -48,6 +48,7 @@ def is_anti_alt_region(region): return 'anti_alt' in region.get('tags',[])
 def is_anti_refresh_region(region): return 'anti_refresh' in region.get('tags',[])
 
 anti_alt_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_alt_region(data)]
+anti_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if is_anti_refresh_region(data)]
 allow_refresh_region_names = [name for name, data in gamedata['regions'].iteritems() if not is_anti_refresh_region(data)]
 
 class Policy(object):
@@ -558,7 +559,12 @@ def open_log(db_client):
 class NullFD(object):
     def write(self, stuff): pass
 
-POLICIES = [AntiAltPolicy, IdleCheckAntiRefreshPolicy, LoginPatternAntiRefreshPolicy]
+POLICIES = []
+
+if anti_alt_region_names:
+    POLICIES.append(AntiAltPolicy)
+if anti_refresh_region_names:
+    POLICIES += [IdleCheckAntiRefreshPolicy, LoginPatternAntiRefreshPolicy]
 
 def my_slave(input):
     msg_fd = sys.stderr if input['verbose'] else NullFD()
@@ -620,7 +626,7 @@ if __name__ == '__main__':
         elif key == '--non-incremental':
             incremental = False
 
-    if not manual_user_list and not anti_alt_region_names:
+    if not manual_user_list and len(POLICIES) < 1:
         sys.exit(0) # nothing to do
 
     with SpinSingletonProcess.SingletonProcess('PolicyBot-%s' % (SpinConfig.config['game_id'],)):
