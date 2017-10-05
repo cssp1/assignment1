@@ -23031,7 +23031,7 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
         dialog.widgets['region_status'+row].text_color = (already_here ? dialog.widgets['region_name'+row].text_color : ((open && pred_ok) ? (('text_color' in data) ? SPUI.make_colorv(data['text_color']) : SPUI.good_text_color) : SPUI.error_text_color));
         dialog.widgets['region_info'+row].str = data['ui_description_short'];
         dialog.widgets['region_info'+row].text_color = SPUI.make_colorv(('info_color' in data) ? data['info_color'] : dialog.data['widgets']['region_info']['text_color']);
-        dialog.widgets['region_info'+row].tooltip.str = data['ui_description_long'];
+        dialog.widgets['region_info'+row].tooltip.str = SPText.bbcode_strip(data['ui_description_long']);
 
 
         // remember state/str since update_change_region_dialog may want to override it
@@ -23087,7 +23087,8 @@ function change_region_dialog_setup_row(dialog, row, rowdata) {
                 var msg = gamedata['strings']['change_region_confirm' + (within_region ? '_within_region' : (ladder_reset ? '_ladder_reset': '' ))];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', gamedata['regions'][_id]['ui_name']),
                                             msg['ui_description'].replace('%s', gamedata['regions'][_id]['ui_name'])+'\n\n'+gamedata['strings']['regional_map']['change_region_feature_info'].replace('%NAME',gamedata['regions'][_id]['ui_name']).replace('%DESCR',gamedata['regions'][_id]['ui_description_long']),
-                                            {'cancel_button': true,
+                                            {'use_bbcode': true,
+                                             'cancel_button': true,
                                              'ok_button_ui_name': msg['ui_button'],
                                              'dialog': 'message_dialog_big',
                                              'on_ok': start_execute_cb});
@@ -46721,7 +46722,7 @@ function handle_server_message(data) {
                 var msg = gamedata['strings']['change_region_finish'];
                 invoke_child_message_dialog(msg['ui_title'].replace('%s', session.region.data['ui_name']),
                                             msg['ui_description'].replace('%s', session.region.data['ui_name']).replace('%loc', player.home_base_loc[0].toString()+','+player.home_base_loc[1].toString())+session.region.data['ui_description_long'],
-                                            {'dialog': 'message_dialog_big'});
+                                            {'dialog': 'message_dialog_big', 'use_bbcode': true});
                 GameArt.play_canned_sound('success_playful_22');
             }, -2);
         }
