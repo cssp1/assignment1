@@ -1736,7 +1736,7 @@
                              "ui_name_click_to_unlock": "Click to Unlock",
                              "ui_name_level": "Level %cur of %max",
                              "ui_name_inprogress": "Lvl %d in %s",
-                             "ui_name_repair": "Blocked on Repairs",
+                             "ui_name_repair": "Building Damaged",
                              "array": [4,2], "array_offset": [160,150] },
             "grid_price": { "kind": "ActionButton", "xy": [58,193], "dimensions": [96,32], "text_offset": [8,0], "text_size": 13, "text_style": "thick",
                             "bg_image": "price_display_short", "ui_name": "%d", "ui_name_start": "Start",
