@@ -37,6 +37,8 @@ def handle(filename, dry_run = True, is_sandbox = False, battle_archive_s3_bucke
        filename.endswith('-policy_bot.json') or \
        filename.endswith('-fb_conversion_pixels.json') or \
        filename.endswith('-fb_app_events.json') or \
+       filename.endswith('-battlehouse.json') or \
+       filename.endswith('-battlehouse_client.json') or \
        filename.endswith('-adotomi.json') or \
        filename.endswith('-adparlor.json') or \
        filename.endswith('-dauup2.json') or \
