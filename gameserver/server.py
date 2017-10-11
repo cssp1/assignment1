@@ -5357,6 +5357,7 @@ class Session(object):
                              ('adparlor', self.user.adparlor_context),
                              ('liniad', self.user.liniad_context),
                              ('battlehouse', self.user.bh_id),
+                             ('battlehouse_client', self.user.bh_id if (self.user.frame_platform == 'bh') else None), # only run within BH.com frame
                              ('mailchimp', self.user.get_mailchimp_context()),
                              ('fb_conversion_pixels', self.user.fb_conversion_pixels_context),
                              ('fb_app_events', True if (self.user.frame_platform == 'fb') else None),
@@ -5422,7 +5423,7 @@ class Session(object):
 
         if 'fb_app_event' in data:
             return self.do_send_adnetwork_event_fb_app_event(retmsg, api, context, name, data, *args, **kwargs)
-        elif 'client' in data:
+        elif ('client' in data) or ('client_bh' in data):
             return self.do_send_adnetwork_event_clientside(retmsg, api, context, name, data, *args, **kwargs)
         else:
             return self.do_send_adnetwork_event_serverside(retmsg, api, context, name, data, *args, **kwargs)
@@ -5458,21 +5459,28 @@ class Session(object):
                                              (api, self.user.user_id, name))
             return False
 
-        s = data['client']
-        if post_fbtax_dollars is not None:
-            s = s.replace('$POST_FBTAX_DOLLARS', '%.2f' % post_fbtax_dollars)
-
         log_props = {'user_id': self.user.user_id, 'kpi': name, 'context': context}
         if post_fbtax_dollars is not None: log_props['post_fbtax_dollars'] = post_fbtax_dollars
         if currency is not None: log_props['currency'] = currency
         self.user.log_adnetwork_event(api, log_props)
 
+        if 'client' in data:
+            # just a URL to hit
+            msg = "CLIENT_TRACKING_PIXEL_IMAGE"
+            arg = data['client']
+            if post_fbtax_dollars is not None:
+                arg = arg.replace('$POST_FBTAX_DOLLARS', '%.2f' % post_fbtax_dollars)
+        elif 'client_bh' in data:
+            # bh.com postMessage event
+            msg = "CLIENT_TRACKING_PIXEL_BH"
+            arg = data['client_bh']
+
         if gamedata['server'].get('log_'+api,1):
-            gamesite.exception_log.event(server_time, '%s API for user %d (%s): %s %s' % \
-                                         (api, self.user.user_id, name, s, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
+            gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s' % \
+                                         (api, self.user.user_id, name, arg, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            retmsg.append(["CLIENT_TRACKING_PIXEL_IMAGE", s, 0])
+            retmsg.append([msg, arg, 0])
             return True
         else:
             return False
@@ -29988,6 +29996,8 @@ class GAMEAPI(resource.Resource):
         elif arg[0] == "CLIENT_TRACKING_PIXEL_RESULT":
             pass
         elif arg[0] == "CLIENT_TRACKING_PIXEL_IMAGE_RESULT":
+            pass
+        elif arg[0] == "CLIENT_TRACKING_PIXEL_BH_RESULT":
             pass
 
         elif arg[0] == "CAST_SPELL":

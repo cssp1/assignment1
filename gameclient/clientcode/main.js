@@ -48675,6 +48675,14 @@ function handle_server_message(data) {
         img.src = str;
         result = true;
         send_to_server.func(["CLIENT_TRACKING_PIXEL_IMAGE_RESULT", tag, result]);
+    } else if(msg == "CLIENT_TRACKING_PIXEL_BH") {
+        var msg_data = data[1], tag = data[2];
+        var success = false;
+        if(spin_frame_platform === 'bh') {
+            window.top.postMessage({'method': 'bh_metric_event_clientside', 'event_name': msg_data['event_name']}, '*');
+            success = true;
+        }
+        send_to_server.func(["CLIENT_TRACKING_PIXEL_BH_RESULT", tag, success]);
     } else if(msg == "FORCE_RELOAD") {
         invoke_login_error_message("CANNOT_LOG_IN_VERSION_MISMATCH_GAMEDATA");
     } else if(msg == "LOGIN_ABUSE_WARNING") {
