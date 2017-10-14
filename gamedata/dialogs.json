@@ -6213,13 +6213,15 @@
                         "ui_alliance_disbanded": "(Disbanded Alliance)",
                         "ui_alliance_former": "%now (at the time named %former)",
                         "ui_event_line": "[color=#d0d0d0]%date:[/color] %event",
+                        "ui_actor_unknown": "an Alliance officer",
                         "events": {"ui_data_incomplete": "(note: Membership history prior to April 2015 is not available)",
                                    "ui_data_none": "No memberships found",
                                    "ui_0110_created_new_account": "Started playing [color=#ffff00]%game[/color]",
                                    "ui_4610_alliance_member_joined": "Joined %alliance",
+                                   "ui_4610_alliance_member_joined_with_inviter": "Joined %alliance (invited by %actor)",
                                    "ui_4620_alliance_member_left": "Left %alliance",
-                                   "ui_4625_alliance_member_kicked": "Was kicked from %alliance",
-                                   "ui_4650_alliance_member_join_request_accepted": "Joined %alliance"}
+                                   "ui_4625_alliance_member_kicked": "Was kicked from %alliance (by %actor)",
+                                   "ui_4650_alliance_member_join_request_accepted": "Joined %alliance (accepted by %actor)"}
                         //                        "ui_group_header": "[b]%group[/b]",
                         //                        "ui_stat": "%stat: [color=#1eff66]%val[/color]",
                         //                        "ui_stat_ranked": "%stat: [color=#1eff66]%val[/color] [color=#ffff00](ranked #%rank)[/color]",

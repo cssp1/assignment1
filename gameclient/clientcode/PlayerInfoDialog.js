@@ -1387,7 +1387,14 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
     var pcache_info = dialog.parent.user_data['info'];
 
     goog.array.forEach(event_list, function(ev) {
-        if(!('ui_'+ev['event_name'] in dialog.widgets['output'].data['events'])) { return; }
+        var ui_event_name_key;
+        if(ev['event_name'] == '4610_alliance_member_joined' && 'inviter_id' in ev) {
+            ui_event_name_key = 'ui_4610_alliance_member_joined_with_inviter';
+        } else {
+            ui_event_name_key = 'ui_'+ev['event_name'];
+        }
+
+        if(!(ui_event_name_key in dialog.widgets['output'].data['events'])) { return; }
 
         if(ev['event_name'] == '4625_alliance_member_kicked' ||
            ev['event_name'] == '4650_alliance_member_join_request_accepted') {
@@ -1397,7 +1404,7 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
             if(user_id != ev['user_id']) { return; }
         }
 
-        var msg = dialog.widgets['output'].data['events']['ui_'+ev['event_name']];
+        var msg = dialog.widgets['output'].data['events'][ui_event_name_key];
 
         function format_alliance(alliance_id, name, tag) {
             var bb_text = gamedata['strings']['chat_templates']['alliance']
@@ -1406,6 +1413,12 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
             if(tag) {
                 bb_text += gamedata['strings']['chat_templates']['alliance_tag'].replace('%alliance_tag', tag).replace('%alliance_id', alliance_id.toString());
             }
+            return bb_text;
+        }
+        function format_player(player_id, name) {
+            var bb_text = gamedata['strings']['chat_templates']['player']
+                .replace('%player_name', name)
+                .replace('%player_id', player_id.toString());
             return bb_text;
         }
 
@@ -1436,6 +1449,24 @@ PlayerInfoDialog.alliance_history_tab_receive = function(dialog, data) {
         line = line.replace('%date', pretty_print_date_and_time_utc(ev['time']));
         line = line.replace('%event', msg);
         line = line.replace('%alliance', ui_alliance);
+
+        var actor_id = null;
+        if(ev['event_name'] == '4650_alliance_member_join_request_accepted') {
+            actor_id = ev['user_id']; // leader who accepted the request
+        } else if(ev['event_name'] == '4610_alliance_member_joined' && 'inviter_id' in ev) {
+            actor_id = ev['inviter_id'];
+        } else if(ev['event_name'] == '4625_alliance_member_kicked') {
+            actor_id = ev['user_id'];
+        }
+
+        if(actor_id) {
+            var ui_actor = dialog.widgets['output'].data['ui_unknown_actor'];
+            var actor_info = PlayerCache.query_sync(actor_id);
+            if(actor_info) {
+                ui_actor = format_player(actor_id, PlayerCache.get_ui_name(actor_info));
+            }
+            line = line.replace('%actor', ui_actor);
+        }
 
         dialog.widgets['output'].append_text(SPText.cstring_to_ablocks_bbcode(line, null, system_chat_bbcode_click_handlers));
     });
