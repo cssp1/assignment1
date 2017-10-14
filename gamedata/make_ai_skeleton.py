@@ -1088,6 +1088,9 @@ if __name__ == '__main__':
                                    "water": 0, "iron": 0 }),
                     ]
 
+                if 'ui_difficulty_comment' in data:
+                    json += [("ui_difficulty_comment", data['ui_difficulty_comment'][diff])]
+
                 if 'villain_map_portrait' in data:
                     json += [("map_portrait", data['villain_map_portrait'][diff])]
 
@@ -1696,6 +1699,9 @@ if __name__ == '__main__':
                 ("portrait", data['villain_portrait'][diff]),
                 ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
                 ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
+
+            if 'ui_difficulty_comment' in data:
+                json += [("ui_difficulty_comment", data['ui_difficulty_comment'][diff])]
 
             if 'base_resource_loot' in data and data['base_resource_loot'][diff][0] is not None:
                 json += [("base_resource_loot", {})]
