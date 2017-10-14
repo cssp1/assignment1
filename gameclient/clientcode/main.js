@@ -48358,7 +48358,7 @@ function handle_server_message(data) {
         var tag = data[1], result = data[2];
         map_log_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "QUERY_PLAYER_ALLIANCE_MEMBERSHIP_HISTORY_RESULT") {
-        var tag = data[1], result = data[2], alinfo_list = data[3];
+        var tag = data[1], result = data[2], alinfo_list = data[3], plinfo_list = data[4];
         if(alinfo_list) {
             goog.array.forEach(alinfo_list, function(alinfo) {
                 if(alinfo) {
@@ -48367,6 +48367,7 @@ function handle_server_message(data) {
                 }
             });
         }
+        if(plinfo_list) { PlayerCache.update_batch(plinfo_list); }
         player_alliance_membership_history_receiver.dispatchEvent({type: tag, result:result});
     } else if(msg == "GET_BATTLE_LOG3_RESULT" || msg == "GET_BATTLE_REPLAY_RESULT") {
         var tag = data[1], result = data[2];
