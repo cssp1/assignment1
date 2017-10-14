@@ -15710,6 +15710,9 @@ msgstr "Clan Info"
 msgid "Alliance History"
 msgstr "Clan History"
 
+msgid "an Alliance officer"
+msgstr "a Clan officer"
+
 msgid "Show multiplayer battles involving your alliance"
 msgstr "Show multiplayer battles involving your Clan"
 
