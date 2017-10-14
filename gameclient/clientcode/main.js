@@ -15897,6 +15897,12 @@ var system_chat_bbcode_click_handlers = {
             change_selection_ui(null); invoke_alliance_info(alliance_id);
         }
     }; } },
+    'player': { 'onclick': function(splayer_id) { return function(w, mloc) {
+        var player_id = parseInt(splayer_id,10);
+        if(player_id >= 0) {
+            change_selection_ui(null); PlayerInfoDialog.invoke(player_id);
+        }
+    }; } },
     'achievement': {'onclick': function(player_and_name) { return function(w, mloc) {
         var fields = player_and_name.split(':');
         var player_id = parseInt(fields[0],10), name = fields[1];
