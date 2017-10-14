@@ -1738,7 +1738,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
+                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_INGAME_TIP',
                         'ALL_AGGRESSIVE',
                    ])
 
@@ -1923,6 +1923,10 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
         else:
             if cons['asset'] not in gamedata['art']:
                 error |= 1; print '%s: PRELOAD_ART_ASSET refers to missing asset %s' % (reason, cons['asset'])
+
+    elif cons['consequent'] == 'INVOKE_INGAME_TIP':
+        if cons['tip_name'] not in gamedata['strings']:
+                error |= 1; print '%s: INVOKE_INGAME_TIP tip_name not found in gamedata.strings: %s' % (reason, cons['tip_name'])
 
     elif cons['consequent'] == 'INVOKE_MISSIONS_DIALOG':
         if ('select_mission' in cons) and (cons['select_mission'] not in gamedata['quests']):
@@ -2614,6 +2618,9 @@ def check_ai_base(strid, base):
         for entry in challenge_icon_list:
             if entry:
                 error |= require_art_asset(entry, reason = 'AI base %s:challenge_icon' % strid)
+
+    if 'ui_difficulty_comment' in base:
+        error |= check_cond_chain(base['ui_difficulty_comment'], reason = strid+':'+'ui_difficulty_comment')
 
     if 'item_loot' in base:
         error |= 1

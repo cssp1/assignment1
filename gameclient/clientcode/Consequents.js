@@ -827,6 +827,25 @@ DisplayDailyTipConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeIngameTipConsequent(data) {
+    goog.base(this, data);
+    this.tip_name = data['tip_name'] || null;
+    this.notification_params = data['notification_params'] || null;
+}
+goog.inherits(InvokeIngameTipConsequent, Consequent);
+InvokeIngameTipConsequent.prototype.execute = function(state) {
+    var cb = (function(_this) { return function() {
+        invoke_ingame_tip(_this.tip_name, {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED});
+    }; })(this);
+    if(this.notification_params !== null) {
+        notification_queue.push(cb, this.notification_params);
+    } else {
+        cb();
+    }
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function InvokeOfferChoiceConsequent(data) {
     goog.base(this, data);
     this.then_cons = read_consequent(data['then']);
@@ -1036,6 +1055,7 @@ function read_consequent(data) {
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }
+    else if(kind === 'INVOKE_INGAME_TIP') { return new InvokeIngameTipConsequent(data); }
     else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
     else if(kind === 'INVOKE_LOGIN_INCENTIVE_DIALOG') { return new InvokeLoginIncentiveDialogConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
