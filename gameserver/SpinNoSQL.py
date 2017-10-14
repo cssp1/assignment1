@@ -2453,7 +2453,8 @@ class NoSQLClient (object):
         # get rid of any existing invites
         self.alliance_table('alliance_invites').delete_many({'user_id':user_id, 'alliance_id':alliance_id})
         # record invite
-        self.alliance_table('alliance_invites').insert_one({'user_id':user_id, 'alliance_id':alliance_id, 'creation_time':time_now, 'expire_time': expire_time})
+        self.alliance_table('alliance_invites').insert_one({'user_id':user_id, 'alliance_id':alliance_id,
+                                                            'sender_id': sender_id, 'creation_time':time_now, 'expire_time': expire_time})
         return True
 
     def send_join_request(self, user_id, alliance_id, time_now, expire_time, reason=''): return self.instrument('send_join_request(%s)'%reason, self._send_join_request, (user_id, alliance_id, time_now, expire_time))
@@ -2476,7 +2477,7 @@ class NoSQLClient (object):
         if (not self._check_alliance_member_perm(alliance_id, poller_id, 'invite')): return False
         success = True
         if accept:
-            success = self._join_alliance(user_id, alliance_id, time_now, max_members, force = True)
+            success, inviter_id = self._join_alliance(user_id, alliance_id, time_now, max_members, force = True)
         if (not success) or (not accept):
             # _join_alliance cleans up the request in the success case
             self.alliance_table('alliance_join_requests').delete_many({'user_id':user_id})
@@ -2510,12 +2511,17 @@ class NoSQLClient (object):
                 # alliance does not exist
                 success = False
 
+        inviter_id = None
+
         if success:
             if info['join_type'] != 'anyone' and (not force):
                 # check for applicable invite
-                if not bool(self.alliance_table('alliance_invites').find_one({'user_id':user_id, 'alliance_id':alliance_id, 'expire_time':{'$gte':time_now}})):
+                invite_row = self.alliance_table('alliance_invites').find_one({'user_id':user_id, 'alliance_id':alliance_id, 'expire_time':{'$gte':time_now}})
+                if not invite_row:
                     # we're not invited
                     success = False
+                else:
+                    inviter_id = invite_row.get('sender_id', None)
 
         if success:
             # check alliance size
@@ -2531,7 +2537,7 @@ class NoSQLClient (object):
             self.alliance_table('alliance_invites').delete_many({'user_id':user_id})
             self.alliance_table('alliance_join_requests').delete_many({'user_id':user_id})
 
-        return success
+        return success, inviter_id
 
     # return value is same as do_maint_fix_leadership_problem
     def leave_alliance(self, user_id, reason=''): return self.instrument('leave_alliance(%s)'%reason, self._leave_alliance, (user_id,))
@@ -3198,14 +3204,14 @@ if __name__ == '__main__':
 
         MAX_MEMBERS = 2
 
-        assert not client.join_alliance(1120, 999, time_now, MAX_MEMBERS) # alliance does not exist
-        assert client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
-        assert not client.join_alliance(UID+1, alliance_2, time_now, MAX_MEMBERS) # already in alliance
-        assert not client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS) # already in alliance
-        assert client.join_alliance(UID+4, alliance_1, time_now, MAX_MEMBERS)
-        assert not client.join_alliance(UID+3, alliance_1, time_now, MAX_MEMBERS) # too many members
+        assert not client.join_alliance(1120, 999, time_now, MAX_MEMBERS)[0] # alliance does not exist
+        assert client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)[0]
+        assert not client.join_alliance(UID+1, alliance_2, time_now, MAX_MEMBERS)[0] # already in alliance
+        assert not client.join_alliance(UID+1, alliance_1, time_now, MAX_MEMBERS)[0] # already in alliance
+        assert client.join_alliance(UID+4, alliance_1, time_now, MAX_MEMBERS)[0]
+        assert not client.join_alliance(UID+3, alliance_1, time_now, MAX_MEMBERS)[0] # too many members
 
-        assert client.join_alliance(UID+2, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert client.join_alliance(UID+2, alliance_2, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)[0]
 
         assert client.modify_alliance(alliance_1, UID+1, ui_name = 'New Democratic Mars Union', chat_tag='ABC')[0]
         assert not client.modify_alliance(alliance_1, UID+1, chat_tag='123')[0] # duplicate chat tag
@@ -3216,10 +3222,10 @@ if __name__ == '__main__':
         assert not client.send_alliance_invite(9999, UID+6, alliance_2, time_now, time_now+3600) # not sent by leader
         assert client.send_alliance_invite(UID+2, UID+6, alliance_2, time_now, time_now+3600)
         assert client.join_alliance(UID+6, alliance_2, time_now, MAX_MEMBERS)
-        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # too many members
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)[0] # too many members
         assert client.leave_alliance(UID+6) == 0
         assert client.leave_alliance(UID+6) == 0
-        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)
+        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)[0]
         assert client.kick_from_alliance(UID+2, alliance_2, UID+7)
 
         assert sorted(client.get_alliance_member_ids(alliance_1)) == [UID+1,UID+4]
@@ -3228,13 +3234,13 @@ if __name__ == '__main__':
         assert client.get_alliance_info(alliance_2)['num_members'] == 1
 
         assert client.modify_alliance(alliance_2, UID+2, join_type='invite_only')
-        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # not invited
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)[0] # not invited
         assert not client.am_i_invited(alliance_2, UID+7, time_now)
         assert client.send_alliance_invite(UID+2, UID+7, 2, time_now, time_now+300)
         assert client.am_i_invited(alliance_2, UID+7, time_now)
-        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)
+        assert client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) == (True, UID+2)
         assert client.leave_alliance(UID+7) == 0
-        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS) # not invited
+        assert not client.join_alliance(UID+7, alliance_2, time_now, MAX_MEMBERS)[0] # not invited
         assert client.send_join_request(UID+7, alliance_2, time_now, time_now+300)
         assert client.poll_join_requests(UID+2, alliance_2, time_now) == [UID+7]
         assert client.ack_join_request(UID+2, alliance_2, UID+7, True, time_now, MAX_MEMBERS)
@@ -3254,11 +3260,11 @@ if __name__ == '__main__':
         # deliberately create messed-up leadership situations
         alliance_4 = client.create_alliance(u'Leaderless Alliance', "", 'anyone', 1120, 'star_orange', time_now, 'fb')[0]
         assert alliance_4 > 0
-        assert client.join_alliance(UID+3, alliance_4, time_now, MAX_MEMBERS)
+        assert client.join_alliance(UID+3, alliance_4, time_now, MAX_MEMBERS)[0]
         alliance_5 = client.create_alliance(u'Contested Alliance', "", 'anyone', UID+5, 'star_orange', time_now, 'fb')[0]
         assert alliance_5 > 0
-        assert client.join_alliance(UID+5, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
-        assert client.join_alliance(UID+6, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)
+        assert client.join_alliance(UID+5, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)[0]
+        assert client.join_alliance(UID+6, alliance_5, time_now, MAX_MEMBERS, role = client.ROLE_LEADER, force = True)[0]
 
         assert client.do_maint_fix_leadership_problem(alliance_1) == 0
         assert client.do_maint_fix_leadership_problem(alliance_2) == 0

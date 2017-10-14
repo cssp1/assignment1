@@ -29108,9 +29108,10 @@ class GAMEAPI(resource.Resource):
                 if spell.get('cooldown',-1) > 0 and session.player.cooldown_active(spell['cooldown_name']):
                     success = False
 
+            inviter_id = None
+
             if success:
-                if not gamesite.sql_client.join_alliance(session.user.user_id, alliance_id, server_time, gamedata['alliances']['max_members'], reason='ALLIANCE_JOIN'):
-                    success = False
+                success, inviter_id = gamesite.sql_client.join_alliance(session.user.user_id, alliance_id, server_time, gamedata['alliances']['max_members'], reason='ALLIANCE_JOIN')
 
             if success:
                 new_alliance_info, new_alliance_membership = session.init_alliance(retmsg, reason='ALLIANCE_JOIN')
@@ -29126,11 +29127,13 @@ class GAMEAPI(resource.Resource):
                     session.increment_player_metric('alliances_joined', 1, time_series = False)
                     session.deferred_history_update = True
 
-                    metric_event_coded(session.user.user_id, '4610_alliance_member_joined', {'alliance_id': new_alliance_info['id'],
-                                                                                             'alliance_ui_name': new_alliance_info['ui_name'],
-                                                                                             'alliance_chat_tag': new_alliance_info.get('chat_tag'),
-                                                                                             'role': gamesite.sql_client.ROLE_DEFAULT,
-                                                                                             'sum':session.player.get_denormalized_summary_props('brief')})
+                    metric_props = {'alliance_id': new_alliance_info['id'],
+                                    'alliance_ui_name': new_alliance_info['ui_name'],
+                                    'alliance_chat_tag': new_alliance_info.get('chat_tag'),
+                                    'role': gamesite.sql_client.ROLE_DEFAULT,
+                                    'sum':session.player.get_denormalized_summary_props('brief')}
+                    if inviter_id: metric_props['inviter_id'] = inviter_id
+                    metric_event_coded(session.user.user_id, '4610_alliance_member_joined', metric_props)
                     metric_event_coded(session.user.user_id, '4602_alliance_num_members_updated', {'alliance_id': new_alliance_info['id'], 'num_members_cache': new_alliance_info['num_members']})
 
                 else:
@@ -30706,7 +30709,7 @@ class GAMEAPI(resource.Resource):
                                                                                     reason='ALLIANCE_CREATE')
 
                                 # join
-                                assert gamesite.sql_client.join_alliance(session.user.user_id, new_id, server_time, gamedata['alliances']['max_members'], role=gamesite.sql_client.ROLE_LEADER, force=True, reason='ALLIANCE_CREATE')
+                                assert gamesite.sql_client.join_alliance(session.user.user_id, new_id, server_time, gamedata['alliances']['max_members'], role=gamesite.sql_client.ROLE_LEADER, force=True, reason='ALLIANCE_CREATE')[0]
 
                                 # verify that join worked, and set up chat
                                 new_info, new_membership = session.init_alliance(retmsg, reason='ALLIANCE_CREATE')
