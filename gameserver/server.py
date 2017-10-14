@@ -20331,6 +20331,10 @@ class GAMEAPI(resource.Resource):
                 delta = session.player.get_townhall_level() - session.viewing_player.get_townhall_level()
                 if delta >= 1:
                     session.player.do_apply_aura('townhall_loot_malus', strength = math.pow(malus, delta), ignore_limit = True)
+                    malus_aura_spec = session.player.get_abtest_aura('townhall_loot_malus')
+                    # XXX really this should be handled inside do_apply_aura()
+                    if ('on_apply' in malus_aura_spec):
+                        session.execute_consequent_safe(malus_aura_spec['on_apply'], session.player, change_retmsg, reason='on_apply_townhall_loot_malus')
 
         # set up PvP point auras
         if session.ladder_state:
