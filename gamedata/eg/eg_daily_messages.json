@@ -31,6 +31,6 @@
      ]},
      "attachments": [{"spec": "boost_iron_100000"},
                      {"spec": "boost_water_100000"},
-                     {"spec": "protection_1d", "stack":2}]
+                     {"spec": "protection_1d"}]
     }
 ]
