@@ -35,11 +35,15 @@ def responses_schema(sql_util):
                         'by_user_id': {'unique':False, 'keys':[('user_id','ASC')]}}}
 
 RESP_INTVAL = {
-    'Very Important': 5,
-    'Somewhat important': 4,
-    "Don't Know / Don't Care": 3,
-    'Not Very Important': 2,
-    'Not at all important': 1,
+    'very important': 5,
+    'very effective': 5,
+    'somewhat important': 4,
+    'somewhat effective': 4,
+    "don't know / don't care": 3,
+    'not very important': 2,
+    'not very effective': 2,
+    'not effective at all': 1,
+    'not at all important': 1,
     'Yes': 1,
     'No': 0
     }
@@ -166,8 +170,8 @@ if __name__ == '__main__':
             raw = row[question_id]
             if raw.isdigit():
                 intval = int(raw)
-            elif raw in RESP_INTVAL:
-                intval = RESP_INTVAL[raw]
+            elif raw.lower() in RESP_INTVAL:
+                intval = RESP_INTVAL[raw.lower()]
             else:
                 intval = None
             if len(raw) > 255:
