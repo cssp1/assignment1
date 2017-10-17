@@ -83,8 +83,17 @@ ${BUILT}/${GAME_ID}_store_compiled.json: ${GAME_ID}/${GAME_ID}_store.json # just
 # client versions of non-shipped JSON
 ${BUILT}/${GAME_ID}_ai_bases_client.json: ${GAMEDATA}/make_ai_bases.py ${BUILT}/${GAME_ID}_ai_bases_compiled.json
 	@echo "    ${GAME_ID}_ai_bases_client.json..." && ${GAMEDATA}/make_ai_bases.py --client ${BUILT}/${GAME_ID}_ai_bases_compiled.json $@
-${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives.py ${BUILT}/${GAME_ID}_hives_compiled.json
-	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives.py --client ${BUILT}/${GAME_ID}_hives_compiled.json $@
+${BUILT}/${GAME_ID}_hives_client.json: ${GAMEDATA}/make_hives.py ${BUILT}/${GAME_ID}_hives_compiled.json \
+	${BUILT}/${GAME_ID}_buildings_compiled.json \
+	${GAME_ID}/${GAME_ID}_main_options.json \
+	${GAME_ID}/${GAME_ID}_player_xp.json \
+	${GAME_ID}/${GAME_ID}_resources.json
+	@echo "    ${GAME_ID}_hives_client.json..." && ${GAMEDATA}/make_hives.py -g ${GAME_ID} --client \
+		--buildings ${BUILT}/${GAME_ID}_buildings_compiled.json \
+		--main-options ${GAME_ID}/${GAME_ID}_main_options.json \
+		--player-xp ${GAME_ID}/${GAME_ID}_player_xp.json \
+		--resources ${GAME_ID}/${GAME_ID}_resources.json \
+		${BUILT}/${GAME_ID}_hives_compiled.json $@
 ${BUILT}/${GAME_ID}_quarries_client.json: ${GAMEDATA}/make_quarries.py ${BUILT}/${GAME_ID}_quarries_compiled.json
 	@echo "    ${GAME_ID}_quarries_client.json..." && ${GAMEDATA}/make_quarries.py --client ${BUILT}/${GAME_ID}_quarries_compiled.json $@
 ${BUILT}/${GAME_ID}_raids_client.json: ${GAMEDATA}/make_raids.py ${BUILT}/${GAME_ID}_raids_compiled.json

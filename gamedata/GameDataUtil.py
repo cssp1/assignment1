@@ -5,6 +5,7 @@
 # found in the LICENSE file.
 
 # stand-alone library for parsing gamedata, without instantiating server-side objects
+from math import pow
 
 def pretty_print_qty(qty):
     if qty >= 1000000:
@@ -154,3 +155,31 @@ class ResourceValuation(object):
         return sum((self.relative_res[resname]*amounts[resname]*self.res_internal_weight[resname] for resname in amounts), 0)
     def get_weights(self):
         return dict((resname, self.relative_res[resname]*self.res_internal_weight[resname]) for resname in self.relative_res)
+
+# return a cond chain with ui_text describing the resource loot available in an AI base or hive,
+# corrected for the relative townhall difference townhall_loot_malus.
+
+def ui_difficulty_comment_for_townhall_loot_malus(gamedata, ai_townhall_level, base_resource_loot):
+    # note: requires some pieces of gamedata to be loaded, see below
+
+    max_townhall_level = get_max_level(gamedata['buildings'][gamedata['townhall']])
+
+    def comment_for_attacker_level(attacker_townhall_level):
+        if attacker_townhall_level <= ai_townhall_level:
+            loot_factor = 1
+        else:
+            loot_factor = pow(gamedata['townhall_loot_malus'], attacker_townhall_level - ai_townhall_level)
+
+        res_list = [(res, int(loot_factor*base_resource_loot[res])) for res in gamedata['resources'] if base_resource_loot.get(res,0) > 0]
+
+        # put rarer resources first
+        res_list.sort(key = lambda x: -gamedata['resources'][x[0]].get('ui_rarity',0))
+
+        ui_res_list = [("%s %s" % (pretty_print_qty_brief(amount) if amount > 1000 else '<1K', gamedata['resources'][res]['ui_name'])) for res, amount in res_list]
+
+        return ", ".join(ui_res_list) + " (when fresh)"
+
+    return [[{"predicate": "PLAYER_HISTORY", "key": gamedata['townhall']+"_level", "method": ">=", "value": attacker_townhall_level},
+             comment_for_attacker_level(attacker_townhall_level)] for attacker_townhall_level in xrange(max_townhall_level, ai_townhall_level, -1)] + \
+             [[{"predicate": "ALWAYS_TRUE"}, comment_for_attacker_level(1)]]
+

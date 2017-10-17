@@ -10,6 +10,7 @@ import SpinJSON
 import SpinConfig
 import AtomicFileWrite
 import LootTable
+from GameDataUtil import ui_difficulty_comment_for_townhall_loot_malus
 import sys, copy, getopt, os, random, subprocess
 
 gamedata = None
@@ -853,9 +854,11 @@ if __name__ == '__main__':
 
     # manually load some parts of gamedata. Do not require ALL of it, in order to avoid a chicken-and-egg dependency cycle.
     gamedata_main_options = SpinConfig.load(SpinConfig.gamedata_component_filename('main_options.json', override_game_id = game_id), stripped = True, override_game_id = game_id)
-    gamedata = {'townhall': gamedata_main_options['townhall']}
+    gamedata = {'townhall': gamedata_main_options['townhall'], 'townhall_loot_malus': gamedata_main_options.get('townhall_loot_malus', 1)}
     gamedata['resources'] = SpinConfig.load(SpinConfig.gamedata_component_filename('resources.json', override_game_id = game_id), override_game_id = game_id)
     gamedata['units'] = SpinConfig.load(SpinConfig.gamedata_component_filename('units.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['buildings'] = SpinConfig.load(SpinConfig.gamedata_component_filename('buildings.json', override_game_id = game_id), override_game_id = game_id)
+    gamedata['player_xp'] = SpinConfig.load(SpinConfig.gamedata_component_filename('player_xp.json', override_game_id = game_id), override_game_id = game_id)
     gamedata['item_sets'] = SpinConfig.load(SpinConfig.gamedata_component_filename('item_sets.json', override_game_id = game_id), override_game_id = game_id)
     gamedata['loot_tables'] = SpinConfig.load(SpinConfig.gamedata_component_filename('loot_tables.json', override_game_id = game_id), override_game_id = game_id)
     gamedata['matchmaking'] = SpinConfig.load(SpinConfig.gamedata_component_filename('matchmaking.json', override_game_id = game_id), override_game_id = game_id)
@@ -1090,6 +1093,14 @@ if __name__ == '__main__':
 
                 if 'ui_difficulty_comment' in data:
                     json += [("ui_difficulty_comment", data['ui_difficulty_comment'][diff])]
+
+                # add automatic ui_difficulty_comment reflecting resource loot as affected by townhall_loot_malus
+                elif gamedata.get('townhall_loot_malus', 1) < 1 and 'base_resource_loot' in data:
+                    # assume AI level == townhall level
+                    assert gamedata['player_xp'].get('level_assignment') == 'townhall_level'
+
+                    ai_townhall_level = data['starting_ai_level'][diff]+ i * data['ai_level_gain_per_base']
+                    json += [("ui_difficulty_comment", ui_difficulty_comment_for_townhall_loot_malus(gamedata, ai_townhall_level, data['base_resource_loot'][diff][i]))]
 
                 if 'villain_map_portrait' in data:
                     json += [("map_portrait", data['villain_map_portrait'][diff])]
