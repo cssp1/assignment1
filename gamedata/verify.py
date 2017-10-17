@@ -705,7 +705,7 @@ def check_aura(auraname, spec, maxlevel):
         for effect in spec['effects']:
             # server-side codes (implemented in server.py)
             if effect['code'] in ('modstat', 'hold_unit_space', 'trophy_pvp_decay',
-                                  'sandstorm_max', 'base_damage_win_condition'):
+                                  'sandstorm_max', 'base_damage_win_condition', 'weak_secteam'):
                 if not spec.get('server',False):
                     error |= 1; print '%s: uses a server-side effect code but server != 1' % auraname
                 if spec.get('client',False):

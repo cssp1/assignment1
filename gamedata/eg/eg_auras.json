@@ -453,6 +453,14 @@
         "effects": [{"code": "cast_spell_continuously", "spell": "EMIT_SONIC"}]
     },
 
+    "weak_secteam": {
+        "name": "weak_secteam",
+        "harm": 1, "server": 1, "client": 0,
+        "ui_name": "Badly damaged",
+        "ui_description": "Unit was badly damaged in a previous battle. Security team refused to get on board.",
+        "effects": [{"code": "weak_secteam"}]
+    },
+
     // CLIENT-SIDE OBJECT AURAS
 
     "damage_boosted": {

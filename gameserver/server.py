@@ -5704,15 +5704,12 @@ class Session(object):
         self.has_attacked = True
         self.debug_log_action('deploy_ai_attack')
 
-        # add "weak zombie" debuff to player units
-        if gamedata['zombie_debuff_threshold'] >= 0:
-            for unit in self.player.home_base_iter():
-                if (unit.owner is self.player) and unit.is_mobile() and (not unit.is_destroyed()) and self.has_object(unit.obj_id):
-                    if (unit.hp / max(0.01, float(unit.max_hp))) < gamedata['zombie_debuff_threshold']:
-                        if unit.auras is None: unit.auras = []
-                        Aura.apply_aura(unit.auras, 'weak_zombie', 1, session_only = True)
-
-                        retmsg.append(["OBJECT_AURAS_UPDATE", unit.serialize_auras()])
+        # add "weak unit" debuffs to player units
+        for unit in self.player.home_base_iter():
+            if (unit.owner is self.player) and unit.is_mobile() and (not unit.is_destroyed()) and self.has_object(unit.obj_id):
+                unit.apply_weak_unit_debuffs()
+                if unit.auras:
+                    retmsg.append(["OBJECT_AURAS_UPDATE", unit.serialize_auras()])
 
         # need to send this so that enemy units in your base get the right stats
         retmsg.append(["ENEMY_STATTAB_UPDATE", {'player':{},'units':{},'buildings':{}}])
@@ -6987,10 +6984,31 @@ class GameObject(object):
         self.auras = newauras
         self.update_max_hp()
 
-    def is_weak_zombie(self):
-        if self.auras:
-            return Aura.has_aura_with_code(self.auras, 'weak_zombie')
-        return False
+    def is_on_destroy_enabled(self):
+        if self.auras and Aura.has_aura_with_code(self.auras, 'weak_zombie'): return False
+        return True
+
+    def apply_weak_unit_debuffs(self):
+        hp_ratio = self.hp / max(0.01, float(self.max_hp))
+        auras_to_apply = []
+
+        if gamedata['zombie_debuff_threshold'] >= 0 and hp_ratio < gamedata['zombie_debuff_threshold']:
+            auras_to_apply.append('weak_zombie')
+        if gamedata['weak_secteam_debuff_threshold'] >= 0 and hp_ratio < gamedata['weak_secteam_debuff_threshold']:
+            # do we actually carry a secteam?
+            on_destroy_list = self.owner.stattab.get_unit_stat(self.spec.name, 'on_destroy', self.get_leveled_quantity(self.spec.on_destroy))
+            if on_destroy_list:
+                for cons in on_destroy_list:
+                    if cons['consequent'] == 'SPAWN_SECURITY_TEAM':
+                        auras_to_apply.append('weak_secteam')
+                        break
+
+        if auras_to_apply:
+            if self.auras is None: self.auras = []
+            for a in auras_to_apply:
+                Aura.apply_aura(self.auras, a, 1, session_only = True)
+
+        return auras_to_apply
 
     def serialize_state(self, fake_xy = None, update_hp = True, update_xy = True):
         assert self.team != -1
@@ -7141,6 +7159,11 @@ class Mobile(GameObject):
         self.temporary = state.get('temporary', None)
 
     def is_temporary(self): return bool(self.temporary)
+
+    def is_on_destroy_enabled(self):
+        if not GameObject.is_on_destroy_enabled(self): return False
+        if self.auras and Aura.has_aura_with_code(self.auras, 'weak_secteam'): return False
+        return True
 
     # reposition in middle of map, used for deploying squad units that don't have positions yet
     def ensure_mobile_position(self, base_ncells):
@@ -24558,11 +24581,8 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["OBJECT_CREATED2", unit.serialize_state(fake_xy = loc)])
 
-            # add "weak zombie" debuff
-            if (unit.hp / max(0.01, float(unit.max_hp))) < gamedata['zombie_debuff_threshold']:
-                if unit.auras is None: unit.auras = []
-                Aura.apply_aura(unit.auras, 'weak_zombie', 1, session_only = True)
-
+            # add "weak unit" debuffs
+            unit.apply_weak_unit_debuffs()
             if unit.auras:
                 retmsg.append(["OBJECT_AURAS_UPDATE", unit.serialize_auras()])
 
@@ -25622,7 +25642,7 @@ class GAMEAPI(resource.Resource):
                                 if 'buildings_killed' not in session.loot: session.loot['buildings_killed'] = {}
                                 dict_increment(session.loot['buildings_killed'], obj.spec.name, 1)
 
-                        if not obj.is_weak_zombie():
+                        if obj.is_on_destroy_enabled():
                             # check for equipment that has on_destroy consequents (such as security team spawning)
                             on_destroy_cons_list = obj.get_stat('on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
                             if on_destroy_cons_list:
@@ -25829,7 +25849,7 @@ class GAMEAPI(resource.Resource):
         # must come before rem_object() since it needs obj.team
         session.log_attack_unit(owning_user_id, obj, '3930_unit_destroyed', fake_xy = death_location, killer_info = killer_info)
 
-        was_zombie = obj.is_weak_zombie()
+        on_destroy_enabled = obj.is_on_destroy_enabled()
 
         # note: this invalidates obj.team and removes session-only auras
         session.rem_object(id)
@@ -25891,7 +25911,7 @@ class GAMEAPI(resource.Resource):
             # record immediately since it may leave the session and/or bases
             session.damage_log.record(obj)
 
-        if not was_zombie:
+        if on_destroy_enabled:
             on_destroy_cons_list = obj.owner.stattab.get_unit_stat(obj.spec.name, 'on_destroy', obj.get_leveled_quantity(obj.spec.on_destroy))
             if on_destroy_cons_list:
                 for cons in on_destroy_cons_list:

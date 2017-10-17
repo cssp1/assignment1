@@ -817,6 +817,9 @@
     "weak_zombie_tip": { "ui_title": "Random Failures Suffered",
                          "ui_description": "Units with more than %one_minus_threshold% damage now suffer speed and damage reductions due to random equipment failures, and cannot spawn security teams.\n\nOur forces desperately need repairs." },
 
+    "weak_secteam_tip": { "ui_title": "Too Damaged for Security Team",
+                          "ui_description": "Security team refuses to get on board when a unit enters battle with %one_minus_threshold%+ damage. To re-activate the security team, repair the unit and make another attack."},
+
     "no_equipment_tip": { "ui_title": "You Lack Equipment",
                           "ui_description": "Your Warehouse lacks equipment items for this slot.\n\nWin equipment during limited-time special events by fighting featured opponents on the Attack menu." },
 

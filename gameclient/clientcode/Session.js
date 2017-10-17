@@ -74,7 +74,8 @@ Session.Session = function() {
     this.battle_outcome_sync_marker = Synchronizer.INIT; // synchronizer to make sure server is up to date before client tries to end battle
     this.battle_outcome_dirty = false; // whether we need to check for win/loss - always update sync_marker when setting true
     this.deployed_unit_space = 0; // how much "space" worth of units has been deployed into battle
-    this.weak_zombie_warned = false; // whether or not we have already shown the "you are about to deploy a zombie unit" warning
+    /** @type {!Object<string,number>} - whether or not we have already shown the "you are about to deploy a zombie/no-secteam unit" warning, indexed by tipname */
+    this.weak_unit_warned = {};
     this.manufacture_overflow_warned = false; // whether we have already shown the "base defenders full, new units diverted to reserves" message
     this.buy_gamebucks_sku_highlight_shown = false; // whether we have already shown the SKU highlight upon Buy Gamebucks dialog open
     this.is_alt_account = false; // whether we are viewing a base owned by a known alt account
@@ -243,9 +244,9 @@ Session.Session.prototype.count_post_deploy_units = function() {
     return goog.object.getCount(goog.object.filter(this.post_deploy_units, function(obj) { return obj['source'] !== 'donated'; }));
 };
 
-// return [army_unit, zombie_status] representing next (healthiest undeployed) unit we can deploy of a certain spec
+// return [army_unit, zombie_status, weak_secteam_status] representing next (healthiest undeployed) unit we can deploy of a certain spec
 Session.Session.prototype.get_next_deployable_unit = function(specname) {
-    var unit = null, highest_hp = -1, is_zombie = false;
+    var unit = null, highest_hp = -1;
     this.foreach_deployable_unit(function (obj) {
         if(obj['spec'] != specname) { return; }
         if(obj['obj_id'] in this.post_deploy_units ||
@@ -257,12 +258,17 @@ Session.Session.prototype.get_next_deployable_unit = function(specname) {
         }
     }, this);
     if(!unit) { throw Error('get_next_deployable_unit('+specname+') failed'); }
-    if(unit && gamedata['zombie_debuff_threshold'] >= 0) {
-        var curmax = army_unit_hp(unit);
-        var ratio = curmax[0]/Math.max(curmax[1],1);
-        if(ratio < gamedata['zombie_debuff_threshold']) { is_zombie = true; }
-    }
-    return [unit, is_zombie];
+
+    var level = unit['level'] || 1;
+
+    // check HP for weak-unit warnings
+    var curmax = army_unit_hp(unit);
+    var ratio = curmax[0]/Math.max(curmax[1],1);
+
+    var is_zombie = (gamedata['zombie_debuff_threshold'] >= 0 && ratio < gamedata['zombie_debuff_threshold']);
+    var is_weak_secteam = (gamedata['weak_secteam_debuff_threshold'] >= 0 && ratio < gamedata['weak_secteam_debuff_threshold'] && player.unit_carries_secteam(unit['spec'], level));
+
+    return [unit, is_zombie, is_weak_secteam];
 };
 
 // return the army_unit of the weakest (non-donated) unit of this spec in pre-deploy, for canceling unit deployment one-by-one

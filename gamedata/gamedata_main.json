@@ -733,6 +733,7 @@
     "research_cancel_refund": 0.50, // fraction of original cost that is refunded when tech research is cancelled
 
     "zombie_debuff_threshold": 0.1, // fraction of HP below which zombie debuff applies (set -1 to disable)
+    "weak_secteam_debuff_threshold": 0.5, // fraction of HP below which no-secteam debuff applies (set -1 to disable)
 
     "minimum_combat_power_factor": 0.30, // minimum effectiveness of turrets if all energy plants are inoperative
 

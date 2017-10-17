@@ -96,7 +96,7 @@
         }
     },
 
-    "message_dialog_weak_zombie": {
+    "message_dialog_weak_unit": {
         "dimensions": [487,337],
         "default_button": "ok_button",
         "widgets": {

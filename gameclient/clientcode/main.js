@@ -7399,6 +7399,22 @@ player.home_continent = function() {
     return eval_cond_or_literal(gamedata['continent_assignment'], player, null);
 };
 
+/** @param {string} specname
+    @param {number} level
+    @return {boolean} whether this type of unit, if owned by player, currently carries a secteam */
+player.unit_carries_secteam = function(specname, level) {
+    var spec = gamedata['units'][specname];
+    var on_destroy = get_unit_stat(player.stattab, specname, 'on_destroy', get_leveled_quantity(spec['on_destroy'] || null, level));
+    if(!on_destroy) { return false; }
+    for(var i = 0; i < on_destroy.length; i++) {
+        var cons = on_destroy[i];
+        if(cons['consequent'] === 'SPAWN_SECURITY_TEAM') {
+            return true;
+        }
+    }
+    return false;
+};
+
 player.can_resurrect_unit = function(obj) {
     if(obj.spec['resurrectable']) { return true; }
     return get_unit_stat(player.stattab, obj.spec['name'], 'resurrection', RESURRECT_NEVER) >= RESURRECT_AND_REPAIR_WITH_TECH;
@@ -13914,7 +13930,11 @@ function update_unit_deployment_bar_squad(dialog) {
             }
 
             // at this point we are sure at least one unit can be deployed from this squad
+
+            /** @type {string|null} specname of first unit affected by weak-unit debuffs */
             var is_zombie = null;
+            /** @type {string|null} */
+            var is_weak_secteam = null;
 
             session.foreach_deployable_unit(function (army_unit) {
                 if((army_unit['squad_id'] || 0) !== squad_id) { return; }
@@ -13928,10 +13948,14 @@ function update_unit_deployment_bar_squad(dialog) {
                     return;
                 }
 
-                if(!is_zombie && gamedata['zombie_debuff_threshold'] >= 0) {
-                    var curmax = army_unit_hp(army_unit);
-                    var ratio = curmax[0]/Math.max(curmax[1],1);
-                    if(ratio < gamedata['zombie_debuff_threshold']) { is_zombie = army_unit['spec']; }
+                var curmax = army_unit_hp(army_unit);
+                var ratio = curmax[0]/Math.max(curmax[1],1);
+
+                if(!is_zombie && gamedata['zombie_debuff_threshold'] >= 0 && ratio < gamedata['zombie_debuff_threshold']) {
+                    is_zombie = army_unit['spec'];
+                }
+                if(!is_weak_secteam && gamedata['weak_secteam_debuff_threshold'] >= 0 && ratio < gamedata['weak_secteam_debuff_threshold'] && player.unit_carries_secteam(army_unit['spec'], level)) {
+                    is_weak_secteam = army_unit['spec'];
                 }
 
                 session.pre_deploy_units[army_unit['obj_id']] = army_unit;
@@ -13947,9 +13971,12 @@ function update_unit_deployment_bar_squad(dialog) {
                 change_selection_ui_under(cursor);
             }
 
-            if(!session.weak_zombie_warned && is_zombie) {
-                session.weak_zombie_warned = true;
-                invoke_weak_zombie_tip(is_zombie);
+            if(player.tutorial_state == "COMPLETE") {
+                if(is_zombie) {
+                    invoke_weak_unit_tip('weak_zombie_tip', /** @type {string} */ (is_zombie), gamedata['zombie_debuff_threshold']);
+                } else if(is_weak_secteam) {
+                    invoke_weak_unit_tip('weak_secteam_tip', /** @type {string} */ (is_weak_secteam), gamedata['weak_secteam_debuff_threshold']);
+                }
             }
 
             player.quest_tracked_dirty = true;
@@ -14082,10 +14109,16 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
                 change_selection_ui_under(cursor);
             }
 
-            var is_zombie = false;
+            /** @type {string|null} specname of first unit affected by weak-unit debuffs */
+            var is_zombie = null;
+            /** @type {string|null} */
+            var is_weak_secteam = null;
+
             for(var i = 0; i < incr; i++) {
                 var obj_zomb = session.get_next_deployable_unit(name);
-                var obj = obj_zomb[0]; is_zombie |= obj_zomb[1];
+                var obj = obj_zomb[0];
+                if(!is_zombie && obj_zomb[1]) { is_zombie = obj['spec']; }
+                if(!is_weak_secteam && obj_zomb[2]) { is_weak_secteam = obj['spec']; }
                 session.pre_deploy_units[obj['obj_id']] = obj;
                 if(gamedata['unit_deploy_style'] != 'drip') {
                     // batch-style unit deployment predicts deployed_unit_space as the cursor fills up, drip-style does not
@@ -14093,11 +14126,12 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
                 }
             }
 
-            if(!session.weak_zombie_warned &&
-               (player.tutorial_state == "COMPLETE") &&
-               is_zombie) {
-                session.weak_zombie_warned = true;
-                invoke_weak_zombie_tip(name);
+            if(player.tutorial_state == "COMPLETE") {
+                if(is_zombie) {
+                    invoke_weak_unit_tip('weak_zombie_tip', /** @type {string} */ (is_zombie), gamedata['zombie_debuff_threshold']);
+                } else if(is_weak_secteam) {
+                    invoke_weak_unit_tip('weak_secteam_tip', /** @type {string} */ (is_weak_secteam), gamedata['weak_secteam_debuff_threshold']);
+                }
             }
 
             player.quest_tracked_dirty = true;
@@ -37346,18 +37380,22 @@ function invoke_ingame_tip(name, options) {
     return dialog;
 }
 
-/** @param {string} name - specname of unit to talk about */
-function invoke_weak_zombie_tip(name) {
-    var dialog = invoke_ingame_tip('weak_zombie_tip', {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED,
-                                                       dialog:'message_dialog_weak_zombie',
-                                                       dialog_options: {parentless:true}
-                                                      });
+/** @param {string} tipname
+    @param {string} name - specname of unit to talk about
+    @param {number} threshold - from gamedata, HP ratio below which the debuff applies */
+function invoke_weak_unit_tip(tipname, name, threshold) {
+    if(session.weak_unit_warned[tipname]) { return; }
+    session.weak_unit_warned[tipname] = 1;
+    var dialog = invoke_ingame_tip(tipname, {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED,
+                                             dialog:'message_dialog_weak_unit',
+                                             dialog_options: {parentless:true}
+                                            });
     if(!dialog) { return; } // suppressed
     SPUI.root.add(dialog);
     dialog.auto_center();
     var unit_ui_name = gamedata['units'][name]['ui_name'];
-    dialog.widgets['title'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_title'].replace('%s', unit_ui_name));
-    dialog.widgets['description'].set_text_with_linebreaking(gamedata['strings']['weak_zombie_tip']['ui_description'].replace('%s', unit_ui_name).replace('%one_minus_threshold', (100.0*(1.0-player.get_any_abtest_value('zombie_debuff_threshold', gamedata['zombie_debuff_threshold']))).toFixed(0)));
+    dialog.widgets['title'].set_text_with_linebreaking(gamedata['strings'][tipname]['ui_title'].replace('%s', unit_ui_name));
+    dialog.widgets['description'].set_text_with_linebreaking(gamedata['strings'][tipname]['ui_description'].replace('%s', unit_ui_name).replace('%one_minus_threshold', (100.0*(1.0-threshold)).toFixed(0)));
     dialog.widgets['ok_button'].onclick = close_parent_dialog;
     dialog.widgets['unit_icon'].show = dialog.widgets['unit_wrench_icon'].show = true;
     dialog.widgets['unit_icon'].asset = get_leveled_quantity(gamedata['units'][name]['art_asset'], 1);
@@ -47026,7 +47064,7 @@ function handle_server_message(data) {
         session.is_alt_account = data[26];
         session.deployable_squads = data[28];
         session.deployed_unit_space = 0;
-        session.weak_zombie_warned = false;
+        goog.object.clear(session.weak_unit_warned);
         if(gamedata['territory']['dirty_region_map_after_session_change']) { session.region.dirty = true; }
         var viewing_alliance_id = data[29], viewing_alliance_info = data[30];
         session.ladder_state = data[31];
