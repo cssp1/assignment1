@@ -1698,6 +1698,11 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
     } else if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_expire_time' in feature) && (feature['base_expire_time'] > 0) &&
               (feature['base_expire_time'] - mapwidget.time) < gamedata['territory']['escaping_soon_time']) {
         blink_list.push({'status':'escaping_soon'});
+    } else if(goog.array.contains(['hive','raid'], feature['base_type']) && ('base_template' in feature) && (feature['base_template'] in gamedata[{'hive':'hives_client','raid':'raids_client'}[feature['base_type']]]['templates']) && ('ui_difficulty_comment' in gamedata[{'hive':'hives_client','raid':'raids_client'}[feature['base_type']]]['templates'][feature['base_template']])) {
+        var comment = eval_cond_or_literal(gamedata[{'hive':'hives_client','raid':'raids_client'}[feature['base_type']]]['templates'][feature['base_template']]['ui_difficulty_comment'], player, null);
+        if(comment) {
+            blink_list.push({'status':'open_with_difficulty_comment', 'str':comment});
+        }
     } else if(feature['base_last_conquer_time'] && feature['base_last_conquer_time'] > 0) {
         blink_list.push({'status':'open_since', 'str':pretty_print_time_brief(mapwidget.time - feature['base_last_conquer_time'])});
     } else if(feature['base_type'] == 'home' && !is_ai_user_id_range(feature['base_landlord_id'])) {
@@ -1733,9 +1738,10 @@ RegionMap.RegionMap.update_feature_popup = function(dialog) {
         var period = gamedata['territory']['last_defended_blink_period'];
         index = Math.floor(((client_time - dialog.user_data['open_time'])/period) % blink_list.length);
     }
-
-    dialog.widgets['attackability'].str = dialog.data['widgets']['attackability']['ui_name_'+blink_list[index]['status']].replace('%s', blink_list[index]['str']||'');
     dialog.widgets['attackability'].text_color = SPUI.make_colorv(dialog.data['widgets']['attackability']['text_color_'+blink_list[index]['status']]);
+
+    var final_str = dialog.data['widgets']['attackability']['ui_name_'+blink_list[index]['status']].replace('%s', blink_list[index]['str']||'');
+    dialog.widgets['attackability'].set_text_with_linebreaking_and_shrink_font_to_fit(final_str);
 };
 
 /** @param {!Object<string,?>} feature

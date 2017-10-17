@@ -8853,7 +8853,8 @@
             "squad_hp_bar": { "show": 0, "kind": "ProgressBar", "xy": [200,10], "dimensions": [60,9], "outline_width": 1,
                               "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
 
-            "attackability": {"kind": "TextField", "xy":[69,43], "dimensions": [124,13],"text_size": 13,"text_hjustify":"left","text_style":"bold",
+            "attackability": {"kind": "TextField", "xy":[69,43], "dimensions": [270,17], "text_size": 13, "text_hjustify":"left", "text_style":"normal",
+                              "clip_to": [69,43,192,17],
                               "ui_name": "",
                               "ui_name_open": "", "text_color_open": [1,1,1,1],
                               "ui_name_open_with_trophies": "+%s PvP Points", "text_color_open_with_trophies": [1,0.5,0,1],
