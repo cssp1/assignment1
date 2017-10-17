@@ -4033,6 +4033,7 @@
                                   "ui_name_hard": "Hard", "text_color_hard": [0.8,0.6,0],
                                   "ui_name_monstrous": "Monstrous", "text_color_monstrous": [1,0.5,0],
                                   "ui_name_extreme": "Extreme", "text_color_extreme": [1,0.2,0],
+                                  "ui_tooltip": "", "tooltip_delay": 0, "max_len": 12,
                                   "show": 0, "array": [1,5], "array_offset": [0,56] },
 
             "row_info_button": {"kind": "ActionButton", "xy":[325,118], "dimensions":[23,23], "bg_image": "question_button", "push_bg_image": 1,

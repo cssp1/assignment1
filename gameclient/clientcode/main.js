@@ -36725,13 +36725,21 @@ function map_dialog_change_page(dialog, chapter, page) {
                         if(difficulty) {
                             show_difficulty = true;
                             dialog.widgets['row_ai_difficulty'+row].str = dialog.data['widgets']['row_ai_difficulty']['ui_name_'+difficulty];
+                            dialog.widgets['row_ai_difficulty'+row].tooltip.str = null;
                             level_color = SPUI.make_colorv(dialog.data['widgets']['row_ai_difficulty']['text_color_'+difficulty]);
                             dialog.widgets['row_ai_difficulty'+row].text_color = level_color;
                         }
                         if(base && ('ui_difficulty_comment' in base)) { // this can override the default string
                             var comment = eval_cond_or_literal(base['ui_difficulty_comment'], player, null);
                             if(comment) {
-                                dialog.widgets['row_ai_difficulty'+row].str = comment;
+                                var max_len = dialog.data['widgets']['row_ai_difficulty']['max_len'];
+                                if(comment.length > max_len) {
+                                    dialog.widgets['row_ai_difficulty'+row].str = comment.slice(0,max_len) + '...';
+                                    dialog.widgets['row_ai_difficulty'+row].tooltip.str = comment;
+                                } else {
+                                    dialog.widgets['row_ai_difficulty'+row].str = comment;
+                                    dialog.widgets['row_ai_difficulty'+row].tooltip.str = null;
+                                }
                             }
                         }
                     }
