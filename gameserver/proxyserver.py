@@ -531,7 +531,7 @@ class KGVisitor(Visitor):
                                                                                                           })
     def allowed_frame_origin(self, request):
         if SpinConfig.config.get('enable_kongregate',0):
-            return '*.kongregate.com'
+            return 'http://*.kongregate.com https://*.kongregate.com'
         return None
 
 class AGVisitor(Visitor):
