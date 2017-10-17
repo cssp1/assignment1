@@ -6,6 +6,22 @@
 
 # stand-alone library for parsing gamedata, without instantiating server-side objects
 
+def pretty_print_qty(qty):
+    if qty >= 1000000:
+        return '%.1fM' % (qty/1000000.0)
+    elif qty >= 10000:
+        return '%dK' % (qty//1000)
+    elif qty >= 1000:
+        return '%.1fK' % (qty/1000.0)
+    return str(qty)
+
+def pretty_print_qty_brief(qty):
+    if qty >= 1000000:
+        return '%dM' % (qty//1000000)
+    elif qty >= 1000:
+        return '%dK' % (qty//1000)
+    return str(qty)
+
 def get_leveled_quantity(qty, level):
     if type(qty) is list:
         return qty[level-1]

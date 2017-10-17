@@ -9,7 +9,7 @@
 from math import sqrt
 import re
 import SpinConfig
-from GameDataUtil import get_max_level, ResourceValuation # get_leveled_quantity
+from GameDataUtil import pretty_print_qty, get_max_level, ResourceValuation # get_leveled_quantity
 
 gamedata = None # will be loaded later
 
@@ -33,15 +33,6 @@ def pretty_print_time_brief(sec):
         ret += '%dm' % m
     #ret += '%ds' % sec
     return ret
-
-def pretty_print_qty(qty):
-    if qty >= 1000000:
-        return '%.1fM' % (qty/1000000.0)
-    elif qty >= 10000:
-        return '%dK' % (qty//1000)
-    elif qty >= 1000:
-        return '%.1fK' % (qty/1000.0)
-    return str(qty)
 
 def pretty_print_stat(key, val):
     if isinstance(val, basestring):
