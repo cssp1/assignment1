@@ -340,6 +340,9 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         }
     }
 
+    // some lines to re-order after the end of the normal timestamped sequence
+    var footer = [];
+
     for(var i = 0; i < metlist.length; i++) {
         var met = metlist[i];
         var line = [];
@@ -350,6 +353,12 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
             // note: GUI displays the timestamp as a "Battle ID" to reduce player confusion, but it's just the UNIX
             // timestamp of the battle start, NOT an actual unique ID.
             line.push(new SPText.ABlock(ui_battle_kind+' starts at '+(new Date(1000*summary['time'])).toUTCString()+' (Battle ID '+summary['time'].toString()+')', props.neutral.normal));
+            /* might be redundant/counterproductive to show this
+            if(summary['attacker_could_revenge_until'] > 0) {
+                ret.push([line]);
+                line = [new SPText.ABlock(names['attacker'] + ' ' + (summary['attacker_could_revenge_until'] >= server_time ? (summary['attacker_id'] === viewer_id ? 'have' : 'has') : 'had') +' revenge rights against ' + poss['defender'] + ' home base until ' + pretty_print_date_and_time_utc(summary['attacker_could_revenge_until']) + ' GMT', pr.normal)];
+            }
+            */
         } else if('time' in met) {
             line.push(new SPText.ABlock((met['time']-start).toString()+'s: ', pr.normal));
         }
@@ -569,6 +578,12 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
                 var ui_str = (ui_str_list.length > 0 ? ui_str_list.join('\n') : 'None');
                 line.push(new SPText.ABlock(poss[met['user_id']]+' raid strength remaining: '+ui_str, pr.normal));
             }
+        } else if(met['event_name'] == '3890_revenge_enabled') {
+            pr = (met['user_id'] == my_id) ? props.good : props.bad;
+
+            // add after end
+            footer.push([[new SPText.ABlock('Because of this attack, ' + names[met['user_id']]+' can take revenge on ' + poss[met['against']] + ' home base regardless of level difference until ' + pretty_print_date_and_time_utc(met['end_time']) + ' GMT', pr.normal)]]);
+            continue;
         } else {
             line.push(new SPText.ABlock(met['event_name'], pr.normal));
         }
@@ -576,6 +591,9 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         ret.push([line]);
 
     }
+
+    ret = ret.concat(footer);
+
     //console.log(ret);
     return ret;
 };

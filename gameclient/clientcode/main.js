@@ -20038,7 +20038,9 @@ function invoke_attack_stronger_message(do_attack_cb) {
     change_selection_ui(dialog);
     dialog.auto_center();
 
-    dialog.widgets['description'].str = dialog_data['widgets']['description']['ui_name'].replace('%s', session.ui_name);
+    dialog.widgets['description'].str = dialog_data['widgets']['description']['ui_name']
+        .replace('%s', session.ui_name)
+        .replace('%duration', pretty_print_time(gamedata['matchmaking']['revenge_time']));
     dialog.widgets['yes_button'].onclick = (function (cb) { return function() { change_selection(null); cb(); }; })(do_attack_cb);
     dialog.widgets['no_button'].onclick = function() { change_selection(null); };
     return dialog;

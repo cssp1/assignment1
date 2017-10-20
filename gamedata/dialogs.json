@@ -435,10 +435,10 @@
         "default_button": "yes_button",
         "widgets": {
             "bg": { "kind": "Dialog", "xy":[0,0], "dimensions":[451,151], "dialog": "message_dialog_bg" },
-            "title":  { "kind": "TextField", "xy": [110,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
+            "title":  { "kind": "TextField", "xy": [104,19], "dimensions": [294, 24], "text_style": "bold", "text_hjustify": "left",
                         "ui_name": "Are you sure?" },
-            "description": { "kind": "TextField", "xy": [110,43], "dimensions": [294,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15, "text_vjustify": "top",
-                             "ui_name": "This powerful base is restricted from attacking you.\nIf you attack now, %s can retaliate!" },
+            "description": { "kind": "TextField", "xy": [104,43], "dimensions": [294,34], "text_hjustify": "left",  "text_size": 13, "text_leading": 15, "text_vjustify": "top",
+                             "ui_name": "This powerful rival is restricted from attacking your home.\nIf you attack, they can retaliate for %duration!" },
 
             "yes_button": { "kind": "ActionButton", "xy": [144,106], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                             "bg_image": "action_button_134px", "ui_name": "Attack" },
