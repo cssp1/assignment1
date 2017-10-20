@@ -6540,6 +6540,7 @@ class GameObjectSpec(Spec):
         ["track_level_in_player_history", False],
         ["history_category", None],
         ["defense_types", []],
+        ["damage_taken_from", None], # if present, dictionary of key->multiplier
         ["invisible", False],
         ["invis_on_hold", False],
         ["flying", False],

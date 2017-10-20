@@ -1600,12 +1600,12 @@ function CombatStats() {
     this.disarmed = 0;
     this.damage_taken = 1;
     /** @type {!Object.<string,number>} */
-    this.damage_taken_from = {};
+    this.damage_taken_from = {}; // OVERRIDES the spec's native damage_taken_from table
     this.rate_of_fire = 1;
     this.accuracy = 1;
     this.weapon_damage = 1;
     /** @type {!Object.<string,number>} */
-    this.weapon_damage_vs = {}; // multiplies with the usual damage_vs_table
+    this.weapon_damage_vs = {}; // multiplies with the weapon's native damage_vs_table
     this.effective_weapon_range = 1;
     this.weapon_range = 1;
     this.extra_armor = 0;
@@ -1629,11 +1629,11 @@ CombatStats.prototype.clear = function() {
     this.stunned = 0;
     this.disarmed = 0;
     this.damage_taken = 1;
-    this.damage_taken_from = {};
+    this.damage_taken_from = {}; // OVERRIDES the spec's native damage_taken_from table
     this.rate_of_fire = 1;
     this.accuracy = 1;
     this.weapon_damage = 1;
-    this.weapon_damage_vs = {}; // multiplies with the usual damage_vs_table
+    this.weapon_damage_vs = {}; // multiplies with the weapon's native damage_vs_table
     this.effective_weapon_range = 1;
     this.weapon_range = 1;
     this.extra_armor = 0;
@@ -2493,9 +2493,13 @@ function get_damage_modifier(vs_table, target) {
                 }
             }
         }
-        for(var kind in target.combat_stats.damage_taken_from) {
-            if(kind in vs_table) {
+
+        for(var kind in vs_table) {
+            if(kind in target.combat_stats.damage_taken_from) {
                 damage_mod *= vs_table[kind] * target.combat_stats.damage_taken_from[kind];
+            // note: completely override the native table, if present in combat_stats
+            } else if('damage_taken_from' in target.spec && kind in target.spec['damage_taken_from']) {
+                damage_mod *= vs_table[kind] * target.get_leveled_quantity(target.spec['damage_taken_from'][kind]);
             }
         }
     }
@@ -42819,6 +42823,16 @@ function update_upgrade_dialog(dialog) {
                 });
             }
 
+            if('damage_taken_from' in spec) {
+                goog.object.forEach(spec['damage_taken_from'], function(amount, key) {
+                    var stat = 'damage_taken_from:'+key;
+                    if(stat in gamedata['strings']['modstats']['stats'] &&
+                       gamedata['strings']['modstats']['stats'][stat]['display'] !== null) {
+                        feature_list.push(stat);
+                    }
+                });
+            }
+
             if('permanent_auras' in spec) {
                 feature_list.push('permanent_auras');
             }
@@ -42950,6 +42964,16 @@ function update_upgrade_dialog(dialog) {
                 if(stat in gamedata['strings']['modstats']['stats'] &&
                    gamedata['strings']['modstats']['stats'][stat]['display'] !== null &&
                    !goog.array.contains(feature_list, stat)) {
+                    feature_list.push(stat);
+                }
+            });
+        }
+
+        if('damage_taken_from' in unit.spec) {
+            goog.object.forEach(unit.spec['damage_taken_from'], function(amount, key) {
+                var stat = 'damage_taken_from:'+key;
+                if(stat in gamedata['strings']['modstats']['stats'] &&
+                   gamedata['strings']['modstats']['stats'][stat]['display'] !== null) {
                     feature_list.push(stat);
                 }
             });

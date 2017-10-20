@@ -67,6 +67,13 @@ ModChain.get_base_value = function(stat, spec, level) {
     } else if(stat.indexOf('provides_limited_equipped:') == 0) {
         var thing = stat.replace('provides_limited_equipped:','');
         return get_leveled_quantity(spec['provides_limited_equipped'][thing]||0, level);
+    } else if(stat.indexOf('damage_taken_from:') === 0) {
+        var thing = stat.replace('damage_taken_from:','');
+        if('damage_taken_from' in spec && thing in spec['damage_taken_from']) {
+            return get_leveled_quantity(spec['damage_taken_from'][thing], level);
+        } else {
+            return 1;
+        }
     } else if(stat.indexOf('quarry_control_aura:') == 0) {
         var au_specname = stat.replace('quarry_control_aura:','');
         var au_data = goog.array.find(spec['quarry_control_auras'], function(au) { return au['spec'] === au_specname; });
@@ -617,7 +624,16 @@ ModChain.display_value_detailed = function(stat, modchain, spec, level, auto_spe
     }
     var ui_data = gamedata['strings']['modstats']['stats'][stat];
     var extra = null;
-    var show_base = (stat in spec); // don't bother showing "base" values for stats that are not part of the spec
+    var show_base = false;
+
+    // don't bother showing "base" values for stats that are not part of the spec
+    if(stat in spec) {
+        show_base = true;
+    } else if(stat.indexOf('damage_taken_from:') === 0 &&
+              'damage_taken_from' in spec &&
+              stat.split(':')[1] in spec['damage_taken_from']) {
+        show_base = true;
+    }
 
     // special case for weapon stats - these go into combat stats, so their "base" value is actually something like 1.0
     // recompute them with base values taken from the actual auto_spell stats

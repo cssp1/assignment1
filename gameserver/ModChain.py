@@ -30,6 +30,11 @@ def get_base_value(stat, spec, level):
     elif stat == 'weapon':
         assert len(spec.spells) >= 1
         return spec.spells[0]
+    elif stat.startswith('damage_taken_from:'):
+        thing = stat.split(':')[1]
+        if spec.damage_taken_from and thing in spec.damage_taken_from:
+            return get_leveled_quantity(spec.damage_taken_from[thing], level)
+        return 1
     else:
         return 1
 
