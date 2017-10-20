@@ -4035,6 +4035,7 @@ class Session(object):
         # these are reset each time the connected user views a different base
         self.home_base = True
         self.has_attacked = False
+        self.revenge_attack_until = -1 # if the attacker is taking advantage of a revenge_defender cooldown allowance, end time of the allowance, otherwise -1
 
         self.defender_cc_standing = False # true if the defender's CC was not destroyed at start of battle
         self.defender_protection_expired_at = -1 # set on initial base visit
@@ -9807,6 +9808,9 @@ class Player(AbstractPlayer):
     def alliance_raids_enabled(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('enable_alliance_raids'), None, self)
     def squad_bumping_enabled(self): return self.get_territory_setting('enable_squad_bumping')
 
+    def squads_affect_revenge(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('squads_affect_revenge'), None, self)
+    def quarries_affect_revenge(self): return Predicates.eval_cond_or_literal(self.get_territory_setting('quarries_affect_revenge'), None, self)
+
     def unit_speedups_enabled(self):
         return self.is_cheater or gamedata.get('enable_unit_speedups', True)
     def crafting_speedups_enabled(self):
@@ -11647,6 +11651,7 @@ class Player(AbstractPlayer):
         return True
 
     def get_pvp_balance(self, other_player, base):
+        if other_player is self: return None
         if other_player.is_ai(): return None
         my_level = self.resources.player_level
         his_level = other_player.resources.player_level
@@ -11659,6 +11664,14 @@ class Player(AbstractPlayer):
 
         elif (base is not other_player.my_home):
             # quarry/squad - no limit
+
+            # but, if enemy is stronger AND a new revenge allowance is going to be created, then warn!
+            if my_level < other_player.attackable_level_range()[0] and \
+               (not self.cooldown_active('revenge_attacker:%d' % other_player.user_id)) and \
+               ((base.base_type == 'squad' and other_player.squads_affect_revenge()) or \
+                (base.base_type == 'quarry' and other_player.quarries_affect_revenge())):
+                return 'enemy' # allow attack, but warn
+
             return None
 
         elif (self.home_region in gamedata['regions']) and (not gamedata['regions'][self.home_region].get('enable_pvp_level_gap', True)):
@@ -19098,6 +19111,55 @@ class GAMEAPI(resource.Resource):
 
             if (not session.viewing_player.is_ai()):
 
+                # REVENGE SYSTEM
+
+                # was this battle a revenge counterattack?
+                was_revenge = (session.revenge_attack_until >= 0)
+                if was_revenge:
+                    summary['is_revenge'] = 1
+
+                    # for future reference (i.e. to prove to players who complain...),
+                    # record the revenge status AS OF BATTLE START in the battle summary
+                    summary['attacker_could_revenge_until'] = session.revenge_attack_until
+
+                    # if this was a revenge counterattack, remove the cooldowns to "settle the score" between these players
+                    # but only do this in ladder and legacy PvP, and it must be a home-base attack
+                    if (session.player.is_ladder_player() or session.player.is_legacy_pvp_player()) and \
+                       (session.viewing_base is session.viewing_player.my_home):
+                        session.player.cooldown_reset('revenge_defender:%d' % session.viewing_player.user_id)
+                        session.viewing_player.cooldown_reset('revenge_attacker:%d' % session.player.user_id)
+                        session.attack_event(session.user.user_id, '3891_revenge_cleared')
+                        session.deferred_player_cooldowns_update = True
+
+                # it was not a counterattack. Create a new revenge allowance?
+                elif gamedata['matchmaking']['revenge_time'] > 0 and \
+                     ((session.viewing_base is session.viewing_player.my_home) or \
+                      (session.viewing_base.base_type == 'squad' and session.viewing_player.squads_affect_revenge()) or \
+                      (session.viewing_base.base_type == 'quarry' and session.viewing_player.quarries_affect_revenge())):
+                    # create a revenge allowance
+                    rtime = gamedata['matchmaking']['revenge_time']
+                    summary['defender_can_revenge_until'] = server_time + rtime
+
+                    # victim can take revenge against attacker
+                    if session.viewing_base is session.viewing_player.my_home:
+                        session.viewing_player.cooldown_trigger('revenge_defender:%d' % session.player.user_id, rtime)
+                    else: # send by asynchronous message, since we can't write to the player data
+                        gamesite.msg_client.msg_send([{'to': [session.viewing_player.user_id],
+                                                       'type': 'cooldown_trigger',
+                                                       'expire_time': server_time + rtime,
+                                                       'end_time': server_time + rtime,
+                                                       'from': session.player.user_id,
+                                                       'cooldown_name': 'revenge_defender:%d' % session.player.user_id,
+                                                       }])
+
+                    # attacker is subject to revenge from victim
+                    session.player.cooldown_trigger('revenge_attacker:%d' % session.viewing_player.user_id, rtime)
+                    session.attack_event(session.viewing_user.user_id, '3890_revenge_enabled', {'against': session.user.user_id,
+                                                                                                'end_time': server_time + rtime})
+                    session.deferred_player_cooldowns_update = True
+
+                # END REVENGE SYSTEM
+
                 if (session.viewing_base is session.viewing_player.my_home):
                     # home base PvP attack
 
@@ -19107,25 +19169,6 @@ class GAMEAPI(resource.Resource):
                     # adjust by minimum damage threshold
                     min_damage = session.viewing_player.get_leveled_quantity(session.viewing_player.get_any_abtest_value('protection_min_damage', gamedata['server']['protection_min_damage']))
                     storage_damage = (precurve_storage_damage - min_damage) / (1.0 - min_damage)
-
-                    was_revenge = False
-                    if gamedata['matchmaking']['revenge_time'] > 0:
-                        # record revenge status
-
-                        # if this was a revenge counterattack, remove the cooldowns to "settle the score" between these players
-                        if session.player.cooldown_active('revenge_defender:%d' % session.viewing_player.user_id):
-                            was_revenge = True
-                            summary['is_revenge'] = 1
-                            # but only do this in ladder and legacy PvP
-                            if session.player.is_ladder_player() or session.player.is_legacy_pvp_player():
-                                session.player.cooldown_reset('revenge_defender:%d' % session.viewing_player.user_id)
-                                session.viewing_player.cooldown_reset('revenge_attacker:%d' % session.player.user_id)
-                        else:
-                            # create a revenge allowance
-                            # victim can take revenge against attacker
-                            session.viewing_player.cooldown_trigger('revenge_defender:%d' % session.player.user_id, gamedata['matchmaking']['revenge_time'])
-                            # attacker is subject to revenge from victim
-                            session.player.cooldown_trigger('revenge_attacker:%d' % session.viewing_player.user_id, gamedata['matchmaking']['revenge_time'])
 
                     fatigue_cdname = ('ladder_fatigue' if session.is_ladder_battle() else 'battle_fatigue')
 
@@ -19774,6 +19817,7 @@ class GAMEAPI(resource.Resource):
             # END has_attacked
 
         session.has_attacked = False
+        session.revenge_attack_until = -1
         session.debug_log_action('_complete_attack')
 
         session.defender_cc_standing = False
@@ -20150,13 +20194,7 @@ class GAMEAPI(resource.Resource):
                     # always permit hive destruction when CC is dead at the end of the fight
                     session.defender_cc_standing = True
 
-            if session.viewing_player is not session.player and \
-               session.viewing_player.is_human() and \
-               gamedata['prevent_same_alliance_attacks'] and \
-               session.player.is_same_alliance(session.viewing_player.user_id):
-                session.pvp_balance = 'same_alliance'
-            else:
-                session.pvp_balance = None
+            session.pvp_balance = session.player.get_pvp_balance(session.viewing_player, session.viewing_base)
 
             if gamesite.nosql_client:
                 spyee_lock_state = gamesite.nosql_client.map_feature_lock_get_state_batch(session.player.home_region, [session.viewing_base.base_id], reason = 'spy_quarry')[0][0]
@@ -20568,6 +20606,7 @@ class GAMEAPI(resource.Resource):
                              'deployed_units', 'defending_units', 'raid_mode', 'new_raid_offense', 'new_raid_defense', 'new_raid_hp', 'new_raid_space',
                              'attacker_auras', 'defender_auras', 'attacker_tech', 'defender_tech',
                              'base_damage', 'loot', 'attacker_outcome', 'defender_outcome', 'prot_time',
+                             'is_revenge', 'attacker_could_revenge_until', 'defender_can_revenge_until',
                              'replay_version')
 
     def query_battle_history(self, session, retmsg, arg):
@@ -24265,12 +24304,17 @@ class GAMEAPI(resource.Resource):
         # perform all necessary mutations at the start of an offensive attack
         # note: assumes all necessary locks are already taken
         is_home_attack = (base.base_type == 'home')
-        is_revenge_attack = attacker.cooldown_active('revenge_defender:%d' % defender.user_id)
         attacker_is_human = attacker.is_human()
         defender_is_human = defender.is_human()
 
-        defender.init_attack_defender(attacker.user_id, attacker_is_human, is_home_attack, ladder_state, is_revenge_attack)
-        attacker.init_attack_attacker(defender.user_id, defender_is_human, is_home_attack, ladder_state, is_revenge_attack)
+        if attacker_is_human and defender_is_human:
+            revenge_togo = attacker.cooldown_togo('revenge_defender:%d' % defender.user_id)
+            if revenge_togo >= 0:
+                # record the fact that this is a revenge attack
+                session.revenge_attack_until = server_time + revenge_togo
+
+        defender.init_attack_defender(attacker.user_id, attacker_is_human, is_home_attack, ladder_state, session.revenge_attack_until >= 0)
+        attacker.init_attack_attacker(defender.user_id, defender_is_human, is_home_attack, ladder_state, session.revenge_attack_until >= 0)
 
         base.base_last_attack_time = server_time
         base.base_times_attacked += 1

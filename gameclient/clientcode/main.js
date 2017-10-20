@@ -6644,6 +6644,11 @@ player.quarry_guards_enabled = function() { return player.get_territory_setting(
 /** @return {boolean} */
 player.raids_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_raids'), player, null); };
 
+/** @return {boolean} */
+player.squads_affect_revenge = function() { return eval_cond_or_literal(player.get_territory_setting('squads_affect_revenge'), player, null); };
+/** @return {boolean} */
+player.quarries_affect_revenge = function() { return eval_cond_or_literal(player.get_territory_setting('quarries_affect_revenge'), player, null); };
+
 /** alliance raids flag - includes both defensive and offensive raids.
     valid only when raids_enabled() is true.
     @return {boolean}
@@ -20035,14 +20040,14 @@ function invoke_attack_revenge_lower_level_message(do_attack_cb) {
 function invoke_attack_stronger_message(do_attack_cb) {
     var dialog_data = gamedata['dialogs']['attack_stronger_message'];
     var dialog = new SPUI.Dialog(dialog_data);
-    change_selection_ui(dialog);
+
+    install_child_dialog(dialog);
     dialog.auto_center();
 
     dialog.widgets['description'].str = dialog_data['widgets']['description']['ui_name']
-        .replace('%s', session.ui_name)
         .replace('%duration', pretty_print_time(gamedata['matchmaking']['revenge_time']));
-    dialog.widgets['yes_button'].onclick = (function (cb) { return function() { change_selection(null); cb(); }; })(do_attack_cb);
-    dialog.widgets['no_button'].onclick = function() { change_selection(null); };
+    dialog.widgets['yes_button'].onclick = (function (cb) { return function(w) { close_parent_dialog(w); cb(); }; })(do_attack_cb);
+    dialog.widgets['no_button'].onclick = close_parent_dialog;
     return dialog;
 }
 

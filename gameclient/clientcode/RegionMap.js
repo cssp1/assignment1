@@ -921,6 +921,13 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
         (feature['base_type'] != 'squad' || gamedata['territory']['squads_affect_protection']) &&
         (feature['base_type'] != 'quarry'|| gamedata['territory']['quarries_affect_protection']);
 
+    var will_trigger_revenge = !is_ai_user_id_range(feature['base_landlord_id']) &&
+        feature['base_landlord_id'] != session.user_id && !same_alliance && info &&
+        !player.cooldown_active('revenge_attacker:'+feature['base_landlord_id'].toString()) &&
+        (feature['base_type'] != 'squad' || player.squads_affect_revenge()) &&
+        (feature['base_type'] != 'quarry' || player.quarries_affect_revenge()) &&
+        ((info['player_level']||0 > player.level()) && this.region.pvp_level_gap_enabled() && !player.in_attackable_level_range(info['player_level']||0));
+
     // looking at an enemy home base that we can attack
     var can_attack_home = (feature['base_type'] === 'home' && feature['base_landlord_id'] != session.user_id && !same_alliance &&
                            info &&
@@ -974,13 +981,21 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 if(found_unit) {
                     // pre-attack button
                     var attack_cb = make_cb(this, feature, 1); // pass pre_attack = 1 for auto-attack
-                    var wrapped_attack_cb = (will_lose_protection ? (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb) : attack_cb);
+                    var wrapped_attack_cb = (will_lose_protection ?
+                                             (function(_attack_cb) { return function() { invoke_attack_through_protection_message(_attack_cb); }; })(attack_cb)
+                                             : (will_trigger_revenge ?
+                                                (function (_attack_cb) { return function() { invoke_attack_stronger_message(_attack_cb); }; })(attack_cb)
+                                                : attack_cb));
                     ret.push([gamedata['strings']['regional_map']['attack'], wrapped_attack_cb, 'attack']);
 
                     // pre-attack-and-resolve button
                     if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
                         var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
-                        var wrapped_resolve_cb = (will_lose_protection ? (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb) : resolve_cb);
+                        var wrapped_resolve_cb = (will_lose_protection ?
+                                                  (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb)
+                                                  : (will_trigger_revenge ?
+                                                     (function (_resolve_cb) { return function() { invoke_attack_stronger_message(_resolve_cb); }; })(resolve_cb)
+                                                     : resolve_cb));
                         ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
                     }
                 }
@@ -1007,7 +1022,11 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
             _mapwidget.set_popup(null);
             SquadControlDialog.invoke_raid(_feature['base_map_loc'], _feature);
         }; })(this, feature);
-        var wrapped_raid_cb = (can_attack_home && will_lose_protection ? (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb) : raid_cb);
+        var wrapped_raid_cb = (can_attack_home && will_lose_protection ?
+                               (function(_raid_cb) { return function() { invoke_attack_through_protection_message(_raid_cb); }; })(raid_cb)
+                               : (will_trigger_revenge ?
+                                  (function (_raid_cb) { return function() { invoke_attack_stronger_message(_raid_cb); }; })(raid_cb)
+                                  : raid_cb));
 
         if(feature['base_type'] === 'home' && can_guard_home) {
             ret.push([gamedata['strings']['regional_map']['guard'], wrapped_raid_cb, 'normal']);
