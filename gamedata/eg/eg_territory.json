@@ -45,7 +45,7 @@
     "quarry_dump_on_conquer": true, // whether harvester production gets zeroed out upon conquer
     "quarries_affect_protection": true, // whether attacking a player-owned quarry removes your own home base protection
     "squads_affect_protection": true, // whether attacking a player-owned squad removes your own home base protection
-    "quarries_affect_pvp_level_exception": false, // whether attacking a quarry owned by a much higher level player allows them to attack your home base
+    "squads_affect_revenge": true, // whether attacking a squad owned by a much higher level player allows them to attack your home base
     "base_defenders_can_attack_neighbors": false, // whether or not base defenders squad can be used in attacks against things 1 hex away from your home
 
     // color of NAME (LNN) labels on regional map
