@@ -128,10 +128,15 @@ def can_send(time_now, timezone, stream, ref, history, cooldowns, user_class):
         # auto-mute - check for too many unacked notifications with this ref
         if ref:
             max_unacked = {STREAM_URGENT: 3, STREAM_ALWAYS: -1}.get(stream, 2)
-            if max_unacked > 0 and \
-               (history.get('notification2:%s:unacked' % ref, 0) >= max_unacked or
-                history.get('notification:%s:unacked' % ref, 0) >= max_unacked):
-                return False, 'player has ignored too many notifications with ref "%s" (auto-muted)' % ref
+            if max_unacked > 0:
+
+                if history.get('notification2:%s:unacked' % ref, 0) >= max_unacked:
+                    return False, 'player has ignored too many notifications with ref "%s" (auto-muted, via notification2)' % ref
+
+                # note: only check legacy notification:unacked counter if notification2_gen was never bumped
+                if (history.get('notification2_gen',None) is None and \
+                    history.get('notification:%s:unacked' % ref, 0) >= max_unacked):
+                    return False, 'player has ignored too many notifications with ref "%s" (auto-muted, via legacy unacked counter)' % ref
 
     return True, None
 

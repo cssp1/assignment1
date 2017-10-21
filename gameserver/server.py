@@ -242,7 +242,8 @@ obsolete_time_series_re = re.compile('^unit:(.+):manufactured_at_time$|^(.+)_man
 
 # recognize notification2 state counters for clearing
 # note: do not clear :last_time, since that is required to avoid unnecessary repetition
-notification2_state_re = re.compile('^notification2:.+:(sent|clicked|unacked)$')
+# for now, I think it is OK to just clear "unacked" while keeping "sent"/"clicked"
+notification2_state_re = re.compile('^notification2:.+:(unacked)$') # (sent|clicked|unacked)
 
 SCORES2_MIGRATION_VERSION = 9
 
@@ -9114,6 +9115,7 @@ class Player(AbstractPlayer):
                        }
         if 'notification2_gen' in gamedata['fb_notifications']:
             new_history['notification2_gen'] = Predicates.eval_cond_or_literal(gamedata['fb_notifications']['notification2_gen'], None, self)
+            new_history['notification2_gen_time'] = server_time
 
         # NOTE: carry over certain metrics even across tutorial restarts
         save_fields = ['logged_in_times', 'time_in_game', 'longest_play_session']
@@ -14340,18 +14342,35 @@ class LivePlayer(Player):
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
-        cur_notification2_gen = Predicates.eval_cond_or_literal(gamedata['fb_notifications'].get('notification2_gen',None), session, self)
-        do_reset_notification2 = ('notification2_gen' in gamedata['fb_notifications'] and \
-                                  self.history.get('notification2_gen',None) != cur_notification2_gen)
+        cur_notification2_gen = self.get_any_abtest_value('notification2_gen',
+                                                          Predicates.eval_cond_or_literal(gamedata['fb_notifications'].get('notification2_gen',None), session, self))
+        notification2_reset_interval = self.get_any_abtest_value('notification2_reset_interval',
+                                                                 Predicates.eval_cond_or_literal(gamedata['fb_notifications'].get('notification2_reset_interval', -1), session, self))
+
+        # should we clear the "unacked" state to try sending messages again?
+        # only do so if "notification2_gen" is explicitly set, AND
+        # 1) the notification2_gen changes, OR 2) notification2_reset_time has passed
+        reset_notification2_reason = None
+
+        if cur_notification2_gen is not None:
+            if self.history.get('notification2_gen',0) < cur_notification2_gen:
+                reset_notification2_reason = 'notification2_gen %r -> %r' % (self.history.get('notification2_gen',0), cur_notification2_gen)
+            elif (notification2_reset_interval > 0 and \
+                  server_time >= self.history.get('notification2_gen_time',0) + notification2_reset_interval):
+                reset_notification2_reason = 'notification2_reset_interval passed (last %r)' % self.history.get('notification2_gen_time',0)
 
         # get rid of obsolete history fields
         for k in self.history.keys():
             if (obsolete_time_series_re.match(k) or \
-                (do_reset_notification2 and notification2_state_re.match(k))):
+                (reset_notification2_reason and notification2_state_re.match(k))):
                 del self.history[k]
 
-        if do_reset_notification2:
+        if reset_notification2_reason:
             self.history['notification2_gen'] = cur_notification2_gen
+            self.history['notification2_gen_time'] = server_time
+            metric_event_coded(self.user_id, '7132_fb_notification_reset',
+                               {'notification2_gen': cur_notification2_gen,
+                                'reason': reset_notification2_reason})
 
         # fix bad intro mails
         if self.history.get('inventory_intro_mail_sent',0) < 2:
