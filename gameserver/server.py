@@ -4890,7 +4890,7 @@ class Session(object):
     def log_attack_unit(self, owner_id, obj, event_name, props = None, fake_xy = None, killer_info = None):
         self.attack_event(owner_id, event_name, self._log_attack_unit_props(obj, props = props, fake_xy = fake_xy, killer_info = killer_info))
 
-    def attack_event(self, user_id, event_name, props):
+    def attack_event(self, user_id, event_name, props = None):
         if self.attack_log is None:
             if gamedata['server']['log_self_attacks']:
                 gamesite.exception_log.event(server_time, 'attack_event with no open log! user ' + str(user_id))
@@ -4900,6 +4900,8 @@ class Session(object):
         if user_id == RogueOwner.user_id and self.incoming_attack_id > 0:
             user_id = self.incoming_attack_id
 
+        if props is None:
+            props = {}
         props['code'] = int(event_name[0:4])
         props['event_name'] = event_name
         props['user_id'] = user_id
