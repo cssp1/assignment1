@@ -9103,6 +9103,13 @@ class Player(AbstractPlayer):
 
         self.travel_state = {'dest_loc':None, 'start_time':-1, 'end_time':-1, 'attacks_made': 0}
 
+        # A/B test cohort membership
+        # dictionary { "T001_yyy": "group_zzz" }
+        if self.abtests is None:
+            self.abtests = {}
+        else:
+            pass # carry over tests across developer restarts
+
         # 'history': dictionary of historical stats (e.g., 'battles_fought', 'res_collected', etc)
         # used for mission/predicate completion tracking, and some metrics
 
@@ -9140,13 +9147,6 @@ class Player(AbstractPlayer):
         self.cooldowns = {}
 
         self.scores2 = Scores2.CurScores()
-
-        # A/B test cohort membership
-        # dictionary { "T001_yyy": "group_zzz" }
-        if self.abtests is None:
-            self.abtests = {}
-        else:
-            pass # carry over tests across developer restarts
 
         # in-playerdb battle history
         # obsolete now - replaced by SpinNoSQL battles table (and optionally cold SQL storage)
