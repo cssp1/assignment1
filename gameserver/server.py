@@ -7225,9 +7225,10 @@ class MapBlockingGameObject(GameObject):
         if self.removing:
             return self.removing.halt(server_time)
         return False
-    def update_removing(self, undamaged_time):
+    def update_removing(self, undamaged_time = -1, ref_time = -1):
         if not self.removing: return False
-        return self.removing.resume(undamaged_time, server_time)
+        if ref_time < 0: ref_time = server_time
+        return self.removing.resume(undamaged_time, ref_time)
     def activity_finish_time(self):
         if self.is_removing():
             ret = self.removing.total_time - self.removing.done_time
@@ -7243,8 +7244,8 @@ class MapBlockingGameObject(GameObject):
         if self.is_removing():
             return 'remove,' + self.removing.describe_state()
         return 'nothing'
-    def update_all(self, undamaged_time = -1):
-        self.update_removing(undamaged_time)
+    def update_all(self, undamaged_time = -1, ref_time = -1, power_factor = 1):
+        self.update_removing(undamaged_time, ref_time)
 
 class Inert(MapBlockingGameObject):
     def __init__(self, obj_id, spec, owner, x, y, hp, level, build_finish_time, auras, metadata=None):
@@ -7457,13 +7458,15 @@ class Building(MapBlockingGameObject):
         if 'config' in state:
             self.config = copy.deepcopy(state['config'])
 
-    def update_repair_hp_only(self):
+    def update_repair_hp_only(self, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         # ONLY update hitpoints for client battle purposes
         # do NOT actually set repair_finish_time=-1, let the client trigger that with PING_OBJECT
         # because it needs to go through the power_changed path etc.
         if self.repair_finish_time > 0:
             # bump hp up to what it should be after the elapsed time
-            percent_unrepaired = float(self.repair_finish_time - server_time) / (self.get_leveled_quantity(self.spec.repair_time) / self.get_stat('repair_speed', 1))
+            percent_unrepaired = float(self.repair_finish_time - ref_time) / (self.get_leveled_quantity(self.spec.repair_time) / self.get_stat('repair_speed', 1))
 
             # do not let hp == self.max_hp, since that will make is_damaged() false and throw off other code
             max_hp = self.max_hp - 1
@@ -7478,11 +7481,13 @@ class Building(MapBlockingGameObject):
         self.repair_finish_time = -1
         return disrupted
 
-    def update_production(self, player, base_type, base_region, power_factor):
+    def update_production(self, player, base_type, base_region, power_factor, undamaged_time = -1, ref_time = -1):
         # base may be None if you are just going to halt immediately
 
         if not self.is_producer():
             return
+
+        if ref_time < 0: ref_time = server_time
 
         capacity = self.get_leveled_quantity(self.spec.production_capacity)
 
@@ -7495,12 +7500,15 @@ class Building(MapBlockingGameObject):
         #capacity = int(capacity * player.get_abtest_value('T001_harvester_cap', 'modifier', 1))
 
         # update self.contents and reset produce_start_time
+        old_start_time = self.produce_start_time
+        old_rate = self.produce_rate
+        pre_added = 0
+
         if (self.produce_start_time > 0):
             assert (self.produce_rate > 0)
 
-            units = self.contents + int((float(self.produce_rate) * (server_time - self.produce_start_time))/(60.0*60.0))
-            units = max(0, min(units, capacity))
-            self.contents = units
+            pre_added = int((float(self.produce_rate) * (ref_time - self.produce_start_time))/(60.0*60.0))
+            self.contents = max(0, min(self.contents + pre_added, capacity))
 
         # zero out ongoing production
         self.produce_start_time = -1
@@ -7509,17 +7517,25 @@ class Building(MapBlockingGameObject):
         # now restart production
         if self.is_damaged() or self.is_upgrading() or self.is_under_construction() or self.is_enhancing() or self.is_removing() or (self.contents >= capacity):
             # can't make anything
-            return
+            pass
+        else:
+            units_per_hour = max(
+                self.get_stat('produces_'+res, self.get_leveled_quantity(getattr(self.spec, 'produces_'+res))) \
+                for res in gamedata['resources'])
 
-        units_per_hour = max(
-            self.get_stat('produces_'+res, self.get_leveled_quantity(getattr(self.spec, 'produces_'+res))) \
-            for res in gamedata['resources'])
+            units_per_hour = max(0, int(units_per_hour * power_factor * yield_rate * player.get_any_abtest_value('global_harvest_coeff', gamedata['global_harvest_coeff'])))
 
-        units_per_hour = max(0, int(units_per_hour * power_factor * yield_rate * player.get_any_abtest_value('global_harvest_coeff', gamedata['global_harvest_coeff'])))
+            if (units_per_hour > 0):
+                self.produce_rate = units_per_hour
 
-        if (units_per_hour > 0):
-            self.produce_start_time = server_time
-            self.produce_rate = units_per_hour
+                if undamaged_time > 0:
+                    self.produce_start_time = undamaged_time
+                else:
+                    self.produce_start_time = ref_time
+
+        if 0:
+            gamesite.exception_log.event(server_time, '%s\nupdate_production(): %d %s L%d OLD start %d rate %d - added %d, power %.2f - NEW start %d rate %d' % \
+                                         (''.join(traceback.format_stack()), ref_time, self.spec.name, self.level, old_start_time, old_rate, pre_added, power_factor, self.produce_start_time, self.produce_rate))
 
     def halt_production(self, player):
         self.update_production(player, None, None, 1)
@@ -7594,39 +7610,49 @@ class Building(MapBlockingGameObject):
         return disrupted
 
     # try to restart research - assume building reached full health at "undamaged_time" (-1 if it was always at full health)
-    def update_research(self, undamaged_time):
+    def update_research(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if not self.research_item: return
         if self.repair_finish_time > 0 or self.is_damaged(): return
         if self.research_start_time > 0: return
         if undamaged_time >= 0:
-            self.research_done_time += server_time - undamaged_time
-        self.research_start_time = server_time
+            self.research_done_time += ref_time - undamaged_time
+        self.research_start_time = ref_time
 
-    def update_build(self, undamaged_time):
+    def update_build(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if self.build_total_time < 0: return
         if self.repair_finish_time > 0 or self.is_damaged(): return
         if self.build_start_time > 0: return
         if undamaged_time >= 0:
-            self.build_done_time += server_time - undamaged_time
-        self.build_start_time = server_time
+            self.build_done_time += ref_time - undamaged_time
+        self.build_start_time = ref_time
 
-    def update_upgrade(self, undamaged_time):
+    def update_upgrade(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if self.upgrade_total_time < 0: return
         if self.repair_finish_time > 0 or self.is_damaged(): return
         if self.upgrade_start_time > 0: return
         if undamaged_time >= 0:
-            self.upgrade_done_time += server_time - undamaged_time
-        self.upgrade_start_time = server_time
+            self.upgrade_done_time += ref_time - undamaged_time
+        self.upgrade_start_time = ref_time
 
-    def update_manuf(self, undamaged_time):
+    def update_manuf(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if len(self.manuf_queue) < 1: return
         if self.repair_finish_time > 0 or self.is_damaged(): return
         if self.manuf_start_time > 0: return
         if undamaged_time >= 0:
-            self.manuf_done_time += server_time - undamaged_time
-        self.manuf_start_time = server_time
+            self.manuf_done_time += ref_time - undamaged_time
+        self.manuf_start_time = ref_time
 
-    def update_crafting(self, undamaged_time):
+    def update_crafting(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if not self.crafting: return False
         recipe_name = self.crafting.queue[0].craft_state['recipe']
         if recipe_name in gamedata['crafting']['recipes']:
@@ -7634,22 +7660,24 @@ class Building(MapBlockingGameObject):
             if category_name in gamedata['crafting']['categories']:
                 if gamedata['crafting']['categories'][category_name].get('haltable',True) and \
                    (self.repair_finish_time > 0 or self.is_damaged()): return False
-        return self.crafting.resume(undamaged_time, server_time)
+        return self.crafting.resume(undamaged_time, ref_time)
 
-    def update_enhancing(self, undamaged_time):
+    def update_enhancing(self, undamaged_time = -1, ref_time = -1):
+        if ref_time < 0: ref_time = server_time
+
         if not self.enhancing: return False
-        return self.enhancing.resume(undamaged_time, server_time)
+        return self.enhancing.resume(undamaged_time, ref_time)
 
-    # note! does not update_production! (should it?)
-    def update_all(self, undamaged_time = -1):
-        MapBlockingGameObject.update_all(self, undamaged_time)
-        self.update_repair_hp_only()
-        self.update_research(undamaged_time)
-        self.update_upgrade(undamaged_time)
-        self.update_build(undamaged_time)
-        self.update_manuf(undamaged_time)
-        self.update_crafting(undamaged_time)
-        self.update_enhancing(undamaged_time)
+    # note! does not update_production! that has a more delicate relationship with power and time, so it's handled separately
+    def update_all(self, undamaged_time = -1, ref_time = -1, power_factor = 1):
+        MapBlockingGameObject.update_all(self, undamaged_time, ref_time, power_factor)
+        self.update_repair_hp_only(ref_time = ref_time)
+        self.update_research(undamaged_time = undamaged_time, ref_time = ref_time)
+        self.update_upgrade(undamaged_time = undamaged_time, ref_time = ref_time)
+        self.update_build(undamaged_time = undamaged_time, ref_time = ref_time)
+        self.update_manuf(undamaged_time = undamaged_time, ref_time = ref_time)
+        self.update_crafting(undamaged_time = undamaged_time, ref_time = ref_time)
+        self.update_enhancing(undamaged_time = undamaged_time, ref_time = ref_time)
 
     # harvest up to 'limit' resources and return # of units harvested
     # must call update_production() afterward to unhalt!
@@ -8205,6 +8233,43 @@ class Base(object):
 
         return (power_factor, power_state, affected_obj_list)
 
+    def simulate_passage_of_time(self):
+        # simulate passage of time for repairs, and also kickstart
+        # production/research/upgrades/etc if it got stopped for some
+        # reason, and the building is at full health.
+        # note: does not collect any products - rely on the client to ping us for that.
+        # note: assume this is called before the client sees any objects, so it is OK to mutate state without sending messages.
+
+        power_factor = self.get_power_factor()
+
+        # list of (sim time, obj) for each object we need to simulate
+        obj_list = [(min(server_time, obj.repair_finish_time if (obj.is_building() and obj.repair_finish_time > 0) else server_time), obj) for obj in self.iter_objects() \
+                    if (obj.is_building() or obj.is_inert())]
+
+        # sort by repair_finish_time, so that we can simulate power state changes
+        # and halted/running state transitions
+
+        obj_list.sort()
+
+        # walk forward in time
+        for t, obj in obj_list:
+
+            if obj.is_building() and obj.is_repairing() and obj.repair_finish_time < server_time:
+                # something is fully repaired
+                obj.heal_to_full()
+                obj.repair_finish_time = -1
+
+                if obj.affects_power():
+                    # update the power factor, based on current damage status
+                    power_factor = self.get_power_factor()
+
+                    # iterate through harvesters (and anything else affected by power?)
+                    for p in self.iter_objects():
+                        if p.is_building() and p.is_producer():
+                            p.update_production(p.owner, self.base_type, self.base_region, power_factor, ref_time = t)
+
+            obj.update_all(ref_time = t, power_factor = power_factor)
+
     def get_base_radius(self):
         assert self.base_size >= 0 and self.base_size < len(gamedata['map']['base_perimeter'])
         return int(gamedata['map']['base_perimeter'][self.base_size]/2)
@@ -8590,7 +8655,7 @@ class Base(object):
         power_factor = compute_power_factor(self.get_power_state())
         for object in affected:
             object.update_production(object.owner, self.base_type, self.base_region, power_factor)
-            object.update_all()
+            object.update_all(power_factor = power_factor)
 
     def get_townhall_level(self):
         for obj in self.iter_objects():
@@ -21816,8 +21881,9 @@ class GAMEAPI(resource.Resource):
                     object.heal_to_full()
                     undamaged_time = object.repair_finish_time
                     object.repair_finish_time = -1
-                    object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
-                    object.update_all(undamaged_time)
+                    power_factor = compute_power_factor(base.get_power_state())
+                    object.update_production(object.owner, base.base_type, base.base_region, power_factor)
+                    object.update_all(undamaged_time, power_factor = power_factor)
 
             if object.is_building() and object.is_under_construction() and (object.owner is session.player):
                 prog = object.build_done_time
@@ -21895,7 +21961,7 @@ class GAMEAPI(resource.Resource):
                         session.execute_consequent_safe(enh_spec.get_leveled_quantity(enh_spec.completion, enh_level), session.player, retmsg, reason='enhancement:completion')
 
             if object.is_removing() and (object.owner is session.player):
-                if object.update_removing(-1):
+                if object.update_removing():
                     # removing complete
                     did_a_remove = True
                     object.removing = None
