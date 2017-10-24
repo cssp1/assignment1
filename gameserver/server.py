@@ -22025,7 +22025,11 @@ class GAMEAPI(resource.Resource):
 
             # if the action had any possible impact on power generation, then re-initialize harvesters
             if did_a_repair or did_finish_construction or did_an_upgrade:
-                session.power_changed(base, object, retmsg)
+
+                # defer for efficiency
+                #session.power_changed(base, object, retmsg)
+                session.deferred_power_change = True
+
                 session.deferred_ladder_point_decay_check = True
 
             if did_finish_construction or did_an_upgrade:
