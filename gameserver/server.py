@@ -7457,7 +7457,7 @@ class Building(MapBlockingGameObject):
         if 'config' in state:
             self.config = copy.deepcopy(state['config'])
 
-    def update_repair(self):
+    def update_repair_hp_only(self):
         # ONLY update hitpoints for client battle purposes
         # do NOT actually set repair_finish_time=-1, let the client trigger that with PING_OBJECT
         # because it needs to go through the power_changed path etc.
@@ -7473,7 +7473,7 @@ class Building(MapBlockingGameObject):
             self.hp = new_hp
 
     def halt_repair(self):
-        self.update_repair()
+        self.update_repair_hp_only()
         disrupted = (self.repair_finish_time > 0)
         self.repair_finish_time = -1
         return disrupted
@@ -7643,7 +7643,7 @@ class Building(MapBlockingGameObject):
     # note! does not update_production! (should it?)
     def update_all(self, undamaged_time = -1):
         MapBlockingGameObject.update_all(self, undamaged_time)
-        self.update_repair()
+        self.update_repair_hp_only()
         self.update_research(undamaged_time)
         self.update_upgrade(undamaged_time)
         self.update_build(undamaged_time)
@@ -25586,7 +25586,7 @@ class GAMEAPI(resource.Resource):
                 if newhp > obj.hp:
                     if obj.is_building():
                         # see if raised HP is just the result of ongoing repair since obj.hp was updated
-                        obj.update_repair()
+                        obj.update_repair_hp_only()
                     if newhp > obj.hp:
                         if session.player.tutorial_state == "COMPLETE": # this is a known harmless race condition during the initial rails tutorial, so don't bother logging it
                             gamesite.exception_log.event(server_time, 'rejecting object_combat_update that raises object HP: user %d owner %d type %s hp %d->%d max %d STATE %s' % (session.user.user_id, owning_user.user_id if owning_user else -1, obj.spec.name, obj.hp, newhp, max_hp, repr(obj.serialize_state())))
