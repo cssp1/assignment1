@@ -20197,12 +20197,12 @@ class GAMEAPI(resource.Resource):
         session.protection_eligible = None # reset flag
 
         # simulate passage of time for repairs
+
+        # update unit repairs
         session.viewing_player.unit_repair_tick()
-        for obj in session.viewing_base.iter_objects():
-            if obj.is_building() or obj.is_inert():
-                # simulate passage of time for repairs, and also
-                # kickstart research and upgrading if it got stopped for some reason, and the building is at full health
-                obj.update_all()
+
+        # update building repairs and production
+        session.viewing_base.simulate_passage_of_time()
 
         base_damage, base_repair_time = session.viewing_base.calc_base_damage_and_repair_time()
 
