@@ -909,6 +909,10 @@
                               "ui_button": "Proceed",
                               "ui_description": "Winner will be determined automatically. Beware, combat results may differ from your manual battles." },
 
+    "attack_stronger_confirm": { "ui_title": "Are you sure?",
+                                 "ui_button": "Attack", "ui_ignore_button": "Don't ask in the future",
+                                 "ui_description": "This powerful rival is restricted from attacking your home base because of the level difference.\n\nIf you attack them, they can take revenge against your home base for %duration!" },
+
     "skip_tutorial_confirm": { "ui_title": "Skip Tutorial Missions?",
                                "ui_button": "Skip",
                                "ui_description": "To resume, click the \"?\" button at the top of your screen." },

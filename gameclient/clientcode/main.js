@@ -20042,17 +20042,19 @@ function invoke_attack_revenge_lower_level_message(do_attack_cb) {
 }
 
 function invoke_attack_stronger_message(do_attack_cb) {
-    var dialog_data = gamedata['dialogs']['attack_stronger_message'];
-    var dialog = new SPUI.Dialog(dialog_data);
-
-    install_child_dialog(dialog);
-    dialog.auto_center();
-
-    dialog.widgets['description'].str = dialog_data['widgets']['description']['ui_name']
-        .replace('%duration', pretty_print_time(gamedata['matchmaking']['revenge_time']));
-    dialog.widgets['yes_button'].onclick = (function (cb) { return function(w) { close_parent_dialog(w); cb(); }; })(do_attack_cb);
-    dialog.widgets['no_button'].onclick = close_parent_dialog;
-    return dialog;
+    var replacements = {'%duration':  pretty_print_time(gamedata['matchmaking']['revenge_time'])};
+    var dialog = invoke_ingame_tip('attack_stronger_confirm',
+                                   {frequency: GameTipFrequency.ALWAYS_UNLESS_IGNORED,
+                                    replacements: replacements,
+                                    ignore_button_ui_name: gamedata['strings']['attack_stronger_confirm']['ui_ignore_button'],
+                                    dialog_options: {'on_ok': do_attack_cb, 'cancel_button': true,
+                                                     'ok_button_ui_name': gamedata['strings']['attack_stronger_confirm']['ui_button']}});
+    if(dialog) {
+        return dialog; // will chain to the callback
+    } else {
+        // attack immediately
+        do_attack_cb();
+    }
 }
 
 function invoke_attack_stronger_strict_message() { return invoke_attack_level_range_message('stronger_strict'); };
@@ -37335,10 +37337,11 @@ var GameTipFrequency = {
     @param {string} name
     @param {({frequency: (GameTipFrequency|undefined),
               dialog_options: (Object|undefined),
+              ignore_button_ui_name: (string|null|undefined),
               replacements: (Object.<string,string>|undefined)}|null)=} options
     @return {SPUI.Dialog|null} */
 function invoke_ingame_tip(name, options) {
-    if(!options) { options = {frequency:undefined, dialog_options:undefined, replacements:undefined}; }
+    if(!options) { options = {frequency:undefined, dialog_options:undefined, ignore_button_ui_name:undefined, replacements:undefined}; }
 
     /** @type {!GameTipFrequency} */
     var frequency = options.frequency || GameTipFrequency.ONCE_ONLY;
@@ -37371,6 +37374,9 @@ function invoke_ingame_tip(name, options) {
     if(ignore_key) {
         if('ignore_button' in dialog.widgets) {
             dialog.widgets['ignore_button'].show = true;
+            if(options.ignore_button_ui_name) {
+                dialog.widgets['ignore_button'].str = options.ignore_button_ui_name;
+            }
             dialog.widgets['ignore_button'].onclick = (function (_ignore_key) { return function(w) {
                 w.state = (w.state == 'active' ? 'normal' : 'active');
                 player.preferences[_ignore_key] = (w.state == 'active' ? 1 : 0);
