@@ -196,8 +196,6 @@ Region.Region.prototype.in_bounds = function(xy) {
 /** @param {!Array<number>} xy
     @return {!Array<!Array<number>>} */
 Region.Region.prototype.get_neighbors = function(xy) {
-    // temporary debugging
-    if(!xy || !(0 in xy)) { throw Error('bad parameter to get_neighbors: '+(xy ? xy.toString() : 'null')); }
     var odd = (xy[1]%2) > 0;
     var ret = [];
     goog.array.forEach([[xy[0]-1,xy[1]], // left
