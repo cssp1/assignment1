@@ -97,6 +97,8 @@ resource "aws_instance" "mongodb" {
   user_data = <<EOF
 ${var.cloud_config_boilerplate_rendered}
  - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_maint_hour=${count.index}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_maint_weekday=7" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_device=/dev/nvme0n1" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
  - echo "mongodb_backups_bucket=${var.backups_bucket}" >> /etc/facter/facts.d/terraform.txt
