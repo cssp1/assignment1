@@ -7112,7 +7112,7 @@
 
             "grid": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "state": "icon", "xy": [58,89], "dimensions": [57,58], "bg_image_offset": [0,-9], "bg_image_justify": "center", "asset": "", "ui_tooltip": "%s\nLevel %cur of %max", "tooltip_delay": 0, "fixed_tooltip_offset": [53,155] },
             "grid_health": { "array": [10,2], "array_offset": [63,70], "kind": "ProgressBar", "xy": [61, 135], "dimensions": [48, 6],
-                             "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
+                             "full_color_ramp": [[0,[0.6,0.6,0.0,1]], [0.5,[0.41,0.57,0.160,1]]], "empty_color": [0.3,0.3,0.3,1] },
             "grid_wrench": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [86,105], "dimensions": [24,24], "asset_active": "repair_wrench_green", "asset_queued": "repair_wrench_gray" },
             "grid_skull": { "array": [10,2], "array_offset": [63,70], "kind": "StaticImage", "xy": [84,114], "dimensions": [22,25], "asset": "repair_skull" },
 
@@ -7139,7 +7139,7 @@
             "in_production_wrench": { "kind": "StaticImage", "xy": [132,364], "dimensions": [24,24], "asset": "repair_wrench_green", "rocking": 1 },
             "in_production_cancel": { "kind": "ActionButton", "xy": [141,292], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1},
             "in_production_health": { "kind": "ProgressBar", "xy": [54, 300], "dimensions": [81, 6],
-                                      "full_color": [0.41,0.57,0.160,1], "empty_color": [0.3,0.3,0.3,1] },
+                                      "full_color_ramp": [[0,[0.6,0.6,0.0,1]], [0.5,[0.41,0.57,0.160,1]]], "empty_color": [0.3,0.3,0.3,1] },
 
             "queue_bg": { "array": [8,1], "array_offset": [65,0],
                           "kind": "StaticImage", "xy":[168,294], "dimensions":[60,59], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable"},
@@ -7403,7 +7403,8 @@
             "squad_unit": { "kind": "Dialog", "xy": [47,86], "dimensions": [50,50], "dialog": "unit_icon", "clip_to": [37,36,349,378],
                             "array": [0,4], "array_max": [6,4], "array_offset": [55,64] },
             "squad_hp_bar": { "kind": "ProgressBar", "xy": [47,138], "dimensions": [50, 6], "outline_width": 1, "clip_to": [37,36,349,378],
-                              "full_color": [0.41,0.57,0.160,1], "full_color_queued": [0.5,0.5,0.5,1],
+                              "full_color_queued": [0.5,0.5,0.5,1],
+                              "full_color_ramp": [[0,[0.6,0.6,0.0,1]], [0.5,[0.41,0.57,0.160,1]]],
                               "empty_color": [0.3,0.3,0.3,1],
                               "array": [0,4], "array_max": [6,4], "array_offset": [55,64] },
             "reserve_unit": { "kind": "Dialog", "xy": [485,86], "dimensions": [50,50], "dialog": "unit_icon", "clip_to": [475,36,222,387],

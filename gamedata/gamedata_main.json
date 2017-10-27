@@ -350,16 +350,24 @@
         // these break our convention of using floating-point linear RGB :( but it's very performance-critical.
         "health_bar_colors_friendly": {
             "bg": "rgba(0,0,0,0.25)",
-            "fg": "rgba(0,204,0,1.0)",
-            "fg_transition": "rgba(0,102,0,1.0)",
-            "highlight": "rgba(0,255,0,1.0)",
+
+            // unit health bars can change color as a function of the health %
+            // these can be specified as step function arrays, [[min_health0, color0], [min_health1, color1], ... ]
+            // friendly units change from green to yellow when <50% health
+            "fg": [[0,"rgba(180,180,0,1.0)"], [0.5,"rgba(0,204,0,1.0)"]],
+            "fg_transition": [[0,"rgba(102,102,0,1.0)"], [0.5,"rgba(0,102,0,1.0)"]],
+            "highlight": [[0, "rgba(240,240,0,1)"], [0.5, "rgba(0,255,0,1.0)"]],
+
             "outline": "rgba(0,0,0,1)"
         },
         "health_bar_colors_enemy": {
             "bg": "rgba(0,0,0,0.25)",
-            "fg": "rgba(220,50,50,1.0)",
-            "fg_transition": "rgba(110,25,25,1.0)",
-            "highlight": "rgba(255,95,95,1.0)",
+
+            // small color change on enemy units to darker red when <50% health
+            "fg": [[0,"rgba(200,30,30,1.0)"], [0.5,"rgba(220,50,50,1.0)"]],
+            "fg_transition": [[0,"rgba(100,0,0,1.0)"], [0.5,"rgba(110,25,25,1.0)"]],
+            "highlight": [[0, "rgba(240,80,80,1.0)"], [0.5, "rgba(255,95,95,1.0)"]],
+
             "outline": "rgba(0,0,0,1)"
         },
         "progress_bar_colors": {

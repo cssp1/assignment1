@@ -546,7 +546,13 @@ SquadManageDialog.update_squad_manage = function(dialog) {
             dialog.widgets[hp_wname].show = true;
             dialog.widgets[hp_wname].progress = hp_ratio;
             if(hp_ratio < 1 && squad_is_under_repair) { request_unit_repair_update(); }
-            dialog.widgets[hp_wname].full_color = SPUI.make_colorv(dialog.data['widgets']['squad_hp_bar']['full_color' + (obj['in_manuf_queue'] ? '_queued' : '')]);
+            if(obj['in_manuf_queue']) {
+                dialog.widgets[hp_wname].full_color_ramp = null;
+                dialog.widgets[hp_wname].full_color = SPUI.make_colorv(dialog.data['widgets']['squad_hp_bar']['full_color_queued']);
+            } else {
+                dialog.widgets[hp_wname].full_color_ramp = dialog.data['widgets']['squad_hp_bar']['full_color_ramp'];
+            }
+
             dialog.widgets[hp_wname].xy = vec_add(vec_add(dialog.data['widgets']['squad_hp_bar']['xy'], [-dialog.user_data['squad_scroll_pos'],0]),
                                                   vec_mul([grid_x,grid_y], dialog.data['widgets']['squad_hp_bar']['array_offset']));
             grid_x += 1; if(grid_x >= squad_columns) { grid_y += 1; grid_x = 0; }
