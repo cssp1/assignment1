@@ -25345,7 +25345,7 @@ function alliance_mate_gift_dialog_setup_row(dialog, row, rowdata) {
 
             // if we're going through a Facebook request, wrap the cb inside a request prompt
             var wrapped_cb;
-            if('send_alliance_gift' in gamedata['virals'] && spin_frame_platform == 'fb' &&
+            if('send_alliance_gift' in gamedata['virals'] && spin_frame_platform == 'fb' && spin_facebook_enabled &&
                info && info['facebook_id'] &&
                ((goog.array.find(player.friends, function(f) { return f.user_id == _id; }) !== null) ||
                 (!info['uninstalled'] && ('last_login_time' in info) && info['last_login_time'] >= server_time - 5*86400 &&
