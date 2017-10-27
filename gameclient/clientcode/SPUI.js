@@ -2923,7 +2923,15 @@ SPUI.ProgressBar = function(data) {
     col = data['full_color'] || [0.0,0.7,0.7,1];
     // the bar itself
     this.full_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
-    // optionally change the color of the bar when low
+
+    // option: use a step-function color depending on the prog level
+    /** @type {Array|null} */
+    this.full_color_ramp = null;
+    if('full_color_ramp' in data) {
+        this.full_color_ramp = data['full_color_ramp'];
+    }
+
+    // optionally mix a color smoothly with progress from low to high
     if('low_color' in data) {
         col = data['low_color'];
         this.low_color = new SPUI.Color(col[0], col[1], col[2], col[3]);
@@ -2984,7 +2992,18 @@ SPUI.ProgressBar.prototype.do_draw = function(offset) {
 
     if(bar) {
         var col;
-        if(this.low_color) {
+        if(this.full_color_ramp) {
+            var i;
+            for(i = 0; i < this.full_color_ramp.length; i++) {
+                var entry = this.full_color_ramp[i];
+                if(this.progress < entry[0]) {
+                    i -= 1;
+                    break;
+                }
+            }
+            i = Math.min(Math.max(i, 0), this.full_color_ramp.length-1);
+            col = SPUI.make_colorv(this.full_color_ramp[i][1]);
+        } else if(this.low_color) {
             col = SPUI.Color.mix(this.low_color, this.full_color, this.progress);
         } else {
             col = this.full_color;
