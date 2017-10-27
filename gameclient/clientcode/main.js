@@ -53720,21 +53720,47 @@ function draw_health_bar(xy, obj) {
  * @param {number} prog2 - transitioning progress, pixels
  */
 function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
+
+    /** evaluate a color specified in gamedata, which could be either a literal string (HTML5 canvas color)
+        or a step-function specified as an array [[min_prog, color], [min_prog, color], ...]
+        @param {?} data
+        @param {number} p
+        @param {number} max_p
+        @return {string} */
+    function get_color(data, p, max_p) {
+        if(typeof(data) === 'string') {
+            return data; // literal string
+        } else {
+            // array indexed by min 'p' ratio
+            var r = p/max_p;
+            var i;
+            for(i = 0; i < data.length; i++) {
+                var entry = data[i];
+                if(r < entry[0]) {
+                    i -= 1;
+                    break;
+                }
+            }
+            i = Math.min(Math.max(i, 0), data.length-1);
+            return data[i][1];
+        }
+    };
+
     // fill center/background
     ctx.fillStyle = colors['bg'];
     ctx.fillRect(xy[0], xy[1], w, h);
     // fill "progress" area
-    ctx.fillStyle = colors['fg'];
+    ctx.fillStyle = get_color(colors['fg'], prog, w);
     ctx.fillRect(xy[0], xy[1], prog, h);
     ctx.lineWidth = (h >= 6 ? 2 : 1);
-    ctx.strokeStyle = colors['highlight'];
+    ctx.strokeStyle = get_color(colors['highlight'], prog, w);
     ctx.beginPath();
-    ctx.moveTo(xy[0], xy[1]+2);
-    ctx.lineTo(xy[0]+prog, xy[1]+2);
+    ctx.moveTo(xy[0], xy[1]+1);
+    ctx.lineTo(xy[0]+prog, xy[1]+1);
     ctx.stroke();
 
     if(prog2 > prog) {
-        ctx.fillStyle = colors['fg_transition'];
+        ctx.fillStyle = get_color(colors['fg_transition'], prog2, w);
         ctx.fillRect(xy[0]+prog, xy[1], prog2 - prog, h);
     }
 
