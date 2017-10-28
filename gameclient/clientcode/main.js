@@ -19080,6 +19080,12 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
             if(index >= 0) {
                 found_widget_name = 'button'+index.toString();
             }
+        } else if(widget_name && widget_name.indexOf('MAP_AI:') == 0) {
+            var base_id = parseInt(widget_name.split(':')[1], 10);
+            var entry = goog.array.findIndex(parent.user_data['friends_on_page'], function(fr) { return fr.user_id === base_id; });
+            if(entry >= 0) {
+                found_widget_name = 'row_button'+entry.toString();
+            }
         } else if(widget_name && widget_name.indexOf('BUTTON:') == 0 /* && parent.user_data['buttons'] */) {
             // XXX somehow we were getting here with parent.user_data missing 'buttons'. Band-aid fix for now.
             var spellname = widget_name.split(':')[1];
