@@ -24341,6 +24341,12 @@ class GAMEAPI(resource.Resource):
         base.base_last_attack_time = server_time
         base.base_times_attacked += 1
 
+        # record map-attack counts
+        if not is_home_attack:
+            met_names = {'hive': 'hives', 'quarry': 'quarries', 'squad': 'squads'}
+            if base.base_type in met_names:
+                record_player_metric(attacker, dict_increment, met_names[base.base_type]+'_attacked', 1, time_series = False)
+
         # deal with damage protection mutation
         if defender_is_human and \
            (is_home_attack or \
@@ -30857,6 +30863,8 @@ class GAMEAPI(resource.Resource):
                 if success:
                     new_id = max([x['id'] for x in session.player.squads.itervalues()]+[0,]) + 1
                     session.player.squads[str(new_id)] = {'id':new_id, 'ui_name': ui_name}
+                    session.increment_player_metric('squads_created', 1, time_series = False)
+
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
             elif spellname == 'SQUAD_RENAME':
