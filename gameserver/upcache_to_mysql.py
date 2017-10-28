@@ -19,6 +19,8 @@ import SpinSingletonProcess
 import MySQLdb
 from abtests_to_sql import abtests_schema
 
+INT2_MAX = 32767
+
 def field_column(key, val):
     return "`%s` %s" % (key, val)
 
@@ -44,7 +46,7 @@ def army_composition_table_schema(sql_util):
                        collapsed_summary_dimensions(sql_util) + \
                       [('kind','VARCHAR(16) NOT NULL'),
                        ('spec','VARCHAR(255) NOT NULL'),
-                       ('level','INT1 NOT NULL'),
+                       ('level','INT2 NOT NULL'),
                        ('location','VARCHAR(32) NOT NULL'),
                        ('total_count','INT4 NOT NULL')],
             'indices': {
@@ -74,9 +76,9 @@ abtest_filter = re.compile('^T[0-9]+')
 
 # "ALL" mode
 # always accept these keys
-accept_filter = re.compile('^feature_used:playfield_speed|^feature_used:client_ingame|^feature_used:first_action|ai_tutorial.*_progress$|^achievement:.*blitz')
+accept_filter = re.compile('^feature_used:playfield_speed|^feature_used:client_ingame|^feature_used:first_action|^feature_used:region_map_scroll_help|ai_tutorial.*_progress$|^achievement:.*blitz')
 # then, always reject these keys
-reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_hour|account_creation_wday|^fb_notification:|^feature_used:|^achievement:|^quest:|_conquests$|_progress$|_attempted$|days_since_joined|days_since_last_login|lock_state|^visits_[0-9]+d$|^retained_[0-9]+d$|oauth_token|facebook_permissions_str|acquisition_type|^link$|_context$|^item:|^unit:.+:(killed|lost)|_times_(started|completed)$')
+reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_hour|account_creation_wday|^fb_notification:|^achievement:|^quest:|_conquests$|_progress$|_attempted$|days_since_joined|days_since_last_login|lock_state|^visits_[0-9]+d$|^retained_[0-9]+d$|oauth_token|facebook_permissions_str|acquisition_type|^link$|_context$|^item:|^unit:.+:(killed|lost)|_times_(started|completed)$')
 
 # "lite" mode
 lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
@@ -134,7 +136,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
             return 'INT8' # time value
         elif key.endswith('_time') or key == 'time_in_game' or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key) or key.startswith('peak_'):
             return 'INT8' # times / big resource amounts
-        elif key.startswith('likes_') or key.startswith('returned_'):
+        elif key.startswith('likes_') or key.startswith('returned_') or key.startswith('feature_used:'):
             return sql_util.bit_type() # booleans
         elif key.endswith('_level') or key.endswith('_level_started') or ('_townhall_L' in key):
             return 'INT1' # level numbers
@@ -348,6 +350,13 @@ def do_slave(input):
 
         for user in cache.iter_segment(input['segnum']):
             user_id = user['user_id']
+
+            # manual adjustments
+
+            # unknown country should show as NULL
+            if user.get('country') == 'unknown':
+                del user['country']
+
             keys = [x for x in sorted_field_names if x in user]
             values = [user[x] for x in keys]
 
@@ -497,18 +506,23 @@ def do_slave(input):
                 for squad in user.get('unit_counts', {}):
                     for unit, count in user['unit_counts'][squad].iteritems():
                         spec, level_str = unit.split(':L')
-                        update_army_composition_entry('unit', spec, int(level_str), squad, count)
+                        level = int(level_str)
+                        assert 0 <= level <= INT2_MAX
+                        update_army_composition_entry('unit', spec, level, squad, count)
 
                 # track building composition
                 for building, count in user.get('building_counts', {}).iteritems():
                     spec, level_str = building.split(':L')
-                    update_army_composition_entry('building', spec, int(level_str), 'home', count)
+                    level = int(level_str)
+                    assert 0 <= level <= INT2_MAX
+                    update_army_composition_entry('building', spec, level, 'home', count)
 
                 # track equipment composition
                 for game_object in user.get('equipment_counts', {}):
                     for item, count in user['equipment_counts'][game_object].iteritems():
                         spec, level = get_item_spec_level(gamedata, item)
                         if spec is None: continue
+                        assert 0 <= level <= INT2_MAX
 
                         if game_object in gamedata['buildings']:
                             location = 'building'
@@ -522,12 +536,14 @@ def do_slave(input):
                 for item, count in user.get('inventory_counts', {}).iteritems():
                     spec, level = get_item_spec_level(gamedata, item)
                     if spec is None: continue
+                    assert 0 <= level <= INT2_MAX
                     if 'equip' in gamedata['items'].get(spec, {}):
                         # note: for now, we only track EQUIPPABLE items in inventory
                         update_army_composition_entry('equipment', spec, level, 'inventory', count)
 
                 # track tech composition
                 for tech, level in user.get('tech', {}).iteritems():
+                    assert 0 <= level <= INT2_MAX
                     update_army_composition_entry('tech', tech, level, None, 1)
 
             # current resource levels table
