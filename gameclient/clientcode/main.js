@@ -24015,7 +24015,12 @@ function invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str) 
 
 /** @param {string=} msg */
 function invoke_loot_dialog(msg) {
-    if(player.loot_buffer.length < 1) { return null; }
+    if(player.loot_buffer.length < 1) { return null; } // nothing in the loot buffer
+
+    if(!session.home_base) { return null; } // can't use this outside home base
+    // (it will be picked up upon return to home base)
+
+
     /*
     if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'loot_dialog') {
         // update rather than refreshing
