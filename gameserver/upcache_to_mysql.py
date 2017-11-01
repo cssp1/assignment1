@@ -445,32 +445,6 @@ def do_slave(input):
                             km = summary_vals + ('building', 'ANY', -1, 1)
                             upgrade_achievement_counters[km] = upgrade_achievement_counters.get(km,0) + 1
 
-            # parse sessions
-            if input['do_sessions'] and ('sessions' in user):
-                cur.executemany("INSERT INTO "+sql_util.sym(input['sessions_table']) + " (user_id,start,end,frame_platform,country_tier,townhall_level,prev_receipts) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                                [(user['user_id'], s[0], s[1], user.get('frame_platform','fb'), user.get('country_tier',None),
-                                  SpinUpcache.building_level_at_age(user, gamedata['townhall'], s[1] - user['account_creation_time']),
-                                  SpinUpcache.receipts_at_age(user, s[1] - user['account_creation_time'])) for s in user['sessions'] if (s[0] > 0 and s[1] > 0 and s[1]>=s[0])])
-
-            # parse activity
-            ACTIVITY_MIN_CC_LEVEL = 5 # only record for CCL5+ players (same as ANALYTICS2)
-            # note! the source data, from gameserver, omits gamebucks_spent for players who never paid. This is by design to reduce bloat.
-
-            if input['do_activity'] and ('activity' in user) and ('account_creation_time' in user) and user.get(gamedata['townhall']+'_level',1) >= ACTIVITY_MIN_CC_LEVEL:
-                def parse_activity(user, stime, data):
-                    ntime = long(stime)
-                    age = ntime - user['account_creation_time']
-                    cc_level = SpinUpcache.building_level_at_age(user, gamedata['townhall'], age)
-                    if cc_level < ACTIVITY_MIN_CC_LEVEL: return None
-                    act = SpinUpcache.classify_activity(gamedata, data)
-                    return (user['user_id'], ntime, act['state'], act.get('ai_tag', None) or act.get('ai_ui_name', None), data.get('gamebucks_spent',None), data.get('money_spent',None),
-                            user.get('frame_platform','fb'), user.get('country_tier',None), cc_level, SpinUpcache.receipts_at_age(user, age))
-
-                cur.executemany("INSERT INTO "+sql_util.sym(input['activity_table']) + \
-                                " (user_id, time, state, ai_ui_name, gamebucks_spent, receipts, frame_platform, country_tier, townhall_level, prev_receipts)" + \
-                                " VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                                filter(lambda x: x is not None, (parse_activity(user, stime, data) for stime, data in user['activity'].iteritems() if data['state'] not in ('idle','harvest'))))
-
             # update LTV estimate
             if input['do_ltv']:
                 ltv_est = SkynetLTV.ltv_estimate(input['game_id'], gamedata, user, cache.update_time(), use_post_install_data = 9999999)
@@ -592,8 +566,6 @@ if __name__ == '__main__':
     do_townhall = True
     do_tech = True
     do_buildings = True
-    do_sessions = False # taken over by sessions_to_sql.py
-    do_activity = False # taken over by activity_to_sql.py
     do_ltv = True
     do_alts = True
     do_army_composition = True
@@ -602,7 +574,7 @@ if __name__ == '__main__':
     use_local = False
     skip_developer = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','sessions','activity','use-local','include-developers','prune'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['parallel=','lite','use-local','include-developers','prune'])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -612,14 +584,10 @@ if __name__ == '__main__':
         elif key == '--lite':
             field_mode = 'lite'
             do_townhall = False
-            do_sessions = False
             #do_tech = False
             #do_buildings = False
-            do_activity = False
             #do_ltv = False
             do_army_composition = False
-        elif key == '--activity': do_activity = True
-        elif key == '--sessions': do_sessions = True
         elif key == '--use-local': use_local = True
         elif key == '--include-developers': skip_developer = False
         elif key == '--prune': do_prune = True
@@ -667,12 +635,10 @@ if __name__ == '__main__':
             upcache_table = cfg['table_prefix']+game_id+'_upcache'
             if field_mode != 'ALL':
                 upcache_table += '_'+field_mode
-            sessions_table = cfg['table_prefix']+game_id+'_sessions'
             townhall_table = cfg['table_prefix']+game_id+'_townhall_at_time'
             tech_table = cfg['table_prefix']+game_id+'_tech_at_time'
             upgrade_achievement_table = cfg['table_prefix']+game_id+'_upgrade_achievement'
             buildings_table = cfg['table_prefix']+game_id+'_building_levels_at_time'
-            activity_table = cfg['table_prefix']+game_id+'_activity_5min'
             facebook_campaign_map_table = cfg['table_prefix']+game_id+'_facebook_campaign_map'
             ltv_table = cfg['table_prefix']+game_id+'_user_ltv'
             alts_table = cfg['table_prefix']+game_id+'_alt_accounts'
@@ -682,8 +648,6 @@ if __name__ == '__main__':
 
             # these are the tables that are replaced entirely each run
             atomic_tables = [upcache_table,facebook_campaign_map_table] + \
-                            ([sessions_table] if do_sessions else []) + \
-                            ([activity_table] if do_activity else []) + \
                             ([townhall_table] if do_townhall else []) + \
                             ([upgrade_achievement_table] if (do_tech or do_buildings) else []) + \
                             ([buildings_table] if do_buildings else []) + \
@@ -715,23 +679,6 @@ if __name__ == '__main__':
                                                                'indices': {'by_account_creation_time': {'keys': [('account_creation_time','ASC')]},
                                                                            'by_last_login_time': {'keys': [('last_login_time','ASC')]}}
                                                                })
-
-            if do_sessions: # keep in sync with sessions_to_sql.py
-                sql_util.ensure_table(cur, sessions_table+'_temp',
-                                      {'fields': [('user_id', 'INT4 NOT NULL'),
-                                                  ('start', 'INT8 NOT NULL'),
-                                                  ('end', 'INT8 NOT NULL')] + sql_util.summary_in_dimensions()}) # make index after load
-
-            if do_activity: # keep in sync with activity_to_sql.py
-                sql_util.ensure_table(cur, activity_table+'_temp',
-                                      {'fields': [('user_id','INT4 NOT NULL'),
-                                                  ('time','INT8 NOT NULL'),
-                                                  ('gamebucks_spent','INT4'),
-                                                  ('receipts','FLOAT4')] + \
-                                                 sql_util.summary_in_dimensions() + \
-                                                 [('state','VARCHAR(32) NOT NULL'),
-                                                  ('ai_ui_name','VARCHAR(32)')]
-                                       }) # make index after load
 
             if do_townhall:
                 sql_util.ensure_table(cur, townhall_table+'_temp',
@@ -800,16 +747,14 @@ if __name__ == '__main__':
 
             try:
                 tasks = [{'game_id':game_id, 'cache_info':cache.info, 'dbconfig':cfg,
-                          'do_townhall': do_townhall, 'do_sessions': do_sessions, 'do_tech': do_tech, 'do_buildings': do_buildings, 'do_activity': do_activity,
+                          'do_townhall': do_townhall, 'do_tech': do_tech, 'do_buildings': do_buildings,
                           'do_ltv': do_ltv, 'ltv_table': ltv_table+'_temp',
                           'do_alts': do_alts, 'alts_table': alts_table+'_temp',
                           'upcache_table': upcache_table+'_temp',
-                          'sessions_table': sessions_table+'_temp',
                           'townhall_table': townhall_table+'_temp',
                           'tech_table': tech_table+'_temp',
                           'upgrade_achievement_table': upgrade_achievement_table+'_temp',
                           'buildings_table': buildings_table+'_temp',
-                          'activity_table': activity_table+'_temp',
                           'do_army_composition': do_army_composition, 'army_composition_table': army_composition_table,
                           'do_resource_levels': do_resource_levels, 'resource_levels_table': resource_levels_table,
                           'abtests_table': abtests_table,
@@ -847,12 +792,6 @@ if __name__ == '__main__':
             #if verbose: print 'building indices for', upcache_table
             #cur.execute("ALTER TABLE "+sql_util.sym(upcache_table)+" ADD INDEX by_account_creation_time (account_creation_time), ADD INDEX by_last_login_time (last_login_time)")
 
-            if do_sessions:
-                if verbose: print 'building indices for', sessions_table
-                cur.execute("ALTER TABLE "+sql_util.sym(sessions_table)+" ADD INDEX by_start (start), ADD INDEX by_user_start (user_id, start)")
-            if do_activity:
-                if verbose: print 'building indices for', activity_table
-                cur.execute("ALTER TABLE "+sql_util.sym(activity_table)+" ADD INDEX by_time (time)")
             if do_townhall:
                 if verbose: print 'building indices for', townhall_table
                 cur.execute("ALTER TABLE "+sql_util.sym(townhall_table)+" ADD INDEX ts (user_id, townhall_level, time), ADD INDEX ts2 (user_id, time, townhall_level), ADD INDEX by_th_time (townhall_level, time)")
