@@ -29,6 +29,17 @@ class ActivityClassifier(object):
         'idle': -1
         }
 
+    # in addition to the main classification, we also record binary
+    # flags to track player participation in social and progression mechanics
+    FLAGS = set(['alliance_member', # was seen in an alliance
+                 'alliance_chat', # said something in alliance chat channel
+                 'alliance_unit_donation', # donated units to an alliancemate
+                 'alliance_gift', # sent a gift item to an alliancemate
+                 'public_chat', # said something in a public channel (global or regional)
+                 'map_move', # moved a squad on the map
+                 'map_attack' # made an attack on the map
+                 ])
+
     def __init__(self, gamedata):
         self.gamedata = gamedata
         self.state = 'idle'

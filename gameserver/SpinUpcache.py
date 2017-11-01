@@ -690,7 +690,8 @@ def classify_quarry(gamedata, template):
 def classify_activity(gamedata, data):
     assert ('ai_bases_server' in gamedata) and ('loot_tables' in gamedata) # ensure some server-side stuff we need is loaded
     state = data['state']
-    if state in ('idle', 'harvest'): return None
+    flags = data.get('flags', {})
+    if state in ('idle', 'harvest') and len(flags) < 1: return None
 
     if state in ('pve_defense','pve_list'):
         if state == 'pve_defense':
@@ -713,7 +714,7 @@ def classify_activity(gamedata, data):
     else:
         pass # leave "state" alone
 
-    ret = {'state': state}
+    ret = {'state': state, 'flags': flags}
 
     if state.startswith('pve'):
         if 'tag' in data:
