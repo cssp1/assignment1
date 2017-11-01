@@ -1017,6 +1017,7 @@ class UserTable:
     FIELDS = [('country', None),
               ('fb_hit_time', int),
               ('account_creation_time', int),
+              ('account_creation_flow', None),
               ('last_login_time', int),
               ('last_login_ip', str),
               ('last_logout_time', int),
@@ -1223,6 +1224,7 @@ class User:
         self.fb_hit_time = -1 # server_time at which the user's Facebook data was downloaded
         self.fb_retrieve_semaphore = None # set of outstanding profile/friends/likes requests (by string name) to keep track of what's in progress
         self.account_creation_time = -1 # server_time at which account was originally created
+        self.account_creation_flow = None # can be a string that describes the login flow, e.g. "anonymous_autoplay"
         self.last_login_time = -1 # last time at which user played the game
         self.last_logout_time = -1 # last time at which user exited the game
         self.last_login_ip = '' # last IP address from which this user logged in
@@ -26815,6 +26817,9 @@ class GAMEAPI(resource.Resource):
             user.account_creation_time = server_time
             if not spin_secure_mode: # mark new accounts as developers
                 user.developer = 1
+
+            if 'account_creation_flow' in url_qs:
+                user.account_creation_flow = url_qs['account_creation_flow'][0]
 
         user.frame_platform = frame_platform
         user.social_id = social_id

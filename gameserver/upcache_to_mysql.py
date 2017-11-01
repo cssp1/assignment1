@@ -82,7 +82,8 @@ reject_filter = re.compile('^T[0-9]+_|acquisition_game_version|account_creation_
 
 # "lite" mode
 lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
-                                         ['account_creation_time', 'last_login_time', 'last_login_ip', 'time_of_first_purchase',
+                                         ['account_creation_time', 'account_creation_flow',
+                                          'last_login_time', 'last_login_ip', 'time_of_first_purchase',
                                           'acquisition_campaign',
                                           'acquisition_ad_skynet',
                                           'country', 'country_tier', 'currency', 'timezone',
@@ -223,6 +224,7 @@ def do_slave(input):
     if input['mode'] == 'get_fields':
         fields = {'money_spent': 'FLOAT4', # force this column into existence because analytics_views.sql depends on it
                   'account_creation_time': 'INT8', # same here
+                  'account_creation_flow': 'VARCHAR(32)',
                   'country_tier': 'CHAR(1)', 'country': 'CHAR(2)',
                   'acquisition_campaign': 'VARCHAR(64)',
                   'acquisition_ad_skynet': 'VARCHAR(128)',
