@@ -31,13 +31,18 @@ class ActivityClassifier(object):
 
     # in addition to the main classification, we also record binary
     # flags to track player participation in social and progression mechanics
-    FLAGS = set(['alliance_member', # was seen in an alliance
-                 'alliance_chat', # said something in alliance chat channel
-                 'alliance_unit_donation', # donated units to an alliancemate
+
+    # IMPORTANT! if any flag is added or removed, the SQL table schema will change
+    # for activity_5min and activity_X_summary, and the columns will need to be adjusted.
+    # see activity_to_sql.py.
+
+    FLAGS = set(['alliance_chat', # said something in alliance chat channel
                  'alliance_gift', # sent a gift item to an alliancemate
-                 'public_chat', # said something in a public channel (global or regional)
-                 'map_move', # moved a squad on the map
+                 'alliance_member', # was seen in an alliance
+                 'alliance_unit_donation', # donated units to an alliancemate
                  'map_attack' # made an attack on the map
+                 'map_move', # moved a squad on the map
+                 'public_chat', # said something in a public channel (global or regional)
                  ])
 
     def __init__(self, gamedata):

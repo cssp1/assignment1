@@ -13,14 +13,18 @@ import SpinConfig
 import SpinUpcache
 import SpinJSON
 import SpinNoSQL
+import SpinETL
 import SpinSQLUtil
 import SpinSingletonProcess
 import MySQLdb
+from ActivityClassifier import ActivityClassifier
 
 gamedata = None
 time_now = int(time.time())
 
-# keep schema in sync with upcache_to_mysql.py!
+# list of activity flags to track in SQL - must be sorted stably
+FLAG_LIST = sorted(list(ActivityClassifier.FLAGS))
+
 def activity_schema(sql_util):
     return {'fields': [('user_id','INT4 NOT NULL'),
                        ('time','INT8 NOT NULL'),
@@ -28,7 +32,10 @@ def activity_schema(sql_util):
                        ('receipts','FLOAT4')] + \
                       sql_util.summary_in_dimensions() + \
                       [('state','VARCHAR(32) NOT NULL'),
-                       ('ai_ui_name','VARCHAR(32)')],
+                       ('ai_ui_name','VARCHAR(32)')] + \
+                      [(flagname, sql_util.bit_type()) for flagname in FLAG_LIST],
+                      # note: binary flags for individual player participation
+
             'indices': {'time': {'keys': [('time','ASC')]}}
             }
 
@@ -41,6 +48,20 @@ def activity_summary_schema(sql_util, interval):
                        ('gamebucks_spent','INT8 NOT NULL'),
                        ('receipts','FLOAT4 NOT NULL')],
             'indices': {'master': {'unique':True, 'keys': [(interval,'ASC')] + [(dim,'ASC') for dim, kind in sql_util.summary_out_dimensions()] + [('state','ASC'),('ai_ui_name','ASC')]}},
+            }
+
+# tracks the number of players we see each day with each participation flag set
+# uses a coarser grouping configuration than activity_summary since we don't need state/ai_ui_name
+def participation_summary_schema(sql_util, interval):
+    return {'fields': [(interval, 'INT8 NOT NULL')] + \
+                      sql_util.summary_out_dimensions() + \
+                      [('n_players','INT4 NOT NULL'),
+                       ('active_time','INT8 NOT NULL'),
+                       ('gamebucks_spent','INT8 NOT NULL'),
+                       ('receipts','FLOAT4 NOT NULL')] + \
+                      [(flagname, 'INT4') for flagname in FLAG_LIST],
+                      # note: the flags here are SUMs counting how many players had each flag set in the group
+            'indices': {'master': {'unique':True, 'keys': [(interval,'ASC')] + [(dim,'ASC') for dim, kind in sql_util.summary_out_dimensions()]}},
             }
 
 if __name__ == '__main__':
@@ -77,6 +98,7 @@ if __name__ == '__main__':
         activity_table = cfg['table_prefix']+game_id+'_activity_5min'
         activity_daily_summary_table = cfg['table_prefix']+game_id+'_activity_daily_summary'
         activity_hourly_summary_table = cfg['table_prefix']+game_id+'_activity_hourly_summary'
+        participation_daily_summary_table = cfg['table_prefix']+game_id+'_participation_daily_summary'
 
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
@@ -84,6 +106,7 @@ if __name__ == '__main__':
         sql_util.ensure_table(cur, activity_table, activity_schema(sql_util))
         sql_util.ensure_table(cur, activity_daily_summary_table, activity_summary_schema(sql_util, 'day'))
         sql_util.ensure_table(cur, activity_hourly_summary_table, activity_summary_schema(sql_util, 'hour'))
+        sql_util.ensure_table(cur, participation_daily_summary_table, participation_summary_schema(sql_util, 'day'))
         con.commit()
 
         # set time range for MongoDB query
@@ -98,6 +121,7 @@ if __name__ == '__main__':
         con.commit()
 
         if verbose:  print 'start_time', start_time, 'end_time', end_time
+        if verbose:  print 'FLAG_LIST', FLAG_LIST
 
         batch = 0
         total = 0
@@ -107,10 +131,10 @@ if __name__ == '__main__':
         qs = {'time':{'$gt':start_time, '$lt':end_time }}
 
         for row in nosql_client.log_buffer_table('activity').find(qs):
+            if row.get('developer',False): continue # skip events by developers
+
             act = SpinUpcache.classify_activity(gamedata, row)
             if not act: continue
-
-            if row.get('developer',False): continue # skip events by developers
 
             sql_util.do_insert(cur, activity_table,
                                [('user_id',row['user_id']),
@@ -119,7 +143,8 @@ if __name__ == '__main__':
                                 ('receipts',row.get('money_spent',None))] +
                                sql_util.parse_brief_summary(row) + \
                                [('state',act['state']),
-                                ('ai_ui_name',act.get('ai_tag',None) or act.get('ai_ui_name',None))]
+                                ('ai_ui_name',act.get('ai_tag',None) or act.get('ai_ui_name',None))] + \
+                               [(flagname, 1 if act['flags'].get(flagname) else 0) for flagname in FLAG_LIST]
                                )
 
             batch += 1
@@ -136,62 +161,43 @@ if __name__ == '__main__':
         if verbose: print 'total', total, 'inserted', 'affecting', len(affected_days), 'day(s)', len(affected_hours), 'hour(s)'
 
         # update summaries
+        def do_update(cur, table, interval, day_start, dt):
+            snapped_time = str(dt)+"*FLOOR(time/"+str(dt)+".0)"
 
-        # find range of activity data available
-        cur.execute("SELECT MIN(time) AS min_time, MAX(time) AS max_time FROM "+sql_util.sym(activity_table))
-        rows = cur.fetchall()
-        if rows and rows[0] and rows[0]['min_time'] and rows[0]['max_time']:
-            activity_range = (rows[0]['min_time'], rows[0]['max_time'])
-        else:
-            activity_range = None
-
-        for sum_table, affected, interval, dt in ((activity_daily_summary_table, affected_days, 'day', 86400),
-                                                  (activity_hourly_summary_table, affected_hours, 'hour', 3600)):
-
-            # find range that we should summarize
-            cur.execute("SELECT MIN("+interval+") AS min, MAX("+interval+") AS max FROM "+sql_util.sym(sum_table))
-            rows = cur.fetchall()
-            if rows and rows[0] and rows[0]['min'] and rows[0]['max']:
-                # if summary table already exists, update incrementally
-                if activity_range: # fill in any missing trailing summary data
-                    source_days = sorted(affected.union(set(xrange(dt*(rows[0]['max']//dt + 1), dt*(activity_range[1]//dt + 1), dt))))
-                else:
-                    source_days = sorted(list(affected))
+            if table == participation_daily_summary_table:
+                cur.execute("INSERT INTO "+sql_util.sym(table) +" " + \
+                            "SELECT "+snapped_time+" AS "+interval+"," + \
+                            "       frame_platform," + \
+                            "       country_tier," + \
+                            "       townhall_level," + \
+                            "       "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," + \
+                            "       COUNT(DISTINCT user_id) AS n_players," + \
+                            "       300*SUM(1) AS active_time," + \
+                            "       SUM(IFNULL(gamebucks_spent,0)) AS gamebucks_spent," + \
+                            "       SUM(IFNULL(receipts,0)) AS receipts, " + \
+                            ", ".join([("COUNT(DISTINCT CASE WHEN IFNULL("+flagname+",0)>0 THEN user_id END) AS "+flagname) for flagname in FLAG_LIST]) + " " + \
+                            "FROM "+sql_util.sym(activity_table)+ " activity WHERE time >= %s AND time < %s + "+str(dt)+" " + \
+                            "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, "+sql_util.encode_spend_bracket("prev_receipts")+" ORDER BY NULL", [day_start,]*2)
             else:
-                # otherwise start from the beginning of the activity data
-                if activity_range:
-                    source_days = range(dt*(activity_range[0]//dt), dt*(activity_range[1]//dt + 1), dt)
-                else:
-                    source_days = None
+                cur.execute("INSERT INTO "+sql_util.sym(table) +" " + \
+                            "SELECT "+snapped_time+" AS "+interval+"," + \
+                            "       frame_platform," + \
+                            "       country_tier," + \
+                            "       townhall_level," + \
+                            "       "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," + \
+                            "       state," + \
+                            "       ai_ui_name," + \
+                            "       300*SUM(1) AS active_time," + \
+                            "       SUM(IFNULL(gamebucks_spent,0)) AS gamebucks_spent," + \
+                            "       SUM(IFNULL(receipts,0)) AS receipts " + \
+                            "FROM "+sql_util.sym(activity_table)+ " activity WHERE time >= %s AND time < %s + "+str(dt)+" " + \
+                            "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, "+sql_util.encode_spend_bracket("prev_receipts")+", state, ai_ui_name ORDER BY NULL", [day_start,]*2)
 
-            con.commit()
-
-            if source_days:
-                for day_start in source_days:
-                    # if day_start + dt >= time_now - 15*60: continue # skip incomplete hours/days
-
-                    if verbose: print interval, day_start, time.strftime('%Y%m%d %H:%M:%S', time.gmtime(day_start))
-
-                    # delete entries for the summary range we're about to update
-                    cur.execute("DELETE FROM "+sql_util.sym(sum_table)+" WHERE "+interval+" >= %s AND "+interval+" < %s + "+str(dt), [day_start, day_start])
-
-                    # fill summary with global login data
-                    snapped_time = str(dt)+"*FLOOR(time/"+str(dt)+".0)"
-                    cur.execute("INSERT INTO "+sql_util.sym(sum_table) +" " + \
-                                "SELECT "+snapped_time+" AS "+interval+"," + \
-                                "       frame_platform," + \
-                                "       country_tier," + \
-                                "       townhall_level," + \
-                                "       "+sql_util.encode_spend_bracket("prev_receipts")+" AS spend_bracket," + \
-                                "       state," + \
-                                "       ai_ui_name," + \
-                                "       300*SUM(1) AS active_time," + \
-                                "       SUM(IFNULL(gamebucks_spent,0)) AS gamebucks_spent," + \
-                                "       SUM(IFNULL(receipts,0)) AS receipts " + \
-                                "FROM "+sql_util.sym(activity_table)+ " activity WHERE time >= %s AND time < %s + "+str(dt)+" " + \
-                                "GROUP BY "+interval+", frame_platform, country_tier, townhall_level, "+sql_util.encode_spend_bracket("prev_receipts")+", state, ai_ui_name ORDER BY NULL", [day_start,]*2)
-
-                    con.commit()
+        for sum_table, affected, interval, dt in ((participation_daily_summary_table, affected_days, 'day', 86400),
+                                                  (activity_daily_summary_table, affected_days, 'day', 86400),
+                                                  (activity_hourly_summary_table, affected_hours, 'hour', 3600)):
+            SpinETL.update_summary(sql_util, con, cur, sum_table, affected, [start_time, end_time], interval, dt, verbose=verbose, dry_run=False,
+                                   execute_func = do_update, resummarize_tail = 1*86400)
 
         if do_prune:
             # drop old data
