@@ -40,7 +40,7 @@ class ActivityClassifier(object):
                  'alliance_gift', # sent a gift item to an alliancemate
                  'alliance_member', # was seen in an alliance
                  'alliance_unit_donation', # donated units to an alliancemate
-                 'map_attack' # made an attack on the map
+                 'map_attack', # made an attack on the map
                  'map_move', # moved a squad on the map
                  'public_chat', # said something in a public channel (global or regional)
                  ])
