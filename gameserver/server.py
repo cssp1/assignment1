@@ -4211,7 +4211,7 @@ class Session(object):
             sample['dt'] = interval
             self.activity_classifier = ActivityClassifier.ActivityClassifier(gamedata)
             self.last_activity_sample_time = t
-            if sample['state'] not in ('idle','harvest'): # don't bother recording idle or harvest time
+            if (sample['state'] not in ('idle','harvest')) or sample.get('flags'): # don't bother recording idle or harvest time
                 if gamedata['server'].get('log_activity_in_player_history', False):
                     hist = self.player.history
                     if 'activity' not in hist: hist['activity'] = {}
@@ -4346,6 +4346,10 @@ class Session(object):
                            txt, retmsg = retmsg)
 
         gamesite.chat_mgr.join(self, self.alliance_chat_channel)
+
+        # record this here on login/join/etc to catch alliance members at least once a day, but without polluting logs
+        self.activity_classifier.set_flag('alliance_member')
+
         return alliance_info, alliance_membership
 
     def init_global_chat(self, retmsg):
@@ -10485,6 +10489,8 @@ class Player(AbstractPlayer):
             self.cooldown_trigger(cdname, cdtime)
             session.deferred_player_cooldowns_update = True
 
+        session.activity_classifier.set_flag('map_move')
+
         return True, [feature], None
 
     # limit # of steps to prevent DDOS
@@ -10811,6 +10817,8 @@ class Player(AbstractPlayer):
                 cdname = 'squad_order:%d' % squad_id
                 self.cooldown_trigger(cdname, new_path[-1]['eta'] + cdtime - server_time)
                 session.deferred_player_cooldowns_update = True
+
+        session.activity_classifier.set_flag('map_move')
 
         return True, [new_entry], None
 
@@ -21504,6 +21512,7 @@ class GAMEAPI(resource.Resource):
             gamesite.msg_client.msg_send([msg_data])
 
             if is_alliance:
+                session.activity_classifier.set_flag('alliance_gift')
                 pcache_data = self.do_query_player_cache(session, [target_id], reason = spellname, get_trophies = False)[0] or {}
                 if session.alliance_chat_channel and pcache_data:
                     def format_item(item):
@@ -29444,7 +29453,7 @@ class GAMEAPI(resource.Resource):
 
                 bypass_gag = (channel not in ('GLOBAL','REGION'))
 
-                session.activity_classifier.sent_chat_message(channel)
+                session.activity_classifier.sent_chat_message(channel, is_public = (not bypass_gag), is_alliance = (channel == 'ALLIANCE'))
 
                 # remap channel name from generic client-side names to specific server-side names
                 channel = session.decode_chat_channel_name(channel)
@@ -31314,6 +31323,7 @@ class GAMEAPI(resource.Resource):
                         session.increment_player_metric('units_donated_cur_alliance', num_donated, time_series = False)
                         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                         session.player.send_history_update(retmsg)
+                        session.activity_classifier.set_flag('alliance_unit_donation')
                         metric_event_coded(session.player.user_id, '4150_units_donated', {'sum':session.player.get_denormalized_summary_props('brief'),
                                                                                           'alliance_id':alliance_id,
                                                                                           'recipient_id':recipient_id,

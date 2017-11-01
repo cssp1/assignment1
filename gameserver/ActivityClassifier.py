@@ -52,6 +52,7 @@ class ActivityClassifier(object):
         self.gamebucks_spent = 0
         self.money_spent = 0
         self.purchases = []
+        self.flags = set()
 
     def did_action(self, name, props = None):
         cur_prio = self.PRIORITY[self.state]
@@ -68,7 +69,13 @@ class ActivityClassifier(object):
         if self.gamebucks_spent > 0: ret['gamebucks_spent'] = self.gamebucks_spent
         if self.money_spent > 0: ret['money_spent'] = self.money_spent
         if self.purchases and 0: ret['purchases'] = self.purchases # off for now to reduce bloat
+        if self.flags:
+            ret['flags'] = dict((flagname, 1) for flagname in self.flags)
         return ret
+
+    def set_flag(self, flagname):
+        if flagname in ActivityClassifier.FLAGS:
+            self.flags.add(flagname)
 
     def spent_money(self, amount, descr):
         self.money_spent += amount
@@ -88,8 +95,12 @@ class ActivityClassifier(object):
     def manufactured_unit(self):
         self.did_action('consume', {'kind':'unit'})
 
-    def sent_chat_message(self, channel):
+    def sent_chat_message(self, channel, is_public = False, is_alliance = False):
         self.did_action('chat', {'channel':channel})
+        if is_public:
+            self.set_flag('public_chat')
+        if is_alliance:
+            self.set_flag('alliance_chat')
 
     def get_ai_props(self, hive_template, ai_id):
         if hive_template:
@@ -112,6 +123,9 @@ class ActivityClassifier(object):
         self.did_action('pve_defense', props)
 
     def attacked_base(self, viewing_player, viewing_base, using_squads = False):
+        if using_squads:
+            self.set_flag('map_attack')
+
         if viewing_base.base_type == 'quarry':
             self.did_action('pvquarry', {'template':viewing_base.base_template} if viewing_base.base_template else None)
         elif viewing_base.base_type == 'hive':
