@@ -107,6 +107,13 @@ if __name__ == '__main__':
                                                ('stack', a.get('stack',1))] \
                                               for a in row['units']]
                                              )
+                elif row['event_name'] == '4140_unit_donation_requested':
+                    # re-purpose the columns: stash the space into the "stack" column, and the region_id in the spec column
+                    if 'max_space' in row:
+                        keyvals.append(('stack', row['max_space']))
+                    if 'region_id' in row:
+                        keyvals.append(('spec', row['region_id']))
+                    sql_util.do_insert(cur, unit_donation_table, keyvals)
                 else:
                     pass # unrecognized event
 
