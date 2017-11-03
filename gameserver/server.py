@@ -29460,6 +29460,9 @@ class GAMEAPI(resource.Resource):
 
                 session.activity_classifier.sent_chat_message(channel, is_public = (not bypass_gag), is_alliance = (channel == 'ALLIANCE'))
 
+                if session.setmax_player_metric('feature_used:alliance_chat' if (channel == 'ALLIANCE') else 'feature_used:public_chat', 1):
+                    session.deferred_history_update = True
+
                 # remap channel name from generic client-side names to specific server-side names
                 channel = session.decode_chat_channel_name(channel)
                 if not channel:

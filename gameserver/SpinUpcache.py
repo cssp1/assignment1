@@ -69,6 +69,7 @@ FEATURE_USE_FIELDS = ["feature_used:"+x for x in ["client_ingame",
                                                   "quarry_finder_seen", "quarry_finder_used",
                                                   "strongpoint_finder_seen", "strongpoint_finder_used",
                                                   "attacker_finder_seen", "attacker_finder_used",
+                                                  "public_chat", "alliance_chat",
                                                   ]]
 
 def get_all_abtests(gamedata):
