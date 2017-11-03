@@ -3930,6 +3930,54 @@ class AttackReplayReceiver (object):
                                                                                   })
 
 
+class ScreenRecordingReceiver(object):
+    @classmethod
+    def base_name(cls, log_time, user_id):
+        return '%s-%d-%d.jpg' % (game_id, user_id, log_time)
+    @classmethod
+    def storage_dir(cls, log_time):
+        return spin_log_dir+'/'+SpinLog.time_to_date_string(log_time)+'-screen-recordings'
+    @classmethod
+    def ensure_storage_dir(cls, log_time):
+        log_dir = cls.storage_dir(log_time)
+        if not os.path.exists(log_dir):
+            try: os.mkdir(log_dir)
+            except: pass
+    @classmethod
+    def storage_path(cls, log_time, user_id):
+        return os.path.join(cls.storage_dir(log_time), cls.base_name(log_time, user_id))
+    @classmethod
+    def storage_s3_bucket(cls):
+        return SpinConfig.config.get('screen_recordings_s3_bucket',None)
+    @classmethod
+    def storage_s3_name(cls, log_time, user_id):
+        tm = time.gmtime(log_time)
+        base_name = cls.base_name(log_time, user_id)
+        return '%s-%04d%02d/%04d%02d%02d/%s' % (game_id, tm.tm_year, tm.tm_mon, tm.tm_year, tm.tm_mon, tm.tm_mday, base_name)
+
+    @classmethod
+    def upload_frame(cls, log_time, user_id, buf, codec):
+        assert codec == 'jpg'
+        # check for JPEG magic bytes
+        assert (buf[0:2] == b'\xff\xd8') and (buf[-2:] == b'\xff\xd9')
+        # make sure file is not too large
+        assert len(buf) < 1024*1024
+
+        if isinstance(io_system, S3IOSystem):
+            bucket = cls.storage_s3_bucket()
+            if bucket:
+                s3_filename = cls.storage_s3_name(log_time, user_id)
+
+                # fire and forget
+                io_system.do_async_write((bucket,s3_filename), buf, lambda: None, False, 0)
+
+        else: # write locally
+            cls.ensure_storage_dir(log_time)
+            local_filename = cls.storage_path(log_time, user_id)
+            with AtomicFileWrite.AtomicFileWrite(local_filename, 'wb') as atom:
+                atom.fd.write(buf)
+                atom.complete()
+
 class Session(object):
     class AsyncLogout:
         def __init__(self, parent):
@@ -28771,6 +28819,28 @@ class GAMEAPI(resource.Resource):
                     del session.attack_replay_receivers[token]
         elif arg[0] == "GET_BATTLE_REPLAY":
             return self.get_battle_replay(session, retmsg, arg)
+
+        elif arg[0] == "UPLOAD_SCREEN_DATA":
+            # receive and store a screenshot from the game client
+            log_time, codec, base64buf = arg[1:4]
+
+            # frequency limit
+            if session.player.cooldown_active('UPLOAD_SCREEN_DATA'):
+                return
+            session.player.cooldown_trigger('UPLOAD_SCREEN_DATA', 10)
+
+            # check parameters, and just ignore this if something is invalid
+            try:
+                # make sure time value is reasonable
+                log_time = int(log_time)
+                assert log_time >= server_time - 600 and log_time < server_time + 600
+
+                buf = base64.b64decode(base64buf)
+
+                ScreenRecordingReceiver.upload_frame(log_time, session.user.user_id, buf, codec)
+
+            except:
+                gamesite.exception_log.event(server_time, ('UPLOAD_SCREEN_DATA error from %r: ' % (session.user.user_id,))+traceback.format_exc().strip())
 
         elif arg[0] == "QUERY_MAP_LOG":
             if (not session.player.is_developer()):

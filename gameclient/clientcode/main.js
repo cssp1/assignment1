@@ -17709,6 +17709,53 @@ function do_post_screenshot(data, filename, player_caption, privacy, reason, lau
     }; })(data, filename, caption, privacy, reason, launch_callback, cb));
 }
 
+// for analysis, take a screenshot of the entire game canvas, and upload it to our server
+function upload_screen_capture() {
+    if(!Screenshot.supported()) { return; }
+
+    /** @type {!HTMLCanvasElement} */
+    var canvas_to_capture = /** @type {!HTMLCanvasElement} */ (canvas);
+
+    // scale down the big image by drawing it to an offscreen canvas
+    var res_scale = 0.5;
+    if(res_scale != 1) {
+        /** @type {!HTMLCanvasElement} */
+        var osc = /** @type {!HTMLCanvasElement} */ (document.createElement('canvas'));
+        osc.width = Math.floor(canvas_width * res_scale);
+        osc.height = Math.floor(canvas_height * res_scale);
+        var osc_con = osc.getContext('2d');
+        osc_con.drawImage(canvas, 0, 0, canvas_width * canvas_oversample, canvas_height * canvas_oversample, 0, 0, osc.width, osc.height);
+        canvas_to_capture = osc;
+    }
+
+    var data_url = Screenshot.capture_full(canvas_to_capture, Screenshot.Codec.JPEG, null);
+    if(!data_url) { return; }
+
+    // check that we got a Base64-encoded JPEG, as we expected
+    var prefix = 'data:image/jpeg;base64,';
+    if(data_url.indexOf(prefix) !== 0) { return; }
+
+    // send the raw Base64-encoded data
+    var base64_data = data_url.slice(prefix.length, data_url.length);
+    send_to_server.func(["UPLOAD_SCREEN_DATA", server_time, 'jpg', base64_data]);
+}
+
+var last_screen_capture_upload_time = -1;
+function upload_screen_capture_check() {
+    var cd = player.cooldown_find('uploading_screen_data');
+    if(!cd) { return; }
+
+    var interval = 30;
+    if('data' in cd && 'interval' in cd['data']) {
+        interval = cd['data']['interval'];
+    }
+
+    if(client_time >= last_screen_capture_upload_time + interval) {
+        last_screen_capture_upload_time = client_time;
+        upload_screen_capture();
+    }
+}
+
 function invoke_gift_prompt_dialog() {
     if(player.tutorial_state != "COMPLETE") { return; }
 
@@ -51422,6 +51469,9 @@ function do_draw() {
                 last_websocket_keepalive = client_time;
                 send_to_server.func(["PING_CHAT", player.chat_seen, 'websocket_keepalive']);
             }
+
+            // check if we should be sending screenshots for analysis
+            upload_screen_capture_check();
         }
 
         // send any pending user/alliance queries
