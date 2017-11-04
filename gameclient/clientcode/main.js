@@ -53250,7 +53250,7 @@ function draw_aura(xy, indicator_xy, aura) {
     if(('effects' in aura.spec) && aura.spec['effects'].length > 0) {
         for(var j = 0; j < aura.spec['effects'].length; j++) {
             var eff = aura.spec['effects'][j];
-            if(eff['code'] === 'weak_zombie') {
+            if(eff['code'] === 'weak_zombie' || eff['code'] === 'weak_secteam') {
                 return false;
             }
         }

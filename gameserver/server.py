@@ -5765,7 +5765,7 @@ class Session(object):
         # add "weak unit" debuffs to player units
         for unit in self.player.home_base_iter():
             if (unit.owner is self.player) and unit.is_mobile() and (not unit.is_destroyed()) and self.has_object(unit.obj_id):
-                unit.apply_weak_unit_debuffs()
+                unit.apply_weak_unit_debuffs(True)
                 if unit.auras:
                     retmsg.append(["OBJECT_AURAS_UPDATE", unit.serialize_auras()])
 
@@ -7047,12 +7047,15 @@ class GameObject(object):
         if self.auras and Aura.has_aura_with_code(self.auras, 'weak_zombie'): return False
         return True
 
-    def apply_weak_unit_debuffs(self):
+    def apply_weak_unit_debuffs(self, is_offense):
         hp_ratio = self.hp / max(0.01, float(self.max_hp))
         auras_to_apply = []
 
-        if gamedata['zombie_debuff_threshold'] >= 0 and hp_ratio < gamedata['zombie_debuff_threshold']:
+        # note: historically, zombie debuff only applied to units on offense.
+        # it makes more sense to apply unconditionally, but not doing this yet because it might upset players.
+        if is_offense and gamedata['zombie_debuff_threshold'] >= 0 and hp_ratio < gamedata['zombie_debuff_threshold']:
             auras_to_apply.append('weak_zombie')
+
         if gamedata['weak_secteam_debuff_threshold'] >= 0 and hp_ratio < gamedata['weak_secteam_debuff_threshold']:
             # do we actually carry a secteam?
             on_destroy_list = self.owner.stattab.get_unit_stat(self.spec.name, 'on_destroy', self.get_leveled_quantity(self.spec.on_destroy))
@@ -20349,7 +20352,12 @@ class GAMEAPI(resource.Resource):
 
             # last-chance check on unit level
             if obj.owner: obj.ensure_level(obj.owner.tech.get(obj.spec.level_determined_by_tech, 1))
-            if obj.is_mobile(): obj.ensure_mobile_position(session.viewing_base.ncells())
+            if obj.is_mobile():
+                obj.ensure_mobile_position(session.viewing_base.ncells())
+
+                # apply zombie debuffs, but only for enemy units (player units get these upon deployment, or, at home base, when AI attack deploys)
+                if (not obj.is_destroyed()) and (obj.owner is not session.player):
+                    obj.apply_weak_unit_debuffs(False)
 
             session.add_object(obj)
             obj_states.append(obj.serialize_state())
@@ -20368,6 +20376,8 @@ class GAMEAPI(resource.Resource):
                         obj.on_approach_fired = False
                         obj.ensure_level(session.viewing_player.tech.get(obj.spec.level_determined_by_tech, 1))
                         obj.ensure_mobile_position(session.viewing_base.ncells())
+                        if (not obj.is_destroyed()):
+                            obj.apply_weak_unit_debuffs(False)
                         session.add_object(obj)
                         obj_states.append(obj.serialize_state())
                         if obj.auras: aura_states.append(obj.serialize_auras())
@@ -24713,7 +24723,7 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["OBJECT_CREATED2", unit.serialize_state(fake_xy = loc)])
 
             # add "weak unit" debuffs
-            unit.apply_weak_unit_debuffs()
+            unit.apply_weak_unit_debuffs(True)
             if unit.auras:
                 retmsg.append(["OBJECT_AURAS_UPDATE", unit.serialize_auras()])
 
