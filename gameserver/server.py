@@ -31303,7 +31303,10 @@ class GAMEAPI(resource.Resource):
                     session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
                     if session.increment_player_metric('unit_donations_requested', 1, time_series = False):
                         session.deferred_history_update = True
-                    metric_event_coded(session.player.user_id, '4140_unit_donation_requested', {'alliance_id':alliance_id,'tag':tag,'max_space':max_space,'cur_space':cur_space,'region_id': region_id})
+                    metric_event_coded(session.player.user_id, '4140_unit_donation_requested',
+                                       {'sum':session.player.get_denormalized_summary_props('brief'),
+                                        'alliance_id':alliance_id,'tag':tag,
+                                        'max_space':max_space,'cur_space':cur_space,'region_id': region_id})
                     if session.alliance_chat_channel:
                         session.do_chat_send(session.alliance_chat_channel,
                                              'I need units! (tag %d cur %d max %d region %r)' % (tag, cur_space, max_space, region_id),
