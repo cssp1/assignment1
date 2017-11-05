@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
         filename = 'GeoLite2-Country.mmdb'
 
-        r = cStringIO.StringIO(requests.get('http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz').content)
+        r = cStringIO.StringIO(requests.get('https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz').content)
 
         # annoyingly, the database is packaged inside a directory in this TAR file.
         # unpack the one piece of the TAR that we want, and write it to disk.
