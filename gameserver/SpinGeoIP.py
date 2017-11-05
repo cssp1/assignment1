@@ -41,9 +41,46 @@ def SpinGeoIP():
     return SpinGeoIP_Stub()
 
 if __name__ == '__main__':
-    geo = SpinGeoIP()
-    print geo.get_country('182.168.1.1')
-    print geo.get_country('8.8.8.8')
-    print geo.get_country('2602:0306:36d6:46d0:45eb:f0d6:accc:3819')
-    print geo.get_country('2a02:0c7f:5242:9200:5cd5:c475:7388:977a')
+    import getopt
+
+    mode = 'test'
+
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['update'])
+
+    for key, val in opts:
+        if key == '--update': mode = 'update'
+
+    if mode == 'test':
+        geo = SpinGeoIP()
+        print geo.get_country('182.168.1.1')
+        print geo.get_country('8.8.8.8')
+        print geo.get_country('2602:0306:36d6:46d0:45eb:f0d6:accc:3819')
+        print geo.get_country('2a02:0c7f:5242:9200:5cd5:c475:7388:977a')
+
+    elif mode == 'update':
+        # download the latest GeoLite2-Country database file, and
+        # replace the copy in the gameserver/ directory with it
+
+        import requests
+        import tarfile
+        import cStringIO
+        import AtomicFileWrite
+        import geoip2.database
+
+        filename = 'GeoLite2-Country.mmdb'
+
+        r = cStringIO.StringIO(requests.get('http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz').content)
+
+        # annoyingly, the database is packaged inside a directory in this TAR file.
+        # unpack the one piece of the TAR that we want, and write it to disk.
+        tarf = tarfile.open(fileobj = r, mode = 'r:gz')
+        for tarinfo in tarf:
+            if tarinfo.name.endswith(filename): # recognize the filename
+                data = tarf.extractfile(tarinfo).read() # dump the raw bytes
+                atom = AtomicFileWrite.AtomicFileWrite(filename, 'wb') # write to disk
+                atom.fd.write(data)
+                atom.complete()
+                break
+
+        print 'Updated! Check in the new file to the SCM.'
 
