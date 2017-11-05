@@ -75,18 +75,16 @@ function do_conform {
 AWS_CLOUDFRONT_IPS=`curl -s https://ip-ranges.amazonaws.com/ip-ranges.json | \
     python -c 'import json, sys; print " ".join(x["ip_prefix"] for x in json.load(sys.stdin)["prefixes"] if x["service"] == "CLOUDFRONT")'`
 AWS_CLOUDFRONT_PORTS="80"
-#do_conform "sg-584f7632" "${AWS_CLOUDFRONT_IPS}" "${AWS_CLOUDFRONT_PORTS}" # cloudfront
 do_conform "sg-7f070d06" "${AWS_CLOUDFRONT_IPS}" "${AWS_CLOUDFRONT_PORTS}" # cloudfront-vpc-sg
 
 # CloudFlare
 CLOUDFLARE_IPS=`curl -s https://www.cloudflare.com/ips-v4 | tr '\n' ' '`
 CLOUDFLARE_PORTS="80 443"
-#do_conform "sg-d14a73bb" "${CLOUDFLARE_IPS}" "${CLOUDFLARE_PORTS}" # cloudflare
 do_conform "sg-a6060cdf" "${CLOUDFLARE_IPS}" "${CLOUDFLARE_PORTS}" # cloudflare-vpc-sg
 
 # Incapsula
-INCAPSULA_IPS=`curl -s --data "resp_format=text" https://my.incapsula.com/api/integration/v1/ips | grep -v '::' | tr '\n' ' '`
-INCAPSULA_PORTS="80 443"
-#do_conform "sg-e34f7689" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}" # incapsula
-do_conform "sg-54070d2d" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}" # incapsula-vpc-sg
+# note: as of 2017 Nov 4, this API endpoint seems to be broken :(
+#INCAPSULA_IPS=`curl -s --data "resp_format=text" https://my.incapsula.com/api/integration/v1/ips | grep -v '::' | tr '\n' ' '`
+#INCAPSULA_PORTS="80 443"
+#do_conform "sg-54070d2d" "${INCAPSULA_IPS}" "${INCAPSULA_PORTS}" # incapsula-vpc-sg
 
