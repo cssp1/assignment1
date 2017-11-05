@@ -22,7 +22,11 @@ SPVideoWidget.onclose = null;
 /** @param {string} key
     @return {string} */
 SPVideoWidget.make_youtube_url = function(key) {
-    return 'http://www.youtube.com/embed/'+key+'?html5=1&autoplay=1&enablejsapi=1&hd=1&modestbranding=1&rel=0&theme=dark&origin='+spin_server_protocol+spin_server_host+':'+spin_server_port;
+    var ret = 'http://www.youtube.com/embed/'+key+'?html5=1&autoplay=1&enablejsapi=1&hd=1&modestbranding=1&rel=0&theme=dark';
+    if(spin_server_host != 'localhost') {
+        ret += '&origin='+spin_server_protocol+spin_server_host+':'+spin_server_port;
+    }
+    return ret;
 };
 
 /** @param {string} video_url

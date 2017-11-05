@@ -775,6 +775,25 @@ OpenURLConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeVideoWidgetConsequent(data) {
+    goog.base(this, data);
+    this.youtube_id = data['youtube_id'];
+    this.notification_params = data['notification_params'] || null;
+}
+goog.inherits(InvokeVideoWidgetConsequent, Consequent);
+InvokeVideoWidgetConsequent.prototype.execute = function(state) {
+    var cb = (function(_this) { return function() {
+        SPVideoWidget.init(SPVideoWidget.make_youtube_url(_this.youtube_id), function() {});
+    }; })(this);
+    if(this.notification_params !== null) {
+        notification_queue.push(cb, this.notification_params);
+    } else {
+        cb();
+    }
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function FocusChatGUIConsequent(data) {
     goog.base(this, data);
     this.tab = data['tab'] || null;
@@ -1052,6 +1071,7 @@ function read_consequent(data) {
     else if(kind === 'BH_WEB_PUSH_INIT') { return new BHWebPushInitConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }
+    else if(kind === 'INVOKE_VIDEO_WIDGET') { return new InvokeVideoWidgetConsequent(data); }
     else if(kind === 'FOCUS_CHAT_GUI') { return new FocusChatGUIConsequent(data); }
     else if(kind === 'DAILY_TIP_UNDERSTOOD') { return new DailyTipUnderstoodConsequent(data); }
     else if(kind === 'DISPLAY_DAILY_TIP') { return new DisplayDailyTipConsequent(data); }

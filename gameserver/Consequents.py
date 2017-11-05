@@ -834,6 +834,7 @@ def read_consequent(data):
                   'INVOKE_OFFER_CHOICE','INVOKE_MISSIONS_DIALOG','INVOKE_MAIL_DIALOG',
                   'START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI','BH_BOOKMARK_PROMPT','BH_WEB_PUSH_INIT',
                   'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_MAP_DIALOG', 'INVOKE_INGAME_TIP',
+                  'INVOKE_VIDEO_WIDGET',
                   ): return ClientConsequent(data)
     else:
         raise Exception('unknown consequent '+kind)

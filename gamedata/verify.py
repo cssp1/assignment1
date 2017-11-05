@@ -1738,7 +1738,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'GIVE_UNITS', 'TAKE_UNITS', 'PRELOAD_ART_ASSET', 'HEAL_ALL_UNITS', 'HEAL_ALL_BUILDINGS',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_INGAME_TIP',
+                        'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_INGAME_TIP', 'INVOKE_VIDEO_WIDGET',
                         'ALL_AGGRESSIVE',
                    ])
 
@@ -1927,6 +1927,10 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
     elif cons['consequent'] == 'INVOKE_INGAME_TIP':
         if cons['tip_name'] not in gamedata['strings']:
                 error |= 1; print '%s: INVOKE_INGAME_TIP tip_name not found in gamedata.strings: %s' % (reason, cons['tip_name'])
+
+    elif cons['consequent'] == 'INVOKE_VIDEO_WIDGET':
+        if 'youtube_id' not in cons:
+            error |= 1; print '%s: INVOKE_VIDEO_WIDGET requires parameter "youtube_id"' % (reason,)
 
     elif cons['consequent'] == 'INVOKE_MISSIONS_DIALOG':
         if ('select_mission' in cons) and (cons['select_mission'] not in gamedata['quests']):
