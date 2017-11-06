@@ -37971,6 +37971,16 @@ function keyboard_shortcuts_update(dialog) {
 
 function invoke_region_map_help() {
     player.record_feature_use('region_map_help');
+
+    // optionally override the standard help dialog
+    if('region_map_help_consequent' in gamedata['territory']) {
+        var cons = eval_cond_or_literal(gamedata['territory']['region_map_help_consequent'], player, null);
+        if(cons) {
+            read_consequent(cons).execute();
+            return;
+        }
+    }
+
     var dialog = new SPUI.Dialog(gamedata['dialogs']['region_map_help']);
     install_child_dialog(dialog);
     dialog.auto_center();
