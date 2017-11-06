@@ -62,7 +62,7 @@
     "WAREHOUSE_IS_BUSY": { "ui_title": "Warehouse Offline", "ui_name": "Warehouse busy or damaged - cannot use inventory." },
     "SQUAD_BAY_IS_BUSY": { "ui_title": "Reserves Bay Offline", "ui_name": "Reserves Bay busy or damaged - cannot manage units." },
     "CANNOT_SPY_TRAVEL_NOT_ARRIVED": { "ui_name": "Cannot spy on this base because you have not traveled there yet." },
-    "CANNOT_SPY_NO_NEARBY_SQUADS": { "ui_title": "No Battalions in Range", "ui_name": "Cannot view this location because you have no battalions within range, or all nearby battalions are already engaged in combat." },
+    "CANNOT_SPY_NO_NEARBY_SQUADS": { "ui_title": "No Battalions in Range", "ui_name": "Cannot view this location because you have no battalions within range, or all nearby battalions are already engaged in combat.\n\nUse \"Call Battalion\" to order a battalion to this location." },
     "CANNOT_SPY_ON_MOVING_SQUAD": { "ui_title": "Battalion is Moving", "ui_name": "This battalion is in motion! We cannot Spy until it halts." },
     "CANNOT_DEPLOY_TRAVEL_NOT_ARRIVED": { "ui_name": "Cannot deploy units into this base because you have not traveled there yet." },
     "FACTORY_DAMAGED": { "ui_name": "Cannot build because the factory is damaged" },
