@@ -610,9 +610,9 @@ def _adstats_pull(db, adgroup_list, time_range = None):
         # note: the time zone / daylight savings time math here is really hairy
         # it looks like Facebook thinks it is more important for the "day" to be 24 hours than for the since/until times to
         # actually be on a midnight boundary. So, use the time offset of the END time for all computations, including the start time.
-        query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[1])),
+        query = '?'+urllib.urlencode({'time_range': {'since': chop_to_date(time_range[0] + utc_pacific_offset(time_range[1]) + 3600),
                                                      # FB API is inclusive of last day, so subtract one day
-                                                     'until': chop_to_date(max(time_range[0] + utc_pacific_offset(time_range[1]),
+                                                     'until': chop_to_date(max(time_range[0] + utc_pacific_offset(time_range[1]) + 3600,
                                                                                time_range[1] - 86400 + utc_pacific_offset(time_range[1])))},
                                       'fields': 'date_stop,date_start,ad_id,account_id,adset_id,campaign_id,' + \
                                       ','.join(ADSTATS_COUNTERS_QUERY + ADSTATS_DATA_FIELDS)
@@ -633,7 +633,7 @@ def _adstats_pull(db, adgroup_list, time_range = None):
 
         if time_range:
             # make sure we got the right time range
-            parsed_start_time = SpinFacebook.parse_fb_date(x['date_start'], utc_pacific_offset(time_range[0]))
+            parsed_start_time = SpinFacebook.parse_fb_date(x['date_start'], utc_pacific_offset(time_range[1]))
             parsed_end_time = SpinFacebook.parse_fb_date(x['date_stop'], utc_pacific_offset(time_range[1])) + 86400
 
             # fudge room for daylight savings time
