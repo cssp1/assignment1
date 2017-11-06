@@ -30960,7 +30960,8 @@ class GAMEAPI(resource.Resource):
                 if success:
                     new_id = max([x['id'] for x in session.player.squads.itervalues()]+[0,]) + 1
                     session.player.squads[str(new_id)] = {'id':new_id, 'ui_name': ui_name}
-                    session.increment_player_metric('squads_created', 1, time_series = False)
+                    if session.increment_player_metric('squads_created', 1, time_series = False):
+                        session.deferred_history_update = True
 
                 retmsg.append(["SQUADS_UPDATE", session.player.squads])
 
