@@ -1011,7 +1011,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                   (function(_mapwidget, _feature) { return function() {
                       _mapwidget.set_popup(null);
                       SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                  }; })(this, feature), 'passive']);
+                  }; })(this, feature), 'passive', null, SPUI.default_text_color, 'call']);
     }
 
     // LAUNCH RAID
@@ -1223,7 +1223,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                                       (function(_mapwidget, _feature) { return function() {
                                           _mapwidget.set_popup(null);
                                           SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                                      }; })(mapwidget, feature), 'passive']);
+                                      }; })(mapwidget, feature), 'passive', null, SPUI.default_text_color, 'call']);
                     }
                 }
             }
@@ -1285,7 +1285,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                                   (function(_mapwidget, _feature) { return function() {
                                       _mapwidget.set_popup(null);
                                       SquadControlDialog.invoke_call(_feature['base_map_loc'], _feature);
-                                  }; })(mapwidget, feature), 'passive']);
+                                  }; })(mapwidget, feature), 'passive', null, SPUI.default_text_color, 'call']);
                 } else {
                     // SPY/CALL
                     buttons = buttons.concat(mapwidget.make_nosql_spy_buttons(feature));
@@ -1339,6 +1339,8 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         throw Error('unhandled # of buttons '+buttons.length.toString());
     }
 
+    dialog.user_data['visible_buttons'] = [];
+
     var i;
     for(i = 0; i < buttons.length; i++) {
         dialog.widgets['button'+i].show = true;
@@ -1347,6 +1349,8 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
         dialog.widgets['button'+i].state = (buttons[i].length > 2 ? buttons[i][2] : 'normal');
         dialog.widgets['button'+i].tooltip.str = (buttons[i].length > 3 ? buttons[i][3] : null);
         dialog.widgets['button'+i].tooltip.text_color = (buttons[i].length > 4 ? buttons[i][4] : SPUI.default_text_color);
+        // string ID for locating the button to attach a tutorial arrow
+        dialog.user_data['visible_buttons'].push((buttons[i].length > 5 ? buttons[i][5] : null));
     }
     while(i < MAXBUT) {
         dialog.widgets['button'+i].show = false; i += 1;
@@ -1376,6 +1380,7 @@ RegionMap.RegionMap.prototype.make_feature_popup_menu = function() {
     dialog.user_data['anim_start'] = client_time;
     dialog.user_data['mapwidget'] = this;
     dialog.user_data['feature'] = feature;
+    dialog.user_data['visible_buttons'] = []; // for tutorial arrow use, track which functions are on which button
 
     dialog.ondraw = RegionMap.RegionMap.update_feature_popup_menu;
 

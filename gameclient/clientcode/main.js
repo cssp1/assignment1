@@ -19161,6 +19161,19 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                     }
                 }
             }
+        } else if(widget_name && widget_name.indexOf('MAP_POPUP:') == 0) {
+            // one of the buttons on the region_map_popup_menu. parent dialog should be "region_map_dialog".
+            var kind = widget_name.split(':')[1];
+            found_widget_name = null;
+            if(parent.widgets.map.popup && parent.widgets.map.popup.user_data['menu']) {
+                parent_offset = parent.widgets.map.popup.get_absolute_xy();
+                parent = parent.widgets.map.popup.user_data['menu'];
+                var index = parent.user_data['visible_buttons'].indexOf(kind);
+                if(index >= 0) {
+                    found_widget_name = 'button'+index.toString();
+
+                }
+            }
         }
 
 
