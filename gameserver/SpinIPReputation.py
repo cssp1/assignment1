@@ -10,16 +10,14 @@ from ipaddress import IPv6Address, IPv4Address, IPv6Network, IPv4Network, v4_int
 
 class CheckerResult(object):
     def __init__(self, entry):
+        self.entry = entry
+        self.flags = entry.get('flags',{})
         self.description = entry['description']
-        self.block_account_creation = entry.get('block_account_creation',1)
-        self.block_everything = entry.get('block_everything',0)
 
     def __repr__(self):
-        ls = []
-        if self.block_account_creation: ls.append('block-account-creation')
-        if self.block_everything: ls.append('block-everything')
-        if ls:
-            return self.description + ' (' + ','.join(ls) + ')'
+        flag_list = sorted(self.flags.keys())
+        if flag_list:
+            return '[' + ','.join(flag_list) + ']' + (' %r from %s' % (self.description, self.entry['source']))
         else:
             return 'OK'
 
@@ -56,9 +54,12 @@ class Checker(object):
                     entry['hi*'] = v4_int_to_packed(int(IPv4Address(net[-1])))
 
             # remove some fields to save memory
-            for FIELD in ('lo','hi','cidr','source'):
+            for FIELD in ('lo','hi','cidr'):
                 if FIELD in entry:
                     del entry[FIELD]
+
+            # intern the common "source" strings
+            entry['source'] = intern(str(entry['source']))
 
             ip_dict[entry['lo*']] = entry
 
@@ -73,7 +74,7 @@ class Checker(object):
         else:
             ip = v4_int_to_packed(int(IPv4Address(unicode(ipaddr))))
 
-        # binary search
+        # binary search in the sorted list
         hi = len(self.ip_list)-1
         lo = 0
         while hi >= lo:
