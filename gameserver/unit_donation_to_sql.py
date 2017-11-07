@@ -89,7 +89,7 @@ if __name__ == '__main__':
         for source_table in ('log_unit_donation',):
             for row in SpinETL.iterate_from_mongodb(game_id, source_table, start_time, end_time):
 
-                if row['sum'].get('developer',False): continue # skip events by developers
+                if ('sum' in row) and row['sum'].get('developer',False): continue # skip events by developers
 
                 keyvals = [('time',row['time']),
                            ('user_id',row['user_id']),
