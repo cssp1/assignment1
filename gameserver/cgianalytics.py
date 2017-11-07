@@ -2100,6 +2100,14 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
     {'name': 'Q21B %CONV% Squad Bay L2', 'convert_from': lambda user: user.get('squad_bay_level',0) >= 1,
      'func': lambda user: user.get('squad_bay_level',0) >= 2 },
 
+    {'name': 'Q21C Created a Squad', 'func': lambda user: user.get('squads_created',0) >= 1 },
+    {'name': 'Q21D %CONV% Deployed a Squad', 'convert_from': lambda user: user.get('squads_created',0) >= 1,
+     'func': lambda user: user.get('squads_deployed',0) >= 1 },
+    {'name': 'Q21E %CONV% Moved a Squad', 'convert_from': lambda user: user.get('squads_deployed',0) >= 1,
+     'func': lambda user: user.get('squads_moved',0) >= 1 },
+    {'name': 'Q21F %CONV% Attacked With a Squad', 'convert_from': lambda user: user.get('squads_moved',0) >= 1,
+     'func': lambda user: user.get('squad_attacks_launched',0) >= 1 },
+
     {'name': 'Q22A Destroyed 1+ Hive', 'func': lambda user: user.get('hives_destroyed',0) >= 1 },
     {'name': 'Q22B Destroyed 5+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 5 },
     {'name': 'Q22C Destroyed 10+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 10 },

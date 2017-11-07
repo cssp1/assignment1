@@ -10609,6 +10609,9 @@ class Player(AbstractPlayer):
 
         session.activity_classifier.set_flag('map_move')
 
+        if session.increment_player_metric('squads_deployed', 1, time_series = False):
+            pass # session.deferred_history_update = True
+
         return True, [feature], None
 
     # limit # of steps to prevent DDOS
@@ -10937,6 +10940,9 @@ class Player(AbstractPlayer):
                 session.deferred_player_cooldowns_update = True
 
         session.activity_classifier.set_flag('map_move')
+
+        if session.increment_player_metric('squads_moved', 1, time_series = False):
+            pass # session.deferred_history_update = True
 
         return True, [new_entry], None
 
@@ -24673,6 +24679,10 @@ class GAMEAPI(resource.Resource):
 
             if session.viewing_player is not session.player:
                 session.activity_classifier.attacked_base(session.viewing_player, session.viewing_base, using_squads = session.using_squad_deployment())
+
+                if session.using_squad_deployment():
+                    if session.increment_player_metric('squad_attacks_launched', 1, time_series = False):
+                        pass # session.deferred_history_update = True
 
             # INITIAL damage protection calculation
             # at the start of the battle, we check whether any damage protection is potentially available (based on recent attacks, who is attacking, etc)
