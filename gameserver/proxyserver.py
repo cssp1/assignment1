@@ -52,6 +52,7 @@ import SpinPasswordProtection
 import SpinSignature
 import SpinGoogleAuth
 import SpinGeoIP
+import SpinIPReputation
 import SpinBrotli
 import PlayerPortraits
 
@@ -65,6 +66,7 @@ proxy_log_dir = SpinConfig.config.get('log_dir', 'logs')
 db_client = None
 social_id_table = None
 geoip_client = SpinGeoIP.SpinGeoIP()
+ip_rep_checker = SpinIPReputation.Checker()
 raw_log = None
 metrics_log = None
 exception_log = None
@@ -1090,7 +1092,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 rec = IPRecord(ip)
                 ip_table[ip] = rec
             if rec.add_attempt(proxy_time):
-                print 'blocked login spam from %s' % repr(ip)
+                raw_log.event(proxy_time, 'blocked login spam from %r' % ip)
                 return self.index_visit_login_spam()
 
         # check for overload condition
@@ -2185,6 +2187,20 @@ class GameProxy(proxy.ReverseProxyResource):
         # create and insert user_id
         user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, True)
         visitor.demographics['user_id'] = user_id
+
+        # check IP reputation
+        # (potentially this could be moved up earlier, to avoid creating a new user_id if we're going to block)
+        ip = visitor.demographics['ip']
+        if ip and ip != 'unknown' and ip_rep_checker:
+            rep_result = None
+            try:
+                rep_result = ip_rep_checker.query(ip)
+            except:
+                exception_log.event(proxy_time, 'proxyserver: SpinIPReputation.Checker query failed on IP %r:\n%s' % \
+                                    (ip, traceback.format_exc()))
+
+            if rep_result:
+                raw_log.event(proxy_time, 'SpinIPReputation hit for user_id %d IP %r: %r' % (user_id, ip, rep_result))
 
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
@@ -3363,6 +3379,13 @@ def reconfig():
 
         if db_client:
             db_client.update_dbconfig(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
+
+        # reinitialize the IP Geolocation and Reputation databases
+
+        global geoip_client, ip_rep_checker
+        geoip_client = SpinGeoIP.SpinGeoIP()
+        ip_rep_checker = SpinIPReputation.Checker()
+
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
         status_json = admin_stats.get_server_status_json()
