@@ -19268,7 +19268,9 @@ class GAMEAPI(resource.Resource):
                 # REVENGE SYSTEM
 
                 # was this battle a revenge counterattack?
-                was_revenge = (session.revenge_attack_until >= 0)
+                was_revenge = (session.revenge_attack_until >= 0) and (session.viewing_base is session.viewing_player.my_home)
+                prevent_further_revenge = False
+
                 if was_revenge:
                     summary['is_revenge'] = 1
 
@@ -19280,16 +19282,18 @@ class GAMEAPI(resource.Resource):
                     # but only do this in ladder and legacy PvP, and it must be a home-base attack
                     if (session.player.is_ladder_player() or session.player.is_legacy_pvp_player()) and \
                        (session.viewing_base is session.viewing_player.my_home):
+                        prevent_further_revenge = True
                         session.player.cooldown_reset('revenge_defender:%d' % session.viewing_player.user_id)
                         session.viewing_player.cooldown_reset('revenge_attacker:%d' % session.player.user_id)
                         session.attack_event(session.user.user_id, '3891_revenge_cleared')
                         session.deferred_player_cooldowns_update = True
 
-                # it was not a counterattack. Create a new revenge allowance?
-                elif gamedata['matchmaking']['revenge_time'] > 0 and \
-                     ((session.viewing_base is session.viewing_player.my_home) or \
-                      (session.viewing_base.base_type == 'squad' and session.viewing_player.squads_affect_revenge()) or \
-                      (session.viewing_base.base_type == 'quarry' and session.viewing_player.quarries_affect_revenge())):
+                # Create a new revenge allowance?
+                if (not prevent_further_revenge) and \
+                   gamedata['matchmaking']['revenge_time'] > 0 and \
+                   ((session.viewing_base is session.viewing_player.my_home) or \
+                    (session.viewing_base.base_type == 'squad' and session.viewing_player.squads_affect_revenge()) or \
+                    (session.viewing_base.base_type == 'quarry' and session.viewing_player.quarries_affect_revenge())):
                     # create a revenge allowance
                     rtime = gamedata['matchmaking']['revenge_time']
                     summary['defender_can_revenge_until'] = server_time + rtime
