@@ -1025,7 +1025,7 @@ if __name__ == '__main__':
         for diff in data['difficulties']:
             instance_cdname = "ai_"+data['event_name']+data['key_suffix'][diff]+"_instance"
 
-            if diff in data['speedrun_time']:
+            if diff in data.get('speedrun_time',{}):
                 speedrun_aura = data['event_name'] + data['key_suffix'][diff] + '_speedrun_contender'
             else:
                 speedrun_aura = None
