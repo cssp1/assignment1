@@ -27,6 +27,7 @@ def login_flow_schema(sql_util): return {
                ('browser_version', 'FLOAT4'),
                ('method', 'VARCHAR(128)'),
                ('splash_image', 'VARCHAR(128)'),
+               ('since_pageload', 'FLOAT4'),
                ],
     'indices': {'by_time': {'keys': [('time','ASC')]}}
     }
@@ -101,7 +102,7 @@ if __name__ == '__main__':
 
             for FIELD in ('user_id','social_id','country','country_tier','ip',
                           'browser_name','browser_os','browser_version','method',
-                          'splash_image'):
+                          'splash_image','since_pageload'):
                 if FIELD in row:
                     keyvals.append((FIELD, row[FIELD]))
 

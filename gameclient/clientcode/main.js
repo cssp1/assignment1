@@ -9468,7 +9468,7 @@ function send_proxy_keepalive() {
                         1000*ajax_config['message_timeout_gameplay']);
 }
 
-var metric_0107_sent = false, metric_0120_sent = false;
+var metric_0107_sent = false;
 
 function gameart_onload() {
     var all = GameArt.get_dl_progress_all();
@@ -9480,22 +9480,15 @@ function gameart_onload() {
         if(gamedata['client']['delay_load_art'] && client_art_state === client_art_states.DOWNLOADING_ESSENTIAL) {
             client_art_state = client_art_states.DOWNLOADING_ALL;
             if(!metric_0107_sent) {
-                if(gamedata['client']['enable_loading_metrics']) {
-                    metric_event('0107_game_loaded_essential_art', {'time_to_assetload_essential':time_to_load});
-                }
                 metric_0107_sent = true;
+                SPLWMetrics.send_event(spin_metrics_anon_id, '0107_client_loaded_essential_art', add_demographics({'user_id': session.user_id,
+                                                                                                                   'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin}));
             }
         }
     }
 
     if(all >= 1) {
         client_art_state = client_art_states.DONE;
-        if(!metric_0120_sent) {
-            if(gamedata['client']['enable_loading_metrics']) {
-                metric_event('0120_loaded_game', {'time_to_assetload':time_to_load});
-            }
-            metric_0120_sent = true;
-        }
     }
 }
 
@@ -10949,13 +10942,6 @@ SPINPUNCHGAME.init = function() {
         user_log.msg(spin_init_messages[i], new SPUI.Color(0.5,1,1,1));
     }
 
-    // send time_to_loading metric
-    if(gamedata['client']['enable_loading_metrics']) {
-        var time_to_loading = (new Date()).getTime()/1000 - spin_pageload_begin;
-        SPLWMetrics.send_event(spin_metrics_anon_id, '0105_game_load_start',
-                               {'time_to_loading':time_to_loading});
-    }
-
     // try websockets by default, if able and gamedata.client.enable_websockets is true
     if(spin_game_direct_connect && gamedata['client']['enable_websockets'] && SPWebsocket.is_supported() &&
        (parseInt(spin_game_server_ws_port,10) > 0 || parseInt(spin_game_server_wss_port,10) > 0)) {
@@ -11018,7 +11004,9 @@ SPINPUNCHGAME.init = function() {
                                    spin_login_country,
                                    spin_user_id];
 
-    SPLWMetrics.send_event(spin_metrics_anon_id, '0105_client_start', add_demographics({'splash_image':spin_loading_screen_name}));
+    SPLWMetrics.send_event(spin_metrics_anon_id, '0105_client_start', add_demographics({'user_id': session.user_id,
+                                                                                        'splash_image': spin_loading_screen_name,
+                                                                                        'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin}));
 
     // uncomment these brackets to test proxyserver race conditions
     //window.setTimeout(function() {
@@ -46736,10 +46724,8 @@ function handle_server_message(data) {
         session.connect_time = client_time;
         session.client_hello_packet = null;
 
-        if(gamedata['client']['enable_loading_metrics']) {
-            metric_event('0106_game_connected_to_server', {'time_to_RUNNING': (new Date()).getTime()/1000 - spin_pageload_begin,
-                                                           'method': (spin_game_direct_connect ? 'direct':'proxy')});
-        }
+        metric_event('0106_client_connected_to_server', {'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin,
+                                                         'method': (spin_game_direct_connect ? 'direct':'proxy')});
 
         // optionally switch on websockets (which may already be on from init() if gamedata.client.enable_websockets is true)
         // but note: don't do this if spin_game_direct_connect has been turned off by error 0631 happening from an earlier connection attempt
@@ -47454,7 +47440,9 @@ function handle_server_message(data) {
             }
         }
 
-        SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({'splash_image':spin_loading_screen_name}));
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0120_client_ingame', add_demographics({'user_id': session.user_id,
+                                                                                             'splash_image':spin_loading_screen_name,
+                                                                                             'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin}));
         player.record_feature_use('client_ingame');
 
     } else if(msg == "OBJECT_REMOVED" || msg == "OBJECT_REMOVED2") {
@@ -50518,7 +50506,8 @@ function register_player_input() {
     if(!SPINPUNCHGAME.first_action_sent &&
        (client_state != client_states.LOADING)) { // wait until logged in (or prevented from logging in, after successful connection attempt) before sending
         SPINPUNCHGAME.first_action_sent = true;
-        SPLWMetrics.send_event(spin_metrics_anon_id, '0125_first_action', add_demographics({}));
+        SPLWMetrics.send_event(spin_metrics_anon_id, '0125_first_action', add_demographics({'user_id': session.user_id,
+                                                                                            'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin}));
         if(session.connected()) {
             player.record_feature_use('first_action');
         }

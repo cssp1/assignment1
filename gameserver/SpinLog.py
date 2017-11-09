@@ -374,6 +374,8 @@ def LoginFlowFilter(child): # for tracking churn during game load process
     return JSONLogFilter(child,
                          allow = ['0100_authenticated_visit',
                                   '0105_client_start',
+                                  '0106_client_connected_to_server',
+                                  '0107_client_loaded_essential_art',
                                   '0115_logged_in',
                                   '0120_client_ingame',
                                   '0125_first_action',
