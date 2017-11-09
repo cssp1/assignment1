@@ -15,8 +15,6 @@
     "contents": ["units", "buildings", "spells", "auras", "map", "items", "art"],
 
     "client": {
-        // report verbose loading metrics
-        "enable_loading_metrics": false,
         "instrument_tutorial": 1, // enable detailed logging of tutorial state changes
 
         "max_exception_msg_length": 1500, // max # of characters to send with client_exception messages
