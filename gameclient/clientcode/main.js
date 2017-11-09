@@ -32862,7 +32862,12 @@ function update_manufacture_dialog(dialog) {
         if(builder.manuf_start_time > 0) {
             time_left -= (server_time - builder.manuf_start_time);
         }
-        dialog.widgets['in_production_time'].str = pretty_print_time(time_left);
+        if(session.enable_progress_timers) {
+            dialog.widgets['in_production_time'].str = pretty_print_time(time_left);
+        } else {
+            // conceal the true time, for tutorial purposes
+            dialog.widgets['in_production_time'].str = dialog.data['widgets']['in_production_time']['ui_name_working'];
+        }
 
         var progress = 1 - time_left/item['total_time'];
 
@@ -32962,8 +32967,13 @@ function update_manufacture_dialog(dialog) {
             dialog.widgets['finish_button'].state = 'normal';
 
             var price = Store.get_user_currency_price(builder.id, gamedata['spells']['SPEEDUP_FOR_MONEY'], null);
-            dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
-            dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+            if(session.enable_progress_timers) {
+                dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+                dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+            } else {
+                // conceal for tutorial purposes
+                dialog.widgets['price_display'].str = dialog.widgets['price_display'].tooltip.str = '';
+            }
 
             if(price == 0) {
                 closure = (function(_builder) { return function() {
@@ -47138,6 +47148,7 @@ function handle_server_message(data) {
         session.has_deployed = false;
         session.deploy_time = -1;
         session.enable_combat_resource_bars = true;
+        session.enable_progress_timers = true;
         session.enable_dialog_completion_buttons = true;
         session.surrender_pending = false;
         session.retreat_pending = -1;

@@ -906,6 +906,17 @@ EnableCombatResourceBarsConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function EnableProgressTimersConsequent(data) {
+    goog.base(this, data);
+    this.enabled = data['enable'];
+}
+goog.inherits(EnableProgressTimersConsequent, Consequent);
+EnableProgressTimersConsequent.prototype.execute = function(state) {
+    session.enable_progress_timers = this.enabled;
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function EnableDialogCompletionConsequent(data) {
     goog.base(this, data);
     this.enabled = data['enable'];
@@ -1079,6 +1090,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
     else if(kind === 'INVOKE_LOGIN_INCENTIVE_DIALOG') { return new InvokeLoginIncentiveDialogConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
+    else if(kind === 'ENABLE_PROGRESS_TIMERS') { return new EnableProgressTimersConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }
     else if(kind === 'PRELOAD_ART_ASSET') { return new PreloadArtAssetConsequent(data); }
     else if(kind === 'METRIC_EVENT') { return new MetricEventConsequent(data); }

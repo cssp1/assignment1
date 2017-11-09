@@ -58,6 +58,7 @@ Session.Session = function() {
 
     this.change_time = -1; // client_time at which last SESSION_CHANGE was received (for debugging only)
     this.enable_combat_resource_bars = true; // used by the tutorial to hide combat resource bars (via ENABLE_COMBAT_RESOURCE_BARS consequent)
+    this.enable_progress_timers = true; // used by the tutorial to hide time remaining in long actions
     this.enable_dialog_completion_buttons = true; // used by the tutorial to disable completions button when player shouldn't press them (via ENABLE_DIALOG_COMPLETION consequent)
     this.surrender_pending = false; // true if player has pressed Surrender and we are waiting for the session change
     this.retreat_pending = -1; // client_time at which retreat will happen (between clicking "End Attack" and session change request)

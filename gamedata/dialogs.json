@@ -2631,7 +2631,7 @@
                                         "full_color": [0.189,0.710,0.905,1],
                                         "empty_color": [0.3,0.3,0.3,1] },
             "in_production_time": { "kind": "TextField", "xy": [296,349], "dimensions": [103,17], "text_size": 13,
-                                    "text_hjustify": "left", "text_style": "bold" },
+                                    "text_hjustify": "left", "text_style": "bold", "ui_name_working": "In Progress..." },
             "in_production_level": { "show": 0, "kind": "TextField", "xy": [296,284], "dimensions": [103,17], "text_size": 13,
                                      "text_hjustify": "left", "ui_name": "L%d" },
 
