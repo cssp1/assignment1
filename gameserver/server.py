@@ -20550,7 +20550,8 @@ class GAMEAPI(resource.Resource):
         session.viewing_player.apply_regional_auras(is_defender = True)
 
         # apply general-purpose loot malus
-        if session.viewing_player is not session.player:
+        if (session.viewing_player is not session.player) and \
+           (session.viewing_base.base_type not in ('quarry', 'squad')):
             malus = gamedata.get('townhall_loot_malus', 1)
             if malus < 1:
                 # player townhall minus opponent townhall
