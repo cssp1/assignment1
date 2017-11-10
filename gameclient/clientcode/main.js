@@ -542,9 +542,12 @@ function pad_with_zeros(s, n) {
 }
 
 function pretty_print_qty_brief(n) {
-    if(n >= 1000000) {
+    if(n >= 10000000) { // 10m+: 1 digit after the decimal, e.g. "18.5m"
         var d = n/1000000, rem = n % 1000000;
         return d.toFixed(rem == 0 ? 0 : 1)+'m';
+    } else if(n >= 1000000) { // 1-10m: 2 digits after the decimal, e.g. "1.85m"
+        var d = n/1000000, rem = n % 1000000;
+        return d.toFixed(rem == 0 ? 0 : 2)+'m';
     } else if(n >= 1000) {
         var d = n/1000, rem = n % 1000;
         return d.toFixed(rem == 0 ? 0 : 1)+'k';
