@@ -144,8 +144,7 @@
             "query_interval": 3.0 // min # of seconds between queries
         },
 
-        "delay_load_art": 1, // if true, use delayed loading on art assets (after "Loading..." screen, but do load everything unconditionally)
-        "lazy_art": true, // if true, do not even begin loading images or sounds until an attempt is made to draw/play them
+        "force_lazy_sound": false, // enable work-around that forces all audio files to be loaded lazily, even if attached to non-lazy art assets
 
         // maximum number of art asset download requests to give the browser at any one time
         "concurrent_art_downloads": { "default": 20, "iOS": 5 },

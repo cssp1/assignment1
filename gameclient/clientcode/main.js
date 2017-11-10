@@ -9477,7 +9477,7 @@ function gameart_onload() {
     var time_to_load = (new Date()).getTime()/1000 - spin_pageload_begin;
 
     if(essential >= 1) {
-        if(gamedata['client']['delay_load_art'] && client_art_state === client_art_states.DOWNLOADING_ESSENTIAL) {
+        if(client_art_state === client_art_states.DOWNLOADING_ESSENTIAL) {
             client_art_state = client_art_states.DOWNLOADING_ALL;
             if(!metric_0107_sent) {
                 metric_0107_sent = true;
@@ -46735,9 +46735,7 @@ function handle_server_message(data) {
             }
         }
 
-        var use_lazy_art = player.get_any_abtest_value('force_lazy_art', gamedata['client']['lazy_art']);
-        if(document.URL.indexOf('lazy_art=1') != -1) { use_lazy_art = true; }
-        if(document.URL.indexOf('lazy_art=0') != -1) { use_lazy_art = false; }
+        var force_lazy_sound = player.get_any_abtest_value('force_lazy_sound', gamedata['client']['force_lazy_sound'] || false);
 
         // order of precedence for graphics options is player preference << browser forcing (A/B testable) << URL query
         var use_low_gfx = false;
@@ -46767,9 +46765,9 @@ function handle_server_message(data) {
             }
         }
 
-        console.log('GameArt settings: low_gfx '+use_low_gfx+' lazy_art '+use_lazy_art+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
+        console.log('GameArt settings: low_gfx '+use_low_gfx+' audio_driver '+(audio_driver ? audio_driver.toString() : null));
 
-        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, use_lazy_art, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
+        GameArt.init(client_time, canvas, ctx, gamedata['art'], gameart_onload, audio_driver, use_low_gfx, force_lazy_sound, player.get_any_abtest_value('enable_pixel_manipulation_in_low_gfx', gamedata['client']['enable_pixel_manipulation_in_low_gfx']));
 
         if(!ctx) { throw Error('ctx not initialized'); }
         SPFX.init(ctx, use_low_gfx, false);
@@ -51378,11 +51376,7 @@ function do_draw() {
             msg = data['frames'][index];
         } else {
             var progress;
-            if(gamedata['client']['delay_load_art']) {
-                progress = GameArt.get_dl_progress_essential();
-            } else {
-                progress = GameArt.get_dl_progress_all();
-            }
+            progress = GameArt.get_dl_progress_essential();
             msg = gamedata['strings']['loading_screen_loading'].replace('%pct',(100*progress).toFixed(0));
         }
 

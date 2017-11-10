@@ -336,7 +336,7 @@ GameArt.set_audio_channel_max = function(num) {
     if(GameArt.channel_governor) { GameArt.channel_governor.max_chan = num; }
 };
 
-GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_name, use_low_gfx, lazy_art, enable_pixel_manipulation_in_low_gfx) {
+GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_name, use_low_gfx, force_lazy_sound, enable_pixel_manipulation_in_low_gfx) {
     GameArt.initialized = true;
     GameArt.time = time;
     GameArt.canvas = canvas;
@@ -344,7 +344,8 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     GameArt.enable_audio = !!audio_driver_name;
     GameArt.enable_images = (document.URL.indexOf('null_all_images=1') == -1);
     GameArt.low_gfx = use_low_gfx;
-    GameArt.lazy_art = lazy_art;
+    GameArt.lazy_art = true;
+    GameArt.force_lazy_sound = force_lazy_sound;
     GameArt.enable_pixel_manipulation_in_low_gfx = enable_pixel_manipulation_in_low_gfx;
 
     GameArt.force_ssl_art = (document.URL.indexOf('sslart=1') != -1);
@@ -1477,6 +1478,12 @@ GameArt.Sound = function(filename, volume, priority, load_priority, delay_load, 
     // force audio samples to be downloaded lazily even if attached to a non-lazy asset
     if(load_priority >= GameArt.essential_priority) {
         load_priority = GameArt.essential_priority - 40;
+
+        // note: this should always have been here, but for many years we didn't set delay_load=true,
+        // so despite lowering load_priority, the audio was never actually loaded lazily!
+        if(GameArt.lazy_art && GameArt.force_lazy_sound) {
+            this.delay_load = true;
+        }
     }
 
     if(!GameArt.enable_audio) {
