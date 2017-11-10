@@ -51349,6 +51349,10 @@ function do_draw() {
     ctx.lineWidth = 1;
     set_default_canvas_transform(ctx);
 
+    if(backdrop_music && GameArt.music_volume > 0) {
+        backdrop_music.check_delay_load();
+    }
+
     var world = (session.has_world() ? session.get_draw_world() : null);
     if(world) {
         world.fxworld.set_time(client_time, world.combat_engine.cur_tick);
