@@ -39887,6 +39887,7 @@ var g_ui_locker = null; // global instance
     @param {function()|null=} cb */
 function invoke_ui_locker(sync_marker, cb) {
     if(!sync_marker && (sync_marker !== 0)) { sync_marker = synchronizer.request_sync(); }
+    //console.log('ui_locker UP '+sync_marker.toString());
     if(g_ui_locker) {
         g_ui_locker.user_data['sync_marker'] = Math.max(g_ui_locker.user_data['sync_marker'], sync_marker);
         return g_ui_locker;
@@ -39900,12 +39901,16 @@ function invoke_ui_locker(sync_marker, cb) {
     dialog.auto_center();
     dialog.modal = dialog_data['modal'];
     dialog.ondraw = update_ui_locker;
-    dialog.on_destroy = function(dialog) { if(g_ui_locker === dialog) { g_ui_locker = null; } };
+    dialog.on_destroy = function(dialog) {
+        //console.log('ui_locker DESTROY '+dialog.user_data['sync_marker'].toString());
+        if(g_ui_locker === dialog) { g_ui_locker = null; }
+    };
     g_ui_locker = dialog;
     return dialog;
 }
 function update_ui_locker(dialog) {
     if(synchronizer.is_in_sync(dialog.user_data['sync_marker'])) {
+        //console.log('ui_locker DOWN '+dialog.user_data['sync_marker'].toString());
         var cb = dialog.user_data['cb'];
         close_parent_dialog(dialog.widgets['loading_rect']);
         if(cb) { cb(); }
@@ -50937,7 +50942,7 @@ function on_keydown(e) {
 
     if(code === 13) { // ENTER key
         var button = null;
-        if(selection.ui) {
+        if(selection.ui && !g_ui_locker) {
             button = selection.ui.default_button || null;
             // hack - handle nested dialogs
             if(selection.ui.children) {
