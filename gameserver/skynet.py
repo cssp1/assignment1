@@ -1744,10 +1744,16 @@ def adgroup_targeting(db, tgt):
     game_id = tgt.get('game', 'tr')
     game_data = GAMES[game_id]
 
+    if 'locale' in tgt:
+        TABLE = {'en-ALL': '1001'}
+        ret['locales'] = [TABLE[tgt['locale']],]
+
     if 'country' in tgt:
         assert 'country_group' not in tgt
         ret['geo_locations'] = {}
-        if ',' in tgt['country']:
+        if tgt['country'] in ('itunes_app_store','worldwide'):
+            ret['geo_locations']['country_groups'] = [tgt['country']]
+        elif ',' in tgt['country']:
             # note: as a special-case hack, we allow comma-separated country lists
             # this conflicts with the original idea of having a separate "country_group" targeting parameter,
             # but it makes it easier to run campaigns with mixed single-country and multi-country targets
@@ -1756,9 +1762,14 @@ def adgroup_targeting(db, tgt):
             ret['geo_locations']['countries'] = [tgt['country'].upper(),]  # note: must be uppercase!
     elif 'country_group' in tgt:
         assert 'country' not in tgt
-        ret['countries'] = map(lambda x: x.upper(), tgt['country_group'].split(','))
-    else:
-        raise Exception('target must include either country or country_group')
+        ret['geo_locations'] = {}
+        ret['geo_locations']['countries'] = map(lambda x: x.upper(), tgt['country_group'].split(','))
+
+    if not ret.get('geo_locations'):
+        raise Exception('target must include one of (country/country_group)')
+
+    if 'exclude_country' in tgt:
+        ret['excluded_geo_locations'] = {'countries': [c.upper() for c in tgt['exclude_country'].split(',')]}
 
     if 'gender' in tgt:
         ret['genders'] = [2 if tgt['gender'] == 'f' else 1] # # 1=male, 2=female
