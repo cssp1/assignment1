@@ -1639,7 +1639,10 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
         if pred['name'] not in gamedata['predicate_library']:
             error |= 1
             print '%s: %s predicate refers to nonexistent library predicate "%s"' % (reason, pred['predicate'], pred['name'])
-        if (expect_library_preds) is not None and (pred['name'] not in expect_library_preds) and (not pred['name'].endswith('_event_store_open')):
+        if (expect_library_preds) is not None and \
+           (pred['name'] not in expect_library_preds) and \
+           (not pred['name'].endswith('_event_store_open')) and \
+           (not pred['name'].endswith('_sale')):
             error |= 1; print '%s: %s predicate refers to LIBRARY "%s" but is only allowed to refer to one of %s' % (reason, pred['predicate'], pred['name'], repr(expect_library_preds))
 
     elif pred['predicate'] == 'SELECTED':
