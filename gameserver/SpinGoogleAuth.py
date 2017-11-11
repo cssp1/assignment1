@@ -97,7 +97,7 @@ def auth_spinpunch_user(access_token, expires_in, user_info, spin_users, realm, 
                            'roles':spin_users[spin_user].get('roles',[]),
                            # note: we do NOT obey Google's "expires_in", which seems to be about one hour
                            # XXX should probably create some mechanism to renew tokens rather than using long expiration times
-                           'expires_at': time_now + max(6*3600, expires_in),
+                           'expires_at': time_now + max(24*3600, expires_in),
                            'algorithm': 'HMAC-SHA256'}
         spin_token_data['spin_token'] = make_signed_request(spin_token_data, realm_secret)
         return spin_token_data
