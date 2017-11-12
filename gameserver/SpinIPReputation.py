@@ -21,6 +21,8 @@ class CheckerResult(object):
         else:
             return 'OK'
 
+    def is_toxic(self): return self.flags.get('toxic',0)
+
 class Checker(object):
     def __init__(self):
         ip_dict = {} # map from range_lo -> ip-reputation entry dict

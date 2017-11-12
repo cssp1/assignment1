@@ -2067,6 +2067,10 @@ class GameProxy(proxy.ReverseProxyResource):
         redirect_url = SpinConfig.config['proxyserver']['coming_soon_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
+    def index_visit_banned(self, request, visitor):
+        redirect_url = SpinConfig.config['proxyserver']['account_banned_landing']
+        return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
+
     def index_visit_authorized(self, request, visitor):
         if not visitor.social_id:
             # this can happen when the Facebook fetch_oauth_token API fails
@@ -2201,6 +2205,10 @@ class GameProxy(proxy.ReverseProxyResource):
 
             if rep_result:
                 raw_log.event(proxy_time, 'SpinIPReputation hit for user_id %d IP %r: %r' % (user_id, ip, rep_result))
+
+                # don't let known toxic people play
+                if rep_result.is_toxic():
+                    return self.index_visit_banned(request, visitor)
 
         # note: we're remembering the gameserver's HTTP port no matter what protocol the client is using,
         # since this is for proxy forwarding
