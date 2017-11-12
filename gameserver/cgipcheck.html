@@ -520,7 +520,21 @@ var display_chat_messages = function(ui_ident, result) {
         var s = pretty_print_ts(r['time']) + ' ' + pad_string(r['channel'],16) + ' ' + sender_name + ': ' + r['text'];
         lines.push(s);
     });
-    window.open('data:text/plain,'+encodeURIComponent(lines.join('\n')), '_blank');
+
+    var raw_text = lines.join('\n');
+
+    if(0) { // doesn't handle UTF-8 correctly?
+        var text_blob = new Blob([raw_text], {'type': 'text/plain;charset=UTF-8', 'encoding':'UTF-8'});
+        var text_blob_url = URL.createObjectURL(text_blob);
+        window.open(text_blob_url, '_blank');
+    } else {
+        var w = window.open('', '_blank');
+        w.document.open();
+        w.document.write('<html><head><meta charset="UTF-8"></head><body><pre>');
+        w.document.write(quote_for_html(raw_text));
+        w.document.write('</pre></body></html>');
+        w.document.close();
+    }
 };
 
 var method_clear_lockout = function() {
