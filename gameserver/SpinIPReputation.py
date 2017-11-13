@@ -94,14 +94,19 @@ if __name__ == '__main__':
     import sys, getopt
 
     mode = 'test'
+    check_ip = None
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['update'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['update','check='])
 
     for key, val in opts:
         if key == '--update': mode = 'update'
+        elif key == '--check': mode = 'check'; check_ip = val
 
-    if mode == 'test':
-        c = Checker()
+    c = Checker()
+
+    if mode == 'check':
+        print check_ip, '->', c.query(check_ip)
+    elif mode == 'test':
         for addr in ('127.0.0.1',
                      '8.8.8.8',
                      '5.9.128.128',
