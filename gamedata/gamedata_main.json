@@ -144,7 +144,7 @@
             "query_interval": 3.0 // min # of seconds between queries
         },
 
-        "force_lazy_sound": false, // enable work-around that forces all audio files to be loaded lazily, even if attached to non-lazy art assets
+        "force_lazy_sound": 1, // enable work-around that forces all audio files to be loaded lazily, even if attached to non-lazy art assets
 
         // maximum number of art asset download requests to give the browser at any one time
         "concurrent_art_downloads": { "default": 20, "iOS": 5 },
