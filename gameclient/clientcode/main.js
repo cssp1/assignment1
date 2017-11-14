@@ -21207,9 +21207,13 @@ function add_regional_map_button(buttons) {
     var pred = read_predicate({'predicate':'LIBRARY', 'name':'quarry_play_requirement'});
     var can_view_quarries = pred.is_satisfied(player, null);
     if(can_view_quarries) {
-        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], onclick: function() { change_selection_ui(null); invoke_region_map(); }, asset: 'menu_button_resizable'}));
+        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'],
+                                            spellname: 'SHOW_REGIONAL_MAP',
+                                            onclick: function() { change_selection_ui(null); invoke_region_map(); }, asset: 'menu_button_resizable'}));
     } else {
-        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'], onclick: get_requirements_help(pred), state: 'disabled_clickable',
+        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_name'],
+                                            spellname: 'SHOW_REGIONAL_MAP',
+                                            onclick: get_requirements_help(pred), state: 'disabled_clickable',
                                             ui_tooltip: gamedata['spells']['SHOW_REGIONAL_MAP']['ui_tooltip_unmet'].replace('%s',pred.ui_describe(player)), asset: 'menu_button_resizable'}));
     }
 }
@@ -21319,7 +21323,9 @@ function invoke_building_context_menu(mouse_xy) {
             if(obj.spec['name'] !== gamedata['townhall']) { upgrade_is_active = false; }
             if(player.squads_enabled()) {
                 // MANAGE SQUADS button
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MANAGE_SQUADS']['ui_name'], onclick: function() { change_selection_ui(null); SquadControlDialog.invoke_normal(); }}));
+                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['MANAGE_SQUADS']['ui_name'],
+                                                    spellname: 'MANAGE_SQUADS',
+                                                    onclick: function() { change_selection_ui(null); SquadControlDialog.invoke_normal(); }}));
                 add_deploy_squads_button(buttons);
             }
         }
@@ -21371,10 +21377,13 @@ function invoke_building_context_menu(mouse_xy) {
             if(1) {
                 var pred = read_predicate({'predicate':'LIBRARY','name':'alliance_join_requirement'});
                 if(!pred.is_satisfied(player, null)) {
-                    alliances_button = new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: get_requirements_help(pred,null), state: 'disabled_clickable', ui_tooltip: gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))});
+                    alliances_button = new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'],
+                                                              spellname: 'SHOW_ALLIANCES',
+                                                              onclick: get_requirements_help(pred,null), state: 'disabled_clickable', ui_tooltip: gamedata['spells']['SHOW_ALLIANCES']['ui_name_unmet'].replace('%s',pred.ui_describe(player))});
                     upgrade_is_active = true; // re-enable upgrade because it might be essential to join an alliance
                 } else {
                     alliances_button = new ContextMenuButton({ui_name: gamedata['spells']['SHOW_ALLIANCES']['ui_name'], onclick: invoke_alliance_dialog,
+                                                              spellname: 'SHOW_ALLIANCES',
                                                               asset: (session.is_in_alliance() ? 'menu_button_resizable' : 'action_button_resizable')});
                 }
             }
@@ -28884,6 +28893,7 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
         }
         dialog.user_data['tab'] = newtab;
     }
+    player.quest_tracked_dirty = true;
 
     var use_trophies = player.use_trophies(); // whether PvP points are enabled
     var event = player.current_alliance_stat_tournament_event(); // whether a stat tournament is going on
