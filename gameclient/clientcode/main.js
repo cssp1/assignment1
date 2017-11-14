@@ -11213,7 +11213,19 @@ function init_desktop_dialogs() {
         if(session.has_attacked) {
         } else {
             dialog.widgets['missions_button'].onclick = function() {
-                if(player.tutorial_state == "COMPLETE" && (player.has_unread_mail() || player.has_uncollected_gift_mail())) {
+                var action = 'missions'; // invoke "mail" or "missions" dialog
+
+                if(player.tutorial_state == "COMPLETE") {
+                    var force_action = null;
+                    if('missions_button_action' in gamedata['client']) {
+                        force_action = eval_cond(gamedata['client']['missions_button_action'], player, null);
+                    }
+                    if(force_action !== 'missions' && (player.has_unread_mail() || player.has_uncollected_gift_mail())) {
+                        action = 'mail';
+                    }
+                }
+
+                if(action === 'mail') {
                     invoke_mail_dialog(true);
                 } else {
                     invoke_missions_dialog(true);

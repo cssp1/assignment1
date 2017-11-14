@@ -3875,6 +3875,9 @@ def main(args):
 
     for name in ('enable_replay_recording', 'enable_replay_playback',):
         error |= check_predicate(gamedata['client'][name], reason = 'client:'+name)
+    for name in ('missions_button_action',):
+        if name in gamedata['client']:
+            error |= check_cond_chain(gamedata['client'][name], reason='client:'+name)
 
     error |= check_server(gamedata['server'])
     error |= check_promo_codes(gamedata['promo_codes'])
