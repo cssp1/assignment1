@@ -2191,7 +2191,7 @@ def check_hives_and_raids(kind, hives):
                 warn = None
                 if pop < 10:
                     warn  = 'LOW (%d)' % pop
-                elif pop >= 1000:
+                elif pop >= {'fs': 2000}.get(gamedata['game_id'], 1000):
                     warn = 'HIGH (%d)' % pop
                 if warn:
                     interval = [entry_t, spawn_pop[j+1][0] if j+1 < len(spawn_pop) else -1]
