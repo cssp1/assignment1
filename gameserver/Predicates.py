@@ -340,6 +340,24 @@ class TechLevelPredicate(Predicate):
         return (player.tech.get(self.tech,0) >= self.min_level) and \
                ((self.max_level < 0) or (player.tech.get(self.tech,0) <= self.max_level))
 
+class QuestActivePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.quest_name = data['quest_name']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        if (self.quest_name in player.completed_quests): return False
+        target_quest = player.get_abtest_quest(self.quest_name)
+        if target_quest.activation and (not target_quest.activation.is_satisfied2(session, player, qdata, override_time = override_time)): return False
+        if target_quest.goal.is_satisfied2(session, player, qdata): return False
+        return True
+
+    def is_satisfied(self, player, qdata): # XXXXXX remove when safe
+        if (self.quest_name in player.completed_quests): return False
+        target_quest = player.get_abtest_quest(self.quest_name)
+        if target_quest.activation and (not target_quest.activation.is_satisfied(player, qdata)): return False
+        if target_quest.goal.is_satisfied(player, qdata): return False
+        return True
+
 class QuestCompletedPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -999,6 +1017,7 @@ def read_predicate(data):
     elif kind == 'UNIT_QUANTITY': return UnitQuantityPredicate(data)
     elif kind == 'TECH_LEVEL': return TechLevelPredicate(data)
     elif kind == 'QUEST_COMPLETED': return QuestCompletedPredicate(data)
+    elif kind == 'QUEST_ACTIVE': return QuestActivePredicate(data)
     elif kind == 'AURA_ACTIVE': return AuraActivePredicate(data)
     elif kind == 'AURA_INACTIVE': return AuraInactivePredicate(data)
     elif kind == 'COOLDOWN_ACTIVE': return CooldownActivePredicate(data)

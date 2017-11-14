@@ -769,6 +769,25 @@ QuestCompletedPredicate.prototype.ui_time_range = function(player) { return [-1,
 
 /** @constructor @struct
   * @extends Predicate */
+function QuestActivePredicate(data) {
+    goog.base(this, data);
+    this.quest = gamedata['quests'][data['quest_name']];
+}
+goog.inherits(QuestActivePredicate, Predicate);
+QuestActivePredicate.prototype.do_ui_describe = function(player) { return null; } // internal use only
+QuestActivePredicate.prototype.is_satisfied = function(player, qdata) {
+    if(this.quest['name'] in player.completed_quests) { return false; }
+    if(('activation' in this.quest) && !read_predicate(this.quest['activation']).is_satisfied(player, null)) {
+        return false;
+    }
+    if(read_predicate(this.quest['goal']).is_satisfied(player, null)) {
+        return false;
+    }
+    return true;
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function AuraActivePredicate(data) {
     goog.base(this, data);
     this.aura_name = data['aura_name'];
@@ -2061,6 +2080,7 @@ function read_predicate(data) {
     else if(kind === 'UNIT_QUANTITY') { return new UnitQuantityPredicate(data); }
     else if(kind === 'TECH_LEVEL') { return new TechLevelPredicate(data); }
     else if(kind === 'QUEST_COMPLETED') { return new QuestCompletedPredicate(data); }
+    else if(kind === 'QUEST_ACTIVE') { return new QuestActivePredicate(data); }
     else if(kind === 'AURA_ACTIVE') { return new AuraActivePredicate(data); }
     else if(kind === 'AURA_INACTIVE') { return new AuraInactivePredicate(data); }
     else if(kind === 'COOLDOWN_ACTIVE') { return new CooldownActivePredicate(data); }
