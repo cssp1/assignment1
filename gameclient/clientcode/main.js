@@ -19015,6 +19015,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         } else if(parent_path_list[0].indexOf("_dialog") != -1 ||
                   parent_path_list[0].indexOf("_tab") != -1 ||
                   parent_path_list[0].indexOf("context_menu") != -1 ||
+                  parent_path_list[0].indexOf("inventory_context") != -1 ||
                   parent_path_list[0].indexOf("tutorial") != -1) {
 
             // search for parent dialog by name
@@ -24768,12 +24769,15 @@ function invoke_inventory_context(inv_dialog, parent_widget, slot, item, show_dr
         //inv_dialog.remove(dialog);
         inv_dialog.user_data['context'] = null;
     }
+    player.quest_tracked_dirty = true;
+
     if(slot < 0) { return null; }
 
     // SPUI.Container to which this widget will be parented (usually inv_dialog, but may be overridden)
     var parent_dialog = (props && props['parent_dialog'] ? props['parent_dialog'] : inv_dialog);
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['inventory_context']);
+    dialog.user_data['dialog'] = 'inventory_context';
     dialog.user_data['props'] = props || null;
     dialog.user_data['parent_widget'] = parent_widget;
     dialog.user_data['parent_dialog'] = parent_dialog;
