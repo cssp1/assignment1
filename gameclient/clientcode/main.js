@@ -21412,14 +21412,17 @@ function invoke_building_context_menu(mouse_xy) {
             // offer to speed up repairs or construction
             upgrade_is_active = false;
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                spellname: 'SPEEDUP_FOR_MONEY',
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
         } else if((session.home_base || quarry_upgradable) && (obj.is_upgrading() || obj.is_enhancing())) {
             // if upgrading or enhancing, then just show speedup and cancel
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                spellname: 'SPEEDUP_FOR_MONEY',
                                                 onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                }));
             buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_UPGRADE']['ui_name'],
+                                                spellname: 'CANCEL_UPGRADE',
                                                 onclick: (function (_obj) { return function() {
                                                     change_selection_ui(null);
                                                     var ingredient_loss = false;
