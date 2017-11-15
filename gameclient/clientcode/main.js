@@ -35799,6 +35799,11 @@ function missions_dialog_scroll(dialog, first_row) {
         var rowname = 'row'+ui_row.toString();
         dialog.widgets[rowname].show = true;
         dialog.widgets[rowname].str = quest['ui_name'];
+
+        if(player.is_cheater) { // in DEV Edit mode, show quest priority numbers
+            dialog.widgets[rowname].str += ' (' + (quest['ui_priority']||0).toString() + ')';
+        }
+
         dialog.widgets[rowname].onclick =
             dialog.widgets['row_icon'+ui_row.toString()].onclick =
             (function (rownum) { return function (w) {
