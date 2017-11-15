@@ -241,6 +241,22 @@ AllAggressiveConsequent.prototype.execute = function(state) {
     });
 };
 
+/** @constructor @struct
+  * @extends Consequent */
+function UINotifyConsequent(data) {
+    goog.base(this, data);
+    this.notification_params = data['notification_params'] || {};
+    this.action = read_consequent(data['action']);
+    this.name = data['name'] || null;
+}
+goog.inherits(UINotifyConsequent, Consequent);
+UINotifyConsequent.prototype.execute = function(state) {
+    notification_queue.push(goog.bind(function() {
+        this.action.execute(); // note: drops state
+    }, this), this.notification_params);
+};
+
+
 // note: normally this is done server-side for AI base completions,
 // resulting in receiving DISPLAY_MESSAGE over the network, but we
 // also implement a client-side version for quest "completion"
@@ -1100,6 +1116,7 @@ function read_consequent(data) {
     else if(kind === 'GIVE_GAMEBUCKS') { return new GiveGamebucksConsequent(data); }
     else if(kind === 'FPS_COUNTER') { return new FPSCounterConsequent(data); }
     else if(kind === 'LIBRARY') { return new LibraryConsequent(data); }
+    else if(kind === 'UI_NOTIFY') { return new UINotifyConsequent(data); }
     else { throw Error('unknown consequent type '+kind); }
 }
 

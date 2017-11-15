@@ -10425,7 +10425,15 @@ NotificationQueue.prototype.fire_next = function(min_prio) {
     if(item) {
         this.queue.splice(item_i,1);
         item['cb']();
-        player.quest_tracked_dirty = true;
+        if(item['maintain_quest_tips']) {
+            // ugly hack - if the callback is used to pop up some sort of tutorial GUI, like TUTORIAL_ARROW,
+            // then we do not want to blow away player.quest_root
+            player.quest_tracked_dirty = false;
+            selection.ui_change_time = -1;
+        } else {
+            // normally, we want to re-evaluate quest tips here
+            player.quest_tracked_dirty = true;
+        }
     }
     return !!item;
 };
@@ -10434,7 +10442,8 @@ NotificationQueue.prototype.push = function(cb, params) {
     if(!params) { params = {}; }
     this.queue.push({'cb':cb,
                      'priority': params['priority'] || 0,
-                     'show_if_away': params['show_if_away'] || false
+                     'show_if_away': params['show_if_away'] || false,
+                     'maintain_quest_tips': params['maintain_quest_tips'] || false
                     });
 };
 NotificationQueue.prototype.push_with_priority = function(cb, priority) { this.push(cb, {'priority':priority}); };
