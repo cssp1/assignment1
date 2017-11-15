@@ -32719,7 +32719,7 @@ function update_manufacture_dialog(dialog) {
         widget.onenter = (function(_name) { return function(w) { manufacture_dialog_select_unit(w.parent, _name); } })(name);
 
         // this is the function that handles the mouse click
-        var closure = (function(spec_name) {
+        var closure = (function(spec_name, _widget_name) {
             return function(w) {
                 var dialog = w.parent;
                 var builder = dialog.user_data['builder'];
@@ -32732,7 +32732,7 @@ function update_manufacture_dialog(dialog) {
                 } else if(builder && unlock_level > 0) {
 
                     // this is the function that actually runs the build command
-                    var send_command = (function (_dialog, _spec_name) { return function() {
+                    var send_command = (function (_dialog, _spec_name, __widget_name) { return function() {
                         var builder = _dialog.user_data['builder'];
                         send_to_server.func(["CAST_SPELL", builder.id, "MAKE_DROIDS", _spec_name]);
                         var manuf_queue = builder.start_client_prediction('manuf_queue', builder.manuf_queue);
@@ -32764,7 +32764,13 @@ function update_manufacture_dialog(dialog) {
                         }
                         player.quest_tracked_dirty = true;
 
-                    }; })(dialog, spec_name);
+
+                        if(player.get_any_abtest_value('manufacture_unit_glow', gamedata['client']['manufacture_unit_glow'] || false)) {
+                            _dialog.widgets['grid_glow'+__widget_name].show = true;
+                            _dialog.widgets['grid_glow'+__widget_name].reset_fx();
+                        }
+
+                    }; })(dialog, spec_name, _widget_name);
 
                     // check requirements
                     var spec = gamedata['units'][spec_name];
@@ -32867,7 +32873,7 @@ function update_manufacture_dialog(dialog) {
                 // all paths that do not end in send_command() should return true to stop the dripper, since it indicates some problem that must be solved.
                 return true;
             };
-        })(name);
+        })(name, widget_name);
         widget.onclick = closure;
 
         if(!gamedata['client']['unit_manufacture_dripper']) {

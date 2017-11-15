@@ -2556,6 +2556,12 @@
             "sunken_grid": {"kind": "StaticImage", "xy":[47,120], "dimensions":[57,63], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable",
                             "array": [3,4], "array_offset": [64,67] },
 
+            "grid_glow": {"show": 0, "kind": "StaticImage","xy":[38,111],"dimensions":[75,82],
+                          "asset": "dialog_glow_thin_resizable", "bg_image_resizable": 1,
+                          "composite_mode": "lighter", "alpha": 0.5,
+                          "fade":1, "duration": 0.65, "fade_peak": 0.4, "delay": -0.3,
+                          "array": [3,4], "array_offset": [64,67]},
+
             "grid": { "kind": "ActionButton", "xy": [47,120], "dimensions": [57,63], // [57,43] deliberately oversized for easy clickability
                       "bg_image_offset": [1,-2], // [0,6]
                       "bg_image_justify": "center", "state": "normal", "push_bg_image": 1, "mouseover_sound": 1,
