@@ -19003,7 +19003,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         var parent_path_list = parent_path.split('/');
 
         // special case for desktop dialogs
-        if(parent_path_list[0].indexOf("desktop_") === 0 || goog.array.contains(['attack_button_dialog','quest_bar'], parent_path_list[0])) {
+        if(parent_path_list[0].indexOf("desktop_") === 0 || goog.array.contains(['attack_button_dialog','quest_bar','chat_frame'], parent_path_list[0])) {
             // pick desktop dialog directly
             parent = desktop_dialogs[parent_path_list[0]] || null;
 
