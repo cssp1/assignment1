@@ -1685,7 +1685,9 @@ TUTORIAL_AI = {
             {'ui_name': 'Crimson Armada (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels': 25},
             ],
     'sg': [{'ui_name': 'Rall (tutorial25)', 'key': 'ai_tutorial25_progress', 'num_levels':25}],
-    'fs': [],
+    'fs': [{'ui_name': 'tier2_hamilton_pt1', 'key': 'ai_tier2_hamilton_pt1_progress', 'num_levels': 4},
+           {'ui_name': 'tier2_fanatic', 'key': 'ai_tier2_fanatic_progress', 'num_levels': 6},
+           ],
     }
 
 TECH_BUILDINGS = {
@@ -1998,6 +2000,9 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
 #    {'name': 'F07 Used Feature: Settings Menu', 'func': lambda user: user.get('feature_used:settings_dialog',False) },
     {'name': 'F08A Used Feature: Skip Tutorial', 'func': lambda user: user.get('feature_used:skip_tutorial',False) },
     {'name': 'F08B Used Feature: Resume Tutorial', 'func': lambda user: user.get('feature_used:resume_tutorial',False) },
+    {'name': 'F10A Used Public Chat', 'func': lambda user: user.get('feature_used:public_chat',False), 'show_p': True },
+    {'name': 'F10A Used Alliance Chat', 'func': lambda user: user.get('feature_used:alliance_chat',False), 'show_p': True },
+
     {'name': 'F20 Disabled Sound Effects', 'func': lambda user: get_preference(user, 'sound_volume', 1) == 0 },
     {'name': 'F21 Disabled Music', 'func': lambda user: get_preference(user, 'music_volume', 1) == 0 },
     {'name': 'F22 Enabled "Manual Unit Control" preference', 'func': lambda user: get_preference(user, 'auto_unit_control', 1) == 0 },

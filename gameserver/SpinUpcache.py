@@ -1420,6 +1420,13 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              "ai_tyrant1_attempted","ai_tyrant1_progress","ai_tyrant1_times_started","ai_tyrant1_times_completed","ai_tyrant1_conquests",
                              "ai_skar_conquests","ai_skar1_conquests",
 
+                             # FS
+                             "ai_tier2_hamilton_pt1_progress",
+                             "ai_tier2_fanatic_progress",
+                             "ai_tier3_hamilton_pt2_progress",
+                             "ai_tier3_ambush_progress",
+                             "ai_tier3_cyclops_pt1_progress",
+
                              # add new event player history keys here
                              # YOU MUST ALSO ADD THEM ABOVE AS WELL! SEARCH FOR "ai_ambush_progress"!
 
