@@ -850,7 +850,7 @@ def check_spell(spellname, spec):
     if 'projectile_asset' in spec:
         error |= require_art_asset(spec['projectile_asset'], spellname+':projectile_asset')
 
-    for PRED in ('requires', 'show_if'):
+    for PRED in ('requires', 'show_if', 'cooldown_if'):
         if PRED in spec:
             error |= check_predicate(spec[PRED], reason = spellname+':'+PRED)
     for CONS in ('pre_activation', 'consequent', 'on_purchase'):

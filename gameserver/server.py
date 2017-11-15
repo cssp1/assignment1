@@ -29278,7 +29278,7 @@ class GAMEAPI(resource.Resource):
                                  }
                                 ]
                     spell = gamedata['spells']['ALLIANCE_LEAVE']
-                    cd_time = spell.get('cooldown',-1)
+                    cd_time = spell.get('cooldown',-1) # note: does not check cooldown_if predicate
                     if cd_time > 0:
                         # queue asynchronous message to start the deserter cooldown
                         messages.append({'to': [kickee],
@@ -29434,7 +29434,10 @@ class GAMEAPI(resource.Resource):
                     session.player.update_alliance_score_cache(info['id'], alliance_info = info, reason='ALLIANCE_LEAVE')
                     gamesite.pcache_client.player_cache_update(session.player.user_id, {'alliance_id': -1}, reason = 'ALLIANCE_LEAVE')
                     spell = gamedata['spells']['ALLIANCE_LEAVE']
-                    cd_time = spell.get('cooldown',-1)
+                    if ('cooldown_if' not in spell) or Predicates.read_predicate(spell['cooldown_if']).is_satisfied2(session, session.player, None):
+                        cd_time = spell.get('cooldown',-1)
+                    else:
+                        cd_time = -1
                     if cd_time > 0:
                         session.player.cooldown_trigger(spell['cooldown_name'], cd_time)
                         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])

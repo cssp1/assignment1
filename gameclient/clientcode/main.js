@@ -29919,16 +29919,41 @@ function resort_alliance_info_tab(dialog) {
     scrollable_dialog_change_page(dialog, dialog.user_data['page']);
 }
 
-/** Evaluate point loss for leaving alliance. Extract the appropriate string from gamedata['strings']['alliance_*_confirm'].
-    @param {!Object<string,string>} s
+/** Describe what will happen if player leaves the current alliance.
+    Extracts the appropriate strings from gamedata['strings']['alliance_leave_*'].
+    @param {!Object<string,string>} s - pass in gamedata['strings']['leave_alliance_confirm'] or 'disband_alliance_confirm'
+    @param {boolean} is_last_member
+    @param {boolean} is_leader
     @return {string} */
-function alliance_leave_point_loss_ui_description(s) {
+function alliance_leave_ui_description(s, is_last_member, is_leader) {
+    var conditions = [];
+
+    // check if point loss applies
     var loss_fraction = eval_cond_or_literal(gamedata['matchmaking']['alliance_leave_point_loss'] || 0, player, null);
     if(loss_fraction > 0) {
-        return s['ui_description_point_loss'].replace('%pct', (100.0*loss_fraction).toFixed(0));
-    } else {
-        return s['ui_description'];
+        conditions.push(gamedata['strings']['alliance_leave_point_loss'].replace('%pct', (100.0*loss_fraction).toFixed(0)));
     }
+
+    if(is_last_member) {
+        conditions.push(gamedata['strings']['alliance_leave_disband']);
+    } else if(is_leader) {
+        conditions.push(gamedata['strings']['alliance_leave_leader']);
+    }
+
+    // check if the cooldown will apply
+    var spell = gamedata['spells']['ALLIANCE_LEAVE'];
+    if('cooldown' in spell && (!('cooldown_if' in spell) || read_predicate(spell['cooldown_if']).is_satisfied(player, null))) {
+        var cd_time = spell['cooldown'] || -1;
+        if(cd_time > 0) {
+            conditions.push(gamedata['strings']['alliance_leave_cooldown'].replace('%hours', (cd_time/3600).toFixed(0)));
+        }
+    } else {
+        conditions.push(gamedata['strings']['alliance_leave_no_cooldown']);
+    }
+
+    var ui_conditions = goog.array.map(conditions, function(x) { return '- '+x; }).join('\n');
+
+    return s['ui_description'].replace('%conditions', ui_conditions);
 }
 
 function update_alliance_info_tab(dialog) {
@@ -29987,8 +30012,10 @@ function update_alliance_info_tab(dialog) {
                     var is_last_member = (info['members'].length <= 1);
                     __dialog.widgets['leave_button'].str = __dialog.data['widgets']['leave_button']['ui_name'+(is_last_member ? '_disband':'')];
                     __dialog.widgets['leave_button'].onclick = (function (_alliance_id, _ui_name, _is_last_member, _is_leader) { return function(w) {
-                        var s = gamedata['strings'][(_is_last_member ? 'disband_alliance_confirm' : (_is_leader ? 'leave_alliance_leader_confirm' : 'leave_alliance_confirm'))];
-                        invoke_child_message_dialog(s['ui_title'], alliance_leave_point_loss_ui_description(s).replace('%s', _ui_name),
+
+                        var s = gamedata['strings'][(_is_last_member ? 'disband_alliance_confirm' : 'leave_alliance_confirm')];
+
+                        invoke_child_message_dialog(s['ui_title'], alliance_leave_ui_description(s, _is_last_member, _is_leader).replace('%s', _ui_name),
                                         {'dialog':'message_dialog_big',
                                          'cancel_button': true,
                                          'ok_button_ui_name': gamedata['dialogs']['alliance_info_tab']['widgets']['leave_button']['ui_name'+(_is_last_member ? '_disband':'')],
@@ -30362,8 +30389,11 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 } else if(session.check_alliance_perm('kick') && ((session.alliance_membership['role']||0) > (member['role']||0))) {
                     buttons.push(new ContextMenuButton({ui_name: d.data['widgets']['manage_button']['ui_name_kick'],
                                                         onclick: (function (_d, _user_id, _ui_name) { return function(w) {
-                                                           var s = gamedata['strings']['alliance_kick_confirm'];
-                                                           invoke_child_message_dialog(s['ui_title'], alliance_leave_point_loss_ui_description(s).replace('%s', _ui_name),
+                                                            var s = gamedata['strings']['alliance_kick_confirm'];
+                                                            var ui_descr = s['ui_description'].replace('%s', _ui_name);
+                                                            var loss_fraction = eval_cond_or_literal(gamedata['matchmaking']['alliance_leave_point_loss'] || 0, player, null);
+                                                            ui_descr = ui_descr.replace('%pct', (100.0*loss_fraction).toFixed(0));
+                                                            invoke_child_message_dialog(s['ui_title'], ui_descr,
                                                                                        {'dialog': 'message_dialog_big',
                                                                                         'cancel_button': true,
                                                                                         'ok_button_ui_name': s['ui_button'],
