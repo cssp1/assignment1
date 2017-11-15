@@ -33,6 +33,14 @@
 // there is no way to opt out of the initial "rails" tutorial, because it is completely hard-coded
 "skip_tutorial_button": 1,
 
+"default_chat_tab": [[{"predicate": "AND", "subpredicates": [
+    {"predicate": "LIBRARY", "name": "quarry_requirement"},
+    {"predicate":"HOME_REGION", "regions": ["ANY"]}]}, "REGION"],
+                     [{"predicate":"ALWAYS_TRUE"}, "GLOBAL"]],
+"maximize_chat_on_login_if": {"predicate": "AND", "subpredicates":[
+    { "predicate": "PLAYER_HISTORY", "key": "logged_in_times", "method": ">=", "value": 5 },
+    { "predicate": "LIBRARY", "name": "extended_tutorial_complete" }
+]},
 "advanced_chat_reporting": 1,
 
 "enable_replay_recording": {"predicate": "OR", "subpredicates": [

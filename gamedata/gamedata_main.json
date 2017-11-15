@@ -270,14 +270,6 @@
 
         "enable_chat_getmore": 1, // enable loading previous chat messages from database
 
-        "default_chat_tab": [[{"predicate": "AND", "subpredicates": [
-            {"predicate": "LIBRARY", "name": "quarry_requirement"},
-            {"predicate":"HOME_REGION", "regions": ["ANY"]}]}, "REGION"],
-                             [{"predicate":"ALWAYS_TRUE"}, "GLOBAL"]],
-        "maximize_chat_on_login_if": {"predicate": "AND", "subpredicates":[
-            { "predicate": "PLAYER_HISTORY", "key": "logged_in_times", "method": ">=", "value": 5 },
-            { "predicate": "LIBRARY", "name": "extended_tutorial_complete" }
-        ]},
         "show_alliance_mate_last_played_time": 1, // show "Last Played: X days ago" for members of your own alliance
         "show_alliance_mate_online_status": 1, // show online/offline status for members of your own alliance
 
