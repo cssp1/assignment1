@@ -16250,8 +16250,9 @@ function init_chat_frame() {
         if(!str) { return; }
 
         var channel = dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'];
-        if(goog.array.contains(['GLOBAL','REGION'], channel) &&
-           ChatFilter.is_bad(str)) {
+        var is_public_channel = goog.array.contains(['GLOBAL','REGION'], channel);
+
+        if(is_public_channel && ChatFilter.is_bad(str)) {
             var after_warn = (function (_w) { return function() {
                 // restore keyboard focus after warning closes
                 _w.has_typed = true;
@@ -16264,7 +16265,8 @@ function init_chat_frame() {
             }
         }
         var encoded_str = SPHTTP.wrap_string(str);
-        send_to_server.func(["CHAT_SEND", dialog.widgets['tabs'+dialog.user_data['cur_tab']].user_data['channel_name'], encoded_str]);
+
+        send_to_server.func(["CHAT_SEND", channel, encoded_str]);
         dialog.widgets['tabs'+dialog.user_data['cur_tab']].widgets['output'].scroll_to_bottom();
 
         // play a click effect
@@ -16274,6 +16276,12 @@ function init_chat_frame() {
         player.history['chat_messages_sent'] = (player.history['chat_messages_sent'] || 0) + 1;
         if(player.history['chat_messages_sent'] < 2) { // avoid this calculation after many have been sent
             player.invalidate_quest_cache();
+        }
+
+        if(channel == 'ALLIANCE') {
+            player.record_feature_use('alliance_chat');
+        } else if(is_public_channel) {
+            player.record_feature_use('public_chat');
         }
     };
     chat_frame_size(dialog, false, false);
