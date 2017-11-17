@@ -403,10 +403,43 @@ def do_slave(input):
             if input['do_townhall'] and ('account_creation_time' in user):
                 ts_key = gamedata['townhall']+'_level_at_time'
                 if ts_key in user:
+                    # iterate manually up the levels, so we can track the elapsed time interval between upgrades
+                    sage_to_level = user[ts_key]
+                    level_to_age = dict((level, int(sage)) for sage, level in sage_to_level.iteritems())
+                    max_level_attained = max(sage_to_level.itervalues())
+
+                    rows = []
+
+                    for level in range(1, max_level_attained+1):
+                        if level in level_to_age:
+                            age = level_to_age[level]
+
+                            # age at which previous level was achieved
+                            if level == 1:
+                                prev_age = None
+                            elif level == 2:
+                                prev_age = 0
+                            elif level-1 in level_to_age:
+                                prev_age = level_to_age[level-1]
+                            else:
+                                prev_age = None
+
+                            # age at which next level was achieved
+                            if level+1 in level_to_age:
+                                next_age = level_to_age[level+1]
+                            else:
+                                next_age = None
+
+                            rows.append((user['user_id'], level,
+                                         user['account_creation_time'] + age, age,
+                                         (user['account_creation_time'] + prev_age) if (prev_age is not None) else None,
+                                         prev_age,
+                                         (user['account_creation_time'] + next_age) if (next_age is not None) else None,
+                                         next_age))
+
                     cur.executemany("INSERT INTO " +sql_util.sym(input['townhall_table']) + \
-                                    " (user_id,townhall_level,time,age) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
-                                    [(user['user_id'], level, user['account_creation_time'] + int(sage), int(sage)) for sage, level in user[ts_key].iteritems()]
-                                    )
+                                    " (user_id,townhall_level,time,age,prev_time,prev_age,next_time,next_age) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON DUPLICATE KEY UPDATE user_id=user_id;",
+                                    rows)
 
             # parse tech unlock timing
             if input['do_tech']:
@@ -687,7 +720,13 @@ if __name__ == '__main__':
                                       {'fields': [('user_id','INT4 NOT NULL'),
                                                   ('time','INT8 NOT NULL'),
                                                   ('age','INT8 NOT NULL'),
-                                                  ('townhall_level','INT4 NOT NULL')]}) # make index after load
+                                                  ('townhall_level','INT4 NOT NULL'),
+                                                  # also include time/age at which previous townhall_level was reached, to allow easy interval computations
+                                                  ('prev_time', 'INT8'),
+                                                  ('prev_age', 'INT8'),
+                                                  ('next_time', 'INT8'),
+                                                  ('next_age', 'INT8'),
+                                                  ]}) # make index after load
 
             if do_tech:
                 sql_util.ensure_table(cur, tech_table+'_temp',
