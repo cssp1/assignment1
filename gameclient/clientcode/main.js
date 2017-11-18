@@ -47670,15 +47670,17 @@ function handle_server_message(data) {
             if(!player.is_cheater) {
                 // trigger visual effect
                 var fx_data = gamedata['client']['vfx']['building_enhancement_finish'];
-                var tech = gamedata['enhancements'][enh_name];
-                var unit = tech['associated_unit'] || tech['affects_unit'] || null;
-                var asset = lab.get_leveled_quantity(lab.spec['art_asset']);
-                var instance_data = { '%OBJECT_SPRITE': asset };
-                world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
-                                                        true,
-                                                        instance_data);
-                // hold notification until animation finishes
-                notification_queue.hold_until(client_time + 2.9);
+                if(fx_data) {
+                    var tech = gamedata['enhancements'][enh_name];
+                    var unit = tech['associated_unit'] || tech['affects_unit'] || null;
+                    var asset = lab.get_leveled_quantity(lab.spec['art_asset']);
+                    var instance_data = { '%OBJECT_SPRITE': asset };
+                    world.fxworld.add_visual_effect_at_time([lab.x,lab.y], 0, [0,1,0], client_time, fx_data,
+                                                            true,
+                                                            instance_data);
+                    // hold notification until animation finishes
+                    notification_queue.hold_until(client_time + 2.9);
+                }
             }
         }
 
