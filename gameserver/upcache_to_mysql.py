@@ -135,7 +135,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
             return 'INT4' # counters
         elif key.startswith('achievement:'):
             return 'INT8' # time value
-        elif key.endswith('_time') or key == 'time_in_game' or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key) or key.startswith('peak_'):
+        elif key.endswith('_time') or key in ('time_in_game','player_xp') or ('time_reacquired' in key) or ('stolen' in key) or ('harvested' in key) or ('looted' in key) or key.startswith('peak_'):
             return 'INT8' # times / big resource amounts
         elif key.startswith('likes_') or key.startswith('returned_') or key.startswith('feature_used:'):
             return sql_util.bit_type() # booleans
