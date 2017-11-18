@@ -8039,7 +8039,14 @@ class ResourceState:
 
     def gain_xp(self, amount, reason='', metadata = None):
         if amount == 0: return
+
+        warn_threshold = gamedata['server'].get('gain_xp_warn_threshold',-1)
+        if amount > 0 and amount >= warn_threshold:
+            gamesite.exception_log.event(server_time, 'gain_xp(): player %d unusually large gain of %r (reason %r meta %r)\n%s' % \
+                                         (self.player.user_id, amount, reason, metadata, ''.join(traceback.format_stack())))
+
         self.xp += amount
+
         if LOTS_OF_METRICS:
             user_id = self.player.user_id
             if not is_ai_user_id_range(user_id):
