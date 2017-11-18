@@ -22123,7 +22123,7 @@ class GAMEAPI(resource.Resource):
                 if object.spec.provides_inventory:
                     session.player.send_inventory_update(retmsg)
 
-                if object.spec.name in (gamedata['townhall'],gamedata['region_map_building']):
+                if object.spec.name in (gamedata['townhall'],gamedata['region_map_building'],gamedata.get('squad_building','')):
                     # these buildings can enable regional map features, place player on map if not already there
                     session.player.update_map_placement(session, retmsg)
 
@@ -22490,7 +22490,7 @@ class GAMEAPI(resource.Resource):
             if object.spec.track_level_in_player_history:
                 session.setmax_player_metric(object.spec.name+'_level', object.level, bucket = bool(object.spec.worth_less_xp))
 
-        if object.spec.name in (gamedata['townhall'],gamedata['region_map_building']):
+        if object.spec.name in (gamedata['townhall'],gamedata['region_map_building'],gamedata.get('squad_building','')):
             # these buildings can enable regional map features, place player on map if not already there
             session.player.update_map_placement(session, retmsg)
 
