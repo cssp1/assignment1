@@ -8041,7 +8041,7 @@ class ResourceState:
         if amount == 0: return
 
         warn_threshold = gamedata['server'].get('gain_xp_warn_threshold',-1)
-        if amount > 0 and amount >= warn_threshold:
+        if warn_threshold > 0 and amount >= warn_threshold:
             gamesite.exception_log.event(server_time, 'gain_xp(): player %d unusually large gain of %r (reason %r meta %r)\n%s' % \
                                          (self.player.user_id, amount, reason, metadata, ''.join(traceback.format_stack())))
 
