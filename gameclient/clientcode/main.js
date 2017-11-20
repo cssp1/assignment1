@@ -10491,7 +10491,13 @@ var kill_startup_div = function() {
 };
 var kill_loading_screen = function() {
     kill_startup_div();
-    loading_screen_image = null; // don't need this any more, let GC have it
+    if(loading_screen_image) {
+        loading_screen_image = null; // don't need this any more, let GC have it
+
+        if(spin_frame_platform === 'bh') { // inform the parent /play page that we are painting everything now
+            window.top.postMessage('bh_iframe_loaded', '*');
+        }
+    }
 };
 
 var blacklist_audio = false;
@@ -51483,14 +51489,14 @@ function do_draw() {
 
         ctx.save();
 
-        // clear to white (or gradient on BH)
         if(spin_frame_platform === 'bh') {
-            var grad = ctx.createLinearGradient(0,0,0,canvas_height);
-            grad.addColorStop(0,'#363636');
-            grad.addColorStop(1,'#121212');
-            ctx.fillStyle = grad;
+            // BH: clear to transparent
+            ctx.clearRect(0,0,canvas_width,canvas_height);
+        } else {
+            // other platforms: clear to white
+            ctx.fillRect(0,0,canvas_width,canvas_height);
         }
-        ctx.fillRect(0,0,canvas_width,canvas_height);
+
         ctx.fillStyle = '#ffffff';
 
         // draw "Loading..." screen
@@ -51507,7 +51513,7 @@ function do_draw() {
                 ctx.drawImage(loading_screen_image, x, y, 736, 423);
             } catch (e) {}
             // use white text
-        } else {
+        } else if(spin_frame_platform !== 'bh') {
             // black text
             ctx.fillStyle = "#000000";
         }
