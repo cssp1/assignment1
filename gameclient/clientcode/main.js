@@ -17083,6 +17083,12 @@ function do_invoke_repair_dialog() {
 };
 
 function invoke_repair_dialog() {
+    if(!session.enable_progress_timers) {
+        // in "conceal timers" mode, just skip this dialog entirely
+        start_slow_repairs();
+        return null;
+    }
+
     change_selection(null);
     var dialog = do_invoke_repair_dialog();
     change_selection_ui(dialog);
