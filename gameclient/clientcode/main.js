@@ -19980,8 +19980,13 @@ function do_invoke_speedup_dialog(kind) {
 
     dialog.widgets['price_display'].bg_image = player.get_any_abtest_value('price_display_asset', gamedata['store']['price_display_asset']);
     dialog.widgets['price_display'].state = Store.get_user_currency();
-    dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
-    dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+    if(session.enable_progress_timers) {
+        dialog.widgets['price_display'].str = Store.display_user_currency_price(price); // PRICE
+        dialog.widgets['price_display'].tooltip.str = Store.display_user_currency_price_tooltip(price);
+    } else {
+        // conceal for tutorial purposes
+        dialog.widgets['price_display'].str = dialog.widgets['price_display'].tooltip.str = '';
+    }
 
     dialog.widgets['ok_button'].onclick =
         dialog.widgets['price_display'].onclick = closure;
@@ -47233,7 +47238,7 @@ function handle_server_message(data) {
         session.has_deployed = false;
         session.deploy_time = -1;
         session.enable_combat_resource_bars = true;
-        session.enable_progress_timers = true;
+        // session.enable_progress_timers is carried over between view changes
         session.enable_dialog_completion_buttons = true;
         session.surrender_pending = false;
         session.retreat_pending = -1;
@@ -52615,12 +52620,12 @@ function draw_building_or_inert(world, obj, powerfac) {
         if(obj.is_under_construction()) {
             progress = obj.build_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
-                status_text.push(gamedata['strings']['cursors']['constructing']+': ' + pretty_print_time(obj.build_time_left()));
+                status_text.push(gamedata['strings']['cursors']['constructing']+': ' + (session.enable_progress_timers ? pretty_print_time(obj.build_time_left()) : ' ...'));
             }
         } else if(obj.is_upgrading()) {
             progress = obj.upgrade_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
-                status_text.push(gamedata['strings']['cursors']['upgrading']+': ' + pretty_print_time(obj.upgrade_time_left()));
+                status_text.push(gamedata['strings']['cursors']['upgrading']+': ' + (session.enable_progress_timers ? pretty_print_time(obj.upgrade_time_left()) : ' ...'));
             }
         } else if(obj.is_enhancing()) {
             progress = obj.enhance_progress();
@@ -52633,7 +52638,7 @@ function draw_building_or_inert(world, obj, powerfac) {
             var current = ((obj.research_item in tech) ? tech[obj.research_item] : 0);
             progress = obj.research_progress();
             if(progress >= 0 && (progress < 1 || obj.team == 'player')) {
-                status_text.push(gamedata['strings']['cursors']['researching'].replace('%tech',gamedata['tech'][obj.research_item]['ui_name']).replace('%d', (current+1).toString())+': '+ pretty_print_time(obj.research_time_left()));
+                status_text.push(gamedata['strings']['cursors']['researching'].replace('%tech',gamedata['tech'][obj.research_item]['ui_name']).replace('%d', (current+1).toString())+': '+ (session.enable_progress_timers ? pretty_print_time(obj.research_time_left()) : ' ...'));
             }
         } else if(obj.is_crafting()) {
             var recipe = gamedata['crafting']['recipes'][obj.is_crafting()];
@@ -52659,7 +52664,7 @@ function draw_building_or_inert(world, obj, powerfac) {
                 if(obj.manuf_queue.length > 1) {
                     s += ' ... ';
                 }
-                status_text.push(s + ': ' + pretty_print_time(obj.manuf_time_left()));
+                status_text.push(s + ': ' + (session.enable_progress_timers ? pretty_print_time(obj.manuf_time_left()) : ' ...'));
             }
         }
     }
