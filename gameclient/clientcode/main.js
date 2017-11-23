@@ -10479,7 +10479,11 @@ var kill_startup_div = function() {
     if(fade_time > 0) {
         var set_startup_div_fade = (function (_start_time, _end_time, _div) { return function() {
             if(client_time >= _end_time) {
-                _div.style.display = 'none'; return;
+                _div.style.display = 'none';
+                if(spin_frame_platform === 'bh') { // inform the parent /play page that we are painting everything now
+                    window.top.postMessage('bh_iframe_loaded', '*');
+                }
+                return;
             }
             _div.style.opacity = 1.0 - (client_time - _start_time)/(_end_time - _start_time);
             window.setTimeout(set_startup_div_fade, 1000*gamedata['client']['startup_div_fade_tick']);
@@ -10925,6 +10929,9 @@ SPINPUNCHGAME.init = function() {
     }
 
     if(spin_loading_screen_mode == 'canvas') {
+        // to test skipping this load, you can use this instead of the below lines:
+        // loading_screen_image = {complete: false, width: -1};
+
         // start downloading the splash screen before GameArt init
         loading_screen_image = new Image();
         loading_screen_image.crossOrigin = 'Anonymous';
