@@ -635,10 +635,10 @@ UnitQuantityPredicate.prototype.is_satisfied = function(player, qdata) {
     // add units that are currently under construction
     if(this.include_queued) {
         session.for_each_real_object(function(obj) {
-            if(obj.is_building() && obj.is_manufacturing()) {
-                for(var j = 0; j < obj.manuf_queue.length; j++) {
-                    var item = obj.manuf_queue[j];
-                    if(item['spec_name'] === this.unit_spec['name']) {
+            if(obj.is_building() && obj.is_manufacturer()) {
+                var manuf_queue = obj.get_client_prediction('manuf_queue', obj.manuf_queue);
+                for(var j = 0; j < manuf_queue.length; j++) {
+                    if(manuf_queue[j]['spec_name'] === this.unit_spec['name']) {
                         howmany += 1;
                     }
                 }

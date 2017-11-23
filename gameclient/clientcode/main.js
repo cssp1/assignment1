@@ -32641,6 +32641,7 @@ function cancel_manuf_item(builder, queue_slot, spec_name) {
     for(var res in gamedata['resources']) {
         player.resource_state[res][1] += Math.floor(((entry && 'cost' in entry) ? gamedata['manufacture_cancel_refund'] : 1) * (cost[res] || 0));
     }
+    player.quest_tracked_dirty = true;
 }
 
 /** Main per-frame update - takes care of grid buttons and status displays*/
