@@ -9,6 +9,10 @@
 </div>
 
 <script type="text/javascript">
+
+// when this iframe loads completely, inform parent window that we can be shown
+window.addEventListener('load', function() { window.top.postMessage('bh_iframe_alive', '*'); }, false);
+
 var spin_setup_startup_div = function() {}; // not implemented on bh
 
 /* Apply div sizing that works with the browser */
