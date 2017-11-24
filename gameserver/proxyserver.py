@@ -212,7 +212,13 @@ class GameServer:
 static_includes = None
 def reload_static_includes():
     global static_includes
-    STATIC_INCLUDE_FILES = ['proxy_index.html', 'index_body_fb.html', 'index_body_kg.html', 'index_body_ag.html', 'index_body_bh.html', 'index_body_mm.html', 'kg_guest.html', 'fb_guest.html',
+    STATIC_INCLUDE_FILES = ['proxy_index.html',
+                            'index_body_fb.html', 'index_body_fb.css',
+                            'index_body_kg.html', 'index_body_kg.css',
+                            'index_body_ag.html', 'index_body_ag.css',
+                            'index_body_bh.html', 'index_body_bh.css',
+                            'index_body_mm.html', 'index_body_mm.css',
+                            'kg_guest.html', 'fb_guest.html',
                             'BrowserDetect.js', 'SPLWMetrics.js',
                             'FacebookSDK.js', 'FacebookSDK_Battlehouse.js', 'KongregateSDK.js', 'ArmorGamesSDK.js', 'CastleSDK.js', 'GoogleAnalyticsSDK.js', 'facebookexternalhit.html', 'BattlehouseSDK.js',
                             'XsollaSDK.min.js']
@@ -2516,6 +2522,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$XSOLLA_SDK$': get_static_include('XsollaSDK.min.js') if (SpinConfig.config.get('enable_xsolla',0) and visitor.frame_platform in ('ag','bh','mm')) else '',
             '$LOADING_SCREEN_NAME$': screen_name,
             '$LOADING_SCREEN_DATA$': SpinJSON.dumps(screen_data),
+            '$INDEX_CSS$': get_static_include('index_body_%s.css' % visitor.frame_platform),
             '$INDEX_BODY$': get_static_include('index_body_%s.html' % visitor.frame_platform).replace('$GAME_COPYRIGHT_INFO$', SpinConfig.config.get('game_copyright_info', '$YEAR$ Example copyright info').replace('$YEAR$', repr(time.gmtime(proxy_time).tm_year))),
             })
 
