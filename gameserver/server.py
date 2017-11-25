@@ -24416,6 +24416,14 @@ class GAMEAPI(resource.Resource):
         if ('enable_protection_if' in gamedata['server']) and (not Predicates.read_predicate(gamedata['server']['enable_protection_if']).is_satisfied(defender, None)):
             return False # turned off by predicate
 
+        if not gamedata['server'].get('protect_during_revenge', True):
+            # deny protection during revenge attacks that take place outside normal level range
+
+            # if defender is not inside attacker's normal level range, AND the revenge cooldown is active...
+            if (not attacker.in_attackable_level_range(defender.level())) and \
+               attacker.cooldown_active('revenge_defender:%d' % defender.user_id):
+                return False
+
         protect_facebook_friends = defender.get_any_abtest_value('protect_facebook_friends', gamedata['server']['protect_facebook_friends'])
         protect_same_ip = defender.get_any_abtest_value('protect_same_ip', gamedata['server']['protect_same_ip'])
         protect_same_alliance = defender.get_any_abtest_value('protect_same_alliance', gamedata['server']['protect_same_alliance'])
