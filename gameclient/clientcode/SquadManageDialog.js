@@ -34,7 +34,10 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
-    dialog.widgets['close_button'].onclick = dialog.widgets['save_button'].onclick = close_parent_dialog;
+    dialog.widgets['close_button'].onclick = dialog.widgets['save_button'].onclick = function(w) {
+        close_parent_dialog(w);
+        player.quest_tracked_dirty = true;
+    };
     dialog.widgets['name_input'].str = squad['ui_name'];
     if(squad_id === SQUAD_IDS.BASE_DEFENDERS) {
         dialog.widgets['name_input_bg'].show = dialog.widgets['name_input'].show = false;
@@ -114,6 +117,7 @@ SquadManageDialog.invoke_squad_manage = function(squad_id) {
     dialog.widgets['squad_loading_spinner'].xy = dialog.data['widgets']['squad_loading_spinner'][(squad_id === SQUAD_IDS.BASE_DEFENDERS ? 'xy_base_defenders' : 'xy')];
 
     dialog.ondraw = SquadManageDialog.update_squad_manage;
+    player.quest_tracked_dirty = true;
 };
 
 SquadManageDialog.update_squad_manage = function(dialog) {

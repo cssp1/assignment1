@@ -914,8 +914,10 @@ class ArmySizePredicate(Predicate):
         self.trigger_qty = data['trigger_qty']
         self.method = data.get('method', '>=')
         self.include_queued = data.get('include_queued', True)
+        self.squad_id = data.get('squad_id', 'ALL')
+
     def is_satisfied(self, player, qdata):
-        army_size = player.get_army_space_usage_by_squad()['ALL']
+        army_size = player.get_army_space_usage_by_squad()[str(self.squad_id)]
 
         if not self.include_queued:
             army_size -= player.get_manufacture_queue_space_usage()

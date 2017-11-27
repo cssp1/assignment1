@@ -79,6 +79,7 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
     dialog.user_data['dialog'] = 'squad_control';
     dialog.user_data['last_columns'] = -1;
     dialog.user_data['dlg_mode'] = dlg_mode;
+    dialog.user_data['hover_squad_id'] = null;
     if(dlg_mode_data) {
         goog.object.forEach(dlg_mode_data, function(v,k) { dialog.user_data[k] = v; });
     }
@@ -286,6 +287,7 @@ SquadControlDialog.make_squad_tile = function(dialog, squad_id, ij, dlg_mode, te
     } else if(template === 'squad_tile') {
         d.user_data['squad_id'] = squad_id;
         d.user_data['icon_unit_specname'] = null;
+        d.user_data['hover'] = false;
         d.widgets['manage_button'].onclick = function(w) {
             var squad_id = w.parent.user_data['squad_id'];
             if(squad_id === SQUAD_IDS.RESERVES) {
@@ -566,7 +568,14 @@ SquadControlDialog.update_squad_tile = function(dialog) {
         grid_x = 0; grid_y += 1;
     }
 
-    var hover = (dialog.mouse_enter_time > 0) && (dialog.parent.mouse_enter_time > 0);
+    var hover = dialog.user_data['hover'] = (dialog.mouse_enter_time > 0) && (dialog.parent.mouse_enter_time > 0);
+    if(hover) {
+        if(dialog.parent.user_data['hover_squad_id'] != dialog.user_data['squad_id']) {
+            dialog.parent.user_data['hover_squad_id'] = dialog.user_data['squad_id'];
+            player.quest_tracked_dirty = true;
+        }
+    }
+
     var can_do_action = false; // apples when dlg_mode is deploy or call
     var repair_in_sync = synchronizer.is_in_sync(unit_repair_sync_marker);
 

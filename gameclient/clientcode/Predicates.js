@@ -1981,10 +1981,11 @@ function ArmySizePredicate(data) {
     this.trigger_qty = data['trigger_qty'];
     this.method = data['method'] || ">=";
     this.include_queued = 'include_queued' in data ? data['include_queued'] : true;
+    this.squad_id = 'squad_id' in data ? data['squad_id'] : 'ALL';
 }
 goog.inherits(ArmySizePredicate, Predicate);
 ArmySizePredicate.prototype.is_satisfied = function(player, qdata) {
-    var army_size = player.get_army_space_usage_by_squad()['ALL'];
+    var army_size = player.get_army_space_usage_by_squad()[this.squad_id.toString()];
 
     if(!this.include_queued) {
         army_size -= player.get_manufacture_queue_space_usage();
