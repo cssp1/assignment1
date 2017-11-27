@@ -46979,6 +46979,7 @@ function handle_server_message(data) {
         for(var key in SquadControlDialog.update_receivers) {
             SquadControlDialog.update_receivers[key]();
         }
+        player.quest_tracked_dirty = true;
     } else if(msg == "PLAYER_ARMY_UPDATE" || msg == "PLAYER_ARMY_UPDATE_FULL") {
         if(msg == "PLAYER_ARMY_UPDATE_FULL") {
             player.my_army = {};
