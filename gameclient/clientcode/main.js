@@ -19705,8 +19705,10 @@ function invoke_child_message_dialog(title_text, body_text, props) {
         return invoke_message_dialog(title_text, body_text, props);
     }
 
-    var dialog_data = gamedata['dialogs'][props['dialog'] || 'message_dialog'];
+    var dialog_template_name = props['dialog'] || 'message_dialog';
+    var dialog_data = gamedata['dialogs'][dialog_template_name];
     var dialog = new SPUI.Dialog(dialog_data);
+    dialog.user_data['dialog'] = dialog_template_name;
 
     if(!props.parentless) {
         /* XXXXXX this code is actually more correct - try it sometime
@@ -19745,6 +19747,7 @@ function invoke_child_message_dialog(title_text, body_text, props) {
 
     var make_go_away = function (_action) { return function(w) {
         close_parent_dialog(w);
+        player.quest_tracked_dirty = true;
         if(_action) { _action(); }
     }; };
     if('close_button' in dialog.widgets) { dialog.widgets['close_button'].onclick = make_go_away(props['on_cancel'] || null); }
