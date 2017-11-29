@@ -21527,6 +21527,7 @@ function invoke_building_context_menu(mouse_xy) {
                 upgrade_is_active = false; // XXX check idle_state for things we can research
                 if(obj.is_researching()) {
                     buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['SPEEDUP_FOR_MONEY']['ui_name'],
+                                                        spellname: 'SPEEDUP_FOR_MONEY',
                                                         onclick: (function (_obj) { return function() {change_selection_unit(_obj); invoke_speedup_dialog('speedup');}; })(obj)
                                                        }));
                     buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CANCEL_RESEARCH']['ui_name'],
@@ -21536,6 +21537,7 @@ function invoke_building_context_menu(mouse_xy) {
                                                         }; })(selection.unit.id), asset: 'menu_button_resizable'}));
                 } else {
                     buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['RESEARCH_FOR_FREE']['ui_name'],
+                                                        spellname: 'RESEARCH_FOR_FREE',
                                                         onclick: (function (_obj) { return function() {
                                                             var category = _obj.spec['research_categories'][0];
                                                             invoke_research_dialog(null, category);
