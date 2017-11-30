@@ -27491,6 +27491,9 @@ class GAMEAPI(resource.Resource):
         if session.alliance_chat_channel and gamedata['server']['chat_alliance_logins']:
             session.do_chat_send(session.alliance_chat_channel, 'I logged in!', bypass_gag = True, props = {'type':'logged_in'})
 
+        if alliance_info:
+            gamesite.sql_client.alliance_activity(alliance_info['id'], reason = 'SERVER_HELLO')
+
         # accept any queued messages the user has received
         mail_stat = self.do_receive_mail(session, retmsg, is_login = True)
         show_battle_history = mail_stat and mail_stat.get('was_attacked', False)
@@ -29001,7 +29004,12 @@ class GAMEAPI(resource.Resource):
                     result = gamesite.sql_client.search_alliance(search_terms, limit = limit, reason = 'QUERY_ALLIANCE_LIST')
                 else:
                     limit = gamedata['alliances']['join_list_limit']
-                    result = gamesite.sql_client.get_alliance_list(limit, open_join_only = (not gamedata['alliances']['join_list_show_private']), members_fewer_than = gamedata['alliances']['max_members'], match_continent = session.player.home_continent() if gamedata['alliances']['join_list_match_continent'] else None, reason = 'QUERY_ALLIANCE_LIST')
+                    require_activity_within_time = gamedata['alliances'].get('join_list_require_activity_within_time', -1)
+                    if require_activity_within_time > 0:
+                        has_activity_since = server_time - require_activity_within_time
+                    else:
+                        has_activity_since = -1
+                    result = gamesite.sql_client.get_alliance_list(limit, open_join_only = (not gamedata['alliances']['join_list_show_private']), members_fewer_than = gamedata['alliances']['max_members'], match_continent = session.player.home_continent() if gamedata['alliances']['join_list_match_continent'] else None, has_activity_since = has_activity_since, reason = 'QUERY_ALLIANCE_LIST')
             else:
                 result = []
                 retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])

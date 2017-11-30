@@ -601,7 +601,8 @@
         "search_list_limit": 50, // max number of alliances to display for "Search Alliance" results (-1 to disable - but this has performance implications)
         "join_list_limit": 100, // max number of alliances to display on "Join Alliance" list (-1 to disable - but this has performance implications)
         "join_list_show_private": 1, // show invite-only alliances in join list
-        "join_list_match_continent": 1 // show only alliances in your own continent in join list
+        "join_list_match_continent": 1, // show only alliances in your own continent in join list
+        "join_list_require_activity_within_time": -1 // require recent activity to show up in join list (# of seconds since last activity)
     },
 
     "climates":

@@ -2228,7 +2228,7 @@ class NoSQLClient (object):
         assert continent
         tbl = self.alliance_table('alliances')
         props = {'ui_name': ui_name, 'ui_description':ui_descr, 'join_type':join_type, 'founder_id':founder_id, 'leader_id':founder_id,
-                 'logo':logo, 'creation_time':creat, 'continent': continent, 'chat_motd':chat_motd, 'num_members_cache': 0}
+                 'logo':logo, 'creation_time':creat, 'last_active_time':creat, 'continent': continent, 'chat_motd':chat_motd, 'num_members_cache': 0}
         if chat_tag and len(chat_tag) > 0:
             assert len(chat_tag) == 3
             props['chat_tag'] = unicode(chat_tag.upper())
@@ -2266,7 +2266,7 @@ class NoSQLClient (object):
     def _modify_alliance(self, alliance_id, modifier_id, ui_name, ui_description, join_type, logo, leader_id, continent, chat_motd, chat_tag):
         if (not self._check_alliance_member_perm(alliance_id, modifier_id, 'admin')): return False, None
 
-        props = {}
+        props = {'last_active_time': self.time}
         unset = {}
         if ui_name is not None: props['ui_name'] = unicode(ui_name)
         if ui_description is not None: props['ui_description'] = unicode(ui_description)
@@ -2323,8 +2323,8 @@ class NoSQLClient (object):
         if member_access: FIELDS += ['chat_motd']
         return dict(((field,1) for field in FIELDS))
 
-    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent))
-    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent):
+    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, has_activity_since = -1, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent, has_activity_since))
+    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent, has_activity_since):
         qs = {}
         if open_join_only:
             qs['join_type'] = 'anyone'
@@ -2332,6 +2332,8 @@ class NoSQLClient (object):
             qs['num_members_cache'] = {'$lt': members_fewer_than}
         if match_continent:
             qs['continent'] = match_continent
+        if has_activity_since > 0:
+            qs['last_active_time'] = {'$gte': has_activity_since}
 
         cur = self.alliance_table('alliances').find(qs, self.alliance_query_fields(False))
         if limit >= 1:
@@ -2526,7 +2528,9 @@ class NoSQLClient (object):
         if success:
             # check alliance size
             if self.alliance_table('alliances').update_one({'_id':alliance_id, 'num_members_cache': { '$lt': max_members }},
-                                                           {'$inc': {'num_members_cache': 1} }).matched_count > 0:
+                                                           {'$inc': {'num_members_cache': 1},
+                                                            '$set': {'last_active_time': self.time},
+                                                            }).matched_count > 0:
                 # race in between here is protected by the player login lock
                 self.alliance_table('alliance_members').insert_one({'_id':user_id, 'alliance_id':alliance_id, 'role':role, 'join_time':time_now})
             else:
@@ -2570,6 +2574,13 @@ class NoSQLClient (object):
         self.alliance_table('alliance_invites').delete_many({'alliance_id':alliance_id, 'user_id':user_id})
         self.alliance_table('alliance_join_requests').delete_many({'alliance_id':alliance_id, 'user_id':user_id})
         return success
+
+    # just bump the last_active_time
+    def alliance_activity(self, alliance_id, reason=''): return self.instrument('alliance_activity(%s)'%reason, self._alliance_activity, (alliance_id,))
+    def _alliance_activity(self, alliance_id):
+        self.alliance_table('alliances') \
+                                         .with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)) \
+                                         .update_one({'_id':alliance_id}, {'$set':{'last_active_time':self.time}})
 
     ###### UNIT DONATIONS ######
 
