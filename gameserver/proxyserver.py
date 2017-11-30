@@ -1103,8 +1103,8 @@ class GameProxy(proxy.ReverseProxyResource):
 
         # check for overload condition
         on_wire = control_async_http.num_on_wire()
-        if on_wire >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',100):
-            raw_log.event(proxy_time, 'server_overload with %d on AsyncHTTP_CONTROLAPI wire' % (on_wire,))
+        if on_wire >= SpinConfig.config['proxyserver'].get('AsyncHTTP_CONTROLAPI', {}).get('max_in_flight',200):
+            exception_log.event(proxy_time, 'proxyserver server_overload with %d on AsyncHTTP_CONTROLAPI wire' % (on_wire,))
             return self.index_visit_server_overload()
 
         if verbose() >= 2:
