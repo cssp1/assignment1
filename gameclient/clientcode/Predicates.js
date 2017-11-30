@@ -1515,6 +1515,36 @@ SelectedPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function RegionMapSelectedPredicate(data) {
+    goog.base(this, data);
+    this.base_type = data['base_type'] || null;
+    this.base_template = data['base_template'] || null;
+}
+goog.inherits(RegionMapSelectedPredicate, Predicate);
+RegionMapSelectedPredicate.prototype.is_satisfied = function(player, qdata) {
+    var mapwidget = null;
+    if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'region_map_dialog') {
+        mapwidget = selection.ui.widgets['map'];
+    } else {
+        return false; // map dialog not up
+    }
+
+    if(!mapwidget.selection_feature) {
+        return false; // nothing selected
+    }
+    var feature = mapwidget.selection_feature;
+
+    if(this.base_type) {
+        if(feature['base_type'] !== this.base_type) { return false; }
+    }
+    if(this.base_template) {
+        if(feature['base_template'] !== this.base_template) { return false; }
+    }
+    return true;
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function UIClearPredicate(data) {
     goog.base(this, data);
 }
@@ -2141,6 +2171,8 @@ function read_predicate(data) {
         return new BrowserHardwarePredicate(data);
     } else if(kind === 'SELECTED') {
         return new SelectedPredicate(data);
+    } else if(kind === 'REGION_MAP_SELECTED') {
+        return new RegionMapSelectedPredicate(data);
     } else if(kind === 'UI_CLEAR') {
         return new UIClearPredicate(data);
     } else if(kind === 'QUEST_CLAIMABLE') {

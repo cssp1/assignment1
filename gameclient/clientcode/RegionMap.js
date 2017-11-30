@@ -528,10 +528,11 @@ RegionMap.RegionMap.prototype.set_state = function(state) {
 };
 
 RegionMap.RegionMap.prototype.set_popup = function(newui) {
-    if(!this.parent) { return; } // dialob was closed
+    if(!this.parent) { return; } // dialog was closed
     if(this.popup) { this.parent.remove(this.popup); }
     this.popup = newui;
     if(this.popup) { this.parent.add(this.popup); }
+    player.quest_tracked_dirty = true;
 };
 
 /** @param {Region.Region|null} region */

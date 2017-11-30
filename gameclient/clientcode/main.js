@@ -19051,6 +19051,7 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
         } else if(parent_path_list[0].indexOf("_dialog") != -1 ||
                   parent_path_list[0].indexOf("_tab") != -1 ||
                   parent_path_list[0].indexOf("squad_") === 0 ||
+                  parent_path_list[0].indexOf("_popup") != -1 ||
                   parent_path_list[0].indexOf("context_menu") != -1 ||
                   parent_path_list[0].indexOf("inventory_context") != -1 ||
                   parent_path_list[0].indexOf("tutorial") != -1) {

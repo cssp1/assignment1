@@ -117,6 +117,7 @@ SquadControlDialog.do_invoke = function(dlg_mode, dlg_mode_data) {
     }
 
     dialog.widgets['notify_choice'].show = (dlg_mode == 'normal' && spin_frame_platform == 'fb' && player.raids_enabled());
+    player.quest_tracked_dirty = true;
 
     return dialog;
 }
