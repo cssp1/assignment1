@@ -965,7 +965,7 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 do_visit_base(-1, {base_id:_feature['base_id'], pre_attack:_pre_attack, short_loading_timeout:true});
             }; };
             var spy_cb = make_cb(this, feature, 0);
-            ret.push([verb, spy_cb]);
+            ret.push([verb, spy_cb, 'normal', null, SPUI.default_text_color, 'spy']);
 
             if(can_pre_attack) {
                 // do not show pre_attack option if player has no units deployable into this climate
@@ -1387,6 +1387,7 @@ RegionMap.RegionMap.prototype.make_feature_popup_menu = function() {
 
     this.popup.user_data['sticky'] = true;
     this.popup.add_under(dialog);
+    player.quest_tracked_dirty = true;
 };
 
 // XXX hack until we fix tooltips showing underneath modal dialogs

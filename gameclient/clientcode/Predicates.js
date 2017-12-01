@@ -1545,6 +1545,28 @@ RegionMapSelectedPredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function SquadIsMovingPredicate(data) {
+    goog.base(this, data);
+    this.squad_id = data['squad_id'] || 0;
+}
+goog.inherits(SquadIsMovingPredicate, Predicate);
+SquadIsMovingPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.squad_is_moving(this.squad_id);
+};
+
+/** @constructor @struct
+  * @extends Predicate */
+function SquadIsDeployedPredicate(data) {
+    goog.base(this, data);
+    this.squad_id = data['squad_id'] || 0;
+}
+goog.inherits(SquadIsDeployedPredicate, Predicate);
+SquadIsDeployedPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.squad_is_deployed(this.squad_id);
+};
+
+/** @constructor @struct
+  * @extends Predicate */
 function UIClearPredicate(data) {
     goog.base(this, data);
 }
@@ -2173,6 +2195,10 @@ function read_predicate(data) {
         return new SelectedPredicate(data);
     } else if(kind === 'REGION_MAP_SELECTED') {
         return new RegionMapSelectedPredicate(data);
+    } else if(kind === 'SQUAD_IS_MOVING') {
+        return new SquadIsMovingPredicate(data);
+    } else if(kind === 'SQUAD_IS_DEPLOYED') {
+        return new SquadIsDeployedPredicate(data);
     } else if(kind === 'UI_CLEAR') {
         return new UIClearPredicate(data);
     } else if(kind === 'QUEST_CLAIMABLE') {
