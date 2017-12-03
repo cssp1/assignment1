@@ -333,6 +333,19 @@ Region.Region.prototype.feature_interpolate_pos = function(feature, t) {
     }
 };
 
+/** @param {string|null=} want_type
+    @param {string|null=} want_template */
+Region.Region.prototype.find_features_by_type = function(want_type, want_template) {
+    var ret = [];
+    var template_regex = (want_template ? new RegExp(want_template) : null);
+    goog.array.forEach(this.features, function(feature) {
+        if(want_type && feature['base_type'] !== want_type) { return; }
+        if(template_regex && (!feature['base_template'] || !template_regex.exec(feature['base_template']))) { return; }
+        ret.push(feature);
+    }, this);
+    return ret;
+};
+
 Region.Region.prototype.find_own_features_by_type = function(want_type) {
     var ret = [];
     goog.array.forEach(this.features, function(feature) {

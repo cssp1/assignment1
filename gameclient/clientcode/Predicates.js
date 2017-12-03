@@ -1534,6 +1534,10 @@ RegionMapSelectedPredicate.prototype.is_satisfied = function(player, qdata) {
     }
     var feature = mapwidget.selection_feature;
 
+    if(!mapwidget.popup || !mapwidget.popup.user_data['menu']) {
+        return false; // usually we want to require the popup menu to be visible
+    }
+
     if(this.base_type) {
         if(feature['base_type'] !== this.base_type) { return false; }
     }
@@ -1564,6 +1568,55 @@ goog.inherits(SquadIsDeployedPredicate, Predicate);
 SquadIsDeployedPredicate.prototype.is_satisfied = function(player, qdata) {
     return player.squad_is_deployed(this.squad_id);
 };
+
+/** @constructor @struct
+  * @extends Predicate */
+function SquadLocationPredicate(data) {
+    goog.base(this, data);
+    this.squad_id = data['squad_id'] || 0;
+    this.adjacent_to = data['adjacent_to'] || null;
+}
+goog.inherits(SquadLocationPredicate, Predicate);
+SquadLocationPredicate.prototype.is_satisfied = function(player, qdata) {
+    var squad_data = player.squads[this.squad_id.toString()];
+    if(!squad_data) { return false; }
+    if(!player.squad_is_deployed(this.squad_id)) { return false; }
+    if(player.squad_is_moving(this.squad_id)) { return false; }
+
+    var squad_loc = squad_data['map_loc'];
+
+    if(this.adjacent_to) {
+        var criteria = this.adjacent_to;
+        var neighbor_coords = session.region.get_neighbors(squad_loc);
+
+        // list of all neighboring features around the squad
+        var neighbor_features = goog.array.concatMap(neighbor_coords, function(coord) {
+            return session.region.find_features_at_coords(coord);
+        }, this);
+
+        var home_feature = session.region.find_home_feature();
+
+        if('my_home' in criteria) {
+            if(!goog.array.find(neighbor_features, function(f) { return f['base_id'] === home_feature['base_id']; }, this)) {
+                return false;
+            }
+        }
+        if('base_type' in criteria) {
+            if(!goog.array.find(neighbor_features, function(f) { return f['base_type'] === criteria['base_type']; }, this)) {
+                return false;
+            }
+        }
+        if('base_template' in criteria) {
+            var template_regex = new RegExp(criteria['base_template']);
+            if(!goog.array.find(neighbor_features, function(f) { return template_regex.exec(f['base_template']) !== null; }, this)) {
+                return false;
+            }
+
+        }
+    }
+    return true;
+};
+
 
 /** @constructor @struct
   * @extends Predicate */
@@ -1670,11 +1723,15 @@ HasDeployedPredicate.prototype.do_ui_describe = function(player) {
   * @extends Predicate */
 function PreDeployUnitsPredicate(data) {
     goog.base(this, data);
-    this.spec_name = data['spec'];
+    this.spec_name = data['spec'] || null;
     this.qty = data['qty'];
 }
 goog.inherits(PreDeployUnitsPredicate, Predicate);
 PreDeployUnitsPredicate.prototype.is_satisfied = function(player, qdata) {
+    if(!this.spec_name) { // not looking for a specific spec
+        return session.count_pre_deploy_units() >= this.qty;
+    }
+
     var spec = gamedata['units'][this.spec_name];
     var available_qty = session.count_deployable_units_of_spec(this.spec_name);
     var selected_qty = session.count_pre_deploy_units_of_spec(this.spec_name);
@@ -2199,6 +2256,8 @@ function read_predicate(data) {
         return new SquadIsMovingPredicate(data);
     } else if(kind === 'SQUAD_IS_DEPLOYED') {
         return new SquadIsDeployedPredicate(data);
+    } else if(kind === 'SQUAD_LOCATION') {
+        return new SquadLocationPredicate(data);
     } else if(kind === 'UI_CLEAR') {
         return new UIClearPredicate(data);
     } else if(kind === 'QUEST_CLAIMABLE') {

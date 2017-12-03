@@ -228,6 +228,11 @@ Session.Session.prototype.count_deployable_units_of_spec = function(specname) {
 
 // note: checking obj['source'] == 'donated' might make sense if we ever start considering donated units as part of space limits again
 
+// count units loaded into the deployment cursor
+Session.Session.prototype.count_pre_deploy_units = function() {
+    return goog.object.getCount(goog.object.filter(this.pre_deploy_units, function(obj) { return obj['source'] !== 'donated'; }));
+};
+
 // count units of this type loaded into the deployment cursor
 Session.Session.prototype.count_pre_deploy_units_of_spec = function(specname) {
     return goog.object.getCount(goog.object.filter(this.pre_deploy_units, function(obj) { return obj['spec'] == specname && obj['source'] !== 'donated'; }));

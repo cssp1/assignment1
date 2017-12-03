@@ -93,12 +93,20 @@ function TutorialArrowConsequent(data) {
     goog.base(this, data);
     this.arrow_type = data['arrow_type'];
 
-    // 'landscape' only
+    // arrow type 'landscape' only
     this.target_name = data['target_name'] || null;
     this.coordinates = data['coordinates'] || null;
-    // 'button' only
+
+    // arrow type 'button' only
     this.dialog_name = data['dialog_name'] || null;
     this.widget_name = data['widget_name'] || null;
+
+    // arrow type'region_map' only
+    this.base_is_my_home = data['my_home'] || null;
+    this.squad_id = data['squad_id'] || null;
+    this.base_type = data['base_type'] || null;
+    this.base_template = data['base_template'] || null;
+    this.base_closest_to = data['base_closest_to'] || null;
 
     this.direction = data['direction'] || 'down';
     this.reticle_size = data['reticle_size'] || null;
@@ -123,6 +131,9 @@ TutorialArrowConsequent.prototype.execute = function(state) {
         player.quest_landscape_arrow = dialog;
     } else if(this.arrow_type == 'button') {
         dialog.ondraw = update_tutorial_arrow_for_button(dialog, this.dialog_name, this.widget_name, this.direction);
+    } else if(this.arrow_type == 'region_map') {
+        dialog.ondraw = update_tutorial_arrow_for_region_map(dialog, this.base_is_my_home, this.squad_id, this.base_type, this.base_template, this.base_closest_to);
+        dialog.afterdraw = tutorial_arrow_draw_reticle;
     }
 };
 

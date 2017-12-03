@@ -19029,6 +19029,78 @@ function tutorial_step_valentina_nonmodal_message(data) {
     tutorial_step(false);
 }
 
+// maintain a tutorial arrow pointing to a feature on the regional map
+function update_tutorial_arrow_for_region_map(_dialog, _my_home, _squad_id, _base_type, _base_template, _closest_to) {
+    return (function (dialog, my_home, squad_id, base_type, base_template, closest_to) { return function() {
+        var direction = 'down';
+        var feature = null;
+        var mapwidget = null;
+
+        if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] == 'region_map_dialog') {
+            mapwidget = selection.ui.widgets['map'];
+        }
+
+        if(session.region) {
+            if(my_home) {
+                feature = session.region.find_home_feature();
+            } else if(squad_id) {
+                feature = session.region.find_feature_by_id(player.squad_base_id(squad_id));
+            } else if(base_type || base_template) {
+                // get list of all features that match these criteria
+                var feature_list = session.region.find_features_by_type(base_type, base_template);
+                if(closest_to === 'my_home') {
+                    // sort by distance to home base
+                    goog.array.sortByKey(feature_list, function(f) {
+                        return hex_distance(player.home_base_loc, f['base_map_loc']);
+                    });
+                }
+                feature = (feature_list.length >= 1 ? feature_list[0] : null);
+            }
+        }
+
+        if(feature && mapwidget) {
+
+            dialog.show = true;
+
+            // hack - remove then add it back to make it on top (of the tutorial UI)
+            var root = dialog.parent;
+            if(root === tutorial_root) {
+                root.unparent(dialog);
+                root.add(dialog);
+            }
+
+            // widget coordinates of the center of the map cell
+            var widget_xy = mapwidget.cell_to_widget(vec_add(feature['base_map_loc'], [0.5,0.5]));
+
+            var xy = vec_add(mapwidget.get_absolute_xy(), widget_xy);
+
+            // ?
+            mapwidget.pan_to_cell(feature['base_map_loc'], {slowly:true});
+            //mapwidget.zoom_all_the_way_in();
+
+            dialog.user_data['reticle_loc'] = null;
+            dialog.user_data['reticle_pos'] = vec_copy(xy);
+            dialog.user_data['reticle_size'] = 70 * mapwidget.zoom;
+
+            var arrow_dims = dialog.data['widgets']['arrow']['dimensions'];
+            var wave = Math.floor(8*Math.sin(4*client_time));
+            if(direction == 'down') {
+                xy[1] -= arrow_dims[1] + Math.floor(20 * mapwidget.zoom);
+            } else {
+                xy[1] += Math.floor(arrow_dims[1]/2) - 10;
+            }
+            dialog.xy = [xy[0] - Math.floor(arrow_dims[0]/2),
+                         xy[1] - 0];
+            dialog.widgets['arrow'].xy = [0, wave];
+            if(dialog.parent) { // might be ok to do this unconditionally
+                dialog.xy = vec_sub(dialog.xy, dialog.parent.get_absolute_xy());
+            }
+        } else {
+            dialog.show = false;
+        }
+    }; })(_dialog, _my_home, _squad_id, _base_type, _base_template, _closest_to);
+}
+
 // maintain a tutorial arrow pointing to a button on a specific UI dialog
 function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _direction) {
     return (function (dialog, parent_path, widget_name, direction) { return function() {

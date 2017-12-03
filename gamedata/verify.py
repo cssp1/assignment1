@@ -1522,7 +1522,7 @@ PREDICATE_TYPES = set(['AND', 'OR', 'NOT', 'ALWAYS_TRUE', 'ALWAYS_FALSE', 'TUTOR
                    'RESOURCE_STORAGE_CAPACITY',
                    'RESOURCES_HARVESTED_TOTAL', 'RESOURCES_HARVESTED_AT_ONCE', 'FRIENDS_JOINED', 'FACEBOOK_APP_NAMESPACE', 'FACEBOOK_LIKES_SERVER',
                    'FACEBOOK_LIKES_CLIENT', 'PRICE_REGION', 'COUNTRY', 'COUNTRY_TIER', 'EVENT_TIME', 'ABSOLUTE_TIME', 'TIME_OF_DAY', 'BROWSER_HARDWARE',
-                   'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'REGION_MAP_SELECTED', 'SQUAD_IS_MOVING', 'SQUAD_IS_DEPLOYED', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
+                   'BROWSER_OS', 'BROWSER_NAME', 'BROWSER_VERSION', 'SELECTED', 'REGION_MAP_SELECTED', 'SQUAD_IS_MOVING', 'SQUAD_IS_DEPLOYED', 'SQUAD_LOCATION', 'UI_CLEAR', 'QUEST_CLAIMABLE', 'HOME_BASE', 'HAS_ATTACKED', 'HAS_DEPLOYED',
                    'PRE_DEPLOY_UNITS', 'DIALOG_OPEN', 'FOREMAN_IS_BUSY', 'GAMEBUCKS_BALANCE', 'INVENTORY', 'HAS_ITEM', 'HAS_ITEM_SET', 'HOME_REGION', 'REGION_PROPERTY', 'LADDER_PLAYER',
                    'HOSTILE_UNIT_NEAR', 'HOSTILE_UNIT_EXISTS',
                    'MAIL_ATTACHMENTS_WAITING', 'AURA_ACTIVE', 'AURA_INACTIVE', 'AI_INSTANCE_GENERATION', 'USER_ID', 'LOGGED_IN_RECENTLY', 'PVP_AGGRESSED_RECENTLY', 'IS_IN_ALLIANCE', 'FRAME_PLATFORM', 'NEW_BIRTHDAY', 'HAS_ALIAS', 'HAS_TITLE', 'USING_TITLE', 'PLAYER_LEVEL',
@@ -1603,10 +1603,13 @@ def check_predicate(pred, reason = '', context = None, context_data = None,
             error |= 1
             print '%s: %s predicate refers to nonexistent quest "%s"' % (reason, pred['predicate'], pred['quest_name'])
     elif pred['predicate'] == 'PRE_DEPLOY_UNITS':
-        if pred['spec'] not in gamedata['units']:
-            error |= 1
-            print '%s: %s predicate refers to nonexistent unit "%s"' % (reason, pred['predicate'], pred['spec'])
-        error |= check_unit_name(pred['spec'], reason)
+        if 'spec' in pred:
+            if pred['spec'] not in gamedata['units']:
+                error |= 1
+                print '%s: %s predicate refers to nonexistent unit "%s"' % (reason, pred['predicate'], pred['spec'])
+            error |= check_unit_name(pred['spec'], reason)
+        if 'qty' not in pred:
+            error |= 1; print '%s: %s predicate is missing "qty"' % (reason, pred['predicate'])
 
     elif pred['predicate'] in ('AURA_ACTIVE', 'AURA_INACTIVE'):
         if pred['aura_name'] not in gamedata['auras']:

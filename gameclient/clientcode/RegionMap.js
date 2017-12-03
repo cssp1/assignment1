@@ -475,6 +475,7 @@ RegionMap.RegionMap = function(data, fxworld) {
     /** @type {Region.Region|null} */
     this.region = null;
     this.time = -1; // the caller should update this per-frame
+    this.last_quest_tracked_dirty_time = -1;
     this.hstar_context = null;
 
     // input goes to zoom_linear but is then passed through exp() to control the actual zoom,
@@ -1151,7 +1152,7 @@ RegionMap.RegionMap.update_feature_popup_menu = function(dialog) {
                     buttons.push([gamedata['strings']['regional_map']['recall'], (function(_mapwidget, _feature, _squad_data) { return function() {
                         _mapwidget.set_popup(null);
                         player.squad_recall(_squad_data['id']);
-                    }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending')) ? 'disabled' : 'passive')]);
+                    }; })(mapwidget, feature, squad_data), ((squad_data['pending'] || player.squad_get_client_data(squad_data['id'], 'move_pending')) ? 'disabled' : 'passive'), null, SPUI.default_text_color, 'recall']);
                 }
             }
 
@@ -2993,6 +2994,13 @@ RegionMap.RegionMap.prototype.draw = function(offset) {
         SPUI.ctx.fillRect(this.xy[0]+offset[0], this.xy[1]+offset[1], this.wh[0], this.wh[1]);
     }
     SPUI.ctx.restore();
+
+    // dirty the quest state every 1 second
+    // ugly, but important to trigger this when player squads reach their destinations or squad_order cooldowns expire
+    if(this.time - this.last_quest_tracked_dirty_time > 1) {
+        this.last_quest_tracked_dirty_time = this.time;
+        player.quest_tracked_dirty = true;
+    }
 };
 
 /** @param {number} squad_id */
