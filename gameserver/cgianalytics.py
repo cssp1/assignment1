@@ -1669,7 +1669,15 @@ EXTENDED_TUTORIAL_QUESTS = {
            'new_unit_attack',
            'activate_an_item',
            'upgrade_toc_level_2',
-           'build_and_mount_turret'],
+           'build_and_mount_turret',
+           'assign_units_to_reserves',
+           'create_squad',
+           'upgrade_squad_bay_level_2',
+           'destroy_hive',
+           'upgrade_transmitter',
+           'join_an_alliance',
+           'use_alliance_chat',
+           ],
     }
 
 TUTORIAL_AI = {
