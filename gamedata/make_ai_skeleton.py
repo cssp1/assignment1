@@ -986,8 +986,9 @@ if __name__ == '__main__':
             for i in xrange(data['bases_per_difficulty']):
                 print >> out_fd, "// %d Base %d" % (base_id, i+1)
                 base_id += 1
-            print >> out_fd, "// %d Placeholder for reset" % base_id
-            base_id += 1
+            if 'reset_interval' in data:
+                print >> out_fd, "// %d Placeholder for reset" % base_id
+                base_id += 1
             print >> out_fd
 
         # predicate for time-based showing/hiding of the AI
@@ -1023,7 +1024,10 @@ if __name__ == '__main__':
 
 
         for diff in data['difficulties']:
-            instance_cdname = "ai_"+data['event_name']+data['key_suffix'][diff]+"_instance"
+            if 'reset_interval' in data:
+                instance_cdname = "ai_"+data['event_name']+data['key_suffix'][diff]+"_instance"
+            else:
+                instance_cdname = None
 
             if diff in data.get('speedrun_time',{}):
                 speedrun_aura = data['event_name'] + data['key_suffix'][diff] + '_speedrun_contender'
@@ -1122,9 +1126,11 @@ if __name__ == '__main__':
                 for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
                     if FIELD in data: json.append((FIELD, data[FIELD]))
 
-                if is_first_base:
+                if is_first_base and 'ui_resets' in data:
                     json += [("ui_resets", data['ui_resets'])]
-                json += [("ui_instance_cooldown", instance_cdname)]
+
+                if instance_cdname:
+                    json += [("ui_instance_cooldown", instance_cdname)]
 
                 abtest_pred = { "predicate": "ANY_ABTEST", "key": data['abtest'], "value": 1 } if ('abtest' in data) else None
 
@@ -1138,12 +1144,18 @@ if __name__ == '__main__':
                 if is_first_base:
                     # first base in series
 
-                    show_pred['subpredicates'] += [{"predicate": "OR", "subpredicates": [
-                        # either cooldown is inactive
-                        {"predicate": "COOLDOWN_INACTIVE", "name": instance_cdname},
-                        # OR it's active and progress_now is zero
-                        {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
-                        ]}]
+                    if instance_cdname: # repeatable
+                        show_pred_instance = {"predicate": "OR", "subpredicates": [
+                            # either cooldown is inactive
+                            {"predicate": "COOLDOWN_INACTIVE", "name": instance_cdname},
+                            # OR it's active and progress_now is zero
+                            {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
+                            ]
+                                              }
+                    else: # non-repeatable
+                        show_pred_instance = {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
+
+                    show_pred['subpredicates'] += [show_pred_instance,]
 
                     if diff == 'Normal':
                         show_pred['subpredicates'] += [
@@ -1174,7 +1186,10 @@ if __name__ == '__main__':
                             ]
                 else:
                     # not first base
-                    show_pred['subpredicates'] += [{ "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname }]
+
+                    if instance_cdname:
+                        # cooldown must be active
+                        show_pred['subpredicates'] += [{ "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname }]
 
                     this_pred = {"predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": i}
 
@@ -1364,9 +1379,10 @@ if __name__ == '__main__':
                 if is_first_base:
                     # start the cooldown on attack of first level, and (re)initialize progress_now
                     attack_pred = {"consequent": "AND", "subconsequents": [
-                        { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },
                         { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "set", "value": i }
                         ]}
+                    if instance_cdname:
+                        attack_pred['subconsequents'].append({ "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] })
 
                 # add "attempted" progress key
                 attempt_pred = { "consequent": "AND", "subconsequents": [
@@ -1458,9 +1474,12 @@ if __name__ == '__main__':
 
                 if is_first_base:
                     completion['subconsequents'] += [
-                        { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_times_started", "method": "increment", "value": 1 },
-                        { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] },
+                        { "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_times_started", "method": "increment", "value": 1 }
                         ]
+                    if instance_cdname:
+                        completion['subconsequents'] += [
+                            { "consequent": "COOLDOWN_TRIGGER", "name": instance_cdname, "method": "periodic", "origin": data['reset_origin_time'], "period": data['reset_interval'] }
+                            ]
                     if ('extra_key_suffix' in data):
                         completion['subconsequents'] += [{ "consequent": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['extra_key_suffix'][diff]+"_times_started", "method": "increment", "value": 1 }]
                     if speedrun_aura:
@@ -1652,11 +1671,11 @@ if __name__ == '__main__':
                         # create an empty base contents file to use as a starting point
                         sys.stderr.write('creating %s\n' % base_file_path)
                         fd = open(base_file_path, 'w')
-                        for i in xrange(len(base)):
-                            key, val = base[i]
+                        for j in xrange(len(base)):
+                            key, val = base[j]
                             print >> fd, '"%s":' % key,
                             dump_json(val, fd=fd)
-                            if i != len(base)-1:
+                            if j != len(base)-1:
                                 print >> fd, ','
                             else:
                                 print >> fd, ''
@@ -1669,92 +1688,102 @@ if __name__ == '__main__':
 
                 json += base_json
 
-                for i in xrange(len(json)):
-                    if type(json[i]) in (str, unicode):
+                for j in xrange(len(json)):
+                    if type(json[j]) in (str, unicode):
                         # literal strings are only used for #includes
-                        assert json[i].startswith('#include')
-                        print >> out_fd, json[i], # XXXXXX this adds a trailing space
+                        assert json[j].startswith('#include')
+                        print >> out_fd, json[j], # XXXXXX this adds a trailing space
                     else:
-                        assert type(json[i]) in (tuple, list)
-                        key, val = json[i]
+                        assert type(json[j]) in (tuple, list)
+                        key, val = json[j]
                         print >> out_fd, '    "%s":' % key,
                         dump_json(val, fd = out_fd)
-                    if i != len(json)-1:
+                    if j != len(json)-1:
                         print >> out_fd, ','
                     else:
                         print >> out_fd, ''
 
-                print >> out_fd, '},'
+
+                if (not instance_cdname) and \
+                   (diff == data['difficulties'][-1]) and \
+                   (i == (data['bases_per_difficulty']-1)):
+                    print >> out_fd, '}'
+                else:
+                    print >> out_fd, '},'
 
                 base_id += 1
                 if not skip:
                     unskipped_count += 1
                     overall_unskipped_count += 1
 
-            # placeholder base
-            print >> out_fd
-            print >> out_fd, "// PLACEHOLDER BASE FOR %s WHILE WAITING FOR RESET" % diff.upper()
-            print >> out_fd, '"%d": {' % base_id
 
-            show_pred = {"predicate": "AND", "subpredicates": [ ] }
-            if time_pred:
-                show_pred['subpredicates'] += [ time_pred ]
-            show_pred['subpredicates'] += [ { "predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": data['bases_per_difficulty'] },
-                                            { "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname } ]
+            if instance_cdname:
+                # placeholder base
+                print >> out_fd
+                print >> out_fd, "// PLACEHOLDER BASE FOR %s WHILE WAITING FOR RESET" % diff.upper()
+                print >> out_fd, '"%d": {' % base_id
 
-            json = [
-                ("ui_name", data['villain_ui_name']),
-                ("ui_map_name", ui_map_name),
-                ("ui_priority", ui_priority),
-                ("ui_difficulty_index", ui_difficulty_index),
-                ("portrait", data['villain_portrait'][diff]),
-                ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
-                ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
+                show_pred = {"predicate": "AND", "subpredicates": [ ] }
+                if time_pred:
+                    show_pred['subpredicates'] += [ time_pred ]
+                show_pred['subpredicates'] += [ { "predicate": "PLAYER_HISTORY", "key": "ai_"+data['event_name']+data['key_suffix'][diff]+"_progress_now", "method": "==", "value": data['bases_per_difficulty'] },
+                                                { "predicate": "COOLDOWN_ACTIVE", "name": instance_cdname } ]
 
-            if 'ui_difficulty_comment' in data:
-                json += [("ui_difficulty_comment", data['ui_difficulty_comment'][diff])]
+                json = [
+                    ("ui_name", data['villain_ui_name']),
+                    ("ui_map_name", ui_map_name),
+                    ("ui_priority", ui_priority),
+                    ("ui_difficulty_index", ui_difficulty_index),
+                    ("portrait", data['villain_portrait'][diff]),
+                    ("resources", { "player_level": data['starting_ai_level'][diff], "water": 0, "iron": 0 }),
+                    ("ui_info", "VICTORY COMPLETE\n" + data['ui_resets'])]
 
-            if 'base_resource_loot' in data and data['base_resource_loot'][diff][0] is not None:
-                json += [("base_resource_loot", {})]
+                if 'ui_difficulty_comment' in data:
+                    json += [("ui_difficulty_comment", data['ui_difficulty_comment'][diff])]
 
-            if game_id != 'fs':
-                json.append(('auto_level',1))
+                if 'base_resource_loot' in data and data['base_resource_loot'][diff][0] is not None:
+                    json += [("base_resource_loot", {})]
 
-            if 'villain_map_portrait' in data:
-                json += [("map_portrait", data['villain_map_portrait'][diff])]
+                if game_id != 'fs':
+                    json.append(('auto_level',1))
 
-            for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
-                if FIELD in data: json.append((FIELD, data[FIELD]))
+                if 'villain_map_portrait' in data:
+                    json += [("map_portrait", data['villain_map_portrait'][diff])]
 
-            assert unskipped_count == num_unskipped_bases
-            assert (not (('skip' in data) and data['skip'][diff][-1])) # if last base is skipped, then we need to change our show_if predicate
+                for FIELD in ('ui_info_url', 'analytics_tag', 'ui_instance_cooldown_template'):
+                    if FIELD in data: json.append((FIELD, data[FIELD]))
 
-            # Dummy base "activation" predicate message can show for two cases:
-            # 1. Player has already completed the event this week, and needs to wait for next week.
-            # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
-            # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
-            json += [("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
-                     ("ui_difficulty", diff),
-                     ("ui_spy_button","Defeated"),
-                     ("ui_instance_cooldown",instance_cdname),
-                     ("show_if", show_pred),
-                     ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "You've already completed %s this week" % ui_map_name }),
-                     ("tech",{}),
-                     ("buildings", [{"xy":[90,90],"spec":gamedata['townhall']}]),
-                     ("units",[])]
+                assert unskipped_count == num_unskipped_bases
+                assert (not (('skip' in data) and data['skip'][diff][-1])) # if last base is skipped, then we need to change our show_if predicate
 
-            for key, val in json:
-                print >> out_fd, '    "%s":' % key,
-                dump_json(val, fd = out_fd)
-                if key != 'units':
-                    print >> out_fd, ','
+                # Dummy base "activation" predicate message can show for two cases:
+                # 1. Player has already completed the event this week, and needs to wait for next week.
+                # 2. While still logged in, a week boundary passes. The engine currently doesn't update the
+                # available AI list in this case, so the player will still see last week's dummy base. XXX needs fix.
+                json += [("ui_progress", format_ui_progress(unskipped_count, num_unskipped_bases, overall_unskipped_count, overall_num_unskipped_bases)),
+                         ("ui_difficulty", diff),
+                         ("ui_spy_button","Defeated"),
+                         ("ui_instance_cooldown",instance_cdname),
+                         ("show_if", show_pred),
+                         ("activation", {"predicate": "ALWAYS_FALSE", "ui_name": "You've already completed %s this week" % ui_map_name }),
+                         ("tech",{}),
+                         ("buildings", [{"xy":[90,90],"spec":gamedata['townhall']}]),
+                         ("units",[])]
+
+                for key, val in json:
+                    print >> out_fd, '    "%s":' % key,
+                    dump_json(val, fd = out_fd)
+                    if key != 'units':
+                        print >> out_fd, ','
+                    else:
+                        print >> out_fd, ''
+
+                if diff == data['difficulties'][-1]:
+                    print >> out_fd, '}'
                 else:
-                    print >> out_fd, ''
-            if diff == data['difficulties'][-1]:
-                print >> out_fd, '}'
-            else:
-                print >> out_fd, '},'
-            base_id += 1
+                    print >> out_fd, '},'
+
+                base_id += 1
 
             # print warnings about the skeleton (in non-legacy games)
             if game_id not in ('mf2','bfm'):
