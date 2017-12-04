@@ -2790,6 +2790,9 @@ def check_quests(quests):
         if 'ui_description' in data and type(data['ui_description']) is list:
             error |= check_cond_chain(data['ui_description'], reason = 'quest:'+key+':ui_description')
 
+        if 'ui_description' not in data:
+            error |= 1; print 'quest %s is missing ui_description' % (key,)
+
         for BADFIELD in ('ui_instruction','ui_descriptions'):
             if BADFIELD in data:
                 error |= 1; print 'quest %s has typo: "%s"' % (key, BADFIELD)
