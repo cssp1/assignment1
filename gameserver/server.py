@@ -5319,6 +5319,12 @@ class Session(object):
             discovered_where = 'messages'
             player.send_loot_mail(str(player.resources.player_level), 0, loot, retmsg, mail_template = gamedata['strings']['level_up_reward_mail'])
 
+        elif reason == 'special' and all(x['spec'] == 'gamebucks' for x in loot) and show_items_discovered:
+            # special case when the only loot given is gamebucks - send "fungibly" instead of by message
+            discovered_where = 'inventory'
+            player.resources.gain_gamebucks(sum((x.get('stack',1) for x in loot), 0), reason='give_loot')
+            retmsg.append(["PLAYER_STATE_UPDATE", player.resources.calc_snapshot().serialize()])
+
         elif reason in ('special','refund','promo_code'):
             discovered_where = 'messages'
             if mail_template is None:
