@@ -1789,8 +1789,11 @@ class NoSQLClient (object):
 
     def get_map_features_by_type(self, region, base_type, reason=''):
         return self.instrument('get_map_features_by_type(%s)'%reason, self._query_map_features, (region,{'base_type':base_type}))
-    def count_map_features_by_type(self, region, base_type, reason=''):
-        return self.instrument('count_map_features_by_type(%s)'%reason, self._count_map_features, (region,{'base_type':base_type}))
+    def count_map_features_by_type(self, region, base_type, filter = None, reason=''):
+        qs = {'base_type': base_type}
+        if filter:
+            qs.update(filter)
+        return self.instrument('count_map_features_by_type(%s)'%reason, self._count_map_features, (region,qs))
     def get_map_feature_ids(self, region, reason=''):
         return (x['base_id'] for x in self.instrument('get_map_feature_ids(%s)'%reason, self._query_map_features, (region,{},{'_id':1})))
     def get_map_feature_ids_by_type(self, region, base_type, reason=''):

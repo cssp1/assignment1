@@ -1097,7 +1097,19 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
         local_qty_scale = 1
 
-        if 'hive_num_scale_by_player_pop' in region_data:
+        if 'num_scale_by_player_townhall_level' in spawn_data:
+            # make the spawn proportional to the number of players in the map at the given townhall level(s)
+            # note: in this case, "num" should probably be 1
+            player_townhall_level_sum = 0.0
+            for sth, coeff in spawn_data['num_scale_by_player_townhall_level'].iteritems():
+                th = int(sth)
+                players_at_th = nosql_client.count_map_features_by_type(region_id, 'home', filter = {gamedata['townhall']+'_level': th})
+                if verbose:
+                    print 'players_at_th', players_at_th, 'at', th
+                player_townhall_level_sum += coeff * players_at_th
+            local_qty_scale *= player_townhall_level_sum
+
+        elif 'hive_num_scale_by_player_pop' in region_data:
             if player_pop is None: # cache this
                 player_pop = nosql_client.count_map_features_by_type(region_id, 'home')
                 player_pop_factor = min(max(float(player_pop) / region_data['pop_soft_cap'], 0), 1)
@@ -1113,7 +1125,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
             continue
 
         # spawn at least one as long as base_qty is above zero
-        qty = max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale))
+        qty = min(max(spawn_data.get('num_min',1), int(base_qty * global_qty_scale * local_qty_scale)), spawn_data.get('num_max', 999999))
 
         for i in xrange(qty):
             if spawn_hive(hives, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
