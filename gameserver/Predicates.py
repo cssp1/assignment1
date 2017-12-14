@@ -990,6 +990,8 @@ class TrustLevelPredicate(Predicate):
         self.min_level = {'TRUST_ANONYMOUS_GUEST': 0,
                           'TRUST_UNVERIFIED': 5,
                           'TRUST_VERIFIED': 10}[data['min_level']]
+    def is_satisfied(self, player, qdata):
+        return player.trust_level >= self.min_level
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.player.trust_level >= self.min_level
 
