@@ -392,7 +392,12 @@ def custom_audience_create(db, ad_account_id, name, description = None):
     return _custom_audience_create(db, ad_account_id, props)
 
 def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, country, lookalike_type = 'similarity', lookalike_ratio = None, description = None):
-    spec = {'country': country.upper()}
+    if country == 'ww': # worldwide
+        spec = {'allow_international_seeds': True,
+                'location_spec': {'geo_locations': {'country_groups': ['worldwide']}}}
+    else:
+        spec = {'country': country.upper()}
+
     if lookalike_ratio is not None:
         spec['ratio'] = lookalike_ratio
     else:
@@ -402,7 +407,9 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
     if not origin_audience:
         raise Exception('origin audience not found: '+repr(origin_audience_qs))
 
-    props = {'name': name, 'origin_audience_id': origin_audience['id'],
+    props = {'name': name,
+             'subtype': 'LOOKALIKE',
+             'origin_audience_id': origin_audience['id'],
              'lookalike_spec':SpinJSON.dumps(spec)}
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
