@@ -15334,7 +15334,7 @@ def get_acquisition_data_from_url(url, user_id):
 
         # mark super-common FB bookmark clicks as useless for acquisition tracking purposes,
         # to avoid userdb bloat
-        if ('fb_source' in q and q['fb_source'][0].endswith('bookmark')) or \
+        if ('fb_source' in q and ('bookmark' in q['fb_source'][0])) or \
            ('app_request_type' in q and q['app_request_type'][0] == 'user_to_user') or \
            ('ref' in q and q['ref'][0] == 'bookmarks'):
             ret['useless'] = 1
