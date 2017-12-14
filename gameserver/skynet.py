@@ -541,6 +541,15 @@ def adgroup_encode_bid(tgt, bid):
         elif bid_type == 'oCPM_CLICK':
             ret['billing_event'] = 'LINK_CLICKS'
             ret['optimization_goal'] = 'LINK_CLICKS'
+        elif bid_type.startswith('oCPM_app_'): # optimize for app events
+            app_event_name = '_'.join(bid_type.split('_')[2:])
+            ret['billing_event'] = 'IMPRESSIONS'
+            ret['optimization_goal'] = 'OFFSITE_CONVERSIONS'
+            # this seems to work for mobile apps only :(
+            ret['promoted_object'] = SpinJSON.dumps({'application_id': game_data['app_id'],
+                                                     'object_store_url':'https://apps.facebook.com/'+game_data['namespace']+'/',
+                                                     'custom_event_type': app_event_name})
+
         else:
             event = '_'.join(bid_type.split('_')[1:])
             assert event in conversion_pixels
@@ -1548,6 +1557,9 @@ def call_to_action_type(tgt):
         return 'OPEN_LINK' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
     return 'PLAY_GAME'
 
+# used to force creation of new adcreative by changing the cache key
+ADCREATIVE_GENERATION = 4
+
 def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_name, tgt, spin_atgt):
     # this just got REALLY complicated for app ads:
     # https://developers.facebook.com/docs/reference/ads-api/mobile-app-ads/
@@ -1645,14 +1657,18 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                 creative['object_story_id'] = page_post_id
             else: # inline creation
                 cr_params = {'page_id': page_id,
-                             'link_data': {'call_to_action': {'type': call_to_action_type(tgt),
-                                                              'value': {'link':base_link_url}},
+                             'link_data': {
                                            'message': body_text,
                                            'name': title_text,
                                            'link': base_link_url,
                                            'picture': adimage_get_s3_url(db, tgt['image']),
                                            }
                              }
+                if not (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_')):
+                    # when using OFFSITE_CONVERSION optimization, FB API refuses to attach adcreatives containing call_to_action
+                    # to a new ad
+                    cr_params['link_data']['call_to_action'] =  {'type': call_to_action_type(tgt),
+                                                                 'value': {'link':base_link_url}}
                 if link_caption:
                     cr_params['link_data']['caption'] = link_caption
                 if link_description:
@@ -1687,6 +1703,8 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
     else:
         raise Exception('unhandled ad_type')
+
+    creative[spin_field('generation')] = ADCREATIVE_GENERATION
 
     entry = db.fb_adcreatives.find_one(creative)
     if entry and 'id' in entry: return entry, None # use cached copy
@@ -2020,11 +2038,18 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
     params = {'name':name, 'daily_budget':NEW_CAMPAIGN_BUDGET, 'status':CAMPAIGN_STATUS_CODES['active'],
               'targeting': SpinJSON.dumps(adgroup_targeting(db, tgt)),
               'campaign_id': campaign_group_id, 'redownload':1}
+
+    promoted_object = {}
+
     if call_to_action_type(tgt) == 'PLAY_GAME' and tgt.get('destination','app') == 'app':
-        params['promoted_object'] = SpinJSON.dumps({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
-    elif tgt.get('promoted_event', None):
+        promoted_object.update({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
+
+    if tgt.get('promoted_event', None):
         pixel_data = conversion_pixels[tgt['promoted_event'][0]]
-        params['promoted_object'] = SpinJSON.dumps({'pixel_id': pixel_data['fb_pixel'], 'custom_event_type': pixel_data['fb_name']})
+        promoted_object.update({'pixel_id': pixel_data['fb_pixel'], 'custom_event_type': pixel_data['fb_name']})
+
+    if promoted_object:
+        params['promoted_object'] = SpinJSON.dumps(promoted_object)
 
     params.update(adgroup_encode_bid(tgt, bid))
 
@@ -2141,7 +2166,7 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_delive
                 elif bid_type.endswith('cc2_by_day_1'):
                     factor = spin_params['townhall2_within_1day']['values'][1]['coeff']/TRUE_INSTALLS_PER_CLICK
                     ui_factor = '*installs_per_cc2/TRUE_INSTALLS_PER_CLICK(%.2f)' % factor
-                elif bid_type.endswith('ftd'):
+                elif bid_type.endswith('ftd') or bid_type.lower().endswith('purchase'):
                     factor = 1 # this is folded into 'coeff'
                     ui_factor = ''
                 else:
