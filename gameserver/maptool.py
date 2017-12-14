@@ -616,7 +616,7 @@ def spawn_all_quarries(db, lock_manager, region_id, force_rotation = False, dry_
         for i in xrange(qty):
             if spawn_quarry(quarries, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), i, name_idx,
                             spawn_data.get('distribution', {'func':'uniform'}), spawn_data['template'], template, spawn_data['resource'],
-                            start_time = start_time, end_time = end_time, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
+                            start_time = start_time, end_time = end_time, region_player_pop = player_pop if region_data.get('quarry_num_scale_by_player_pop',False) else None,
                             force_rotation = force_rotation, dry_run = dry_run):
                 do_throttle()
             name_idx += 1
