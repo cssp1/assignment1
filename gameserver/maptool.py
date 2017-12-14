@@ -1129,7 +1129,10 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
         for i in xrange(qty):
             if spawn_hive(hives, map_cache, db, lock_manager, region_id, (spawn_data['id_start']+i), name_idx, spawn_data['template'], template,
-                          start_time = start_time, end_time = end_time, repeat_interval = repeat_interval, region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
+                          start_time = start_time, end_time = end_time, repeat_interval = repeat_interval,
+                          duration = int(spawn_data.get('duration',hives['duration']) *
+                                         (1.0 - spawn_data.get('randomize_duration',hives['randomize_duration']) * random.random())),
+                          region_player_pop = player_pop if region_data.get('hive_num_scale_by_player_pop',False) else None,
                           force_rotation = force_rotation, dry_run = dry_run):
                 num_spawned_by_type[spawn_data['template']] = num_spawned_by_type.get(spawn_data['template'],0) + 1
                 do_throttle()
@@ -1143,7 +1146,8 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
 
 
 def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, template_name, template,
-               start_time = -1, end_time = -1, repeat_interval = None, force_rotation = False, region_player_pop = None,
+               start_time = -1, end_time = -1, repeat_interval = None, duration = -1,
+               force_rotation = False, region_player_pop = None,
                dry_run = True):
 
     owner_id = template['owner_id']
@@ -1170,8 +1174,6 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     else:
         ui_name = '%s-%04d' % (alphabet[name_idx%len(alphabet)], id_num)
 
-    duration = int(hives['duration'] * (1.0 - hives['randomize_duration'] * random.random()))
-
     # clamp duration to end time
     ref_time = (event_time_override or time_now)
     if (end_time > 0):
@@ -1182,6 +1184,8 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
             run_end_time = end_time
         if (ref_time + duration >= run_end_time):
             duration = min(duration, run_end_time - ref_time)
+
+    assert duration > 0
 
     assign_climate = template.get('base_climate', None)
 
