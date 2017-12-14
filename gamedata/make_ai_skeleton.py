@@ -1657,6 +1657,9 @@ if __name__ == '__main__':
                             args.insert(len(args)-1, '--skew-flavor=%s' % data['skew_flavor_in_bases'])
                         if 'difficulty_index_in_bases' in data:
                             args.insert(len(args)-1, '--difficulty-index=%r' % data['difficulty_index_in_bases'][diff][i])
+                        if 'prep_ai_base_flags' in data:
+                            for flag in data['prep_ai_base_flags']:
+                                args.insert(len(args)-1, flag)
 
                         #sys.stderr.write('\n'.join(args) + '\n')
                         subprocess.check_call(args)
