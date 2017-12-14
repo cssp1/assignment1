@@ -1100,7 +1100,7 @@ def spawn_all_hives(db, lock_manager, region_id, force_rotation = False, dry_run
         if 'num_scale_by_player_townhall_level' in spawn_data:
             # make the spawn proportional to the number of players in the map at the given townhall level(s)
             # note: in this case, "num" should probably be 1
-            player_townhall_level_sum = 0.0
+            player_townhall_level_sum = 0.001 # ensure "num_min" still applies
             for sth, coeff in spawn_data['num_scale_by_player_townhall_level'].iteritems():
                 th = int(sth)
                 players_at_th = nosql_client.count_map_features_by_type(region_id, 'home', filter = {gamedata['townhall']+'_level': th})
