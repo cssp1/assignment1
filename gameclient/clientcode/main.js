@@ -53902,7 +53902,8 @@ function draw_health_bar(xy, obj) {
 
     var show_at_full_health = (obj.is_mobile() &&
                                !obj.spec['never_show_full_health_bar'] &&
-                               get_preference_setting(player.preferences, 'always_show_unit_health'));
+                               (get_preference_setting(player.preferences, 'always_show_unit_health') ||
+                                gamedata['client']['always_show_unit_health']));
 
     if(!show_at_full_health && obj.is_mobile()) {
         // shortcut
@@ -53958,10 +53959,27 @@ function draw_health_bar(xy, obj) {
                 throb_speed = 90;
             }
         }
+        var color_set = gamedata['client'][(obj.team === 'enemy' ? 'health_bar_colors_enemy' : 'health_bar_colors_friendly')];
+
+        // optionally add tickmarks on the bar to represent large amounts of HP
+        var num_ticks = 0;
+
+        /* logarithmic calculation example based on FS:
+        var log_scale_min = Math.log10(150);
+        var log_scale_max = Math.log10(150000);
+        var scale = (Math.log10(max_hp) - log_scale_min) / (log_scale_max - log_scale_min);
+        scale = clamp(scale, 0, 1);
+        num_ticks = Math.floor(2 + (20 - 2) * scale);
+        */
+
+        if('health_bar_ticks' in obj.spec) {
+            num_ticks = obj.get_leveled_quantity(obj.spec['health_bar_ticks']);
+        }
+
         draw_bar([xy[0]-Math.floor(w/2), xy[1]-yoff], w, h,
                  Math.floor(w*(clamp(hp/max_hp,0,1))),
                  Math.floor(w*(clamp(displayed_hp/max_hp,0,1))),
-                 gamedata['client'][(obj.team === 'enemy' ? 'health_bar_colors_enemy' : 'health_bar_colors_friendly')], throb_speed);
+                 color_set, throb_speed, num_ticks);
     }
 
     // also draw progress bar for building actions
@@ -53991,7 +54009,7 @@ function draw_health_bar(xy, obj) {
         draw_bar([xy[0]-Math.floor(pw/2), xy[1]-pyoff],
                  pw,
                  ph, prog, prog,
-                 gamedata['client']['progress_bar_colors'], 10);
+                 gamedata['client']['progress_bar_colors'], 10, 0);
     }
 
     ctx.restore();
@@ -54003,8 +54021,10 @@ function draw_health_bar(xy, obj) {
  * @param {number} h
  * @param {number} prog - instantaneous progress, pixels
  * @param {number} prog2 - transitioning progress, pixels
+ * @param {number} throb_speed
+ * @param {number} num_ticks
  */
-function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
+function draw_bar(xy, w, h, prog, prog2, colors, throb_speed, num_ticks) {
 
     /** evaluate a color specified in gamedata, which could be either a literal string (HTML5 canvas color)
         or a step-function specified as an array [[min_prog, color], [min_prog, color], ...]
@@ -54068,6 +54088,20 @@ function draw_bar(xy, w, h, prog, prog2, colors, throb_speed) {
         ctx.globalAlpha = 1;
     }
     */
+
+    // stroke tickmarks
+    if(num_ticks > 0) {
+        var tick_spacing = w / num_ticks;
+        ctx.beginPath();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = colors['tick'];
+        for(var tx = tick_spacing; tx <= w /*Math.max(prog, prog2)*/; tx += tick_spacing) {
+            var origin = draw_quantize([xy[0] + tx, xy[1]]);
+            ctx.moveTo(origin[0], origin[1]);
+            ctx.lineTo(origin[0], origin[1] + h);
+        }
+        ctx.stroke();
+    }
 
     // stroke outline
     ctx.lineWidth = 1; // (h >= 6 ? 2 : 1);
