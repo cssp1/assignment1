@@ -11159,7 +11159,8 @@ function init_desktop_dialogs() {
     // when defending home base against AI attack, hide resource bars and show "Surrender" button
     if(session.home_base) {
         if(session.has_attacked) {
-            if(player.tutorial_state == "COMPLETE") {
+            if(player.tutorial_state == "COMPLETE" &&
+               session.enable_progress_timers /* hide surrender button during critical guided steps */) {
                 dialog.widgets['surrender_button'].show = true;
             } else {
                 dialog.widgets['surrender_button'].show = false;
@@ -16989,6 +16990,14 @@ function init_dialog_repair_buttons(dialog, base_damage, enable_confirm) {
             start_slow_repairs();
         };
 
+        if(!session.enable_progress_timers) {
+            // prevent player from seeing for-pay options, force "slow" path
+            dialog.widgets['repair_instant_button'].show =
+                dialog.widgets['price_display'].show = false;
+            dialog.widgets['repair_slow_button'].state = 'active';
+            dialog.default_button = dialog.widgets['repair_slow_button'];
+        }
+
     } else {
         // base is not damaged
         dialog.widgets['price_display'].show =
@@ -20580,7 +20589,8 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.auto_center();
     dialog.modal = true;
 
-    if(player.tutorial_state == 'COMPLETE' && can_show_replay_for_battle_summary(battle_summary)) {
+    if(player.tutorial_state == 'COMPLETE' && session.enable_progress_timers &&
+       can_show_replay_for_battle_summary(battle_summary)) {
         var link_qs = battle_replay_link_qs(battle_summary['time'], battle_summary['attacker_id'], battle_summary['defender_id'], battle_summary['base_id'], dialog.user_data['replay_signature']);
         if(link_qs && FBShare.supported()) {
             dialog.widgets['fb_share_button'].show =
