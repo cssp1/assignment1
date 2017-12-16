@@ -15102,6 +15102,10 @@ def init_game(player, add_extras):
             setattr(player.resources, res, override[res])
     if 'xp' in override: player.resources.xp = override['xp']
 
+    inventory_list = override['inventory'] if ('inventory' in override) else gamedata['starting_conditions'].get('inventory', [])
+    if inventory_list:
+        player.inventory = copy.deepcopy(inventory_list)
+
 def spawn_tutorial_units(session, retmsg):
     override = session.player.get_any_abtest_value('starting_conditions', {})
     data_list = override['attacking_units'] if ('attacking_units' in override) else gamedata['starting_conditions']['attacking_units']
