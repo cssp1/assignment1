@@ -1670,6 +1670,7 @@ EXTENDED_TUTORIAL_QUESTS = {
            'activate_an_item',
            'upgrade_toc_level_2',
            'build_and_mount_turret',
+           'replenish_units_for_map_tutorial',
            'assign_units_to_reserves',
            'create_squad',
            'upgrade_squad_bay_level_2',
