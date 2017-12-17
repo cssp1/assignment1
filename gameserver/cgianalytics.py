@@ -2123,8 +2123,8 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
      'func': lambda user: user.get('squad_attacks_launched',0) >= 1 },
 
     {'name': 'Q22A Destroyed 1+ Hive', 'func': lambda user: user.get('hives_destroyed',0) >= 1 },
-    {'name': 'Q22B Destroyed 2+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 1 },
-    {'name': 'Q22C Destroyed 3+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 2 },
+    {'name': 'Q22B Destroyed 2+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 2 },
+    {'name': 'Q22C Destroyed 3+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 3 },
     {'name': 'Q22D Destroyed 4+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 4 },
     {'name': 'Q22E Destroyed 5+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 5 },
     {'name': 'Q22F Destroyed 10+ Hives', 'func': lambda user: user.get('hives_destroyed',0) >= 10 },
