@@ -1824,11 +1824,13 @@ FUNNEL_BASIC = [
     {'name': 'A02A Central Computer L2 (time-independent)', 'func': lambda user: user.get(gamedata['townhall']+'_level', 1) >= 2 },
 
     {'name': 'A04A Returned between 24-48 hrs after acct creation', 'mandatory_age': 48*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 2, after=1) >= 1, 'show_p':True },
-    {'name': 'A04A1 Returned between 48-72 hrs after acct creation', 'mandatory_age': 72*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 3, after=2) >= 1, 'show_p':True },
-    {'name': 'A04A2 Returned between 72-96 hrs after acct creation', 'mandatory_age': 96*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 4, after=3) >= 1, 'show_p':True },
-    {'name': 'A04A3 Returned between 120-144 hrs after acct creation', 'mandatory_age': 144*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 6, after=5) >= 1, 'show_p':True },
-    {'name': 'A04B Returned between 168-192 hrs after acct creation', 'mandatory_age': 192*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 8, after=7) >= 1, 'show_p':True },
-    {'name': 'A04C Returned between 672-696 hrs after acct creation', 'mandatory_age': 696*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 29, after=28) >= 1, 'show_p':True },
+    {'name': 'A04A1 Returned on 2nd day after acct creation', 'mandatory_age': 72*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 3, after=2) >= 1, 'show_p':True },
+    {'name': 'A04A2 Returned on 3rd day after acct creation', 'mandatory_age': 96*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 4, after=3) >= 1, 'show_p':True },
+    {'name': 'A04A3 Returned on 5th day after acct creation', 'mandatory_age': 144*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 6, after=5) >= 1, 'show_p':True },
+    {'name': 'A04B Returned on 7th dy after acct creation', 'mandatory_age': 192*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 8, after=7) >= 1, 'show_p':True },
+    {'name': 'A04B1 Returned on 10th day after acct creation', 'mandatory_age': 264*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 11, after=10) >= 1, 'show_p':True },
+    {'name': 'A04B2 Returned on 15th day after acct creation', 'mandatory_age': 384*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 16, after=15) >= 1, 'show_p':True },
+    {'name': 'A04C Returned on 28th day after acct creation', 'mandatory_age': 696*60*60, 'func': lambda user: SpinUpcache.visits_within(user, 29, after=28) >= 1, 'show_p':True },
 
 #    {'name': 'A04C Retained at least One Day', 'mandatory_age': 2*24*60*60,
 #     'func':         lambda user: user.get('last_login_time',0) - user.get('account_creation_time',0) >= 24*60*60, 'show_p': True },
