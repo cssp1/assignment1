@@ -5401,7 +5401,7 @@ class Session(object):
                     if 'hp' in state: del state['hp']
             retmsg.append(["PLAYER_ARMY_UPDATE", filter(lambda x: x is not None, [self.player.strip_fields_for_army_update(state) for state in states])])
 
-            self.player.unit_repair_send(retmsg)
+        self.player.unit_repair_send(retmsg)
 
     def heal_all_buildings(self, retmsg):
         for obj in self.player.home_base_iter():
