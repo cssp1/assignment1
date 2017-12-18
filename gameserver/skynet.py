@@ -552,7 +552,8 @@ def adgroup_encode_bid(tgt, bid):
 
         else:
             event = '_'.join(bid_type.split('_')[1:])
-            assert event in conversion_pixels
+            if event not in conversion_pixels:
+                raise Exception('event named %s not found in game_data["conversion_pixels"]' % event)
             pixel_data = conversion_pixels[event]
             ret['billing_event'] = 'IMPRESSIONS'
             ret['optimization_goal'] = 'OFFSITE_CONVERSIONS'
