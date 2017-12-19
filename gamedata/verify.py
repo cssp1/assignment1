@@ -17,7 +17,7 @@ try:
     from pyxdameraulevenshtein import damerau_levenshtein_distance
     has_damerau_levenshtein = True
 except ImportError:
-    print 'pyxadameraulevenshtein module not found - install this if you want typo-checking'
+    print 'pyxDamerauLevenshtein module not found - install this if you want typo-checking'
     pass
 
 time_now = int(time.time())
