@@ -2774,34 +2774,34 @@
     "region_tr_island2_bg": { "states": { "normal": { "images": ["art/regions/tr_island2_1024.jpg"], "dimensions": [1024,512] } } },
 
     "map_flame": { "states": { "normal": { "style": "animation", "framerate": 4, "loop": 1,"images": [
-        "art/regions/tr_tiles6.png", "*", "*", "*"
+        "art/regions/tr_tiles7.png", "*", "*", "*"
     ], "dimensions": [64,64], "origins": [192,0,192,64,192,128,192,192], "composite_mode": "lighter", "alpha": 0.8 } } },
-    "map_bubble":  { "states": { "normal": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,192], "alpha": 1 } } },
+    "map_bubble":  { "states": { "normal": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,192], "alpha": 1 } } },
 
     "region_tiles": { "states": {
         // remember this image is downscaled by 50% during build, so cut origins in half!
         // use --filter catmull-rom -r 0.5 --unpremultiply
-        "desertA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,128] },
-        "desertB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,64] },
-        "desertC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,0] },
-        "desertD": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,384] },
-        "desertE": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,448] },
+        "desertA": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,128] },
+        "desertB": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,64] },
+        "desertC": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,0] },
+        "desertD": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,384] },
+        "desertE": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,448] },
 
-        "mountainA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,192] },
-        "mountainB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,256] },
-        "mountainC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,256] },
+        "mountainA": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,192] },
+        "mountainB": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,256] },
+        "mountainC": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,256] },
 
-        "grassA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,320] },
-        "grassB": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,384] },
-        "grassC": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,320] },
+        "grassA": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,320] },
+        "grassB": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,384] },
+        "grassC": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,320] },
 
-        "waterA": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [0,448] },
+        "waterA": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [0,448] },
 
-        "base": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,  0] },
-        "base_destroyed": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [192,256] },
-        "quarry_water": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96, 64] },
-        "quarry_iron": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [96,128] },
-        "quarry_res3": { "images": ["art/regions/tr_tiles6.png"], "dimensions": [96,64], "origins": [192,320] }
+        "base": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,  0] },
+        "base_destroyed": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [192,256] },
+        "quarry_water": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96, 64] },
+        "quarry_iron": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [96,128] },
+        "quarry_res3": { "images": ["art/regions/tr_tiles7.png"], "dimensions": [96,64], "origins": [192,320] }
     } },
 
     //        "building_shield_big": { "states": { "normal": { "images": ["art/fx/building_shields.png"], "origins": [0,0], "center":[126,97], "dimensions": [256,150], "delay_load": 1 } } },
