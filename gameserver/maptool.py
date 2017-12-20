@@ -1234,6 +1234,15 @@ def spawn_hive(hives, map_cache, db, lock_manager, region_id, id_num, name_idx, 
     if template.get('randomize_defenses',False):
         AIBaseRandomizer.randomize_defenses(gamedata, base_data['my_base'], random_seed = 1000*time.time(), ui_name = template_name)
 
+    # determine townhall level, if available, and store that in the feature
+    townhall_level = None
+    for obj in base_data['my_base']:
+        if obj['spec'] == gamedata['townhall']:
+            townhall_level = obj.get('level', 1)
+            break
+    if townhall_level is not None:
+        feature[gamedata['townhall']+'_level'] = townhall_level
+
     for p in template.get('scenery',[]):
         obj = {'obj_id': nosql_id_generator.generate(),
                'spec': rotate_scenery_sprite(xform, p['spec']),
