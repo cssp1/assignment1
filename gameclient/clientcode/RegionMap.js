@@ -2371,6 +2371,9 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         throw Error('quarry feature is missing base_icon! '+JSON.stringify(feature));
                     }
                     icon_type = 'quarry_'+feature['base_icon'];
+                } else if(feature['base_type'] == 'hive' && GameArt.assets['region_tiles'].has_state('hive')) {
+                    // use hive-specific asset
+                    icon_type = 'hive';
                 } else {
                     var info = (feature['base_type'] == 'home' && feature['base_landlord_id'] ? PlayerCache.query_sync_fetch(feature['base_landlord_id']) : null);
                     if(info &&
@@ -2381,6 +2384,14 @@ RegionMap.RegionMap.prototype.draw_feature = function(feature) {
                         icon_type = 'base_destroyed';
                     } else {
                         icon_type = 'base';
+                    }
+                }
+
+                // check for townhall-level-specific asset
+                if((gamedata['townhall']+'_level') in feature) {
+                    var th_suffix = '_TH'+feature[gamedata['townhall']+'_level'].toString();
+                    if(GameArt.assets['region_tiles'].has_state(icon_type + th_suffix)) {
+                        icon_type = icon_type + th_suffix;
                     }
                 }
 
