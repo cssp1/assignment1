@@ -173,13 +173,13 @@ if __name__ == '__main__':
 
             # count player bases by townhall level, separating active/non-active status
             active_time = time_now - 3 * 86400 # arbitrarily say last_mtime within 3 days counts as "active"
-            count_by_townhall = nosql_client.region_table(name, 'map').aggregate([{'$match':{'base_type':'home'}},
-                                                                                  {'$project':{'townhall_level': '$'+gamedata['townhall']+'_level',
-                                                                                               'is_active': {'$gte': ['$last_mtime', active_time]}
-                                                                                               }},
-                                                                                  {'$group':{'_id': {'townhall_level': '$townhall_level',
-                                                                                                     'is_active': '$is_active'},
-                                                                                             'count': {'$sum':1}}}])
+            count_by_townhall = list(nosql_client.region_table(name, 'map').aggregate([{'$match':{'base_type':'home', gamedata['townhall']+'_level': {'$exists': True}}},
+                                                                                       {'$project':{'townhall_level': '$'+gamedata['townhall']+'_level',
+                                                                                                    'is_active': {'$gte': ['$last_mtime', active_time]}
+                                                                                                    }},
+                                                                                       {'$group':{'_id': {'townhall_level': '$townhall_level',
+                                                                                                          'is_active': '$is_active'},
+                                                                                                  'count': {'$sum':1}}}]))
             if not dry_run:
                 sql_util.do_insert_batch(cur, map_summary_table,
                                          [[('time',time_now),
