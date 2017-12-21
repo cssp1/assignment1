@@ -452,6 +452,12 @@ class NoSQLClient (object):
         if n > 0:
             print '  Deleted', n, 'old unit_donation_requests'
 
+        print 'Checking for stale help_requests...'
+        n = self.help_requests_table().delete_many({'expire_time':{'$lt':time_now}}).deleted_count
+        if n > 0:
+            print '  Deleted', n, 'old help_requests'
+
+
         print 'Dropping old DAU tables...'
         n = 0
         for tbl, timestamp in self.dau_tables():
@@ -2641,7 +2647,7 @@ class NoSQLClient (object):
         return self.instrument('help_requests_getlist', self._help_requests_getlist, (user_id, alliance_id))
     def _help_requests_getlist(self, user_id, alliance_id):
         assert user_id or alliance_id
-        qs = {}
+        qs = {'expire_time': {'$gte': self.time}}
         if user_id: qs['user_id'] = user_id
         if alliance_id: qs['alliance_id'] = alliance_id
         return map(self.decode_help_request, self.help_requests_table().find(qs))
@@ -2653,6 +2659,7 @@ class NoSQLClient (object):
     def _help_request_help(self, req_id, helper_id, alliance_id, region_id):
         assert req_id and helper_id and alliance_id
         match_qs = {'_id': self.encode_object_id(req_id),
+                    'expire_time': {'$gte': self.time},
                     'user_id': {'$ne': helper_id}, # can't help yourself
                     'alliance_id': alliance_id,
                     'helper_ids': {'$nin': [helper_id]}}
@@ -2663,21 +2670,24 @@ class NoSQLClient (object):
                                                              return_document = pymongo.ReturnDocument.AFTER)
         if not ret:
             # update failed
-            return -1
-        return len(ret['helper_ids'])
+            return -1, None
+        ret = self.decode_help_request(ret)
+        return len(ret['helper_ids']), ret
 
     def help_request_remove(self, req_id):
         return self.instrument('help_request_remove', self._help_request_remove, (req_id,))
     def _help_request_remove(self, req_id):
-        self.help_requests_table().delete_one({'_id': req_id})
+        self.help_requests_table().delete_one({'_id': self.encode_object_id(req_id)})
 
-    def help_request_create(self, user_id = None, alliance_id = None, region_id = None, req_props = None):
-        return self.instrument('help_request_create', self._help_request_create, (user_id, alliance_id, region_id, req_props))
-    def _help_request_create(self, user_id, alliance_id, region_id, req_props):
-        assert user_id and alliance_id and req_props
+    def help_request_create(self, user_id = None, alliance_id = None, region_id = None, req_props = None, expire_time = None):
+        return self.instrument('help_request_create', self._help_request_create, (user_id, alliance_id, region_id, req_props, expire_time))
+    def _help_request_create(self, user_id, alliance_id, region_id, req_props, expire_time):
+        assert user_id and alliance_id and req_props and (expire_time > 0)
         doc = {'user_id': user_id,
                'alliance_id': alliance_id,
-               'req_props': req_props}
+               'req_props': req_props,
+               'time': self.time,
+               'expire_time': expire_time}
         if region_id:
             doc['region_id'] = region_id
         self.help_requests_table().insert_one(doc)
@@ -3428,12 +3438,12 @@ if __name__ == '__main__':
 
         # test help requests
         client.help_requests_table().drop()
-        assert client.help_request_help('000000000000000000000000', 1234, 1, 'sector200') < 0 # invalid request
-        req_id = client.help_request_create(1112, 1, 'sector200', {'kind': 'speedup'})
-        assert client.help_request_help(req_id, 1113, 1, 'sector200') == 1 # OK
-        assert client.help_request_help(req_id, 1114, 1, 'sector200') == 2 # OK
-        assert client.help_request_help(req_id, 1113, 1, 'sector200') < 0 # already helped
-        assert client.help_request_help(req_id, 1112, 1, 'sector200') < 0 # can't help yourself
+        assert client.help_request_help('000000000000000000000000', 1234, 1, 'sector200')[0] < 0 # invalid request
+        req_id = client.help_request_create(1112, 1, 'sector200', {'kind': 'speedup'}, expire_time = time_now + 30)
+        assert client.help_request_help(req_id, 1113, 1, 'sector200')[0] == 1 # OK
+        assert client.help_request_help(req_id, 1114, 1, 'sector200')[0] == 2 # OK
+        assert client.help_request_help(req_id, 1113, 1, 'sector200')[0] < 0 # already helped
+        assert client.help_request_help(req_id, 1112, 1, 'sector200')[0] < 0 # can't help yourself
         print client.help_requests_getlist(alliance_id = 1)
         client.help_request_remove(req_id)
 
