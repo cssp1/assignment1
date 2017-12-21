@@ -5006,7 +5006,7 @@ function Building() {
     this.upgrade_total_time = -1;
     this.upgrade_start_time = -1;
     this.upgrade_done_time = -1;
-    this.upgrade_helped = 0;
+    this.upgrade_helped = -1;
 
     this.research_item = '';
     this.research_total_time = -1;
@@ -15856,7 +15856,7 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                                                             'req_id': req_id, 'req_props': sender_info['req_props'], 'expire_time': sender_info['expire_time'],
                                                             'cur_helpers': sender_info['cur_helpers'], 'max_helpers':sender_info['max_helpers'],
                                                             'region_id': sender_info['region_id'] || null,
-                                                            'i_donated':false, 'my_xp': 0, 'dialog': null,
+                                                            'i_helped':false, 'my_xp': 0, 'dialog': null,
                                                             'recipient_id': sender_info['user_id'],
                                                             'recipient_name': sender_info['chat_name']};
         var text;
@@ -15872,10 +15872,22 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
                 }
             }
             req['callback'] = (function (_req) { return function(w, mloc) {
-                if(_req['i_donated']) { return; }
-                if(_req['expire_time'] < server_time) { return; } // stale
+                if(_req['i_helped']) { return; }
+                if(_req['expire_time'] < server_time) {
+                    // stale
+                    var s = gamedata['errors']['HELP_REQUEST_STALE'];
+                    invoke_child_message_dialog(s['ui_title'], s['ui_name'], {'dialog':'message_dialog_big'});
+                    return;
+                }
+
+                if(_req['region_id'] && (!session.region.data || session.region.data['id'] !== _req['region_id'])) {
+                    // wrong region - offer to relocate
+                    invoke_find_on_map(_req['region_id'], [0,0]);
+                    return;
+                }
+
                 send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", _req['recipient_id'], _req['req_id']]);
-                _req['i_donated'] = true; // client-side predict
+                _req['i_helped'] = true; // client-side predict
             }; })(req);
             text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['help_request_chat']['other'][kind].replace('%cur', sender_info['cur_helpers'].toString()).replace('%max', sender_info['max_helpers'].toString()).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()).replace('%region', region_ui_name).replace('%descr', ui_descr), {onclick:req['callback']});
         }
@@ -20239,6 +20251,46 @@ function do_invoke_speedup_dialog(kind) {
 
     dialog.widgets['ok_button'].onclick =
         dialog.widgets['price_display'].onclick = closure;
+
+    // alliance help system
+    if(player.get_any_abtest_value('enable_alliance_help', gamedata['enable_alliance_help']) &&
+       selection.unit.is_building() && !selection.unit.is_damaged() && selection.unit.is_upgrading()) {
+        var spell = gamedata['spells']['REQUEST_ALLIANCE_HELP'];
+        dialog.widgets['help_request_button'].show = true;
+        dialog.widgets['help_request_button'].str = spell['ui_name'];
+        if(selection.unit.upgrade_helped > 0) {
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'];
+        } else if(selection.unit.upgrade_helped == 0) {
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
+        } else if(!session.is_in_alliance()) {
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_no_alliance'];
+        } else if(player.cooldown_active(spell['cooldown_name'])) {
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo(spell['cooldown_name'])));
+        } else {
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip'];
+            dialog.widgets['help_request_button'].onclick = function(w) {
+                var s = gamedata['strings']['help_request_confirm'];
+                invoke_child_message_dialog(s['ui_title'], s['ui_description']
+                                            .replace('%max', pretty_print_number(gamedata['alliance_help_quorum']))
+                                            .replace('%duration', pretty_print_time(gamedata['alliance_help_request_duration']))
+                                            .replace('%pct', (100.0*gamedata['alliance_help_speedup_fraction']).toFixed(0))
+                                            .replace('%min_time', pretty_print_time(gamedata['alliance_help_speedup_min_time']))
+                                            .replace('%cooldown', pretty_print_time(spell['cooldown'])),
+                                            {'dialog': 'message_dialog_big',
+                                             'cancel_button': true,
+                                             'ok_button_ui_name': s['ui_button'],
+                                             'on_ok': (function (_unit) { return function() {
+                                                 change_selection_ui(null);
+                                                 send_to_server.func(["CAST_SPELL", _unit.id, "REQUEST_ALLIANCE_HELP"]);
+                                                 _unit.upgrade_helped = 0; // client-side predict
+                                             }; })(selection.unit)});
+            };
+        }
+    }
 
     if(player.tutorial_state === 'speedup_open_speedup_menu' &&
        selection.unit.spec['name'] === gamedata['tutorial'][player.tutorial_state]['target'] &&

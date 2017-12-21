@@ -759,6 +759,7 @@
     "unit_donation_max_age": 259200, // unit donation requests older than this disappear
 
     "alliance_help_quorum": 10, // minimum number of "helpers" to execute a help request
+    "alliance_help_request_duration": 3600, // request persists for this long
 
     // alliance help speedups grant the maximum of:
     "alliance_help_speedup_fraction": 0.1, // this fraction of a total upgrade time

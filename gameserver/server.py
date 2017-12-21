@@ -7361,7 +7361,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None # doubles as build_ingredients
-        self.upgrade_helped = 0 # counter for times this received a help_request benefit
+        self.upgrade_helped = -1 # -1 means no status, 0 means "help requested", >0 means "help completed"
 
         self.research_item = ''
         self.research_total_time = -1
@@ -7488,7 +7488,7 @@ class Building(MapBlockingGameObject):
             if self.upgrade_total_time >= 10:
                 self.upgrade_done_time = 0
                 self.upgrade_start_time = server_time
-                self.upgrade_helped = state.get('upgrade_helped', 0)
+                self.upgrade_helped = state.get('upgrade_helped', -1)
             else:
                 self.upgrade_done_time = 0
                 self.upgrade_total_time = 1
@@ -7498,7 +7498,7 @@ class Building(MapBlockingGameObject):
             self.upgrade_start_time = state.get('upgrade_start_time',-1)
             self.upgrade_done_time = state.get('upgrade_done_time',-1)
             self.upgrade_ingredients = state.get('upgrade_ingredients', None)
-            self.upgrade_helped = state.get('upgrade_helped', 0)
+            self.upgrade_helped = state.get('upgrade_helped', -1)
 
         self.manuf_queue = state.get('manuf_queue', [])
         if len(self.manuf_queue) > 0 and ('manuf_start_time' not in state):
@@ -7638,7 +7638,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None
-        self.upgrade_helped = 0
+        self.upgrade_helped = -1
 
     def halt_manuf(self):
         if self.manuf_start_time > 0:
@@ -22033,7 +22033,7 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_start_time = -1
                     object.upgrade_done_time = -1
                     object.upgrade_ingredients = None
-                    object.upgrade_helped = 0
+                    object.upgrade_helped = -1
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
 
                     if SpinConfig.game() == 'fs':
@@ -22417,7 +22417,7 @@ class GAMEAPI(resource.Resource):
         else:
             object.upgrade_total_time = 1
             object.upgrade_done_time = 999
-        object.upgrade_helped = 0
+        object.upgrade_helped = -1
 
         # re-evaluate power situation
         session.power_changed(session.viewing_base, object, retmsg)
@@ -22467,7 +22467,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_start_time = -1
         object.upgrade_done_time = -1
         object.upgrade_ingredients = None
-        object.upgrade_helped = 0
+        object.upgrade_helped = -1
 
         object.change_level(object.level+1)
 
@@ -24040,6 +24040,7 @@ class GAMEAPI(resource.Resource):
                                  gamedata['alliance_help_speedup_min_time']))
             if time_saved > 0:
                 obj.upgrade_done_time += time_saved
+                obj.upgrade_helped = max(1, time_saved)
                 session.deferred_object_state_updates.add(obj)
 
         else:
@@ -31626,7 +31627,7 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_helped:
+                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_helped >= 0:
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         success = False
 
@@ -31637,8 +31638,13 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
+                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
+                        success = False
+
+                if success:
                     region_id = session.player.home_region if gamedata.get('alliance_help_restrict_region', True) else None
-                    expire_time = server_time + gamedata.get('alliance_help_request_duration', 3600)
+                    expire_time = server_time + gamedata['alliance_help_request_duration']
                     req_props = {'obj_id': object.obj_id, 'obj_spec': object.spec.name, 'obj_level': object.level,
                                  'kind': 'speedup', 'action': 'upgrade',
                                  'action_spec': object.spec.name, 'action_level': object.level+1,
@@ -31649,7 +31655,7 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    object.upgrade_helped += 1
+                    object.upgrade_helped = max(object.upgrade_helped, 0)
                     session.deferred_object_state_updates.add(object)
                     session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
                     if session.increment_player_metric('alliance_help_requested', 1, time_series = False):
@@ -31697,6 +31703,11 @@ class GAMEAPI(resource.Resource):
                     if (not session.player.get_any_abtest_value('enable_alliance_help', gamedata.get('enable_alliance_help', False))) or \
                        (not gamesite.sql_client) or (not session.alliance_chat_channel):
                         retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
+                        success = False
+
+                if success:
+                    if gamedata.get('alliance_help_restrict_region', True) and (not session.player.home_region):
+                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
                         success = False
 
                 if success:
