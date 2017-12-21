@@ -758,6 +758,12 @@
 
     "unit_donation_max_age": 259200, // unit donation requests older than this disappear
 
+    "alliance_help_quorum": 10, // minimum number of "helpers" to execute a help request
+
+    // alliance help speedups grant the maximum of:
+    "alliance_help_speedup_fraction": 0.1, // this fraction of a total upgrade time
+    "alliance_help_speedup_min_time": 600, // 10 minutes
+
     "gamebucks_in_deposits": 1, // whether iron_deposits can contain gamebucks
 
     // see https://developers.facebook.com/docs/payments/payer_promotion/

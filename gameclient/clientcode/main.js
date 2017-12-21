@@ -5006,6 +5006,7 @@ function Building() {
     this.upgrade_total_time = -1;
     this.upgrade_start_time = -1;
     this.upgrade_done_time = -1;
+    this.upgrade_helped = 0;
 
     this.research_item = '';
     this.research_total_time = -1;
@@ -5123,6 +5124,7 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     this.upgrade_total_time = data.shift();
     this.upgrade_start_time = data.shift();
     this.upgrade_done_time = data.shift();
+    this.upgrade_helped = data.shift();
     this.research_item = data.shift();
     this.research_total_time = data.shift();
     this.research_start_time = data.shift();
@@ -15464,13 +15466,16 @@ function publish_ai_base(base) { manipulate_ai_base(base, "PUBLISH_AI_BASE", "pu
     @param {string|null} mod_message_id
     @param {string|null} target_message_id
     @param {string|null} target_unit_donation_tag
-    @param {number|null} target_unit_donation_recipient_id */
-var ChatModifier = function(mod_time, mod_message_id, target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id) {
+    @param {number|null} target_unit_donation_recipient_id
+    @param {string|null} target_help_request_id
+*/
+var ChatModifier = function(mod_time, mod_message_id, target_message_id, target_unit_donation_tag, target_unit_donation_recipient_id, target_help_request_id) {
     this.mod_time = mod_time;
     this.mod_message_id = mod_message_id;
     this.target_message_id = target_message_id;
     this.target_unit_donation_tag = target_unit_donation_tag;
     this.target_unit_donation_recipient_id = target_unit_donation_recipient_id;
+    this.target_help_request_id = target_help_request_id;
 };
 /** @param {!SPUI.ScrollingTextField} output - widget containing the text node
     @param {!Object<string,?>|null} req - unit_donation_request entry from user_data of chat tab
@@ -15502,7 +15507,7 @@ ChatModifier.compare = function(a,b) {
     @param {string} target_message_id
     @param {string|null} new_type */
 var ChatHider = function(mod_time, mod_message_id, target_message_id, new_type) {
-    goog.base(this, mod_time, mod_message_id, target_message_id, null, null);
+    goog.base(this, mod_time, mod_message_id, target_message_id, null, null, null);
     this.new_type = new_type;
 };
 goog.inherits(ChatHider, ChatModifier);
@@ -15526,7 +15531,7 @@ ChatHider.prototype.apply = function(output, req, node) {
     @param {number} max_space
     @param {number} xp_gained */
 var ChatUnitDonation = function(mod_time, mod_message_id, sender_user_id, tag, cur_space, max_space, xp_gained) {
-    goog.base(this, mod_time, mod_message_id, null, tag, null);
+    goog.base(this, mod_time, mod_message_id, null, tag, null, null);
     this.sender_user_id = sender_user_id;
     this.cur_space = cur_space;
     this.max_space = max_space;
@@ -15574,7 +15579,7 @@ ChatUnitDonation.prototype.apply = function(output, req, node) {
     @param {number} sender_user_id
     @param {string|null} new_tag */
 var ChatUnitDonationRequestInvalidation = function(mod_time, mod_message_id, sender_user_id, new_tag) {
-    goog.base(this, mod_time, mod_message_id, null, null, sender_user_id);
+    goog.base(this, mod_time, mod_message_id, null, null, sender_user_id, null);
     this.new_tag = new_tag;
 };
 goog.inherits(ChatUnitDonationRequestInvalidation, ChatModifier);
@@ -15591,6 +15596,95 @@ ChatUnitDonationRequestInvalidation.prototype.apply = function(output, req, node
                 output.revise_text(node, text);
             } else {
                 output.remove_text(node); // the destroy() callback will remove it from tab.user_data['unit_donation_requests']
+            }
+        }
+    }
+};
+
+/** @param {!Object<string,?>} req_props
+    @return {string} */
+var help_request_ui_descr = function(req_props) {
+    if(req_props['kind'] == 'speedup' && req_props['action'] == 'upgrade' &&
+       req_props['action_spec'] && req_props['action_spec'] in gamedata['buildings']) {
+        var spec = gamedata['buildings'][req_props['action_spec']];
+        return spec['ui_name'] + ' L' + req_props['action_level'].toString();
+    }
+    return '???';
+};
+
+/** @constructor @struct
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {number} sender_user_id
+    @param {string|null} req_id
+    @param {number} cur_helpers
+    @param {number} max_helpers
+    @param {number|null} xp_gained */
+var ChatHelpResponse = function(mod_time, mod_message_id, sender_user_id, req_id, cur_helpers, max_helpers, xp_gained) {
+    goog.base(this, mod_time, mod_message_id, null, null, null, req_id);
+    this.sender_user_id = sender_user_id;
+    this.cur_helpers = cur_helpers;
+    this.max_helpers = max_helpers;
+    this.xp_gained = xp_gained;
+};
+goog.inherits(ChatHelpResponse, ChatModifier);
+/** @override */
+ChatHelpResponse.prototype.apply = function(output, req, node) {
+    if(this.sender_user_id === session.user_id) {
+        req['i_helped'] = true;
+        req['my_xp'] += this.xp_gained;
+    }
+
+    req['cur_helpers'] = this.cur_helpers;
+    req['max_helpers'] = this.max_helpers;
+
+    var text;
+
+    var region_ui_name = (req['region_id'] && req['region_id'] in gamedata['regions'] ? gamedata['regions'][req['region_id']]['ui_name'] : '');
+    var ui_descr = help_request_ui_descr(req['req_props']);
+
+    if(req['recipient_id'] === session.user_id) {
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['help_request_chat'][region_ui_name ? 'you_region' : 'you'].replace('%cur', this.cur_helpers.toString()).replace('%max', this.max_helpers.toString()).replace('%region', region_ui_name).replace('%descr', ui_descr));
+    } else {
+        var kind = (req['i_helped'] ? 'you_have_helped' : 'you_have_not_helped');
+        if(region_ui_name) {
+            if(!session.region.data || (session.region.data['id'] !== req['region_id'])) {
+                kind += '_different_region';
+            } else {
+                kind += '_region';
+            }
+        }
+        text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['help_request_chat']['other'][kind].replace('%cur', this.cur_helpers.toString()).replace('%max', this.max_helpers.toString()).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()).replace('%region', region_ui_name).replace('%descr', ui_descr), req['callback'] ? {onclick:req['callback']} : null);
+    }
+
+    output.revise_text(node, text);
+};
+
+/** @constructor @struct
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {number} sender_user_id
+    @param {string|null} new_req_id */
+var ChatHelpRequestInvalidation = function(mod_time, mod_message_id, sender_user_id, new_req_id) {
+    goog.base(this, mod_time, mod_message_id, null, null, sender_user_id, null);
+    this.new_req_id = new_req_id;
+};
+goog.inherits(ChatHelpRequestInvalidation, ChatModifier);
+/** @override */
+ChatHelpRequestInvalidation.prototype.apply = function(output, req, node) {
+    // do not apply invalidation to request matching the new_req_id value - this can happen if
+    // the chat buffer re-orders the two messages that are sent with the same "time" value
+    if(req['req_id'] !== this.new_req_id) {
+        req['cur_helpers'] = req['max_helpers'];
+        if(node) {
+            var new_template = gamedata['strings']['help_request_chat']['other']['stale'];
+            if(new_template) {
+                var text = SPText.cstring_to_ablocks_bbcode(new_template.replace('%recipient',req['recipient_name']));
+                output.revise_text(node, text);
+            } else {
+                output.remove_text(node); // the destroy() callback will remove it from tab.user_data['help_requests']
             }
         }
     }
@@ -15615,6 +15709,9 @@ function chat_tab_apply_modifier(modifier, tab) {
         persist = true; // always persist
     } else if(modifier.target_unit_donation_tag && modifier.target_unit_donation_tag in tab.user_data['unit_donation_requests']) {
         var req = tab.user_data['unit_donation_requests'][modifier.target_unit_donation_tag];
+        modifier.apply(tab.widgets['output'], req, req['node'] || null);
+    } else if(modifier.target_help_request_id && modifier.target_help_request_id in tab.user_data['help_requests']) {
+        var req = tab.user_data['help_requests'][modifier.target_help_request_id];
         modifier.apply(tab.widgets['output'], req, req['node'] || null);
     } else {
         persist = true; // haven't seen the target yet
@@ -15672,7 +15769,12 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
         modifier = new ChatUnitDonation(sender_info['time']||0, chat_msg_id,
                                         sender_info['user_id'], sender_info['tag'] || null,
                                         sender_info['cur_space'], sender_info['max_space'],
-                                        sender_info['xp_gained']);
+                                        sender_info['xp_gained']||0);
+    } else if(sender_info['type'] == 'help_response') { // a response to an existing request
+        modifier = new ChatHelpResponse(sender_info['time']||0, chat_msg_id,
+                                        sender_info['user_id'], sender_info['req_id'] || null,
+                                        sender_info['cur_helpers'], sender_info['max_helpers'],
+                                        sender_info['xp_gained']||0);
     }
 
     if(modifier) {
@@ -15738,6 +15840,53 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
             delete _tab.user_data['unit_donation_requests'][_req['tag']];
         }; })(req, tab);
 
+    } else if(sender_info['type'] == 'help_request') { // new help request
+        if(server_time >= sender_info['expire_time']) {
+            return; // request is stale
+        }
+        var req_id = sender_info['req_id'] || '';
+        var region_ui_name = (sender_info['region_id'] && sender_info['region_id'] in gamedata['regions'] ?
+                              gamedata['regions'][sender_info['region_id']]['ui_name'] : '');
+
+        var ui_descr = help_request_ui_descr(sender_info['req_props']);
+
+        if(req_id in tab.user_data['help_requests']) { return; } // already seen (?)
+        var req = tab.user_data['help_requests'][req_id] = {'node':null, // updated below
+                                                            'callback': null, // updated below
+                                                            'req_id': req_id, 'req_props': sender_info['req_props'], 'expire_time': sender_info['expire_time'],
+                                                            'cur_helpers': sender_info['cur_helpers'], 'max_helpers':sender_info['max_helpers'],
+                                                            'region_id': sender_info['region_id'] || null,
+                                                            'i_donated':false, 'my_xp': 0, 'dialog': null,
+                                                            'recipient_id': sender_info['user_id'],
+                                                            'recipient_name': sender_info['chat_name']};
+        var text;
+        if(req['recipient_id'] == session.user_id) {
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['help_request_chat'][region_ui_name ? 'you_region' : 'you'].replace('%cur', sender_info['cur_helpers'].toString()).replace('%max', sender_info['max_helpers'].toString()).replace('%region', region_ui_name).replace('%descr', ui_descr));
+        } else {
+            var kind = 'you_have_not_helped';
+            if(region_ui_name) {
+                if(!session.region.data || (session.region.data['id'] !== sender_info['region_id'])) {
+                    kind += '_different_region';
+                } else {
+                    kind += '_region';
+                }
+            }
+            req['callback'] = (function (_req) { return function(w, mloc) {
+                if(_req['i_donated']) { return; }
+                if(_req['expire_time'] < server_time) { return; } // stale
+                send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", _req['recipient_id'], _req['req_id']]);
+                _req['i_donated'] = true; // client-side predict
+            }; })(req);
+            text = SPText.cstring_to_ablocks_bbcode(gamedata['strings']['help_request_chat']['other'][kind].replace('%cur', sender_info['cur_helpers'].toString()).replace('%max', sender_info['max_helpers'].toString()).replace('%recipient',req['recipient_name']).replace('%xp', req['my_xp'].toString()).replace('%region', region_ui_name).replace('%descr', ui_descr), {onclick:req['callback']});
+        }
+        if(is_prepend) {
+            req['node'] = tab.widgets['output'].prepend_text(text);
+        } else {
+            req['node'] = tab.widgets['output'].append_text(text);
+        }
+        req['node'].on_destroy = (function (_req, _tab) { return function(_node) {
+            delete _tab.user_data['help_requests'][_req['req_id']];
+        }; })(req, tab);
     } else {
         // normal chat message
         if(player.has_blocked_or_force_blocked_user(sender_info['user_id']) &&
@@ -15884,7 +16033,7 @@ function chat_tab_accept_message(channel_name, sender_info, wrapped_body, chat_m
 
     // update timestamps for jewel notification, but not if we typed the message ourself, and not for non-text updates
     if(sender_info['user_id'] != session.user_id &&
-       !goog.array.contains(['unit_donation', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
+       !goog.array.contains(['unit_donation', 'help_response', 'welcome', 'logged_in', 'logged_out', 'message_hide'], sender_info['type'])) {
         tab.user_data['last_timestamp'] = Math.max(tab.user_data['last_timestamp'], sender_info['time'] || server_time);
     }
 
@@ -16200,6 +16349,7 @@ function init_chat_frame() {
         dialog.user_data['channel_to_tab'][dialog.user_data['channel_names'][i]] = i;
         tab.user_data['last_timestamp'] = 0;
         tab.user_data['unit_donation_requests'] = {};
+        tab.user_data['help_requests'] = {};
         tab.user_data['chat_messages_by_id'] = {};
         tab.user_data['pending_modifiers'] = []; // for prepended text
         tab.user_data['earliest_id'] = null;
@@ -30391,6 +30541,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
 
 
             d.user_data['ui_donations'] = d.data['widgets']['info']['ui_donations'].replace('%d', pretty_print_number(r['units_donated_cur_alliance'] || 0));
+            d.user_data['ui_helps'] = d.data['widgets']['info']['ui_helps'].replace('%d', pretty_print_number(r['help_responses_cur_alliance'] || 0));
 
             // last played
             if(gamedata['client']['show_alliance_mate_last_played_time'] && (session.alliance_id == d.parent.user_data['alliance_id'])) {
@@ -30421,7 +30572,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 d.user_data['ui_member_since'] = null;
             }
 
-            // TOOLTIP: role, last played (if alliancemate), donations, member since
+            // TOOLTIP: role, last played (if alliancemate), donations, helps, member since
             d.user_data['tip_info'] = [];
             d.user_data['tip_info'].push(d.user_data['ui_role']);
             if(player.get_any_abtest_value('enable_region_map', gamedata['enable_region_map'])) { d.user_data['tip_info'].push(d.user_data['ui_home']); }
@@ -30429,6 +30580,9 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 d.user_data['tip_info'].push(d.user_data['ui_last_played'] || '');
             }
             if(gamedata['enable_unit_donation']) { d.user_data['tip_info'].push(d.user_data['ui_donations']); }
+            if(player.get_any_abtest_value('enable_alliance_help', gamedata['enable_alliance_help'])) {
+                d.user_data['tip_info'].push(d.user_data['ui_helps']);
+            }
             d.user_data['tip_info'].push(d.user_data['ui_member_since'] || '');
             if(!d.user_data['anim_start']) {
                 d.user_data['anim_start'] = d.parent.user_data['open_time'] + d.data['widgets']['info']['blink_offset']*_rownum;
@@ -47931,6 +48085,9 @@ function handle_server_message(data) {
         var from_id = data[2], from_fbid = data[3], from_name = data[4];
         var display_string = units_description(unit_list, ', ');
         user_log.msg(gamedata['strings']['you_got_reinforcements'].replace('%sender',from_name).replace('%units', display_string), new SPUI.Color(1,0,1,1));
+    } else if(msg == "HELP_RESPONSE" || msg == "HELP_COMPLETE") {
+        var from_name = data[1], req = data[2], time_saved = data[3];
+        user_log.msg(gamedata['strings'][msg == "HELP_COMPLETE" ? 'you_got_help_complete': 'you_got_help_response'].replace('%sender', from_name).replace('%cur', req['helper_ids'].length.toString()).replace('%max', gamedata['alliance_help_quorum'].toString()).replace('%descr', help_request_ui_descr(req['req_props'])).replace('%time_saved', pretty_print_time(time_saved)), new SPUI.Color(1,0,1,1));
     } else if(msg == "INVENTORY_UPDATE") {
         player.max_inventory = data[1];
         player.inventory = data[2];
@@ -48682,7 +48839,19 @@ function handle_server_message(data) {
                 invoke_child_message_dialog(gamedata['dialogs']['unit_donation_dialog']['ui_error_title'], error['ui_name'], {'dialog':'message_dialog_big'});
             }
         }
-
+    } else if(msg == "GIVE_ALLIANCE_HELP_RESULT") {
+        var success = data[1], error_reason = data[2];
+        var dialog = find_dialog('alliance_help_dialog');
+        if(dialog) { dialog.user_data['pending'] = false; }
+        if(success) {
+            GameArt.play_canned_sound('success_playful_22');;
+            if(dialog) { close_parent_dialog(dialog.widgets['close_button']); }
+        } else {
+            var error = gamedata['errors'][error_reason];
+            if(error) {
+                invoke_child_message_dialog(error['ui_title'], error['ui_name'], {'dialog':'message_dialog_big'});
+            }
+        }
     } else if(msg == "LOTTERY_GET_SLATE_RESULT") {
         var slate = data[1];
         for(var i = 0; i < lottery_slate_receivers.length; i++) {

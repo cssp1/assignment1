@@ -180,7 +180,7 @@ def nosql_read_all_objects(region_id, base_id, base_landlord_id):
                   'spec': state['spec']
                   }
         for FIELD in ('level', 'hp_ratio', 'tag', 'metadata', 'creation_time', 'repair_finish_time', 'disarmed',
-                      'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time', 'squad_id',
+                      'upgrade_total_time', 'upgrade_start_time', 'upgrade_done_time', 'upgrade_ingredients', 'upgrade_helped', 'squad_id',
                       'orders','patrol','equipment','enhancements','produce_start_time','produce_rate','contents',
                       'pack_id','behaviors'):
             if FIELD in state:
@@ -518,7 +518,7 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
         # update base objects with new owner
         # optionally, also repair defenses, cancel upgrades, and restart production
         set_props = {'owner_id': feature['base_landlord_id']}
-        unset_props = ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients',
+        unset_props = ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_helped',
                        'enhancing','crafting']
         if gamedata['territory'].get('quarry_repair_on_abandon', False):
             unset_props += ['repair_finish_time','hp','hp_ratio','disarmed']

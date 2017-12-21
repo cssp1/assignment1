@@ -7361,6 +7361,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None # doubles as build_ingredients
+        self.upgrade_helped = 0 # counter for times this received a help_request benefit
 
         self.research_item = ''
         self.research_total_time = -1
@@ -7399,7 +7400,7 @@ class Building(MapBlockingGameObject):
         self.disarmed = False
 
     def serialize_state(self, update_hp = True, update_xy = True):
-        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None, copy.deepcopy(self.enhancements)]
+        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.upgrade_helped, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None, copy.deepcopy(self.enhancements)]
 
     def persist_state(self, **args):
         ret = MapBlockingGameObject.persist_state(self, **args)
@@ -7422,6 +7423,7 @@ class Building(MapBlockingGameObject):
             ret['upgrade_start_time'] = self.upgrade_start_time
             ret['upgrade_done_time'] = self.upgrade_done_time
             ret['upgrade_ingredients'] = copy.deepcopy(self.upgrade_ingredients)
+            ret['upgrade_helped'] = self.upgrade_helped
         if self.produce_start_time > 0:
             ret['produce_start_time'] = self.produce_start_time
         if self.produce_rate > 0:
@@ -7486,6 +7488,7 @@ class Building(MapBlockingGameObject):
             if self.upgrade_total_time >= 10:
                 self.upgrade_done_time = 0
                 self.upgrade_start_time = server_time
+                self.upgrade_helped = state.get('upgrade_helped', 0)
             else:
                 self.upgrade_done_time = 0
                 self.upgrade_total_time = 1
@@ -7495,6 +7498,7 @@ class Building(MapBlockingGameObject):
             self.upgrade_start_time = state.get('upgrade_start_time',-1)
             self.upgrade_done_time = state.get('upgrade_done_time',-1)
             self.upgrade_ingredients = state.get('upgrade_ingredients', None)
+            self.upgrade_helped = state.get('upgrade_helped', 0)
 
         self.manuf_queue = state.get('manuf_queue', [])
         if len(self.manuf_queue) > 0 and ('manuf_start_time' not in state):
@@ -7634,6 +7638,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None
+        self.upgrade_helped = 0
 
     def halt_manuf(self):
         if self.manuf_start_time > 0:
@@ -8656,7 +8661,7 @@ class Base(object):
                     if obj.is_upgrading():
                         # cancel upgrade immediately, no refund
                         obj.cancel_upgrade()
-                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients']
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_helped']
                     if obj.is_enhancing():
                         # cancel enhancement immediately, no refund
                         obj.cancel_enhancing()
@@ -8688,7 +8693,7 @@ class Base(object):
                     if obj.is_upgrading():
                         # cancel upgrade immediately, no refund
                         obj.cancel_upgrade()
-                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients']
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_helped']
                     if obj.is_enhancing():
                         # cancel enhancement immediately, no refund
                         obj.cancel_enhancing()
@@ -21099,7 +21104,7 @@ class GAMEAPI(resource.Resource):
         if fields is None:
             fields = ['user_id', 'player_level', gamedata['townhall']+'_level',
                       'social_id', 'ui_name', 'real_name', 'kg_avatar_url', 'ag_avatar_url', 'last_defense_time', 'last_login_time', 'uninstalled', # XXXXXX
-                      'units_donated_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
+                      'units_donated_cur_alliance', 'help_responses_cur_alliance', 'home_region', 'home_base_loc', 'ladder_player', 'pvp_player',
                       'LOCK_STATE', 'LOCK_OWNER', 'protection_end_time', 'base_damage', 'base_repair_time', 'account_creation_time',
                       'facebook_id', 'kg_id', 'ag_id', 'bh_id', 'mm_id',
                       'facebook_name', 'facebook_first_name', 'last_fb_notification_time', 'enable_fb_notifications', # remove later
@@ -22028,6 +22033,7 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_start_time = -1
                     object.upgrade_done_time = -1
                     object.upgrade_ingredients = None
+                    object.upgrade_helped = 0
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
 
                     if SpinConfig.game() == 'fs':
@@ -22411,6 +22417,7 @@ class GAMEAPI(resource.Resource):
         else:
             object.upgrade_total_time = 1
             object.upgrade_done_time = 999
+        object.upgrade_helped = 0
 
         # re-evaluate power situation
         session.power_changed(session.viewing_base, object, retmsg)
@@ -22460,6 +22467,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_start_time = -1
         object.upgrade_done_time = -1
         object.upgrade_ingredients = None
+        object.upgrade_helped = 0
 
         object.change_level(object.level+1)
 
@@ -24015,6 +24023,36 @@ class GAMEAPI(resource.Resource):
         session.player.unit_repair_send(retmsg)
         retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
 
+    def do_help_request_complete(self, session, retmsg, ui_from_name, req):
+        # apply the benefit of the new-complete help request, and tell the player about it
+        req_props = req['req_props']
+        time_saved = 0
+
+        if req_props['kind'] == 'speedup' and req_props['action'] == 'upgrade':
+            obj = session.player.my_home.find_object_by_id(req_props['obj_id'])
+            if not obj or not obj.is_building(): return
+            if obj.is_damaged(): return
+            if not obj.is_upgrading(): return
+
+            # min(time left, max(fraction * total_time, min_time))
+            time_saved = min(obj.upgrade_total_time - (server_time - obj.upgrade_start_time + obj.upgrade_done_time),
+                             max(int(gamedata['alliance_help_speedup_fraction'] * obj.upgrade_total_time),
+                                 gamedata['alliance_help_speedup_min_time']))
+            if time_saved > 0:
+                obj.upgrade_done_time += time_saved
+                session.deferred_object_state_updates.add(obj)
+
+        else:
+            gamesite.exception_log.event(server_time, 'unrecognized help request: %r' % req_props)
+            return
+
+        retmsg.append(["HELP_COMPLETE", ui_from_name, req, time_saved])
+        metric_event_coded(session.player.user_id, '4182_alliance_help_completed',
+                           {'sum':session.player.get_denormalized_summary_props('brief'),
+                            'alliance_id': req.get('alliance_id', None), 'time_saved': time_saved,
+                            'req_id':req['req_id'], 'req_props': req_props})
+        session.increment_player_metric('help_completed', 1, time_series = False)
+
     def do_equip_building(self, session, retmsg, arg, force = False):
         dest_object_id = arg[1]
         dest_addr = arg[2]
@@ -25224,8 +25262,9 @@ class GAMEAPI(resource.Resource):
                     to_ack.append(msg['msg_id'])
                     ret['new_alliance'] = True
 
-                    # reset donation counter here, since it may be asynchronous with ALLIANCE_JOIN
+                    # reset donation counters here, since it may be asynchronous with ALLIANCE_JOIN
                     session.setvalue_player_metric('units_donated_cur_alliance', 0, time_series = False)
+                    session.setvalue_player_metric('help_responses_cur_alliance', 0, time_series = False)
 
                     if (not is_login):
                         # async alliance status change - update cached state and notify player
@@ -25384,6 +25423,10 @@ class GAMEAPI(resource.Resource):
                     to_ack.append(msg['msg_id'])
                     session.increment_player_metric('donated_units_received', sum([item.get('stack',1) for item in units]), time_series = False)
                     metric_event_coded(session.player.user_id, '4160_unit_donation_received', {'units':units,'from':msg['from']})
+
+                elif msg['type'] == 'help_complete':
+                    self.do_help_request_complete(session, retmsg, msg['from_name'], msg['req'])
+                    to_ack.append(msg['msg_id'])
 
                 elif msg['type'] == 'TRIALPAYAPI_payment':
                     try:
@@ -27886,6 +27929,8 @@ class GAMEAPI(resource.Resource):
 
         if 'units_donated_cur_alliance' in session.player.history:
             cache_props['units_donated_cur_alliance'] = session.player.history['units_donated_cur_alliance']
+        if 'help_responses_cur_alliance' in session.player.history:
+            cache_props['help_responses_cur_alliance'] = session.player.history['help_responses_cur_alliance']
 
         if alliance_id != 'skip': # might be None
             if alliance_id is not None: assert alliance_id >= 0 # don't pass negative alliance_ids
@@ -31559,6 +31604,161 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 retmsg.append(["DONATE_UNITS_RESULT", success, error_reason])
+
+            elif spellname == 'REQUEST_ALLIANCE_HELP':
+                assert object
+
+                success = True
+
+                if session.player.cooldown_active(gamedata['spells'][spellname]['cooldown_name']):
+                    retmsg.append(["ERROR", "ON_COOLDOWN"])
+                    success = False
+
+                if success:
+                    if session.has_attacked or (object not in session.player.home_base_iter()):
+                        retmsg.append(["ERROR", "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"])
+                        success = False
+
+                if success:
+                    if (not session.player.get_any_abtest_value('enable_alliance_help', gamedata.get('enable_alliance_help', False))) or \
+                       (not gamesite.sql_client) or (not session.alliance_chat_channel):
+                        retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
+                        success = False
+
+                if success:
+                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_helped:
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
+                        success = False
+
+                if success:
+                    alliance_id = session.get_alliance_id()
+                    if alliance_id <= 0:
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
+                        success = False
+
+                if success:
+                    region_id = session.player.home_region if gamedata.get('alliance_help_restrict_region', True) else None
+                    expire_time = server_time + gamedata.get('alliance_help_request_duration', 3600)
+                    req_props = {'obj_id': object.obj_id, 'obj_spec': object.spec.name, 'obj_level': object.level,
+                                 'kind': 'speedup', 'action': 'upgrade',
+                                 'action_spec': object.spec.name, 'action_level': object.level+1,
+                                 'start_time': object.upgrade_start_time, 'total_time': object.upgrade_total_time, 'done_time': object.upgrade_done_time}
+                    req_id = gamesite.sql_client.help_request_create(session.player.user_id, alliance_id, region_id, req_props,
+                                                                     expire_time = expire_time)
+                    if not req_id:
+                        success = False
+
+                if success:
+                    object.upgrade_helped += 1
+                    session.deferred_object_state_updates.add(object)
+                    session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
+                    if session.increment_player_metric('alliance_help_requested', 1, time_series = False):
+                        session.deferred_history_update = True
+                    metric_event_coded(session.player.user_id, '4180_alliance_help_requested',
+                                       {'sum':session.player.get_denormalized_summary_props('brief'),
+                                        'alliance_id':alliance_id, 'req_id':req_id, 'region_id': region_id,
+                                        'expire_time': expire_time,
+                                        'req_props': req_props})
+
+                    if session.alliance_chat_channel:
+                        session.do_chat_send(session.alliance_chat_channel,
+                                             'I want help! (req_id %r region %r)' % (req_id, region_id),
+                                             bypass_gag = True, props = {'type':'help_request', 'req_id':req_id, 'region_id': region_id,
+                                                                         'cur_helpers': 0, 'max_helpers': gamedata['alliance_help_quorum'],
+                                                                         'req_props': req_props, 'expire_time': expire_time})
+
+                    if gamedata.get('alliance_help_notifications', True):
+                        member_list = gamesite.sql_client.get_alliance_members(alliance_id, reason = 'REQUEST_ALLIANCE_HELP')
+                        if member_list:
+                            replacements = SpinJSON.dumps({'%SENDER_UI_NAME': session.user.get_ui_name(session.player),
+                                                           '%DESCR': '%s L%d' % (gamedata['buildings'][req_props['action_spec']]['ui_name'], req_props['action_level'])})
+                            for member in member_list:
+                                if member['user_id'] != session.user.user_id:
+                                    gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'send_notification', # 'reliable': 1,
+                                                                                  'ignore_if_online': 1, # only send to offline people
+                                                                                  'user_id': member['user_id'],
+                                                                                  'replacements': replacements,
+                                                                                  'config': 'alliance_help_request'})
+                # send this regardless of success state
+                retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
+
+            elif spellname == 'GIVE_ALLIANCE_HELP':
+                recipient_id = spellargs[0]
+                req_id = spellargs[1]
+                success = True
+                error_reason = None
+
+                if success:
+                    if session.has_attacked:
+                        error_reason = "CANNOT_CAST_SPELL_OUTSIDE_HOME_BASE"
+                        success = False
+
+                if success:
+                    if (not session.player.get_any_abtest_value('enable_alliance_help', gamedata.get('enable_alliance_help', False))) or \
+                       (not gamesite.sql_client) or (not session.alliance_chat_channel):
+                        retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
+                        success = False
+
+                if success:
+                    alliance_id = session.get_alliance_id()
+                    if alliance_id <= 0:
+                        error_reason = "REQUIREMENTS_NOT_SATISFIED"
+                        success = False
+
+                if success:
+                    region_id = session.player.home_region if gamedata.get('alliance_help_restrict_region', True) else None
+                    cur_helpers, req = gamesite.sql_client.help_request_help(req_id = req_id, helper_id = session.player.user_id,
+                                                                             alliance_id = alliance_id, region_id = region_id)
+                    if cur_helpers < 0 or (not req):
+                        # help failed
+                        success = False
+                        error_reason = "HELP_REQUEST_STALE"
+
+                if success and req:
+                    xp = gamedata['player_xp'].get('respond_to_help_request', 0)
+                    if xp:
+                        cc = session.player.find_object_by_type(gamedata['townhall'])
+                        self.give_xp_to(session, session.player, retmsg, xp, 'respond_to_help_request', [cc.x,cc.y] if cc else None, obj_session_id = cc.obj_id if cc else None)
+
+                    session.increment_player_metric('help_responses', 1, time_series = False)
+                    session.increment_player_metric('help_responses_cur_alliance', 1, time_series = False)
+                    session.deferred_history_update = True
+
+                    if session.alliance_chat_channel:
+                        session.do_chat_send(session.alliance_chat_channel,
+                                             'I helped! (req_id %r region %r)' % (req_id, region_id),
+                                             bypass_gag = True, props = {'type':'help_response', 'req_id': req_id, 'region_id': region_id,
+                                                                         'recipient_id': recipient_id,
+                                                                         'cur_helpers': cur_helpers, 'max_helpers': gamedata['alliance_help_quorum'],
+                                                                         'req_props': req['req_props'], 'expire_time': req['expire_time'],
+                                                                         'xp_gained': xp})
+
+                    #session.activity_classifier.set_flag('alliance_help')
+                    metric_event_coded(session.player.user_id, '4181_alliance_help_added',
+                                       {'sum':session.player.get_denormalized_summary_props('brief'),
+                                        'alliance_id':alliance_id,
+                                        'recipient_id':recipient_id, 'cur_helpers': cur_helpers, 'max_helpers': gamedata['alliance_help_quorum'],
+                                        'req_id':req_id, 'req_props': req['req_props']})
+
+                    if cur_helpers >= gamedata['alliance_help_quorum']:
+                        # trigger the completion!
+                        gamesite.sql_client.help_request_remove(req_id)
+                        gamesite.msg_client.msg_send([{'to':[recipient_id],
+                                                       'type':'help_complete',
+                                                       'from': session.player.user_id,
+                                                       'from_name': session.user.get_ui_name(session.player),
+                                                       'req': req,
+                                                       }])
+                        # tell recipient to check mail
+                        gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'receive_mail', 'user_id': recipient_id})
+
+                    else:
+                        # incomplete, send GUI-only notification
+                        gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'help_response', 'user_id': recipient_id,
+                                                                      'sender_name': session.user.get_ui_name(session.player),
+                                                                      'req': SpinJSON.dumps(req)})
+
+                retmsg.append(["GIVE_ALLIANCE_HELP_RESULT", success, error_reason])
 
             else:
                 return self.handle_protocol_error(session, retmsg, arg)

@@ -37,6 +37,8 @@ def ref_to_stream(ref):
             'incoming_raid': STREAM_URGENT,
             'raid_complete': STREAM_URGENT,
 
+            'alliance_help_request': STREAM_URGENT,
+
             'you_sent_gift_order': STREAM_ALWAYS,
             'you_got_gift_order': STREAM_ALWAYS,
             'your_gift_order_was_received': STREAM_ALWAYS,

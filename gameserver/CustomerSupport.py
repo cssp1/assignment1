@@ -1576,6 +1576,20 @@ class HandleRepopulateFriends(Handler): # no logging
             # this will call populate_friends_who_play() when finished
         return ReturnValue(result = 'ok')
 
+class HandleHelpResponse(Handler): # no logging
+    # note: this is an online-only GUI notification to the recipient that someone helped them
+    # the actual completion mechanics are handled via the persistent message system
+    need_user = False
+    need_player = False
+    def __init__(self, *pargs, **pkwargs):
+        Handler.__init__(self, *pargs, **pkwargs)
+        self.sender_ui_name = self.args['sender_name']
+        self.req = SpinJSON.loads(self.args['req'])
+    def exec_offline(self, user, player): return ReturnValue(result = 'ok') # no-op
+    def exec_online(self, session, retmsg):
+        session.send([["HELP_RESPONSE", self.sender_ui_name, self.req, 0]])
+        return ReturnValue(result = 'ok')
+
 class HandlePlayerCacheUpdate(Handler): # no logging
     need_user = False
     need_player = False
@@ -1964,6 +1978,7 @@ methods = {
     'kick_alliance_member': HandleKickAllianceMember,
     'reset_idle_check_state': HandleResetIdleCheckState,
     'repopulate_friends': HandleRepopulateFriends,
+    'help_response': HandleHelpResponse,
     'player_cache_update': HandlePlayerCacheUpdate,
     'ai_attack': HandleAIAttack,
     'push_gamedata': HandlePushGamedata,

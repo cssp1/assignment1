@@ -3397,7 +3397,9 @@
                       "ui_last_played_day": "Last played: 1 Day ago",
                       "ui_last_played_days": "Last played: %d Days ago",
                       "ui_last_played_99days": "Last played: >99 Days ago",
-                      "ui_donations": "Donations: %d"},
+                      "ui_donations": "Donations: %d",
+                      "ui_helps": "Helped: %d"
+                    },
 
             "manage_button": { "kind": "ActionButton", "xy": [470,9], "dimensions": [78, 28], "bg_image": "menu_button_resizable",
                                "text_size": 13, "text_style": "bold", "bg_image_resizable": 1,
