@@ -3738,7 +3738,7 @@ class ArmyUnitDamageLog(DamageLog):
     def _record(self, state, unit):
         if unit['obj_id'] not in state:
             if gamedata['server'].get('log_damage_log',1) >= 1:
-                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object at %s owner %d: spec %s obj_id %s squad %r' % (self.base_id, unit['owner_id'], unit['spec'], unit['obj_id'], obj.get('squad_id')))
+                gamesite.exception_log.event(server_time, 'DamageLog: _record() on unseen object at %s owner %d: spec %s obj_id %s squad %r' % (self.base_id, unit['owner_id'], unit['spec'], unit['obj_id'], unit.get('squad_id')))
             return
         cur_hp, max_hp = army_unit_hp(unit)
         state[unit['obj_id']]['cur_health'] = cur_hp/float(max_hp)
@@ -11363,7 +11363,7 @@ class Player(AbstractPlayer):
 
     def alliance_building_is_busy(self):
         alliance_building = self.find_object_by_type(gamedata['alliance_building'])
-        if (not alliance_building) or alliance_building.is_busy() or alliance_alliance_building.is_damaged():
+        if (not alliance_building) or alliance_building.is_busy() or alliance_building.is_damaged():
             return True
         return False
 
@@ -18111,7 +18111,7 @@ class Store(object):
             session.give_enhancement(session.player, retmsg, object, enh_name, enh_level, 'instant')
             session.activity_classifier.built_or_upgraded_building()
             if enh_spec.completion:
-                session.execute_consequent_safe(enh.get_leveled_quantity(enh_spec.completion, enh_level), session.player, retmsg, reason='enhancement:completion')
+                session.execute_consequent_safe(enh_spec.get_leveled_quantity(enh_spec.completion, enh_level), session.player, retmsg, reason='enhancement:completion')
 
         elif spellname.startswith("BOOST_") or spellname == "BUY_RESOURCES_TOPUP":
             arg = spellarg if spellname == "BUY_RESOURCES_TOPUP" else None
