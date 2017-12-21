@@ -48679,7 +48679,7 @@ function handle_server_message(data) {
         } else {
             var error = gamedata['errors'][error_reason];
             if(error) {
-                invoke_child_message_dialog(dialog.data['ui_error_title'], error['ui_name'], {'dialog':'message_dialog_big'});
+                invoke_child_message_dialog(gamedata['dialogs']['unit_donation_dialog']['ui_error_title'], error['ui_name'], {'dialog':'message_dialog_big'});
             }
         }
 
