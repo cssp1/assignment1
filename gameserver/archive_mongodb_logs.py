@@ -89,6 +89,9 @@ TABLES = {
     # unit donation log
     'unit_donation': { 's3_name': 'unit_donation', 'table_name': 'log_unit_donation', 'compression': 'zip', 'retain_for': 7*86400 },
 
+    # alliance help log
+    'alliance_help': { 's3_name': 'alliance_help', 'table_name': 'log_alliance_help', 'compression': 'zip', 'retain_for': 7*86400 },
+
     # ladder PvP log
     'ladder_pvp': { 's3_name': 'ladder_pvp', 'table_name': 'log_ladder_pvp', 'compression': 'zip', 'retain_for': 3*86400 },
 

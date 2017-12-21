@@ -203,6 +203,7 @@ class NoSQLClient (object):
         self.seen_player_portraits = False
         self.seen_regions = {}
         self.seen_alliances = False
+        self.seen_help_requests = False
         self.seen_turf = False
         self.time = 0 # need to be updated by caller!
         self.slaves = {}
@@ -2621,6 +2622,68 @@ class NoSQLClient (object):
                 return (ret['max_space'] - ret['space_left'], ret['max_space']) # return cur, max
         return None
 
+    ###### ALLIANCE HELP REQUESTS ######
+
+    def help_requests_table(self):
+        if not self.seen_help_requests:
+            self._table('help_requests').create_index('user_id', unique=False)
+            self._table('help_requests').create_index('alliance_id', unique=False)
+            self.seen_help_requests = True
+        return self._table('help_requests')
+
+    def decode_help_request(self, req):
+       if '_id' in req:
+           req['req_id'] = self.decode_object_id(req['_id'])
+           del req['_id']
+       return req
+
+    def help_requests_getlist(self, user_id = None, alliance_id = None):
+        return self.instrument('help_requests_getlist', self._help_requests_getlist, (user_id, alliance_id))
+    def _help_requests_getlist(self, user_id, alliance_id):
+        assert user_id or alliance_id
+        qs = {}
+        if user_id: qs['user_id'] = user_id
+        if alliance_id: qs['alliance_id'] = alliance_id
+        return map(self.decode_help_request, self.help_requests_table().find(qs))
+
+    # attempt to add a new helper to the helper list.
+    # Returns -1 if update fails, otherwise the current (post-add) length of the helper list.
+    def help_request_help(self, req_id = None, helper_id = None, alliance_id = None, region_id = None):
+        return self.instrument('help_request_help', self._help_request_help, (req_id, helper_id, alliance_id, region_id))
+    def _help_request_help(self, req_id, helper_id, alliance_id, region_id):
+        assert req_id and helper_id and alliance_id
+        match_qs = {'_id': self.encode_object_id(req_id),
+                    'user_id': {'$ne': helper_id}, # can't help yourself
+                    'alliance_id': alliance_id,
+                    'helper_ids': {'$nin': [helper_id]}}
+        if region_id:
+            match_qs['region_id'] = region_id
+        ret = self.help_requests_table().find_one_and_update(match_qs,
+                                                             {'$addToSet': {'helper_ids': helper_id}},
+                                                             return_document = pymongo.ReturnDocument.AFTER)
+        if not ret:
+            # update failed
+            return -1
+        return len(ret['helper_ids'])
+
+    def help_request_remove(self, req_id):
+        return self.instrument('help_request_remove', self._help_request_remove, (req_id,))
+    def _help_request_remove(self, req_id):
+        self.help_requests_table().delete_one({'_id': req_id})
+
+    def help_request_create(self, user_id = None, alliance_id = None, region_id = None, req_props = None):
+        return self.instrument('help_request_create', self._help_request_create, (user_id, alliance_id, region_id, req_props))
+    def _help_request_create(self, user_id, alliance_id, region_id, req_props):
+        assert user_id and alliance_id and req_props
+        doc = {'user_id': user_id,
+               'alliance_id': alliance_id,
+               'req_props': req_props}
+        if region_id:
+            doc['region_id'] = region_id
+        self.help_requests_table().insert_one(doc)
+        return self.decode_object_id(doc['_id'])
+
+
 if __name__ == '__main__':
     import getopt
     import codecs
@@ -3362,5 +3425,16 @@ if __name__ == '__main__':
         assert set(client.ip_hits_get('1.2.3.4')) == set([100,101])
         assert client.ip_hits_get('1.2.3.5') == [200,]
         assert client.ip_hits_get('1.2.3.5', since = time_now + 50) == []
+
+        # test help requests
+        client.help_requests_table().drop()
+        assert client.help_request_help('000000000000000000000000', 1234, 1, 'sector200') < 0 # invalid request
+        req_id = client.help_request_create(1112, 1, 'sector200', {'kind': 'speedup'})
+        assert client.help_request_help(req_id, 1113, 1, 'sector200') == 1 # OK
+        assert client.help_request_help(req_id, 1114, 1, 'sector200') == 2 # OK
+        assert client.help_request_help(req_id, 1113, 1, 'sector200') < 0 # already helped
+        assert client.help_request_help(req_id, 1112, 1, 'sector200') < 0 # can't help yourself
+        print client.help_requests_getlist(alliance_id = 1)
+        client.help_request_remove(req_id)
 
         print 'OK!'

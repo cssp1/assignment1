@@ -353,6 +353,12 @@ def UnitDonationLogFilter(child):
                          allow = ['4140_unit_donation_requested',
                                   '4150_units_donated'
                                   ])
+def AllianceHelpLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = ['4180_alliance_help_requested',
+                                  '4181_alliance_help_added',
+                                  '4182_alliance_help_completed'
+                                  ])
 def DamageAttributionLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['3871_damage_attribution'

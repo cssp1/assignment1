@@ -31869,6 +31869,7 @@ class GameSite(server.Site):
                                              SpinLog.AlliancesLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_alliances')), # alliance events to MongoDB log_alliances
                                              SpinLog.AllianceMembersLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_alliance_members')), # alliance member events to MongoDB log_alliance_members
                                              SpinLog.UnitDonationLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_unit_donation')), # unit donation events to MongoDB log_unit_donation
+                                             SpinLog.AllianceHelpLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_alliance_help')), # alliance help events to MongoDB log_alliance_help
                                              SpinLog.DamageAttributionLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_damage_attribution')), # damage attribution events to MongoDB log_damage_attribution
                                              SpinLog.FishingLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fishing')), # fishing events to MongoDB log_fishing
                                              SpinLog.QuestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_quests')), # quests events to MongoDB log_quests
