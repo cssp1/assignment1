@@ -1640,8 +1640,14 @@ class HandleSendNotification(Handler):
         # if true, FORCE an offline message to be sent, IN ADDITION to in-game text notification (if there is one)
         self.send_offline = bool(int(self.args.get('send_offline','0')))
 
+        # if true, don't send anything if the player is currently online
+        self.ignore_if_online = bool(int(self.args.get('ignore_if_online','0')))
+
     # no logging
     def exec_online(self, session, retmsg):
+        if self.ignore_if_online:
+            return ReturnValue(result = 'ok')
+
         if self.send_ingame:
             message = self.gamesite.gameapi.NotificationMessage(self.config['ref'] if self.config else None,
                                                                 self.config['ref'] if self.config else None, # not really fb_ref, but shouldn't matter
