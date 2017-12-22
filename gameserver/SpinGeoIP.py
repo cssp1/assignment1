@@ -43,7 +43,7 @@ def SpinGeoIP():
 if __name__ == '__main__':
     import getopt
 
-    mode = 'test'
+    mode = 'lookup'
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['update'])
 
@@ -84,3 +84,7 @@ if __name__ == '__main__':
 
         print 'Updated! Check in the new file to the SCM.'
 
+    elif mode == 'lookup':
+        geo = SpinGeoIP()
+        for arg in args:
+            print arg, geo.get_country(arg)
