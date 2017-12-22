@@ -47172,8 +47172,9 @@ function handle_server_message(data) {
         session.connect_time = client_time;
         session.client_hello_packet = null;
 
-        metric_event('0106_client_connected_to_server', {'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin,
-                                                         'method': (spin_game_direct_connect ? 'direct':'proxy')});
+        metric_event('0106_client_connected_to_server', add_demographics({'user_id': session.user_id,
+                                                                          'since_pageload': (new Date()).getTime()/1000 - spin_pageload_begin,
+                                                                          'method': (spin_game_direct_connect ? 'direct':'proxy')}));
 
         // optionally switch on websockets (which may already be on from init() if gamedata.client.enable_websockets is true)
         // but note: don't do this if spin_game_direct_connect has been turned off by error 0631 happening from an earlier connection attempt
