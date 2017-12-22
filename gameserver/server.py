@@ -27653,6 +27653,11 @@ class GAMEAPI(resource.Resource):
         # mark end of login messages
         retmsg.append(["END_SERVER_HELLO"])
 
+        on_login_cons = player.get_abtest_consequent('on_login_post_hello', fail_missing = False)
+        if on_login_cons:
+            session.execute_consequent_safe(on_login_cons, session.player, retmsg,
+                                            context = {}, reason='on_login_post_hello')
+
         session.last_active_time = server_time
 
         # since CLIENT_HELLO is a special case outside the usual message buffer handling,
