@@ -5968,6 +5968,8 @@ player.unit_donation_enabled = function() {
     return player.get_any_abtest_value('enable_unit_donation', gamedata['enable_unit_donation']);
 };
 
+player.alliance_help_enabled = function() { return eval_cond_or_literal(player.get_territory_setting('enable_alliance_help'), player, null); };
+
 player.donated_units_icon = function() {
     // try to use alliance icon, otherwise use default icon
     var icon = gamedata['auras']['donated_units']['icon'];
@@ -20253,7 +20255,7 @@ function do_invoke_speedup_dialog(kind) {
         dialog.widgets['price_display'].onclick = closure;
 
     // alliance help system
-    if(player.get_any_abtest_value('enable_alliance_help', gamedata['enable_alliance_help']) &&
+    if(player.alliance_help_enabled() &&
        selection.unit.is_building() && !selection.unit.is_damaged() && selection.unit.is_upgrading()) {
         var spell = gamedata['spells']['REQUEST_ALLIANCE_HELP'];
         dialog.widgets['help_request_button'].show = true;
@@ -30632,7 +30634,7 @@ function alliance_info_member_rowfunc(dialog, row, rowdata) {
                 d.user_data['tip_info'].push(d.user_data['ui_last_played'] || '');
             }
             if(gamedata['enable_unit_donation']) { d.user_data['tip_info'].push(d.user_data['ui_donations']); }
-            if(player.get_any_abtest_value('enable_alliance_help', gamedata['enable_alliance_help'])) {
+            if(player.alliance_help_enabled()) {
                 d.user_data['tip_info'].push(d.user_data['ui_helps']);
             }
             d.user_data['tip_info'].push(d.user_data['ui_member_since'] || '');

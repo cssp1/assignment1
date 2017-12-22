@@ -11916,6 +11916,9 @@ class Player(AbstractPlayer):
     def unit_donation_enabled(self):
         return self.get_any_abtest_value('enable_unit_donation', gamedata['enable_unit_donation'])
 
+    def alliance_help_enabled(self):
+        return Predicates.eval_cond_or_literal(self.get_territory_setting('enable_alliance_help'), None, self)
+
     def make_donated_unit(self, specname, level = None):
         # generate bogus ID, ensuring this won't be written to MongoDB
         obj_id = 'DONATED-'+gamesite.nosql_id_generator.generate()
@@ -31621,7 +31624,7 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if (not session.player.get_any_abtest_value('enable_alliance_help', gamedata.get('enable_alliance_help', False))) or \
+                    if (not session.player.alliance_help_enabled()) or \
                        (not gamesite.sql_client) or (not session.alliance_chat_channel):
                         retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
                         success = False
@@ -31706,7 +31709,7 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if (not session.player.get_any_abtest_value('enable_alliance_help', gamedata.get('enable_alliance_help', False))) or \
+                    if (not session.player.alliance_help_enabled()) or \
                        (not gamesite.sql_client) or (not session.alliance_chat_channel):
                         retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])
                         success = False
