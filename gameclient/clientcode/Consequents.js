@@ -909,6 +909,17 @@ InvokeOfferChoiceConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function HelpRequestReminderConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(HelpRequestReminderConsequent, Consequent);
+HelpRequestReminderConsequent.prototype.execute = function(state) {
+    notification_queue.push(help_request_reminder);
+};
+
+
+/** @constructor @struct
+  * @extends Consequent */
 function InvokeLoginIncentiveDialogConsequent(data) {
     goog.base(this, data);
 }
@@ -1107,6 +1118,7 @@ function read_consequent(data) {
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
     else if(kind === 'BH_BOOKMARK_PROMPT') { return new BHBookmarkPromptConsequent(data); }
     else if(kind === 'BH_WEB_PUSH_INIT') { return new BHWebPushInitConsequent(data); }
+    else if(kind === 'HELP_REQUEST_REMINDER') { return new HelpRequestReminderConsequent(data); }
     else if(kind === 'FACEBOOK_PERMISSIONS_PROMPT') { return new FacebookPermissionsPromptConsequent(data); }
     else if(kind === 'OPEN_URL') { return new OpenURLConsequent(data); }
     else if(kind === 'INVOKE_VIDEO_WIDGET') { return new InvokeVideoWidgetConsequent(data); }

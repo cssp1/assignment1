@@ -16686,6 +16686,37 @@ function invoke_report_abuse_dialog(user_id, chat_report_args) {
     });
 }
 
+/** Scan the alliance chat tab for all help requests that we can respond to,
+    and display a GUI message offering to do so.*/
+function help_request_reminder() {
+    if(!global_chat_frame || !('ALLIANCE' in global_chat_frame.user_data['channel_to_tab'])) { return; }
+    var tab = global_chat_frame.widgets['tabs'+global_chat_frame.user_data['channel_to_tab']['ALLIANCE'].toString()];
+    var req_list = [];
+    for(var req_id in tab.user_data['help_requests']) {
+        var req = tab.user_data['help_requests'][req_id];
+        if(req['i_helped'] ||
+           req['recipient_id'] == session.user_id ||
+           req['expire_time'] < server_time ||
+           req['cur_helpers'] >= req['max_helpers'] ||
+           (req['region_id'] && !(session.region.data && session.region.data['id'] === req['region_id']))) {
+               continue;
+        }
+        req_list.push(req);
+    }
+    if(req_list.length < 1) { return; }
+    var s = gamedata['strings']['help_respond_all_prompt'];
+    invoke_child_message_dialog(s['ui_title'], s['ui_description'].replace('%d', pretty_print_number(req_list.length)),
+                                {'dialog': 'message_dialog_big',
+                                 'cancel_button': true,
+                                 'ok_button_ui_name': s['ui_button'],
+                                 'on_ok': (function (_req_list) { return function() {
+                                     goog.array.forEach(_req_list, function(req) {
+                                         send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "GIVE_ALLIANCE_HELP", req['recipient_id'], req['req_id']]);
+                                         req['i_helped'] = true; // client-side predict
+                                     });
+                                 }; })(req_list)});
+}
+
 function invoke_damage_protection_notice() {
     var dsk = desktop_dialogs['aura_bar'];
 
