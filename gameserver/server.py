@@ -31674,6 +31674,8 @@ class GAMEAPI(resource.Resource):
                                         'expire_time': expire_time,
                                         'req_props': req_props})
 
+                    retmsg.append(["HELP_REQUESTED", object.obj_id, [object.x, object.y]])
+
                     if session.alliance_chat_channel:
                         session.do_chat_send(session.alliance_chat_channel,
                                              'I want help! (req_id %r region %r)' % (req_id, region_id),

@@ -48170,6 +48170,20 @@ function handle_server_message(data) {
         var from_id = data[2], from_fbid = data[3], from_name = data[4];
         var display_string = units_description(unit_list, ', ');
         user_log.msg(gamedata['strings']['you_got_reinforcements'].replace('%sender',from_name).replace('%units', display_string), new SPUI.Color(1,0,1,1));
+    } else if(msg == "HELP_REQUESTED") {
+        var obj_id = data[1];
+        var pos = data[2];
+
+        var str = gamedata['strings']['you_sent_help_request'];
+
+        // offset pos a little bit
+        var off = [0, -11];
+
+        world.fxworld.add(new SPFX.CombatText(vec_add(pos, off), 0, str, [1, 0.2, 1, 1],
+                                              world.fxworld.now_time(), 3.0,
+                                              { drop_shadow: true, font_size: 20, text_style: 'normal' }));
+        GameArt.play_canned_sound('request_help_sound');
+
     } else if(msg == "HELP_RESPONSE" || msg == "HELP_COMPLETE") {
         var from_name = data[1], req = data[2], time_saved = data[3];
         user_log.msg(gamedata['strings'][msg == "HELP_COMPLETE" ? 'you_got_help_complete': 'you_got_help_response'].replace('%sender', from_name).replace('%cur', req['helper_ids'].length.toString()).replace('%max', gamedata['alliance_help_quorum'].toString()).replace('%descr', help_request_ui_descr(req['req_props'])).replace('%time_saved', pretty_print_time(time_saved)), new SPUI.Color(1,0,1,1));
