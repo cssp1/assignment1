@@ -1620,6 +1620,9 @@ class GameProxy(proxy.ReverseProxyResource):
                     if 'locale' in udata and ('locale' not in visitor.demographics):
                         visitor.demographics['locale'] = udata['locale']
 
+                if visitor.demographics['country'] == 'unknown':
+                    # if Facebook didn't tell us a country, look it up ourselves using the IP
+                    geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
                 # test option for testing the oauth token fetch path
                 if SpinConfig.config['proxyserver'].get('code_overrides_signed_request',False):
