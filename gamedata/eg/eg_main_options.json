@@ -88,6 +88,8 @@
 "enable_unit_donation": 0,
 "donated_units_take_space": 0, // whether donated units eat into your normal attack space limit
 
+"alliance_help_quorum": 10, // minimum number of "helpers" to execute a help request
+
 "enable_harvest_all": 1, // whether to enable "Collect All" feature on Harvesters (NOTE: harvesting from quarries requires this to be ON!)
 "enable_resource_gifts": 0, // enable sending Facebook "Mystery Gift" Requests with random amount of resources to Facebook friends (NOT related to other gifting mechanisms)
 "resource_gifts_fb_api_version": 2, // use new multi-friend-selector apprequests 2 flow

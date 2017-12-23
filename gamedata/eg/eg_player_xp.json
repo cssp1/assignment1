@@ -69,5 +69,7 @@
 
     // these multiply the effect of "loot" and "loot_victory_bonus" above, depending on the type of opponent
     "pvp_loot_xp": 1.0, // human opponent
-    "pve_loot_xp": 1.0 // AI opponent
+    "pve_loot_xp": 1.0, // AI opponent
+
+    "respond_to_help_request": 10 // 10 XP for responding to a help request
 }
