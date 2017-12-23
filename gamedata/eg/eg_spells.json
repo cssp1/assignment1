@@ -462,6 +462,17 @@
         "ui_name": "Send Reinforcements",
         "activation": "instant"
     },
+    "REQUEST_ALLIANCE_HELP": {
+        "ui_name": "Get Help",
+        "ui_tooltip": "Ask your Clan for help",
+        "ui_tooltip_no_alliance": "Must be in a Clan to request help",
+        "ui_tooltip_cooldown": "Request help again in: %s",
+        "ui_tooltip_already_requested": "Already requested help - check Clan chat for progress",
+        "ui_tooltip_already_completed": "Already received help (saved %time)",
+        "activation": "instant",
+        "cooldown": 3600,
+        "cooldown_name": "REQUEST_ALLIANCE_HELP"
+    },
     "ALLIANCE_GIFT_LOOT": {
         "ui_name": "Send a gift to a member of your Clan.",
         "activation": "targeted_alliance_mate",

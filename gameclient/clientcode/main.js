@@ -20293,7 +20293,7 @@ function do_invoke_speedup_dialog(kind) {
         dialog.widgets['help_request_button'].str = spell['ui_name'];
         if(selection.unit.upgrade_helped > 0) {
             dialog.widgets['help_request_button'].state = 'disabled';
-            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'];
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'].replace('%time', pretty_print_time(selection.unit.upgrade_helped));
         } else if(selection.unit.upgrade_helped == 0) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
