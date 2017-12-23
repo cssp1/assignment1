@@ -24033,9 +24033,22 @@ class GAMEAPI(resource.Resource):
 
         if req_props['kind'] == 'speedup' and req_props['action'] == 'upgrade':
             obj = session.player.my_home.find_object_by_id(req_props['obj_id'])
-            if not obj or not obj.is_building(): return
-            if obj.is_damaged(): return
-            if not obj.is_upgrading(): return
+            if not obj or \
+               not obj.is_building() or \
+               obj.is_damaged or \
+               not obj.is_upgrading:
+                metric_event_coded(session.player.user_id, '4183_alliance_help_failed',
+                                   {'sum':session.player.get_denormalized_summary_props('brief'),
+                                    'alliance_id': req.get('alliance_id', None),
+                                    'req_id':req['req_id'], 'req_props': req_props})
+                if session.alliance_chat_channel:
+                    session.do_chat_send(session.alliance_chat_channel,
+                                         'My help failed to complete! (req_id %r region %r)' % (req['req_id'], req.get('region_id', None)),
+                                         bypass_gag = True, props = {'type':'help_failed', 'req_id': req['req_id'], 'region_id': req.get('region_id',None),
+                                                                     'recipient_id': session.player.user_id,
+                                                                     'req_props': req['req_props']})
+
+                return
 
             # min(time left, max(fraction * total_time, min_time))
             time_saved = min(obj.upgrade_total_time - (server_time - obj.upgrade_start_time + obj.upgrade_done_time),
@@ -24056,6 +24069,13 @@ class GAMEAPI(resource.Resource):
                             'alliance_id': req.get('alliance_id', None), 'time_saved': time_saved,
                             'req_id':req['req_id'], 'req_props': req_props})
         session.increment_player_metric('help_completed', 1, time_series = False)
+
+        if session.alliance_chat_channel:
+            session.do_chat_send(session.alliance_chat_channel,
+                                 'My help is complete! (req_id %r region %r)' % (req['req_id'], req.get('region_id', None)),
+                                 bypass_gag = True, props = {'type':'help_complete', 'req_id': req['req_id'], 'region_id': req.get('region_id',None),
+                                                             'recipient_id': session.player.user_id, 'time_saved': time_saved,
+                                                             'req_props': req['req_props']})
 
     def do_equip_building(self, session, retmsg, arg, force = False):
         dest_object_id = arg[1]
@@ -27563,7 +27583,6 @@ class GAMEAPI(resource.Resource):
 
         # send alliance state
         retmsg.append(["ALLIANCE_UPDATE", alliance_info['id'] if alliance_info else -1, (not mail_stat.get('new_alliance', False)), alliance_info, alliance_membership, mail_stat.get('new_alliance_role', False)])
-        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
         if alliance_join_requests:
             pcache_data = self.do_query_player_cache(session, alliance_join_requests, reason = 'ALLIANCE_JOIN_REQUESTS')
             retmsg.append(["ALLIANCE_JOIN_REQUESTS", alliance_join_requests, pcache_data])
@@ -27647,6 +27666,9 @@ class GAMEAPI(resource.Resource):
             session.init_region_chat(session.player.home_region, retmsg)
 
         retmsg.append(["MAP_BOOKMARKS_UPDATE", session.player.map_bookmarks])
+
+        # this needs to come AFTER map state is initialized, because messages can be region-dependent
+        if alliance_chat_catchup_messages: retmsg += alliance_chat_catchup_messages
 
         self.send_player_cache_update(session, 'login') # mainly for uninstalled flag and last_login_time
 

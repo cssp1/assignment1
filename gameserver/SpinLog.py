@@ -357,7 +357,8 @@ def AllianceHelpLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['4180_alliance_help_requested',
                                   '4181_alliance_help_added',
-                                  '4182_alliance_help_completed'
+                                  '4182_alliance_help_completed',
+                                  '4183_alliance_help_failed',
                                   ])
 def DamageAttributionLogFilter(child):
     return JSONLogFilter(child,

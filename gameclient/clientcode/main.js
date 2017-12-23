@@ -15667,6 +15667,64 @@ ChatHelpResponse.prototype.apply = function(output, req, node) {
     @extends ChatModifier
     @param {number} mod_time
     @param {string|null} mod_message_id
+    @param {string|null} req_id
+    @param {number} time_saved */
+var ChatHelpComplete = function(mod_time, mod_message_id, req_id, time_saved) {
+    goog.base(this, mod_time, mod_message_id, null, null, null, req_id);
+    this.time_saved = time_saved;
+};
+goog.inherits(ChatHelpComplete, ChatModifier);
+/** @override */
+ChatHelpComplete.prototype.apply = function(output, req, node) {
+    req['time_saved'] = this.time_saved;
+
+    var region_ui_name = (req['region_id'] && req['region_id'] in gamedata['regions'] ? gamedata['regions'][req['region_id']]['ui_name'] : '');
+    var ui_descr = help_request_ui_descr(req['req_props']);
+
+    var template = (req['recipient_id'] === session.user_id ?
+                    gamedata['strings']['help_request_chat'][region_ui_name ? 'you_completed_region' : 'you_completed'] :
+                    gamedata['strings']['help_request_chat']['other'][region_ui_name ? 'completed_region' : 'completed']);
+    var text = SPText.cstring_to_ablocks_bbcode(template
+                                                .replace('%region', region_ui_name)
+                                                .replace('%recipient',req['recipient_name'])
+                                                .replace('%descr', ui_descr)
+                                                .replace('%time_saved', pretty_print_time(this.time_saved)));
+    output.revise_text(node, text);
+};
+
+/** @constructor @struct
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
+    @param {string|null} req_id
+    @param {string|null} reason */
+var ChatHelpFailed = function(mod_time, mod_message_id, req_id, reason) {
+    goog.base(this, mod_time, mod_message_id, null, null, null, req_id);
+    this.reason = reason;
+};
+goog.inherits(ChatHelpFailed, ChatModifier);
+/** @override */
+ChatHelpFailed.prototype.apply = function(output, req, node) {
+    if(this.reason) {
+        req['reason'] = this.reason;
+    }
+    var region_ui_name = (req['region_id'] && req['region_id'] in gamedata['regions'] ? gamedata['regions'][req['region_id']]['ui_name'] : '');
+    var ui_descr = help_request_ui_descr(req['req_props']);
+
+    var template = (req['recipient_id'] === session.user_id ?
+                    gamedata['strings']['help_request_chat'][region_ui_name ? 'you_failed_region' : 'you_failed'] :
+                    gamedata['strings']['help_request_chat']['other'][region_ui_name ? 'failed_region' : 'failed']);
+    var text = SPText.cstring_to_ablocks_bbcode(template
+                                                .replace('%region', region_ui_name)
+                                                .replace('%recipient',req['recipient_name'])
+                                                .replace('%descr', ui_descr));
+    output.revise_text(node, text);
+};
+
+/** @constructor @struct
+    @extends ChatModifier
+    @param {number} mod_time
+    @param {string|null} mod_message_id
     @param {number} sender_user_id
     @param {string|null} new_req_id */
 var ChatHelpRequestInvalidation = function(mod_time, mod_message_id, sender_user_id, new_req_id) {
@@ -15777,8 +15835,15 @@ function chat_frame_accept_message(dialog, channel_name, sender_info, wrapped_bo
                                         sender_info['user_id'], sender_info['req_id'] || null,
                                         sender_info['cur_helpers'], sender_info['max_helpers'],
                                         sender_info['xp_gained']||0);
+    } else if(sender_info['type'] == 'help_complete') { // a completion of an existing request
+        modifier = new ChatHelpComplete(sender_info['time']||0, chat_msg_id,
+                                        sender_info['req_id'] || null,
+                                        sender_info['time_saved']||0);
+    } else if(sender_info['type'] == 'help_failed') { // a failure of an existing request
+        modifier = new ChatHelpFailed(sender_info['time']||0, chat_msg_id,
+                                      sender_info['req_id'] || null,
+                                      sender_info['reason'] || null);
     }
-
     if(modifier) {
         goog.array.forEach(tablist, goog.partial(chat_tab_apply_modifier, modifier));
         return;

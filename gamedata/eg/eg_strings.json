@@ -238,20 +238,32 @@
         "you": ":: [color=#ffff00]You requested help for %descr[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
         "you_region": ":: [color=#ffff00]You requested help in %region for %descr[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
 
+        "you_completed": ":: [color=#c0c000]You received help for %descr.[/color]\n:: Speedup of %time_saved!",
+        "you_completed_region": ":: [color=#c0c000]You received help in %region for %descr.[/color]\n:: Speedup of %time_saved!",
+
+        "you_failed": ":: [color=#c0c000]You requested help for %descr.[/color]\n:: [color=#c0c0c0]Failed due to damage or cancellation[/color]",
+        "you_failed_region": ":: [color=#c0c000]You requested help in %region for %descr.[/color]\n:: [color=#c0c0c0]Failed due to damage or cancellation[/color]",
+
         // help requests put in by other players
         "other": {
             // if you have not helped yet
-            "you_have_not_helped": ":: [color=#ffff00]%recipient requests help for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
-            "you_have_not_helped_region": ":: [color=#ffff00]%recipient requests help in %region for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
-            "you_have_not_helped_different_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+            "you_have_not_helped": ":: [color=#ffff00]%recipient requested help for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+            "you_have_not_helped_region": ":: [color=#ffff00]%recipient requested help in %region for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+            "you_have_not_helped_different_region": ":: [color=#ffff00]%recipient requested help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
 
             // if you have helped already
-            "you_have_helped": ":: [color=#ffff00]%recipient requests help for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
-            "you_have_helped_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
-            "you_have_helped_different_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+            "you_have_helped": ":: [color=#ffff00]%recipient requested help for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+            "you_have_helped_region": ":: [color=#ffff00]%recipient requested help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+            "you_have_helped_different_region": ":: [color=#ffff00]%recipient requested help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
 
             "stale": ":: [color=#ffff00]%recipient withdraws this help request[/color]",
-            "stale_region": ":: [color=#ffff00]%recipient withdraws this help request[/color]"
+            "stale_region": ":: [color=#ffff00]%recipient withdraws this help request[/color]",
+
+            "completed": ":: [color=#c0c000]%recipient received help for %descr.[/color]\n:: Speedup of %time_saved!",
+            "completed_region": ":: [color=#c0c000]%recipient received help in %region for %descr.[/color]\n:: Speedup of %time_saved!",
+
+            "failed": ":: [color=#c0c000]%recipient requested help for %descr.[/color]\n:: [color=#c0c0c0]Failed due to damage or cancellation[/color]",
+            "failed_region": ":: [color=#c0c000]%recipient requested help in %region for %descr.[/color]\n:: [color=#c0c0c0]Failed due to damage or cancellation[/color]"
         }
     },
 
