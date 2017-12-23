@@ -23,6 +23,18 @@
             "ui_name_quarry": "%ATTACKER attacked your quarry! Fight back now?"
         },
 
+        "alliance_help_request": {
+            "ref": "alliance_help_request", "priority": 70,
+            "enable_newbie": 1,
+            "enable_elder": 1,
+            "ui_name": "%SENDER_UI_NAME needs your help for %DESCR. Send help now?",
+            "email": {
+                "ui_subject": "%SENDER_UI_NAME needs your help",
+                "ui_headline": "CLANMATE REQUEST",
+                "ui_cta": "SEND HELP"
+            }
+        },
+
         "incoming_raid": {
             "ref": "incoming_raid", "priority": 99,
             "enable_newbie": 1,

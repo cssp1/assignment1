@@ -206,6 +206,9 @@
 
     // message displayed on game desktop
     "you_got_reinforcements": "%sender sent you reinforcements: %units",
+    "you_sent_help_request": "Help request sent!",
+    "you_got_help_response": "%sender helped your %descr.\n%cur helped so far, %max required for speedup.",
+    "you_got_help_complete": "Clan help complete, thanks to %sender!\nSpeedup of %time_saved applied to your %descr!",
 
     // messages displayed in chat window
     "unit_donation_chat": {
@@ -229,6 +232,38 @@
             "stale_region": ":: [color=#ffff00]%recipient withdraws this unit request[/color]"
         }
     },
+
+    "help_request_chat": {
+        // your own help requests
+        "you": ":: [color=#ffff00]You requested help for %descr[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+        "you_region": ":: [color=#ffff00]You requested help in %region for %descr[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+
+        // help requests put in by other players
+        "other": {
+            // if you have not helped yet
+            "you_have_not_helped": ":: [color=#ffff00]%recipient requests help for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+            "you_have_not_helped_region": ":: [color=#ffff00]%recipient requests help in %region for %descr. *Click to help*[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+            "you_have_not_helped_different_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color]",
+
+            // if you have helped already
+            "you_have_helped": ":: [color=#ffff00]%recipient requests help for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+            "you_have_helped_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+            "you_have_helped_different_region": ":: [color=#ffff00]%recipient requests help in %region for %descr.[/color]\n:: [color=#c0c0c0]%cur/%max help received[/color] - Thank you!",
+
+            "stale": ":: [color=#ffff00]%recipient withdraws this help request[/color]",
+            "stale_region": ":: [color=#ffff00]%recipient withdraws this help request[/color]"
+        }
+    },
+
+    "help_request_confirm": { "ui_title": "Get Help from Clanmates?",
+                              "ui_description": "You can ask your Clan to help speed this up.\n\nOnce %max Clanmates, who must be in the same map, respond within %duration, you will receive a speedup worth %pct% of the total time or %min_time, whichever is greater.\n\nYou can ask for help once every %cooldown. Each upgrade may receive help one time.",
+                              "ui_button": "Proceed"
+                            },
+
+    "help_respond_all_prompt": { "ui_title": "Help your Clanmates?",
+                                 "ui_description": "%d Clanmate(s) await your help to finish upgrades.\n\nSend help to all open requests?",
+                                 "ui_button": "Help All"
+                               },
 
     "chat_age": "Sent %s ago", // used on tooltip for chat messages
 

@@ -459,6 +459,7 @@
     "upgrade_sound_loud": {"states": { "normal": { "audio": "art/soundfx/bonus_building_upgrade_a2.$AUDIO_CODEC", "volume": 1.0, "load_priority": 100 } } },
     "xp_gain_sound": {"states": { "normal": { "audio": "art/soundfx/menu_move_building.$AUDIO_CODEC", "volume": 1.0 } } },
     "request_unit_donation_sound": {"states": { "normal": { "audio": "art/soundfx/menu_move_building.$AUDIO_CODEC", "volume": 1.0 } } },
+    "request_help_sound": {"states": { "normal": { "audio": "art/soundfx/technical.$AUDIO_CODEC", "volume": 1.0 } } },
     "level_up_sound": {"states": { "normal": { "audio": "art/soundfx/big_game_promote2.$AUDIO_CODEC", "volume": 0.7, "load_priority": 100 } } },
     "minor_level_up_sound": {"states": { "normal": { "audio": "art/soundfx/success_playful_14.$AUDIO_CODEC", "volume": 0.7, "load_priority": 100 } } },
     "success_playful_22":  {"states": { "normal": { "audio": "art/soundfx/bonus_building_upgrade_milestone.$AUDIO_CODEC", "volume": 0.7, "load_priority": 100 } } },
