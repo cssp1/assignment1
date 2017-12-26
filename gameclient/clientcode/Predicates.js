@@ -227,6 +227,14 @@ OrPredicate.prototype.do_ui_describe = function(player) {
     return new PredicateUIDescription(descr_ls.join(' OR\n'), opts);
 };
 OrPredicate.prototype.do_ui_help = function(player) {
+    // if any subpredicate is true, return null
+    if(goog.array.find(this.subpredicates, function(pred) {
+        return pred.is_satisfied(player);
+    }, this)) {
+        return null;
+    }
+
+    // otherwise return first available subpredicate's ui_help
     for(var i = 0; i < this.subpredicates.length; i++) {
         var h = this.subpredicates[i].ui_help(player);
         if(h) { return h; }
