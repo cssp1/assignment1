@@ -20351,8 +20351,9 @@ function do_invoke_speedup_dialog(kind) {
         dialog.widgets['price_display'].onclick = closure;
 
     // alliance help system
-    if(player.alliance_help_enabled() &&
-       selection.unit.is_building() && !selection.unit.is_damaged() && selection.unit.is_upgrading()) {
+    if(price > 0 && player.alliance_help_enabled() &&
+       selection.unit.is_building() && !selection.unit.is_damaged() && selection.unit.is_upgrading() &&
+       !('show_if' in gamedata['spells']['REQUEST_ALLIANCE_HELP'] && !read_predicate(gamedata['spells']['REQUEST_ALLIANCE_HELP']['show_if']).is_satisfied(player))) {
         var spell = gamedata['spells']['REQUEST_ALLIANCE_HELP'];
         dialog.widgets['help_request_button'].show = true;
         dialog.widgets['help_request_button'].str = spell['ui_name'];
@@ -20368,6 +20369,12 @@ function do_invoke_speedup_dialog(kind) {
         } else if(player.cooldown_active(spell['cooldown_name'])) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_cooldown'].replace('%s', pretty_print_time(player.cooldown_togo(spell['cooldown_name'])));
+        } else if('requires' in spell && !read_predicate(spell['requires']).is_satisfied(player)) {
+            var pred = read_predicate(spell['requires']);
+            dialog.widgets['help_request_button'].state = 'disabled_clickable';
+            dialog.widgets['help_request_button'].onclick = get_requirements_help(pred);
+            dialog.widgets['help_request_button'].tooltip.str = pred.ui_describe(player);
+            dialog.widgets['help_request_button'].tooltip.text_color = SPUI.error_text_color;
         } else {
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip'];
             dialog.widgets['help_request_button'].onclick = function(w) {
@@ -48249,6 +48256,12 @@ function handle_server_message(data) {
                                               world.fxworld.now_time(), 3.0,
                                               { drop_shadow: true, font_size: 20, text_style: 'normal' }));
         GameArt.play_canned_sound('request_help_sound');
+
+        // pop up Alliance chat
+        if(global_chat_frame) {
+            change_chat_tab(global_chat_frame, 'ALLIANCE');
+            chat_frame_size(global_chat_frame, true, true);
+        }
 
     } else if(msg == "HELP_RESPONSE" || msg == "HELP_COMPLETE") {
         var from_name = data[1], req = data[2], time_saved = data[3];

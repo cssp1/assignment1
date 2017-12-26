@@ -31640,8 +31640,15 @@ class GAMEAPI(resource.Resource):
                 assert object
 
                 success = True
+                spell = gamedata['spells'][spellname]
 
-                if session.player.cooldown_active(gamedata['spells'][spellname]['cooldown_name']):
+                for PRED in ('show_if', 'requires'):
+                    if PRED in spell and (not Predicates.read_predicate(spell[PRED]).is_satisfied2(session, session.player, None)):
+                        retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED", spell[PRED]])
+                        success = False
+                        break
+
+                if session.player.cooldown_active(spell['cooldown_name']):
                     retmsg.append(["ERROR", "ON_COOLDOWN"])
                     success = False
 
