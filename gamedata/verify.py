@@ -750,6 +750,9 @@ def check_aura(auraname, spec, maxlevel):
         if spec.get('server',False) or spec.get('client',False):
             error |= 1; print '%s: has no effects but is set for client or server processing' % auraname
 
+    if spec.get('harm') and not spec.get('limited',1):
+        error |= 1; print '%s: aura is harmful, it does not need a "limited": 0 setting' % auraname
+
     return error
 
 EFFECT_TYPES = set(['combine', 'explosion', 'sound', 'shockwave', 'particles', 'camera_shake', 'combat_text', 'phantom_unit', 'random', 'particle_magnet', 'drag_field','library'])

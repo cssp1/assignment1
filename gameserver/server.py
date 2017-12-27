@@ -6920,6 +6920,12 @@ def reconstitute_object(observer, player, state, context = 'unknown'):
 
     return obj
 
+def player_aura_counts_against_limit(spec):
+    # harmful auras don't count
+    if spec.get('harm', False): return False
+    # otherwise, look at the "limited" flag
+    return spec.get('limited', True)
+
 # confusing: player_auras are raw dicts, but object auras are instances of this class
 class Aura (object):
     def __init__(self, spec, strength, range = -1, duration = -1, session_only = False, from_stattab = False):
@@ -9636,8 +9642,8 @@ class Player(AbstractPlayer):
             if (data is not None): aura['data'] = data
 
         else:
-            if (not ignore_limit) and spec.get('limited',True):
-                aura_count = sum((1 for x in self.player_auras if gamedata['auras'][x['spec']].get('limited',True)), 0)
+            if (not ignore_limit) and player_aura_counts_against_limit(spec):
+                aura_count = sum((1 for x in self.player_auras if player_aura_counts_against_limit(gamedata['auras'][x['spec']])), 0)
                 if aura_count >= gamedata['player_aura_limit']:
                     return False
             # create new aura
