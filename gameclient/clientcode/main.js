@@ -14528,7 +14528,18 @@ function inventory_item_is_usable_in_combat(spec, session) {
     for(var m = 0; m < uselist.length; m++) {
         var use = uselist[m];
         if('spellname' in use) {
-            if(use['spellname'] == 'APPLY_AURA') { return UsableInCombat.USABLE_BOOST; }
+            if(use['spellname'] == 'APPLY_AURA') {
+                var aura_name = use['spellarg'][1];
+
+                // ignore boosts that you wouldn't want to use in combat, even though you technicaly could
+                if(aura_name.indexOf('repair_boosted') !== -1 ||
+                   aura_name.indexOf('research_boosted') !== -1 ||
+                   aura_name.indexOf('production_boosted') !== -1) {
+                    continue;
+                }
+
+                return UsableInCombat.USABLE_BOOST;
+            }
         }
     }
 
