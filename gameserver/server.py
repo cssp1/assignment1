@@ -31723,7 +31723,7 @@ class GAMEAPI(resource.Resource):
                                                            '%DESCR': '%s L%d' % (gamedata['buildings'][req_props['action_spec']]['ui_name'], req_props['action_level'])})
                             for member, pinfo in zip(member_list, pcache_data):
                                 if member['user_id'] != session.user.user_id:
-                                    if gamedata.get('alliance_help_restrict_region', True) and pinfo and pinfo['home_region'] != region_id:
+                                    if gamedata.get('alliance_help_restrict_region', True) and pinfo and pinfo.get('home_region',None) != region_id:
                                         continue # different region - don't notify
                                     gamesite.do_CONTROLAPI(session.user.user_id, {'method': 'send_notification', # 'reliable': 1,
                                                                                   'ignore_if_online': 1, # only send to offline people
