@@ -24039,10 +24039,10 @@ class GAMEAPI(resource.Resource):
 
         if req_props['kind'] == 'speedup' and req_props['action'] == 'upgrade':
             obj = session.player.my_home.find_object_by_id(req_props['obj_id'])
-            if not obj or \
-               not obj.is_building() or \
-               obj.is_damaged or \
-               not obj.is_upgrading:
+            if (not obj) or \
+               (not obj.is_building()) or \
+               obj.is_damaged() or \
+               (not obj.is_upgrading()):
                 metric_event_coded(session.player.user_id, '4183_alliance_help_failed',
                                    {'sum':session.player.get_denormalized_summary_props('brief'),
                                     'alliance_id': req.get('alliance_id', None),
