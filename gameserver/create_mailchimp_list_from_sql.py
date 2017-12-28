@@ -17,28 +17,11 @@ import SpinConfig
 import SpinJSON
 import SpinSQLUtil, MySQLdb
 import requests
-import urllib
-import hashlib
+from SpinMailChimp import mailchimp_api, mailchimp_api_batch, subscriber_hash
 
 time_now = int(time.time())
 requests_session = requests.Session()
 gamedata = None
-
-def mailchimp_api(method, path, params = None, data = None, version = '3.0'):
-    api_key = SpinConfig.config['mailchimp_api_key']
-    datacenter = api_key.split('-')[1]
-    url = 'https://%s.api.mailchimp.com/%s/%s' % (datacenter, version, path)
-    if params:
-        url += '?' + urllib.urlencode(params)
-    headers = {'Authorization': 'Bearer '+api_key,
-               'Accept': '*/*',
-               'Content-Type': 'application/x-www-form-urlencoded'}
-    postdata = SpinJSON.dumps(data) if data else None
-    ret = SpinJSON.loads(requests_session.request(method, url, headers = headers, data = postdata).content)
-    return ret
-
-def mailchimp_api_batch(batch, version = '3.0'):
-    return mailchimp_api('POST', 'batches', data = {'operations': batch}, version = version)
 
 MERGE_FIELDS = [
     {'name': 'Cohort', 'tag': 'COHORT', 'type': 'text', 'public': False},
@@ -51,8 +34,11 @@ MERGE_FIELDS = [
     {'name': 'Townhall Level', 'tag': 'TOWNHALL', 'type': 'number', 'public': False},
     ]
 
-def create_list(list_name, game_name):
-    ret = mailchimp_api('POST', 'lists', data = {
+def create_list(list_name, game_name, dry_run = False):
+    if dry_run:
+        return '000'
+
+    ret = mailchimp_api(requests_session, 'POST', 'lists', data = {
         'name': list_name,
         'contact': {"city": "Palo Alto",
                     "zip": "94301",
@@ -71,20 +57,24 @@ def create_list(list_name, game_name):
         'email_type_option': False})
     return ret['id']
 
-def ensure_merge_fields(list_id):
-    result = mailchimp_api('GET', 'lists/%s/merge-fields' % list_id)
+def ensure_merge_fields(list_id, dry_run = False):
+    result = mailchimp_api(requests_session, 'GET', 'lists/%s/merge-fields' % list_id)
     cur_fields_by_tag = dict((field['tag'], field) for field in result['merge_fields'])
     for field in MERGE_FIELDS:
         if field['tag'] not in cur_fields_by_tag:
-            mailchimp_api('POST', 'lists/%s/merge-fields' % list_id,
-                          data = field)
+            if dry_run:
+                print 'would add field', field['tag']
+            else:
+                mailchimp_api(requests_session, 'POST', 'lists/%s/merge-fields' % list_id,
+                              data = field)
         else:
             cur = cur_fields_by_tag[field['tag']]
             for k, v in field.iteritems():
                 if cur[k] != field[k]:
                     print 'disagree:', k, cur[k], field[k]
-                    mailchimp_api('PATCH', 'lists/%s/merge-fields/%s' % (list_id, cur['merge_id']),
-                                  data = {k: field[k]})
+                    if not dry_run:
+                        mailchimp_api(requests_session, 'PATCH', 'lists/%s/merge-fields/%s' % (list_id, cur['merge_id']),
+                                      data = {k: field[k]})
 
 def player_to_cohort(pinfo, num_cohorts):
     """ Assign a cohort code to a player based on user_id """
@@ -125,19 +115,16 @@ def player_to_member(pinfo, cohort_id):
         ret['merge_fields']['FULLNAME'] = pinfo['facebook_name']
     return ret
 
-def player_hash(pinfo):
-    return hashlib.md5(pinfo['email'].lower()).hexdigest()
-
 def add_players_to_list(list_id, pinfo_list, num_cohorts):
     if len(pinfo_list) == 1:
         # non-batch
-        return [mailchimp_api('PUT',  'lists/%s/members/%s' % (list_id, player_hash(pinfo_list[0])),
+        return [mailchimp_api(requests_session, 'PUT',  'lists/%s/members/%s' % (list_id, subscriber_hash(pinfo_list[0]['email'])),
                               data = player_to_member(pinfo_list[0], player_to_cohort(pinfo_list[0], num_cohorts)))]
 
-    batch = [{'method': 'PUT', 'path': 'lists/%s/members/%s' % (list_id, player_hash(pinfo)),
+    batch = [{'method': 'PUT', 'path': 'lists/%s/members/%s' % (list_id, subscriber_hash(pinfo['email'])),
               'body': SpinJSON.dumps(player_to_member(pinfo, player_to_cohort(pinfo, num_cohorts)))} \
              for pinfo in pinfo_list]
-    return mailchimp_api_batch(batch)
+    return mailchimp_api_batch(requests_session, batch)
 
 def upcache_table(sql_util, game_id):
     # note: assumes table_prefix equals '$GAMEID_upcache'
@@ -151,8 +138,10 @@ if __name__ == '__main__':
     churned_for_days = 30
     active_within_days = 999999
     num_cohorts = 5
+    dry_run = False
+    print_player_ids = False
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['list-name=','min-spend=','churned-for=','active-within=','cohorts=','min-balance='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['list-name=','min-spend=','churned-for=','active-within=','cohorts=','min-balance=','dry-run','print-player-ids'])
     for key, val in opts:
         if key == '-g': game_id = val
         elif key == '--list-name': list_name = val
@@ -161,6 +150,8 @@ if __name__ == '__main__':
         elif key == '--churned-for': churned_for_days = int(val)
         elif key == '--active-within': active_within_days = int(val)
         elif key == '--cohorts': num_cohorts = int(val)
+        elif key == '--dry-run': dry_run = True
+        elif key == '--print-player-ids': print_player_ids = True
 
     if not list_name:
         print '--list-name= is required'
@@ -210,7 +201,7 @@ if __name__ == '__main__':
 
     # get all our current lists
     print 'querying existing MailChimp lists...'
-    lists = mailchimp_api('GET', 'lists', {'fields': 'lists.name,lists.id', 'count': 999})['lists']
+    lists = mailchimp_api(requests_session, 'GET', 'lists', {'fields': 'lists.name,lists.id', 'count': 999})['lists']
     lists_by_name = dict((ls['name'], ls['id']) for ls in lists)
 
     if list_name in lists_by_name:
@@ -218,14 +209,22 @@ if __name__ == '__main__':
         print 'using existing list %s (%s)' % (list_name, list_id)
     else:
         print 'creating list', list_name, '...'
-        lists_by_name[list_name] = list_id = create_list(list_name, gamedata['strings']['game_name'])
+        if dry_run:
+            list_id = '000'
+        else:
+            list_id = create_list(list_name, gamedata['strings']['game_name'])
+        lists_by_name[list_name] = list_id
         print 'created list %s (%s)' % (list_name, list_id)
 
     print 'ensuring merge fields are up to date...'
-    ensure_merge_fields(list_id)
+    ensure_merge_fields(list_id, dry_run = dry_run)
 
     candidate_list = candidates_by_email.values()
     # candidate_list = candidate_list[:1]
     print 'adding', len(candidate_list), 'players...'
-    ret = add_players_to_list(list_id, candidate_list, num_cohorts)
+    if not dry_run:
+        ret = add_players_to_list(list_id, candidate_list, num_cohorts)
     # print ret
+
+    if print_player_ids:
+        print sorted([int(x['user_id']) for x in candidate_list])
