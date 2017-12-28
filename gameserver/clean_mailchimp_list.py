@@ -9,6 +9,7 @@
 
 import sys, time, getopt
 import SpinJSON
+import SpinConfig
 import requests
 from SpinMailChimp import mailchimp_api, mailchimp_api_batch, subscriber_hash, parse_mailchimp_time
 
@@ -55,7 +56,7 @@ if __name__ == '__main__':
             print 'querying', offset, '-', offset + BATCH_SIZE
 
         ret = mailchimp_api(requests_session, 'GET', 'lists/%s/members' % list_id,
-                            {'fields': 'members.email_address,members.status,members.stats,members.timestamp_signup,members.last_changed',
+                            {'fields': 'members.email_address,members.status,members.stats,members.timestamp_signup,members.last_changed,members.merge_fields',
                              'status': 'subscribed',
                              'offset': offset, 'count': BATCH_SIZE})
         for member in ret['members']:
@@ -64,6 +65,12 @@ if __name__ == '__main__':
             if member['stats']['avg_click_rate'] > 0 or \
                member['stats']['avg_open_rate'] > 0:
                 continue # member has responded
+
+            # maybe act differently on different country tiers?
+            if member['merge_fields'].get('COUNTRY'):
+                country_tier = SpinConfig.country_tier_map.get(member['merge_fields']['COUNTRY'], 4)
+            elif member['merge_fields'].get('TIER'):
+                country_tier = int(member['merge_fields']['TIER'])
 
             if member['timestamp_signup']:
                 signup_time = parse_mailchimp_time(member['timestamp_signup'])
