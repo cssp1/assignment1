@@ -1471,7 +1471,8 @@ class User:
                 'merge_fields':
                 {"FNAME": first_name,
                  "LNAME": last_name,
-                 "FULLNAME": full_name}
+                 "FULLNAME": full_name,
+                 "PLAYER_ID": self.user_id}
                 }
         if self.locale: ret['language'] = self.locale[0:2]
         if self.account_creation_time > 0:
@@ -5610,8 +5611,15 @@ class Session(object):
                        'Content-Type': 'application/x-www-form-urlencoded'}
             if data['mailchimp_action'] == 'subscribe':
                 context['status'] = 'subscribed'
+                subscriber_hash = hashlib.md5(context['email_address'].lower()).hexdigest()
+                # use "PUT" method so that this is an upsert
+                method = 'PUT'
+                url += '/' + subscriber_hash
+            else:
+                gamesite.exception_log.event(server_time, 'unknown mailchimp_action %s for %s' % (data['mailchimp_action'], name))
+                return False
             postdata = SpinJSON.dumps(context)
-            method = 'POST'
+
         else:
             url = data['url']
 
