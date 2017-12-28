@@ -214,6 +214,11 @@ class SpecificPvEResLoot(BaseResLoot):
                     for res in gamedata['resources']:
                         if fraction and res in fraction:
                             if not p.is_destroyed():
+
+                                # never allow the total_fraction to grow above 1 - epsilon
+                                # this can happen in odd cases like corrupted bases that have two townhalls with >50% fraction each
+                                fraction[res] = min(fraction[res], 0.999 - total_fractions.get(res,0))
+
                                 total_fractions[res] = total_fractions.get(res,0) + fraction[res]
                                 if p.obj_id not in fractions_by_id:
                                     fractions_by_id[p.obj_id] = {}
