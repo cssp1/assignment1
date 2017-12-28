@@ -464,7 +464,7 @@
     },
     "REQUEST_ALLIANCE_HELP": {
         "ui_name": "Get Help",
-        "ui_tooltip": "Ask your Clan for help",
+        "ui_tooltip": "Ask your Clan for help (estimated speedup: %est)",
         "ui_tooltip_no_alliance": "Must be in a Clan to request help",
         "ui_tooltip_cooldown": "Request help again in: %s",
         "ui_tooltip_already_requested": "Already requested help - check Clan chat for progress",
