@@ -2574,7 +2574,9 @@ function calculate_battle_outcome() {
                     victory = false;
                 }
             } else {
-                if(obj.team === 'enemy' && !obj.is_destroyed()) {
+                // do not count enemy landmines
+                if(obj.team === 'enemy' && !obj.is_destroyed() &&
+                   !(obj.is_building() && obj.is_minefield())) {
                     /*
                     if(player.is_developer()) {
                         console.log('undestroyed enemy '+obj.spec['name']);
