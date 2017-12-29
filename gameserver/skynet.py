@@ -55,10 +55,13 @@ def encode_filename(name):
     return name.split('.')[0].split('_')[1]
 
 def get_creatives(asset_path):
+    # note: video ads must be named "video_vid*****.mp4" and have a thumbnail with that name .jpg
+
     image_files = sorted(glob.glob(os.path.join(asset_path, 'image_*.jpg')))
+    video_files = sorted(glob.glob(os.path.join(asset_path, 'video_*.mp4')))
     title_files = sorted(glob.glob(os.path.join(asset_path, 'title_*.txt')))
     body_files =  sorted(glob.glob(os.path.join(asset_path, 'body_*.txt')))
-    return { 'image': {'name':'image', 'key':'x', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in image_files]},
+    return { 'image': {'name':'image', 'key':'x', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in (image_files + video_files)]},
              'title': {'name':'title', 'key':'y', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in title_files]},
              'body':  {'name':'body',  'key':'z', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in body_files]} }
 
@@ -105,7 +108,7 @@ def get_ad_stgt_list(campaign, param_table):
     to_remove = []
     for c in combos:
         if 'image' in c:
-            is_big = c['image'].startswith('big')
+            is_big = c['image'].startswith('big') or c['image'].startswith('vid')
             if (c['ad_type'] in (32,432) and (not is_big)) or \
                (c['ad_type'] not in (32,432) and is_big):
                 to_remove.append(c)
@@ -1513,6 +1516,23 @@ def adimage_get_s3_url(db, image):
         print 'done'
     return entry['url']
 
+def _advideo_upload(db, ad_account_id, filename):
+    base = os.path.basename(filename)
+    result = fb_api(SpinFacebook.versioned_graph_endpoint('advideo', 'act_'+ad_account_id+'/advideos'), upload_files = { base: open(filename, 'rb') })
+    if not result: return False
+    assert 'id' in result
+    # remember basename so we can look it up later
+    result[spin_field('basename')] = base
+    update_fields_by_id(db.fb_advideos, mongo_enc(result), primary_key = 'id')
+    return result['id']
+
+def advideo_get_id(db, ad_account_id, filename):
+    assert os.path.exists(filename)
+    base = os.path.basename(filename)
+    entry = db.fb_advideos.find_one({spin_field('basename'):base}) # does ad_account_id need to match?
+    if entry and 'id' in entry: return entry['id']
+    return _advideo_upload(db, ad_account_id, filename)
+
 def _page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action):
     params = {'access_token': page_token,
               'call_to_action': SpinJSON.dumps({'type': call_to_action,
@@ -1554,8 +1574,9 @@ def call_to_action_type(tgt):
     if tgt.get('destination','app') in ('bh_com','bh_com_autoplay',):
         #return 'SIGN_UP' # 20170703 - switched from OPEN_LINK
         return 'PLAY_GAME' # 20170823 - switched to PLAY_GAME
-    if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC'):
-        return 'OPEN_LINK' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
+    if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC') or \
+       (tgt.get('destination','app') == 'app' and tgt['bid_type'].startswith('oCPM_')):
+        return 'SIGN_UP' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
     return 'PLAY_GAME'
 
 # used to force creation of new adcreative by changing the cache key
@@ -1619,7 +1640,11 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
     if ad_type in (1,4,32,432):
         title_text = open(os.path.join(asset_path, 'title_'+tgt['title']+'.txt')).read().strip()
         body_text = open(os.path.join(asset_path, 'body_'+tgt['body']+'.txt')).read().strip()
-        image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
+        if tgt['image'].startswith('vid'):
+            image_file = os.path.join(asset_path, 'video_'+tgt['image']+'.mp4')
+            thumbnail_file = os.path.join(asset_path, 'video_'+tgt['image']+'.jpg')
+        else:
+            image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
         if ad_type == 1:
             image_hash = adimage_get_hash(db, ad_account_id, image_file)
 
@@ -1657,23 +1682,37 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                                                    call_to_action_type(tgt))
                 creative['object_story_id'] = page_post_id
             else: # inline creation
-                cr_params = {'page_id': page_id,
-                             'link_data': {
-                                           'message': body_text,
-                                           'name': title_text,
-                                           'link': base_link_url,
-                                           'picture': adimage_get_s3_url(db, tgt['image']),
-                                           }
-                             }
+                cr_params = {'page_id': page_id }
+
+                if tgt['image'].startswith('vid'):
+                    cr_data = cr_params['video_data'] = {
+                        'message': body_text,
+                        'title': title_text,
+                        'video_id': advideo_get_id(db, ad_account_id, image_file),
+                        'image_hash': adimage_get_hash(db, ad_account_id, thumbnail_file),
+                        'call_to_action': {'type': call_to_action_type(tgt),
+                                           'value': {'link':base_link_url}}
+                        }
+                    if link_description:
+                        cr_data['link_description'] = link_description
+                else:
+                    cr_data = cr_params['link_data'] = {
+                        'message': body_text,
+                        'name': title_text,
+                        'link': base_link_url,
+                        'picture': adimage_get_s3_url(db, tgt['image']),
+                        }
+                    if link_description:
+                        cr_data['description'] = link_description
+
                 if not (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_')):
-                    # when using OFFSITE_CONVERSION optimization, FB API refuses to attach adcreatives containing call_to_action
-                    # to a new ad
-                    cr_params['link_data']['call_to_action'] =  {'type': call_to_action_type(tgt),
-                                                                 'value': {'link':base_link_url}}
+                    # when using OFFSITE_CONVERSION optimization for a Canvas app,
+                    # FB API refuses to accept adcreatives containing call_to_action
+                    cr_data['call_to_action'] =  {'type': call_to_action_type(tgt),
+                                                  'value': {'link':base_link_url}}
                 if link_caption:
-                    cr_params['link_data']['caption'] = link_caption
-                if link_description:
-                    cr_params['link_data']['description'] = link_description
+                    cr_data['caption'] = link_caption
+
                 creative['object_story_spec'] = SpinJSON.dumps(cr_params)
 
             creative['url_tags'] = link_qs
@@ -2167,7 +2206,7 @@ def compute_bid(db, spin_params, tgt, base_bid, ad_account_id = None, use_delive
                 elif bid_type.endswith('cc2_by_day_1'):
                     factor = spin_params['townhall2_within_1day']['values'][1]['coeff']/TRUE_INSTALLS_PER_CLICK
                     ui_factor = '*installs_per_cc2/TRUE_INSTALLS_PER_CLICK(%.2f)' % factor
-                elif bid_type.endswith('ftd') or bid_type.lower().endswith('purchase'):
+                elif bid_type.endswith('ftd') or bid_type.lower().endswith('purchase') or bid_type.endswith('cc3_by_day_2'):
                     factor = 1 # this is folded into 'coeff'
                     ui_factor = ''
                 else:
