@@ -603,6 +603,11 @@
         "PLAYER_LEVEL": { "ui_name": "Achieve Level %d" }
     },
 
+    // info about specific player history keys, used to display progress on PLAYER_HISTORY predicates
+    "player_history": {
+        "help_responses": {"ui_progress": "Helped %d1/%d2 Times"}
+    },
+
     // HTML to override what goes in the spin_footer_linkbar div
     "footer_linkbar_content": [
         // Like only
