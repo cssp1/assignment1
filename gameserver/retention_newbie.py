@@ -299,7 +299,7 @@ class Sender(object):
             print >> self.msg_fd, '(playerDB data missing)'
             return
 
-        if (player['abtests'].get('T330_notification2', None) == "on") or gamedata['game_id'] in ('dv','fs','bfm'):
+        if True: # XXXXXX (player['abtests'].get('T330_notification2', None) == "on") or gamedata['game_id'] in ('dv','fs','bfm'):
             print >> self.msg_fd, '(player says) in T330_notification2, skipping'
             return
 
