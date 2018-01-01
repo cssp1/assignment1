@@ -651,7 +651,10 @@ class WebSocketsResource(object):
         # On Twisted 16.3.0+, the transport is paused whilst the existing
         # request is served; there won't be any requests after us so we can
         # just resume this ourselves.
-        if hasattr(transport, "resumeProducing"):
+        # also see https://github.com/django/daphne/commit/b65140b1589a02fc8187bd750b01f3eff43d2140
+        if hasattr(transport, "_networkProducer"): # for Twisted 17.1+
+            transport._networkProducer.resumeProducing()
+        elif hasattr(transport, "resumeProducing"): # for Twisted 16.x
             transport.resumeProducing()
 
         return NOT_DONE_YET
