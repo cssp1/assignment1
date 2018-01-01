@@ -82,7 +82,7 @@ class PlayerPortraits(object):
                                 accept_http_errors = True)
         return d
 
-    def update_complete(self, d, url, frame_platform, time_now, user_id, body = '', headers = {}, status = '500', ui_reason = None):
+    def update_complete(self, d, url, frame_platform, time_now, user_id, body = '', headers = {}, status = 500, ui_reason = None):
         status = int(status)
         try:
             if status != 200:
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     import sys, time
 
     async_http = AsyncHTTP.AsyncHTTPRequester(-1, -1, 30, # request timeout
-                                              -1,
+                                              3, # -1,
                                               lambda x: sys.stderr.write(x+'\n'))
     db_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']),
                                       identity = 'PlayerPortraits.py',

@@ -5636,7 +5636,7 @@ class Session(object):
                                          (api, self.user.user_id, name, method, url, '(sent)' if SpinConfig.config.get('enable_'+api,False) else '(disabled)'))
 
         if SpinConfig.config.get('enable_'+api,False):
-            def log_result(api, user_id, name, method, url, body = '', headers = {}, status = '500'):
+            def log_result(api, user_id, name, method, url, body = '', headers = {}, status = 500):
                 status = int(status)
                 if gamedata['server'].get('log_'+api,1) >= 2:
                     gamesite.exception_log.event(server_time, '%s API for user %d (%s): %r %s RESULT\nHTTP %d\n%r' % \

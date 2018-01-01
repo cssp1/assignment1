@@ -695,7 +695,7 @@ def controlapi_launch(request, args, headers, postdata, url_qs, ui_log_info, att
                 SpinHTTP.set_service_unavailable(request)
             return defer.succeed(SpinHTTP.service_unavailable_response_body)
 
-    def on_finish(d, is_reliable, args, in_headers, postdata, url_qs, ui_log_info, attempt_count, success, request, body = '', headers = {}, status = '500', ui_reason = None):
+    def on_finish(d, is_reliable, args, in_headers, postdata, url_qs, ui_log_info, attempt_count, success, request, body = '', headers = {}, status = 500, ui_reason = None):
         update_time()
         code = int(status)
 
