@@ -69,19 +69,26 @@ class AgentBodySender(object):
 
 # helper that accumulates an incoming response body from twisted.web.client.Agent
 class AgentBodyReceiver(twisted.internet.protocol.Protocol):
-    def __init__(self, deferred):
+    def __init__(self, deferred, status_code, status_phrase):
         self.d = deferred
         self.buf = bytes()
+        # for HTTP errors, we need to remember the status during the body download,
+        # so that we can call the errback with it plus the response body.
+        self.status_code = status_code
+        self.status_phrase = status_phrase
     def dataReceived(self, data):
         self.buf += data
     def connectionLost(self, reason):
         assert isinstance(reason, twisted.python.failure.Failure)
-        if isinstance(reason.value, twisted.web.client.ResponseDone):
-            # this is the normal case
-            self.d.callback(self.buf)
-        elif isinstance(reason.value, twisted.web.client.PotentialDataLoss):
-            # didn't get Content-Length, but return what we got anyway
-            self.d.callback(self.buf)
+        # ResponseDone: this is the normal case
+        # PotentialDataLoss: didn't get Content-Length, but return what we got anyway
+        if isinstance(reason.value, twisted.web.client.ResponseDone) or \
+           isinstance(reason.value, twisted.web.client.PotentialDataLoss):
+            if self.status_code >= 200 and self.status_code <= 299:
+                self.d.callback(self.buf)
+            else:
+                # fire errback for a non-normal status code
+                self.d.errback(twisted.web.error.Error(self.status_code, message = self.status_phrase, response = self.buf))
         else:
             # a failure occurred
             self.d.errback(reason)
@@ -100,7 +107,7 @@ class AgentAdaptor(object):
     def read_response(self, response):
         self.response_headers = dict(response.headers.getAllRawHeaders())
         self.status = int(response.code) # note: this used to be a string
-        recv = AgentBodyReceiver(self.deferred)
+        recv = AgentBodyReceiver(self.deferred, self.status, response.phrase)
         response.deliverBody(recv)
 
 # Twisted attempts to rely on the host OpenSSL's trust store, which doesn't work on OSX.
@@ -496,10 +503,10 @@ class AsyncHTTPRequester(object):
             http_code = int(reason.value.status) # note! "status" is returned as a string, not an integer!
             if http_code == 404 and (not self.error_on_404):
                 # received a 404, but the client wants to treat it as success with buf = 'NOTFOUND'
-                return self.on_response('NOTFOUND', getter, request)
+                return self.on_response(b'NOTFOUND', getter, request)
             elif http_code == 204:
                 # 204 is not actually an error, just an empty body
-                return self.on_response('', getter, request)
+                return self.on_response(b'', getter, request)
             elif request.accept_http_errors:
                 # pass through HTTP error responses without raising an exception
                 return self.on_response(reason.value.response, getter, request)
@@ -643,6 +650,7 @@ if __name__ == '__main__':
     req.queue_request(server_time, 'https://wrong.hostname.badssl.com/', lambda x: log.msg('RESPONSE D'))
     req.queue_request(server_time, 'https://www.battlehouse.com/feed/atom/', lambda x: log.msg('RESPONSE E'),
                       headers = {'X-AsyncHTTP-Test': 'foobar'})
+    req.queue_request(server_time, 'https://s3-external-1.amazonaws.com/spinpunch-public/asdf', lambda x: log.msg('RESPONSE F %r' % x))
 
     req.queue_request(server_time, 'https://s3-external-1.amazonaws.com/spinpunch-scratch/hello2.txt',
                       lambda x: log.msg("PUT SUCCESSFUL %r" % x),
