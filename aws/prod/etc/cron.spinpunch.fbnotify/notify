@@ -2,4 +2,4 @@
 
 . /etc/spinpunch
 
-(cd $GAME_DIR/gameserver && ./retention_newbie.py --parallel 8 --quiet > /dev/null)
+(cd $GAME_DIR/gameserver && ./send_player_notifications.py --parallel 8 --quiet > /dev/null)
