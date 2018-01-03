@@ -469,7 +469,7 @@ class AntiAltPolicy(Policy):
 
         assert len(anti_alt_regions) >= 1 and len(pro_alt_regions) >= 1
         is_majority_anti_alt_game = (len(anti_alt_regions) > len(pro_alt_regions)) or \
-                                    (SpinConfig.game() == 'bfm') # special-purpose hack for BFM during migration
+                                    (SpinConfig.game() in ('bfm','mf','mf2')) # special-purpose hack for migration
 
         # check repeat offender status via cooldown
         togo = do_CONTROLAPI({'user_id':user_id, 'method':'cooldown_togo', 'name':self.REPEAT_OFFENDER_COOLDOWN_NAME})
