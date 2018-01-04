@@ -1887,7 +1887,7 @@ class User:
                                                      SpinConfig.config['battlehouse_api_path']+('/user/%s' % self.bh_id) + '?service=' + SpinConfig.game(),
                                                      lambda result, _session=session, _d=d: self.retrieve_bh_info_complete(_session, _d, result),
                                                      headers = {'Authorization': 'Bearer '+self.bh_auth_token,
-                                                                'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']})
+                                                                'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')})
         # update portrait
         portrait_d = gamesite.player_portraits.update(server_time, self.user_id, {}, 'bh', 'bh'+str(self.bh_id), self.bh_auth_token)
         session.portrait_update_launched(portrait_d)
@@ -1931,7 +1931,7 @@ class User:
         assert self.bh_auth_token
         url = SpinConfig.config['battlehouse_api_path']+ '/user/'+self.bh_id+'/invites?' + \
               urllib.urlencode({'service': SpinConfig.game()})
-        headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+        headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')}
         response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
         response = SpinJSON.loads(response_raw)
         if 'result' in response:
@@ -1978,7 +1978,7 @@ class User:
                                 'code': invite_code,
                                 'state': 'init'})
         headers = {'Authorization': 'Bearer '+self.bh_auth_token,
-                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')}
         response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
         response = SpinJSON.loads(response_raw)
 
@@ -2059,7 +2059,7 @@ class User:
               urllib.urlencode({'service': SpinConfig.game(),
                                 'state': 'complete'})
         headers = {'Authorization': 'Bearer '+self.bh_auth_token,
-                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+                   'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')}
         response_raw = yield gamesite.AsyncHTTP_Battlehouse.queue_request_deferred(server_time, url, headers = headers)
         response = SpinJSON.loads(response_raw)
 
@@ -5600,15 +5600,15 @@ class Session(object):
         if api == 'battlehouse':
             url = SpinConfig.config['battlehouse_api_path'] + '/metrics_event'
             params['service'] = SpinConfig.game()
-            headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret']}
+            headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')}
             method = 'POST'
         elif api == 'mailchimp':
             api_key = SpinConfig.config['mailchimp_api_key']
             datacenter = api_key.split('-')[1]
             url = data['url'].replace('%DC%', datacenter)
-            headers = {'Authorization': 'Bearer '+api_key,
-                       'Accept': '*/*',
-                       'Content-Type': 'application/x-www-form-urlencoded'}
+            headers = {'Authorization': b'Bearer '+api_key.encode('utf-8'),
+                       'Accept': b'*/*',
+                       'Content-Type': b'application/x-www-form-urlencoded'}
             if data['mailchimp_action'] == 'subscribe':
                 context['status'] = 'subscribed'
                 subscriber_hash = hashlib.md5(context['email_address'].lower()).hexdigest()
