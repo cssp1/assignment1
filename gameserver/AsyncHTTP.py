@@ -98,6 +98,7 @@ class AgentBodyReceiver(twisted.internet.protocol.Protocol):
 # .deferred, that calls back with the result body
 # .status, the HTTP response code
 # .response_headers, the headers in the form {key: [value0, value1, ...]}
+#   * where "key" is lower-cased
 class AgentAdaptor(object):
     def __init__(self, header_d):
         self.deferred = twisted.internet.defer.Deferred()
@@ -105,7 +106,8 @@ class AgentAdaptor(object):
         self.response_headers = {}
         header_d.addCallbacks(self.read_response, self.deferred.errback)
     def read_response(self, response):
-        self.response_headers = dict(response.headers.getAllRawHeaders())
+        # note: lowercase the incoming header keys
+        self.response_headers = dict((k.lower(), v) for k, v in response.headers.getAllRawHeaders())
         self.status = int(response.code) # note: this used to be a string
         recv = AgentBodyReceiver(self.deferred, self.status, response.phrase)
         response.deliverBody(recv)
