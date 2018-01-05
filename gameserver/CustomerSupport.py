@@ -1882,6 +1882,32 @@ class HandleApplyAllianceLeavePointLoss(Handler):
                 retmsg.append(["PLAYER_CACHE_UPDATE", [self.gamesite.gameapi.get_player_cache_props(user, player, None)]])
         return ReturnValue(result = 'ok')
 
+class HandleModifyScores(Handler):
+    def __init__(self, *pargs, **pkwargs):
+        Handler.__init__(self, *pargs, **pkwargs)
+        self.stat = self.args['stat']
+        self.delta = self.args.get('delta', None)
+        self.new_value = self.args.get('value', None)
+        self.old_value = None # obtained during exec and then used for logging
+    def do_exec_offline(self, json_user, json_player):
+        return self._exec_offline_as_online(json_user, json_player)
+    def do_exec_online(self, session, retmsg):
+        return self.exec_all(session, retmsg, session.user, session.player)
+    def exec_all(self, session, retmsg, user, player):
+        # record the old value for later use by get_log_entry()
+        self.old_value = player.get_master_score(self.stat)
+        if self.delta is not None:
+            player.modify_scores({self.stat: int(self.delta)}, method = '+=', reason = 'CustomerSupport')
+        elif self.new_value is not None:
+            player.modify_scores({self.stat: int(self.new_value)}, method = '=', reason = 'CustomerSupport')
+        if retmsg is not None:
+            retmsg.append(["PLAYER_CACHE_UPDATE", [self.gamesite.gameapi.get_player_cache_props(user, player, None)]])
+        return ReturnValue(result = 'ok')
+    # override that records what the old value was
+    def get_log_entry(self):
+        entry = Handler.get_log_entry(self)
+        entry['old_value'] = self.old_value
+        return entry
 
 class HandleReceiveMail(Handler):
     # alerts server handling a logged-in player to push new mail immediately
@@ -1989,6 +2015,7 @@ methods = {
     'send_notification': HandleSendNotification,
     'receive_mail': HandleReceiveMail,
     'apply_alliance_leave_point_loss': HandleApplyAllianceLeavePointLoss,
+    'modify_scores': HandleModifyScores,
     'player_batch': HandlePlayerBatch,
     # not implemented yet: join_abtest, clear_abtest
 }
