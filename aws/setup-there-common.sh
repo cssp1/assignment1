@@ -30,6 +30,11 @@ sudo sed -i 's/do_update\s*=\s*no/do_update = yes/' /etc/yum/yum-updatesd.conf
 sudo chkconfig yum-updatesd on
 sudo /etc/init.d/yum-updatesd restart
 
+# for backup yum updates, add cron job
+sudo sh -c '/bin/cat > /var/spool/cron/root' <<EOF
+0 0 * * * /usr/bin/yum -e 0 -d 0 -y update
+EOF
+
 echo "SETUP(remote): Setting up common options..."
 
 # create "proj" group and add the ec2-user account to it
