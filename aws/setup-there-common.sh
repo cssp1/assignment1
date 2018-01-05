@@ -59,10 +59,10 @@ enabled=1
 EOF
 
 # add mongodb repo address
-sudo sh -c '/bin/cat > /etc/yum.repos.d/mongodb-org-3.4.repo' <<EOF
-[mongodb-org-3.4]
-name=MongoDB Repository (3.4)
-baseurl=https://repo.mongodb.org/yum/amazon/2013.03/mongodb-org/3.4/x86_64/
+sudo sh -c '/bin/cat > /etc/yum.repos.d/mongodb.repo' <<EOF
+[mongodb]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/amazon/2013.03/mongodb-org/3.6/x86_64/
 gpgcheck=0
 enabled=1
 EOF
