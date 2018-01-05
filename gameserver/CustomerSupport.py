@@ -1417,6 +1417,8 @@ class HandleChangeRegion(Handler):
         for obj in to_remove:
             player['my_base'].remove(obj)
 
+        ladder_reset = False
+
         if old_region:
             # recall squads
             for squad_sid, squad in player.get('squads',{}).iteritems():
@@ -1434,7 +1436,20 @@ class HandleChangeRegion(Handler):
                 # remove home base from old region (drops old lock as well)
                 self.gamesite.nosql_client.drop_map_feature(old_region, base_id, originator=self.user_id, reason='CustomerSupport')
 
-                # skip modifying ladder scores and on_enter consequent
+                old_is_ladder = self.gamedata['regions'][old_region].get('ladder_pvp', self.gamedata.get('ladder_pvp', False))
+                new_is_ladder = player['base_region'] and self.gamedata['regions'][player['base_region']].get('ladder_pvp', self.gamedata.get('ladder_pvp', False))
+                new_zero_points = player['base_region'] and self.gamedata['regions'][player['base_region']].get('zero_points_on_entry', False)
+
+                if (old_is_ladder and (not new_is_ladder) and self.gamedata['matchmaking']['zero_points_on_ladder_exit']) or \
+                   new_zero_points:
+                    # switching out of ladder - reset scores
+                    ladder_reset = True
+                    HandleModifyScores(self.time_now, self.user_id, self.gamedata, self.gamesite,
+                                       {'stat': 'trophies_pvp', 'value': str(self.gamedata['trophy_floor']['pvp'])}) \
+                                       .exec_offline(user, player)
+
+                # note: skips on_enter consequent!
+
                 if self.gamedata.get('unit_donation_restrict_region', False):
                     self.gamesite.sql_client.invalidate_unit_donation_request(self.user_id)
                     player['donated_units'] = {}
@@ -1452,6 +1467,7 @@ class HandleChangeRegion(Handler):
                                                         'event_name': '4701_change_region_success',
                                                         'request_region':new_region, 'request_loc':new_loc, 'request_precision':new_loc_precision,
                                                         'new_region': player['base_region'], 'new_loc': player['base_map_loc'],
+                                                        'ladder_reset': ladder_reset,
                                                         'old_region':old_region, 'old_loc':old_loc, 'reason':'CustomerSupport'})
         # drop lock from create_map_feature()
         if new_region and new_region != 'LIMBO' and (new_region != old_region):
