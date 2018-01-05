@@ -224,7 +224,7 @@ class AsyncHTTPRequester(object):
 
     def __init__(self, concurrent_request_limit, total_request_limit, request_timeout, verbosity, log_exception_func,
                  max_tries = 1, retry_delay = 0, error_on_404 = True,
-                 api = 'HTTPClientFactory' # choose twisted.web.HTTPClientFactory (deprecated) or Agent (new) XXXXXX make Agent default soon
+                 api = 'Agent' # use old 'HTTPClientFactory' or new 'Agent' API
                  ):
 
         # reference to the server's global event Reactor
