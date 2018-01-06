@@ -90,6 +90,11 @@ echo "/etc/spinpunch - edit anything that needs changing."
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias; newaliases"
 echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com-latest.tar.gz"
 
+echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
+echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
+echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
+
 # PYTHON PACKAGES
 echo "switch /etc/alternatives/python,pip,python-config to v2.7"
 echo "pip install --upgrade pip" # upgrade the upgrader
@@ -97,11 +102,6 @@ echo "pip install --upgrade pip" # upgrade the upgrader
 # optional: install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb
 
 echo "pip install -r gameserver/requirements.txt"
-
-echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
-echo "MISSING: GIT: git config --global user.name " # 'Example Deploy'
-echo "MISSING: GIT: git config --global user.email " # 'awstech@example.com'
 
 echo "game code checkout. symlink gameserver/logs to an ephemeral storage location (consider using xfs for efficiency with 100k+ small files)."
 
@@ -114,9 +114,6 @@ echo "    key /home/ec2-user/.ssh/slack.token (with incoming webhook for game ch
 echo "    key /home/ec2-user/.ssh/mattermost-webhook-url for automated messages"
 echo "    key /home/ec2-user/.ssh/dropbox-access-token for tournament winner list uploads"
 echo "    key /home/ec2-user/.ssh/google-translate-api-key for PCHECK translation"
-
-# CUSTOMIZED PYTHON PACKAGES
-echo "build/install ujson library. (python setup.py build; sudo python setup.py install)"
 
 echo "apply private patches"
 
