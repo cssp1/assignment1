@@ -95,14 +95,25 @@ import subprocess
 import itertools
 
 # SP3RDPARTY : lz4 Python library (modified) : BSD License
-try: import lz4; has_lz4 = True
-except: has_lz4 = False
+try:
+    import lz4
+    has_lz4 = True
+    try:
+        import lz4.block # newer lz4 API
+    except:
+        pass
+except:
+    has_lz4 = False
 
 # apply compression and JSON-safe wrapping to a text string for transmission to the client
 def compress_and_wrap_string(s):
     if has_lz4:
         codec = 'lz4'
-        z_result = base64.b64encode(bytes(lz4.compress(s)))
+        if hasattr(lz4, 'block'): # newer lz4 API
+            c = lz4.block.compress(s)
+        else: # old lz4 API
+            c = lz4.compress(s)
+        z_result = base64.b64encode(bytes(c))
     else:
         codec = 'lzjb'
         z_result = base64.b64encode(bytes(SpinLZJB.compress(SpinLZJB.string_to_bytes(s))))
