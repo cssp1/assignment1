@@ -33,7 +33,6 @@ service-identity==17.0.0
 six==1.11.0
 SQLAlchemy==1.1.15
 txpostgres==1.6.0
-# ujson==1.22 # note: this needs to be the DJM-customized version
 
 # SpinPunch customized Python libraries
 
@@ -41,3 +40,6 @@ txpostgres==1.6.0
 # our customized version fixes these.
 git+ssh://git@github.com/spinpunch/twisted.git@spinpunch 
 
+# ujson MUST be this customized version, which adds extra options like
+# buffer size hints and adjusts whitespace handling
+git+ssh://git@github.com/spinpunch/ultrajson.git@spinpunch 
