@@ -90,30 +90,13 @@ echo "/etc/spinpunch - edit anything that needs changing."
 echo "MISSING: /etc/aliases: add 'root: awstech@example.com' mail alias; newaliases"
 echo "SSL certs, from s3://spinpunch-config/ssl-spinpunch.com-latest.tar.gz"
 
-
 # PYTHON PACKAGES
 echo "switch /etc/alternatives/python,pip,python-config to v2.7"
 echo "pip install --upgrade pip" # upgrade the upgrader
-echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
-echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
-echo "pip install --upgrade ndg-httpsclient pyasn1 urllib3" # for SNI support in requests
-echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
-echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
-echo "pip install --upgrade pyxDamerauLevenshtein"
-echo "pip install --upgrade brotlipy"
-echo "pip install --upgrade blist"
-echo "pip install --upgrade ipaddress" # for SpinIPReputation.py
-echo "pip install --upgrade Pillow" # for image manipulation (player portraits etc)
-echo "pip install --upgrade distribute" # needed to fix import warning from "import pymongo, OpenSSL.SSL"
 
-# FIRST, install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb THEN
-echo "pip install --upgrade geoip2"
+# optional: install libmaxminddb first for C acceleration from https://github.com/maxmind/libmaxminddb
 
-# INSTALL TWISTED
-
-echo "pip install --upgrade twisted"
-echo "Apply gameserver/http.py.patchX to twisted/web/http.py wherever it is installed"
-echo "If using Twisted < 16.3.2, apply gameserver/twcgi.py.twisted16 to twisted/web/twcgi.py wherever it is installed"
+echo "pip install -r gameserver/requirements.txt"
 
 echo "MISSING: SVN: /home/ec2-user/.ssh/spsvnaccess.pem (also .ssh/config with Host/User/IdentityFile)"
 echo "MISSING: GIT: /home/ec2-user/.ssh/${GAME_ID}prod.pem (also .ssh/config with Host/User/IdentityFile)"
@@ -133,7 +116,7 @@ echo "    key /home/ec2-user/.ssh/dropbox-access-token for tournament winner lis
 echo "    key /home/ec2-user/.ssh/google-translate-api-key for PCHECK translation"
 
 # CUSTOMIZED PYTHON PACKAGES
-echo "build/install ujson, blist, and lz4 libraries. (python setup.py build; sudo python setup.py install)"
+echo "build/install ujson library. (python setup.py build; sudo python setup.py install)"
 
 echo "apply private patches"
 

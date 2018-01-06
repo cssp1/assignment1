@@ -105,14 +105,7 @@ echo "fix-ec2-mail.py (requires hostname to be correct)"
 echo "set up swap space"
 
 # PYTHON PACKAGES
-echo "switch /etc/alternatives/python,pip,python-config to v2.7"
-echo "pip install --upgrade pip" # upgrade the upgrader
-echo "pip install --upgrade requests" # this overrides system python-requests package with a newer version of Requests
-echo "pip install --upgrade pyOpenSSL service_identity certifi" # override system pyOpenSSL with newer version and add service_identity and certifi
-echo "pip install --upgrade pymongo" # note: we now require post-3.0 API
-echo "pip install --upgrade psycopg2 txpostgres" # replace system psycopg2 with newer version necessary for txpostgres
-echo "pip install --upgrade pyxDamerauLevenshtein"
-echo "pip install --upgrade Pillow" # for image manipulation (player portraits etc)
+echo "follow Python package installation instructions in setup-there-prod.sh"
 
 echo "MISSING: /etc/cron scripts for production. /var/tmp/swap setup. Home dirs in /media/aux"
 echo "MISSING: SSL certs, from s3://spinpunch-config/ssl-spinpunch.com.tar.gz.gpg."
