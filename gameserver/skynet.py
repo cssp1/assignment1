@@ -2025,8 +2025,11 @@ def adgroup_create_batch(db, ad_account_id, arglist):
                                  'body': urllib.urlencode(adgroup_create_batch_element(db, *args)) } for args in arglist])
     for result in result_list:
         if result:
-            assert 'data' in result and 'ads' in result['data'] and len(result['data']['ads']) == 1
-            adgroup = result['data']['ads'][result['data']['ads'].keys()[0]]
+            if 0: # FB API seems to return this in a different format now (20180107)
+                assert 'data' in result and 'ads' in result['data'] and len(result['data']['ads']) == 1
+                adgroup = result['data']['ads'][result['data']['ads'].keys()[0]]
+            else:
+                adgroup = result
             update_fields_by_id(db.fb_adgroups, mongo_enc(ad_add_skynet_fields(adgroup)))
             r = adgroup
         else:
