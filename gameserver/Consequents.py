@@ -530,8 +530,14 @@ class CooldownTriggerConsequent(Consequent):
         elif self.method == 'periodic':
             self.period = data['period']
             self.origin = data['origin']
+            if data.get('duration', None) is not None:
+                self.duration = data['duration']
+            else:
+                self.duration = self.period
         else:
             raise Exception('unhandled cooldown method '+self.method)
+
+        self.max_duration = data.get('max_duration', None)
 
     def execute(self, session, player, retmsg, context=None):
         if self.method == 'constant':
@@ -541,7 +547,11 @@ class CooldownTriggerConsequent(Consequent):
                 duration = self.duration
         elif self.method == 'periodic':
             et = player.get_absolute_time()
-            duration = self.period - ((et - self.origin) % self.period)
+            duration = max(self.duration - ((et - self.origin) % self.period), 0)
+
+        if self.max_duration is not None:
+            duration = min(duration, self.max_duration)
+
         session.player.cooldown_trigger(self.name, duration, data = self.data)
         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
