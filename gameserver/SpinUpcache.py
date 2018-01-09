@@ -1667,8 +1667,8 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                             retained = 0
                         obj['retained_%dd' % days] = retained
 
-        # compute returned_x-yh metrics (returned 1d, 2d, 3d, 5d, 7d, 30d)
-        for begin, end in ((24,48), (48,72), (72,96), (120,144), (168,192), (672,696)):
+        # compute returned_x-yh metrics (returned 1d, 2d, 3d, 5d, 7d, 10d, 15d, 28d)
+        for begin, end in ((24,48), (48,72), (72,96), (120,144), (168,192), (240,264), (360,384), (672,696)):
             if time_now >= (account_creation_time + end*60*60):
                 obj['returned_%d-%dh' % (begin,end)] = 1 if visits_within(obj, end//24, after=begin//24) else 0
 
