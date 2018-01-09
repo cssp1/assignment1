@@ -20,15 +20,19 @@ def bh_users_schema(sql_util):
     return {'fields': [('user_id', 'VARCHAR(255) NOT NULL'),
                        ('ui_name', 'VARCHAR(255)'),
                        ('ui_email', 'VARCHAR(255)'),
+                       ('real_name', 'VARCHAR(255)'),
                        ('name_source', 'VARCHAR(64)'),
                        ('email_source', 'VARCHAR(64)'),
-                       ('email_verified', 'VARCHAR(64)'),
+                       ('email_verified', 'INT1'),
+                       ('trust_level', 'INT4'),
                        ('creation_time', 'INT8'),
                        ('creation_provider', 'VARCHAR(64)'),
                        ('last_login_time', 'INT8'),
                        ('last_login_ip', 'VARCHAR(64)'),
+                       ('creation_ip', 'VARCHAR(64)'),
                        ('facebook_id', 'VARCHAR(64)'), # might be null: facebook ID for the battlehouse.com login app
                        ('country', 'VARCHAR(2)'),
+                       ('country_tier', 'CHAR(1)'),
                        ('locale', 'VARCHAR(16)'),
                        ('timezone', 'INT4'),
                        ],
@@ -61,6 +65,11 @@ if __name__ == '__main__':
                                 headers = {'x-bhlogin-api-secret': SpinConfig.config['battlehouse_api_secret']})
         response.raise_for_status()
         rows = SpinJSON.loads(response.content)['result']
+
+        # add derived fields
+        for row in rows:
+            if row.get('country'):
+                row['country_tier'] = str(SpinConfig.country_tier_map.get(row['country'], 4))
 
         for table, schema in ((bh_users_table, bh_users_schema(sql_util)),
                               ):
