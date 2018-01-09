@@ -1442,6 +1442,7 @@ class User:
         return self.social_id
 
     def get_email(self):
+        # note: keep in sync with SpinUpcache.py update_upcache_entry()
         if self.bh_profile and self.bh_profile.get('ui_email') and self.bh_profile.get('email_verified'):
             return self.bh_profile['ui_email']
         if self.mm_profile and self.mm_profile.get('email'):
