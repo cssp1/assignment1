@@ -200,7 +200,6 @@ FACEBOOK_CAMPAIGN_MAP = {
     'dialog': 'MISSING',
     'dialog_permission': 'MISSING',
     'myapps': 'MISSING',
-    'reminders': 'MISSING',
 
     # Facebook-sourced free acquisition
     'bookmark_favoritestry': 'facebook_free',
@@ -1049,6 +1048,17 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
             obj['birth_year'] = int(profile['birthday'].split('/')[2])
         except:
             pass
+
+    # update info from Battlehouse.com profile
+    bh_profile = obj.get('bh_profile')
+    if bh_profile:
+        if bh_profile.get('ui_email') and bh_profile.get('email_verified'):
+            # note: override other sources for email address, since this one is strongly checked and opted-in
+            obj['email'] = bh_profile['ui_email']
+        if bh_profile.get('locale'):
+            obj['locale'] = bh_profile['locale']
+        if bh_profile.get('timezone'):
+            obj['timezone'] = bh_profile['timezone']
 
     # revise facebook likes only if out of date - otherwise leave them alone
     # note: passes through upcache where "obj" is the existing cache entry will never have a 'facebook_likes' field!
