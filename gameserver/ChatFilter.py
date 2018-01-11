@@ -158,13 +158,52 @@ class ChatFilter(object):
 
         return False
 
-    def is_graphical(self, input):
     # Check for non-letter "graphics" like smiley faces
     # These are usually allowed in routine chat messages, but
     # should not be allowed for important titles like player names.
 
+    def is_graphical(self, input, allow_chars = []):
+
+        # caller can provide exceptions
+        allowed_codepoints = map(ord, allow_chars)
+
+        # block standard graphical symbols
+        # keep in sync: ChatFilter.py, main.js: alias_disallowed_chars, errors.json: ALIAS_BAD
+        disallowed_codepoints = map(ord, ['\n', '\t', '\r', '\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&', '^', '%', '$', '#', '@', '!', '~', '?', '`', '\0', '-', '='])
+
         for codepoint in codepoints.from_unicode(input):
-            # see https://en.wikipedia.org/wiki/Unicode_block
+            if codepoint in allowed_codepoints:
+                continue
+
+            if codepoint in disallowed_codepoints:
+                return True
+
+            # for reference, see https://en.wikipedia.org/wiki/Unicode_block
+
+            if codepoint >= 0x80 and codepoint <= 0x9f: # Latin-1 Supplement: C1 Controls
+                return True
+            if codepoint >= 0xa0 and codepoint <= 0xbf: # Latin-1 Supplement: Punctuation and Symbols
+                return True
+
+            if codepoint < 0x10000 and unicodedata.category(unichr(codepoint)) == 'Po': # punctuation, other
+                return True
+
+            if codepoint in (0x5e, # CIRCUMFLEX ACCENT
+                             0x60, # GRAVE ACCENT
+                             0xd7, # MULTIPLICATION SIGN
+                             0xf7, # DIVISION SIGN
+                             0x37e, # GREEK QUESTION MARK
+                             0x387, # GREEK ANO TELEIA
+                             0x589, # ARMENIAN FULL STOP
+                             0x5c0, 0x5c3, 0x5c6, 0x5f3, 0x5f4, # Hebrew punctuation
+                             0x640, # Arabic Tatweel (this is debatable)
+                             ):
+                return True
+
+            if codepoint >= 0x2b0 and codepoint <= 0x2ff: # SPACING_MODIFIER_LETTERS
+                return True
+            if codepoint >= 0x55a and codepoint <= 0x55f: # ARMENIAN punctuation
+                return True
             if codepoint >= 0x2100 and codepoint <= 0x2bff:
                 return True
             if codepoint >= 0x16fe0 and codepoint <= 0x16fff:
@@ -173,6 +212,7 @@ class ChatFilter(object):
                 return True
             if codepoint >= 0x1f300 and codepoint <= 0x1f9ff:
                 return True
+
         return False
 
     # Check for abuse of Unicode special characters to create text that renders improperly
@@ -271,5 +311,9 @@ if __name__ == '__main__':
     assert cf.is_graphical(u'🖕🖕🖕')
     assert cf.is_graphical(u"\u2508\u256d\u256e\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508\u2508 \u2508\u2503\u2503\u2508\u256d\u256e\u2508\u250f\u256e\u256d\u256e\u256d\u256e\u2503\u256d \u2508\u2503\u2503\u2508\u2503\u2503\u2508\u2523\u252b\u2503\u2503\u2503\u2508\u2523\u252b \u2508\u2503\u2523\u2533\u252b\u2503\u2508\u2503\u2570\u2570\u256f\u2570\u256f\u2503\u2570 \u256d\u253b\u253b\u253b\u252b\u2503\u2508\u2508\u256d\u256e\u2503\u2503\u2501\u2533\u2501 \u2503\u2571\u256d\u2501\u256f\u2503\u2508\u2508\u2503\u2503\u2503\u2503\u2508\u2503\u2508 \u2570\u256e\u2571\u2571\u2571\u2503\u2508\u2508\u2570\u256f\u2570\u256f\u2508\u2503\u2508")
     assert cf.is_graphical(u"\ud83d\udd95\ud83c\udffb\ud83d\udd95\ud83c\udffb\ud83d\udd95\ud83c\udffb")
+    assert cf.is_graphical(u'--==Death==--')
+    assert cf.is_graphical(u'asdf$@#Death??@$#$')
+    assert not cf.is_graphical(u'--==Death==--', allow_chars = ['-','='])
+    assert cf.is_graphical(u'\u00d7\u0640')
 
     print 'OK'

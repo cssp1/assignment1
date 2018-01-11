@@ -206,7 +206,6 @@ tag_chars_ext = name_chars_simple + \
 name_chars_ext = tag_chars_ext + \
                  [' ', "'"]
 descr_disallowed_chars = ['\n', '\t', '\r']
-alias_disallowed_chars = ['\n', '\t', '\r', '\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&', '^', '%', '$', '#', '@', '!', '~', '?', '`', '\0'] # keep in sync with loginserver.py, server.py, main.js, and errors.json ALIAS_BAD
 
 def is_valid_alliance_descr(name):
     if len(name) > 256: return False
@@ -240,10 +239,9 @@ def is_valid_alliance_tag(tag):
 def is_valid_alias(name):
     assert type(name) is unicode # make sure we're given Unicode input
     if len(name) < 4 or len(name) > 15: return False
-    for c in name:
-        if c in alias_disallowed_chars: return False
     if chat_filter.is_bad(name): return False
-    if chat_filter.is_graphical(name): return False
+    # note: we should have disallowed - and = here, but it's too late for legacy games (--==MegaDeath==--)
+    if chat_filter.is_graphical(name, allow_chars = ['-','=']): return False
     if chat_filter.is_ugly(name): return False
     if 'spinpunch' in name.lower(): return False
     return True

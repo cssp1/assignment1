@@ -23328,7 +23328,9 @@ function invoke_change_alias_dialog(callback, spellname) {
         dialog.widgets['cancel_button'].onclick = close_parent_dialog;
     dialog.widgets['title'].str = spell['ui_name'];
     dialog.widgets['input'].str = player.alias || '';
-    dialog.widgets['input'].disallowed_chars = ['\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&', '^', '%', '$', '#', '@', '!', '~', '?', '`']; // keep in sync with loginserver.py, server.py, main.js, and errors.json ALIAS_BADkeep in sync with server.py alias_disallowed_chars and errors.json ALIAS_BAD
+    dialog.widgets['input'].disallowed_chars = ['\\', '/', ' ', '.', ':', ';', '+', '*', '(', ')', '<', '>', '[', ']', '{', '}', ',', '|', '"', "'", '_', '&', '^', '%', '$', '#', '@', '!', '~', '?', '`']; // keep in sync: ChatFilter.py, main.js: alias_disallowed_chars, errors.json: ALIAS_BAD
+    // note: we should have prevented - and = here (--==xxDeathManxx==--), but it's too late for existing games
+
     var descr1 = spell['ui_description'];
     var descr2 = gamedata['errors']['ALIAS_BAD']['ui_name'];
     while(descr2.indexOf('\n\n') >= 0) { // replace double line breaks with single
