@@ -126,7 +126,7 @@ ChatFilter.compress_string = function(s) {
     return { compressed: r, index_map: index_map };
 };
 
-/** Check a string for bad words
+/** Check a string for offensive language
     @param {string} s
     @return {boolean} */
 ChatFilter.is_bad = function(s) {
@@ -139,7 +139,7 @@ ChatFilter.is_bad = function(s) {
     return false;
 };
 
-/** Replace a bad word with asterisks of the same string length
+/** Replace an offensive word with asterisks of the same string length
     @param {string} rep
     @return {string} */
 ChatFilter.censor_replacer = function(rep) {
@@ -150,7 +150,7 @@ ChatFilter.censor_replacer = function(rep) {
     return asterisks;
 };
 
-/** Replace bad words in a string with asterisks
+/** Replace offensive words in a string with asterisks
     @param {string} original_s
     @return {string} */
 ChatFilter.censor = function(original_s) {

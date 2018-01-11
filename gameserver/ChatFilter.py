@@ -91,6 +91,8 @@ class ChatFilter(object):
 
         return r, index_map
 
+    # Check if a string contains offensive language
+    # This checks the *meaning* of the words, not any technical aspects like graphical symbols
     def is_bad(self, input):
         if self.bad_regex.search(input): return True
         if self.space_bad_regex:
@@ -98,6 +100,7 @@ class ChatFilter(object):
             if self.space_bad_regex.search(compressed): return True
         return False
 
+    # Replace offensive words in a string with asterisks
     def censor(self, original_s):
         s = self.bad_regex.sub(lambda match: '*'*len(match.group()), original_s)
 
@@ -118,7 +121,10 @@ class ChatFilter(object):
                     s = s[:begin] + '*'*(end-begin+1) + s[end+1:]
         return s
 
-    # check for abusive chat messages that repeat single letters or digraphs too much
+    # Check for abusive chat messages that repeat single letters or digraphs too much
+    # e.g.: "hahahahahahahahhahahfofofofofofofofo"
+    # There is nothing really wrong with technical content or meaning, but other players usually
+    # complain when they see messages like this, so we want to block them.
     def is_spammy(self, input, min_length = None):
         if min_length is None:
             min_length = self.spam_min_length
@@ -152,8 +158,11 @@ class ChatFilter(object):
 
         return False
 
-    # scan for non-letter "graphics" like smiley faces
     def is_graphical(self, input):
+    # Check for non-letter "graphics" like smiley faces
+    # These are usually allowed in routine chat messages, but
+    # should not be allowed for important titles like player names.
+
         for codepoint in codepoints.from_unicode(input):
             # see https://en.wikipedia.org/wiki/Unicode_block
             if codepoint >= 0x2100 and codepoint <= 0x2bff:
@@ -166,7 +175,8 @@ class ChatFilter(object):
                 return True
         return False
 
-    # scan for abuse of Unicode special characters to create text that renders improperly
+    # Check for abuse of Unicode special characters to create text that renders improperly
+    # This should always be blocked, even in routine chat messages, because it leads to corrupt text display.
     def is_ugly(self, input):
         nonspacing_run = 0 # don't allow very long runs of nonspacing characters
 
