@@ -13,7 +13,7 @@ import socket
 import SpinS3
 
 from SkynetLib import spin_targets, bid_coeff, \
-     encode_one_param, encode_params, decode_params, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
+     encode_one_param, encode_params, decode_params, decode_one_param, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
      decode_adgroup_name, adgroup_name_is_bad, make_variable_regexp, adgroup_dtgt_filter_query, mongo_enc
 from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL, \
      BATTLEHOUSE_APP_ID, BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
@@ -394,11 +394,17 @@ def custom_audience_create(db, ad_account_id, name, description = None):
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
-def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, country, lookalike_type = 'similarity', lookalike_ratio = None, description = None):
-    if country == 'ww': # worldwide
+def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, country_param, lookalike_type = 'similarity', lookalike_ratio = None, description = None):
+    # decode the country as if it's an ad target parameter
+    country = decode_one_param(spin_targets, 'c'+country_param)[1]
+    print country
+    if country == 'worldwide':
         spec = {'allow_international_seeds': True,
                 'location_spec': {'geo_locations': {'country_groups': ['worldwide']}}}
-    else:
+    elif ',' in country: # comma-separated list
+        spec = {'allow_international_seeds': True,
+                'location_spec': {'geo_locations': {'countries': country.split(',')}}}
+    else: # assume single country
         spec = {'country': country.upper()}
 
     if lookalike_ratio is not None:
