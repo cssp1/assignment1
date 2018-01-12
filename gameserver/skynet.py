@@ -882,7 +882,7 @@ def adstats_record_get_live_adgroups(db, match_qs, time_range):
         if to_fix:
             if not quiet: print 'fixing', len(to_fix), 'old adstats_hourly entries'
             for adgroup in fb_api_batch(SpinFacebook.versioned_graph_endpoint('adgroup', ''),
-                                        [{'method':'GET', 'relative_url': fix['id']+'?'+urllib.urlencode({'fields':ADGROUP_FIELDS})} for fix in to_fix]):
+                                        [{'method':'GET', 'relative_url': fix['id']+'?'+urllib.urlencode({'fields':AD_FIELDS})} for fix in to_fix]):
                 if adgroup:
                     qs = {'adgroup_id': str(adgroup['id'])}
                     stgt, tgt = decode_adgroup_name(standin_spin_params, adgroup['name'])
@@ -3063,22 +3063,20 @@ if __name__ == '__main__':
             if audience_id: print 'CREATED audience in account_id', GAMES[cmd_game_id]['ad_account_id'], ':', custom_audience, "'id':", "'"+audience_id+"',"
         if audience_id:
             print custom_audience, 'id', audience_id, '...', ; sys.stdout.flush()
-            if len(args)>=1:
-                filenames = args
-            else:
-                filenames = [os.path.join(asset_path, 'audiences', 'audience-%s.txt.gz' % custom_audience),]
+            filenames = args
 
-            def stream_ids(filenames):
-                for filename in filenames:
-                    if filename.endswith('.gz'):
-                        fd = FastGzipFile.Reader(filename)
-                    else:
-                        fd = open(filename)
-                    for line in fd.xreadlines():
-                        yield line.strip()
+            if filenames:
+                def stream_lines_from_files(filenames):
+                    for filename in filenames:
+                        if filename.endswith('.gz'):
+                            fd = FastGzipFile.Reader(filename)
+                        else:
+                            fd = open(filename)
+                        for line in fd.xreadlines():
+                            yield line.strip()
 
-            n_added = custom_audience_add(audience_id, ((GAMES[custom_audience_game_id]['app_id'], fb_id) for fb_id in stream_ids(filenames)))
-            print 'added', n_added, 'users'
+                n_added = custom_audience_add(audience_id, GAMES[custom_audience_game_id]['app_id'], stream_lines_from_files(filenames))
+                print 'added', n_added, 'rows'
 
     else:
         print >>sys.stderr, "unknown mode", mode
