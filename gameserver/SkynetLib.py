@@ -112,7 +112,7 @@ ensure_keys_are_unique(spin_targets)
 def make_variable_regexp(template):
     return template \
            .replace('$DATE', '(?P<DATE>[0-9]{8})') \
-           .replace('$COUNTRY', '(?P<COUNTRY>[a-z,]+)') \
+           .replace('$COUNTRY', '(?P<COUNTRY>[a-z0-9,]+)') \
            .replace('$GAME', '(?P<GAME>[a-z0-9,]+)') \
            +'$'
 
