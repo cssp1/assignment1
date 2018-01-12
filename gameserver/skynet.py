@@ -417,26 +417,47 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
-def _custom_audience_add(audience_id, app_id_facebook_id_list):
-    app_id_list = list(set(x[0] for x in app_id_facebook_id_list))
+def _custom_audience_add(audience_id, facebook_app_id_list, schema, data):
     result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
-                    post_params = {'payload': SpinJSON.dumps({'schema':'UID', 'data': [x[1] for x in app_id_facebook_id_list], 'app_ids': app_id_list})})
-    print 'transmitted', result['num_received'], 'of which', result['num_invalid_entries'], 'were invalid'
+                    post_params = {'payload': SpinJSON.dumps({'schema':schema, 'data': data, 'app_ids': facebook_app_id_list})})
+    print 'transmitted', result['num_received'], schema, 'of which', result['num_invalid_entries'], 'were invalid'
     if verbose:
         print result
     return result['num_received']
 
-def custom_audience_add(audience_id, app_id_facebook_id_list):
+# add new entries to a custom audience
+# "fb_app_id" is the corresponding Facebook App ID for rows that consist of a Facebook ID
+# "rows" is a sequence of strings where each string is either a Facebook ID or an email address (distinguished by having an '@' character)
+def custom_audience_add(audience_id, fb_app_id, rows):
+
     limit = 5000 # 5000 with new /payload API
     added = 0
-    batch = []
-    for app_fb_id in app_id_facebook_id_list:
-        batch.append(app_fb_id)
-        if len(batch) >= limit:
-            added += _custom_audience_add(audience_id, batch)
-            batch = []
-    if batch:
-        added += _custom_audience_add(audience_id, batch)
+
+    batch_UID = []
+    batch_EMAIL_SHA256 = []
+
+    for row in rows:
+        # for encoding notes, see https://developers.facebook.com/docs/marketing-api/audiences-api
+        if '@' in row:
+            # assume it's an email address
+            batch_EMAIL_SHA256.append(hashlib.sha256(row.strip().lower()).hexdigest())
+
+            if len(batch_EMAIL_SHA256) >= limit:
+                added += _custom_audience_add(audience_id, [fb_app_id,], 'EMAIL_SHA256', batch_EMAIL_SHA256)
+                del batch_EMAIL_SHA256[:]
+        else:
+            # assume it's a Facebook ID
+            batch_UID.append(row.strip())
+
+            if len(batch_UID) >= limit:
+                added += _custom_audience_add(audience_id, [fb_app_id,], 'UID', batch_UID)
+                del batch_UID[:]
+
+    if batch_EMAIL_SHA256:
+        added += _custom_audience_add(audience_id, [fb_app_id,], 'EMAIL_SHA256', batch_EMAIL_SHA256)
+    if batch_UID:
+        added += _custom_audience_add(audience_id, [fb_app_id,], 'UID', batch_UID)
+
     return added
 
 AD_FIELDS = 'name,adset_id,created_time,failed_delivery_checks,configured_status,effective_status,bid_amount'
