@@ -1640,6 +1640,8 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
         base_link_url = 'https://apps.facebook.com/'+game_data['namespace']+'/'
         link_url = base_link_url + '?' + link_qs
         #creative['call_to_action_type'] = call_to_action_type(tgt)
+        link_description = 'Multiplayer - Free-to-play - Clan Wars' # XXX this should be A/B tested sometime
+
     elif link_destination == 'appcenter':
         # use cookie reflection to ensure query params survive the bounce
         base_link_url = 'http://'+game_data['host']+'/'
@@ -1656,7 +1658,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             base_link_url = 'https://www.battlehouse.com/play/'+game_data['namespace']
         link_url = base_link_url + '?' + link_qs
         link_caption = None # FB requires that this include the domain of the link game_data['app_name']
-        link_description = 'Multiplayer - Free-to-play - Clan Wars'
+        link_description = 'Multiplayer - Free-to-play - Clan Wars' # XXX this should be A/B tested sometime
     else:
         raise Exception('unknown link destination type '+link_destination)
 
