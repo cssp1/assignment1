@@ -50,8 +50,13 @@ def do_slave_bh(input):
     outputs = [{'aud': copy.deepcopy(aud), 'count':0} for aud in auds]
     fds = [open_output_fd(aud) for aud in auds]
 
-    cur.execute("SELECT user_id, facebook_id, last_login_time FROM " + sql_util.sym(bh_users_table) + \
-                " WHERE facebook_id IS NOT NULL")
+    # note: the money_spent calculation is a hack until we set up reporting from the game servers to loginserver
+
+    cur.execute("SELECT user_id, facebook_id, ui_email, last_login_time," + \
+                " (SELECT IFNULL(money_spent,0) FROM fs_upcache." + sql_util.sym('fs_upcache') + \
+                "  WHERE fs_upcache.bh_id = bh.user_id) AS net_spend " + \
+                "FROM " + sql_util.sym(bh_users_table) + " bh " + \
+                "WHERE (facebook_id IS NOT NULL) OR (ui_email IS NOT NULL)")
 
     for user in cur.fetchall():
         for i, aud in enumerate(auds):
@@ -61,10 +66,10 @@ def do_slave_bh(input):
 
             fd = fds[i]
 
-            if min_spend > 0:
-                raise Exception('no money_spent info for bh.com')
+            net_spend = user.get('net_spend', 0)
 
-            net_spend = -1
+            if net_spend < min_spend:
+                continue
 
             if aud.get('country'):
                 raise Exception('country is unreliable')
@@ -85,8 +90,13 @@ def do_slave_bh(input):
                     continue
 
             if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
-            print >> fd, user['facebook_id']
+            if user['facebook_id']:
+                print >> fd, user['facebook_id']
+            if user['ui_email']:
+                print >> fd, user['ui_email']
             outputs[i]['count'] += 1
+
+    con.commit()
 
     return {'result':outputs}
 
@@ -188,7 +198,9 @@ if __name__ == '__main__':
         for gid in ('mf','tr','mf2','bfm','sg','dv','fs'):
             auds += auds_for_game(gid)
 
-        auds += [{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1}]
+        auds += [{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1},
+                 {'game_id': 'bh', 'aud': 'p10', 'min_spend':10, 'churned_for_days':-1},
+                 ]
 
     else:
         auds = [{'game_id':game_id, 'filename':filename, 'min_spend':min_spend, 'churned_for_days':churned_for_days, 'country':country}]
