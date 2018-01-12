@@ -1940,7 +1940,11 @@ def adgroup_targeting(db, tgt):
         # optionally also exclude a custom audience containing the entire player base
         if tgt.get('exclude_player_audience',True) and game_data.get('exclude_player_audience',None):
             if 'excluded_custom_audiences' not in ret: ret['excluded_custom_audiences'] = []
-            ret['excluded_custom_audiences'].append(format_custom_audience(db, game_data['ad_account_id'], game_data['exclude_player_audience']))
+            if not isinstance(game_data['exclude_player_audience'], list):
+                aud_list = [game_data['exclude_player_audience'],]
+            else:
+                aud_list = game_data['exclude_player_audience']
+            ret['excluded_custom_audiences'] += [format_custom_audience(db, game_data['ad_account_id'], aud) for aud in aud_list]
 
     for aud in tgt.get('exclude_custom_audiences',[]):
         if aud is None: continue
