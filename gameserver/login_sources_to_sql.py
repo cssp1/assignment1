@@ -6,7 +6,7 @@
 
 # dump "log_login_flow" from MongoDB to a MySQL database for analytics
 
-import sys, time, getopt, re, urlparse
+import sys, time, getopt, re, urlparse, calendar
 import SpinConfig
 import SpinSQLUtil
 import SpinETL
@@ -52,8 +52,9 @@ if __name__ == '__main__':
     verbose = True
     do_prune = False
     do_optimize = False
+    source = 'mongodb'
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['prune','optimize'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['prune','optimize','s3='])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -61,6 +62,11 @@ if __name__ == '__main__':
         elif key == '-q': verbose = False
         elif key == '--prune': do_prune = True
         elif key == '--optimize': do_optimize = True
+        elif key == '--s3':
+            # specify starting date for backfill, like "--s3 2015-04-01" (first recording starts here)
+            source = 's3'
+            source_ymd = map(int, val.split('-'))
+            assert len(source_ymd) == 3
 
     sql_util = SpinSQLUtil.MySQLUtil()
     if not verbose: sql_util.disable_warnings()
@@ -94,7 +100,23 @@ if __name__ == '__main__':
         total = 0
         affected_days = set()
 
-        for row in SpinETL.iterate_from_mongodb(game_id, 'log_login_sources', start_time, end_time):
+        if source == 's3':
+            s3_start_time = calendar.timegm(source_ymd + [0,0,0]) - 1
+            if start_time < 0:
+                start_time = s3_start_time
+            else:
+                start_time = max(start_time, s3_start_time)
+
+            if verbose: print 'Source = S3, starting at', start_time
+            row_iter = SpinETL.iterate_from_s3(SpinConfig.config['game_id'], 'spinpunch-logs',
+                                               'login_sources',
+                                               start_time, end_time, verbose = verbose)
+        else:
+            row_iter = SpinETL.iterate_from_mongodb(SpinConfig.config['game_id'],
+                                                    'log_login_sources',
+                                                    start_time, end_time)
+
+        for row in row_iter:
             keyvals = [('time',row['time']),
                        ('event_name',row['event_name'])]
 
@@ -155,14 +177,18 @@ if __name__ == '__main__':
         # XXX no summary yet
 
         if do_prune:
-            # drop old data
-            KEEP_DAYS = 60
-            old_limit = time_now - KEEP_DAYS * 86400
-
-            if verbose: print 'pruning', login_sources_table
             cur = con.cursor()
-            cur.execute("DELETE FROM "+sql_util.sym(login_sources_table)+" WHERE time < %s", [old_limit])
-            if do_optimize:
-                if verbose: print 'optimizing', login_sources_table
-                cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_sources_table))
+
+            # drop old data
+            KEEP_DAYS = {'fs':-1}.get(SpinConfig.game(), 60)
+            if KEEP_DAYS > 0:
+                old_limit = time_now - KEEP_DAYS * 86400
+                if verbose: print 'pruning', login_sources_table
+                cur.execute("DELETE FROM "+sql_util.sym(login_sources_table)+" WHERE time < %s", [old_limit])
+
+                # optimize only makes sense if we are pruning
+                if do_optimize:
+                    if verbose: print 'optimizing', login_sources_table
+                    cur.execute("OPTIMIZE TABLE "+sql_util.sym(login_sources_table))
+
             con.commit()
