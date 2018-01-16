@@ -394,13 +394,16 @@ Showcase.apply_showcase_hacks = function(dialog, hack) {
                 var stack = ('stack' in loot ? loot['stack'] : 1);
                 return [stack, stack];
             } else if('multi' in loot) {
-                var ret = [0, 0];
+                var ret = [Infinity, 0];
 
                 for(var i = 0; i < loot['multi'].length; i++) {
                     var sub_count = get_loot_drop_count(loot['multi'][i]);
 
-                    ret[0] += sub_count[0];
-                    ret[1] += sub_count[1];
+                    // it's confusing to players if we show the sum of sub_counts for a multi list of loot,
+                    // since the number in the GUI be higher than the actual stack of any one individual item.
+                    // instead, display the range.
+                    ret[0] = Math.min(ret[0], sub_count[0]);
+                    ret[1] = Math.max(ret[1], sub_count[1]);
                 }
 
                 return ret;
