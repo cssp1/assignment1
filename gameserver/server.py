@@ -26586,6 +26586,8 @@ class GAMEAPI(resource.Resource):
                     latency_tag = msg[0] + '('+('single' if msg[2] >= 0 else 'all')+')'
                 elif 0 and msg[0] == "QUARRY_QUERY":
                     latency_tag = msg[0] + ('_FULL' if msg[2]<=0 else '_INCREMENTAL')
+                elif msg[0] == "SEARCH_PLAYER_CACHE":
+                    latency_tag = msg[0] + ' ' + SpinHTTP.unwrap_string(msg[1]).strip()[0:64]
                 else:
                     latency_tag = msg[0]
 
