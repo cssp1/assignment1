@@ -971,13 +971,13 @@ SPUI.Dialog.prototype.update_array_widget_positions = function(array_name, eleme
                          wdata['xy'][1] + y * array_offset[1] + first_element_offset[1]];
             widget.array_pos = [x,y];
             if(widget.fixed_tooltip_offset && 'fixed_tooltip_offset' in wdata) {
-                widget.fixed_tooltip_offset = [widget.fixed_tooltip_offset[0] + x * array_offset[0] + first_element_offset[0],
-                                               widget.fixed_tooltip_offset[1] + y * array_offset[1] + first_element_offset[1]];
+                widget.fixed_tooltip_offset = [wdata['fixed_tooltip_offset'][0] + x * array_offset[0] + first_element_offset[0],
+                                               wdata['fixed_tooltip_offset'][1] + y * array_offset[1] + first_element_offset[1]];
             }
             if(widget.clip_to && ('clip_to' in wdata)) {
-                widget.clip_to = [widget.clip_to[0] + x * array_offset[0] + first_element_offset[0],
-                                  widget.clip_to[1] + y * array_offset[1] + first_element_offset[1],
-                                  widget.clip_to[2], widget.clip_to[3]];
+                widget.clip_to = [wdata['clip_to'][0] + x * array_offset[0] + first_element_offset[0],
+                                  wdata['clip_to'][1] + y * array_offset[1] + first_element_offset[1],
+                                  wdata['clip_to'][2], wdata['clip_to'][3]];
             }
         }
     }
