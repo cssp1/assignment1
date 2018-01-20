@@ -7,8 +7,6 @@
 import twisted.python.failure
 import twisted.internet.defer
 import twisted.internet.ssl
-from twisted.internet._sslverify import ClientTLSOptions # only for old HTTPContextFactory API
-from twisted.python.compat import nativeString
 import twisted.internet.protocol
 import twisted.internet.reactor
 import twisted.web.iweb
@@ -43,16 +41,6 @@ else:
                     )
             certs.append(cert)
         return twisted.internet._sslverify.OpenSSLCertificateAuthorities(certs)
-
-# only for old HTTPContextFactory API:
-class TLSSNIContextFactory(twisted.internet.ssl.ClientContextFactory):
-    # A custom context factory to add a server name for TLS connections.
-    def __init__(self, sni_host, *args, **kwargs):
-        self.sni_host = sni_host
-    def getContext(self, hostname=None, port=None):
-        ctx = twisted.internet.ssl.ClientContextFactory.getContext(self)
-        ClientTLSOptions(self.sni_host, ctx)
-        return ctx
 
 # helper that feeds an in-memory request body to twisted.web.client.Agent
 class AgentBodySender(object):
@@ -176,7 +164,7 @@ class AsyncHTTPRequester(object):
         # "freeze" headers and postdata into the version we're going to submit to Twisted.
         # note that headers can be changed by the request's preflight callback, so we have to do this at the last moment before transmission.
         # returns (headers, postdata, list_of_warning_messages)
-        def finalize_headers_and_postdata(self, header_mode = 'list'): # can return "single" or "list"-valued dict
+        def finalize_headers_and_postdata(self):
             final_headers = None
             final_postdata = None
             warnings = []
@@ -198,12 +186,7 @@ class AsyncHTTPRequester(object):
                             else:
                                 raise Exception('non-string-valued HTTP header "%s": %r' % (k, type(v[i])))
 
-                    if header_mode == 'single':
-                        if len(v) > 1:
-                            raise Exception('cannot accept multi-valued headers')
-                        final_headers[k] = v[0]
-                    else:
-                        final_headers[k] = v
+                    final_headers[k] = v
 
             if self.postdata:
                 if isinstance(self.postdata, dict):
@@ -211,10 +194,7 @@ class AsyncHTTPRequester(object):
                     final_postdata = urlencode(self.postdata).encode('utf-8')
                     if final_headers is None:
                         final_headers = {}
-                    if header_mode == 'single':
-                        final_headers['Content-Type'] = b'application/x-www-form-urlencoded'
-                    else:
-                        final_headers['Content-Type'] = [b'application/x-www-form-urlencoded',]
+                    final_headers['Content-Type'] = [b'application/x-www-form-urlencoded',]
                 elif isinstance(self.postdata, bytes):
                     final_postdata = self.postdata
                 else:
@@ -226,6 +206,9 @@ class AsyncHTTPRequester(object):
                  max_tries = 1, retry_delay = 0, error_on_404 = True,
                  api = 'Agent' # use old 'HTTPClientFactory' or new 'Agent' API
                  ):
+
+        if api != 'Agent':
+            raise Exception('only the Agent API is supported now')
 
         # reference to the server's global event Reactor
         self.reactor = twisted.internet.reactor
@@ -251,7 +234,6 @@ class AsyncHTTPRequester(object):
 
         # disable overly verbose log messages
         self.verbosity = verbosity
-        twisted.web.client.HTTPClientFactory.noisy = False
 
         # only print request-setup warnings once, to avoid log spam
         self.warnings_seen = set()
@@ -343,8 +325,7 @@ class AsyncHTTPRequester(object):
             request.preflight_callback(request)
 
         try:
-            final_headers, final_postdata, warnings = request.finalize_headers_and_postdata(header_mode = {'Agent': 'list',
-                                                                                                           'HTTPClientFactory': 'single'}[self.api])
+            final_headers, final_postdata, warnings = request.finalize_headers_and_postdata()
         except Exception as e:
             self.log_exception_func('AsyncHTTP Request Setup Error: ' + traceback.format_exc())
             self.n_errors += 1
@@ -382,9 +363,7 @@ class AsyncHTTPRequester(object):
         return d
 
     def make_web_getter(self, *args, **kwargs):
-        if self.api == 'HTTPClientFactory':
-            return self.make_web_getter_HTTPClientFactory(*args, **kwargs)
-        elif self.api == 'Agent':
+        if self.api == 'Agent':
             return self.make_web_getter_Agent(*args, **kwargs)
         else:
             raise Exception('unknown api ' + self.api)
@@ -427,28 +406,6 @@ class AsyncHTTPRequester(object):
             return _
 
         getter.deferred.addBoth(cancel_watchdog_and_continue, self, watchdog)
-        return getter
-
-    # Wrap Twisted's HTTP Client with a strict watchdog timer
-    # Twisted's own "timeout" parameter doesn't always fire reliably, meaning it does not guarantee
-    # that a request's deferred fires with either callback or errback within the timeout interval.
-    # We see this problem with ~0.01% of Amazon S3 requests - it might be due to a hangup in the
-    # SSL negotiation.
-
-    def make_web_getter_HTTPClientFactory(self, request, url, method = None, headers = None, user_agent = None, timeout = None, postdata = None):
-        # this is like calling twisted.web.client.getPage, but we want the full HTTPClientFactory
-        # and not just its .deferred member, since we want to access the response headers as well as the body.
-        #getter = twisted.web.client._makeGetterFactory(*args, **kwargs)
-        uri = twisted.web.client.URI.fromBytes(url)
-        # note: headers are single-valued, as frozen in 'single' mode
-        getter = twisted.web.client.HTTPClientFactory(url, method=method, headers=headers, agent=user_agent, timeout=timeout, postdata=postdata)
-        if uri.scheme == b'https':
-            self.reactor.connectSSL(nativeString(uri.host), uri.port, getter, TLSSNIContextFactory(uri.host))
-        else:
-            self.reactor.connectTCP(nativeString(uri.host), uri.port, getter)
-
-        self.apply_watchdog_to_getter(getter, request, timeout)
-
         return getter
 
     def make_web_getter_Agent(self, request, url, method = None, headers = None, user_agent = None, timeout = None, postdata = None):
