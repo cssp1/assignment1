@@ -853,6 +853,11 @@ def check_spell(spellname, spec):
     if 'projectile_asset' in spec:
         error |= require_art_asset(spec['projectile_asset'], spellname+':projectile_asset')
 
+    # check that "damage_vs": "blast" is only applied to weapons that do splash damage
+    damage_vs = spec.get('damage_vs', {})
+    if 'blast' in damage_vs and ('splash_range' not in spec):
+        error |= 1; print '%s: has "damage_vs": {"blast": ...} but is missing "splash_range"' % (spellname,)
+
     for PRED in ('requires', 'show_if', 'cooldown_if'):
         if PRED in spec:
             error |= check_predicate(spec[PRED], reason = spellname+':'+PRED)
@@ -3773,6 +3778,10 @@ def main(args):
 
     for cat in gamedata['strings']['damage_vs_categories']:
         error |= require_art_asset('damage_vs_'+cat[0], 'damage_vs_'+cat[0])
+
+    if 'damage_types' in gamedata['strings']:
+        for name, damage_type in gamedata['strings']['damage_types'].iteritems():
+            error |= require_art_asset(damage_type['asset'], 'damage_type:'+name)
 
     for name in gamedata['art']:
         if name.startswith('alicon_'):

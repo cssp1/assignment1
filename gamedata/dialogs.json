@@ -2742,6 +2742,18 @@
                       "dimensions": [372,238], "bg_image_offset": [0,25], "bg_image_justify": "center",
                       "state": "hero" },
 
+            // damage_type icons
+            "damage_types_label": { "kind": "TextField", "xy": [456,263], "dimensions": [111,20], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
+                                    "text_color": [0.8,0.8,0.8,1],
+                                    "text_hjustify": "center", "ui_name": "Weapon Type", "show": 0 },
+            "damage_types": { "kind": "StaticImage", "xy": [456,287], "dimensions": [21,21], "asset": "damage_vs_rover",
+                              "ui_tooltip": "%name\n\n%description", "tooltip_delay": 0, "fixed_tooltip_offset": [456,326],
+                              "max_tooltip_dimensions": [250,600],
+                              "array": [4,1], "array_max_dimensions": [111, 0],
+                              "array_offset": [-1,0],
+                              //"array_offset": [30,0],
+                              "show": 0 },
+
             "damage_vs_label": { "kind": "TextField", "xy": [330,263], "dimensions": [111,20], "text_size": 13, "text_style": "thick", "drop_shadow": 1,
                                  "text_color": [0.8,0.8,0.8,1],
                                  "text_hjustify": "center", "ui_name": "Damage vs." },

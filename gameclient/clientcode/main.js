@@ -44776,6 +44776,45 @@ function init_damage_vs_icons(dialog, spec, weapon_spell) {
                 .replace('%category', ui_name);
         }
     }
+
+    // damage_type icons
+    if('damage_types' in dialog.data['widgets'] && 'damage_types' in gamedata['strings']) {
+        var TYPES = gamedata['strings']['damage_types'];
+        var i = 0;
+        var max_widgets = dialog.data['widgets']['damage_types']['array'][0] * dialog.data['widgets']['damage_types']['array'][1];
+
+        if(show && weapon_spell && 'damage_vs' in weapon_spell) {
+            for(var key in weapon_spell['damage_vs']) {
+                if(key in TYPES) {
+                    var xy;
+                    if(dialog.data['widgets']['damage_types']['array'][1] <= 1) {
+                        xy = [i,0]; // 2D array
+                    } else {
+                        xy = [i % dialog.data['widgets']['damage_types']['array'][0], Math.floor(i / dialog.data['widgets']['damage_types']['array'][0])];
+                    }
+                    var widget = dialog.widgets[SPUI.get_array_widget_name('damage_types', dialog.data['widgets']['damage_types']['array'], xy)];
+                    widget.show = true;
+
+                    var type_data = TYPES[key];
+                    widget.asset = type_data['asset'];
+                    widget.tooltip.str = SPUI.break_lines(widget.data['ui_tooltip'].replace('%name', type_data['ui_name']).replace('%description', type_data['ui_description']),
+                                                          SPUI.desktop_font, widget.data['max_tooltip_dimensions'])[0];
+
+                    i += 1;
+                    if(i >= max_widgets) {
+                        break; // ran out of space
+                    }
+                }
+            }
+        }
+        if('damage_types_label' in dialog.widgets) {
+            dialog.widgets['damage_types_label'].show = (i >= 1);
+        }
+
+        // space out widgets and hide any unused slots at the end
+        dialog.update_array_widget_positions('damage_types', i);
+    }
+
 };
 
 var Store = { order_cleanup_cb: null };
