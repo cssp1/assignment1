@@ -1915,12 +1915,31 @@ def adgroup_targeting(db, tgt):
     if 'friends' in tgt and tgt['friends']:
         ret['friends_of_connections'] = [{'id':game_data['app_id']}]
 
-    # do not show on mobile devices
-    ret['device_platforms'] = ['desktop']
+    device_type = tgt.get('device', 'desktop')
+    if device_type == 'desktop':
+        # do not show on mobile devices
+        ret['device_platforms'] = ['desktop']
 
-    # show FB app ads on Facebook only (not Instagram or audience network)
-    if tgt.get('destination','app') in ('app','appcenter','app_page'):
-        ret['publisher_platforms'] = ['facebook']
+        # show FB app ads on Facebook only (not Instagram or audience network)
+        if tgt.get('destination','app') in ('app','appcenter','app_page'):
+            ret['publisher_platforms'] = ['facebook']
+
+    elif device_type in ('tablet','phone'):
+        ret['device_platforms'] = ['mobile']
+        ret['user_os'] = ['iOS', 'Android']
+        ret['publisher_platforms'] = ['facebook','audience_network','messenger'] # instagram?
+        ret['instagram_positions'] = ['stream']
+        ret['messenger_positions'] = ['messenger_home']
+        ret['audience_network_positions'] = ['classic','instream_video','rewarded_video']
+        # require wifi?
+        # ret['wireless_carrier'] = 'Wifi'
+
+        if device_type == 'tablet':
+            ret['user_device'] = ['Android_Tablet', 'iPad']
+        elif device_type == 'phone':
+            ret['user_device'] = ['Android_Smartphone', 'iPod', 'iPhone']
+    else:
+        raise Exception('unknown device_type '+device_type)
 
     if tgt['ad_type'] == 32:
         ret['facebook_positions'] = ['feed']
