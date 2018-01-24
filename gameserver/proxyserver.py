@@ -3042,6 +3042,7 @@ class CachedJSFile(resource.Resource):
         self.filename = filename
         self.checksum_time = -1
         self.checksum_value = ''
+        self.etag = ''
         self.contents = None
         self.contents_gz = None
         self.contents_br = None
@@ -3086,6 +3087,9 @@ class CachedJSFile(resource.Resource):
                 self.checksum_value = checksum.hexdigest()
                 self.checksum_time = file_time
 
+                # create weak etag
+                self.etag = b'W/"%s"' % self.checksum_value
+
                 self.contents = str(buf.getvalue())
                 self.contents_gz = str(gz_buf.getvalue())
 
@@ -3121,8 +3125,8 @@ class CachedJSFile(resource.Resource):
         content_type = 'text/plain' if SpinConfig.config['proxyserver'].get('xhr_js_files', False) else 'text/javascript'
         request.setHeader('Content-Type', content_type)
         SpinHTTP.set_access_control_headers_for_cdn(request, max_age)
-        if self.checksum_value:
-            request.setHeader('ETag', self.checksum_value.encode('utf-8'))
+        if self.etag:
+            request.setHeader('ETag', self.etag)
 
     def render_OPTIONS(self, request):
         self.set_cdn_headers(request)
@@ -3132,7 +3136,7 @@ class CachedJSFile(resource.Resource):
         self.set_cdn_headers(request)
 
         if_none_match = SpinHTTP.get_twisted_header(request, 'if-none-match')
-        if if_none_match and if_none_match == self.checksum_value:
+        if if_none_match and self.etag and if_none_match == self.etag:
             request.setResponseCode(twisted.web.http.NOT_MODIFIED)
             request.setHeader('Content-Length', b'%d' % self.length())
 
