@@ -724,13 +724,30 @@ TechLevelPredicate.prototype.do_ui_help = function(player) {
 };
 TechLevelPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
+// Certain operations will involve evaluating tons of predicates during a time when game state is guaranteed not to change.
+// (e.g., refreshing completion status of all quests, or updating the Store dialog)
+// For performance, optionally enable caches that work as long as game state does not change.
+
+/** @type {boolean} */
+var predicate_cache_enabled = false;
+
 /** @type {(Object.<string,boolean>|null)} special cache just for QuestCompletedPredicate to avoid O(N^2) behavior */
 var quest_completed_predicate_cache = null;
+
+/** @type {(Object<string,Object>|null)}
+    Special cache for HasItemPredicate
+    null if not in use or no data, otherwise dictionary mapping item_name -> status (see HasItemPredicate for details) */
+var has_item_cache = null;
+
 function predicate_cache_on() {
+    predicate_cache_enabled = true;
     quest_completed_predicate_cache = {};
+    has_item_cache = null; // will be filled with a dictionary on first need
 }
 function predicate_cache_off() {
+    predicate_cache_enabled = false;
     quest_completed_predicate_cache = null;
+    has_item_cache = null;
 }
 
 /** @constructor @struct
@@ -1961,8 +1978,48 @@ function HasItemPredicate(data) {
 }
 goog.inherits(HasItemPredicate, Predicate);
 HasItemPredicate.prototype.is_satisfied = function(player, qdata) {
+    // use cache?
+    if(predicate_cache_enabled &&
+       // Cache does not support leveled items. If this is required, punt to uncached path.
+       this.level === null && this.min_level === null) {
+
+        if(has_item_cache === null) {
+
+            // Initialize the cache
+            // We assume that the common case is going to be multiple checks of HasItemPredicate with different items.
+            // To optimize this case, scan the player once, keeping track of what items we see.
+            // Afterward, HasItemPredicate can be resolved in O(1) just by checking this cache.
+
+            has_item_cache = {};
+            var func = function(where, x) {
+                var name = x['spec'];
+                if(!(name in has_item_cache)) {
+                    has_item_cache[name] = {'stored':0, 'equipped':0, 'mail':0, 'crafting':0};
+                }
+                has_item_cache[name][where] += ('stack' in x ? x['stack'] : 1);
+            }
+            player.stored_item_iter(goog.partial(func, 'stored'));
+            player.equipped_item_iter(goog.partial(func, 'equipped'));
+            player.mail_attachments_iter(goog.partial(func, 'mail'));
+            player.crafting_queue_ingredients_and_products_iter(goog.partial(func, 'crafting'));
+        }
+
+        if(this.item_name in has_item_cache) {
+            // present in cache. Count number of applicable items seem.
+            var state = has_item_cache[this.item_name];
+            var count = state['stored'] + state['equipped'];
+            if(this.check_mail) { count += state['mail']; }
+            if(this.check_crafting) { count += state['crafting']; }
+            return count >= this.min_count;
+        } else {
+            return false; // definitely not present
+        }
+    }
+
+    // normal, uncached path
     return player.has_item(this.item_name, this.min_count, this.check_mail, this.check_crafting, this.level, this.min_level);
 };
+
 HasItemPredicate.prototype.ui_progress = function(player, qdata) {
     var ret = gamedata['strings']['predicates'][this.kind]['ui_progress'];
     ret = ret.replace('%d1', player.count_item(this.item_name, this.check_mail, this.check_crafting, this.level).toString());

@@ -40827,6 +40827,9 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
         player.record_feature_use(catdata['record_feature_use'].replace('%WEEK', current_pvp_week().toFixed(0)));
     }
 
+    // Since game state cannot change during this function, cache predicate results.
+    predicate_cache_on();
+
     for(var i = 0; i < catdata['skus'].length; i++) {
         var skudata = catdata['skus'][i];
         if(!new_store_allow_sku(skudata)) { continue; }
@@ -40884,6 +40887,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
     if(('activation' in catdata) && !read_predicate(catdata['activation']).is_satisfied(player,null)) {
         // illegal category - punt
         dialog.widgets['back_button'].onclick(dialog.widgets['back_button']);
+        predicate_cache_off();
         return null;
     }
 
@@ -41103,8 +41107,10 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
         d.widgets['jewel'].user_data['count'] = 0;
         d.widgets['jewel'].ondraw = update_notification_jewel;
 
-        d.ondraw = update_new_store_sku;
-        d.ondraw(d);
+        // note: don't set d.ondraw, instead we are going to call this
+        // manually from update_new_store_category(), because we want
+        // to enable the predicate cache across all child SKU updates.
+        update_new_store_sku(d);
     }
 
     if(default_sku_index >= 0) {
@@ -41120,6 +41126,7 @@ function invoke_new_store_category(catdata, parent_catdata, scroll_to_sku_name, 
     }
 
     dialog.ondraw = update_new_store_category;
+    predicate_cache_off();
     return dialog;
 }
 
@@ -41213,6 +41220,9 @@ function update_new_store_category(dialog) {
     var left_jewels = 0, right_jewels = 0; // count number of jeweled SKUs to the left and right of the window
 
     // adjust child SKU dialogs
+
+    predicate_cache_on();
+
     for(var i = 0; i < skulist.length; i++) {
         var w = dialog.widgets['sku'+i.toString()];
         var skudata = w.user_data['skudata'];
@@ -41234,7 +41244,11 @@ function update_new_store_category(dialog) {
             if(w.user_data['base_xy'][0] + 0.66*w.wh[0] < 0) { left_jewels += 1; }
             if(w.user_data['base_xy'][0] + 0.33*w.wh[0] >= dialog.widgets['sunken'].xy[0] + dialog.widgets['sunken'].wh[0]) { right_jewels += 1; }
         }
+
+        update_new_store_sku(w);
     }
+
+    predicate_cache_off();
 
     dialog.widgets['scroll_left_jewel'].user_data['count'] = left_jewels;
     dialog.widgets['scroll_right_jewel'].user_data['count'] = right_jewels;
