@@ -2925,7 +2925,9 @@ def check_achievement_category(name, data):
 def check_achievements(achievements):
     error = 0
 
-    for key, data in achievements.iteritems():
+    seen_ui_names = {}
+
+    for key, data in sorted(achievements.iteritems()):
         if key != data.get('name',''):
             error |= 1
             print 'achievement %s has missing or unmatched name' % key
@@ -2944,6 +2946,17 @@ def check_achievements(achievements):
             if (PRED in data) and check_predicate(data[PRED], reason = 'achievement:'+key+':'+PRED):
                 error |= 1
                 print 'achievement %s has bad %s predicate' % (key, PRED)
+
+        # ensure uniqueness of ui_names
+        if data['ui_name'] in seen_ui_names:
+            # ignore some achievements that are duplicated for legacy reasons
+            if key.startswith('conquer_') or \
+               key.startswith('onp_record_') or \
+               (key.startswith('leader_set_') and gamedata['game_id'] == 'dv'): continue
+            error |= 1
+            print 'achievement %s has the same ui_name as %s ("%s")' % (key, seen_ui_names[data['ui_name']], data['ui_name'])
+        else:
+            seen_ui_names[data['ui_name']] = key
 
     return error
 
