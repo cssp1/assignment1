@@ -44654,9 +44654,12 @@ function update_upgrade_dialog_equipment(dialog) {
         equip_problem |= equip_pending;
 
         if(equip_slots) {
-            // horrible hack to deal with tooltip overlap
+            // horrible hack to deal with tooltip overlap:
+            // hide inventory_context when there is a child dialog other than the upgrade_bar, or the inventory_context dialog itself
             var child_dialog = (dialog.children[dialog.children.length-1].user_data && dialog.children[dialog.children.length-1].user_data['dialog'] &&
-                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'upgrade_bar');
+                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'upgrade_bar' &&
+                                dialog.children[dialog.children.length-1].user_data['dialog'] != 'inventory_context'
+                               );
 
             equip_slots = get_leveled_quantity(equip_slots, Math.max(old_level, 1));
             var slot_i = 0;
@@ -44698,6 +44701,7 @@ function update_upgrade_dialog_equipment(dialog) {
                                 invoke_inventory_context(w.parent, w, _slot_i, _eitem, false, {'position':'top_or_bottom'});
                             }; })(slot_i, type_name, n, eitem);
                         } else {
+                            // there's a child dialog in the way - get rid of inventory_context
                             invoke_inventory_context(dialog, dialog.widgets['equip_frame'+slot_i], -1, null, false);
                             dialog.widgets['equip_frame'+slot_i].onenter = null;
                         }
