@@ -348,9 +348,9 @@ SPAudio.ACSample.prototype.play = function(t, v) {
 
     // name changed from Chrome implementation (noteOn) to final Web Audio API (start)
     if(typeof(voice['start']) != 'undefined') {
-        voice['start'](t + this.driver.time_offset);
+        voice['start'](Math.max(0, t + this.driver.time_offset));
     } else {
-        voice['noteOn'](t + this.driver.time_offset);
+        voice['noteOn'](Math.max(0, t + this.driver.time_offset));
     }
 
     this.last_voice = voice;
