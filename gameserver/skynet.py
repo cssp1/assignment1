@@ -1931,8 +1931,9 @@ def adgroup_targeting(db, tgt):
         ret['instagram_positions'] = ['stream']
         ret['messenger_positions'] = ['messenger_home']
         ret['audience_network_positions'] = ['classic','instream_video','rewarded_video']
-        # require wifi?
-        # ret['wireless_carrier'] = 'Wifi'
+
+        # require wifi
+        ret['wireless_carrier'] = ['Wifi']
 
         if device_type == 'tablet':
             ret['user_device'] = ['Android_Tablet', 'iPad']
