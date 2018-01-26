@@ -32807,9 +32807,13 @@ class WSFakeRequest(object):
     def close_connection_aggressively(self): return self.proto.close_connection_aggressively()
 
 class WS_GAMEAPI_Protocol(protocol.Protocol):
-    def __init__(self, gameapi, peer):
+    def __init__(self, gameapi, peer, headers):
         self.gameapi = gameapi
         self.peer_ip = str(peer.host)
+        if 'User-Agent' in headers:
+            self.user_agent = headers['User-Agent'][0]
+        else:
+            self.user_agent = 'unknown(WS_GAMEAPI_Protocol)'
         self.connected = False
         self.sp_length = -1 # for SpinPunch fragmentation
         self.sp_buffer = [] # for SpinPunch fragmentation
@@ -32909,7 +32913,7 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
         self.last_request_repr = repr(args_dict)[0:100] # for debugging only - text representation
         self.last_request_time = server_time
 
-        reply, is_error = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, 'WS_GAMEAPI_Protocol')
+        reply, is_error = gamesite.gameapi.render_request(WSFakeRequest(self), args_dict, self.peer_ip, self.user_agent)
 
         if reply == twisted.web.server.NOT_DONE_YET:
             pass
@@ -32930,8 +32934,8 @@ class WS_GAMEAPI_Protocol(protocol.Protocol):
 class WS_GAMEAPI_Factory(protocol.Factory):
     def __init__(self, gameapi):
         self.gameapi = gameapi
-    def buildProtocol(self, addr):
-        return WS_GAMEAPI_Protocol(self.gameapi, addr)
+    def buildProtocol(self, addr, headers):
+        return WS_GAMEAPI_Protocol(self.gameapi, addr, headers)
 class WS_GAMEAPI(websockets.WebSocketsResource):
     def __init__(self, gameapi):
         websockets.WebSocketsResource.__init__(self, WS_GAMEAPI_Factory(gameapi))

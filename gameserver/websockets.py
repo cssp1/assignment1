@@ -484,7 +484,7 @@ class WebSocketsFactory(WrappingFactory):
 
     # pass extra addr parameter to WebsocketsProtocol to remember the peer address and headers
     def buildProtocol(self, addr, headers):
-        return self.protocol(self, self.wrappedFactory.buildProtocol(addr), spin_peer_addr = addr, spin_headers = headers)
+        return self.protocol(self, self.wrappedFactory.buildProtocol(addr, headers), spin_peer_addr = addr, spin_headers = headers)
 
 class WebSocketsResource(object):
     """
