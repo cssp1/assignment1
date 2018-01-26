@@ -100,6 +100,7 @@ lite_accept_filter = re.compile('|'.join('^'+x+'$' for x in \
                                           'birth_year', 'gender', 'friends_in_game', 'email', 'logged_in_times', 'alliance_id_cache', 'alliances_joined', 'time_in_game',
                                           'spend_[0-9]+d', 'attacks_launched_vs_human', 'attacks_launched_vs_ai',
                                           'chat_messages_sent',
+                                          'canvas_width', 'canvas_height', 'screen_width', 'screen_height', 'devicePixelRatio',
                                           ]))
 
 def setup_field(gamedata, sql_util, key, val, field_mode = None):
@@ -171,6 +172,7 @@ def setup_field(gamedata, sql_util, key, val, field_mode = None):
         elif key == 'browser_name': return 'VARCHAR(16)'
         elif key == 'birthday': return 'VARCHAR(10)'
         elif key == 'last_login_ip': return 'VARCHAR(64)'
+        elif key == 'browser_user_agent': return 'VARCHAR(255)'
         else: return 'VARCHAR(128)'
 
     else: # not a recognized data type

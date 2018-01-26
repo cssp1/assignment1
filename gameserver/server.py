@@ -1037,6 +1037,7 @@ class UserTable:
               ('browser_os', str),
               ('browser_hardware', str),
               ('browser_caps', None),
+              ('browser_user_agent', str),
               ('last_sprobe_result', None),
               ('locale', str),
               ('timezone', int),
@@ -1092,6 +1093,8 @@ class UserTable:
               ('fb_conversion_pixels_context', None),
               ('kg_conversion_pixels_context', None),
               ('liniad_context', None),
+              ('screen_width', int),
+              ('screen_height', int),
               ('canvas_width', int),
               ('canvas_height', int),
               ('canvas_oversample', None),
@@ -1250,11 +1253,14 @@ class User:
         self.browser_os = None
         self.browser_hardware = None
         self.browser_caps = {}
+        self.browser_user_agent = None
 
         # last result sent by SProbe.js
         self.last_sprobe_result = None
 
         # browser canvas pixel dimensions
+        self.screen_width = None
+        self.screen_height = None
         self.canvas_width = None
         self.canvas_height = None
         self.canvas_oversample = None
@@ -26826,7 +26832,7 @@ class GAMEAPI(resource.Resource):
         def __init__(self, api, request, retmsg, session_id, frame_platform, social_id, auth_token,
                      user_id, lockgen, metrics_anon_id, user_demographics, client_browser_caps,
                      client_session_data, query_string, client_permissions, client_login_country,
-                     client_ip):
+                     client_ip, user_agent):
             self.api = api
             self.request = request
             self.retmsg = retmsg
@@ -26844,6 +26850,7 @@ class GAMEAPI(resource.Resource):
             self.client_permissions = client_permissions
             self.client_login_country = client_login_country
             self.client_ip = client_ip
+            self.user_agent = user_agent
 
             self.cancel_reason = None
             self.user = None
@@ -26900,7 +26907,7 @@ class GAMEAPI(resource.Resource):
             assert self.has_lock
             del self.in_progress_by_user_id[self.user_id]
             del self.in_progress_by_session_id[self.session_id]
-            return self.api.complete_client_hello(self.request, self.retmsg, self.user_id, self.frame_platform, self.social_id, self.auth_token, self.lockgen, self.user, self.player, self.session_id, self.metrics_anon_id, self.user_demographics, self.client_browser_caps, self.client_session_data, self.query_string, self.client_permissions, self.client_login_country, self.client_ip)
+            return self.api.complete_client_hello(self.request, self.retmsg, self.user_id, self.frame_platform, self.social_id, self.auth_token, self.lockgen, self.user, self.player, self.session_id, self.metrics_anon_id, self.user_demographics, self.client_browser_caps, self.client_session_data, self.query_string, self.client_permissions, self.client_login_country, self.client_ip, self.user_agent)
 
     # handle initial handshake message from client
     # returns whether or not to go async
@@ -27024,7 +27031,7 @@ class GAMEAPI(resource.Resource):
         # open a new session, using the ID passed in by the client
         aslogin = self.AsyncLogin(self, request, retmsg, client_session_id, frame_platform, client_social_id, client_auth_token,
                                   user_id, lockgen, metrics_anon_id, user_demographics, client_browser_caps,
-                                  client_session_data, query_string, client_permissions, client_login_country, client_ip)
+                                  client_session_data, query_string, client_permissions, client_login_country, client_ip, user_agent)
 
         # begin async lookups into userdb and playerdb
         user_table.lookup_async(user_id, aslogin.user_cb, 'login')
@@ -27057,7 +27064,7 @@ class GAMEAPI(resource.Resource):
 
     def do_complete_client_hello(self, request, retmsg, user_id, frame_platform, social_id, auth_token, lockgen, user, player, session_id,
                                  metrics_anon_id, user_demographics, client_browser_caps, client_session_data, query_string, client_permissions, client_login_country,
-                                 client_ip):
+                                 client_ip, user_agent):
 
         d = make_deferred('do_complete_client_hello') # OK - login path is special - we'll return this for the caller
 
@@ -27137,11 +27144,22 @@ class GAMEAPI(resource.Resource):
             user.browser_version = None
         user.browser_os = str(user_demographics[2]) if user_demographics[2] != 'unknown' else None
         user.locale = str(user_demographics[3]) if user_demographics[3] != 'unknown' else None
-        if len(user_demographics) > 4: user.browser_hardware = str(user_demographics[4]) if user_demographics[4] != 'unknown' else None
+        if len(user_demographics) >= 5:
+            user.browser_hardware = str(user_demographics[4]) if user_demographics[4] != 'unknown' else None
+        if len(user_demographics) >= 8:
+            # demographics[5] is screen resoution '123x456'
+            # demographics[6] is canvas resolution '123x456'
+            # demographics[7] is devicePixelRatio
+            user.screen_width, user.screen_height = map(int, user_demographics[5].split('x'))
+            user.canvas_width, user.canvas_height = map(int, user_demographics[6].split('x'))
+            # note: canvas_oversample is not determined until after receiving SERVER_HELLO
+            user.devicePixelratio = parse_canvas_oversample(user_demographics[7])
 
         for cap in gamedata['browser_caps']:
             if cap in client_browser_caps:
                 user.browser_caps[cap] = int(client_browser_caps[cap])
+
+        user.browser_user_agent = user_agent
 
         user.country = client_login_country
 

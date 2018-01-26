@@ -10984,7 +10984,11 @@ SPINPUNCHGAME.init = function() {
                              spin_demographics['browser_version'] || 'unknown',
                              spin_demographics['browser_OS'] || 'unknown',
                              spin_demographics['locale'] || 'unknown',
-                             spin_demographics['browser_hardware'] || 'unknown'];
+                             spin_demographics['browser_hardware'] || 'unknown',
+                             (screen.width.toString() + 'x' + screen.height.toString()),
+                             (canvas_width.toString() + 'x' + canvas_height.toString()),
+                             window['devicePixelRatio'] || 1
+                            ];
 
     // send browser caps metric
     var audio_context_works = false;
