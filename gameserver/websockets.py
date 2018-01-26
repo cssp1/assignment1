@@ -38,7 +38,7 @@ from twisted.python import log
 from twisted.web.resource import IResource
 import twisted.web.http
 from twisted.web.server import NOT_DONE_YET
-from twisted.internet.address import IPv4Address
+from twisted.internet.address import IPv4Address, IPv6Address
 from zope.interface import implements
 
 import BrowserDetect
@@ -603,7 +603,10 @@ class WebSocketsResource(object):
             peer_port = int(forw_port)
         else:
             peer_port = request.transport.getPeer().port
-        peer = IPv4Address('TCP', peer_ip, peer_port)
+        if ':' in peer_ip:
+            peer = IPv6Address('TCP', peer_ip, peer_port)
+        else:
+            peer = IPv4Address('TCP', peer_ip, peer_port)
 
         # DJM - for debugging only, remember the websocket headers that were sent with the request
         headers = dict((k, v) for k, v in request.requestHeaders.getAllRawHeaders() \
