@@ -1237,7 +1237,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'kg:pool_is_closed')
 
         metric_event_coded(visitor, '0020_page_view',
                            visitor.add_demographics({#'Viewed URL': request.uri,
@@ -1288,7 +1288,7 @@ class GameProxy(proxy.ReverseProxyResource):
             if allow_user_retry:
                 return self.index_visit_kg_auth_redirect(request, visitor)
             else:
-                return self.index_visit_go_away(request, visitor)
+                return self.index_visit_go_away(request, visitor, 'kg:index_visit_kg_verify_response')
 
         return self.index_visit_authorized(request, visitor)
 
@@ -1324,7 +1324,7 @@ class GameProxy(proxy.ReverseProxyResource):
         visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
         if self.the_pool_is_closed():
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'ag:pool_is_closed')
 
         metric_event_coded(visitor, '0020_page_view',
                            visitor.add_demographics({#'Viewed URL': request.uri,
@@ -1365,7 +1365,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # ArmorGames docs say to use payload being null or non-null as the way to determine if a login is valid
         # https://docs.google.com/document/pub?id=1oewk-9Y8yLTUohxCK5by-clEg7qy7-U05FVeC-lSRIc
         if not r.get('payload',None):
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'ag:index_visit_ag_verify_response')
         return self.index_visit_authorized(request, visitor)
 
 
@@ -1374,7 +1374,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # http://myserver.example.com:8005/BHROOT?bh_access_token=...
 
         if self.the_pool_is_closed():
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'bh:pool_is_closed')
 
         if 'bh_access_token' not in request.args:
             return str('missing bh_access_token')
@@ -1386,7 +1386,7 @@ class GameProxy(proxy.ReverseProxyResource):
         # http://myserver.example.com:8005/BHROOT?code=0000abcd&state=something
 
         if self.the_pool_is_closed():
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'mm:pool_is_closed')
 
         if not (('code' in request.args) and ('state' in request.args)):
             if not SpinConfig.config.get('enable_mattermost',0) \
@@ -1500,7 +1500,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_mm_verify_response(self, request, visitor, response):
         r = SpinJSON.loads(response)
         if not r.get('id',None):
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'mm:index_visit_mm_verify_response')
 
         visitor.set_mattermost_id(r['id'])
         # geolocate country
@@ -1540,7 +1540,7 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_do_bh_login_response(self, response, request, visitor, bh_access_token, battlehouse_id):
         r = SpinJSON.loads(response)
         if r['result']['status'] != 'ok' or not r['result'].get('id',None):
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'bh:index_visit_do_bh_login_response')
 
         # redirect unverified accounts here
         if not SpinConfig.config.get('battlehouse_anonymous_play_enabled', False):
@@ -1650,10 +1650,10 @@ class GameProxy(proxy.ReverseProxyResource):
                     pass
 
         if self.the_pool_is_closed(): # note: this needs "country" demographic info
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'fb:pool_is_closed')
 
         if ('go_away_whitelist' in SpinConfig.config) and visitor.facebook_id and (visitor.facebook_id not in SpinConfig.config['go_away_whitelist']):
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'fb:whitelist')
 
 
         if (not visitor.raw_signed_request):
@@ -2047,7 +2047,8 @@ class GameProxy(proxy.ReverseProxyResource):
         redirect_url = SpinConfig.config['proxyserver']['prohibited_country_landing']
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
-    def index_visit_go_away(self, request, visitor):
+    def index_visit_go_away(self, request, visitor, reason):
+        raw_log.event(proxy_time, 'index_visit_go_away() for reason "%s": %s' % (reason, log_request(request)))
         redirect_url = SpinConfig.config['proxyserver']['server_maintenance_landing']
         if ('country' in visitor.demographics) and ('server_maintenance_landing_country_override' in SpinConfig.config['proxyserver']):
             for entry in SpinConfig.config['proxyserver']['server_maintenance_landing_country_override']:
@@ -2058,7 +2059,7 @@ class GameProxy(proxy.ReverseProxyResource):
 
     def index_visit_denied_auth(self, request, visitor):
         redirect_url = SpinConfig.config['proxyserver'].get('user_denied_auth_landing', None)
-        if not redirect_url: return self.index_visit_go_away(request, visitor)
+        if not redirect_url: return self.index_visit_go_away(request, visitor, 'denied_auth')
         return '<html><body onload="location.href = \'%s\';"></body></html>' % str(redirect_url)
 
     def index_visit_server_overload(self):
@@ -2094,7 +2095,7 @@ class GameProxy(proxy.ReverseProxyResource):
             return self.index_visit_coming_soon(request, visitor)
 
         if visitor.must_go_away():
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'must_go_away')
 
         # apply auth to sandbox servers
         if (not SpinConfig.config.get('enable_facebook',0)) and \
@@ -2196,7 +2197,7 @@ class GameProxy(proxy.ReverseProxyResource):
         server = self.assign_game_server(request, visitor)
         if server is None:
             # no servers available
-            return self.index_visit_go_away(request, visitor)
+            return self.index_visit_go_away(request, visitor, 'index_visit_game:no_servers')
 
         # create and insert user_id
         user_id = social_id_table.social_id_to_spinpunch(visitor.social_id, True)
