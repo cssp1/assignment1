@@ -423,7 +423,7 @@ def parse_pgsql_config(dbname, cfg):
         password = cfg['password']
     port = cfg.get('port',5432)
     table_prefix = cfg.get('table_prefix', '')
-    return {'connect_args':['host=%s user=%s password=%s dbname=%s client_encoding=UTF8' % (cfg['host'], username, password, dbname)], 'connect_kwargs':{},
+    return {'connect_args':['host=%s port=%s user=%s password=%s dbname=%s client_encoding=UTF8' % (cfg['host'], port, username, password, dbname)], 'connect_kwargs':{},
             'host':cfg['host'], 'port':port, 'username':username, 'password':password,
             'dbname': dbname, 'table_prefix': table_prefix, 'maintenance_window': cfg.get('maintenance_window',None)}
 
