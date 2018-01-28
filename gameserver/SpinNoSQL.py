@@ -1199,6 +1199,9 @@ class NoSQLClient (object):
             if value >= sys.maxint - 1: return [] # can't exceed 64 bits
             qs['_id'] = value
         else:
+            # quote regex control symbols
+            name = re.escape(name)
+
             if match_mode == 'prefix':
                 qs[name_field] = {'$regex': '^'+name, '$options':'i' if (not case_sensitive) else ''}
             elif match_mode == 'full':
@@ -2355,6 +2358,9 @@ class NoSQLClient (object):
 
     def search_alliance(self, name, limit = -1, reason=''): return self.instrument('search_alliance(%s)'%reason, self._search_alliance, (name, limit))
     def _search_alliance(self, name, limit):
+        # quote regex control symbols
+        name = re.escape(name)
+
         qs = {'ui_name': {'$regex': '^'+name, '$options':'i'}}
         if name:
             qs = {'$or':[qs,
