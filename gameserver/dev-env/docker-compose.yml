@@ -1,0 +1,22 @@
+version: "3"
+services:
+  pgsql:
+    image: postgres:9.6
+#    volumes: # load in the starter dataset (if any)
+#      - ./data:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=gametest
+      - POSTGRES_PASSWORD=gametest
+    ports:
+      - "5434:5432" # accessible as localhost:5434
+
+  mongo:
+    image: mongo:3.6
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=gametest
+      - MONGO_INITDB_ROOT_PASSWORD=gametest
+      - MONGO_INITDB_DATABASE=gametest
+    ports:
+      - "27014:27017" # accessible as localhost:27014
+    volumes:
+      - ./data/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
