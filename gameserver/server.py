@@ -14523,7 +14523,10 @@ class LivePlayer(Player):
         BLOAT = ['logins_by_day', 'purchase_ui_log', 'resources_harvested_at_time', 'resources_looted_at_time', 'stored_iron_at_time', 'stored_water_at_time',
                  'units_manufactured_at_time', 'units_killed_at_time', 'units_lost_at_time', 'items_looted_at_time',
                  'resources_stolen_at_time', 'attacks_launched_at_time', 'attacks_launched_vs_human_at_time', 'attacks_launched_vs_ai_at_time', 'attacks_suffered_at_time',
-                 'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time']
+                 'revenge_attacks_launched_vs_human_at_time', 'revenge_attacks_suffered_at_time',
+                 'gamebucks_spent_on_speedups_at_time', 'gamebucks_spent_on_unit_repair_speedups_at_time', 'speedups_purchased_at_time', 'unit_repair_speedups_purchased_at_time',
+                 'num_gamebucks_purchases_at_time',
+                 ]
         for field in BLOAT:
             if field in self.history: del self.history[field]
 
