@@ -1753,7 +1753,7 @@ CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_PROGRESS_TIMERS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'HELP_REQUEST_REMINDER', 'DISPLAY_DAILY_TIP', 'INVOKE_OFFER_CHOICE', 'TAKE_ITEMS',
                         'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER', 'UI_NOTIFY',
                         'CHANGE_TITLE', 'INVITE_COMPLETE', 'SEND_MESSAGE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_INGAME_TIP', 'INVOKE_VIDEO_WIDGET',
-                        'ALL_AGGRESSIVE',
+                        'ALL_AGGRESSIVE', 'INVOKE_FULLSCREEN_PROMPT',
                    ])
 
 def check_consequent(cons, reason = '', context = None, context_data = None):
@@ -1977,7 +1977,7 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
                                 'ENABLE_COMBAT_RESOURCE_BARS', 'ENABLE_PROGRESS_TIMERS', 'ENABLE_DIALOG_COMPLETION', 'INVITE_FRIENDS_PROMPT', 'BH_BOOKMARK_PROMPT', 'BH_WEB_PUSH_INIT', 'TAKE_ITEMS',
                                 'HELP_REQUEST_REMINDER',
                                 'CLEAR_UI', 'CLEAR_NOTIFICATIONS', 'DEV_EDIT_MODE', 'GIVE_GAMEBUCKS', 'LOAD_AI_BASE', 'REPAIR_ALL', 'FPS_COUNTER',
-                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE', 'INVOKE_LOGIN_INCENTIVE_DIALOG',
+                                'FOCUS_CHAT_GUI', 'ALL_AGGRESSIVE', 'INVITE_COMPLETE', 'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_FULLSCREEN_PROMPT',
                                 'NULL']:
         # we recognize these ones, but they don't have detailed sanity checks written for them yet
         pass

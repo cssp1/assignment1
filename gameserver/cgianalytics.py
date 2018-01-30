@@ -2023,6 +2023,7 @@ FUNNEL_ADVANCED = get_tutorial_stages(gamedata) + [
     {'name': 'F26 Disabled "FB Notifications" preference', 'func': lambda user: get_preference(user, 'enable_fb_notifications', 1) == 0 },
     {'name': 'F30A Used True HTML5 Full Screen', 'func': lambda user: user.get('feature_used:truefullscreen',False) },
     {'name': 'F30B Used True HTML5 Full Screen during tutorial', 'func': lambda user: user.get('feature_used:truefullscreen_during_tutorial',False) },
+    {'name': 'F30C Received HTML5 Full Screen prompt', 'func': lambda user: user.get('feature_used:fullscreen_prompt',False) },
     {'name': 'F31 Used Scrolling', 'func': lambda user: user.get('feature_used:scrolling',False) },
     {'name': 'F32 Used Playfield Zoom', 'func': lambda user: user.get('feature_used:playfield_zoom',False) },
 

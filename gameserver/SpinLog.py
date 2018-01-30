@@ -264,6 +264,9 @@ def MetricsLogFilter(child):
                                   '6402_web_push_sub_prompt_fail',
                                   '6410_web_push_sub_created',
 
+                                  '6500_fullscreen_prompt',
+                                  '6501_fullscreen_engaged',
+
                                   '7132_fb_notification_reset',
 
                                   '7150_friendstone_generated',

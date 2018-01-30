@@ -847,6 +847,7 @@ def read_consequent(data):
                   'HELP_REQUEST_REMINDER',
                   'INVOKE_LOGIN_INCENTIVE_DIALOG', 'INVOKE_MAP_DIALOG', 'INVOKE_INGAME_TIP',
                   'INVOKE_VIDEO_WIDGET','ENABLE_PROGRESS_TIMERS','TUTORIAL_ARROW','UI_NOTIFY',
+                  'INVOKE_FULLSCREEN_PROMPT',
                   ): return ClientConsequent(data)
     else:
         raise Exception('unknown consequent '+kind)

@@ -396,6 +396,18 @@ InviteFriendsPromptConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeFullscreenPromptConsequent(data) {
+    goog.base(this, data);
+    this.notification_params = data['notification_params'] || {};
+}
+goog.inherits(InvokeFullscreenPromptConsequent, Consequent);
+InvokeFullscreenPromptConsequent.prototype.execute = function(state) {
+    if(!auto_fullscreen_prompt_enabled()) { return; }
+    notification_queue.push(invoke_fullscreen_prompt, this.notification_params);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function BHBookmarkPromptConsequent(data) {
     goog.base(this, data);
 }
@@ -1116,6 +1128,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_TOP_ALLIANCES_DIALOG') { return new InvokeTopAlliancesDialogConsequent(data); }
     else if(kind === 'INVOKE_INVENTORY_DIALOG') { return new InvokeInventoryDialogConsequent(data); }
     else if(kind === 'INVITE_FRIENDS_PROMPT') { return new InviteFriendsPromptConsequent(data); }
+    else if(kind === 'INVOKE_FULLSCREEN_PROMPT') { return new InvokeFullscreenPromptConsequent(data); }
     else if(kind === 'BH_BOOKMARK_PROMPT') { return new BHBookmarkPromptConsequent(data); }
     else if(kind === 'BH_WEB_PUSH_INIT') { return new BHWebPushInitConsequent(data); }
     else if(kind === 'HELP_REQUEST_REMINDER') { return new HelpRequestReminderConsequent(data); }

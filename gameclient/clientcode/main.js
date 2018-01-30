@@ -686,12 +686,34 @@ function toggle_true_fullscreen() {
     if(canvas_is_fullscreen) {
         document['SPINcancelFullScreen']();
     } else {
-        player.record_feature_use('truefullscreen');
+        if(player.record_feature_use('truefullscreen')) {
+            metric_event('6501_fullscreen_engaged', add_demographics({}));
+        }
+
         if(player.tutorial_state != "COMPLETE") {
             player.record_feature_use('truefullscreen_during_tutorial');
         }
         canvas_div['SPINrequestFullScreen']();
     }
+}
+
+/** @return {boolean}
+    Check for situations where we want to encourage the player to enable fullscreen mode at EVERY login */
+function auto_fullscreen_prompt_enabled() {
+    if('ignore_fullscreen_prompt' in player.preferences && player.preferences['ignore_fullscreen_prompt']) {
+        return false; // disabled by player preference
+    }
+
+    if(spin_frame_platform !== 'bh') { return false; } // only on bh.com for now
+    if(!has_true_fullscreen()) { return false; }
+
+    // check for Android devices. Note, this should not apply to ChromeOS Chromebooks,
+    // and should not apply in browser standalone mode (where has_true_fullscreen() will return false above)
+    if(spin_demographics['browser_OS'] === "Android") {
+        return true;
+    }
+
+    return false;
 }
 
 function friend_invites_enabled() {
@@ -7290,7 +7312,9 @@ player.record_feature_use = function(name) {
         // update quest status, because some quests are completed by a feature_used: value going nonzero
         player.invalidate_quest_cache();
         player.quest_tracked_dirty = true;
+        return true; // first time
     }
+    return false; // already seen
 };
 player.check_feature_use = function(name) {
     var key = 'feature_used:'+name;
@@ -19442,7 +19466,8 @@ function update_tutorial_arrow_for_button(_dialog, _parent_path, _widget_name, _
                   parent_path_list[0].indexOf("_popup") != -1 ||
                   parent_path_list[0].indexOf("context_menu") != -1 ||
                   parent_path_list[0].indexOf("inventory_context") != -1 ||
-                  parent_path_list[0].indexOf("tutorial") != -1) {
+                  parent_path_list[0].indexOf("tutorial") != -1 ||
+                  parent_path_list[0] === "fullscreen_prompt") {
 
             // search for parent dialog by name
             var roots = [selection.ui, tutorial_root];
@@ -37594,6 +37619,49 @@ function invoke_fullscreen_instructions() {
     } else {
         change_selection_ui(null);
     }
+    return dialog;
+}
+
+function invoke_fullscreen_prompt() {
+    // doesn't make sense to call this unless true fullscreen is available
+    if(!has_true_fullscreen()) { throw Error('browser does not support true fullscreen'); }
+
+    // full screen already?
+    if(canvas_is_fullscreen) { return null; }
+
+    if(player.record_feature_use('fullscreen_prompt')) {
+        metric_event('6500_fullscreen_prompt', add_demographics({}));
+    }
+
+    change_selection(null);
+    var dialog = new SPUI.Dialog(gamedata['dialogs']['fullscreen_prompt']);
+    dialog.user_data['dialog'] = 'fullscreen_prompt';
+    change_selection_ui(dialog);
+    dialog.auto_center();
+    dialog.modal = true;
+    dialog.widgets['close_button'].onclick = close_parent_dialog;
+    dialog.widgets['ok_button'].onclick = function(w) {
+        close_parent_dialog(w);
+        toggle_true_fullscreen();
+    };
+
+    // arrow pointing to ok_button
+    read_consequent({'consequent':'TUTORIAL_ARROW', 'child': 1,
+                     'arrow_type':'button',
+                     'direction':'down',
+                     'dialog_name':'fullscreen_prompt',
+                     'widget_name':'ok_button'}).execute();
+
+    // optional "Don't show again" button
+    if((player.history['logged_in_times'] || 0 >= 5)) {
+        dialog.widgets['ignore_button'].show = true;
+        dialog.widgets['ignore_button'].onclick = function(w) {
+            w.state = (w.state == 'active' ? 'normal' : 'active');
+            player.preferences['ignore_fullscreen_prompt'] = (w.state == 'active' ? 1 : 0);
+            send_to_server.func(["UPDATE_PREFERENCES", player.preferences]);
+        };
+    }
+
     return dialog;
 }
 

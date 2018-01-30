@@ -6754,6 +6754,8 @@
         }
     },
 
+    // tell the player to press a key combination to make their browser go full-screen
+    // this is a passive GUI display only, with no functionality
     "fullscreen_instructions": {
         "dimensions": [770,485],
         "default_button": "ok_button",
@@ -6789,6 +6791,35 @@
             "ok_button": { "kind": "ActionButton", "xy": [265,401], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
                            "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "ui_name": "Understood" },
             "close_button": { "kind": "ActionButton", "xy": [738,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
+        }
+    },
+
+    // active dialog that encourages player to click to enter (true HTML5) full-screen mode
+    "fullscreen_prompt": {
+        "dimensions": [570,485],
+        "default_button": "ok_button",
+        "widgets": {
+            "bg": {"kind": "StaticImage", "xy":[0,0], "dimensions":[570,485], "asset":"dialog_resizable","bg_image_resizable":1 },
+            "sunken": {"kind": "StaticImage", "xy":[8,35], "dimensions":[554,418], "asset": "dialog_sunken_resizable", "bg_image_resizable": 1 },
+            "picture_frame": { "kind": "SolidRect", "xy": [15,42], "dimensions": [193,404], "outline_color": [1,1,1,0.5], "outline_width": 1.5 },
+            "picture": {"kind": "StaticImage", "xy":[16,43], "dimensions":[191,402], "asset": "fullscreen_191x402" },
+
+            "title2": { "kind": "TextField", "xy": [229,60], "dimensions": [210, 46], "text_size": 32, "text_style": "bold",
+                        "text_hjustify": "left", "ui_name": "Play in Full Screen" },
+            "description": { "kind": "TextField", "xy": [229,137], "dimensions": [210,53], "text_size": 15, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "top",
+                             "ui_name": "Tap the button to begin full-screen gameplay." },
+
+            "ok_button": { "kind": "ActionButton", "xy": [275,270], "dimensions": [200,60], "text_size": 17, "text_style": "bold",
+                           "bg_image": "action_button_resizable", "bg_image_resizable": 1, "ui_name": "Proceed" },
+            "close_button": { "kind": "ActionButton", "xy": [538,1], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 },
+
+            "ignore_button": { "kind": "ActionButton", "xy": [270,405], "dimensions": [233,26], "bg_image_offset": [0,4], "push_text": 0,
+                               "bg_image": "checkbox_button", "text_color": [0.5,0.5,0.5,1], "text_size": 13,
+                               "ui_name": "Don't show this message again",
+                               "text_offset": [24,0],
+                               "text_hjustify": "left", "text_vjustify": "center", "show": 0
+                             }
         }
     },
 
