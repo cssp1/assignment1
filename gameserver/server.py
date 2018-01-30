@@ -2958,6 +2958,13 @@ class User:
                 return False
         return True
 
+    # prune list of Facebook "Likes" to the ones we care enough about to store in User data
+    def filter_facebook_likes(self, likes):
+        ids_we_care_about = set(SpinConfig.FACEBOOK_GAME_FAN_PAGES.itervalues())
+        if 'fb_likes_preload' in gamedata:
+            ids_we_care_about.update(gamedata['fb_likes_preload'])
+        return filter(lambda entry: entry['id'] in ids_we_care_about, likes)
+
     # this callback is called for each URL downloaded asynchronously
     @admin_stats.measure_latency('AsyncHTTP(facebook_profile/friends/likes)')
     def retrieve_facebook_info_receive(self, session, dest, raw_result, result = None):
@@ -2977,7 +2984,7 @@ class User:
             self.populate_friends_who_play(session)
 
         elif dest == 'likes':
-            self.facebook_likes = result
+            self.facebook_likes = self.filter_facebook_likes(result)
             session.player.user_facebook_likes = self.facebook_likes
 
         elif dest == 'profile':
