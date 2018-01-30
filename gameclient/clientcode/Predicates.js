@@ -1455,6 +1455,17 @@ BrowserHardwarePredicate.prototype.is_satisfied = function(player, qdata) {
 
 /** @constructor @struct
   * @extends Predicate */
+function BrowserStandaloneModePredicate(data) {
+    goog.base(this, data);
+}
+goog.inherits(BrowserStandaloneModePredicate, Predicate);
+BrowserStandaloneModePredicate.prototype.is_satisfied = function(player, qdata) {
+    return is_browser_standalone_mode(); // from main.js
+};
+
+
+/** @constructor @struct
+  * @extends Predicate */
 function FramePlatformPredicate(data) {
     goog.base(this, data);
     this.platform = data['platform'];
@@ -2313,6 +2324,8 @@ function read_predicate(data) {
         return new BrowserOSPredicate(data);
     } else if(kind === 'BROWSER_HARDWARE') {
         return new BrowserHardwarePredicate(data);
+    } else if(kind === 'BROWSER_STANDALONE_MODE') {
+        return new BrowserStandaloneModePredicate(data);
     } else if(kind === 'SELECTED') {
         return new SelectedPredicate(data);
     } else if(kind === 'REGION_MAP_SELECTED') {
