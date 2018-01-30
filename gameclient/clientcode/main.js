@@ -10909,9 +10909,21 @@ SPINPUNCHGAME.init = function() {
                   ) {
                     console.log('exiting fullscreen mode');
                     canvas_is_fullscreen = false;
+
+                    // unlock screen orientation, if the API is available
+                    if('orientation' in screen && 'unlock' in screen['orientation']) { screen['orientation']['unlock'](); }
                 } else {
                     console.log('entering fullscreen mode');
                     canvas_is_fullscreen = true;
+
+                    // lock screen into landscape mode, if the API is available
+                    if('orientation' in screen && 'lock' in screen['orientation']) {
+                        screen['orientation']['lock']('landscape').then(
+                            // success
+                            function(_) { },
+                            // failure - do nothing
+                            function(_) {});
+                    }
                 }
             }, false);
         } else {
