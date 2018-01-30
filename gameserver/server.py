@@ -1537,29 +1537,34 @@ class User:
         return self.chat_mod or self.is_developer()
 
     def prune_acquisition_data(self):
-        # get rid of all entries that have the 'useless':1 designation, unless they are the first
+        # after adding newest acquisition data entry, go back and prune out unwanted old entries
+        # we get rid of anything that get_acquisition_data_from_url() considers 'useless'
+        # as well as anything not marked 'important' on login
         new_data = []
 
-        for i in xrange(len(self.acquisition_data)):
-            d = self.acquisition_data[i]
-            useless = False
-            if (i != 0):
+        for i, d in enumerate(self.acquisition_data):
+            if i > 0: # never prune first entry
                 if d.get('useless',0):
-                    useless = True
+                    continue # prune - useless
                 elif ('url' in d):
                     parsed = get_acquisition_data_from_url(d['url'], self.user_id)
                     if parsed and parsed.get('useless',0):
-                        useless = True
-            if not useless:
-                new_data.append(d)
+                        continue # prune - useless
+
+                if not d.get('important', False):
+                    continue # prune - not important
+
+            new_data.append(d)
 
         self.acquisition_data = new_data
 
-    def update_acquisition_data(self, data, player):
-        # optionally pass in 'player' to update history fields
+    def update_acquisition_data(self, data, important = False):
+        # 'important' means 'first acquisition, or reacquisition after account lapsed for a while'
 
         if data:
             data['time'] = server_time
+            if important:
+                data['important'] = 1
             self.acquisition_data.append(data)
             if ('adotomi' in gamedata['adnetworks']) and ('adotomi_context' in data) and (not self.adotomi_context):
                 self.adotomi_context = data['adotomi_context']
@@ -2754,7 +2759,7 @@ class User:
 
                 # record acquisition event
                 props['type'] = 'facebook_friend_invite'
-                self.update_acquisition_data(props, None)
+                self.update_acquisition_data(props, important = True)
 
             elif my_data == 'gift':
                 # this is handled server-side upon login with dbclient gift_receive
@@ -2807,7 +2812,7 @@ class User:
 
                 # record acquisition event
                 props['type'] = 'facebook_friend_invite'
-                self.update_acquisition_data(props, None)
+                self.update_acquisition_data(props, important = True)
 
             elif my_data == 'gift':
                 # reception of gifts is handled server-side upon login with dbclient gift_receive - the underlyting apprequest actually does nothing!
@@ -27409,7 +27414,7 @@ class GAMEAPI(resource.Resource):
                     for request_id in url_qs['request_ids'][0].split(','):
                         if (not is_returning_user):
                             # update acquisition data - we need to rewrite retrieve_facebook_requests_complete(), it's old and creaky
-                            user.update_acquisition_data({'facebook_request_id': request_id.split('_')[0], 'type': 'facebook_friend_invite'}, session.player)
+                            user.update_acquisition_data({'facebook_request_id': request_id.split('_')[0], 'type': 'facebook_friend_invite'})
 
 
                 if request_event:
@@ -27488,19 +27493,22 @@ class GAMEAPI(resource.Resource):
         # send the events
         metric_event_coded(user.user_id, '0115_logged_in', copy.deepcopy(acq_event_props))
 
+        is_reacquisition = False
+
         if user.account_creation_time == server_time:
             metric_event_coded(user.user_id, '0110_created_new_account', acq_event_props)
         elif (player.last_logout_time() > 0) and (server_time - player.last_logout_time() >= SpinConfig.ACCOUNT_LAPSE_TIME):
             acq_event_props['sum'] = player.get_denormalized_summary_props('brief')
             acq_event_props['lapse_time'] = server_time - player.last_logout_time()
             metric_event_coded(user.user_id, '0112_account_reacquired', acq_event_props)
+            is_reacquisition = True
 
         session.send_adnetwork_acquisition_event(retmsg)
         session.send_adnetwork_visit_event(retmsg)
         session.send_adnetwork_events(retmsg)
 
         # record acquisition data (for this visit)
-        user.update_acquisition_data(acq_data, session.player)
+        user.update_acquisition_data(acq_data, important = ((not is_returning_user) or is_reacquisition))
 
         retmsg.append(["SERVER_HELLO",
                        gamedata["version"],
