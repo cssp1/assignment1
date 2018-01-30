@@ -660,10 +660,25 @@ function current_pvp_season() {
 }
 
 
+/** @return {boolean}
+    Check if we are running in "mobile standalone" mode, which is
+    where we're in a mobile browser, but permanently (sort of)
+    full-screened by the OS.
+*/
+function is_browser_standalone_mode() {
+    // for iOS
+    if('standalone' in window.navigator && window.navigator['standalone']) { return true; }
+    // for Chrome
+    if('matchMedia' in window && window['matchMedia']('(display-mode: standalone)')['matches']) { return true; }
+    if(get_query_string('standalone') === '1') { return true; }
+    return false;
+}
+
 // only works after init()
 function has_true_fullscreen() {
     if(!(canvas_div['SPINrequestFullScreen'] && document['SPINcancelFullScreen'])) { return false; }
     if(get_query_string('truefullscreen') === '1') { return true; }
+    if(is_browser_standalone_mode()) { return false; } // bh.com frame is already "fullscreen", so disable in-app fullscreen
     return read_predicate(gamedata['client']['truefullscreen']).is_satisfied(player,null);
 }
 
@@ -9850,6 +9865,9 @@ function invoke_playfield_controls_bar() {
     // true FS support
     if(has_true_fullscreen()) {
         dialog.widgets['fullscreen_button'].show = true;
+    } else if(is_browser_standalone_mode()) {
+        // no need for this button (?)
+        dialog.widgets['fullscreen_button'].show = false;
     } else {
         // fake FS dialog - breaks tutorial and has no useful info for non-Windows/Mac browsers
         dialog.widgets['fullscreen_button'].show = ((player.tutorial_state == "COMPLETE") &&
