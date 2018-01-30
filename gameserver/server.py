@@ -14596,6 +14596,13 @@ class LivePlayer(Player):
         # publish any modified scores
         self.publish_scores(reason = 'migrate')
 
+        # prune obsolete Scores2 entries that refer to seasons/weeks/days more than 2 steps into the past
+        # note: this means we are relying on the Postgres database for authoritative historical scores
+        if gamedata['server'].get('scores2_prune', False):
+            self.scores2.prune({Scores2.FREQ_SEASON: SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time()),
+                                Scores2.FREQ_WEEK:   SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time()),
+                                Scores2.FREQ_DAY:    SpinConfig.get_pvp_day(gamedata['matchmaking']['week_origin'], self.get_absolute_time())})
+
     def recalculate_xp(self):
         new_player_xp = gamedata['player_xp']
 
