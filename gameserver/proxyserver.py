@@ -1876,12 +1876,26 @@ class GameProxy(proxy.ReverseProxyResource):
             if self.attempt < config.get('scope_check_max_tries', 2) - 1 and self.is_recoverable_error(reason):
                 self.attempt += 1
                 reactor.callLater(config.get('scope_check_retry_delay', 1.0), self.go)
-                return
 
-            # in the event of an API failure, return a fake JSON response that encodes the error so that we can detect and handle it below
-            self.d.callback(self.parent.index_visit_check_scope_response(self.request, self.visitor,
-                                                                         '{"data":[{"permission":"spin_error","status":'+SpinJSON.dumps(reason)+'}]}',
-                                                                         allow_user_retry = False))
+            elif 'User has not installed the application' in reason:
+                # We're seeing this error more often now. It seems to be some kind of race condition
+                # where the user uninstalls the app and then tries to come back soon afterward.
+                # The browser seems to submit an OAuth access token that is valid, but the FB platform still has them marked "not installed yet".
+
+                if SpinConfig.config['proxyserver'].get('log_auth_scope', 0) >= 1:
+                    exception_log.event(proxy_time, 'proxyserver: ScopeCheck.on_error(), returning back to FB auth step. facebook ID %s reason %r' % (self.visitor.facebook_id, reason))
+
+                # blank out OAuth parameters, because we know they are not working
+                self.visitor.raw_signed_request = self.visitor.oauth_token = self.visitor.csrf_state = None
+
+                # return back to "do FB auth" step
+                self.d.callback(self.parent.index_visit_do_fb_auth(self.request, self.visitor))
+
+            else:
+                # in the event of an unknown API failure, return a fake JSON response that encodes the error so that we can detect and handle it below
+                self.d.callback(self.parent.index_visit_check_scope_response(self.request, self.visitor,
+                                                                             '{"data":[{"permission":"spin_error","status":'+SpinJSON.dumps(reason)+'}]}',
+                                                                             allow_user_retry = False))
 
     # allow_user_retry means "you can kick the user back to the do_auth page"
     def index_visit_check_scope_response(self, request, visitor, response, preload_data = None, allow_user_retry = True):
