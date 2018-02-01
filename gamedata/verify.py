@@ -3225,8 +3225,11 @@ def check_resource(name, data):
             error |= check_predicate(data[PRED], 'resources:'+name+':'+PRED)
     return error
 
-def check_store_sku(sku_name, sku):
+def check_store_sku(sku_name, sku, state = None):
     error = 0
+
+    if state is None:
+        state = {'leaders': {}}
 
     expect_items = None
     expect_items_unique_equipped = None
@@ -3235,6 +3238,16 @@ def check_store_sku(sku_name, sku):
     if 'item' in sku:
         if sku['item'].startswith('leader_'):
             expect_items_unique_equipped = set([gamedata['items'][sku['item']]['unique_equipped']])
+
+            # check that duplicates of the same item have "requires" predicates
+            # this was a very common copy/paste typo for TR leader releases
+            if 'requires' in sku:
+                if sku['item'] in state['leaders']:
+                    other = state['leaders'][sku['item']]
+                    if (sku.get('requires') != other.get('requires')):
+                        error |= 1; print 'Store: leader item %s has inconsistent \"requires\" predicates among its multiple listings' % sku['item']
+                else:
+                    state['leaders'][sku['item']] = sku
         else:
             # guard against typos where a predicate refers to the wrong item or level
             expect_items = set([sku['item']])
@@ -3280,7 +3293,7 @@ def check_store_sku(sku_name, sku):
 
     if 'skus' in sku: # hierarchy
         for subsku in sku['skus']:
-            error |= check_store_sku(sku_name+':'+subsku.get('name',subsku.get('item','unknown')), subsku)
+            error |= check_store_sku(sku_name+':'+subsku.get('name',subsku.get('item','unknown')), subsku, state = state)
 
     else: # single SKU
         if 'item' in sku:
