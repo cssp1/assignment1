@@ -1540,7 +1540,17 @@ class GameProxy(proxy.ReverseProxyResource):
     def index_visit_do_bh_login_response(self, response, request, visitor, bh_access_token, battlehouse_id):
         r = SpinJSON.loads(response)
         if r['result']['status'] != 'ok' or not r['result'].get('id',None):
-            return self.index_visit_go_away(request, visitor, 'bh:index_visit_do_bh_login_response')
+            # Strange - the /play URL rendered but the access token is not valid. Maybe it went stale?
+
+            # Tell the outer frame to fix the login problem
+            # by posting the message "bh_iframe_login_error" to be handled by the play.html frame
+            return ('''
+<html>
+<body onload="window.top.postMessage('bh_iframe_login_error', '*');">
+<h2 style="color:#ff0; font-family: sans-serif;">Temporary login error. Redirecting to the login page...</h2>
+</body>
+</html>
+''').encode('utf-8')
 
         # redirect unverified accounts here
         if not SpinConfig.config.get('battlehouse_anonymous_play_enabled', False):
