@@ -402,8 +402,13 @@ function InvokeFullscreenPromptConsequent(data) {
 }
 goog.inherits(InvokeFullscreenPromptConsequent, Consequent);
 InvokeFullscreenPromptConsequent.prototype.execute = function(state) {
-    if(!auto_fullscreen_prompt_enabled()) { return; }
-    notification_queue.push(invoke_fullscreen_prompt, this.notification_params);
+    // note: the enabled() check must be run inside the notification queue,
+    // because otherwise it might execute before player.preferences is received
+    // from the server.
+    notification_queue.push(function() {
+        if(!auto_fullscreen_prompt_enabled()) { return; }
+        invoke_fullscreen_prompt();
+    }, this.notification_params);
 };
 
 /** @constructor @struct
