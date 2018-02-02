@@ -401,7 +401,7 @@ if __name__ == '__main__':
 
         if (not dry_run) and do_prune:
             # drop old data
-            KEEP_DAYS = 90
+            KEEP_DAYS = 999999 # keep indefinitely
             old_limit = time_now - KEEP_DAYS * 86400
 
             for TABLE in store_table, unit_cost_table:
