@@ -6,7 +6,7 @@
 
 # dump "log_gamebucks" table from MongoDB to a MySQL database for analytics
 
-import sys, time, getopt
+import sys, time, getopt, calendar
 import SpinConfig
 import SpinUpcache
 import SpinJSON
@@ -131,8 +131,9 @@ if __name__ == '__main__':
     do_prune = False
     do_optimize = False
     do_unit_cost = False
+    source = 'mongodb'
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['prune','optimize','dry-run','unit-cost'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:c:q', ['prune','optimize','dry-run','unit-cost','s3='])
 
     for key, val in opts:
         if key == '-g': game_id = val
@@ -142,6 +143,11 @@ if __name__ == '__main__':
         elif key == '--prune': do_prune = True
         elif key == '--optimize': do_optimize = True
         elif key == '--unit-cost': do_unit_cost = True
+        elif key == '--s3':
+            # specify starting date for backfill, like "--s3 2015-04-01"
+            source = 's3'
+            source_ymd = map(int, val.split('-'))
+            assert len(source_ymd) == 3
 
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
 
@@ -175,7 +181,7 @@ if __name__ == '__main__':
         start_time = -1
         end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-        cur.execute("SELECT time FROM "+sql_util.sym(store_table)+" ORDER BY time DESC LIMIT 1")
+        cur.execute("SELECT MAX(time) AS time FROM "+sql_util.sym(store_table))
         rows = cur.fetchall()
         if rows:
             start_time = max(start_time, rows[0]['time'])
@@ -188,9 +194,22 @@ if __name__ == '__main__':
         affected_days = set()
         affected_hours = set()
 
-        qs = {'time':{'$gt':start_time, '$lt':end_time}}
+        if source == 's3':
+            s3_start_time = calendar.timegm(source_ymd + [0,0,0]) - 1
+            if start_time < 0:
+                start_time = s3_start_time
+            else:
+                start_time = max(start_time, s3_start_time)
 
-        for row in nosql_client.log_buffer_table('log_gamebucks').find(qs):
+            if verbose: print 'Source = S3, starting at', start_time
+            row_iter = SpinETL.iterate_from_s3(SpinConfig.config['game_id'], 'spinpunch-logs',
+                                               'gamebucks',
+                                               start_time, end_time, verbose = False)
+        else:
+            row_iter = nosql_client.log_buffer_table('log_gamebucks') \
+                       .find({'time':{'$gt':start_time, '$lt':end_time}})
+
+        for row in row_iter:
             keyvals = [('time',row['time']),
                        ('user_id',row['user_id'])]
 
