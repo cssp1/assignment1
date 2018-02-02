@@ -297,9 +297,6 @@ PURCHASE_CATEGORY_MAP = {'MAKE_DROIDS': 'manufacturing', # dummy entry for produ
                          'ENHANCE_FOR_MONEY': 'enhancement',
                          'CRAFT_FOR_MONEY': 'crafting',
                          'UPGRADE_FOR_MONEY': 'building_upgrade',
-                         'BOOST_IRON_10PCT': 'resource_boost', 'BOOST_IRON_25PCT': 'resource_boost', 'BOOST_IRON_50PCT': 'resource_boost', 'BOOST_IRON_100PCT': 'resource_boost',
-                         'BOOST_WATER_10PCT': 'resource_boost', 'BOOST_WATER_25PCT': 'resource_boost', 'BOOST_WATER_50PCT': 'resource_boost', 'BOOST_WATER_100PCT': 'resource_boost',
-                         'BOOST_RES3_10PCT': 'resource_boost', 'BOOST_RES3_25PCT': 'resource_boost', 'BOOST_RES3_50PCT': 'resource_boost', 'BOOST_RES3_100PCT': 'resource_boost',
                          'BUY_RESOURCES_TOPUP': 'resource_boost',
                          'REPAIR_ALL_FOR_MONEY': 'repair',
                          'UNIT_REPAIR_SPEEDUP_FOR_MONEY': 'repair',
@@ -393,6 +390,12 @@ def classify_purchase(gamedata, descr):
             catname = 'random_items'
         else:
             catname = PURCHASE_CATEGORY_MAP.get(cat, None) # 'specific_items'
+
+    elif cat.startswith('BOOST_IRON_') or \
+         cat.startswith('BOOST_WATER_') or \
+         cat.startswith('BOOST_RES'):
+        catname = 'resource_boost'
+
     else:
         catname = PURCHASE_CATEGORY_MAP.get(cat, None)
 
