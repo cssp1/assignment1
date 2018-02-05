@@ -23,6 +23,7 @@ variable "n_instances" {
   description = "Number of MongoDB server instances"
   default = 1
 }
+variable "ami" {}
 variable "ssh_access_security_group_id" {}
 variable "mongodb_security_group_id" {}
 variable "mongodb_root_password" {}

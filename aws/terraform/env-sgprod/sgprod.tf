@@ -19,6 +19,7 @@ module "mongodb" {
   backups_bucket = "${var.backups_bucket}"
   extra_backups_bucket = "${var.extra_backups_bucket}"
   region = "${var.region}"
+  ami = "${var.amis[var.region]}"
   key_pair_name = "${var.key_pair_name}"
   cloud_config_boilerplate_rendered = "${module.cloud_config.boilerplate_rendered}"
   cron_mail_sns_topic = "${var.cron_mail_sns_topic}"

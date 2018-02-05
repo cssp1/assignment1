@@ -14,6 +14,7 @@ module "mongodb" {
   vpc_id = "${var.vpc_id}"
   subnet_ids = "${var.subnet_ids}"
   availability_zones = "${var.availability_zones}"
+  ami = "${var.amis[var.region]}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   backups_bucket = "${var.backups_bucket}"

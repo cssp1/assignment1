@@ -18,8 +18,11 @@ variable "region" {
 }
 variable "amis" {
   description = "Base AMI to launch AWS instances with"
+  # note 1: AWS instances have ignore_changes set for "ami", because changing them all over at once in an update would be disruptive.
+  #         When updating, manually taint instances individually to do a slow roll-out.
   default = {
-    us-east-1 = "ami-a4827dc9" # Amazon Linux AMI 2016.03.2 HVM (SSD) EBS-Backed 64-bit
+#    us-east-1 = "ami-a4827dc9" # Amazon Linux AMI 2016.03.2 HVM (SSD) EBS-Backed 64-bit
+    us-east-1 = "ami-97785bed" # Amazon Linux AMI 2017.09.1 HVM (SSD) EBS-Backed 64-bit
   }
 }
 variable "key_pair_name" {

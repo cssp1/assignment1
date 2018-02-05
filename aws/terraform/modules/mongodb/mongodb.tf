@@ -46,7 +46,7 @@ EOF
 
 resource "aws_iam_instance_profile" "mongodb" {
     name = "${var.sitename}-mongodb"
-    roles = ["${aws_iam_role.mongodb.name}"]
+    role = "${aws_iam_role.mongodb.name}"
 }
 
 # EC2 instance
@@ -56,9 +56,8 @@ resource "aws_instance" "mongodb" {
 
   # Amazon Linux AMI 2017.03
   # us-east-1 HVM (SSD) EBS-Backed 64-bit
-  ami = "ami-c58c1dd3"
-  # HVM Instance Store
-  # ami = "ami-24e7f233"
+  ami = "${var.ami}"
+  # note: HVM Instance Store needs different AMI
 
   instance_type = "${var.mongodb_instance_type}"
   associate_public_ip_address = true
@@ -72,6 +71,10 @@ resource "aws_instance" "mongodb" {
     Name = "${var.sitename}-mongodb-${count.index}"
     spin_role = "prod-mongo"
     Terraform = "true"
+  }
+
+  lifecycle = {
+    ignore_changes = ["ami", "user_data", "tags"] # must manually taint for these changes
   }
 
   # note: data size BFM 4.4G, TR 66G
