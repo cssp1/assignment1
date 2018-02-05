@@ -2876,12 +2876,37 @@ class GameProxy(proxy.ReverseProxyResource):
         elif self.path == '/ADMIN/':
             return admin_stats.render_html()
 
+        # legacy generic /PING
         elif self.path == '/PING':
             SpinHTTP.set_access_control_headers(request)
             request.setHeader('Pragma','no-cache, no-store')
             request.setHeader('Cache-Control','no-cache, no-store')
             request.setHeader('Expires','0')
             return 'ok\n'
+
+        # new proxyserver game health check
+        # this makes sure that SpinNoSQL is responsive, and there is at least one open game server
+        elif self.path == '/GAME_HEALTH':
+            SpinHTTP.set_access_control_headers(request)
+            request.setHeader('Pragma','no-cache, no-store')
+            request.setHeader('Cache-Control','no-cache, no-store')
+            request.setHeader('Expires','0')
+            status_proxyserver = 'OK'
+            status_mongodb = 'OK'
+            status_game = 'DOWN'
+            try:
+                anyserver = get_any_game_server()
+                if anyserver:
+                    status_game = 'OK'
+                else:
+                    # no active game servers
+                    request.setResponseCode(http.INTERNAL_SERVER_ERROR)
+            except:
+                status_mongodb = 'DOWN'
+                request.setResponseCode(http.INTERNAL_SERVER_ERROR)
+                pass
+            return 'Proxyserver is %s. MongoDB is %s. Game is %s.\n' % \
+                   (status_proxyserver, status_mongodb, status_game)
 
         # should not get here
         raise Exception('unhandled API request '+repr(request))
@@ -2917,7 +2942,7 @@ class GameProxy(proxy.ReverseProxyResource):
                 ret = self.render_ROOT(request, frame_platform = 'bh')
             elif self.path == '/MMROOT':
                 ret = self.render_ROOT(request, frame_platform = 'mm')
-            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
+            elif self.path in ('/GAMEAPI', '/CREDITAPI', '/TRIALPAYAPI', '/KGAPI', '/XSAPI', '/CONTROLAPI', '/STATSAPI', '/METRICSAPI', '/ADMIN/', '/PING', '/GAME_HEALTH', '/OGPAPI', '/FBRTAPI', '/FBDEAUTHAPI'):
                 ret = self.render_API(request)
             else:
                 ret = str('error')
@@ -3335,7 +3360,7 @@ class ProxyRoot(TwistedNoResource):
                 self.static_resources[srcfile] = UncachedJSFile('../gameclient/'+srcfile)
 
         self.proxied_resources = {}
-        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING'):
+        for chnam in ('', 'KGROOT', 'AGROOT', 'BHROOT', 'GAMEAPI', 'METRICSAPI', 'CREDITAPI', 'TRIALPAYAPI', 'KGAPI', 'XSAPI', 'CONTROLAPI', 'STATSAPI', 'ADMIN', 'OGPAPI', 'FBRTAPI', 'FBDEAUTHAPI', 'PING', 'GAME_HEALTH'):
             res = GameProxy('/'+chnam)
 
             # configure auth on canvas page itself (OPTIONAL now, only for demoing game outside of company)
