@@ -3299,6 +3299,9 @@ def check_store_sku(sku_name, sku, state = None):
         if 'item' in sku:
             if sku['item'] not in gamedata['items']:
                 error |= 1; print 'store sku %s for nonexistent item %s' % (sku_name, sku['item'])
+            else:
+                if 'ui_name' in sku and sku['ui_name'] == gamedata['items'][sku['item']]['ui_name']:
+                    error |= 1; print 'store sku %s does not need a ui_name, unless you want to use something different from the item\'s own ui_name.' % (sku_name,)
 
         if 'spell' in sku and sku['spell'] not in gamedata['spells']:
             error |= 1; print 'store sku %s refers to invalid spell "%s"' % (sku_name, sku['spell'])
