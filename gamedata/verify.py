@@ -3225,11 +3225,8 @@ def check_resource(name, data):
             error |= check_predicate(data[PRED], 'resources:'+name+':'+PRED)
     return error
 
-def check_store_sku(sku_name, sku, state = None):
+def check_store_sku(sku_name, sku, state):
     error = 0
-
-    if state is None:
-        state = {'leaders': {}}
 
     expect_items = None
     expect_items_unique_equipped = None
@@ -3244,7 +3241,7 @@ def check_store_sku(sku_name, sku, state = None):
             if 'requires' in sku:
                 if sku['item'] in state['leaders']:
                     other = state['leaders'][sku['item']]
-                    if (sku.get('requires') != other.get('requires')):
+                    if sku['requires'] != other['requires']:
                         error |= 1; print 'Store: leader item %s has inconsistent \"requires\" predicates among its multiple listings' % sku['item']
                 else:
                     state['leaders'][sku['item']] = sku
@@ -3293,7 +3290,7 @@ def check_store_sku(sku_name, sku, state = None):
 
     if 'skus' in sku: # hierarchy
         for subsku in sku['skus']:
-            error |= check_store_sku(sku_name+':'+subsku.get('name',subsku.get('item','unknown')), subsku, state = state)
+            error |= check_store_sku(sku_name+':'+subsku.get('name',subsku.get('item','unknown')), subsku, state)
 
     else: # single SKU
         if 'item' in sku:
@@ -3833,8 +3830,9 @@ def main(args):
     for ASSET in ('gamebucks_pile_asset', 'gamebucks_inventory_icon'):
         error |= require_art_asset(gamedata['store'][ASSET], 'store:'+ASSET)
 
+    check_store_sku_state = {'leaders': {}}
     for sku in gamedata['store']['catalog']:
-        error |= check_store_sku(sku['name'], sku)
+        error |= check_store_sku(sku['name'], sku, check_store_sku_state)
 
     for name, data in gamedata['tutorial'].iteritems():
         if 'ui_description' in data and type(data['ui_description']) is list:
