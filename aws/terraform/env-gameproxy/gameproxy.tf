@@ -9,6 +9,7 @@ variable "cloudfront_security_group_id" {}
 variable "incapsula_security_group_id" {}
 variable "game_haproxy_n_instances" {}
 
+# HAproxy instances between ELB/CloudFlare and game servers
 module "game_haproxy" {
   source = "../modules/game-haproxy"
 

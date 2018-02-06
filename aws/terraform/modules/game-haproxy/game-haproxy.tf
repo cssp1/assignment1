@@ -65,6 +65,7 @@ resource "aws_instance" "game_haproxy" {
   }
 
   lifecycle = {
+    create_before_destroy = true
     ignore_changes = ["ami", "user_data", "tags"] # must manually taint for these changes
   }
 
