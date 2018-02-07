@@ -4,10 +4,16 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# this script scans upcache (or the Battlehouse user database from bh_import_user_data.py)
-# and prints out a list of Facebook IDs for players
-# who meet specific spend or churn criteria. Used for building custom audiences
-# for Facebook ads.
+# This script scans upcache (or the Battlehouse user database from bh_import_user_data.py)
+# and prints out a list of players who meet specific spend or churn criteria.
+
+# Used for building custom audiences for Facebook ads.
+
+# Output format is text, where each line has either
+# FACEBOOK_ID,SPEND
+# or
+# EMAIL_ADDRESS,SPEND
+# (lines with "@" are email addresses, otherwise pure numbers are Facebook IDs)
 
 import sys, time, getopt, copy
 import SpinS3, SpinUpcacheIO, SpinConfig, SpinParallel
@@ -91,9 +97,9 @@ def do_slave_bh(input):
 
             if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
             if user['facebook_id']:
-                print >> fd, user['facebook_id']
+                print >> fd, '%s,%0.2f' % (user['facebook_id'], net_spend)
             if user['ui_email']:
-                print >> fd, user['ui_email']
+                print >> fd, '%s,%0.2f' % (user['ui_email'], net_spend)
             outputs[i]['count'] += 1
 
     con.commit()
@@ -147,7 +153,7 @@ def do_slave_upcache(input):
                         continue
 
             if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
-            print >> fd, user['facebook_id']
+            print >> fd, '%s,%0.2f' % (user['facebook_id'], user.get('money_spent',0.0))
             outputs[i]['count'] += 1
 
     return {'result':outputs}
