@@ -181,13 +181,13 @@ if __name__ == '__main__':
 
         # all-country churned-payer, ALL, and payer audiences, then country-specific payer audiences (for lookalike seeding)
         def auds_for_game(gid):
-            ret = [{'game_id':gid, 'aud':'p10-c10', 'min_spend':10, 'churned_for_days':10},
-                   {'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
-                   {'game_id':gid, 'aud':'p10-c90', 'min_spend':10, 'churned_for_days':90},
+            ret = [#{'game_id':gid, 'aud':'p10-c10', 'min_spend':10, 'churned_for_days':10},
+                   #{'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
+                   #{'game_id':gid, 'aud':'p10-c90', 'min_spend':10, 'churned_for_days':90},
                    {'game_id':gid, 'aud':'p10', 'min_spend':10, 'churned_for_days':-1},
                    ]
-            if gid in ('dv','tr','fs',):
-                ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
+#            if gid in ('dv','tr','fs',):
+#                ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
             if gid in ('dv','tr',):
                 ret.append({'game_id':gid, 'aud':'a60', 'min_spend':-1, 'churned_for_days':-1, 'played_within_days': 60})
             if 0:
@@ -195,10 +195,11 @@ if __name__ == '__main__':
                     ret.append({'game_id':gid, 'aud':'p10-n%s' % country, 'min_spend':10, 'churned_for_days':-1, 'country':country})
             return ret
         auds = []
-        for gid in ('mf','tr','mf2','bfm','sg','dv','fs'):
+        for gid in ('mf','tr','mf2','bfm','sg','dv',): # note: FS not necessary - use BH for that
             auds += auds_for_game(gid)
 
-        auds += [{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1},
+        auds += [#{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1},
+                 {'game_id': 'bh', 'aud': 'a60', 'min_spend':-1, 'churned_for_days':-1, 'played_within_days': 60},
                  {'game_id': 'bh', 'aud': 'p10', 'min_spend':10, 'churned_for_days':-1},
                  ]
 
