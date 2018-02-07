@@ -387,9 +387,10 @@ def _custom_audience_create(db, ad_account_id, props):
     else:
         return None
 
-def custom_audience_create(db, ad_account_id, name, description = None):
+def custom_audience_create(db, ad_account_id, name, description = None, value_based = False):
     props = {'name': name,
              'subtype': 'CUSTOM',
+             'is_value_based': value_based,
              'retention_days': 180}
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
@@ -423,46 +424,80 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
 
-def _custom_audience_add(audience_id, facebook_app_id_list, schema, data):
+def _custom_audience_add(audience_id, facebook_app_id_list, schema, data, session_id, estimated_num_total, batch_seq, is_last_batch):
+    payload = {'schema':schema, 'data': data, 'app_ids': facebook_app_id_list }
+
+    # not sure what Facebook wants here...
+#    if isinstance(schema, list) and schema[0] == 'EMAIL_SHA256':
+#        payload['is_raw'] = False
+#    if schema[0] == 'UID':
+#        payload['is_raw'] = True
+
+    post_params =  {'payload': SpinJSON.dumps(payload),
+                    'session': SpinJSON.dumps({'session_id': session_id, 'estimated_num_total': estimated_num_total,
+                                               'batch_seq': batch_seq, 'last_batch_flag': is_last_batch}),
+                    }
     result = fb_api(SpinFacebook.versioned_graph_endpoint('customaudience', audience_id+'/users'),
-                    post_params = {'payload': SpinJSON.dumps({'schema':schema, 'data': data, 'app_ids': facebook_app_id_list})})
-    print 'transmitted', result['num_received'], schema, 'of which', result['num_invalid_entries'], 'were invalid'
+                    post_params = post_params)
+    print 'transmitted', result['num_received'], '/', estimated_num_total, schema, 'of which', result['num_invalid_entries'], 'were invalid', 'seq', batch_seq, ('LAST' if is_last_batch else '..')
     if verbose:
         print result
     return result['num_received']
 
+def _custom_audience_add_session(audience_id, facebook_app_id_list, schema, data):
+    limit = 500 # with new /payload API
+    added = 0
+    session_id = int(time.time())
+    estimated_num_total = len(data)
+    batch_seq = 1
+    for start in xrange(0, len(data), limit):
+        is_last_batch = bool(start + limit >= len(data))
+        added = max(added, _custom_audience_add(audience_id, facebook_app_id_list, schema, data[start:start+limit],
+                                                session_id, estimated_num_total, batch_seq, is_last_batch))
+        batch_seq += 1
+    return added
+
 # add new entries to a custom audience
 # "fb_app_id" is the corresponding Facebook App ID for rows that consist of a Facebook ID
 # "rows" is a sequence of strings where each string is either a Facebook ID or an email address (distinguished by having an '@' character)
-def custom_audience_add(audience_id, fb_app_id, rows):
+def custom_audience_add(audience_id, fb_app_id, rows, value_based = False):
 
-    limit = 5000 # 5000 with new /payload API
-    added = 0
-
+    # buffer up all entries so we can tell the API how many we're going to upload
     batch_UID = []
     batch_EMAIL_SHA256 = []
 
     for row in rows:
         # for encoding notes, see https://developers.facebook.com/docs/marketing-api/audiences-api
-        if '@' in row:
-            # assume it's an email address
-            batch_EMAIL_SHA256.append(hashlib.sha256(row.strip().lower()).hexdigest())
+        fields = row.strip().split(',')
+        uid_or_email, lookalike_value = fields[0], float(fields[1])
 
-            if len(batch_EMAIL_SHA256) >= limit:
-                added += _custom_audience_add(audience_id, [fb_app_id,], 'EMAIL_SHA256', batch_EMAIL_SHA256)
-                del batch_EMAIL_SHA256[:]
+        if '@' in uid_or_email:
+            # assume it's an email address
+            hashed_email = hashlib.sha256(uid_or_email.strip().lower()).hexdigest()
+            if value_based:
+                entry = [hashed_email, lookalike_value]
+            else:
+                entry = hashed_email
+            batch_EMAIL_SHA256.append(entry)
         else:
             # assume it's a Facebook ID
-            batch_UID.append(row.strip())
 
-            if len(batch_UID) >= limit:
-                added += _custom_audience_add(audience_id, [fb_app_id,], 'UID', batch_UID)
-                del batch_UID[:]
+            if value_based:
+                entry = [uid_or_email.strip(), lookalike_value]
+                # note: FB API doesn't seem to accept LOOKALIKE_VALUE (or any hashed value either) along with UID :(
+                # so we can't use UID for value-based audiences
+                continue
+            else:
+                entry = uid_or_email.strip()
+
+            batch_UID.append(entry)
+
+    added = 0
 
     if batch_EMAIL_SHA256:
-        added += _custom_audience_add(audience_id, [fb_app_id,], 'EMAIL_SHA256', batch_EMAIL_SHA256)
+        added += _custom_audience_add_session(audience_id, [fb_app_id,], ['EMAIL_SHA256', 'LOOKALIKE_VALUE'] if value_based else 'EMAIL_SHA256', batch_EMAIL_SHA256)
     if batch_UID:
-        added += _custom_audience_add(audience_id, [fb_app_id,], 'UID', batch_UID)
+        added += _custom_audience_add_session(audience_id, [fb_app_id,], ['UID','LOOKALIKE_VALUE'] if value_based else 'UID', batch_UID)
 
     return added
 
@@ -2717,6 +2752,7 @@ if __name__ == '__main__':
     group_by = None
     custom_audience = None
     custom_audience_game_id = None
+    custom_audience_is_value_based = False
     origin_audience = None
     country = None
     bid = None
@@ -2739,7 +2775,7 @@ if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['db=', 'game-id=', 'mode=', 'tactical=', 'image-file=', 'dry-run', 'min-clicks=', 'min-impressions=', 'max-frequency=', 'min-age=',
                                                       'bid=', 'coeff=', 'adgroup-name=', 'campaign-name=', 'campaign-group-name=', 'stgt=', 'filter=', 'group-by=',
                                                       'use-analytics=', 'use-regexp-ltv', 'use-record=', 'date-range=', 'time-range=', 'output-format=', 'output-frequency=',
-                                                      'skip-delivery_estimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=',
+                                                      'skip-delivery_estimates', 'enable-campaign-creation', 'disable-ad-creation', 'disable-bid-updates', 'custom-audience=', 'custom-audience-game-id=', 'origin-audience=', 'country=', 'lookalike-type=', 'lookalike-ratio=', 'value-based',
                                                       'verbose', 'quiet'])
 
     for key, val in opts:
@@ -2792,6 +2828,7 @@ if __name__ == '__main__':
         elif key == '--output-format': output_format = val
         elif key == '--lookalike-type': lookalike_type = val
         elif key == '--lookalike-ratio': lookalike_ratio = float(val)
+        elif key == '--value-based': custom_audience_is_value_based = True
 
     config = SpinConfig.get_mongodb_config(dbname)
     client = pymongo.MongoClient(*config['connect_args'], **config['connect_kwargs'])
@@ -3098,7 +3135,9 @@ if __name__ == '__main__':
         if row:
             print 'lookalike audience', custom_audience, 'already exists', "'id':", "'"+row['id']+"',"
         else:
-            audience_id = lookalike_audience_create(db, GAMES[cmd_game_id]['ad_account_id'], custom_audience, origin_audience, country, lookalike_type = lookalike_type, lookalike_ratio = lookalike_ratio)
+            audience_id = lookalike_audience_create(db, GAMES[cmd_game_id]['ad_account_id'], custom_audience, origin_audience, country,
+                                                    lookalike_type = 'custom_ratio' if custom_audience_is_value_based else lookalike_type,
+                                                    lookalike_ratio = lookalike_ratio)
             print 'CREATED lookalike audience in account_id', GAMES[cmd_game_id]['ad_account_id'], 'from', origin_audience, 'in', country, custom_audience, "'id':", "'"+audience_id+"',"
 
     elif mode == 'custom-audience-add':
@@ -3112,7 +3151,7 @@ if __name__ == '__main__':
             audience_id = row['id']
             print 'using existing audience', custom_audience, "'id':", "'"+audience_id+"',"
         else:
-            audience_id = custom_audience_create(db, GAMES[cmd_game_id]['ad_account_id'], custom_audience)
+            audience_id = custom_audience_create(db, GAMES[cmd_game_id]['ad_account_id'], custom_audience, value_based = custom_audience_is_value_based)
             if audience_id: print 'CREATED audience in account_id', GAMES[cmd_game_id]['ad_account_id'], ':', custom_audience, "'id':", "'"+audience_id+"',"
         if audience_id:
             print custom_audience, 'id', audience_id, '...', ; sys.stdout.flush()
@@ -3128,7 +3167,8 @@ if __name__ == '__main__':
                         for line in fd.xreadlines():
                             yield line.strip()
 
-                n_added = custom_audience_add(audience_id, GAMES[custom_audience_game_id]['app_id'], stream_lines_from_files(filenames))
+                n_added = custom_audience_add(audience_id, GAMES[custom_audience_game_id]['app_id'], stream_lines_from_files(filenames),
+                                              value_based = custom_audience_is_value_based)
                 print 'added', n_added, 'rows'
 
     else:
