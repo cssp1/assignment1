@@ -154,6 +154,8 @@ def do_slave_upcache(input):
 
             if verbose: print >> sys.stderr, user['user_id'], 'GOOD!', 'spent', net_spend, 'lapsed %.1f' % (lapsed/86400.0)
             print >> fd, '%s,%0.2f' % (user['facebook_id'], user.get('money_spent',0.0))
+            if user.get('email'):
+                print >> fd, '%s,%0.2f' % (user['email'], user.get('money_spent',0.0))
             outputs[i]['count'] += 1
 
     return {'result':outputs}
