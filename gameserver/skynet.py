@@ -1542,7 +1542,7 @@ def adimages_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adimages, mongo_enc(x), primary_key = 'hash') for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adimage', 'act_'+ad_account_id+'/adimages') + '?fields='+ADIMAGE_FIELDS, is_paged = True, dict_paging = False)]
 
-ADCREATIVE_FIELDS='id,adlabels,body,call_to_action_type,image_crops,image_hash,image_url,link_og_id,link_url,name,object_id,object_url,object_story_id,object_story_spec,object_type,run_status,thumbnail_url,title,url_tags'
+ADCREATIVE_FIELDS='id,adlabels,body,call_to_action_type,image_crops,image_hash,image_url,link_og_id,link_url,name,object_id,object_store_url,object_url,object_story_id,object_story_spec,object_type,thumbnail_url,title,url_tags'
 def adcreatives_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adcreatives, mongo_enc(x)) for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adcreative', 'act_'+ad_account_id+'/adcreatives') + '?fields='+ADCREATIVE_FIELDS, is_paged = True)]
@@ -1637,12 +1637,12 @@ def call_to_action_type(tgt):
         #return 'SIGN_UP' # 20170703 - switched from OPEN_LINK
         return 'PLAY_GAME' # 20170823 - switched to PLAY_GAME
     if tgt.get('include_already_connected_to_game',False) or tgt['bid_type'] in ('oCPM_CLICK', 'CPC') or \
-       (tgt.get('destination','app') == 'app' and tgt['bid_type'].startswith('oCPM_')):
+       (tgt.get('destination','app') == 'app' and tgt['bid_type'].startswith('oCPM_') and tgt['bid_type'] != 'oCPM_INSTALL'):
         return 'SIGN_UP' # since the optimization goal is LINK_CLICKS, not CANVAS_APP_*
     return 'PLAY_GAME'
 
 # used to force creation of new adcreative by changing the cache key
-ADCREATIVE_GENERATION = 4
+ADCREATIVE_GENERATION = 7
 
 def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_name, tgt, spin_atgt):
     # this just got REALLY complicated for app ads:
@@ -1653,6 +1653,9 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
     # add tgt_param to this and uniquify
     creative = {#'type': str(tgt['ad_type']), # this field is obsolete
                 'name': 'Skc '+spin_atgt } # Skc = Skynet Creative
+
+    if tgt['bid_type'] == 'oCPM_INSTALL':
+        creative['object_type'] = 'APPLICATION'
 
     if tgt.get('include_already_connected_to_game',False):
         tgt_key = 'spin_rtgt' # retargetings go to a different parameter
@@ -1769,11 +1772,17 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                     if link_description:
                         cr_data['description'] = link_description
 
-                if not (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_')):
+
+                if (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_') and tgt['bid_type'] != 'oCPM_INSTALL'):
                     # when using OFFSITE_CONVERSION optimization for a Canvas app,
                     # FB API refuses to accept adcreatives containing call_to_action
+                    pass
+                else:
                     cr_data['call_to_action'] =  {'type': call_to_action_type(tgt),
                                                   'value': {'link':base_link_url}}
+                    if tgt['bid_type'] == 'oCPM_INSTALL':
+                        cr_data['call_to_action']['value']['application'] = game_data['app_id']
+
                 if link_caption:
                     cr_data['caption'] = link_caption
 
@@ -2172,7 +2181,7 @@ def adcampaign_make(db, name, ad_account_id, campaign_group_id, app_id, app_name
 
     promoted_object = {}
 
-    if call_to_action_type(tgt) == 'PLAY_GAME' and tgt.get('destination','app') == 'app':
+    if call_to_action_type(tgt) in ('PLAY_GAME','SIGN_UP') and tgt.get('destination','app') == 'app' and tgt['bid_type'] != 'CPC':
         promoted_object.update({'application_id': app_id, 'object_store_url':'https://apps.facebook.com/'+app_namespace+'/'})
 
     if tgt.get('promoted_event', None):
