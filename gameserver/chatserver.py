@@ -10,7 +10,6 @@ import os, sys
 import time
 import signal
 import traceback
-import collections
 
 from twisted.internet import reactor
 from twisted.protocols import amp
@@ -39,7 +38,6 @@ raw_log = None
 exception_log = None
 chat_log = None
 g_subscribers = set()
-g_buffer = collections.deque([], 1024) # store history of this many messages, globally (games get about 1 chat message per day per DAU)
 
 def reload_spin_config():
     # reload config file
@@ -138,40 +136,12 @@ class ChatProtocolHandlers (amp.AMP):
 
             nosql_client.chat_record(json_data['channel'], json_data.get('id', None), json_data['sender'], json_data.get('text',None))
 
-            # store so that clients who connect in the future can catch up
-            g_buffer.append((json_data, len(data)))
-
         for conn in g_subscribers:
             if conn is not self:
                 conn.callRemote(SpinChat_CMDs['chat_recv'], data = data)
 
         return {'success': 1}
     SpinChat_CMDs['chat_send'].responder(chat_send)
-
-    def chat_catchup(self, num):
-        self.check_readable()
-        if verbose: print 'got chat_catchup', num
-
-        to_send = []
-        to_send_len = 0
-
-        start = max(0, len(g_buffer)-num)
-        for i in xrange(start, min(len(g_buffer), start+num)):
-            # send in batch chunks
-            json_data, slength = g_buffer[i]
-            if to_send_len + slength + 5 >= SpinChatProtocol.MSG_LIMIT-1000:
-                self.callRemote(SpinChat_CMDs['chat_recv_batch'], data = SpinJSON.dumps(to_send, pretty=False))
-                to_send = []
-                to_send_len = 0
-            to_send.append(json_data)
-            to_send_len += slength + 5
-
-        if to_send:
-            self.callRemote(SpinChat_CMDs['chat_recv_batch'], data = SpinJSON.dumps(to_send, pretty=False))
-        return {'success': 1}
-
-    SpinChat_CMDs['chat_catchup'].responder(chat_catchup)
-
 
 def do_main():
     if not os.path.exists(log_dir):
