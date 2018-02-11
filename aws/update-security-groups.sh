@@ -3,6 +3,12 @@
 # update AWS EC2 security groups used for production game servers
 # (assumes you are running this with proper AWS credentials in the environment)
 
+echo "The security groups maintained by this script are now obsolete."
+echo "The new groups are maintained automatically by Terraform."
+echo
+echo "To update them, run this:"
+echo "(cd ~/cvs/game/aws/terraform/env-gameproxy && terraform apply)"
+
 function format_ip_list {
     # Convert raw list of IPs/ports into an --ip-permissions argument for authorize-security-group-ingress
     export IP_LIST=$1 # "1.2.3.4 5.6.7.8 ..."

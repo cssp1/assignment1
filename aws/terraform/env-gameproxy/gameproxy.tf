@@ -4,9 +4,6 @@ variable "availability_zones" {}
 variable "subnet_ids" {}
 variable "ssh_access_security_group_id" {}
 variable "game_haproxy_security_group_id" {}
-variable "cloudflare_security_group_id" {}
-variable "cloudfront_security_group_id" {}
-variable "incapsula_security_group_id" {}
 variable "game_haproxy_n_instances" {}
 
 # HAproxy instances between ELB/CloudFlare and game servers
@@ -28,9 +25,8 @@ module "game_haproxy" {
   n_instances = "${var.game_haproxy_n_instances}"
   security_group_id_list = [
     "${var.game_haproxy_security_group_id}",
-    "${var.cloudflare_security_group_id}",
-    "${var.cloudfront_security_group_id}",
-    "${var.incapsula_security_group_id}",
+    "${module.ipranges.cloudflare_ingress_security_group_id}",
+    "${module.ipranges.cloudfront_ingress_security_group_id}",
     "${var.ssh_access_security_group_id}"
   ]
 }
