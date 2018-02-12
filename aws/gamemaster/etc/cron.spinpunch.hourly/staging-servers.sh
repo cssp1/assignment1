@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# crude mutex - this is not atomic, but should protect against the occasional double-run
+LOCKFILE=/tmp/staging-servers.sh.lock
+if [ -e ${LOCKFILE} ] && kill -0 `cat ${LOCKFILE}`; then
+    echo "another instance of staging-server.sh is already running. Check for stuck processes!"
+    exit 1
+fi
+
+# make sure the lockfile is removed when we exit and then claim it
+trap "rm -f ${LOCKFILE}; exit" INT TERM EXIT
+echo $$ > ${LOCKFILE}
+
 declare -A test_regions
 test_regions[ransomerrift]=test256
 test_regions[thudrunner]=sector201
@@ -8,7 +19,6 @@ test_regions[flavorysoda]=sector200
 test_regions[tablettransform]=sector200
 test_regions[rummagestones]=map101
 test_regions[refitskier]=sector200
-export PYTHONPATH="/home/ec2-user/twisted-13.2.0/lib64/python:$PYTHONPATH"
 
 for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummagestones flavorysoda refitskier; do
     # update to latest code
@@ -35,3 +45,4 @@ for GAMEDIR in ransomerrift thudrunner piratewarmers tablettransform rummageston
 
 done
 
+rm -f ${LOCKFILE}
