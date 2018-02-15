@@ -1370,6 +1370,11 @@ function GameObject() {
     /** @type {null|Array<string>} */
     this.behaviors = null;
 
+    /** @type {null|string}
+        "attacker" means that this unit, when spawned in an AI base, should belong to the attacking human player.
+        no client-side effect during normal gameplay - this is used for AI base design only */
+    this.force_team = null;
+
     /** for behaviors to keep state between ticks */
     this.behavior_state = {};
 
@@ -1951,6 +1956,7 @@ GameObject.prototype.receive_state = function(data, init, is_deploying) {
     this.level = data.shift();
     this.equipment = data.shift();
     this.behaviors = data.shift();
+    this.force_team = data.shift();
 
     this.update_stats(null);
     if(updated_hp >= 0) {
@@ -4451,6 +4457,11 @@ GameObject.prototype.run_ai = function(world) {
 
     if(this.is_destroyed()) {
         this.ai_stop();
+        return;
+    }
+
+    if(!this.can_accept_commands()) {
+        // deactivate AI for friendly units on the battlefield before battle start
         return;
     }
 
@@ -8927,6 +8938,17 @@ Mobile.prototype.new_order = function(world, neword, replace) {
         }
     }
     this.state_dirty |= obj_state_flags.ORDERS;
+};
+
+/** @return {boolean} whether the object can currently accept player input */
+GameObject.prototype.can_accept_commands = function() {
+    // do not allow control of "force_team": "attacker" units prior to battle start
+    if(session.viewing_base.base_landlord_id != session.user_id &&
+       !session.has_attacked &&
+       this.team === 'player') {
+        return false;
+    }
+    return true;
 };
 
 /** quantized location as of last combat tick
@@ -18867,6 +18889,16 @@ function update_attack_button_dialog(dialog) {
                     // for tutorial, hold off until all units are readied for deployment
                     var setup_deployment_cursor = function() {
                         if(player.tutorial_state != "COMPLETE" && gamedata['tutorial'][player.tutorial_state]['next'] != 'place_robots_message') {
+                        } else if(!session.viewing_base.deployment_allowed) {
+                            // special case for self-contained AI bases
+                            // select all friendly units immediately
+                            if(player.unit_micro_enabled()) {
+                                session.for_each_real_object(function(obj) {
+                                    if(obj.is_mobile() && obj.team === 'player' && !obj.is_destroyed()) {
+                                        add_unit_to_selection(obj);
+                                    }
+                                });
+                            }
                         } else if(selection.spellname != "DEPLOY_UNITS") {
                             change_selection(player.virtual_units["DEPLOYER"]);
                             selection.spellname = "DEPLOY_UNITS";
@@ -50352,6 +50384,12 @@ function do_on_mouseup(e, is_touch) {
         return;
     }
 
+    if(session.viewing_base.base_landlord_id != session.user_id &&
+       !session.has_attacked) {
+        // do not allow control of attacker units prior to battle start
+        return;
+    }
+
     // find cell index (note: j,i are not quantized to integers)
     var ji = screen_to_ortho(xy);
 
@@ -51550,6 +51588,18 @@ function unit_command_move(world, j, i, use_amove, add_waypoint) {
     }
 }
 
+/** @param {!GameObject} unit */
+function unit_command_toggle_force_team(unit) {
+    // (assumes we are running in AI base design mode)
+    if(unit.force_team === null) {
+        unit.force_team = 'attacker';
+    } else {
+        unit.force_team = null;
+    }
+    send_to_server.func(["CAST_SPELL", unit.id, "SET_FORCE_TEAM", unit.force_team]);
+}
+
+
 
 function on_textInput(e) {
     console.log('textInput '+e.data);
@@ -51612,10 +51662,11 @@ function on_keypress(e) {
 
 var key_unit_command_map = {
     //8: 'REMOVE_OBJECT', // backspace
-    46: 'REMOVE_OBJECT', // delete key
+    46: 'REMOVE_OBJECT', // delete key (only for AI base design)
     69: 'SPECIAL_ABILITY', // e E
     109: 'MOVE_UNIT', 77: 'MOVE_UNIT', // m M
     97: 'AMOVE_UNIT', 65: 'AMOVE_UNIT', // a A
+    70: 'TOGGLE_FORCE_TEAM', // Shift-F (only for AI base design)
     115: 'STOP_UNIT', 83: 'STOP_UNIT', // s S
     112: 'PATROL_UNIT', 80: 'PATROL_UNIT', // p P
     114: 'MAKE_AGGRESSIVE', 82: 'MAKE_AGGRESSIVE' // r R
@@ -51782,7 +51833,7 @@ function on_keyup(e) {
     if(world === session.get_real_world() && selection.unit && selection.unit.is_mobile()) {
         if(code in key_unit_command_map) {
             var cmd = key_unit_command_map[code];
-            if(cmd === 'SPECIAL_ABILITY') {
+            if(cmd === 'SPECIAL_ABILITY' && selection.unit.can_accept_commands()) {
                 if(session.has_attacked || player.is_cheater) {
                     if(global_spell_icon) { global_spell_icon.pushed_key = false; }
                     selection.unit.use_special_ability(world);
@@ -51791,7 +51842,7 @@ function on_keyup(e) {
                         selection.multi[j].use_special_ability(world);
                     }
                 }
-            } else if(cmd === 'STOP_UNIT') {
+            } else if(cmd === 'STOP_UNIT' && selection.unit.can_accept_commands()) {
                 var order = {'state': ai_states.AI_ATTACK_STATIONARY, 'aggressive': false};
                 selection.unit.new_order(world, order, true);
                 selection.unit.ai_threatlist = null; selection.unit.ai_threatlist_dirty = true;
@@ -51799,15 +51850,25 @@ function on_keyup(e) {
                     selection.multi[i].new_order(world, order, true);
                     selection.multi[i].ai_threatlist = null; selection.multi[i].ai_threatlist_dirty = true;
                 }
-            } else if(cmd === 'MAKE_AGGRESSIVE') {
+            } else if(cmd === 'MAKE_AGGRESSIVE' && selection.unit.can_accept_commands()) {
                 unit_command_make_aggressive(world);
-            } else if(cmd === 'REMOVE_OBJECT' && player.is_cheater) {
-                world.send_and_remove_object(selection.unit);
-                var temp = goog.array.clone(selection.multi); // send_and_remove mutates selection.multi
-                for(var i = 0; i < temp.length; i++) {
-                    world.send_and_remove_object(temp[i]);
+            } else if(cmd === 'REMOVE_OBJECT') {
+                if(player.is_cheater) {
+                    world.send_and_remove_object(selection.unit);
+                    var temp = goog.array.clone(selection.multi); // send_and_remove mutates selection.multi
+                    for(var i = 0; i < temp.length; i++) {
+                        world.send_and_remove_object(temp[i]);
+                    }
                 }
-            } else {
+            } else if(cmd === 'TOGGLE_FORCE_TEAM') {
+                if(player.is_cheater) {
+                    unit_command_toggle_force_team(selection.unit);
+                    for(var i = 0; i < selection.multi.length; i++) {
+                        if(selection.multi[i] === selection.unit) { continue; }
+                        unit_command_toggle_force_team(selection.multi[i]);
+                    }
+                }
+            } else if(selection.unit.can_accept_commands()) {
                 // "arm" the spell for the next mousedown
                 selection.spellname = cmd;
                 var cursor;
@@ -52487,14 +52548,17 @@ function do_draw() {
                     }
                 }
 
-                if(gamedata['client']['highlight_enemy_units'] && session.has_attacked) {
-                    world.objects.for_each(function(obj) {
-                        if(obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
-                           (!obj.spec['cloaked'] || !obj.is_invisible())) {
-                            draw_selection_highlight(world, obj);
-                        }
-                    });
-                }
+                // draw highlights on certain non-selected units e.g. to indicate team membership
+                world.objects.for_each(function(obj) {
+                    // highlight enemy units
+                    if(session.has_attacked && obj.is_mobile() && obj.team != 'player' && !obj.is_destroyed() &&
+                       (!obj.spec['cloaked'] || !obj.is_invisible())) {
+                        draw_selection_highlight(world, obj);
+
+                    } else if(!session.has_attacked && (obj.force_team === 'attacker' || (!session.home_base && !session.viewing_base.deployment_allowed && obj.team === 'player'))) {
+                        draw_selection_highlight(world, obj, 'force_team:attacker');
+                    }
+                });
 
                 if(!selection.ui && !session.has_attacked && mouse_state.hovering_over && mouse_state.hovering_over.is_building() && mouse_state.hovering_over.team == 'player') {
                     draw_selection_highlight(world, mouse_state.hovering_over, 'hover');

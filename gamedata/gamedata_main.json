@@ -326,14 +326,21 @@
                        "stroke_alpha": 0.5,
                        "altitude_alpha": 0.3,
                        "fill_alpha": 0.12,
-                       "ring_size": 1 }
+                       "ring_size": 1 },
+
+            // used for AI base design mode to show units that will belong to attacker control when the battle starts
+            "force_team:attacker": {
+                "basecol": "rgba(50,255,50,", // base color **NOTE** alpha part is cut off, it will be appended in code!
+                "stroke_alpha": 0, // alpha of the stroke around the perimeter of the circle
+                "altitude_alpha": 0.3, // alpha of the "altitude stick" underneath flying units
+                "fill_alpha": 0.66, // alpha of the area within the circle
+                "ring_size": 0.85 // size of the circle relative to the unit's gridsize (1.0 = normal)
+            }
         },
 
         // if true, always draw weapon range of selected units
         // otherwise, only draw weapon range of HOLD_POSITION cloaked units (i.e. Phantoms)
         "always_draw_mobile_weapon_range": false,
-
-        "highlight_enemy_units": true, // draw faint circles under enemy units
 
         // fill colors for health/progress bars on the battlefield.
         // these break our convention of using floating-point linear RGB :( but it's very performance-critical.

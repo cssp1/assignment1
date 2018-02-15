@@ -30,7 +30,7 @@ def pretty_print_array(f, name, out, final):
     f.write('\n')
 
 # fields that should be copied verbatim from GameObject state
-OBJECT_FIELDS = ['equipment','orders','patrol','pack_id','behaviors']
+OBJECT_FIELDS = ['equipment','orders','patrol','pack_id','behaviors','force_team']
 
 # convert playerdb base to AI base
 def from_playerdb(player, output, force_unit_level):

@@ -2415,6 +2415,16 @@ def check_ai_base_contents(strid, base, owner, base_type, ensure_force_building_
                     error |= 1
                     print 'ERROR: AI base %s has climate-specific scenery sprite %s but no explicit base_climate' % (strid, item['spec'])
 
+                # ensure that bases with any "force_team": "attacker" objects (skill challenges) don't allow normal deployment
+                if item.get('force_team') == 'attacker':
+                    if base.get('analytics_tag') != 'skill_challenge':
+                        error |= 1
+                        print 'ERROR: AI base %s contains objects with "force_team": "attacker", this is only for skill challenges' % (strid,)
+
+                    if base.get('deployment_allowed', True):
+                        error |= 1
+                        print 'ERROR: AI base %s contains objects with "force_team": "attacker", so "deployment_allowed" should be false' % (strid,)
+
                 max_level = -1
                 if KIND == 'buildings' and ('%RESOURCE' not in item['spec']):
                     spec = gamedata['buildings'][item['spec']]

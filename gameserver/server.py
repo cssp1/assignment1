@@ -6941,6 +6941,12 @@ def reconstitute_object(observer, player, state, context = 'unknown'):
         else:
             gamesite.exception_log.event(server_time, "warning: obs %d player %d in %s loaded object with unknown owner_string %s" % (observer.user_id, player.user_id, context, owner_string))
             owner = player
+
+    elif state.get('force_team') == 'attacker':
+        # special flag that the object should be owned by the attacking player, not the base owner
+        assert observer
+        # note: while creating AI bases in DEV edit mode, observer is player here, but that's OK
+        owner = observer
     else:
         owner = player
 
@@ -7050,6 +7056,7 @@ class GameObject(object):
 
         # used for AI bases only
         self.force_ai_level = None
+        self.force_team = None
 
         # flag that indicates the on_approach consequent has already been run during this session
         self.on_approach_fired = False
@@ -7142,7 +7149,7 @@ class GameObject(object):
         return [self.obj_id, self.spec.name, x, y,
                 self.hp if update_hp else -1,
                 self.max_hp,
-                self.team, self.level, self.equipment, self.behaviors]
+                self.team, self.level, self.equipment, self.behaviors, self.force_team]
 
     def serialize_auras(self):
         ser = [aura.serialize_aura() for aura in self.auras] if self.auras else None
@@ -7168,6 +7175,8 @@ class GameObject(object):
         if self.force_ai_level is not None:
             props['force_ai_level'] = self.force_ai_level
 
+        if self.force_team is not None:
+            props['force_team'] = self.force_team
 
         if nosql:
             props['owner_id'] = self.owner.user_id
@@ -7192,8 +7201,9 @@ class GameObject(object):
             self.x, self.y = 0, 0
 
         self.level = min(max(state.get('level',1), 1), self.spec.maxlevel)
-        self.equipment = state.get('equipment', None)
-        self.behaviors = state.get('behaviors', None)
+        self.equipment = state.get('equipment')
+        self.behaviors = state.get('behaviors')
+        self.force_team = state.get('force_team')
 
         self.update_max_hp()
         max_hp = self.max_hp
@@ -15286,6 +15296,7 @@ def setup_ai_base(strid, cb):
         for p in data['buildings']:
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
+            if 'force_team' in p: obj.force_team = p['force_team']
             if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
             if 'enhancements' in p: obj.enhancements = copy.deepcopy(p['enhancements'])
             if 'behaviors' in p: obj.behaviors = copy.deepcopy(p['behaviors'])
@@ -15301,6 +15312,7 @@ def setup_ai_base(strid, cb):
             obj = instantiate_object_for_player(player, player, p['spec'], x=p['xy'][0], y=p['xy'][1], level=p.get('level',1))
             if 'force_level' in p: obj.force_ai_level = int(p['force_level'])
 
+            if 'force_team' in p: obj.force_team = p['force_team']
             if 'equipment' in p: obj.equipment = copy.deepcopy(p['equipment'])
             if 'orders' in p: obj.orders = p['orders']
             if 'patrol' in p: obj.patrol = p['patrol']
@@ -26084,7 +26096,7 @@ class GAMEAPI(resource.Resource):
             if session.viewing_base.is_nosql_base() and (obj in session.viewing_base.iter_objects()): # XXX inefficient
                 # this will write (for hives/quarries) or not write (for player homes), as appropriate
                 session.viewing_base.nosql_write_one(obj, 'OBJECT_COMBAT_UPDATES')
-                # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','equipment','pack_id','behaviors','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
+                # XXXXXX need to audit fields that we write - persist_state omits the -1 for x_start_time on buildings fields = ['xy','hp_ratio','orders','patrol','contents','equipment','pack_id','behaviors','force_team','repair_finish_time','disarmed','build_start_time','research_start_time','upgrade_start_time','produce_start_time','manuf_start_time'])
 
             elif owning_player and obj.is_mobile() and (not obj.spec.consumable) and SQUAD_IDS.is_mobile_squad_id(obj.squad_id or 0) and \
                  ((owning_player is not session.player) or owning_player.squad_is_deployed(obj.squad_id or 0)):
@@ -30932,6 +30944,7 @@ class GAMEAPI(resource.Resource):
                             obj = instantiate_object_for_player(session.player, session.player, spec, x=data['xy'][0], y=data['xy'][1],
                                                                 level = data.get('force_level', data.get('level',1)))
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
+                            if 'force_team' in data: obj.force_team = data['force_team']
                             if 'equipment' in data: obj.equipment = data['equipment']
                             if 'enhancements' in data: obj.enhancements = data['enhancements']
                             if 'behaviors' in data: obj.behaviors = data['behaviors']
@@ -30940,6 +30953,7 @@ class GAMEAPI(resource.Resource):
                             obj = instantiate_object_for_player(session.player, session.player, data['spec'], x=data['xy'][0], y=data['xy'][1],
                                                                 level = data.get('force_level', data.get('level',1)))
                             if 'force_level' in data: obj.force_ai_level = data['force_level']
+                            if 'force_team' in data: obj.force_team = data['force_team']
                             if 'equipment' in data: obj.equipment = data['equipment']
                             if 'orders' in data: obj.orders = data['orders']
                             if 'patrol' in data: obj.patrol = data['patrol']
@@ -30999,6 +31013,7 @@ class GAMEAPI(resource.Resource):
                                     spec = '%RESOURCE_harvester'
                                 props = {'spec':spec, 'xy': [obj.x,obj.y],
                                          'force_level': obj.level }
+                                if obj.force_team: props['force_team'] = obj.force_team
                                 if obj.equipment: props['equipment'] = obj.equipment
                                 if obj.enhancements: props['enhancements'] = obj.enhancements
                                 if obj.behaviors: props['behaviors'] = obj.behaviors
@@ -31006,6 +31021,7 @@ class GAMEAPI(resource.Resource):
                             elif obj.is_mobile():
                                 if obj.is_temporary(): continue # don't save these
                                 props = {'spec': obj.spec.name, 'xy': [obj.x, obj.y] }
+                                if obj.force_team: props['force_team'] = obj.force_team
                                 if obj.equipment: props['equipment'] = obj.equipment
                                 if obj.behaviors: props['behaviors'] = obj.behaviors
                                 if obj.orders: props['orders'] = obj.orders
@@ -31063,6 +31079,13 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                     retmsg.append(["PUBLISH_AI_BASE_RESULT", success, "PUBLISH_AI_BASE_ERROR" if (not success) else None, error_msg if (not success) else str(idnum)])
+
+            elif spellname == "SET_FORCE_TEAM":
+                if not session.player.is_cheater or not session.home_base or not object:
+                    retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])
+                new_value = spellargs[0]
+                assert (new_value is None) or (isinstance(new_value, basestring))
+                object.force_team = new_value
 
             elif spellname == "CHEAT_AI_ATTACK":
                 if (not session.player.is_developer()):
