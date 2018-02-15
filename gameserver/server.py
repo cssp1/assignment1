@@ -20596,7 +20596,7 @@ class GAMEAPI(resource.Resource):
         else:
             change_retmsg = retmsg
 
-        change_retmsg.append(["SESSION_CHANGE",
+        change_retmsg.append(["SESSION_CHANGE", # XXXXXX clean up these parameters
                        session.viewing_user.user_id,
                        session.viewing_user.facebook_id,
                        session.ui_name,
@@ -30694,6 +30694,10 @@ class GAMEAPI(resource.Resource):
                     return
                 if not session.player.cooldown_active('hitlist_assigned'):
                     session.execute_consequent_safe(session.player.get_abtest_consequent('assign_hitlist'), session.player, retmsg, reason=spellname)
+
+                # XXXXXX temporary
+                if 'assign_skill_challenges' in gamedata['consequent_library'] and (not session.player.cooldown_active('skill_challenges_assigned')):
+                    session.execute_consequent_safe(session.player.get_abtest_consequent('assign_skill_challenges'), session.player, retmsg, reason=spellname)
 
             elif spellname == "MIGRATE_TURRET_HEADS":
                 spell = session.player.get_abtest_spell(spellname); assert spell
