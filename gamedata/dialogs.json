@@ -1088,7 +1088,7 @@
                                "ui_name": "Attack", "ui_tooltip": "Commence attack",
                                "ui_name_attack_ladder": "Attack", "ui_tooltip_attack_ladder": "Commence attack for %s Points",
                                "ui_name_attack_revenge": "Attack", "ui_tooltip_attack_revenge": "Take revenge (one attack only)",
-                               "ui_name_attack_hitlist": "Attack Once", "ui_tooltip_attack_hitlist": "Hit List enemy - one attack only!",
+                               "ui_name_attack_once": "Attack Once", "ui_tooltip_attack_once": "Special enemy - one attack only!",
 
                                "ui_name_stop_reinforcing": "Back to Map", "ui_tooltip_stop_reinforcing": "Stop editing and go back to the Regional Map",
                                "ui_name_stop_attack": "End Attack", "ui_tooltip_stop_attack": "Stop attacking",

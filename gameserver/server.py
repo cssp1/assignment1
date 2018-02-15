@@ -3217,6 +3217,7 @@ class PlayerTable:
                       ('base_expire_time', None, None),
                       ('base_size', None, None),
                       ('deployment_buffer', None, None),
+                      ('deployment_allowed', None, None),
                       ('base_resource_loot', None, None),
                       ('base_res_looter_state', None, None),
                       ('my_base',
@@ -3441,6 +3442,7 @@ class AIInstanceTable:
         player.player_auras = jsonobj.get('player_auras', [])
         player.recalc_stattab(observer)
         player.my_home.deployment_buffer = jsonobj.get('deployment_buffer', 1)
+        if 'deployment_allowed' in jsonobj: player.my_home.deployment_allowed = jsonobj['deployment_allowed']
         if 'unit_equipment' in jsonobj: player.unit_equipment = jsonobj['unit_equipment']
         if 'base_climate' in jsonobj: player.my_home.base_climate = jsonobj['base_climate']
         if 'base_ncells' in jsonobj: player.my_home.base_ncells = jsonobj['base_ncells']
@@ -3515,6 +3517,7 @@ class AIInstanceTable:
                     'base_creation_time': player.my_home.base_creation_time,
                     'base_times_attacked': player.my_home.base_times_attacked,
                     'user_id': ai_id }
+        if player.my_home.deployment_allowed not in (None, True): jsonobj['deployment_allowed'] = player.my_home.deployment_allowed
         if player.my_home.base_resource_loot: jsonobj['base_resource_loot'] = player.my_home.base_resource_loot
         if player.my_home.base_res_looter_state: jsonobj['base_res_looter_state'] = player.my_home.base_res_looter_state
 
@@ -4305,6 +4308,7 @@ class Session(object):
     def is_ladder_battle(self): return self.ladder_state is not None
 
     def using_squad_deployment(self, deployable_squads = None):
+        if not self.viewing_base.deployment_allowed: return False # skill challenges etc
         if deployable_squads is None: deployable_squads = self.deployable_squads
         return (len(deployable_squads) != 1 or (deployable_squads.values()[0]['squad_id'] != SQUAD_IDS.BASE_DEFENDERS))
 
@@ -6138,9 +6142,16 @@ class SessionChangeOld(SessionChange): # non-map path
                 self.dest_player.sync_with_user(self.dest_user)
             self.dest_player.migrate_proxy()
         SessionChange.master_set.remove(self)
+
+        # compute the deployable squads
+        if self.is_ai and self.dest_player and (not self.dest_player.my_home.deployment_allowed):
+            deployable_squads = {} # do not allow use of player's ordinary units
+        else:
+            deployable_squads = self.default_deployable_squads(self.session.player)
+
         self.d.callback([self.session, self.retmsg, self.dest_user_id, self.dest_user, self.dest_player,
                          None, None, self.new_ladder_state,
-                         self.default_deployable_squads(self.session.player),
+                         deployable_squads,
                          self.default_defending_squads(self.dest_user_id),
                          self.pre_attack])
 
@@ -8259,6 +8270,9 @@ class Base(object):
         self.base_size = 0
         self.deployment_buffer = 1 # whether or not to add deployment buffer around base perimeter
 
+        # if false, disables all normal unit deployment methods, and disables item usage (used for skill challenges)
+        self.deployment_allowed = True
+
         # this is used for AI bases that have explicit loot amounts, and player bases to save state across attacks
         self.base_resource_loot = None # dictionary of {"resource": amount} remaining to be looted
         self.base_res_looter_state = None # ResLooter can persist state here
@@ -8487,6 +8501,9 @@ class Base(object):
         return centroid
 
     def is_deployment_location_valid(self, player, xy):
+        if not self.deployment_allowed:
+            return False # everywhere is invalid
+
         ncells = self.ncells()
         if xy[0] < 0 or xy[0] >= ncells[0] or xy[1] < 0 or xy[1] >= ncells[1]:
             return False
@@ -15241,6 +15258,7 @@ def setup_ai_base(strid, cb):
     player.tutorial_state = "COMPLETE"
     player.resources.unpersist_state(data['resources'])
     player.my_home.deployment_buffer = data.get('deployment_buffer', 1)
+    if 'deployment_allowed' in data: player.my_home.deployment_allowed = data['deployment_allowed']
 
     if 'base_climate' in data:
         assert (data['base_climate'] in gamedata['climates']) or (data['base_climate'] is None)
@@ -20614,6 +20632,7 @@ class GAMEAPI(resource.Resource):
                        session.debug_session_change_count,
                        debug_prev_base_id,
                        session.viewing_base.base_richness, # [40]
+                       session.viewing_base.deployment_allowed, # [41]
                        ])
         session.debug_session_change_count += 1
         for astate in aura_states:
@@ -30013,6 +30032,10 @@ class GAMEAPI(resource.Resource):
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         return
 
+                if (not session.viewing_base.deployment_allowed) and (not session.home_base):
+                    retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
+                    return
+
                 uselist = spec['use'] if type(spec['use']) is list else [spec['use']]
 
                 assert max_count >= 1 and max_count <= item.get('stack',1)
@@ -30899,6 +30922,7 @@ class GAMEAPI(resource.Resource):
                         if 'base_climate' in base: session.player.my_home.base_climate = base['base_climate']
                         if 'base_ncells' in base: session.player.my_home.base_ncells = base['base_ncells']
                         if 'deployment_buffer' in base: session.player.my_home.deployment_buffer = base['deployment_buffer']
+                        # note: deployment_allowed is NOT loaded here. We assume the base header will include it.
 
                         for data in base.get('buildings',[]):
                             spec = data['spec']
@@ -30964,6 +30988,8 @@ class GAMEAPI(resource.Resource):
 
                         # force an explicit ncells value
                         out['base_ncells'] = session.player.my_home.base_ncells or gamedata['map']['default_ncells']
+
+                        # deployment_allowed is NOT stored - we expect this to be in the base header
 
                         for obj in session.player.home_base_iter():
                             if obj.is_building():

@@ -34,6 +34,9 @@ Base.Base = function(id, base_data) {
     this.base_type = null;
     this.deployment_buffer = 1;
 
+    /** @type {boolean} if false, disables all normal unit deployment methods (used for skill challenges) */
+    this.deployment_allowed = true;
+
     this.power_state = [0,0]; // power [produced,consumed]
     this.power_factor_cache = 0; // must be reset when power_state changes
     this.power_state_last_serialized = null; // for incremental serialization
@@ -57,6 +60,7 @@ Base.Base.prototype.set_climate = function(new_climate_name) {
 
 Base.Base.prototype.receive_state = function(base_data) {
     this.deployment_buffer = ('deployment_buffer' in base_data ? base_data['deployment_buffer'] : 1);
+    this.deployment_allowed = ('deployment_allowed' in base_data ? base_data['deployment_allowed'] : true);
     this.base_landlord_id = base_data['base_landlord_id'];
     this.set_climate(base_data['base_climate']);
     this.base_map_loc = ('base_map_loc' in base_data ? base_data['base_map_loc'] : null);
@@ -73,6 +77,7 @@ Base.Base.prototype.serialize = function() {
     this.power_state_last_serialized = [this.power_state[0], this.power_state[1]];
     return {'base_id': this.base_id,
             'deployment_buffer': this.deployment_buffer,
+            'deployment_allowed': this.deployment_allowed,
             'base_landlord_id': this.base_landlord_id,
             'base_climate': this.base_climate,
             'base_map_loc': this.base_map_loc,

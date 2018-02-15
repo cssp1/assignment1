@@ -10036,6 +10036,9 @@ function init_playfield_speed_bar(replay_player) {
 
 /** @return {!Array<number>} */
 function get_playfield_speed_limits() {
+    // when deployment_allowed is false, assume this is a timed skill challenge, so disable time manipulation
+    if(!session.is_replay() && !session.viewing_base.deployment_allowed) { return [0, 0]; }
+
     return gamedata['client']['playfield_speed_limits'][session.is_replay() ? 'replay': 'normal'];
 };
 /** @param {BattleReplay.Player|null=} replay_player */
@@ -12578,7 +12581,7 @@ function update_combat_resource_bars(dialog) {
     // unit space deployed/deployable
     dialog.widgets['unit_space_icon'].show =
         dialog.widgets['unit_space_amount'].show = (gamedata['client']['combat_resource_bars_show_space'] &&
-                                                    session.has_attacked &&
+                                                    session.has_attacked && session.viewing_base.deployment_allowed &&
                                                     (session.viewing_base.base_landlord_id != session.user_id ||
                                                      (!is_nosql && session.viewing_base.base_type == 'quarry')));
     dialog.widgets['unit_space_bar'].show =
@@ -14104,7 +14107,7 @@ function update_unit_deployment_bar_squad(dialog) {
 
     // DONATED UNITS
     if(i < max_icons && player.unit_donation_enabled() && player.has_donated_units() &&
-       !session.viewing_base.climate.has_climate_unit_restrictions()) {
+       !session.viewing_base.climate.has_climate_unit_restrictions() && session.viewing_base.deployment_allowed) {
         throw Error('donated units not supported');
     }
 
@@ -14159,7 +14162,7 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
     });
     var uniques = goog.object.getCount(unique_specs);
 
-    if(player.unit_donation_enabled() && player.has_donated_units()) { uniques += 1; }
+    if(player.unit_donation_enabled() && player.has_donated_units() && session.viewing_base.deployment_allowed) { uniques += 1; }
 
     var skip = 0;
     if(uniques > max_icons) {
@@ -14342,7 +14345,7 @@ function update_unit_deployment_bar_batch_or_drip(dialog) {
 
     // DONATED UNITS
     if(i < max_icons && player.unit_donation_enabled() && player.has_donated_units() &&
-       !session.viewing_base.climate.has_climate_unit_restrictions()) {
+       !session.viewing_base.climate.has_climate_unit_restrictions() && session.viewing_base.deployment_allowed) {
 
         var specname = 'DONATED_UNITS';
         dialog.user_data['deploy_button_specs'].push(specname);
@@ -18670,7 +18673,7 @@ function update_attack_button_dialog(dialog) {
                   (session.pvp_balance === 'enemy_strict') ||
                   (session.pvp_balance === 'same_alliance') ||
                   (session.viewing_lock_state != 0 && session.viewing_base.base_landlord_id != session.user_id) ||
-                  (session.count_deployable_units() < 1 && (session.viewing_base.base_landlord_id != session.user_id || !session.region.data || session.region.data['storage'] != 'nosql')) ||
+                  (session.viewing_base.deployment_allowed && session.count_deployable_units() < 1 && (session.viewing_base.base_landlord_id != session.user_id || !session.region.data || session.region.data['storage'] != 'nosql')) ||
                   session.repeat_attack_cooldown_expire > server_time ||
                   i_am_isolated || they_are_isolated || is_sandstorm_max || nopvp_violation || ladder_violation || map_violation ||
                   (session.is_alt_account && gamedata['prevent_alt_attacks']) ||
@@ -18757,13 +18760,15 @@ function update_attack_button_dialog(dialog) {
                 dialog.widgets['attack_button'].tooltip.str = str;
             } else if(is_under_protection) {
                 dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_protection'];
-            } else if(session.count_deployable_units() < 1 && (session.viewing_base.base_landlord_id != session.user_id || !session.region.data || session.region.data['storage'] != 'nosql')) {
+            } else if(session.viewing_base.deployment_allowed && session.count_deployable_units() < 1 &&
+                      (session.viewing_base.base_landlord_id != session.user_id || !session.region.data || session.region.data['storage'] != 'nosql')) {
                 if(session.deployable_squads.length < 1) {
                     if(session.viewing_base.base_landlord_id == session.user_id) {
                         // friendly base - no attack button
                         dialog.widgets['attack_button'].show = false;
                     } else {
-                        // shouldn't get here - enemy base but no squad within range
+                        // shouldn't get here via the map - enemy base but no squad within range
+                        // (skill challenges set deployment_allowed = false)
                         dialog.widgets['attack_button'].show = false;
                     }
                 } else if(!player.has_any_units()) {
@@ -18831,8 +18836,8 @@ function update_attack_button_dialog(dialog) {
                     var base = gamedata['ai_bases_client']['bases'][session.viewing_user_id.toString()];
                     if(base && ('persistent' in base) && !base['persistent']) {
                         dialog.widgets['attack_button'].state = 'attack_once';
-                        dialog.widgets['attack_button'].str = dialog.data['widgets']['attack_button']['ui_name_attack_hitlist'];
-                        dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_attack_hitlist'];
+                        dialog.widgets['attack_button'].str = dialog.data['widgets']['attack_button']['ui_name_attack_once'];
+                        dialog.widgets['attack_button'].tooltip.str = dialog.data['widgets']['attack_button']['ui_tooltip_attack_once'];
                     }
                 }
 
@@ -18846,7 +18851,7 @@ function update_attack_button_dialog(dialog) {
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "DEPLOY_UNITS", [0,0], {}]);
 
                     // turn on combat item bar
-                    if(!session.home_base) {
+                    if(!session.home_base && session.viewing_base.deployment_allowed) {
                         init_combat_item_bar();
                     }
 
@@ -47868,7 +47873,9 @@ function handle_server_message(data) {
                                                 'base_type': data[22],
                                                 'base_ncells': data[23],
                                                 'base_last_attack_time': data[27] || -1,
-                                                'base_richness': data[40] || -1}),
+                                                'base_richness': data[40] || -1,
+                                                'deployment_allowed': data[41]
+                                               }),
                                  session.home_base && player.get_any_abtest_value('enable_citizens', gamedata['client']['enable_citizens']) // enable_citizens
                                 );
 
@@ -47974,7 +47981,7 @@ function handle_server_message(data) {
         set_view_limits();
 
         // recall persisted playfield speed setting for battles only
-        update_player_combat_time_scale(session.home_base ? 0 : get_preference_setting(player.preferences, 'playfield_speed'));
+        update_player_combat_time_scale((session.home_base || !session.viewing_base.deployment_allowed) ? 0 : get_preference_setting(player.preferences, 'playfield_speed'));
 
         if(client_state != client_states.RUNNING) {
             // very first session initiated
@@ -49149,7 +49156,10 @@ function handle_server_message(data) {
             session.deploy_time = server_time;
             APMCounter.reset();
 
-            init_combat_item_bar();
+            if(session.viewing_base.deployment_allowed) {
+                init_combat_item_bar();
+            }
+
             if(GameArt.assets['background_music'].has_state('combat')) {
                 // if no "combat" music is available, stick with "recon"
                 change_backdrop_music(/** @type {!GameArt.Sprite} */ (GameArt.assets['background_music'].states['combat']).audio);

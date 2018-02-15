@@ -189,6 +189,7 @@ Session.Session.prototype.check_alliance_perm = function(want_perm) {
 
 // returns true if using new map/squads deployment, instead of conventional deploy-your-base-defenders method
 Session.Session.prototype.using_squad_deployment = function() {
+    if(!this.viewing_base.deployment_allowed) { return false; } // skill challenges etc
     return (this.deployable_squads.length != 1 || this.deployable_squads[0] != SQUAD_IDS.BASE_DEFENDERS);
 };
 
