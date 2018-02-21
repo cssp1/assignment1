@@ -12638,6 +12638,9 @@ class Player(AbstractPlayer):
         return (client_name, Scores2.make_point(time_scope, time_loc, space_scope, space_loc))
 
     # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
+    # for extra axes, the "stats" value will be like "battle_duration": { ("challenge",   "key",      "skill_challenge:123"): 32.4 }
+    #                                                stat name             extra axis    extra scope   extra loc            value
+    # note, the scores2_to_sql script only accepts a single extra axis named "challenge"
     def modify_scores(self, stats, reason='', method = '+=', trophy_decay_k = 0, trophy_decay_elapsed = 0):
         time_coords = Scores2.make_time_coords(self.get_absolute_time(),
                                                SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time()),
@@ -12654,10 +12657,14 @@ class Player(AbstractPlayer):
         any_changed = False
 
         for name, value in stats.iteritems():
-            if name not in gamedata['leaderboard']['score_fields']:
-                continue # not active in this game
+            entry = gamedata['leaderboard']['score_fields'].get(name)
+            if not entry:
+                continue # this stat not active in this game
+
+            has_extra_axes = isinstance(value, dict)
 
             if name.startswith('trophies_'):
+                assert not has_extra_axes
                 kind = name[9:12]; assert kind in ('pve','pvp','pvv')
                 floor = gamedata['trophy_floor'].get(kind,0)
                 affects_alliance = True
@@ -12680,10 +12687,20 @@ class Player(AbstractPlayer):
             else:
                 floor = None
                 affects_alliance = (name == event_stat_name) # record current stat tournament alliance scores
-                space_coords = Scores2.make_space_coords(self.home_continent(), self.home_region)
-                stat_method = method
+                # disable per-region scores if has_extra_axes
+                space_coords = Scores2.make_space_coords(self.home_continent(), self.home_region if (not has_extra_axes) else None)
+                stat_method = entry.get('method', method) # allow score_fields entry to override the aggregation method
 
-            any_changed |= self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
+            # parse extra axes
+            if has_extra_axes:
+                for extra, raw_value in value.iteritems():
+                    assert isinstance(extra, tuple) and len(extra) == 3
+                    #             axis:     [  scope,   loc  ]
+                    extra_axes = {extra[0]: [extra[1], extra[2]]}
+                    any_changed |= self.scores2.set(name, raw_value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance,
+                                                    extra_axes = extra_axes)
+            else:
+                any_changed |= self.scores2.set(name, value, time_coords, space_coords, method = stat_method, floor = floor, affects_alliance = affects_alliance)
 
         self.publish_scores(reason = 'modify_scores')
         return any_changed
@@ -19224,6 +19241,7 @@ class GAMEAPI(resource.Resource):
 
         outcome = 'none'
         completion_consequent = None
+        timed_challenge = None
         mutated_auras = False
         summary = None
 
@@ -19757,6 +19775,7 @@ class GAMEAPI(resource.Resource):
                 if outcome == 'victory' and (('completion' in base) or session.is_ladder_battle()):
                     # "story" base - use Consequent system
                     completion_consequent = base.get('completion', None)
+                    timed_challenge = base.get('timed_challenge', None)
 
                     if ('fb_open_graph' in base) and base['fb_open_graph'].get('enable', True):
                         session.user.create_fb_open_graph_action('conquer',
@@ -20096,6 +20115,12 @@ class GAMEAPI(resource.Resource):
                         # type-specific token counter
                         skey = 'tokens_looted:'+item['spec']
                         stats[skey] = stats.get(skey,0) + stack
+
+                # collect timing
+                if timed_challenge and outcome == 'victory':
+                    # note, the scores2_to_sql script only accepts a single extra axis named "challenge"
+                    # "key" roughly corresponds to one AI base, but allows multiple base variations to share one key
+                    stats['battle_duration'] = {('challenge', 'key', timed_challenge): int(server_time - session.attack_log.log_time)}
 
                 session.player.modify_scores(stats, reason = 'complete_attack(attacker)')
 
