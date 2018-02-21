@@ -368,11 +368,11 @@ BattleLog.parse = function(my_id, viewer_id, summary, metlist) {
         } else if(met['event_name'] == '3900_unit_exists') {
             if(met['hp'] === 0 || met['hp_ratio'] === 0) { continue; } // dead unit
             if(summary['raid_mode'] === 'scout') {
-                line.push(new SPText.ABlock(poss['defender']+' defending scouts: ', pr.normal));
+                line.push(new SPText.ABlock(poss[met['user_id']]+' starting scouts: ', pr.normal));
             } else {
-                line.push(new SPText.ABlock(poss['defender']+' defenses: ', pr.normal));
+                line.push(new SPText.ABlock(poss[met['user_id']]+' starting units: ', pr.normal));
             }
-            line.push(new SPText.ABlock(BattleLog.unit(met, myrole === 'defender'), pr.hi));
+            line.push(new SPText.ABlock(BattleLog.unit(met, met['user_id'] === my_id), pr.hi));
         } else if(met['event_name'] == '3901_player_auras') {
             var aura_list = [];
             goog.array.forEach(met['player_auras'], function(data) {

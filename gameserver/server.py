@@ -9624,8 +9624,14 @@ class Player(AbstractPlayer):
             self.ladder_match_history.remove(self.ladder_match_history[0])
 
     # modestly censored version of player auras for use in battle logs
-    def player_auras_censored(self):
-        return [aura for aura in self.player_auras_iter_const() if gamedata['auras'].get(aura['spec'],{}).get('show_in_battle_log',True)]
+    def player_auras_censored(self, deployment_allowed = True):
+        ret = []
+        for aura in self.player_auras_iter_const():
+            spec = gamedata['auras'].get(aura['spec'],{})
+            if not spec.get('show_in_battle_log', True): continue
+            if (not deployment_allowed) and spec.get('cancelable', True): continue
+            ret.append(aura)
+        return ret
 
     def player_auras_iter_const(self):
         for aura in self.player_auras:
@@ -24892,9 +24898,14 @@ class GAMEAPI(resource.Resource):
                 censored_viewing_player_auras = session.viewing_player.player_auras_censored()
                 if censored_viewing_player_auras:
                     session.attack_event(session.viewing_user.user_id, '3901_player_auras', {'player_auras':copy.deepcopy(censored_viewing_player_auras)})
-                session.log_attack_units(session.viewing_user.user_id, session.iter_objects(), '3900_unit_exists')
+
+                # defender's standing army
+                session.log_attack_units(session.viewing_user.user_id, filter(lambda obj: obj.owner is session.viewing_player, session.iter_objects()), '3900_unit_exists')
+                # for skill challenges, where friendly units are "baked" into the base
+                session.log_attack_units(session.user.user_id, filter(lambda obj: obj.owner is session.player, session.iter_objects()), '3900_unit_exists')
+
                 if session.damage_log: session.damage_log.init_multi(session.iter_objects())
-                censored_player_auras = session.player.player_auras_censored()
+                censored_player_auras = session.player.player_auras_censored(deployment_allowed = session.viewing_base.deployment_allowed)
                 if censored_player_auras:
                     session.attack_event(session.user.user_id, '3901_player_auras', {'player_auras':copy.deepcopy(censored_player_auras)})
 
