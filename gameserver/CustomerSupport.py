@@ -496,7 +496,7 @@ class HandleApplyOrRemoveAura(Handler):
 
 class HandleRemoveAura(HandleApplyOrRemoveAura):
     def do_exec_online(self, session, retmsg):
-        session.player.remove_aura(session, retmsg, self.args['aura_name'], force = True, data = self.aura_data)
+        session.remove_player_aura(self.args['aura_name'], force = True, data = self.aura_data)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         to_remove = []
@@ -511,8 +511,7 @@ class HandleRemoveAura(HandleApplyOrRemoveAura):
 
 class HandleApplyAura(HandleApplyOrRemoveAura):
     def do_exec_online(self, session, retmsg):
-        session.player.apply_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True, data = self.aura_data)
-        session.player.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
+        session.apply_player_aura(self.args['aura_name'], duration = int(self.args.get('duration','-1')), ignore_limit = True, data = self.aura_data)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         assert self.args['aura_name'] in self.gamedata['auras']
@@ -567,8 +566,7 @@ class HandleChatGag(Handler):
         else:
             self.duration = -1
     def do_exec_online(self, session, retmsg):
-        if session.player.apply_aura('chat_gagged', duration = self.duration, ignore_limit = True):
-            session.player.stattab.send_update(session, session.outgoing_messages)
+        session.apply_player_aura('chat_gagged', duration = self.duration, ignore_limit = True)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         player['player_auras'] = filter(lambda x: x['spec'] != 'chat_gagged', player.get('player_auras',[]))
@@ -583,7 +581,7 @@ class HandleChatUngag(Handler):
     need_user = False
     def do_exec_online(self, session, retmsg):
         for aura_name in self.AURAS:
-            session.player.remove_aura(session, session.outgoing_messages, aura_name, force = True)
+            session.remove_player_aura(aura_name, force = True)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         player['player_auras'] = filter(lambda x: x['spec'] not in self.AURAS, player.get('player_auras',[]))

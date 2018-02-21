@@ -4080,13 +4080,20 @@ class Session(object):
         # flags that we need to perform a recaculation and send the results to the client on next transmission
         self.deferred_ping_squads = False
         self.deferred_ladder_point_decay_check = False
+
+        # note: this applies to self.player only, not self.viewing_player.
+        # stattab updates for viewing_player need to be done and transmitted manually
         self.deferred_stattab_update = False
+
         self.deferred_history_update = False
         self.deferred_battle_history_update = False
         self.deferred_mailbox_update = False
         self.deferred_power_change = False
         self.deferred_player_state_update = False
+
+        # sends updates for BOTH self.player and self.viewing_player
         self.deferred_player_auras_update = False
+
         self.deferred_player_cooldowns_update = False
         self.deferred_donated_units_update = False
         self.deferred_object_state_updates = set()
@@ -5166,7 +5173,7 @@ class Session(object):
             if player is self.player:
                 retmsg.append(["NEW_TECH", tech_name, self.player.tech[tech_name], lab.obj_id if lab else None])
 
-        player.stattab.send_update(self, retmsg)
+        self.deferred_stattab_update = True
 
         # send metrics
         if 0 or LOTS_OF_METRICS: metric_event_coded(object.owner.user_id, '3080_research_tech', {'tech_type':tech_name, 'level':level, 'method':method})
@@ -5180,6 +5187,45 @@ class Session(object):
                 self.user.create_fb_open_graph_action_unlock_unit(unl.name)
         else:
             gamesite.exception_log.event(server_time, 'tech completion for non-session.player! %d' % player.user_id)
+
+    # pass-through apply/remove aura functions that take care of performing stattab and client updates
+    def apply_player_aura(self, specname, *args, **kwargs):
+        if self.player.apply_aura(specname, *args, **kwargs):
+            self.deferred_player_auras_update = True
+            self.deferred_stattab_update = True
+            return True
+        return False
+
+    def remove_player_aura(self, *args, **kwargs):
+        if self.player.remove_aura(*args, **kwargs):
+            self.deferred_player_auras_update = True
+            self.deferred_stattab_update = True
+            return True
+        return False
+
+    def apply_regional_auras(self):
+        attacker_aura_list = gamedata.get('default_player_auras',[])
+
+        if self.player.home_region and (self.player.home_region in gamedata['regions']) and \
+           ('auras' in gamedata['regions'][self.player.home_region]):
+            attacker_aura_list += gamedata['regions'][self.player.home_region]['auras']
+
+        defender_aura_list = attacker_aura_list + gamedata.get('defender_auras',[])
+
+        # all regional auras should go away on session change
+        assert all(gamedata['auras'][data['aura_name']].get('ends_on') == 'session_change' for data in defender_aura_list)
+
+        # apply (attacker) auras to self.player
+        for data in attacker_aura_list:
+            self.apply_player_aura(data['aura_name'], strength = data.get('aura_strength',1), duration = data.get('aura_duration',-1), level = data.get('aura_level',1
+), stack = data.get('stack',-1), ignore_limit = True)
+
+        # apply (defender) auras to self.viewing_player
+        if self.viewing_player is not self.player:
+            for data in defender_aura_list:
+                self.viewing_player.apply_aura(data['aura_name'], strength = data.get('aura_strength',1), duration = data.get('aura_duration',-1), level = data.get('aura_level',1), stack = data.get('stack',-1), ignore_limit = True)
+
+        self.deferred_player_auras_update = True
 
     def give_enhancement(self, player, retmsg, obj, enh_name, level, method, give_xp = True):
         assert player is self.player
@@ -9649,20 +9695,14 @@ class Player(AbstractPlayer):
                 return True
         return False
 
-    # confusing: remove_aura sends stattab update, apply_aura does not (both recalc stattab)
-    def remove_aura(self, session, retmsg, aura_name, remove_stack = -1, force = False, data = None):
+    # note: if this succeeds, and is operating on the logged-in player,
+    # you will also need to perform a deferred stattab update and player_auras update on the session
+    def remove_aura(self, aura_name, remove_stack = -1, force = False, data = None):
         spec = gamedata['auras'][aura_name]
         if (not force) and (not spec.get('cancelable', True)):
-            if retmsg is not None: retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
-            return
+            return False
 
-        if self.do_remove_aura(aura_name, remove_stack = remove_stack, data = data):
-            self.recalc_stattab(self)
-            if retmsg is not None:
-                self.stattab.send_update(session, retmsg) # also sends PLAYER_AURAS_UPDATE
-        else:
-            if (not force) and (retmsg is not None):
-                retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
+        return self.do_remove_aura(aura_name, remove_stack = remove_stack, data = data)
 
     def do_apply_aura(self, aura_name, strength = 1, duration = -1, level = 1, stack = -1, data = None, ignore_limit = False, start_time = -1):
         spec = gamedata['auras'][aura_name]
@@ -9733,31 +9773,11 @@ class Player(AbstractPlayer):
 
         return True
 
-    # confusing: remove_aura sends stattab update, apply_aura does not (both recalc stattab)
+    # note: if this succeeds, and is operating on the logged-in player,
+    # you will also need to perform a deferred stattab update and player_auras update on the session
     def apply_aura(self, *args, **kwargs):
         self.prune_player_auras()
-        success = self.do_apply_aura(*args, **kwargs)
-        if success:
-            self.recalc_stattab(self)
-        return success
-
-    def apply_regional_auras(self, is_defender = False):
-        ret = False
-        aura_list = []
-        if self.home_region and (self.home_region in gamedata['regions']) and \
-           ('auras' in gamedata['regions'][self.home_region]):
-            aura_list += gamedata['regions'][self.home_region]['auras']
-        aura_list += gamedata.get('default_player_auras',[])
-
-        if is_defender:
-            aura_list += gamedata.get('defender_auras',[])
-
-        for data in aura_list:
-            aura_name = data['aura_name']
-            spec = gamedata['auras'][aura_name]
-            assert spec['ends_on'] == 'session_change' # regional auras should go away on session change
-            ret |= self.apply_aura(aura_name, strength = data.get('aura_strength',1), duration = data.get('aura_duration',-1), level = data.get('aura_level',1), stack = data.get('stack',-1), ignore_limit = True)
-        return ret
+        return self.do_apply_aura(*args, **kwargs)
 
     def run_battle_end_auras(self, outcome, session, retmsg):
         to_remove = []
@@ -11929,7 +11949,7 @@ class Player(AbstractPlayer):
             # equal strength
             return None
 
-    def ladder_point_decay_check(self, session, retmsg, base_damage = None, base_repair_time = None):
+    def ladder_point_decay_check(self, session, base_damage = None, base_repair_time = None):
         if base_damage is not None: assert base_repair_time is not None # must be given together
 
         mode = gamedata['matchmaking'].get('ladder_point_decay_mode', 'damage')
@@ -11972,10 +11992,11 @@ class Player(AbstractPlayer):
                 decay = self.has_damage_protection(); end_time = self.resources.protection_end_time
 
         if decay:
-            if self.apply_aura('trophy_pvp_decay', duration = (end_time - server_time) if (end_time > 0) else -1, ignore_limit = True) and (retmsg is not None):
-                retmsg.append(["PLAYER_AURAS_UPDATE" if self is session.player else "ENEMY_AURAS_UPDATE", self.player_auras])
+            if self.apply_aura('trophy_pvp_decay', duration = (end_time - server_time) if (end_time > 0) else -1, ignore_limit = True):
+                session.deferred_player_auras_update = True
         else:
-            self.remove_aura(session, retmsg, 'trophy_pvp_decay', force = True)
+            if self.remove_aura('trophy_pvp_decay', force = True):
+                session.deferred_player_auras_update = True
 
     def apply_alliance_leave_point_loss(self, alliance_ui_name):
         fraction = Predicates.eval_cond_or_literal(gamedata['matchmaking'].get('alliance_leave_point_loss',0), None, self)
@@ -12439,7 +12460,6 @@ class Player(AbstractPlayer):
         def send_update(self, session, retmsg):
             assert self.player in (session.player, session.viewing_player)
             retmsg.append(["PLAYER_STATTAB_UPDATE" if self.player is session.player else "ENEMY_STATTAB_UPDATE", self.serialize()])
-            retmsg.append(["PLAYER_AURAS_UPDATE" if self.player is session.player else "ENEMY_AURAS_UPDATE", self.player.player_auras])
             for obj in self.state_changed_buildings:
                 if session.has_object(obj.obj_id):
                     retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
@@ -19583,7 +19603,7 @@ class GAMEAPI(resource.Resource):
                                                       storage_damage,
                                                       prot_time))
 
-                    session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
+                    session.viewing_player.ladder_point_decay_check(session, base_damage = base_damage, base_repair_time = -1) # PvP attack victim
 
                 # END is human home base
 
@@ -20141,7 +20161,7 @@ class GAMEAPI(resource.Resource):
         # note: not sending updates to retmsg, so we assume a session change will come right after this
         if session.home_base:
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-            session.player.ladder_point_decay_check(session, retmsg) # after attack - player
+            session.player.ladder_point_decay_check(session) # after attack - player
 
         if summary:
             retmsg.append(["BATTLE_ENDED",
@@ -20423,7 +20443,7 @@ class GAMEAPI(resource.Resource):
         session.starting_base_damage = base_damage
 
         if session.viewing_player is not session.player and session.viewing_player.is_human():
-            session.viewing_player.ladder_point_decay_check(session, None, base_damage = base_damage, base_repair_time = base_repair_time) # session change - viewing_player
+            session.viewing_player.ladder_point_decay_check(session, base_damage = base_damage, base_repair_time = base_repair_time) # session change - viewing_player
 
         if new_ladder_state and (not session.viewing_player.is_ai()) and \
            (not \
@@ -20689,9 +20709,7 @@ class GAMEAPI(resource.Resource):
         session.player.prune_player_auras(is_session_change = True)
         session.viewing_player.prune_player_auras(is_session_change = True)
 
-        # apply regional auras
-        session.player.apply_regional_auras(is_defender = False)
-        session.viewing_player.apply_regional_auras(is_defender = True)
+        session.apply_regional_auras()
 
         # apply general-purpose loot malus
         if (session.viewing_player is not session.player) and \
@@ -20775,8 +20793,10 @@ class GAMEAPI(resource.Resource):
 
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
 
+        # manually force a stattab update right now, since it can affect ResLooter etc.
         session.player.recalc_stattab(session.player, session.viewing_base)
         session.player.stattab.send_update(session, change_retmsg)
+        session.deferred_stattab_update = False
 
         if session.viewing_player is not session.player:
             session.viewing_player.recalc_stattab(session.player, session.viewing_base)
@@ -21736,10 +21756,8 @@ class GAMEAPI(resource.Resource):
             assert target == 'player'
             #assert aura_duration > 0
 
-            success = session.player.apply_aura(aura_name, strength = aura_strength, duration = aura_duration, stack = aura_stack)
-            if success:
-                session.player.stattab.send_update(session, retmsg)
-            else:
+            success = session.apply_player_aura(aura_name, strength = aura_strength, duration = aura_duration, stack = aura_stack)
+            if not success:
                 retmsg.append(["ERROR", "PLAYER_AURA_LIMIT"])
                 return False
 
@@ -26727,7 +26745,7 @@ class GAMEAPI(resource.Resource):
 
         if session.deferred_ladder_point_decay_check:
             session.deferred_ladder_point_decay_check = False
-            session.player.ladder_point_decay_check(session, retmsg)
+            session.player.ladder_point_decay_check(session)
 
         if session.deferred_stattab_update:
             session.deferred_stattab_update = False
@@ -26779,6 +26797,8 @@ class GAMEAPI(resource.Resource):
         if session.deferred_player_auras_update:
             session.deferred_player_auras_update = False
             retmsg.append(["PLAYER_AURAS_UPDATE", session.player.player_auras])
+            if session.viewing_player is not session.player:
+                retmsg.append(["ENEMY_AURAS_UPDATE", session.viewing_player.player_auras])
 
         if session.deferred_player_cooldowns_update:
             session.deferred_player_cooldowns_update = False
@@ -27622,7 +27642,7 @@ class GAMEAPI(resource.Resource):
             # force repairs to start to avoid exploits where you leave your own buildings unrepaired
             self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
 
-            session.player.ladder_point_decay_check(session, retmsg) # login
+            session.player.ladder_point_decay_check(session) # login
 
         if session.user.frame_platform == 'fb':
             retmsg.append(["FACEBOOK_CURRENCY_UPDATE", session.user.facebook_currency])
@@ -27883,7 +27903,7 @@ class GAMEAPI(resource.Resource):
 
         # force repairs to start to avoid exploits where you leave your own buildings unrepaired
         self.do_start_repairs(session, None, session.player.my_home.base_id, repair_units = False)
-        session.player.ladder_point_decay_check(session, None) # logout
+        session.player.ladder_point_decay_check(session) # logout
 
         # log metric event
         if method == 'timeout' or method == 'server_restart':

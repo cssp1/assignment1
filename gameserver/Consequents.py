@@ -411,8 +411,7 @@ class ApplyAuraConsequent(Consequent):
                     instance_data[k] = duration
         else:
             instance_data = None
-        if session.player.apply_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True, start_time = start_time):
-            session.player.stattab.send_update(session, retmsg)
+        if session.apply_player_aura(self.name, strength = self.strength, duration = duration, stack = stack, level = self.level, data = instance_data, ignore_limit = True, start_time = start_time):
             spec = session.player.get_abtest_aura(self.name)
             if ('on_apply' in spec):
                 read_consequent(spec['on_apply']).execute(session, player, retmsg, context)
@@ -500,7 +499,7 @@ class RemoveAuraConsequent(Consequent):
         self.remove_stack = data.get('remove_stack',-1)
         self.match_data = data.get('match_data', None)
     def execute(self, session, player, retmsg, context=None):
-        session.player.remove_aura(session, retmsg, self.name, remove_stack = self.remove_stack, force = True, data = self.match_data)
+        session.remove_player_aura(self.name, remove_stack = self.remove_stack, force = True, data = self.match_data)
     def execute_offline(self, gamesite, user, player, context=None):
         for aura in player['player_auras']:
             if aura['spec'] == self.name and \
