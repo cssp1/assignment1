@@ -5135,7 +5135,7 @@ class Session(object):
                     gamesite.gameapi.do_cancel_research(self, retmsg, obj)
 
         player.tech[tech_name] = level
-        player.recalc_stattab(self.player)
+        self.deferred_stattab_update = True
         player.update_unit_levels(self.player, tech_name, self, retmsg)
 
         if give_xp:
@@ -5197,7 +5197,7 @@ class Session(object):
 
         self.viewing_base.nosql_write_one(obj, 'give_enhancement', fields = ['enhancements', 'enhancing'])
 
-        player.recalc_stattab(self.player)
+        self.deferred_stattab_update = True
 
         if give_xp:
             # award XP for each level achieved along the way
@@ -22570,8 +22570,7 @@ class GAMEAPI(resource.Resource):
             session.player.send_inventory_update(retmsg)
 
         if object.affects_player_stattab():
-            session.player.recalc_stattab(session.player)
-            session.player.stattab.send_update(session, retmsg)
+            session.deferred_stattab_update = True
 
         if object.is_producer():
             object.update_production(session.player, session.player.my_home.base_type, session.player.my_home.base_region, compute_power_factor(session.player.my_home.get_power_state()))
@@ -23154,8 +23153,8 @@ class GAMEAPI(resource.Resource):
 
             if target is not object:
                 retmsg.append(["OBJECT_STATE_UPDATE2", target.serialize_state()])
-            player.recalc_stattab(player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
-            player.stattab.send_update(session, retmsg)
+
+            session.deferred_stattab_update = True
 
         if 'on_start' in recipe:
             session.execute_consequent_safe(GameObjectSpec.get_leveled_quantity(recipe['on_start'], arg.recipe_level),
@@ -24196,10 +24195,9 @@ class GAMEAPI(resource.Resource):
 
         if ret:
             session.power_changed(session.viewing_base, obj, retmsg)
-            session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
-            session.player.stattab.send_update(session, retmsg)
             if obj.is_producer():
                 obj.update_production(session.player, session.player.my_home.base_type, session.player.my_home.base_region, compute_power_factor(session.player.my_home.get_power_state()))
+            session.deferred_stattab_update = True
 
         retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
         return ret
@@ -24226,8 +24224,7 @@ class GAMEAPI(resource.Resource):
         if len(session.player.unit_equipment[dest_spec_name]) < 1: del session.player.unit_equipment[dest_spec_name]
 
         if ret:
-            session.player.recalc_stattab(session.player)
-            session.player.stattab.send_update(session, retmsg)
+            session.deferred_stattab_update = True
 
         retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
         return ret
@@ -28322,10 +28319,11 @@ class GAMEAPI(resource.Resource):
 
                 if newstate == "COMPLETE":
                     session.player.set_post_tutorial_state()
-                    session.player.stattab.send_update(session, retmsg)
+                    session.deferred_player_auras_update = True
+                    session.deferred_stattab_update = True
+                    session.deferred_player_state_update = True
                     metric_event_coded(session.user.user_id, '0399_tutorial_complete', {'sum': session.player.get_denormalized_summary_props('brief')})
                     session.setmax_player_metric('tutorial_complete', 1)
-                    retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
                     session.send_adnetwork_events(retmsg)
 
         elif arg[0] == "REPORT_DAMAGE_ATTRIBUTION":
@@ -29963,12 +29961,11 @@ class GAMEAPI(resource.Resource):
                 retmsg.append(["ERROR", "HARMLESS_RACE_CONDITION"])
 
             if success:
-                session.player.recalc_stattab(session.player)
-                session.player.stattab.send_update(session, retmsg)
+                session.deferred_stattab_update = True
 
             retmsg.append(["INVENTORY_REFUND_RESULT" if want_refund else "INVENTORY_TRASH_RESULT", slot, specname, success, num_removed])
             session.player.send_inventory_update(retmsg)
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+            session.deferred_player_state_update = True
 
             if success and want_refund:
                 retmsg.append(["LOOT_BUFFER_UPDATE", session.player.loot_buffer, True])
@@ -30351,9 +30348,9 @@ class GAMEAPI(resource.Resource):
             if need_storage:
                 retmsg.append(["ERROR", "STORAGE_LIMIT", need_storage])
             if success:
-                session.player.recalc_stattab(session.player)
-                session.player.stattab.send_update(session, retmsg)
-            retmsg.append(["PLAYER_STATE_UPDATE", session.player.resources.calc_snapshot().serialize()])
+                session.deferred_stattab_update = True
+
+            session.deferred_player_state_update = True
 
         elif arg[0] == "LOOT_BUFFER_RELEASE":
             client_contents = arg[1]
@@ -30731,8 +30728,8 @@ class GAMEAPI(resource.Resource):
                 else:
                     session.player.player_auras = []
                     session.player.player_auras_recently_expired = []
-                    session.player.recalc_stattab(session.player)
-                    session.player.stattab.send_update(session, retmsg)
+                    session.deferred_player_auras_update = True
+                    session.deferred_stattab_update = True
             elif spellname == "CHEAT_GIVE_GAMEBUCKS":
                 if not session.player.is_cheater:
                     retmsg.append(["ERROR", "DISALLOWED_IN_SECURE_MODE"])

@@ -625,8 +625,7 @@ class FindAndReplaceItemsConsequent(Consequent):
             retmsg.append(["OBJECT_STATE_UPDATE2", obj.serialize_state()])
         if self.affect_equipment:
             retmsg.append(["PLAYER_UNIT_EQUIP_UPDATE", session.player.unit_equipment])
-            session.player.recalc_stattab(session.player)
-            session.player.stattab.send_update(session, retmsg)
+            session.deferred_stattab_update = True
         if self.affect_inventory:
             session.player.send_inventory_update(retmsg)
 
