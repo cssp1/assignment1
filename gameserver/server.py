@@ -3388,7 +3388,7 @@ class PlayerTable:
             player.foreign_data[name] = val
 
         # init stattab AGAIN so that stuff that depends on home base contents (e.g. repair speed) gets updated properly
-        player.recalc_stattab(observer)
+        player.recalc_stattab(observer, None)
 
         return player
 
@@ -3440,7 +3440,7 @@ class AIInstanceTable:
         player.resources.unpersist_state(jsonobj['resources'])
         player.tech = jsonobj.get('tech',{})
         player.player_auras = jsonobj.get('player_auras', [])
-        player.recalc_stattab(observer)
+        player.recalc_stattab(observer, None)
         player.my_home.deployment_buffer = jsonobj.get('deployment_buffer', 1)
         if 'deployment_allowed' in jsonobj: player.my_home.deployment_allowed = jsonobj['deployment_allowed']
         if 'unit_equipment' in jsonobj: player.unit_equipment = jsonobj['unit_equipment']
@@ -12016,15 +12016,15 @@ class Player(AbstractPlayer):
     # this awkwardly has to work in the PlayerTable.parse() code by mutating the player and then returning the argument, to be assigned again
     def load_tech_and_init_stattab(self, observer, tech):
         self.tech = tech
-        self.recalc_stattab(observer)
+        self.recalc_stattab(observer, None)
         return tech
     def load_auras_and_init_stattab(self, observer, auras):
         self.player_auras = auras
-        self.recalc_stattab(observer)
+        self.recalc_stattab(observer, None)
         return auras
 
-    def recalc_stattab(self, observer, additional_base = None):
-        self.stattab = Player.Stattab(self, observer, additional_base)
+    def recalc_stattab(self, observer, viewing_base):
+        self.stattab = Player.Stattab(self, observer, viewing_base)
 
     # stattab is a cache of the values that can be affected by the player's tech and auras
     # not persistent, this is regenerated dynamically
@@ -12096,8 +12096,30 @@ class Player(AbstractPlayer):
             else:
                 return GameObjectSpec.get_leveled_quantity(effect['strength'], level)
 
-        def __init__(self, player, observer, additional_base = None):
-            assert additional_base is not player.my_home # avoid accidentally iterating twice through home
+        def __init__(self, player, observer, viewing_base):
+
+            # normally, stuff in player.my_home always affects the stattab
+            # if we are attacking a base with (not deployment_allowed), then disable effects from player.my_home and auras/tech/etc
+            if viewing_base and \
+               (viewing_base.base_landlord_id != player.user_id) and \
+               (not viewing_base.deployment_allowed):
+                enable_home_effects = False
+            else:
+                enable_home_effects = True
+
+            # and sometimes, we additionally include effects from the viewing_base (if it's friendly to the player)
+            if viewing_base and \
+               (viewing_base is not player.my_home) and \
+               (viewing_base.base_landlord_id == player.user_id) and \
+               (player.is_ai() or viewing_base.base_type == 'quarry'): # should work for non-quarries too, but there is no game content using this yet
+                additional_base = viewing_base
+            else:
+                additional_base = None
+
+            # iterator for all the base objects we need to check for stattab effects
+            base_iterator = itertools.chain(player.my_home.iter_objects() if enable_home_effects else [],
+                                            additional_base.iter_objects() if additional_base else [])
+
             self.modded_buildings = {}
             self.state_changed_buildings = set()
 
@@ -12125,14 +12147,13 @@ class Player(AbstractPlayer):
             self.player.prune_player_auras(is_recalc_stattab = True)
 
             # check for item set completion
-            for item in self.player.equipped_item_iter(player.my_home):
+            for item in self.player.equipped_item_iter(self.player.my_home):
                 self.add_set_item(gamedata['items'].get(item['spec'], None))
             if gamedata['count_unequipped_items_in_sets']:
                 for item in self.player.stored_item_iter():
                     self.add_set_item(gamedata['items'].get(item['spec'], None))
 
             # clear out building modstats and calculate effects of local building equipment
-            base_iterator = itertools.chain(player.home_base_iter(), additional_base.iter_objects()) if additional_base else player.home_base_iter()
             for obj in base_iterator:
                 if obj.is_building():
                     # reset modstats
@@ -12185,42 +12206,43 @@ class Player(AbstractPlayer):
 
                                                 self.apply_modstat_to_building(obj, effect['stat'], effect['method'], strength, 'enhancement', enh_name, {'effect':i, 'level':enh_level})
 
-            # calculate effect of techs
-            for tech_name, level in player.tech.iteritems():
-                if not tech_name: continue
-                if tech_name not in gamedata['tech']:
-                    # skip unknown techs
-                    if tech_name == 'anti_rover_mines':
-                        continue # WSE mistake
-                    if (not is_ai_user_id_range(player.user_id)) or (not tech_name.endswith('_anti_ice')):
-                        gamesite.exception_log.event(server_time, 'player %d has unknown tech "%s", ignoring' % (player.user_id, tech_name))
-                    continue
+            if enable_home_effects:
+                # calculate effect of techs
+                for tech_name, level in self.player.tech.iteritems():
+                    if not tech_name: continue
+                    if tech_name not in gamedata['tech']:
+                        # skip unknown techs
+                        if tech_name == 'anti_rover_mines':
+                            continue # WSE mistake
+                        if (not is_ai_user_id_range(self.player.user_id)) or (not tech_name.endswith('_anti_ice')):
+                            gamesite.exception_log.event(server_time, 'player %d has unknown tech "%s", ignoring' % (self.player.user_id, tech_name))
+                        continue
 
-                tech_spec = observer.get_abtest_spec(TechSpec, tech_name)
-                if tech_spec.effects:
-                    for effect in tech_spec.effects:
-                        if effect['code'] == 'modstat':
-                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
-                                strength = self.get_modstat_strength(effect, level)
-                                if tech_spec.affects_unit:
-                                    self.apply_modstat_to_unit(tech_spec.affects_unit, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
-                                elif tech_spec.affects_manufacture_category:
-                                    self.apply_modstat_to_manufacture_category(tech_spec.affects_manufacture_category, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
+                    tech_spec = self.observer.get_abtest_spec(TechSpec, tech_name)
+                    if tech_spec.effects:
+                        for effect in tech_spec.effects:
+                            if effect['code'] == 'modstat':
+                                if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                    strength = self.get_modstat_strength(effect, level)
+                                    if tech_spec.affects_unit:
+                                        self.apply_modstat_to_unit(tech_spec.affects_unit, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
+                                    elif tech_spec.affects_manufacture_category:
+                                        self.apply_modstat_to_manufacture_category(tech_spec.affects_manufacture_category, effect['stat'], effect['method'], strength, 'tech', tech_name, {'level':level})
 
 
-            # calculate effects of unit equipment
-            for name, equipment in player.unit_equipment.iteritems():
-                for item in Equipment.equip_iter(equipment):
-                    item_spec = gamedata['items'].get(item['spec'], None)
-                    if not item_spec or ('equip' not in item_spec): continue # skip invalid specs
-                    effects = item_spec['equip']['effects']
-                    level = item.get('level',1)
-                    for i in xrange(len(effects)):
-                        effect = effects[i]
-                        if effect['code'] == 'modstat':
-                            if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
-                                strength = self.get_modstat_strength(effect, level)
-                                self.apply_modstat_to_unit(name, effect['stat'], effect['method'], strength, 'equipment', item_spec['name'], {'effect':i, 'level':level})
+                # calculate effects of unit equipment
+                for name, equipment in self.player.unit_equipment.iteritems():
+                    for item in Equipment.equip_iter(equipment):
+                        item_spec = gamedata['items'].get(item['spec'], None)
+                        if not item_spec or ('equip' not in item_spec): continue # skip invalid specs
+                        effects = item_spec['equip']['effects']
+                        level = item.get('level',1)
+                        for i in xrange(len(effects)):
+                            effect = effects[i]
+                            if effect['code'] == 'modstat':
+                                if (not 'apply_if' in effect) or Predicates.read_predicate(effect['apply_if']).is_satisfied(self.player, None):
+                                    strength = self.get_modstat_strength(effect, level)
+                                    self.apply_modstat_to_unit(name, effect['stat'], effect['method'], strength, 'equipment', item_spec['name'], {'effect':i, 'level':level})
 
             self.quarry_control_limit = 0
 
@@ -12301,6 +12323,10 @@ class Player(AbstractPlayer):
                     continue
                 spec = gamedata['auras'][aura['spec']]
                 if not spec.get('server', False): continue
+
+                # disable effects from cancelable auras when enable_home_effects is off
+                if (not enable_home_effects) and spec.get('cancelable', True): continue
+
                 level = aura.get('level',1)
 
                 if 'effects' in spec: # new-style auras
@@ -15140,7 +15166,7 @@ def init_game(player, add_extras):
     tech = override['tech'] if ('tech' in override) else gamedata['starting_conditions']['tech']
     for key, level in tech.iteritems():
         player.tech[key] = level
-    player.recalc_stattab(player)
+    player.recalc_stattab(player, None)
 
     buildings = override['buildings'] if ('buildings' in override) else gamedata['starting_conditions']['buildings']
     for b in buildings:
@@ -15290,7 +15316,7 @@ def setup_ai_base(strid, cb):
         player.tech[techname] = techlevel
     if 'unit_equipment' in data:
         player.unit_equipment = copy.copy(data['unit_equipment'])
-    player.recalc_stattab(player)
+    player.recalc_stattab(player, None)
 
     if ('scenery' not in data) or data.get('random_scenery',False):
         player.my_home.spawn_scenery(player, user.user_id, overwrite = True)
@@ -20749,13 +20775,11 @@ class GAMEAPI(resource.Resource):
 
                 session.player.do_apply_aura(spec['name'], strength = strength, duration = togo, stack = stack, ignore_limit = True)
 
-        # use additional_base parameter to iterate through hive/quarry buildings -
-        # right now we restrict this to AIs and quarries just for safety, but in theory it should work for players too
-        session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
+        session.player.recalc_stattab(session.player, session.viewing_base)
         session.player.stattab.send_update(session, change_retmsg)
 
         if session.viewing_player is not session.player:
-            session.viewing_player.recalc_stattab(session.player, additional_base = session.viewing_base if ((session.viewing_base is not session.viewing_player.my_home) and (session.viewing_player.is_ai() or session.viewing_base.base_type == 'quarry')) else None)
+            session.viewing_player.recalc_stattab(session.player, session.viewing_base)
             session.viewing_player.stattab.send_update(session, change_retmsg)
 
         power_state = session.viewing_base.get_power_state()
@@ -22218,7 +22242,7 @@ class GAMEAPI(resource.Resource):
             if did_finish_construction or did_an_upgrade:
                 # handle any updates to stattab
                 if object.is_building() and object.affects_player_stattab():
-                    object.owner.recalc_stattab(session.player)
+                    object.owner.recalc_stattab(session.player, session.viewing_base)
                     if object.owner is session.player:
                         object.owner.stattab.send_update(session, retmsg)
 
@@ -26707,7 +26731,7 @@ class GAMEAPI(resource.Resource):
 
         if session.deferred_stattab_update:
             session.deferred_stattab_update = False
-            session.player.recalc_stattab(session.player, additional_base = session.viewing_base if (session.viewing_base.base_type == 'quarry' and session.viewing_base.base_landlord_id == session.player.user_id) else None)
+            session.player.recalc_stattab(session.player, session.viewing_base)
             session.player.stattab.send_update(session, retmsg)
 
         if session.deferred_mailbox_update:
