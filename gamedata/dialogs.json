@@ -9438,7 +9438,9 @@
                          "text_style":"normal", "drop_shadow": 0, "text_color": [0.6,0.6,0.6,1],
                          "show": 0 },
             "description": {"kind": "RichTextField", "xy":[10,26], "dimensions": [222,18], "resize_to_fit_text": 1,
-                            "text_size": 13, "text_hjustify":"left", "text_vjustify": "top", "text_style":"normal"},
+                            "text_size": 13, "text_hjustify":"left", "text_vjustify": "top", "text_style":"normal",
+                            "ui_name_aura_inhibited": "[color=#ffff00]No effect at this enemy base[/color]"
+                           },
 
             "expires": {"show": 0, "kind": "TextField", "xy":[10,26], "dimensions": [222,16],"text_size": 13, "text_hjustify":"left", "text_vjustify": "top",
                         "text_style":"normal", "text_color": [1,0,0,1],

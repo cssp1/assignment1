@@ -12755,6 +12755,12 @@ function update_aura_bar(dialog) {
             var aura = display_aura_list[i];
             var aura_spec = gamedata['auras'][aura['spec']];
 
+
+            // in non-deployment_allowed bases, player aura and equipment effects are turned off
+            // however, non-cancelable auras still take effect
+            var effects_inhibited = (session.viewing_base && !session.viewing_base.deployment_allowed &&
+                                     !('cancelable' in aura_spec && !aura_spec['cancelable'] && aura_spec['name'] != 'donated_units'));
+
             // show aura
             dialog.widgets['aura_slot'+i].show = false;
             dialog.widgets['aura_icon'+i].show = true;
@@ -12763,6 +12769,7 @@ function update_aura_bar(dialog) {
                 icon = player.get_any_abtest_value('gamebucks_inventory_icon', gamedata['store']['gamebucks_inventory_icon']);
             }
             dialog.widgets['aura_icon'+i].asset = icon;
+            dialog.widgets['aura_icon'+i].alpha = (effects_inhibited ? 0.5 : 1);
 
             dialog.widgets['aura_stack'+i].str = ('stack' in aura ? (('stack_prefix' in aura_spec) ? aura_spec['stack_prefix'] : '') + pretty_print_number(aura['stack']) : null);
             dialog.widgets['aura_stack'+i].show = ('stack' in aura) && (aura['stack'] != 1) && (!('show_stack' in aura_spec) || aura_spec['show_stack']);
@@ -12816,6 +12823,7 @@ function update_aura_bar(dialog) {
             if(('end_time' in aura) && (aura['end_time'] > 0)) {
                 dialog.widgets['aura_timer'+i].show = true;
                 dialog.widgets['aura_timer'+i].str = pretty_print_time_brief(aura['end_time']-server_time);
+                dialog.widgets['aura_timer'+i].alpha = (effects_inhibited ? 0.5 : 1);
             } else {
                 dialog.widgets['aura_timer'+i].show = false;
             }
@@ -26497,6 +26505,13 @@ function invoke_aura_context(inv_dialog, slot_xy, slot, aura, show_dropdown) {
         }
         descr = descr.replace('%quarries', ui_quarries);
     }
+
+    var effects_inhibited = (session.viewing_base && !session.viewing_base.deployment_allowed &&
+                             !('cancelable' in spec && !spec['cancelable'] && spec['name'] != 'donated_units'));
+    if(effects_inhibited) {
+        descr += '\n\n' + dialog.widgets['description'].data['ui_name_aura_inhibited'];
+    }
+
     //dialog.widgets['description'].set_text_with_linebreaking(descr);
     //dialog.widgets['description'].wh[1] = dialog.widgets['description'].str.split('\n').length * dialog.widgets['description'].font.leading + dialog.widgets['description'].font.size;
     dialog.widgets['description'].set_text_bbcode(descr);
