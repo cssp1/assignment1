@@ -2602,6 +2602,9 @@ function calculate_battle_outcome() {
     } else {
         // foreign-turf battles are won if all enemy units and buildings are dead
         // and UNDECIDED if all player units are dead (let player End Attack manually)
+
+        var ai_data = session.viewing_base.get_ai_base_data();
+
         session.for_each_real_object(function(obj) {
 
             // do not count barriers
@@ -2617,16 +2620,17 @@ function calculate_battle_outcome() {
                     victory = false;
                 }
             } else {
-                // do not count enemy landmines
-                if(obj.team === 'enemy' && !obj.is_destroyed() &&
-                   !(obj.is_building() && obj.is_minefield())) {
-                    /*
-                    if(player.is_developer()) {
-                        console.log('undestroyed enemy '+obj.spec['name']);
-                        console.log(obj);
+                if(ai_data && ai_data['timed_challenge']) {
+                    // timed challenge - count only the enemy TOC
+                    if(obj.team === 'enemy' && !obj.is_destroyed() && obj.spec.name === gamedata['townhall']) {
+                        victory = false;
                     }
-                    */
-                    victory = false;
+                } else {
+                    // count any enemy object, except for landmines
+                    if(obj.team === 'enemy' && !obj.is_destroyed() &&
+                       !(obj.is_building() && obj.is_minefield())) {
+                        victory = false;
+                    }
                 }
             }
 
@@ -2640,19 +2644,20 @@ function calculate_battle_outcome() {
         }
 
         // don't end the battle if the player has any more deployable units
-        if(defeat && (session.count_deployable_units() > 0 || session.count_pre_deploy_donated_units() > 0)) {
+        if(defeat && session.viewing_base.deployment_allowed &&
+           (session.count_deployable_units() > 0 || session.count_pre_deploy_donated_units() > 0)) {
             defeat = false;
         }
 
         // don't end the battle if the player has usable combat items
-        if(defeat) {
+        if(defeat && session.viewing_base.deployment_allowed) {
             goog.array.forEach(session.home_equip_items, function(entry) {
                 if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(entry['item']['spec']), session) >= UsableInCombat.USABLE_MISSILE) {
                     defeat = false;
                 }
             });
         }
-        if(defeat) {
+        if(defeat && session.viewing_base.deployment_allowed) {
             for(var i = 0; i < player.inventory.length; i++) {
                 var item = player.inventory[i];
                 if(inventory_item_is_usable_in_combat(ItemDisplay.get_inventory_item_spec(item['spec']), session) >= UsableInCombat.USABLE_MISSILE) {

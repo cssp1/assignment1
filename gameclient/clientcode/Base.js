@@ -163,6 +163,13 @@ Base.Base.prototype.deployment_zone_centroid = function() {
     return centroid;
 };
 
+/** @return {Object<string,*> | null} Get AI base template associated with this base */
+Base.Base.prototype.get_ai_base_data = function() {
+    if(this.base_type !== 'home') { return null; }
+    var data = gamedata['ai_bases_client']['bases'][this.base_landlord_id.toString()] || null;
+    return data;
+};
+
 // stroke a path outlining the base area perimeter
 // optionally shade either the inside or outside to indicate invalid locations
 Base.Base.prototype.draw_base_perimeter = function(purpose) {

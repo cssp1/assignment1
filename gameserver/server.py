@@ -8807,6 +8807,13 @@ class Base(object):
                 return obj.level
         return 0
 
+
+    # returns the AI base entry from which this was instanced, or None for non-AI bases (or map bases)
+    def get_ai_base_data(self):
+        if self.base_type != 'home': return None
+        key = str(self.base_landlord_id)
+        return  gamedata['ai_bases_server']['bases'].get(key, None)
+
     def get_cache_props(self, extra_props = None):
         # note: some of this is duplicated in CustomerSupport.ChangeRegionHandler, so make updates there too.
         props = { 'base_id': self.base_id,

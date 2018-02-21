@@ -31,7 +31,7 @@ def make_client_base(strid, base):
     for FIELD in ('kind', 'show_if', 'persistent', 'attack_time', 'base_resource_loot',
                   'ui_priority', 'ui_category', 'ui_info', 'ui_info_url', 'ui_resets', 'ui_instance_cooldown', 'ui_instance_cooldown_template', 'ui_spy_button', 'ui_map_name', 'ui_progress', 'ui_difficulty', 'ui_difficulty_index', 'ui_difficulty_comment',
                   'ui_battle_stars_key', 'ui_fancy_victory_text',
-                  'challenge_icon', 'challenge_item',
+                  'challenge_icon', 'challenge_item', 'timed_challenge',
                   'map_portrait'
                   ):
         if FIELD in base: client_base[FIELD] = base[FIELD]
