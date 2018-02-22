@@ -51,7 +51,7 @@ class PerMessageDeflateCompressor(object):
         self.level = ws_config.get('zlib_compression_level', zlib.Z_DEFAULT_COMPRESSION)
 
         # negotiable parameters
-        self.client_window_bits = ws_config.get('zlib_window_bits', self.DEFAULT_WINDOW_BITS)
+        self.client_window_bits = zlib.MAX_WBITS
         self.server_window_bits = ws_config.get('zlib_window_bits', self.DEFAULT_WINDOW_BITS)
 
         self.client_context_takeover = True
