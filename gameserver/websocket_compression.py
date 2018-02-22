@@ -5,7 +5,9 @@
 # https://github.com/faye/permessage-deflate-node/tree/master/lib
 # SP3RDPARTY : github.com/faye : MIT License
 
+from websocket_exceptions import WSException
 import zlib
+
 import SpinConfig # for tunables
 import random # temporary, for A/B test rollout
 
@@ -111,11 +113,20 @@ class PerMessageDeflateCompressor(object):
         if self.zdecomp is None or not self.client_context_takeover:
             self.zdecomp = zlib.decompressobj(-self.client_window_bits)
     def decompress_message_data(self, data):
-        return self.zdecomp.decompress(data)
+        try:
+            return self.zdecomp.decompress(data)
+        except zlib.error as e:
+            # repackage zlib error as a WSException
+            raise WSException(str(e))
+
     def end_decompress_message(self):
         # Eat stripped LEN and NLEN field of a non-compressed block added
         # for Z_SYNC_FLUSH.
-        self.zdecomp.decompress(b'\x00\x00\xff\xff')
+        try:
+            self.zdecomp.decompress(b'\x00\x00\xff\xff')
+        except zlib.error as e:
+            # repackage zlib error as a WSException
+            raise WSException(str(e))
 
 # instantiate a compressor given a list of the ;-separated elements of the incoming Sec-WebSocket-Extensions header
 

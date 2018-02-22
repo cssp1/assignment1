@@ -44,7 +44,7 @@ from zope.interface import implements
 import websocket_compression
 import BrowserDetect
 import SpinHTTP
-import binascii
+from websocket_exceptions import WSException
 
 import twisted.web.error, twisted.web.resource # DJM
 # handle different Twisted versions that moved NoResource around
@@ -52,22 +52,6 @@ if hasattr(twisted.web.resource, 'NoResource'):
     TwistedNoResource = twisted.web.resource.NoResource
 else:
     TwistedNoResource = twisted.web.error.NoResource
-
-class WSException(Exception):
-    """
-    Something stupid happened here.
-
-    If this class escapes txWS, then something stupid happened in multiple
-    places.
-    """
-    def __init__(self, reason, raw_data = None):
-        Exception.__init__(self, reason)
-        self.raw_data = raw_data
-    def __str__(self):
-        ret = Exception.__str__(self)
-        if 0: # self.raw_data:
-            ret += (' Hex data (len %d):\n' % len(self.raw_data)) + binascii.hexlify(self.raw_data[:100]) + '...'
-        return ret
 
 OPCODE_FRAME_CONT = 0x0 # continuation frame
 OPCODE_FRAME_TEXT = 0x1 # first text frame
@@ -279,7 +263,7 @@ class WebSocketsProtocol(ProtocolWrapper):
         return '\n'.join(self.dump_debug_frame(x, abbreviate) for x in self.debug_frames)
     def dump_debug_frame(self, debug_frame, abbreviate):
         parse_time, frame = debug_frame
-        opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
+        opcode, fin, rsv, masked, length, buffered_length, buffered_data, key, data = frame
         if abbreviate and len(data) > 100:
             # abbreviate the data
             ui_data = data[0:16] + '...' + data[-16:]
@@ -291,37 +275,23 @@ class WebSocketsProtocol(ProtocolWrapper):
         else:
             ui_buffered_data = buffered_data
 
-        return '%.7f opcode %3d fin %d len %d key %r buffered %d data %r buf %r' % \
-               (parse_time, opcode, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
+        return '%.7f opcode %3d rsv %d fin %d len %d key %r buffered %d data %r buf %r' % \
+               (parse_time, opcode, rsv, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
         log.msg("Opening connection with %s" % self.transport.getPeer())
 
     def parseFrames(self):
-        """
-        Find frames in incoming data and pass them to the underlying protocol.
-        """
-
-        frames = []
-
         try:
-            newstart = 0
-
-            for frame, newstart in parse_hybi07_frames(self.buf):
-                frames.append(frame)
-                self.debug_frames.append((time.time(), frame))
-
-            if newstart > 0:
-                self.buf = self.buf[newstart:]
-
+            self.do_parseFrames()
         except WSException as e:
             # Couldn't parse all the frames, something went wrong, let's bail.
             # DJM - for debugging, include the peer address we were talking to
             log.err(e, _why = 'WSException while communicating with %s with headers %r\nLast frames:\n%s\n%.7f (exception)' % \
                     (self.spin_peer_addr, self.spin_headers, self.dump_debug_frames(), time.time()))
             try:
-                with open("/tmp/websocket-debug-%d.txt" % int(time.time()), "w") as fd:
+                with open("/tmp/websocket-debug-%f.txt" % time.time(), "w") as fd:
                     fd.write(self.dump_debug_frames(abbreviate = False))
                     fd.write("\n")
             except:
@@ -330,7 +300,22 @@ class WebSocketsProtocol(ProtocolWrapper):
             self.close_code = 1002 # protocol error
             self.close_reason = e.args[0]
             self.loseConnection()
-            return
+
+    def do_parseFrames(self):
+        """
+        Find frames in incoming data and pass them to the underlying protocol.
+        """
+
+        frames = []
+
+        newstart = 0
+
+        for frame, newstart in parse_hybi07_frames(self.buf):
+            frames.append(frame)
+            self.debug_frames.append((time.time(), frame))
+
+        if newstart > 0:
+            self.buf = self.buf[newstart:]
 
         for frame in frames:
             opcode, fin, rsv, _1, _2, _3, _4, _5, data = frame
