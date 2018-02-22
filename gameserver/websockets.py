@@ -41,6 +41,7 @@ from twisted.web.server import NOT_DONE_YET
 from twisted.internet.address import IPv4Address, IPv6Address
 from zope.interface import implements
 
+import websocket_compression
 import BrowserDetect
 import SpinHTTP
 import binascii
@@ -68,26 +69,12 @@ class WSException(Exception):
             ret += (' Hex data (len %d):\n' % len(self.raw_data)) + binascii.hexlify(self.raw_data[:100]) + '...'
         return ret
 
-# Control frame specifiers. Some versions of WS have control signals sent
-# in-band. Adorable, right?
-
-NORMAL, CLOSE, PING, PONG = range(4)
-
-opcode_types = {
-    0x0: NORMAL,
-    0x1: NORMAL,
-    0x2: NORMAL,
-    0x8: CLOSE,
-    0x9: PING,
-    0xa: PONG,
-}
-
-opcode_for_type = {
-    NORMAL: 0x1,
-    CLOSE: 0x8,
-    PING: 0x9,
-    PONG: 0xa,
-}
+OPCODE_FRAME_CONT = 0x0 # continuation frame
+OPCODE_FRAME_TEXT = 0x1 # first text frame
+OPCODE_FRAME_BIN =  0x2 # first binary frame
+OPCODE_CLOSE = 0x8
+OPCODE_PING = 0x9
+OPCODE_PONG = 0xa
 
 encoders = {
     "base64": b64encode,
@@ -149,7 +136,7 @@ def mask(buf, key):
         ## The buffer legth is a 8 bytes multiple
         return "".join(pack('!Q', k ^ unpack('!Q', buf[i:i+8])[0]) for i in xrange(0, div*8, 8))
 
-def make_hybi07_frame(buf, opcode=NORMAL):
+def make_hybi07_frame(buf, opcode, rsv = 0, fin = 1):
     """
     Make a HyBi-07 frame.
 
@@ -158,15 +145,15 @@ def make_hybi07_frame(buf, opcode=NORMAL):
     """
 
     if len(buf) > 0xffff:
-        length = "\x7f%s" % pack(">Q", len(buf))
+        length = b"\x7f%s" % pack(">Q", len(buf))
     elif len(buf) > 0x7d:
-        length = "\x7e%s" % pack(">H", len(buf))
+        length = b"\x7e%s" % pack(">H", len(buf))
     else:
         length = chr(len(buf))
 
-    # Always make a normal packet.
-    header = chr(0x80 | opcode_for_type[opcode])
-    frame = "%s%s%s" % (header, length, buf)
+    # FIN always set
+    header = chr((fin << 7) | (rsv << 4) | opcode)
+    frame = b"%s%s%s" % (header, length, buf)
     return frame
 
 def parse_hybi07_frames(buf):
@@ -188,18 +175,13 @@ def parse_hybi07_frames(buf):
         # Get the FIN bit that we now care about.
         fin = bool(header & 0x80)
 
-        # Check if any of the reserved flags are set.
-        if header & 0x70:
-            # At least one of the reserved flags is set. Pork chop sandwiches!
-            raise WSException("Reserved flag in HyBi-07 frame (%d)" % header, raw_data = buf[start:])
+        # Get RSV bits
+        rsv = (header & 0x70) >> 4
 
-        # Get the opcode, and translate it to a local enum which we actually
-        # care about.
-        raw_opcode = header & 0xf
-        try:
-            opcode = opcode_types[raw_opcode]
-        except KeyError:
-            raise WSException("Unknown opcode %d in HyBi-07 frame" % raw_opcode, raw_data = buf[start:])
+        # Get the opcode
+        opcode = header & 0xf
+        if opcode not in (OPCODE_FRAME_CONT, OPCODE_FRAME_TEXT, OPCODE_FRAME_BIN, OPCODE_CLOSE, OPCODE_PING, OPCODE_PONG):
+            raise WSException("Unknown opcode %d in HyBi-07 frame" % opcode, raw_data = buf[start:])
 
         # Get the payload length and determine whether we need to look for an
         # extra length.
@@ -251,7 +233,7 @@ def parse_hybi07_frames(buf):
             data = mask(data, key)
             assert len(data) == length
 
-        if opcode == CLOSE:
+        if opcode == OPCODE_CLOSE:
             if len(data) >= 2:
                 # Gotta unpack the opcode and return usable data here.
                 data = unpack(">H", data[:2])[0], data[2:]
@@ -262,7 +244,7 @@ def parse_hybi07_frames(buf):
         start += offset + length
         future_data = buf[start:] # for debugging only
         #log.err('HERE fin %d length %d buf %d' % (fin, length, len(buf) - start))
-        yield (opcode, raw_opcode, fin, masked, length, len(buf) - start, future_data, key, data), start
+        yield (opcode, fin, rsv, masked, length, len(buf) - start, future_data, key, data), start
 
 class WebSocketsProtocol(ProtocolWrapper):
     """
@@ -271,8 +253,11 @@ class WebSocketsProtocol(ProtocolWrapper):
     """
 
     buf = ""
-    complete_data = ""
+    complete_data = b""
+    in_frame_group = False
+    in_frame_group_compressed = False
     codec = None
+    compressor = None
     dumb_pong = False # temporary hack to work around Chrome v39+ Websockets code that doesn't like to receive data with a PONG
 
     # DJM - for returning something in the Close frame
@@ -294,7 +279,7 @@ class WebSocketsProtocol(ProtocolWrapper):
         return '\n'.join(self.dump_debug_frame(x, abbreviate) for x in self.debug_frames)
     def dump_debug_frame(self, debug_frame, abbreviate):
         parse_time, frame = debug_frame
-        opcode, raw_opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
+        opcode, fin, masked, length, buffered_length, buffered_data, key, data = frame
         if abbreviate and len(data) > 100:
             # abbreviate the data
             ui_data = data[0:16] + '...' + data[-16:]
@@ -307,7 +292,7 @@ class WebSocketsProtocol(ProtocolWrapper):
             ui_buffered_data = buffered_data
 
         return '%.7f opcode %3d fin %d len %d key %r buffered %d data %r buf %r' % \
-               (parse_time, raw_opcode, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
+               (parse_time, opcode, 1 if fin else 0, length, key, buffered_length, ui_data, ui_buffered_data)
 
     def connectionMade(self):
         ProtocolWrapper.connectionMade(self)
@@ -348,21 +333,53 @@ class WebSocketsProtocol(ProtocolWrapper):
             return
 
         for frame in frames:
-            opcode, _0, fin, _1, _2, _3, _4, _5, data = frame
-            if opcode == NORMAL:
+            opcode, fin, rsv, _1, _2, _3, _4, _5, data = frame
+
+            if opcode in (OPCODE_FRAME_CONT, OPCODE_FRAME_TEXT, OPCODE_FRAME_BIN):
+
+                if opcode == OPCODE_FRAME_CONT:
+                    # continuation frame
+                    if not self.in_frame_group:
+                        # should not be seen outside a frame group
+                        raise WSException("Unexpected continuation HyBi-07 frame (opcode %x fin 0x%x rsv 0x%x)" % (opcode, fin, rsv), raw_data = data)
+                    if rsv:
+                        # RSV flag should not be set
+                        raise WSException("Unexpected RSV flag in continuation HyBi-07 frame (opcode %x fin 0x%x rsv 0x%x)" % (opcode, fin, rsv), raw_data = data)
+
+                else:
+                    # start of a new frame group
+                    self.in_frame_group = True
+
+                    if rsv:
+                        if rsv == 0x4 and self.compressor.is_per_message():
+                            self.in_frame_group_compressed = True
+                            self.compressor.start_decompress_message()
+                        else:
+                            raise WSException("Unexpected RSV flag in HyBi-07 frame (opcode %x fin 0x%x rsv 0x%x)" % (opcode, fin, rsv), raw_data = data)
+
                 # Business as usual. Decode the frame, if we have a decoder.
                 if self.codec:
-                    self.complete_data += decoders[self.codec](data)
-                # If no decoder, just tack it on as is to any previous frame data.
+                    data = decoders[self.codec](data)
+
+                if self.in_frame_group_compressed:
+                    self.complete_data += self.compressor.decompress_message_data(data)
                 else:
                     self.complete_data += data
 
                 # If FIN bit is set this is the last data frame in this context.
                 if fin:
+                    if self.in_frame_group_compressed:
+                        self.compressor.end_decompress_message()
+                        self.in_frame_group_compressed = False
+                    self.in_frame_group = False
+
+                    output_data = self.complete_data
+                    self.complete_data = b''
+
                     # Pass the data compiled from the frames to the underlying protocol.
-                    ProtocolWrapper.dataReceived(self, self.complete_data)
-                    self.complete_data = ""
-            elif opcode == CLOSE:
+                    ProtocolWrapper.dataReceived(self, output_data)
+
+            elif opcode == OPCODE_CLOSE:
                 # The other side wants us to close. I wonder why?
                 reason, text = data
                 log.msg("Closing connection: %r (%d)" % (text, reason))
@@ -370,7 +387,7 @@ class WebSocketsProtocol(ProtocolWrapper):
                 # Close the connection.
                 self.loseConnection()
                 return
-            elif opcode == PING:
+            elif opcode == OPCODE_PING:
                 # 5.5.2 PINGs must be responded to with PONGs.
                 # 5.5.3 PONGs must contain the data that was sent with the
                 # provoking PING.
@@ -378,10 +395,10 @@ class WebSocketsProtocol(ProtocolWrapper):
 
                 # DJM/JW - Chrome v39+ Websockets code breaks when you follow 5.5.3!
                 if self.dumb_pong:
-                    pong_data = ""
+                    pong_data = b""
 
-                self.transport.write(make_hybi07_frame(pong_data, opcode=PONG)) # DJM - this used to say make_hybi07_packet() but there is no definition for that!
-            elif opcode == PONG:
+                self.transport.write(make_hybi07_frame(pong_data, OPCODE_PONG))
+            elif opcode == OPCODE_PONG:
                 pass # log.err("PONG! %r" % (self.spin_peer_addr,))
 
     def sendFrames(self):
@@ -394,17 +411,29 @@ class WebSocketsProtocol(ProtocolWrapper):
         Send all pending frames.
         """
 
-        for frame in self.pending_frames:
+        while self.pending_frames:
+
+            frame = self.pending_frames[0]
+
             # Encode the frame before sending it.
             if self.codec:
                 frame = encoders[self.codec](frame)
-            packet = make_hybi07_frame(frame)
+
+            if self.compressor.is_per_message() and len(frame) >= self.compressor.min_length:
+                self.compressor.start_compress_message()
+                frame = self.compressor.compress_message_data(frame)
+                frame += self.compressor.end_compress_message()
+                packet = make_hybi07_frame(frame, OPCODE_FRAME_TEXT, rsv = 0x4) # single text frame, compressed
+            else:
+                packet = make_hybi07_frame(frame, OPCODE_FRAME_TEXT) # single text frame
+
             self.transport.write(packet)
-        self.pending_frames = []
+
+            del self.pending_frames[0]
 
     def sendPing(self):
         # log.err("PING! %r" % (self.spin_peer_addr,))
-        self.transport.write(make_hybi07_frame("", opcode=PING))
+        self.transport.write(make_hybi07_frame(b'', OPCODE_PING))
 
     def dataReceived(self, data):
         self.buf += data
@@ -458,7 +487,7 @@ class WebSocketsProtocol(ProtocolWrapper):
                 body = "%s%s" % (pack(">H", self.close_code), self.close_reason)
             else:
                 body = ""
-            frame = make_hybi07_frame(body, opcode=CLOSE)
+            frame = make_hybi07_frame(body, OPCODE_CLOSE)
             self.transport.write(frame)
 
             ProtocolWrapper.loseConnection(self)
@@ -578,6 +607,10 @@ class WebSocketsResource(object):
                 log.msg("Codec %s is not implemented" % codec)
                 failed = True
 
+        extension_string = request.getHeader("Sec-WebSocket-Extensions")
+        extension_list = map(lambda x: x.strip(), extension_string.split(';')) if extension_string else []
+        compressor = websocket_compression.init_from_extension_list(extension_list)
+
         if failed:
             request.setResponseCode(400)
             return ""
@@ -595,6 +628,10 @@ class WebSocketsResource(object):
         # 4.2.2.5.5 Optional codec declaration
         if codec:
             request.setHeader("Sec-WebSocket-Protocol", codec)
+
+        # compressor extensions
+        for k, v in compressor.response_headers().iteritems():
+            request.setHeader(k, v)
 
         # DJM - get the true original peer, possibly forwarded
         peer_ip = SpinHTTP.get_twisted_client_ip(request)
@@ -621,6 +658,7 @@ class WebSocketsResource(object):
         if codec:
             protocol.codec = codec
 
+        protocol.compressor = compressor
         protocol.dumb_pong = dumb_pong
 
         # prevent Twisted from going into chunked mode and adding "Content-Encoding: chunked" header,
