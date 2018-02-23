@@ -4452,6 +4452,15 @@ GameObject.prototype.run_behaviors = function(world) {
                     this.team = 'player';
                 }
             }
+        } else if(behavior_name === 'self_destruct') {
+            if(!('self_destruct' in this.behavior_state)) {
+                this.behavior_state['self_destruct'] = {'triggered': 0};
+            }
+            var state = this.behavior_state['self_destruct'];
+            if(this.hp < 0.9*this.max_hp && !state['triggered']) {
+                state['triggered'] = 1;
+                world.combat_engine.queue_damage_effect(new CombatEngine.KillDamageEffect(world.combat_engine.cur_tick, client_time, this.id, null, this.id));
+            }
         }
     }, this);
 };
