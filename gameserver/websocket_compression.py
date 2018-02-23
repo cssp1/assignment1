@@ -137,7 +137,7 @@ def init_from_extension_list(extension_list):
 
     if 'permessage-deflate' in extension_list:
         # for A/B test rollout, use a random chance % to activate compression
-        enable_chance = ws_config.get('enabled', 0.0) # 0.0-1.0
+        enable_chance = ws_config.get('enabled', 1) # 0.0-1.0
         if enable_chance > 0 and (enable_chance >= 1 or (enable_chance > randgen.random())):
             return PerMessageDeflateCompressor(extension_list)
 
