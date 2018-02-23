@@ -288,15 +288,20 @@ class MongoScores2(object):
                                  ID_FIELD['alliance']: alliance_id, 'axes': item['axes'], 'val': total, 'mtime': self.nosql_client.time}, upsert=True)
         return True
 
-    # get "Top N" scorers for a batch of (stat,axes) combinations
+    # get "Top N" scorers for a batch of (stat,axes, [sort order]) combinations
     def player_scores2_get_leaders(self, stat_axes_list, num, start=0, reason=''): return self.nosql_client.instrument('player_scores2_get_leaders(%s)'%reason, self._scores2_get_leaders, ('player',stat_axes_list, num, start))
     def alliance_scores2_get_leaders(self, stat_axes_list, num, start=0, reason=''): return self.nosql_client.instrument('alliance_scores2_get_leaders(%s)'%reason, self._scores2_get_leaders, ('alliance',stat_axes_list, num, start))
     def _scores2_get_leaders(self, kind, stat_axes_list, num, start):
         ret = []
-        for stat, axes in stat_axes_list:
+        for entry in stat_axes_list:
+            if len(entry) == 2: # can omit the sort order. Defaults to descending.
+                stat, axes, sort_order = entry[0], entry[1], -1
+            else:
+                stat, axes, sort_order = entry
+            assert sort_order in (1,-1)
             key = self._scores2_key(stat, axes)
             tbl = self._scores2_table(kind, stat, axes)
-            rows = list(tbl.find({'key':key}, {'_id':0, ID_FIELD[kind]:1, 'val':1}).sort([('val',-1)]).skip(start).limit(num))
+            rows = list(tbl.find({'key':key}, {'_id':0, ID_FIELD[kind]:1, 'val':1}).sort([('val',sort_order)]).skip(start).limit(num))
             ret.append([{ID_FIELD[kind]: rows[i][ID_FIELD[kind]], 'absolute': rows[i]['val'], 'rank':start+i} for i in xrange(len(rows))])
         return ret
 
