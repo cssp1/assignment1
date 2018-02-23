@@ -28463,12 +28463,78 @@ var quarry_receivers = {};
 var last_quarry_query_time = -1;
 var region_pop_receivers = {};
 
-function query_score_leaders(field, period, callback) {
+/** @param {string} stat
+    @param {string} time_scope
+    @param {Object<string,string>|null=} extra_axes
+
+    Tell Scores2 exactly what time/space point we want, for legacy code that only specifies the time scope.
+    (Mimic behavior of server-side function for legacy code)
+
+    @return {{stat: string, axes: !Object<string,!Array>, sort_order: number}}
+*/
+function scores2_query_addr(stat, time_scope, extra_axes) {
+    var axes = {};
+    if(time_scope === 'week') {
+        // query current week
+        axes['time'] = ['week', // Scores2.FREQ_WEEK
+                        current_pvp_week()];
+    } else if(time_scope === 'season') {
+        // query current season
+        axes['time'] = ['season', // Scores2.FREQ_SEASON
+                        current_pvp_season()];
+    } else if(time_scope === 'ALL') {
+        // query all time
+        axes['time'] = ['ALL', // Scores2.FREQ_ALL
+                        0];
+    } else {
+        throw Error('unhandled time_scope ' +time_scope);
+    }
+
+    // look up the leaderboard score_fields entry
+    var entry = gamedata['leaderboard']['score_fields'][stat];
+    var sort_order = (entry && entry['method'] === 'min') ? 1 : -1;
+
+    if(extra_axes) {
+        // add extra axes
+        goog.object.extend(axes, extra_axes);
+    }
+
+    // space scope
+
+    // some stats are by default region-specific, depending on the score_fields entry
+    if(entry && session.region.data && entry['region_specific'] && entry['leaderboard_query_is_region_specific'] !== 0) {
+        axes['space'] = ['region', // Scores2.SPACE_REGION,
+                         session.region.data['id']];
+    } else {
+        // otherwise default to the "wide space": continent for continent-based games, otherwise ALL
+        var scores2_wide_space = gamedata['matchmaking']['scores2_wide_space'] || 'ALL';
+        if(scores2_wide_space === 'continent' && player.home_continent()) {
+            axes['space'] = ['continent', // Scores2.SPACE_CONTINENT
+                             player.home_continent()];
+        } else {
+            axes['space'] = ['ALL', // Scores2.SPACE_ALL
+                             '0']; // Scores2.SPACE_ALL_LOC
+        }
+    }
+    return {stat: stat, axes: axes, sort_order: sort_order};
+};
+
+/** @param {string} stat
+    @param {string} time_scope
+    @param {Object<string,string>|null} extra_axes
+    @param {function(string, Object<string,?>, ?)} callback */
+function query_score_leaders(stat, time_scope, extra_axes, callback) {
     last_query_tag += 1;
     var tag = 'qsl'+last_query_tag.toString();
-    score_leaders_receivers[tag] = callback;
-    send_to_server.func(["QUERY_SCORE_LEADERS", field, period, tag]);
-}
+    score_leaders_receivers[tag] = (function (_callback) {
+        // adapt new server return format to legacy callback arguments
+        return function (stat, axes, result) {
+            _callback(stat, axes['time'][0], result); // trim down to just the time_scope
+        }; })(callback);
+    var query_addr = scores2_query_addr(stat, time_scope, extra_axes);
+    send_to_server.func(["QUERY_SCORE_LEADERS2", query_addr.stat, query_addr.axes, query_addr.sort_order, tag]);
+};
+
 /** @param {Array.<number>} id_list
     @param {Array.<string>} fields
     @param {function(Array)} callback
@@ -28819,7 +28885,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                 dlg.user_data['data'][cat][period] = data;
                 leaderboard_change_page(dlg, null, null, dlg.user_data['chapter'], 0);
             }; })(dialog);
-            query_score_leaders(chapter, period, cb);
+            query_score_leaders(chapter, period, ui_data['extra_axes'] || null, cb);
         } else if(dialog.user_data['data'][chapter][period] === 'PENDING') {
             dialog.widgets['leaderboard_loading'].show = true;
         } else {
@@ -28835,7 +28901,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
 
     dialog.widgets['show_friends'].state = (mode === 'friends' ? 'active' : 'normal');
     dialog.widgets['show_all'].state = (mode === 'all' ? 'active' : 'normal');
-    var region_specific = (gamedata['strings']['leaderboard']['categories'][chapter]['description'].indexOf('%REGION') != -1);
+    var region_specific = (ui_data['description'].indexOf('%REGION') != -1);
     dialog.widgets['show_all'].str = dialog.data['widgets']['show_all']['ui_name'+(region_specific ? '_region': '')];
     dialog.widgets['show_week'].state = (period === 'week' ? 'active' : 'normal');
     dialog.widgets['show_season'].state = (period === 'season' ? 'active' : 'normal');
@@ -28878,7 +28944,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
 
         dialog.widgets['self_loading'].show = (dialog.user_data['self_queries'][chapter+'_'+period] < 2);
 
-        var brag_reason = (gamedata['strings']['leaderboard']['categories'][chapter]['brag_reason'] || gamedata['strings']['leaderboard']['categories'][chapter]['title']).replace('%PVP_CHALLENGE_NAME', gamedata['events']['challenge_pvp_ladder']['ui_name']);
+        var brag_reason = (ui_data['brag_reason'] || ui_data['title']).replace('%PVP_CHALLENGE_NAME', gamedata['events']['challenge_pvp_ladder']['ui_name']);
         if(brag_reason) {
             brag_reason += ' '+gamedata['strings']['leaderboard']['periods'][period]['brag'];
         }
@@ -28907,7 +28973,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
         var display_absolute = (data ? (dialog.user_data['chapter'].slice(0,8) === 'trophies' ? display_trophy_count(absolute, dialog.user_data['chapter'].slice(9)) : absolute) : -1);
         dialog.widgets['your_rank'].str = (rank >= 0 ? pretty_print_number(rank) : '-');
         dialog.widgets['your_pct'].str = (pct >= 0 && display_absolute > 0 ? (100.0*pct).toFixed(1)+'%' : '-');
-        dialog.widgets['your_total'].str = (display_absolute > 0 ? pretty_print_number(display_absolute) : '-');
+        dialog.widgets['your_total'].str = (display_absolute > 0 ? (ui_data['display'] === 'seconds' ? pretty_print_time(display_absolute) : pretty_print_number(display_absolute)) : '-');
         dialog.widgets['your_rank_accent'].show = (pct >= 0.5);
         dialog.widgets['your_rank_accent'].state = (pct >= 0.99 ? 'top' : 'normal');
         dialog.widgets['your_status'].show = (pct >= 0.5);
@@ -28970,8 +29036,9 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
             }
             dialog.widgets['player_name'+index].str = short_name+' (L'+(data['player_level'] || 1).toString()+')';
             dialog.widgets['player_value'+index].show = true;
+
             var display_absolute = (dialog.user_data['chapter'].slice(0,8) === 'trophies' ? display_trophy_count(data['absolute'], dialog.user_data['chapter'].slice(9)) : data['absolute']);
-            dialog.widgets['player_value'+index].str = pretty_print_number(display_absolute);
+            dialog.widgets['player_value'+index].str = (ui_data['display'] === 'seconds' ? pretty_print_time(display_absolute) : pretty_print_number(display_absolute));
             dialog.widgets['rank_accent'+index].show = true;
             dialog.widgets['rank_accent'+index].state = ((i+1) <= 3 ? 'top' : 'normal');
             dialog.widgets['rank_numeral'+index].show = true;
@@ -49375,7 +49442,7 @@ function handle_server_message(data) {
             delete player_scores_receivers[tag];
             cb(user_id_list, result, info);
         }
-    } else if(msg == "QUERY_SCORE_LEADERS_RESULT") {
+    } else if(msg == "QUERY_SCORE_LEADERS2_RESULT") {
         var tag = data[4];
         if(tag in score_leaders_receivers) {
             var cb = score_leaders_receivers[tag];

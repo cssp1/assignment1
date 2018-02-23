@@ -29858,13 +29858,42 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, tag, offline_msg])
 
-        elif arg[0] == "QUERY_SCORE_LEADERS":
-            field_name = arg[1]
-            period = arg[2]
-            tag = arg[3]
+        elif arg[0] == "QUERY_SCORE_LEADERS2":
+            stat = arg[1]
+            axes = arg[2]
+            sort_order = arg[3]
+            tag = arg[4]
 
-            result = gamesite.mongo_scores2_client.player_scores2_get_leaders([session.player.scores2_query_addr(field_name, period, region = session.player.home_region)],
-                                                                              gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS')[0]
+            # sanity check
+            assert 'time' in axes and 'space' in axes
+            time_scope, time_loc = axes['time']
+            assert time_scope in (Scores2.FREQ_WEEK, Scores2.FREQ_SEASON, Scores2.FREQ_ALL)
+            if time_scope == Scores2.FREQ_WEEK:
+                assert abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], session.player.get_absolute_time())) < 2
+            elif time_scope == Scores2.FREQ_SEASON:
+                assert abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], session.player.get_absolute_time())) < 2
+            elif time_scope == Scores2.FREQ_ALL:
+                assert time_loc == 0
+            space_scope, space_loc = axes['space']
+            assert space_scope in (Scores2.SPACE_REGION, Scores2.SPACE_CONTINENT, Scores2.SPACE_ALL)
+            if space_scope == Scores2.SPACE_REGION:
+                assert space_loc in gamedata['regions']
+            elif space_scope == Scores2.SPACE_CONTINENT:
+                assert space_loc == session.player.home_continent()
+            elif space_scope == Scores2.SPACE_ALL:
+                assert space_loc == Scores2.SPACE_ALL_LOC
+
+            # parse extra axes
+            if 'challenge' in axes:
+                assert axes['challenge'][0] == 'key'
+                extra_axes = {'challenge': axes['challenge']}
+            else:
+                extra_axes = None
+
+            # note: this only hits the "hot" database
+            query_point = Scores2.make_point(axes['time'][0], axes['time'][1], axes['space'][0], axes['space'][1], extra_axes)
+            result = gamesite.mongo_scores2_client.player_scores2_get_leaders([(stat, query_point, sort_order)],
+                                                                              gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS2')[0]
 
             # decorate result with player cache properties
             if result:
@@ -29872,7 +29901,7 @@ class GAMEAPI(resource.Resource):
                 for i in xrange(len(result)):
                     result[i].update(props[i])
 
-            retmsg.append(["QUERY_SCORE_LEADERS_RESULT", arg[1], period, result, tag])
+            retmsg.append(["QUERY_SCORE_LEADERS2_RESULT", stat, axes, result, tag])
 
         elif arg[0] == "CHAT_GETMORE":
             channel = arg[1]
