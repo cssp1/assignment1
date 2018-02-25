@@ -12637,6 +12637,46 @@ class Player(AbstractPlayer):
             space_scope, space_loc = self.scores2_wide_space()
         return (client_name, Scores2.make_point(time_scope, time_loc, space_scope, space_loc))
 
+    # given a dictionary like {"time": ["week",300], "space": ["region", "sector201"], ... }
+    # check whether player is allowed to query these particular axes coordinates in Scores2, and return the Scores2 query point if so
+    # this is the more modern version of scores2_query_addr(), where the time/space coordinates are supplied by the client
+    def scores2_query_point(self, axes):
+        if not ('time' in axes and 'space' in axes and len(axes['time']) == 2 and len(axes['space']) == 2):
+            return None # mal-formed axes
+
+        time_scope, time_loc = axes['time']
+        if time_scope == Scores2.FREQ_WEEK:
+            if abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
+                return None # too far from current time
+        elif time_scope == Scores2.FREQ_SEASON:
+            if abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())) >= 2:
+                return None # too far from current time
+        elif time_scope == Scores2.FREQ_ALL:
+            if time_loc != 0:
+                return None # only the 0 coordinate is valid with FREQ_ALL
+
+        space_scope, space_loc = axes['space']
+        if space_scope == Scores2.SPACE_REGION:
+            if space_loc not in gamedata['regions']:
+                return None # non-existent region
+        elif space_scope == Scores2.SPACE_CONTINENT:
+            if space_loc != self.home_continent():
+                return None # player is not in this continent
+        elif space_scope == Scores2.SPACE_ALL:
+            if space_loc != Scores2.SPACE_ALL_LOC:
+                return None # invalid coordinate for SPACE_ALL
+
+        # parse extra axes
+        if 'challenge' in axes:
+            if len(axes['challenge']) == 2 and axes['challenge'][0] == 'key':
+                extra_axes = {'challenge': axes['challenge']}
+            else:
+                return None # mal-formed challenge coordinate
+        else:
+            extra_axes = None
+
+        return Scores2.make_point(axes['time'][0], axes['time'][1], axes['space'][0], axes['space'][1], extra_axes)
+
     # increment score counters, where "stats" is like {"xp": 35, "trophies_pvp": -2, ...}
     # for extra axes, the "stats" value will be like "battle_duration": { ("challenge",   "key",      "skill_challenge:123"): 32.4 }
     #                                                stat name             extra axis    extra scope   extra loc            value
@@ -29864,42 +29904,19 @@ class GAMEAPI(resource.Resource):
             sort_order = arg[3]
             tag = arg[4]
 
-            # sanity check
-            assert 'time' in axes and 'space' in axes
-            time_scope, time_loc = axes['time']
-            assert time_scope in (Scores2.FREQ_WEEK, Scores2.FREQ_SEASON, Scores2.FREQ_ALL)
-            if time_scope == Scores2.FREQ_WEEK:
-                assert abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], session.player.get_absolute_time())) < 2
-            elif time_scope == Scores2.FREQ_SEASON:
-                assert abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], session.player.get_absolute_time())) < 2
-            elif time_scope == Scores2.FREQ_ALL:
-                assert time_loc == 0
-            space_scope, space_loc = axes['space']
-            assert space_scope in (Scores2.SPACE_REGION, Scores2.SPACE_CONTINENT, Scores2.SPACE_ALL)
-            if space_scope == Scores2.SPACE_REGION:
-                assert space_loc in gamedata['regions']
-            elif space_scope == Scores2.SPACE_CONTINENT:
-                assert space_loc == session.player.home_continent()
-            elif space_scope == Scores2.SPACE_ALL:
-                assert space_loc == Scores2.SPACE_ALL_LOC
-
-            # parse extra axes
-            if 'challenge' in axes:
-                assert axes['challenge'][0] == 'key'
-                extra_axes = {'challenge': axes['challenge']}
-            else:
-                extra_axes = None
-
             # note: this only hits the "hot" database
-            query_point = Scores2.make_point(axes['time'][0], axes['time'][1], axes['space'][0], axes['space'][1], extra_axes)
-            result = gamesite.mongo_scores2_client.player_scores2_get_leaders([(stat, query_point, sort_order)],
-                                                                              gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS2')[0]
+            query_point = session.player.scores2_query_point(axes)
+            if query_point is not None:
+                result = gamesite.mongo_scores2_client.player_scores2_get_leaders([(stat, query_point, sort_order)],
+                                                                                  gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS2')[0]
+            else:
+                result = [] # invalid query
 
             # decorate result with player cache properties
             if result:
                 props = self.do_query_player_cache(session, [x['user_id'] for x in result], reason = 'QUERY_SCORE_LEADERS')
-                for i in xrange(len(result)):
-                    result[i].update(props[i])
+                for r, p in zip(result, props):
+                    r.update(p)
 
             retmsg.append(["QUERY_SCORE_LEADERS2_RESULT", stat, axes, result, tag])
 
