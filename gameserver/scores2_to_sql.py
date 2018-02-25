@@ -90,7 +90,7 @@ if __name__ == '__main__':
         for kind in tbl:
             if verbose: print 'setting up tables, indices, and functions for', tbl[kind]
             if do_reset and dry_run < 2:
-                cur.execute("DROP TABLE "+sql_util.sym(tbl[kind]))
+                cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl[kind]))
             if dry_run < 2: sql_util.ensure_table(cur, tbl[kind], scores2_schema(Scores2.ID_FIELD[kind]))
             replacements = { '%kind': kind, '%id_field': Scores2.ID_FIELD[kind], '%tbl': tbl[kind] }
             replace_expr = re.compile('|'.join([key.replace('$','\$') for key in replacements.iterkeys()]))
@@ -178,13 +178,20 @@ if __name__ == '__main__':
                                    ('space_scope', row['axes']['space'][0]), ('space_loc', row['axes']['space'][1])]
 
                         has_extra = False
+                        skip_this_row = False
                         for name, scope_loc in row['axes'].iteritems():
                             if name not in ('time','space'):
                                 # arbitrary extra axes
                                 assert not has_extra # only one
-                                assert name == 'challenge'
+                                if name != 'challenge':
+                                    print 'invalid extra axis name', name
+                                    skip_this_row = True
+                                    break
                                 keyvals += [('extra_scope', scope_loc[0]), ('extra_loc', scope_loc[1])]
                                 has_extra = True
+                        if skip_this_row:
+                            continue
+
                         if not has_extra:
                             keyvals += [('extra_scope',None), ('extra_loc',None)]
 
