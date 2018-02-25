@@ -305,7 +305,7 @@ class MongoScores2(object):
             ret.append([{ID_FIELD[kind]: rows[i][ID_FIELD[kind]], 'absolute': rows[i]['val'], 'rank':start+i} for i in xrange(len(rows))])
         return ret
 
-    # get current scores and optionally ranks for a batch of (stat,axes) combinations
+    # get current scores and optionally ranks for a batch of (stat,axes,[sort order]) combinations
     def player_scores2_get(self, player_ids, stat_axes_list, rank=False, reason=''): return self.nosql_client.instrument('player_scores2_get' + '+RANK' if rank else '' + '(%s)'%reason, self._scores2_get, ('player', player_ids, stat_axes_list, rank))
     def alliance_scores2_get(self, alliance_ids, stat_axes_list, rank=False, reason=''): return self.nosql_client.instrument('alliance_scores2_get' + '+RANK' if rank else '' + '(%s)'%reason, self._scores2_get, ('alliance', alliance_ids, stat_axes_list, rank))
     def _scores2_get(self, kind, id_list, stat_axes_list, rank):
@@ -315,7 +315,7 @@ class MongoScores2(object):
 #        start_time = time.time()
 
         for i in xrange(len(stat_axes_list)):
-            stat, axes = stat_axes_list[i]
+            stat, axes = stat_axes_list[i][0], stat_axes_list[i][1]
             key = self._scores2_key(stat, axes)
             scores = list(self._scores2_table(kind, stat, axes).find({'key':key, ID_FIELD[kind]: {'$in': id_list}},
                                                                      {'_id':0, ID_FIELD[kind]:1, 'val':1}))
@@ -330,7 +330,8 @@ class MongoScores2(object):
         if rank: # find number of players above you, and percentile
             n_totals = {}
 
-            for stat, axes in stat_axes_list:
+            for i in xrange(len(stat_axes_list)):
+                stat, axes = stat_axes_list[i][0], stat_axes_list[i][1]
                 key = self._scores2_key(stat, axes)
                 if need_totals.get(key, False):
                     # this is actually the slowest part of the query - getting the total number of scores for this stat,axes
@@ -341,7 +342,12 @@ class MongoScores2(object):
             for u in xrange(len(id_list)):
                 for i in xrange(len(stat_axes_list)):
                     if ret[u][i]:
-                        stat, axes = stat_axes_list[i]
+
+                        if len(stat_axes_list[i]) == 2: # can omit the sort order. Defaults to descending.
+                            stat, axes, sort_order = stat_axes_list[i][0], stat_axes_list[i][1], -1
+                        else:
+                            stat, axes, sort_order = stat_axes_list[i]
+
                         if ret[u][i]['absolute'] <= 0:
                             # if absolute score is zero, don't bother querying
                             total = 1000000 # use a fictional total so that the rank is like #999,999
@@ -352,7 +358,8 @@ class MongoScores2(object):
                             key = self._scores2_key(stat, axes)
                             total = n_totals[key]
                             if total > 0:
-                                qs = {'key': key, 'val': {'$gt': ret[u][i]['absolute']}}
+                                comparison = '$gt' if sort_order < 0 else '$lt'
+                                qs = {'key': key, 'val': {comparison: ret[u][i]['absolute']}}
                                 n_above_me = self._scores2_table(kind, stat, axes).find(qs,{'_id':0}).count()
                                 ret[u][i]['rank'] = n_above_me
                                 ret[u][i]['rank_total'] = total
