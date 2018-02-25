@@ -10,12 +10,16 @@
 #
 # live game database (mongodb) contains latest and next-latest counter values
 #
-# "data warehouse" (postgres?) contains next-latest and all previous values
+# "data warehouse" (postgres) contains next-latest and all previous values
 
+# Scores are located using a stat name and 'axes' coordinates, like this:
 # {'stat': 'damage_done', 'axes': {'time': ['season',3], 'space': ['region','kasei101']}, 'val': 12345}
 # {'stat': 'best_time', 'axes': {'time': ['season',3], 'space': ['region','kasei101'], 'challenge': ['ai', '321']}, 'val': 12345}
 
 # terminology: "axis" means a [scope,value] pair like ['season',3] or ['region','kasei101']
+
+# for batch queries, some functions accept "stat_axes_list" which is a list of (stat, {'time': [...,...], 'space': [...,...]}, [sort_order]) tuples
+# for compatibility, sort_order can be omitted, and is assumed to be descending (i.e. bigger scores are better).
 
 import math
 
@@ -69,6 +73,17 @@ def make_point(time_scope, time_loc, space_scope, space_loc, extra_axes = None):
         for name, scope_loc in extra_axes.iteritems():
             ret[name] = [scope_loc[0], scope_loc[1]]
     return ret
+
+def stat_axes_list_iterator(stat_axes_list):
+    for i, entry in enumerate(stat_axes_list):
+        stat = entry[0]
+        axes = entry[1]
+        if len(entry) >= 3:
+            sort_order = entry[2]
+            assert sort_order in (1,-1)
+        else:
+            sort_order = -1 # default to descending
+        yield i, stat, axes, sort_order
 
 # this is part of the live playerdb (S3/gameserver) state
 class CurScores(object):
@@ -293,12 +308,7 @@ class MongoScores2(object):
     def alliance_scores2_get_leaders(self, stat_axes_list, num, start=0, reason=''): return self.nosql_client.instrument('alliance_scores2_get_leaders(%s)'%reason, self._scores2_get_leaders, ('alliance',stat_axes_list, num, start))
     def _scores2_get_leaders(self, kind, stat_axes_list, num, start):
         ret = []
-        for entry in stat_axes_list:
-            if len(entry) == 2: # can omit the sort order. Defaults to descending.
-                stat, axes, sort_order = entry[0], entry[1], -1
-            else:
-                stat, axes, sort_order = entry
-            assert sort_order in (1,-1)
+        for _, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
             key = self._scores2_key(stat, axes)
             tbl = self._scores2_table(kind, stat, axes)
             rows = list(tbl.find({'key':key}, {'_id':0, ID_FIELD[kind]:1, 'val':1}).sort([('val',sort_order)]).skip(start).limit(num))
@@ -314,8 +324,7 @@ class MongoScores2(object):
 
 #        start_time = time.time()
 
-        for i in xrange(len(stat_axes_list)):
-            stat, axes = stat_axes_list[i][0], stat_axes_list[i][1]
+        for i, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
             key = self._scores2_key(stat, axes)
             scores = list(self._scores2_table(kind, stat, axes).find({'key':key, ID_FIELD[kind]: {'$in': id_list}},
                                                                      {'_id':0, ID_FIELD[kind]:1, 'val':1}))
@@ -330,8 +339,7 @@ class MongoScores2(object):
         if rank: # find number of players above you, and percentile
             n_totals = {}
 
-            for i in xrange(len(stat_axes_list)):
-                stat, axes = stat_axes_list[i][0], stat_axes_list[i][1]
+            for i, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
                 key = self._scores2_key(stat, axes)
                 if need_totals.get(key, False):
                     # this is actually the slowest part of the query - getting the total number of scores for this stat,axes
@@ -340,14 +348,8 @@ class MongoScores2(object):
 #            end_time = time.time(); print "B %d of %d %.2fms" % (len(n_totals), len(addrs), 1000.0*(end_time-start_time)); start_time = end_time
 
             for u in xrange(len(id_list)):
-                for i in xrange(len(stat_axes_list)):
+                for i, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
                     if ret[u][i]:
-
-                        if len(stat_axes_list[i]) == 2: # can omit the sort order. Defaults to descending.
-                            stat, axes, sort_order = stat_axes_list[i][0], stat_axes_list[i][1], -1
-                        else:
-                            stat, axes, sort_order = stat_axes_list[i]
-
                         if ret[u][i]['absolute'] <= 0:
                             # if absolute score is zero, don't bother querying
                             total = 1000000 # use a fictional total so that the rank is like #999,999
@@ -411,10 +413,11 @@ class SQLScores2(object):
     def _scores2_get_leaders(self, kind, stat_axes_list, num, start):
         cur = self.sql_client.con.cursor()
         ret = []
-        for stat, axes in stat_axes_list:
+        for i, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
             addr = self._scores2_parse_addr(stat, axes)
+            ssort = 'DESC' if sort_order < 0 else 'ASC'
             cur.execute("SELECT %s, val FROM " % self.util.sym(ID_FIELD[kind]) + self.sql_client._table(kind+'_scores2') + \
-                        " WHERE ("+",".join([self.util.sym(k) for k,v in addr]) + ") = (" + ",".join(["%s"]*len(addr))+") ORDER BY val DESC LIMIT %s OFFSET %s",
+                        " WHERE ("+",".join([self.util.sym(k) for k,v in addr]) + ") = (" + ",".join(["%s"]*len(addr))+") ORDER BY val "+ssort+" LIMIT %s OFFSET %s",
                         [v for k,v in addr] + [num, start])
             rows = cur.fetchall()
             r = [{ID_FIELD[kind]: rows[i][0], 'absolute': rows[i][1], 'rank': start+i} for i in xrange(len(rows))]
@@ -476,16 +479,16 @@ class SQLScores2(object):
             self.queries = {} # number of dimensions -> stat_axes_list
             self.query_map = {} # key -> (dims, index_within_query)
 
-            for i in xrange(len(stat_axes_list)):
-                stat, axes = stat_axes_list[i]
+            for i, stat, axes, sort_order in stat_axes_list_iterator(stat_axes_list):
                 dims = len(axes)
                 if dims not in self.queries:
                     self.queries[dims] = []
 
+                # note: cannot query same stat/axes with two different sort orders.
                 key = self.parent._scores2_addr_key(self.parent._scores2_parse_addr(stat, axes))
                 assert key not in self.query_map
                 self.query_map[key] = (dims, len(self.queries[dims]))
-                self.queries[dims].append([stat, axes])
+                self.queries[dims].append((stat, axes, sort_order))
 
             self.getters = dict((dims, self.GetOne(self, self.kind, self.id_list, self.queries[dims], self.rank)) for dims in self.queries)
 
@@ -503,8 +506,7 @@ class SQLScores2(object):
             results = dict((dims, self.getters[dims].receive_rows(d[dims])) for dims in self.queries)
             for u in xrange(len(self.id_list)):
                 r = []
-                for i in xrange(len(self.stat_axes_list)):
-                    stat, axes = self.stat_axes_list[i]
+                for i, stat, axes, sort_order in stat_axes_list_iterator(self.stat_axes_list):
                     key = self.parent._scores2_addr_key(self.parent._scores2_parse_addr(stat, axes))
                     dims, j = self.query_map[key]
                     r.append(results[dims][u][j])
@@ -525,8 +527,7 @@ class SQLScores2(object):
                 self.addr_list = []
                 self.addr_map = {}
 
-                for i in xrange(len(self.stat_axes_list)):
-                    stat, axes = self.stat_axes_list[i]
+                for i, stat, axes, sort_order in stat_axes_list_iterator(self.stat_axes_list):
                     addr = self.parent.parent._scores2_parse_addr(stat, axes)
                     fields = [k for k,v in addr]
                     if self.addr_fields is None:
@@ -536,10 +537,12 @@ class SQLScores2(object):
                     addr_key = self.parent.parent._scores2_addr_key(addr)
                     assert addr_key not in self.addr_map
                     self.addr_map[addr_key] = i
-                    self.addr_list.append(addr)
+                    self.addr_list.append((addr, sort_order))
 
                 tbl = self.parent.parent.sql_client._table(self.kind+'_scores2')
                 if rank:
+                    # note: if sort_order > 0, then we want to check how many other scores are < self.val
+                    # but, to avoid complicating the SQL, we query for the number > self.val, and fix up in receive_rows
                     rank_columns = ', (SELECT COUNT(*) FROM '+tbl+' AS other WHERE ('+",".join(['other.'+k for k in self.addr_fields])+') = ('+",".join(['self.'+k for k in self.addr_fields])+') AND other.val > self.val) AS rank' + \
                                    ', (SELECT COUNT(*) FROM '+tbl+' AS other WHERE ('+",".join(['other.'+k for k in self.addr_fields])+') = ('+",".join(['self.'+k for k in self.addr_fields])+')) AS rank_total'
                 else:
@@ -550,7 +553,7 @@ class SQLScores2(object):
                              " WHERE self."+self.parent.parent.util.sym(ID_FIELD[self.kind])+" IN ("+",".join(['%s']*len(self.id_list))+")" + \
                              " AND ("+",".join(['self.'+k for k in self.addr_fields])+") IN ("+ ",".join(["("+",".join(["%s"]*len(self.addr_fields))+")"]*len(self.stat_axes_list))+")"
 
-                self.query_args = tuple(id_list + [v for entry in self.addr_list for k,v in entry])
+                self.query_args = tuple(id_list + [v for entry in self.addr_list for k,v in entry[0]])
 
             def get_qs(self):
                 return self.query, self.query_args
@@ -568,12 +571,18 @@ class SQLScores2(object):
                         raise Exception('did not find addr: '+repr(key)+' in '+repr(self.addr_map))
                         continue
 
+                    addr, sort_order = self.addr_list[i]
+
                     ret[u][i] = {'absolute':row['val']}
 
                     if ('rank' in row) and row.get('rank_total',0) > 0:
-                        ret[u][i]['rank'] = row['rank']
+                        # fix up rank for the ascending sort order case here
+                        if sort_order > 0:
+                            ret[u][i]['rank'] = row['rank_total'] - row['rank'] - 1 # count of scores below yours
+                        else:
+                            ret[u][i]['rank'] = row['rank'] # count of scores above yours
                         ret[u][i]['rank_total'] = row['rank_total']
-                        ret[u][i]['percentile'] = float(row['rank'])/float(row['rank_total'])
+                        ret[u][i]['percentile'] = float(ret[u][i]['rank'])/float(row['rank_total'])
                 return ret
 
 
