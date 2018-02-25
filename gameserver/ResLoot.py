@@ -321,7 +321,7 @@ class SpecificPvEResLoot(BaseResLoot):
     def send_update(self, retmsg):
         # return the starting and current amounts of loot the base has to offer the player
         retmsg.append(["RES_LOOTER_UPDATE", {'starting': self.starting_base_resource_loot,
-                                             'by_id': copy.deepcopy(self.by_building_id), # for debugging only
+#                                             'by_id': dict((k, v.serialize()) for k, v in self.by_building_id.iteritems()) if self.by_building_id else None, # for debugging only
 #                                             'temp': dict((b.spec.name+'_'+b.obj_id,
 #                                                           {'fraction': b.specific_pve_loot_fraction(),
 #                                                            'contrib': b.resource_loot_contribution()})
