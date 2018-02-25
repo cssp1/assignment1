@@ -28472,6 +28472,16 @@ var quarry_receivers = {};
 var last_quarry_query_time = -1;
 var region_pop_receivers = {};
 
+/** @constructor @struct
+ @param {string} stat
+ @param {!Object<string,Array<(number|string)>>} axes
+ @param {number} sort_order */
+function Scores2QueryAddr(stat, axes, sort_order) {
+    this.stat = stat;
+    this.axes = axes;
+    this.sort_order = sort_order;
+}
+
 /** @param {string} stat
     @param {string} time_scope
     @param {Object<string,string>|null=} extra_axes
@@ -28479,7 +28489,7 @@ var region_pop_receivers = {};
     Tell Scores2 exactly what time/space point we want, for legacy code that only specifies the time scope.
     (Mimic behavior of server-side function for legacy code)
 
-    @return {{stat: string, axes: !Object<string,!Array>, sort_order: number}}
+    @return {!Scores2QueryAddr}
 */
 function scores2_query_addr(stat, time_scope, extra_axes) {
     var axes = {};
@@ -28525,7 +28535,7 @@ function scores2_query_addr(stat, time_scope, extra_axes) {
                              '0']; // Scores2.SPACE_ALL_LOC
         }
     }
-    return {stat: stat, axes: axes, sort_order: sort_order};
+    return new Scores2QueryAddr(stat, axes, sort_order);
 };
 
 /** @param {string} stat
@@ -28544,17 +28554,42 @@ function query_score_leaders(stat, time_scope, extra_axes, callback) {
     send_to_server.func(["QUERY_SCORE_LEADERS2", query_addr.stat, query_addr.axes, query_addr.sort_order, tag]);
 };
 
-/** @param {Array.<number>} id_list
-    @param {Array.<string>} fields
+/** @param {Array<number>} id_list - list of player IDs
+    @param {Array<string>} fields  - list of [['damage_inflicted', 'week', (optional time_loc override)]], ...]
     @param {function(Array)} callback
-    @param {Object=} props */
+    @param {{get_rank: boolean}|null=} props */
 function query_player_scores(id_list, fields, callback, props) {
     var get_rank = !!(props && props.get_rank);
     last_query_tag += 1;
     var tag = 'qps'+last_query_tag.toString();
     player_scores_receivers[tag] = callback;
-    send_to_server.func(["QUERY_PLAYER_SCORES", id_list, fields, tag, get_rank]);
+    // convert fields to new-style stat_axes_list
+    var stat_axes_list = goog.array.map(fields, function(stat_time_scope) {
+        var stat = stat_time_scope[0], time_scope = stat_time_scope[1];
+        var query_addr = scores2_query_addr(stat, time_scope);
+        if(stat_time_scope.length >= 3) {
+            var override_time_loc = stat_time_scope[2];
+            query_addr.axes['time'][1] = override_time_loc;
+        }
+        return [query_addr.stat, query_addr.axes, query_addr.sort_order];
+    });
+    send_to_server.func(["QUERY_PLAYER_SCORES2", id_list, stat_axes_list, tag, get_rank]);
 }
+/** @param {Array<number>} id_list - list of player IDs
+    @param {Array<Scores2QueryAddr>} query_addr_list
+    @param {function(Array)} callback
+    @param {{get_rank: boolean}|null=} props */
+function query_player_scores2(id_list, query_addr_list, callback, props) {
+    var get_rank = !!(props && props.get_rank);
+    last_query_tag += 1;
+    var tag = 'qps'+last_query_tag.toString();
+    player_scores_receivers[tag] = callback;
+    var stat_axes_list = goog.array.map(query_addr_list, function(addr) {
+        return [addr.stat, addr.axes, addr.sort_order];
+    });
+    send_to_server.func(["QUERY_PLAYER_SCORES2", id_list, stat_axes_list, tag, get_rank]);
+}
+
 function search_player_cache(terms, callback) {
     last_query_tag += 1; var tag = 'spc'+last_query_tag.toString();
     search_player_cache_receivers[tag] = callback;
@@ -28679,9 +28714,9 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     dialog.widgets['friend_icon'].set_user(session.user_id);
     dialog.widgets['friend_icon'].onclick = function(w) { PlayerInfoDialog.invoke(session.user_id); };
 
-    dialog.user_data['queries'] = []; // list of [category,period] pairs to send queries on
+    dialog.user_data['queries'] = []; // list of [category, period, extra_axes] tuples to send queries on
     dialog.user_data['data'] = {}; // indexed by [categotry][period]
-    dialog.user_data['friend_data'] = {}; // indexed by [categotry][period]
+    dialog.user_data['friend_data'] = {}; // indexed by [category][period]
     for(var i = 0; i < dialog.user_data['categories'].length; i++) {
         var cat = dialog.user_data['categories'][i];
         var catdata = gamedata['strings']['leaderboard']['categories'][cat];
@@ -28693,7 +28728,7 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
             dialog.user_data['friend_data'][cat][period] = null;
             // if no periods are specified, default to week/season only
             if(goog.array.contains(catdata['periods'] || ['week','season'], period)) {
-                dialog.user_data['queries'].push([cat, period]);
+                dialog.user_data['queries'].push([cat, period, catdata['extra_axes'] || null]);
             }
         }
     }
@@ -28718,22 +28753,22 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     return dialog;
 }
 
-function leaderboard_query_self(dialog, field, frequency) {
+function leaderboard_query_self(dialog, field, frequency, ui_data) {
     var key = field+'_'+frequency;
     if(dialog.user_data['self_queries'][key] > 0) { return; } // already launched
     dialog.user_data['self_queries'][key] = 1; // mark launched
     // ask server for player's own standings
-    var qls = [[field,frequency]];
-    query_player_scores([session.user_id], qls, (function (_dialog, _key, _qls) { return function(user_ids, datas) {
+    var qls = [scores2_query_addr(field, frequency, ui_data['extra_axes'] || null)];
+    query_player_scores2([session.user_id], qls, (function (_dialog, _key, _field, _frequency) { return function(user_ids, datas) {
         if(!_dialog.parent) { return; } // dialog died
         _dialog.user_data['self_queries'][key] = 2; // mark landed
         var data = datas[0][0];
         if(data && ('absolute' in data)) {
-            data['field'] = _qls[0][0]; data['frequency'] = _qls[0][1];
+            data['field'] = _field; data['frequency'] = _frequency;
             _dialog.user_data['self'].push(data);
         }
         leaderboard_change_page(_dialog, null, null, _dialog.user_data['chapter'], _dialog.user_data['page']);
-    }; })(dialog, key, qls), {get_rank:1});
+    }; })(dialog, key, field, frequency), {get_rank:true});
 }
 
 // return localized description of player's rank/percentile standing
@@ -28863,13 +28898,24 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                             }
                         };
                         ranklist.sort(compare_by_abs);
+
+                        // check the sort order for this query
+                        if(scores2_query_addr(queries[i][0], queries[i][1], queries[i][2]).sort_order > 0) {
+                            ranklist.reverse();
+                        }
+
                         dlg.user_data['friend_data'][queries[i][0]][queries[i][1]]=ranklist;
                     }
                     dlg.widgets['leaderboard_loading'].show = false;
                     leaderboard_change_page(dlg, null, null, dlg.user_data['chapter'], 0);
                 }; })(dialog);
 
-                query_player_scores(id_list, dialog.user_data['queries'], friend_scores_cb);
+                query_player_scores2(id_list,
+                                     goog.array.map(dialog.user_data['queries'],
+                                                    function(field_freq_extra) {
+                                                        return scores2_query_addr(field_freq_extra[0], field_freq_extra[1], field_freq_extra[2]);
+                                                    }),
+                                     friend_scores_cb);
                 dialog.widgets['leaderboard_loading'].show = true;
             } else {
                 // player has no friends!
@@ -28949,7 +28995,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                 break;
             }
         }
-        if(!data) { leaderboard_query_self(dialog, chapter, period); }
+        if(!data) { leaderboard_query_self(dialog, chapter, period, ui_data); }
 
         dialog.widgets['self_loading'].show = (dialog.user_data['self_queries'][chapter+'_'+period] < 2);
 
@@ -49444,7 +49490,7 @@ function handle_server_message(data) {
         // stick pcache_data into PlayerCache
         PlayerCache.update_batch(pcache_data);
         AllianceCache.receive_members(alliance_id, tag, result, invite_status);
-    } else if(msg == "QUERY_PLAYER_SCORES_RESULT") {
+    } else if(msg == "QUERY_PLAYER_SCORES2_RESULT") {
         var user_id_list = data[1], result = data[2], tag = data[3], info = data[4] || null;
         if(tag in player_scores_receivers) {
             var cb = player_scores_receivers[tag];

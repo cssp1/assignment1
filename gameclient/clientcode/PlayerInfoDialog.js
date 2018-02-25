@@ -884,7 +884,7 @@ PlayerInfoDialog.scores_query = function(dialog, frequency) {
     var cb = (function (_dialog, _qls, _frequency) { return function(user_ids, data) {
         PlayerInfoDialog.scores_result(_dialog, _qls, [_frequency], data[0]);
     }; })(dialog, qls, frequency);
-    query_player_scores([dialog.user_data['user_id']], qls, cb, {get_rank:1});
+    query_player_scores([dialog.user_data['user_id']], qls, cb, {get_rank:true});
 };
 
 /** @param {!SPUI.Dialog} dialog

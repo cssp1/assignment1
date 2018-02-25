@@ -12640,16 +12640,16 @@ class Player(AbstractPlayer):
     # given a dictionary like {"time": ["week",300], "space": ["region", "sector201"], ... }
     # check whether player is allowed to query these particular axes coordinates in Scores2, and return the Scores2 query point if so
     # this is the more modern version of scores2_query_addr(), where the time/space coordinates are supplied by the client
-    def scores2_query_point(self, axes):
+    def scores2_query_point(self, axes, allow_cold_history = False):
         if not ('time' in axes and 'space' in axes and len(axes['time']) == 2 and len(axes['space']) == 2):
             return None # mal-formed axes
 
         time_scope, time_loc = axes['time']
         if time_scope == Scores2.FREQ_WEEK:
-            if abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
+            if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_week(gamedata['matchmaking']['week_origin'], self.get_absolute_time())) >= 2:
                 return None # too far from current time
         elif time_scope == Scores2.FREQ_SEASON:
-            if abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())) >= 2:
+            if (not allow_cold_history) and abs(time_loc - SpinConfig.get_pvp_season(gamedata['matchmaking']['season_starts'], self.get_absolute_time())) >= 2:
                 return None # too far from current time
         elif time_scope == Scores2.FREQ_ALL:
             if time_loc != 0:
@@ -29801,19 +29801,24 @@ class GAMEAPI(resource.Resource):
 
             retmsg.append(["ALLIANCE_UPDATE", new_alliance_info['id'] if new_alliance_info else -1, False, new_alliance_info, new_alliance_membership, False])
 
-        elif arg[0] == "QUERY_PLAYER_SCORES":
+        elif arg[0] == "QUERY_PLAYER_SCORES2":
             user_ids = arg[1]
-            field_period_list = arg[2]
+            client_stat_axes_list = arg[2]
             tag = arg[3]
             get_rank = bool(arg[4])
             offline_msg = None
 
-            query_addrs = [session.player.scores2_query_addr(entry[0], entry[1], time_loc = entry[2] if len(entry) >= 3 else None, region = session.player.home_region) \
-                           for entry in field_period_list]
+            query_addrs = [(stat, session.player.scores2_query_point(axes, allow_cold_history = True), sort_order) for stat, axes, sort_order in client_stat_axes_list]
 
             result = []
             for u in xrange(len(user_ids)):
                 result.append([None,]*len(query_addrs))
+
+            # check for invalid query coordinates (None return from scores2_query_point())
+            for point in query_addrs:
+                if point[1] is None:
+                    retmsg.append(["QUERY_PLAYER_SCORES2_RESULT", user_ids, result, tag, None, point[0]])
+                    return
 
             # split query into "hot" MongoDB and "cold" SQL parts
             # the "hot" stats are updated basically in realtime via MongoDB
@@ -29840,18 +29845,18 @@ class GAMEAPI(resource.Resource):
                     sql_query_i_addrs.append((i, point))
 
             if mongo_query_i_addrs: # do hot query
-                mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+                mongo_result = gamesite.mongo_scores2_client.player_scores2_get(user_ids, [x[1] for x in mongo_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES2')
                 for u in xrange(len(user_ids)):
                     for j in xrange(len(mongo_query_i_addrs)):
                         result[u][mongo_query_i_addrs[j][0]] = mongo_result[u][j]
 
             if sql_query_i_addrs and gamesite.sql_scores2_client: # do cold query
                 # this technique to launch a chain of sequential SQL queries is based on the test code in Scores2.py
-                batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES')
+                batch = gamesite.sql_scores2_client.player_scores2_get_async(user_ids, [x[1] for x in sql_query_i_addrs], rank = get_rank, reason='QUERY_PLAYER_SCORES2')
                 bdict = batch.get_qs_dict()
                 rdict = {}
                 tag_list = sorted(bdict.keys())
-                master_d = make_deferred('QUERY_PLAYER_SCORES')
+                master_d = make_deferred('QUERY_PLAYER_SCORES2')
 
                 # launch next query in chain
                 def next_query(master_d, session, retmsg, retmsg_tag, result, user_ids, sql_query_i_addrs, batch, bdict, rdict, tag_list, i, last_result):
@@ -29870,14 +29875,14 @@ class GAMEAPI(resource.Resource):
                             for j in xrange(len(sql_query_i_addrs)):
                                 result[u][sql_query_i_addrs[j][0]] = sql_result[u][j]
                         # complete async request
-                        session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, None]], flush_now = True)
+                        session.send([["QUERY_PLAYER_SCORES2_RESULT", user_ids, result, retmsg_tag, None]], flush_now = True)
                         master_d.callback(True)
                         return
 
                     def on_error(master_d, session, retmsg, retmsg_tag, result, user_ids, fail):
                         # complete async request, returning the incomplete results
                         if not session.logout_in_progress:
-                            session.send([["QUERY_PLAYER_SCORES_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE']], flush_now = True)
+                            session.send([["QUERY_PLAYER_SCORES2_RESULT", user_ids, result, retmsg_tag, 'SCORES_OFFLINE']], flush_now = True)
                         master_d.callback(True)
 
                     if not gamesite.sql_scores2_client:
@@ -29896,7 +29901,7 @@ class GAMEAPI(resource.Resource):
             elif sql_query_i_addrs: # client asked for historical scores, but we cannot provide them
                 offline_msg = 'SCORES_OFFLINE'
 
-            retmsg.append(["QUERY_PLAYER_SCORES_RESULT", user_ids, result, tag, offline_msg])
+            retmsg.append(["QUERY_PLAYER_SCORES2_RESULT", user_ids, result, tag, offline_msg])
 
         elif arg[0] == "QUERY_SCORE_LEADERS2":
             stat = arg[1]

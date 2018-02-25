@@ -172,7 +172,7 @@ Region.Region.prototype.ping_contest_rank = function() {
                             if(result) {
                                 _region.contest_rank = result[0];
                             }
-                        }; })(this), {get_rank:1});
+                        }; })(this), {get_rank:true});
 };
 
 Region.Region.prototype.read_terrain = function(xy) {
