@@ -30046,7 +30046,7 @@ class GAMEAPI(resource.Resource):
                 if session.player.has_damage_protection():
                     session.player.set_protection_end_time(session, -1, '3886_protection_removed_manually')
             else:
-                session.player.remove_aura(session, retmsg, specname)
+                session.remove_player_aura(specname)
 
         elif arg[0] in ("INVENTORY_TRASH", "INVENTORY_TRASH_ALL", "INVENTORY_REFUND", "INVENTORY_REFUND_ALL"):
             if session.player.warehouse_is_busy():
