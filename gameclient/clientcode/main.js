@@ -28728,7 +28728,7 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
             dialog.user_data['friend_data'][cat][period] = null;
             // if no periods are specified, default to week/season only
             if(goog.array.contains(catdata['periods'] || ['week','season'], period)) {
-                dialog.user_data['queries'].push([cat, period, catdata['extra_axes'] || null]);
+                dialog.user_data['queries'].push([cat, catdata['stat_name'] || cat, period, catdata['extra_axes'] || null]);
             }
         }
     }
@@ -28753,22 +28753,23 @@ function invoke_leaderboard(force_period, force_mode, force_chapter) {
     return dialog;
 }
 
-function leaderboard_query_self(dialog, field, frequency, ui_data) {
-    var key = field+'_'+frequency;
+function leaderboard_query_self(dialog, chapter, frequency, ui_data) {
+    var key = chapter+'_'+frequency;
     if(dialog.user_data['self_queries'][key] > 0) { return; } // already launched
     dialog.user_data['self_queries'][key] = 1; // mark launched
     // ask server for player's own standings
-    var qls = [scores2_query_addr(field, frequency, ui_data['extra_axes'] || null)];
-    query_player_scores2([session.user_id], qls, (function (_dialog, _key, _field, _frequency) { return function(user_ids, datas) {
+    var stat_name = ui_data['stat_name'] || chapter;
+    var qls = [scores2_query_addr(stat_name, frequency, ui_data['extra_axes'] || null)];
+    query_player_scores2([session.user_id], qls, (function (_dialog, _key, _chapter, _frequency) { return function(user_ids, datas) {
         if(!_dialog.parent) { return; } // dialog died
         _dialog.user_data['self_queries'][key] = 2; // mark landed
         var data = datas[0][0];
         if(data && ('absolute' in data)) {
-            data['field'] = _field; data['frequency'] = _frequency;
+            data['chapter'] = _chapter; data['frequency'] = _frequency;
             _dialog.user_data['self'].push(data);
         }
         leaderboard_change_page(_dialog, null, null, _dialog.user_data['chapter'], _dialog.user_data['page']);
-    }; })(dialog, key, field, frequency), {get_rank:true});
+    }; })(dialog, key, chapter, frequency), {get_rank:true});
 }
 
 // return localized description of player's rank/percentile standing
@@ -28900,11 +28901,12 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                         ranklist.sort(compare_by_abs);
 
                         // check the sort order for this query
-                        if(scores2_query_addr(queries[i][0], queries[i][1], queries[i][2]).sort_order > 0) {
+                        var chapter = queries[i][0]; var stat_name = queries[i][1]; var period = queries[i][2]; var extra_axes = queries[i][3];
+                        if(scores2_query_addr(stat_name, period, extra_axes).sort_order > 0) {
                             ranklist.reverse();
                         }
 
-                        dlg.user_data['friend_data'][queries[i][0]][queries[i][1]]=ranklist;
+                        dlg.user_data['friend_data'][chapter][period]=ranklist;
                     }
                     dlg.widgets['leaderboard_loading'].show = false;
                     leaderboard_change_page(dlg, null, null, dlg.user_data['chapter'], 0);
@@ -28912,8 +28914,9 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
 
                 query_player_scores2(id_list,
                                      goog.array.map(dialog.user_data['queries'],
-                                                    function(field_freq_extra) {
-                                                        return scores2_query_addr(field_freq_extra[0], field_freq_extra[1], field_freq_extra[2]);
+                                                    function(entry) {
+                                                        var stat_name = entry[1]; var period = entry[2]; var extra_axes = entry[3];
+                                                        return scores2_query_addr(stat_name, period, extra_axes);
                                                     }),
                                      friend_scores_cb);
                 dialog.widgets['leaderboard_loading'].show = true;
@@ -28936,11 +28939,11 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
             // ask server for top rankings
             dialog.widgets['leaderboard_loading'].show = true;
             dialog.user_data['data'][chapter][period] = 'PENDING';
-            var cb = (function (dlg) { return function(cat, period, data) {
-                dlg.user_data['data'][cat][period] = data;
-                leaderboard_change_page(dlg, null, null, dlg.user_data['chapter'], 0);
-            }; })(dialog);
-            query_score_leaders(chapter, period, ui_data['extra_axes'] || null, cb);
+            var cb = (function (_dlg, _chapter) { return function(cat, period, data) {
+                _dlg.user_data['data'][_chapter][period] = data;
+                leaderboard_change_page(_dlg, null, null, _dlg.user_data['chapter'], 0);
+            }; })(dialog, chapter);
+            query_score_leaders(ui_data['stat_name'] || chapter, period, ui_data['extra_axes'] || null, cb);
         } else if(dialog.user_data['data'][chapter][period] === 'PENDING') {
             dialog.widgets['leaderboard_loading'].show = true;
         } else {
@@ -28990,7 +28993,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
         var data = null;
         for(var i = 0; i < dialog.user_data['self'].length; i++) {
             var s = dialog.user_data['self'][i];
-            if(s['field'] === chapter && s['frequency'] === period && ('absolute' in s)) {
+            if(s['chapter'] === chapter && s['frequency'] === period && ('absolute' in s)) {
                 data = s;
                 break;
             }
