@@ -9566,9 +9566,12 @@ class Player(AbstractPlayer):
             raise Exception('object not found for obj_id '+repr(id))
         else:
             return None
-    def cooldown_reset(self, cd_name):
+    def cooldown_reset(self, cd_name, remove_stack = -1):
         if cd_name in self.cooldowns:
-            del self.cooldowns[cd_name]
+            if remove_stack < 0 or self.cooldowns[cd_name].get('stack',1) <= remove_stack:
+                del self.cooldowns[cd_name]
+            else:
+                self.cooldowns[cd_name]['stack'] = self.cooldowns[cd_name].get('stack',1) - remove_stack
 
     def cooldown_find(self, cd_name, match_data = None):
         if cd_name in self.cooldowns:

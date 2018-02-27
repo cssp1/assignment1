@@ -537,6 +537,7 @@ class CooldownTriggerConsequent(Consequent):
             raise Exception('unhandled cooldown method '+self.method)
 
         self.max_duration = data.get('max_duration', None)
+        self.add_stack = data.get('add_stack', -1)
 
     def execute(self, session, player, retmsg, context=None):
         if self.method == 'constant':
@@ -551,15 +552,16 @@ class CooldownTriggerConsequent(Consequent):
         if self.max_duration is not None:
             duration = min(duration, self.max_duration)
 
-        session.player.cooldown_trigger(self.name, duration, data = self.data)
+        session.player.cooldown_trigger(self.name, duration, add_stack = self.add_stack, data = self.data)
         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
 class CooldownResetConsequent(Consequent):
     def __init__(self, data):
         Consequent.__init__(self, data)
         self.name = data['name']
+        self.remove_stack = data.get('remove_stack', -1)
     def execute(self, session, player, retmsg, context=None):
-        session.player.cooldown_reset(self.name)
+        session.player.cooldown_reset(self.name, remove_stack = self.remove_stack)
         retmsg.append(["COOLDOWNS_UPDATE", session.player.cooldowns])
 
 class FindAndReplaceItemsConsequent(Consequent):
