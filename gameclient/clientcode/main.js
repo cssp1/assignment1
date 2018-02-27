@@ -37179,7 +37179,8 @@ function update_map_dialog(dialog) {
                     if('ui_instance_cooldown' in base) {
                         var togo = player.cooldown_togo(base['ui_instance_cooldown']);
                         if(togo > 0) {
-                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo));
+                            var stacks = player.cooldown_active(base['ui_instance_cooldown']);
+                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo)).replace('%count', stacks.toString());
                             attackability_col = dialog.data['widgets']['row_attackability']['text_color_resets_inprogress'];
 
                             // detect dummy bases that exist only to hold a place while waiting for the cooldown to expire,
@@ -37204,7 +37205,8 @@ function update_map_dialog(dialog) {
                     if('ui_instance_cooldown' in base) {
                         var togo = player.cooldown_togo(base['ui_instance_cooldown']);
                         if(togo > 0) {
-                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo));
+                            var stacks = player.cooldown_active(base['ui_instance_cooldown']);
+                            attackability_str = (base['ui_instance_cooldown_template'] || dialog.data['widgets']['row_attackability']['ui_name_instance_cooldown']).replace('%s', pretty_print_time(togo)).replace('%count', stacks.toString());
                             attackability_col = dialog.data['widgets']['row_attackability']['text_color_resets_inprogress'];
                         }
                     }
@@ -37618,7 +37620,7 @@ function map_dialog_change_page(dialog, chapter, page) {
                         }
                         if(base && ('ui_difficulty_comment' in base)) { // this can override the default string
                             var comment = eval_cond_or_literal(base['ui_difficulty_comment'], player, null);
-                            if(comment) {
+                            if(comment !== null) {
                                 var max_len = dialog.data['widgets']['row_ai_difficulty']['max_len'];
                                 if(comment.length > max_len) {
                                     dialog.widgets['row_ai_difficulty'+row].str = comment.slice(0,max_len) + '...';
