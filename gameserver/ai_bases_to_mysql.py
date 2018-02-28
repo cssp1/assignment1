@@ -31,6 +31,7 @@ def ai_base_templates_schema(sql_util):
                        ('owner_id', 'INT4'),
                        ('class', 'VARCHAR(32)'),
                        ('analytics_tag', 'VARCHAR(32)'), # XXX deprecated - this can vary over time, so we need to switch to "assignments"
+                       ('loot_tokens', 'INT4'),
                        ], 'indices': {'master': {'unique':True, 'keys':[('base_type','ASC'),('base_template','ASC')]}}}
 
 # since analytics tags can change over time, the base->tag assignment has to be in a separate table
@@ -181,11 +182,17 @@ if __name__ == '__main__':
                 klass = {'quarry': SpinUpcache.classify_quarry,
                          'hive': SpinUpcache.classify_hive,
                          'raid': SpinUpcache.classify_raid}[kind](gamedata, name)
+                if kind in ('hive','raid'):
+                    loot_tokens = SpinUpcache.ai_base_has_tokens(gamedata, data)
+                else:
+                    loot_tokens = 0
                 ai_base_templates_rows.append([('base_type', kind),
                                                ('base_template', name),
                                                ('owner_id', owner_id),
                                                ('class', klass),
-                                               ('analytics_tag', tag)])
+                                               ('analytics_tag', tag),
+                                               ('loot_tokens', loot_tokens),
+                                               ])
                 event_klass = {'pve_event_hive': 'event',
                                'pve_immortal_hive': 'immortal'}.get(klass, None)
 
