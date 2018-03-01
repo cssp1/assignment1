@@ -571,16 +571,17 @@ def birthday_to_years_old(birthday, creat):
 def cons_has_tokens(gamedata, cons):
     if 'subconsequents' in cons:
         for entry in cons['subconsequents']:
-            if cons_has_tokens(gamedata, entry):
-                return True
+            tok = cons_has_tokens(gamedata, entry)
+            if tok > 0:
+                return tok
     elif cons['consequent'] == 'GIVE_LOOT':
         loot = LootTable.get_loot(gamedata['loot_tables'], cons['loot'], cond_resolver = lambda x: True)
         for item in loot:
             if gamedata['items'][item['spec']].get('category') == 'token':
-                return True
-    return False
+                return item.get('stack', 1)
+    return 0
 def ai_base_has_tokens(gamedata, base):
-    if 'completion' not in base: return False
+    if 'completion' not in base: return 0
     return cons_has_tokens(gamedata, base['completion'])
 
 # utility functions to parse AI base JSON to obtain start/end time and repeat interval
