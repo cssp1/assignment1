@@ -6,5 +6,6 @@ data "template_file" "cloud_config_boilerplate" {
     sitedomain = "${var.sitedomain}"
     enable_backups = "${var.enable_backups}"
     puppet_s3_bucket = "${var.puppet_s3_bucket}"
+    logdna_ingestion_key = "${var.logdna_ingestion_key}"
   }
 }

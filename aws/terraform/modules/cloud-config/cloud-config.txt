@@ -9,6 +9,7 @@ runcmd:
  - echo "sitedomain=${sitedomain}" >> /etc/facter/facts.d/terraform.txt
  - echo "enable_backups=${enable_backups}" >> /etc/facter/facts.d/terraform.txt
  - echo "puppet_s3_bucket=${puppet_s3_bucket}" >> /etc/facter/facts.d/terraform.txt
+ - echo "logdna_ingestion_key=${logdna_ingestion_key}" >> /etc/facter/facts.d/terraform.txt
  - aws s3 cp s3://${puppet_s3_bucket}/battlehouse-infra-puppet-modules.tar.gz /tmp
  - (cd /etc/puppet/modules && tar zxf /tmp/battlehouse-infra-puppet-modules.tar.gz) && rm -f /tmp/battlehouse-infra-puppet-modules.tar.gz
  - chmod +x /etc/puppet/modules/*/facts.d/*
