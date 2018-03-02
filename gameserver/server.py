@@ -45,6 +45,7 @@ import AsyncHTTP
 import Predicates
 import Consequents
 import Business
+import UpgradeHelp
 import ModChain
 from Equipment import Equipment
 import LootTable
@@ -7470,7 +7471,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None # doubles as build_ingredients
-        self.upgrade_helped = -1 # -1 means no status, 0 means "help requested", >0 means "help completed"
+        self.upgrade_help = None # when upgrading, this becomes an UpgradeHelp instance
 
         self.research_item = ''
         self.research_total_time = -1
@@ -7509,7 +7510,7 @@ class Building(MapBlockingGameObject):
         self.disarmed = False
 
     def serialize_state(self, update_hp = True, update_xy = True):
-        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.upgrade_helped, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None, copy.deepcopy(self.enhancements)]
+        return MapBlockingGameObject.serialize_state(self, update_hp = update_hp, update_xy = update_xy) + [self.repair_finish_time, self.build_total_time, self.build_start_time, self.build_done_time, self.upgrade_total_time, self.upgrade_start_time, self.upgrade_done_time, self.upgrade_help.persist_state() if self.upgrade_help else -1, self.research_item, self.research_total_time, self.research_start_time, self.research_done_time, self.produce_start_time, self.produce_rate, self.contents, self.manuf_queue, self.manuf_start_time, self.manuf_done_time, self.disarmed, self.crafting.serialize_state() if self.crafting else None, self.config, self.enhancing.serialize_state() if self.enhancing else None, copy.deepcopy(self.enhancements)]
 
     def persist_state(self, **args):
         ret = MapBlockingGameObject.persist_state(self, **args)
@@ -7532,7 +7533,7 @@ class Building(MapBlockingGameObject):
             ret['upgrade_start_time'] = self.upgrade_start_time
             ret['upgrade_done_time'] = self.upgrade_done_time
             ret['upgrade_ingredients'] = copy.deepcopy(self.upgrade_ingredients)
-            ret['upgrade_helped'] = self.upgrade_helped
+            ret['upgrade_helped'] = self.upgrade_help.persist_state()
         if self.produce_start_time > 0:
             ret['produce_start_time'] = self.produce_start_time
         if self.produce_rate > 0:
@@ -7597,17 +7598,20 @@ class Building(MapBlockingGameObject):
             if self.upgrade_total_time >= 10:
                 self.upgrade_done_time = 0
                 self.upgrade_start_time = server_time
-                self.upgrade_helped = state.get('upgrade_helped', -1)
             else:
                 self.upgrade_done_time = 0
                 self.upgrade_total_time = 1
                 self.upgrade_start_time = server_time - 10
+            self.upgrade_help = UpgradeHelp.UpgradeHelp(state.get('upgrade_help', state.get('upgrade_helped', -1)))
         else:
             self.upgrade_total_time = state.get('upgrade_total_time',-1)
             self.upgrade_start_time = state.get('upgrade_start_time',-1)
             self.upgrade_done_time = state.get('upgrade_done_time',-1)
             self.upgrade_ingredients = state.get('upgrade_ingredients', None)
-            self.upgrade_helped = state.get('upgrade_helped', -1)
+            if self.upgrade_total_time > 0: # upgrade in progress
+                self.upgrade_help = UpgradeHelp.UpgradeHelp(state.get('upgrade_help', state.get('upgrade_helped', -1)))
+            else: # no upgrade in progress
+                self.upgrade_help = None
 
         self.manuf_queue = state.get('manuf_queue', [])
         if len(self.manuf_queue) > 0 and ('manuf_start_time' not in state):
@@ -7747,7 +7751,7 @@ class Building(MapBlockingGameObject):
         self.upgrade_start_time = -1
         self.upgrade_done_time = -1
         self.upgrade_ingredients = None
-        self.upgrade_helped = -1
+        self.upgrade_help = None
 
     def halt_manuf(self):
         if self.manuf_start_time > 0:
@@ -8776,7 +8780,7 @@ class Base(object):
                     if obj.is_upgrading():
                         # cancel upgrade immediately, no refund
                         obj.cancel_upgrade()
-                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_helped']
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_help','upgrade_helped']
                     if obj.is_enhancing():
                         # cancel enhancement immediately, no refund
                         obj.cancel_enhancing()
@@ -8808,7 +8812,7 @@ class Base(object):
                     if obj.is_upgrading():
                         # cancel upgrade immediately, no refund
                         obj.cancel_upgrade()
-                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_helped']
+                        fields += ['upgrade_total_time','upgrade_start_time','upgrade_done_time','upgrade_ingredients','upgrade_help','upgrade_helped']
                     if obj.is_enhancing():
                         # cancel enhancement immediately, no refund
                         obj.cancel_enhancing()
@@ -22242,7 +22246,7 @@ class GAMEAPI(resource.Resource):
                     object.upgrade_start_time = -1
                     object.upgrade_done_time = -1
                     object.upgrade_ingredients = None
-                    object.upgrade_helped = -1
+                    object.upgrade_help = None
                     object.update_production(object.owner, base.base_type, base.base_region, compute_power_factor(base.get_power_state()))
 
                     if SpinConfig.game() == 'fs':
@@ -22626,7 +22630,7 @@ class GAMEAPI(resource.Resource):
         else:
             object.upgrade_total_time = 1
             object.upgrade_done_time = 999
-        object.upgrade_helped = -1
+        object.upgrade_help = UpgradeHelp.UpgradeHelp()
 
         # re-evaluate power situation
         session.power_changed(session.viewing_base, object, retmsg)
@@ -22676,7 +22680,7 @@ class GAMEAPI(resource.Resource):
         object.upgrade_start_time = -1
         object.upgrade_done_time = -1
         object.upgrade_ingredients = None
-        object.upgrade_helped = -1
+        object.upgrade_help = None
 
         object.change_level(object.level+1)
 
@@ -24261,7 +24265,8 @@ class GAMEAPI(resource.Resource):
                                  gamedata['alliance_help_speedup_min_time']))
             if time_saved > 0:
                 obj.upgrade_done_time += time_saved
-                obj.upgrade_helped = max(1, time_saved)
+                obj.upgrade_help.help_completed = True
+                obj.upgrade_help.time_saved = max(1, time_saved)
                 session.deferred_object_state_updates.add(obj)
 
         else:
@@ -31924,7 +31929,7 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_helped >= 0:
+                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_help.help_requested or object.upgrade_help.help_completed:
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         success = False
 
@@ -31952,7 +31957,8 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    object.upgrade_helped = max(object.upgrade_helped, 0)
+                    object.upgrade_help.help_requested = True
+                    object.upgrade_help.help_request_expire_time = expire_time
                     session.deferred_object_state_updates.add(object)
                     session.player.cooldown_trigger(gamedata['spells'][spellname]['cooldown_name'], gamedata['spells'][spellname]['cooldown'])
                     if session.increment_player_metric('alliance_help_requested', 1, time_series = False):

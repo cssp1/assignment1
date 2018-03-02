@@ -648,7 +648,7 @@ class FindAndReplaceObjectsConsequent(Consequent):
                             obj.build_total_time = obj.build_start_time = obj.build_done_time = -1
                         if obj.is_upgrading():
                             obj.upgrade_total_time = obj.upgrade_start_time = obj.upgrade_done_time = -1
-                            obj.upgrade_helped = 0
+                            obj.upgrade_help = None
                             obj.change_level(obj.level + 1)
 
                         # now perform replacements

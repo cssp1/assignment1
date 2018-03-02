@@ -55,6 +55,7 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
+goog.require('UpgradeHelp');
 goog.require('Dripper');
 goog.require('Bounce');
 goog.require('CombatEngine');
@@ -5070,7 +5071,8 @@ function Building() {
     this.upgrade_total_time = -1;
     this.upgrade_start_time = -1;
     this.upgrade_done_time = -1;
-    this.upgrade_helped = -1;
+    /** @type {UpgradeHelp.UpgradeHelp|null} */
+    this.upgrade_help = null;
 
     this.research_item = '';
     this.research_total_time = -1;
@@ -5188,7 +5190,13 @@ Building.prototype.receive_state = function(data, init, is_deploying) {
     this.upgrade_total_time = data.shift();
     this.upgrade_start_time = data.shift();
     this.upgrade_done_time = data.shift();
-    this.upgrade_helped = data.shift();
+    var upgrade_help_state = data.shift();
+    if(this.upgrade_total_time > 0) {
+        this.upgrade_help = new UpgradeHelp.UpgradeHelp();
+        this.upgrade_help.receive_state(upgrade_help_state);
+    } else {
+        this.upgrade_help = null;
+    }
     this.research_item = data.shift();
     this.research_total_time = data.shift();
     this.research_start_time = data.shift();
@@ -20488,10 +20496,10 @@ function do_invoke_speedup_dialog(kind) {
         var spell = gamedata['spells']['REQUEST_ALLIANCE_HELP'];
         dialog.widgets['help_request_button'].show = true;
         dialog.widgets['help_request_button'].str = spell['ui_name'];
-        if(selection.unit.upgrade_helped > 0) {
+        if(selection.unit.upgrade_help.help_completed) {
             dialog.widgets['help_request_button'].state = 'disabled';
-            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'].replace('%time', pretty_print_time(selection.unit.upgrade_helped));
-        } else if(selection.unit.upgrade_helped == 0) {
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'].replace('%time', pretty_print_time(selection.unit.upgrade_help.time_saved));
+        } else if(selection.unit.upgrade_help.help_requested) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
         } else if(!session.is_in_alliance()) {
@@ -20525,7 +20533,7 @@ function do_invoke_speedup_dialog(kind) {
                                              'on_ok': (function (_unit) { return function() {
                                                  change_selection_ui(null);
                                                  send_to_server.func(["CAST_SPELL", _unit.id, "REQUEST_ALLIANCE_HELP"]);
-                                                 _unit.upgrade_helped = 0; // client-side predict
+                                                 _unit.upgrade_help.help_requested = true; // client-side predict
                                              }; })(selection.unit)});
             };
         }
