@@ -18,9 +18,10 @@ module "game_haproxy" {
   region = "${var.region}"
   ami = "${var.amis[var.region]}"
   key_pair_name = "${var.key_pair_name}"
-  cloud_config_boilerplate_rendered = "${module.cloud_config.boilerplate_rendered}"
+  aws_cloud_config_head = "${module.aws_cloud_init.cloud_config_head}"
+  aws_cloud_config_tail = "${module.aws_cloud_init.cloud_config_tail}"
+  aws_ec2_iam_role_fragment = "${module.aws_cloud_init.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${var.cron_mail_sns_topic}"
-  puppet_s3_bucket = "${var.puppet_s3_bucket}"
   instance_type = "t2.micro"
   n_instances = "${var.game_haproxy_n_instances}"
   security_group_id_list = [

@@ -2,9 +2,10 @@ variable "sitename" {}
 variable "sitedomain" {}
 variable "region" {}
 variable "key_pair_name" {}
-variable "cloud_config_boilerplate_rendered" {}
+variable "aws_cloud_config_head" {}
+variable "aws_cloud_config_tail" {}
+variable "aws_ec2_iam_role_fragment" {}
 variable "cron_mail_sns_topic" {}
-variable "puppet_s3_bucket" {}
 variable "vpc_id" {}
 variable "subnet_ids" {
   description = "Comma-separated list of VPC subnets, corresponding to the availability_zones array"

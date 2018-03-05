@@ -15,22 +15,7 @@ resource "aws_iam_role_policy" "mongodb" {
 {
   "Version": "2012-10-17",
   "Statement": [
-    { "Effect": "Allow",
-      "Action": ["sns:Publish"],
-      "Resource": ["${var.cron_mail_sns_topic}"]
-    },
-    { "Effect": "Allow",
-      "Action": ["ec2:DescribeTags"],
-      "Resource": ["*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListAllMyBuckets"],
-      "Resource": ["*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:GetObject","s3:HeadObject"],
-      "Resource": ["arn:aws:s3:::${var.puppet_s3_bucket}*"]
-    },
+    ${var.aws_ec2_iam_role_fragment},
     { "Effect": "Allow",
       "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:HeadObject","s3:PutObject"],
       "Resource": ["arn:aws:s3:::${var.backups_bucket}*"]
@@ -50,6 +35,41 @@ resource "aws_iam_instance_profile" "mongodb" {
 }
 
 # EC2 instance
+
+data "template_file" "my_cloud_init" {
+  count = "${var.n_instances}"
+  template = "${file("${path.module}/cloud-config.yaml")}"
+  vars = {
+    spin_maint_hour = "${count.index}"
+    spin_maint_weekday= "7"
+    # storage mountpoints vary by instance type. i3 instances need /dev/nvme0n1...
+    mongodb_device = "${substr(var.mongodb_instance_type,0,1) == "i" ? "/dev/nvme0n1" : "/dev/sdx"}"
+    mongodb_backups_bucket = "${var.backups_bucket}"
+    mongodb_replica_set_name = "${var.sitename}"
+    mongodb_replica_set_serial = "${count.index}"
+  }
+}
+
+data "template_cloudinit_config" "conf" {
+  count = "${var.n_instances}"
+  gzip = false
+  base64_encode = false
+  part {
+    content = "${var.aws_cloud_config_head}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+  part {
+    content = "${data.template_file.my_cloud_init.*.rendered[count.index]}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+  part {
+    content = "${var.aws_cloud_config_tail}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+}
 
 resource "aws_instance" "mongodb" {
   count = "${var.n_instances}"
@@ -97,19 +117,7 @@ resource "aws_instance" "mongodb" {
 #    virtual_name = "ephemeral0"
 #  }
 
-  user_data = <<EOF
-${var.cloud_config_boilerplate_rendered}
- - echo "spin_hostname=${var.sitename}-mongodb-${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "spin_maint_hour=${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "spin_maint_weekday=7" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_device=/dev/nvme0n1" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_root_password=${var.mongodb_root_password}" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_backups_bucket=${var.backups_bucket}" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_replica_set_name=${var.sitename}" >> /etc/facter/facts.d/terraform.txt
- - echo "mongodb_replica_set_serial=${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "include spin_mongodb" >> /etc/puppet/main.pp
- - puppet apply /etc/puppet/main.pp
-EOF
+  user_data = "${data.template_cloudinit_config.conf.*.rendered[count.index]}"
 }
 
 resource "cloudflare_record" "cf_mongodb" {

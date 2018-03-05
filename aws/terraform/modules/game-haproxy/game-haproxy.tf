@@ -15,26 +15,7 @@ resource "aws_iam_role_policy" "game_haproxy" {
 {
   "Version": "2012-10-17",
   "Statement": [
-    { "Effect": "Allow",
-      "Action": ["sns:Publish"],
-      "Resource": ["${var.cron_mail_sns_topic}"]
-    },
-    { "Effect": "Allow",
-      "Action": ["ec2:DescribeTags"],
-      "Resource": ["*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListAllMyBuckets"],
-      "Resource": ["*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:GetObject","s3:HeadObject"],
-      "Resource": ["arn:aws:s3:::${var.puppet_s3_bucket}*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["cloudfront:ListDistributions"],
-      "Resource": ["*"]
-    }
+    ${var.aws_ec2_iam_role_fragment}
   ]
 }
 EOF
@@ -46,6 +27,37 @@ resource "aws_iam_instance_profile" "game_haproxy" {
 }
 
 # EC2 instance
+
+data "template_file" "my_cloud_init" {
+  count = "${var.n_instances}"
+  template = "${file("${path.module}/cloud-config.yaml")}"
+  vars = {
+    spin_maint_hour = "${count.index}"
+    spin_maint_weekday = "7"
+    spin_game_id_list = "mf,tr,mf2,bfm,sg,dv,fs"
+  }
+}
+
+data "template_cloudinit_config" "conf" {
+  count = "${var.n_instances}"
+  gzip = false
+  base64_encode = false
+  part {
+    content = "${var.aws_cloud_config_head}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+  part {
+    content = "${data.template_file.my_cloud_init.*.rendered[count.index]}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+  part {
+    content = "${var.aws_cloud_config_tail}"
+    content_type = "text/cloud-config"
+    merge_type = "list(append)+dict(recurse_array)+str()"
+  }
+}
 
 resource "aws_instance" "game_haproxy" {
   count = "${var.n_instances}"
@@ -69,15 +81,5 @@ resource "aws_instance" "game_haproxy" {
     ignore_changes = ["ami", "user_data", "tags"] # must manually taint for these changes
   }
 
-  user_data = <<EOF
-${var.cloud_config_boilerplate_rendered}
- - echo "spin_hostname=${var.sitename}-game-haproxy-${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "spin_game_id_list=mf,tr,mf2,bfm,sg,dv,fs" >> /etc/facter/facts.d/terraform.txt
- - echo "spin_maint_hour=${count.index}" >> /etc/facter/facts.d/terraform.txt
- - echo "spin_maint_weekday=7" >> /etc/facter/facts.d/terraform.txt
- - echo "haproxy_compile=1" >> /etc/facter/facts.d/terraform.txt
- - echo "include spin_game_haproxy" >> /etc/puppet/main.pp
- - puppet apply /etc/puppet/main.pp --parser=future
-EOF
+  user_data = "${data.template_cloudinit_config.conf.*.rendered[count.index]}"
 }
-

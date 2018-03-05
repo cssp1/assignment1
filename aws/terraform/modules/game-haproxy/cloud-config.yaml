@@ -1,0 +1,7 @@
+runcmd:
+ - echo "spin_maint_hour=${spin_maint_hour}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_maint_weekday=${spin_maint_weekday}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_game_id_list=${spin_game_id_list}" >> /etc/facter/facts.d/terraform.txt
+ - echo "haproxy_compile=1" >> /etc/facter/facts.d/terraform.txt
+ - echo "include spin_game_haproxy" >> /etc/puppet/main.pp
+

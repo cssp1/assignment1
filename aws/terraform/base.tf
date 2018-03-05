@@ -36,9 +36,11 @@ variable "jump_host" {
   description = "SSH host from which to connect to VPC machines (IP should be in ssh_sources)"
   # not used internally by Terraform, only for convenience of tools to query via terraform output
 }
-variable "puppet_s3_bucket" {
-  description = "S3 bucket for stashing Puppet modules that instances will pull from"
-  default = "spinpunch-puppet"
+variable "envkey" {
+  description = "Envkey.com secret for this deployment"
+}
+variable "secrets_bucket" {
+  description = "S3 bucket for backing up envkey"
 }
 variable "cron_mail_sns_topic" {
   description = "SNS Topic ID for receiving cron error messages"
@@ -61,11 +63,13 @@ provider "cloudflare" {
   token = "${var.cloudflare_token}"
 }
 
-module "cloud_config" {
-  source = "./modules/cloud-config"
+module "aws_cloud_init" {
+  source = "./modules/aws-cloud-init"
   cron_mail_sns_topic = "${var.cron_mail_sns_topic}"
+  region = "${var.region}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   enable_backups = "${var.enable_backups}"
-  puppet_s3_bucket = "${var.puppet_s3_bucket}"
+  envkey = "${var.envkey}"
+  secrets_bucket = "${var.secrets_bucket}"
 }

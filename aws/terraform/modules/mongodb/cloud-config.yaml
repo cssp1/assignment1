@@ -1,0 +1,8 @@
+runcmd:
+ - echo "spin_maint_hour=${spin_maint_hour}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_maint_weekday=${spin_maint_weekday}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_device=${mongodb_device}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_backups_bucket=${mongodb_backups_bucket}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_replica_set_name=${mongodb_replica_set_name}" >> /etc/facter/facts.d/terraform.txt
+ - echo "mongodb_replica_set_serial=${mongodb_replica_set_serial}" >> /etc/facter/facts.d/terraform.txt
+ - echo "include spin_mongodb" >> /etc/puppet/main.pp
