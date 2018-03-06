@@ -9711,7 +9711,7 @@ class Player(AbstractPlayer):
     # note: if this succeeds, and is operating on the logged-in player,
     # you will also need to perform a deferred stattab update and player_auras update on the session
     def remove_aura(self, aura_name, remove_stack = -1, force = False, data = None):
-        spec = gamedata['auras'][aura_name]
+        spec = gamedata['auras'].get(aura_name, {})
         if (not force) and (not spec.get('cancelable', True)):
             return False
 
@@ -25526,11 +25526,12 @@ class GAMEAPI(resource.Resource):
                     if end_time > server_time:
                         if msg['aura_name'] in gamedata['auras']:
                             if msg.get('remove_by_name_first'):
-                                session.player.remove_aura(session, retmsg, msg['aura_name'], force = True)
-                            if session.player.apply_aura(msg['aura_name'], strength = msg.get('aura_strength',1), level = msg.get('aura_level',1), data = msg.get('aura_data',None),
-                                                         duration = end_time - server_time, ignore_limit = True):
-                                session.deferred_player_auras_update = True
-                                session.deferred_stattab_update = True
+                                session.remove_player_aura(msg['aura_name'], force = True)
+                            session.apply_player_aura(msg['aura_name'],
+                                                      strength = msg.get('aura_strength',1),
+                                                      level = msg.get('aura_level',1),
+                                                      data = msg.get('aura_data',None),
+                                                      duration = end_time - server_time, ignore_limit = True)
 
                     to_ack.append(msg['msg_id'])
 
