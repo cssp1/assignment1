@@ -7533,7 +7533,7 @@ class Building(MapBlockingGameObject):
             ret['upgrade_start_time'] = self.upgrade_start_time
             ret['upgrade_done_time'] = self.upgrade_done_time
             ret['upgrade_ingredients'] = copy.deepcopy(self.upgrade_ingredients)
-            ret['upgrade_helped'] = self.upgrade_help.persist_state()
+            ret['upgrade_help'] = self.upgrade_help.persist_state()
         if self.produce_start_time > 0:
             ret['produce_start_time'] = self.produce_start_time
         if self.produce_rate > 0:
@@ -31930,7 +31930,8 @@ class GAMEAPI(resource.Resource):
                         success = False
 
                 if success:
-                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or object.upgrade_help.help_requested or object.upgrade_help.help_completed:
+                    if object.is_damaged() or (not object.is_building()) or (not object.is_upgrading()) or \
+                       (not object.upgrade_help.can_request_now(server_time)):
                         retmsg.append(["ERROR", "REQUIREMENTS_NOT_SATISFIED"])
                         success = False
 

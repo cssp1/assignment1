@@ -22,14 +22,18 @@ class UpgradeHelp(object):
         if state is not None:
             self.unpersist_state(state)
 
-    def persist_state(self):
-        # for now, only emit the legacy format
-        if self.help_completed:
-            return max(1, self.time_saved)
-        elif self.help_requested:
-            return 0
-        return -1
-
+    def persist_state(self, legacy_format = False):
+        if legacy_format:
+            if self.help_completed:
+                return max(1, self.time_saved)
+            elif self.help_requested:
+                return 0
+            return -1
+        else:
+            return {'help_requested': self.help_requested,
+                    'help_request_expire_time': self.help_request_expire_time,
+                    'help_completed': self.help_completed,
+                    'time_saved': self.time_saved}
     def unpersist_state(self, state):
         if state in (None, -1):
             return # blank
@@ -48,3 +52,14 @@ class UpgradeHelp(object):
             self.time_saved = state.get('time_saved',-1)
         else:
             raise ValueError('invalid state %r' % state)
+
+    def can_request_now(self, time_now):
+        if self.help_completed:
+            return False # already got help
+        if not self.help_requested:
+            return True # not requested yet
+        if self.help_request_expire_time < 0:
+            return False # unknown expire time
+        if time_now < self.help_request_expire_time:
+            return False # not timed out yet
+        return True

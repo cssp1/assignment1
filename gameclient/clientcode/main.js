@@ -20499,9 +20499,12 @@ function do_invoke_speedup_dialog(kind) {
         if(selection.unit.upgrade_help.help_completed) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_completed'].replace('%time', pretty_print_time(selection.unit.upgrade_help.time_saved));
-        } else if(selection.unit.upgrade_help.help_requested) {
+        } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time < 0) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested'];
+        } else if(selection.unit.upgrade_help.help_requested && selection.unit.upgrade_help.help_request_expire_time > server_time && (selection.unit.upgrade_help.help_request_expire_time - server_time < selection.unit.upgrade_time_left())) {
+            dialog.widgets['help_request_button'].state = 'disabled';
+            dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_already_requested_expires'].replace('%s', pretty_print_time(selection.unit.upgrade_help.help_request_expire_time - server_time));
         } else if(!session.is_in_alliance()) {
             dialog.widgets['help_request_button'].state = 'disabled';
             dialog.widgets['help_request_button'].tooltip.str = spell['ui_tooltip_no_alliance'];

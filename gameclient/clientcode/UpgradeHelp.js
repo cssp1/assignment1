@@ -31,11 +31,29 @@ UpgradeHelp.UpgradeHelp.prototype.receive_state = function(state) {
         }
     } else if(typeof(state) === 'object') {
         // new format
-        self.help_requested = !!state['help_requested'];
-        self.help_request_expire_time = ('help_request_expire_time' in state ? /** @type {number} */ (state['help_request_expire_time']) : -1);
-        self.help_completed = !!state['help_completed'];
-        self.time_saved = ('time_saved' in state ? /** @type {number} */ (state['time_saved']) : -1);
+        this.help_requested = !!state['help_requested'];
+        this.help_request_expire_time = ('help_request_expire_time' in state ? /** @type {number} */ (state['help_request_expire_time']) : -1);
+        this.help_completed = !!state['help_completed'];
+        this.time_saved = ('time_saved' in state ? /** @type {number} */ (state['time_saved']) : -1);
     } else {
         throw Error('unhandled state '+JSON.stringify(state));
     }
+};
+
+/** @param {number} time_now
+    @return {boolean} */
+UpgradeHelp.UpgradeHelp.prototype.can_request_now = function(time_now) {
+    if(this.help_completed) {
+        return false; // already got help
+    }
+    if(!this.help_requested) {
+        return true; // not requested yet
+    }
+    if(this.help_request_expire_time < 0) {
+        return false; // unknown expire time
+    }
+    if(time_now < this.help_request_expire_time) {
+        return false; // not timed out yet
+    }
+    return true;
 };
