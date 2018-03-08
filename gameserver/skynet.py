@@ -1596,41 +1596,83 @@ def advideo_get_id(db, ad_account_id, filename):
     if entry and 'id' in entry: return entry['id']
     return _advideo_upload(db, ad_account_id, filename)
 
-def _page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action):
-    params = {'access_token': page_token,
-              'call_to_action': SpinJSON.dumps({'type': call_to_action,
-                                                'value': {'link':link,
-                                                          'link_title':title}}),
-              'message': body,
-              'link': link,
-              'picture': adimage_get_s3_url(db, image),
-              'published': 'false'
-              }
-    if caption: params['caption'] = caption
-    if description: params['description'] = description
-    entry = fb_api(SpinFacebook.versioned_graph_endpoint('page/feed', page_id+'/feed'), post_params = params)
+def make_object_story_spec(db, ad_account_id, page_id,
+                           body_text, title_text,
+                           image_file, thumbnail_file, tgt, base_link_url,
+                           link_description, link_destination, link_caption,
+                           game_app_id):
+    # use ordered dict because we need to hash this consistently
+    cr_params = SpinJSON.ordered_dict_klass({'page_id': page_id})
+
+    cr_call_to_action = SpinJSON.ordered_dict_klass({'type': call_to_action_type(tgt),
+                                                     'value': SpinJSON.ordered_dict_klass({'link':base_link_url})})
+
+    if tgt['image'].startswith('vid'):
+        cr_data = cr_params['video_data'] = {
+            'message': body_text,
+            'title': title_text,
+            'video_id': advideo_get_id(db, ad_account_id, image_file),
+            'image_hash': adimage_get_hash(db, ad_account_id, thumbnail_file),
+            'call_to_action': cr_call_to_action
+            }
+        if link_description:
+            cr_data['link_description'] = link_description
+    else:
+        cr_data = cr_params['link_data'] = {
+            'message': body_text,
+            'name': title_text,
+            'link': base_link_url,
+            'picture': adimage_get_s3_url(db, tgt['image']),
+            }
+        if link_description:
+            cr_data['description'] = link_description
+
+    if (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_') and tgt['bid_type'] != 'oCPM_INSTALL'):
+        # when using OFFSITE_CONVERSION optimization for a Canvas app,
+        # FB API refuses to accept adcreatives containing call_to_action
+        pass
+    else:
+        cr_data['call_to_action'] = cr_call_to_action
+        if tgt['bid_type'] == 'oCPM_INSTALL':
+            cr_data['call_to_action']['value']['application'] = game_app_id
+
+    if link_caption:
+        cr_data['caption'] = link_caption
+
+    return cr_params
+
+def _page_feed_post_make(db, page_id, page_token, cr_params):
+    params = {'published': 'false'}
+    if 'link_data' in cr_params:
+        params.update(cr_params['link_data'])
+    elif 'video_data' in cr_params:
+        params.update(cr_params['video_data'])
+    else:
+        raise Exception('not sure how to make a post with %r' % cr_params)
+
+    # stringify the JSON parts
+    if 'call_to_action' in params:
+        params['call_to_action'] = SpinJSON.dumps(params['call_to_action'])
+
+    entry = fb_api(SpinFacebook.versioned_graph_endpoint('page/feed', page_id+'/feed'),
+                   url_params = {'access_token': page_token}, # use page token, not ad account token here
+                   post_params = params)
     return entry
 
-def page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action):
+def page_feed_post_make(db, ad_account_id, page_id, page_token, cr_params):
     if dry_run: return '0'
-    page_post_key = {'page_id': page_id,
-                     'link': link,
-                     'caption': caption,
-                     'description': description,
-                     'title': title,
-                     'body': body,
-                     'image': image,
-                     'call_to_action': call_to_action}
-    page_post_key_hash = abbreviate_key(urllib.urlencode([(k,v) for k,v in sorted(page_post_key.items())]))
-    cached = db.fb_page_feed.find_one({'_id': page_post_key_hash, spin_field('key'): page_post_key})
+
+    cr_params_hash = hashlib.sha256(SpinJSON.dumps(cr_params, ordered=True)).hexdigest()
+
+    cached = db.fb_page_feed.find_one({'_id': cr_params_hash, spin_field('key'): cr_params_hash})
     if cached:
         return cached['id']
     else:
-        entry = _page_feed_post_make(db, page_id, page_token, link, caption, description, title, body, image, call_to_action)
+        entry = _page_feed_post_make(db, page_id, page_token, cr_params)
         assert entry and entry['id']
-        entry['_id'] = page_post_key_hash
-        entry[spin_field('key')] = page_post_key
-        db.fb_page_feed.with_options(write_concern = pymongo.write_concern.WriteConcern(w=0)).replace_one({'_id':entry['_id']}, entry, upsert=True)
+        entry['_id'] = cr_params_hash
+        entry[spin_field('key')] = cr_params_hash
+        db.fb_page_feed.replace_one({'_id':entry['_id']}, entry, upsert=True)
         return entry['id']
 
 def call_to_action_type(tgt):
@@ -1713,6 +1755,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             thumbnail_file = os.path.join(asset_path, 'video_'+tgt['image']+'.jpg')
         else:
             image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
+            thumbnail_file = None
         if ad_type == 1:
             image_hash = adimage_get_hash(db, ad_account_id, image_file)
 
@@ -1744,49 +1787,17 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                 #    creative['actor_image_hash'] = adimage_get_hash(db, ad_account_id, os.path.join(asset_path, game_data['app_icon'])) # this gets ignored too
                 creative['object_store_url'] = 'https://apps.facebook.com/'+game_data['namespace']+'/'
 
+            cr_params = make_object_story_spec(db, ad_account_id, page_id,
+                                               body_text, title_text,
+                                               image_file, thumbnail_file,
+                                               tgt, base_link_url,
+                                               link_description, link_destination,
+                                               link_caption, game_data['app_id'])
+
             if 0: # out-of-line creation
-                page_post_id = page_feed_post_make(db, page_id, page_token,
-                                                   base_link_url, link_caption, link_description, title_text, body_text, tgt['image'],
-                                                   call_to_action_type(tgt))
+                page_post_id = page_feed_post_make(db, ad_account_id, page_id, page_token, cr_params)
                 creative['object_story_id'] = page_post_id
             else: # inline creation
-                cr_params = {'page_id': page_id }
-
-                if tgt['image'].startswith('vid'):
-                    cr_data = cr_params['video_data'] = {
-                        'message': body_text,
-                        'title': title_text,
-                        'video_id': advideo_get_id(db, ad_account_id, image_file),
-                        'image_hash': adimage_get_hash(db, ad_account_id, thumbnail_file),
-                        'call_to_action': {'type': call_to_action_type(tgt),
-                                           'value': {'link':base_link_url}}
-                        }
-                    if link_description:
-                        cr_data['link_description'] = link_description
-                else:
-                    cr_data = cr_params['link_data'] = {
-                        'message': body_text,
-                        'name': title_text,
-                        'link': base_link_url,
-                        'picture': adimage_get_s3_url(db, tgt['image']),
-                        }
-                    if link_description:
-                        cr_data['description'] = link_description
-
-
-                if (link_destination == 'app' and tgt['bid_type'].startswith('oCPM_') and tgt['bid_type'] != 'oCPM_INSTALL'):
-                    # when using OFFSITE_CONVERSION optimization for a Canvas app,
-                    # FB API refuses to accept adcreatives containing call_to_action
-                    pass
-                else:
-                    cr_data['call_to_action'] =  {'type': call_to_action_type(tgt),
-                                                  'value': {'link':base_link_url}}
-                    if tgt['bid_type'] == 'oCPM_INSTALL':
-                        cr_data['call_to_action']['value']['application'] = game_data['app_id']
-
-                if link_caption:
-                    cr_data['caption'] = link_caption
-
                 creative['object_story_spec'] = SpinJSON.dumps(cr_params)
 
             creative['url_tags'] = link_qs
