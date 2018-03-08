@@ -146,7 +146,8 @@ def __fb_api_requests(url, url_params, post_params, upload_files, add_access_tok
 
     if add_access_token:
         if url_params is None: url_params = {}
-        url_params['access_token'] = access_token
+        if 'access_token' not in url_params:
+            url_params['access_token'] = access_token
 
     attempt = 0
     last_exc = None
