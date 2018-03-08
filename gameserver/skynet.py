@@ -1688,14 +1688,8 @@ def call_to_action_type(tgt):
 ADCREATIVE_GENERATION = 7
 
 def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_name, tgt, spin_atgt):
-    # this just got REALLY complicated for app ads:
-    # https://developers.facebook.com/docs/reference/ads-api/mobile-app-ads/
-    # instead of just making an adcreative, you have to make a (hidden) feed post to the app fan page,
-    # then link that into the creative
 
-    # add tgt_param to this and uniquify
-    creative = {#'type': str(tgt['ad_type']), # this field is obsolete
-                'name': 'Skc '+spin_atgt } # Skc = Skynet Creative
+    creative = {}
 
     if tgt['bid_type'] == 'oCPM_INSTALL':
         creative['object_type'] = 'APPLICATION'
@@ -1798,10 +1792,11 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                 page_post_id = page_feed_post_make(db, ad_account_id, page_id, page_token, cr_params)
                 creative['object_story_id'] = page_post_id
             else: # inline creation
-                creative['object_story_spec'] = SpinJSON.dumps(cr_params)
+                creative['object_story_spec'] = SpinJSON.dumps(cr_params, ordered = True)
 
-            creative['url_tags'] = link_qs
-            #creative['link_url'] = link_url
+            # 20180308: try using {{ad.name}} replacement so that creatives can be shared even if targeting varies,
+            # as long as the visual appearance of the ad is the same
+            creative['url_tags'] = 'spin_campaign=%s&%s={{ad.name}}' % (campaign_name, tgt_key,)
 
         if ad_type == 1 and link_destination == 'app':
             # assert image is 871x627
@@ -1815,7 +1810,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 #                creative['actor_name'] = game_data['app_name']
 
     elif ad_type in (25,27):
-        creative['url_tags'] = link_qs
+        creative['url_tags'] = 'spin_campaign=%s&%s={{ad.name}}' % (campaign_name, tgt_key,)
         if ad_type == 25:
             # create Sponsored Story ad - these don't have link URLs!
             assert link_destination == 'app'
@@ -1831,56 +1826,68 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
     creative[spin_field('generation')] = ADCREATIVE_GENERATION
 
+    # hash here, before adding name or id
+    myhash = adcreative_hash(creative)
+
+    # check existing creatives for a match
     entry = db.fb_adcreatives.find_one(creative)
-    if entry and 'id' in entry: return entry, None # use cached copy
+    if entry and 'id' in entry:
+        print 'found existing creative for', myhash
+        return entry, None, None # use cached copy
 
-    creative[spin_field('creative_id')] = str(uuid.uuid1())
+    # note: to ensure sharing, the name should not be more unique than the parameters used to create the adcreative
+    creative['name'] = 'Skc2 ' + myhash
+
+    #creative[spin_field('creative_id')] = str(uuid.uuid1())
     params = dict([k_v for k_v in creative.iteritems() if (not is_spin_field(k_v[0]))])
-    return creative, params
+    return creative, params, myhash
 
-def adcreative_make(db, ad_account_id, *args):
-    creative, params = adcreative_make_batch_element(db, ad_account_id, *args)
-    if params is None: return creative
-
-    result = fb_api(SpinFacebook.versioned_graph_endpoint('adcreative', 'act_'+ad_account_id+'/adcreatives'), post_params = params)
-    if not result:
-        if dry_run:
-            return {'id': 'DRY_RUN'} # dummy creative for dry runs
-        else:
-            return False
-    creative['id'] = result['id']
-    update_fields_by_id(db.fb_adcreatives, mongo_enc(creative))
-    return creative
+def adcreative_hash(creative):
+    # SHA256 of entire parameter block, with spin_generation but without name or id
+    return hashlib.sha256(SpinJSON.dumps(creative, ordered = True)).hexdigest()
 
 def adcreative_make_batch(db, ad_account_id, arglist):
     ret = []
     batch = []
 
+    # to avoid creating multiple copies of a creative, keep track of the unique ones to create
+    hash_to_batch_index = {}
+
     for args in arglist:
-        creative, params = adcreative_make_batch_element(db, ad_account_id, *args)
+        creative, params, myhash = adcreative_make_batch_element(db, ad_account_id, *args)
         if params is None:
-            ret.append(creative) # use cached copy
+            # use existing creative
+            ret.append(creative)
         else:
-            batch.append((creative, params, len(ret)))
-            ret.append(None)
+            if myhash in hash_to_batch_index:
+                # same as one we are going to create earlier in the batch
+                print 'sharing new creative for', myhash
+                batch[hash_to_batch_index[myhash]]['ret_indexes'].append(len(ret))
+                ret.append(None)
+            else:
+                print 'making new creative for', myhash
+                hash_to_batch_index[myhash] = len(batch)
+                batch.append({'creative':creative, 'params': params, 'ret_indexes':[len(ret)]})
+                ret.append(None)
 
     if batch:
         for batch_item, result in zip(batch,
                                       fb_api_batch(SpinFacebook.versioned_graph_endpoint('adcreative', ''),
                                                    [{'method':'POST', 'relative_url': 'act_'+ad_account_id+'/adcreatives',
-                                                     'body': urllib.urlencode(params2)} for creative2, params2, ind in batch])):
-            creative, params, ind = batch_item
+                                                     'body': urllib.urlencode(batch_entry['params'])} for batch_entry in batch])):
             if result:
-                creative['id'] = result['id']
-                update_fields_by_id(db.fb_adcreatives, mongo_enc(creative))
-                r = creative
+                batch_item['creative']['id'] = result['id']
+                update_fields_by_id(db.fb_adcreatives, mongo_enc(batch_item['creative']))
+                r = batch_item['creative']
             else:
                 if dry_run:
                     r = {'id': 'DRY_RUN'}
                 else:
                     raise Exception("failed to create adcreative: "+repr(params))
                     r = False
-            ret[ind] = r
+
+            for ind in batch_item['ret_indexes']:
+                ret[ind] = r
 
     return ret
 
@@ -2542,7 +2549,9 @@ def control_ad_campaign(db, spin_params, campaign_name, campaign_data, do_delive
             if 'version' not in tgt:
                 raise Exception('refusing to create new ad without a "version" field: '+stgt)
 
-            adgroup_name = 'Sky '+stgt
+            # adgroup_name = 'Sky '+stgt
+            # 20180308 note: if using url_tags replacement with spin_atgt={{ad.name}}, this name MUST be the unmodified stgt
+            adgroup_name = stgt
 
 #            if not do_delivery_estimates:
 #                print 'NOT creating new ad "%-80s" since we skipped delivery_estimates (and therefore cannot skip tiny audiences)' % (adgroup_name)

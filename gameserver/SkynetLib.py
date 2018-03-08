@@ -256,7 +256,9 @@ if 0:
     sys.exit(0)
 
 def decode_adgroup_name(params, name):
-    if name.startswith('Sky'):
+    # awkward - with new {{ad.name}} interpolation, we don't have a guaranteed way to pick out Skynet ad names.
+    # Just look for lots of underscores...
+    if name.startswith('Sky') or len(name.split('_')) >= 5:
         name_fields = name.split(' ')
         stgt = name_fields[-1]
         try:
