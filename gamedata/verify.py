@@ -2651,6 +2651,9 @@ def check_ai_base(strid, base):
             if entry:
                 error |= require_art_asset(entry, reason = 'AI base %s:challenge_icon' % strid)
 
+    if 'ui_challenge_button_consequent' in base:
+        error |= check_consequent(base['ui_challenge_button_consequent'], reason = strid+':'+'ui_challenge_button_consequent')
+
     if 'ui_difficulty_comment' in base:
         error |= check_cond_chain(base['ui_difficulty_comment'], reason = strid+':'+'ui_difficulty_comment')
 

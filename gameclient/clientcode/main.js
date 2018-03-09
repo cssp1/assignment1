@@ -37497,7 +37497,8 @@ function map_dialog_change_page(dialog, chapter, page) {
             dialog.widgets['row_portrait_outline'+row].show = true;
             dialog.widgets['row_portrait_outline'+row].outline_color = SPUI.make_colorv(dialog.data['widgets']['row_portrait_outline'][('outline_color_'+chapter in dialog.data['widgets']['row_portrait_outline'] ? 'outline_color_'+chapter : 'outline_color')]);
             dialog.widgets['row_challenge_icon_bg'+row].show =
-                dialog.widgets['row_challenge_icon'+row].show = false;
+                dialog.widgets['row_challenge_icon'+row].show =
+                dialog.widgets['row_challenge_button'+row].show = false;
 
             for(var h = 0; h < dialog.data['widgets']['row_star_holes']['array'][0]; h++) {
                 dialog.widgets[SPUI.get_array_widget_name('row_stars', dialog.data['widgets']['row_stars']['array'], [h,row])].show = false;
@@ -37732,6 +37733,14 @@ function map_dialog_change_page(dialog, chapter, page) {
                             }
                         }
                     }
+                    if(base && base['ui_challenge_button_consequent']) {
+                        dialog.widgets['row_challenge_button'+row].show = true;
+                        dialog.widgets['row_challenge_button'+row].str = base['ui_challenge_button_name'];
+                        dialog.widgets['row_challenge_button'+row].tooltip.str = base['ui_challenge_button_tooltip'] || null;
+                        dialog.widgets['row_challenge_button'+row].onclick = (function (_cons) { return function(w) {
+                            read_consequent(_cons).execute(player, null);
+                        }; })(base['ui_challenge_button_consequent']);
+                    }
                 }
 
                 dialog.widgets['row_travel0'+row].show = false;
@@ -37761,6 +37770,7 @@ function map_dialog_change_page(dialog, chapter, page) {
             dialog.widgets['row_level'+row].show =
             dialog.widgets['row_challenge_icon_bg'+row].show =
             dialog.widgets['row_challenge_icon'+row].show =
+            dialog.widgets['row_challenge_button'+row].show =
             dialog.widgets['row_ai_difficulty'+row].show =
             dialog.widgets['row_info_button'+row].show =
             dialog.widgets['row_qsize'+row].show =

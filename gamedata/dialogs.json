@@ -4142,6 +4142,13 @@
             "row_hider_button": { "show": 0, "kind": "ActionButton", "xy":[48,105], "dimensions":[637,50], "ui_tooltip": "Requires: %s", "tooltip_delay": 0,
                                   "array": [1,5], "array_offset": [0,56] },
 
+            // associated with the row_challenge widgets, but put on top of the hider
+            "row_challenge_button": { "kind": "ActionButton", "xy": [440,113], "dimensions": [74,33],
+                                      "bg_image": "menu_button_resizable", "bg_image_resizable": 1,
+                                      "ui_tooltip": "", "tooltip_delay": 0,
+                                      "text_size": 13, "text_style": "bold",
+                                      "array": [1,5], "array_offset": [0,56], "show": 0 },
+
             "hitlist_empty": {"kind": "TextField", "xy":[47,121], "dimensions": [638,43],"text_size": 13,"text_hjustify":"center","text_vjustify":"top",
                               "ui_name":"No targets available now. List refreshes in %s.", "show": 0 },
 
