@@ -13669,8 +13669,11 @@ function update_desktop_dialogs() {
                                 }
                             }
 
-                        } else if(props['stat']) {
-                            var stat_list = [props['stat']];
+                        } else { // show stat, or blank the display if there is no stat
+                            var stat_list = [];
+                            if(props['stat']) {
+                                stat_list.push(props['stat']);
+                            }
                             for(var y = 0; y < d.data['widgets']['resource_bar_tokens']['array'][1]; y++) {
                                 for(var x = 0; x < d.data['widgets']['resource_bar_tokens']['array'][0]; x++) {
                                     var index = y*d.data['widgets']['resource_bar_tokens']['array'][0] + x;
@@ -13700,6 +13703,10 @@ function update_desktop_dialogs() {
                                             d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].str = pretty_print_number(d.user_data['point_counts'][stat_config['name']]);
                                         }
                                         d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].onclick = props['prizes_action'];
+                                    } else {
+                                        d.widgets[SPUI.get_array_widget_name('resource_bar_tokens', d.data['widgets']['resource_bar_tokens']['array'],[x,y])].show =
+                                            d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_amount', d.data['widgets']['resource_bar_tokens_amount']['array'],[x,y])].show =
+                                            d.widgets[SPUI.get_array_widget_name('resource_bar_tokens_icon', d.data['widgets']['resource_bar_tokens_icon']['array'],[x,y])].show = false;
                                     }
                                 }
                             }
