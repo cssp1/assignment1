@@ -11,7 +11,9 @@ variable "secrets_bucket" {
   default = ""
   description = "Name of S3 bucket to store secret environment variables (alternative to envkey). Assumed to exist already."
 }
-variable "cron_mail_sns_topic" {}
+variable "cron_mail_sns_topic" {
+  description = "ARN of an SNS topic that should receive log messages from cron jobs. This is also used to receive CloudWatch alerts."
+}
 variable "envkey" {}
 #variable "envkey_encryption_key_id" { default = "" }
 
