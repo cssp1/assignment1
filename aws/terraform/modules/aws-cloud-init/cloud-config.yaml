@@ -25,6 +25,7 @@ runcmd:
  - export PUPPET_BRANCH='${puppet_branch}'; echo 'PUPPET_BRANCH=${puppet_branch}' >> /etc/environment
  - export SITENAME='${sitename}'; echo 'SITENAME=${sitename}' >> /etc/environment
  - export SITEDOMAIN='${sitedomain}'; echo 'SITEDOMAIN=${sitedomain}' >> /etc/environment
+ - export TERRAFORM_CRON_MAIL_SNS_TOPIC='${terraform_cron_mail_sns_topic}'; echo 'TERRAFORM_CRON_MAIL_SNS_TOPIC=${terraform_cron_mail_sns_topic}' >> /etc/environment
 
  # install envkey-source and envkey-fetch into /usr/local/bin/
  - curl -s https://raw.githubusercontent.com/envkey/envkey-source/master/install.sh | bash
@@ -63,7 +64,6 @@ runcmd:
  # set up Facter, hard-coding the Terraform variables in plaintext
  - mkdir -p /etc/facter/facts.d
  - rm -f /etc/facter/facts.d/terraform.txt && touch /etc/facter/facts.d/terraform.txt && chmod 0600 /etc/facter/facts.d/terraform.txt
- - echo "terraform_cron_mail_sns_topic=${terraform_cron_mail_sns_topic}" >> /etc/facter/facts.d/terraform.txt
  - echo "enable_backups=${enable_backups}" >> /etc/facter/facts.d/terraform.txt
 
  # also emit all /etc/environment variables as Facter facts
