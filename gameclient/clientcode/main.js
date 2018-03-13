@@ -18910,6 +18910,11 @@ function update_attack_button_dialog(dialog) {
                     // send an empty deployment request to get the write lock
                     send_to_server.func(["CAST_SPELL", GameObject.VIRTUAL_ID, "DEPLOY_UNITS", [0,0], {}]);
 
+                    // turn off top scores
+                    if('skill_challenge_standings_dialog' in desktop_dialogs) {
+                        close_dialog(desktop_dialogs['skill_challenge_standings_dialog']);
+                    }
+
                     // turn on combat item bar
                     if(!session.home_base && session.viewing_base.deployment_allowed) {
                         init_combat_item_bar();
@@ -20990,6 +20995,7 @@ function test_fancy_victory_dialog(ai_id, kind, has_trophies, has_item_loot) { /
                                 {'base_damage': 0.51,
                                  'attacker_id': session.user_id,
                                  'defender_id': ai_id,
+                                 'timed_challenge': gamedata['ai_bases_client']['bases'][ai_id.toString()]['timed_challenge'],
                                  'time': Math.floor(server_time),
                                  'duration': 945,
                                  'base_id': 'h'+ai_id.toString(),
@@ -21045,6 +21051,7 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     dialog.user_data['context'] = null;
     dialog.user_data['anim_start_time'] = client_time;
     dialog.user_data['replay_signature'] = replay_signature;
+    dialog.user_data['summary'] = battle_summary;
     install_child_dialog(dialog);
     dialog.auto_center();
     dialog.modal = true;
@@ -21129,8 +21136,8 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
     var trophies = (loot['trophies_pvp'] || 0) + (loot['trophies_pve'] || 0) + (loot['trophies_pvv'] || 0);
     dialog.user_data['trophy_type'] = ((loot['trophies_pvv'] || 0) != 0 ? 'pvv' : ((loot['trophies_pvp'] || 0) != 0 ? 'pvp' : 'pve'));
 
-    if(battle_type !== 'home') {
-        // OFFENSE only
+    if(battle_type !== 'home' && !battle_summary['timed_challenge']) {
+        // OFFENSE, non-timed-challenge: show loot display
 
         // loot amounts
         for(var res in gamedata['resources']) {
@@ -21182,9 +21189,8 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
             }
         }
     } else {
-        // DEFENSE only
+        // no loot display - DEFENSE or timed challenge
 
-        // hide loot display
         if(!trophies) {
             dialog.widgets['you_gained'].show = false; // nothing "gained", so don't show it
         }
@@ -21196,9 +21202,47 @@ function invoke_fancy_victory_dialog(battle_type, battle_base, battle_opponent_u
                 }
             });
         }
+
+        if(battle_summary['timed_challenge']) {
+            // fetch scores, both personal and leaders
+            dialog.widgets['skill_challenge_stats'].show = true;
+            var extra_axes = {'challenge': ['key', battle_summary['timed_challenge']]};
+            query_player_scores2([session.user_id], [scores2_query_addr('battle_duration', 'week', extra_axes)],
+                                 (function (dialog) { return function(user_ids, datas) {
+                                     if(!dialog.parent) { return; } // dialog died
+                                     var my_score = datas[0][0];
+                                     query_score_leaders('battle_duration', 'week', extra_axes, 5,
+                                                         (function (dialog, my_score) { return function(cat, period, leaders) {
+                                                             if(!dialog.parent) { return; } // dialog was killed
+                                                             var bbstr = dialog.data['widgets']['skill_challenge_stats']['ui_name_header'];
+                                                             var ui_duration = pretty_print_time(dialog.user_data['summary']['duration']);
+                                                             var ui_best_duration = my_score ? pretty_print_time(my_score['absolute']) : '?';
+                                                             var ui_best_rank = my_score ? (my_score['rank']+1).toString() : '?';
+                                                             bbstr = bbstr
+                                                                 .replace('%SCORE', ui_duration)
+                                                                 .replace('%BEST_SCORE', ui_best_duration)
+                                                                 .replace('%BEST_RANK', ui_best_rank);
+                                                             for(var y = 0; y < 5; y++) {
+                                                                 if(y < leaders.length) {
+                                                                     var ui_row_name = PlayerCache.get_ui_name(leaders[y]);
+                                                                     if('player_level' in leaders[y]) {
+                                                                         ui_row_name += ' L'+leaders[y]['player_level'].toString();
+                                                                     }
+                                                                     var ui_row_score = pretty_print_time(leaders[y]['absolute']);
+                                                                     bbstr += dialog.data['widgets']['skill_challenge_stats']['ui_name_row']
+                                                                         .replace('%RANK', (y+1).toString())
+                                                                         .replace('%NAME', ui_row_name)
+                                                                         .replace('%SCORE', ui_row_score);
+                                                                 }
+                                                             }
+                                                             dialog.widgets['skill_challenge_stats'].set_text_bbcode(bbstr);
+                                                         }; })(dialog, my_score));
+                                 }; })(dialog), {get_rank: true});
+        }
     }
 
-    if(1) {
+    // battle stats
+    if(!battle_summary['timed_challenge']) {
         dialog.widgets['row_battle_stats'].show = true;
         var bbstr = dialog.data['widgets']['row_battle_stats']['ui_name'];
         bbstr = bbstr.replace('%DURATION', pretty_print_time(battle_summary['duration']));

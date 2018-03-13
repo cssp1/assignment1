@@ -20174,6 +20174,11 @@ class GAMEAPI(resource.Resource):
             # finalize battle summary
             if summary:
                 summary['loot'] = copy.deepcopy(session.loot) # grab loot here since completion consequent may have modified it
+
+                if timed_challenge:
+                    # should probably be set above, but timed_challenge is undefined until after summary = {} initialization :(
+                    summary['timed_challenge'] = timed_challenge
+
                 session.player.increment_battle_statistics(summary['attacker_id'] if summary['battle_type'] == 'defense' else summary['defender_id'], summary)
 
                 # send log to MongoDB

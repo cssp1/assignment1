@@ -34,6 +34,7 @@ Leaderboard.invoke_skill_challenge_standings_dialog = function(stat_name, challe
 
     query_score_leaders(stat_name, 'week', {'challenge': ['key', challenge_key]}, 5,
                         (function (_dialog) { return function(cat, period, data) {
+                            if(!_dialog.parent) { return; } // dialog was killed
                             Leaderboard.skill_challenge_standings_dialog_receive_scores(_dialog, data);
                         }; })(dialog));
 

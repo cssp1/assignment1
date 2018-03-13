@@ -4550,6 +4550,8 @@
             "row_battle_stats": [// not supported with RichTextField: {"type": "typewriter", "start_time": 1.5, "end_time": 2.5 },
                                  { "type": "fadein", "start_time": 2.5, "end_time": 3.0 }],
 
+            "skill_challenge_stats": { "type": "fadein", "start_time": 2.5, "end_time": 3.0 },
+
             "row_water_icon": { "type": "same_as", "ref": "loot_xp_icon", "delay": 0.2 },
             "row_water_amount": { "type": "same_as", "ref": "loot_xp_amount", "delay": 0.2 },
             "row_iron_icon": { "type": "same_as", "ref": "row_water_icon" },
@@ -4731,9 +4733,17 @@
 
             "you_gained":  { "kind": "TextField", "xy": [45,160], "dimensions": [187,21], "text_size": 15, "text_style": "bold",
                              "text_hjustify": "left", "ui_name": "Gain:" },
+
+            "skill_challenge_stats":  { "show": 0, "max_lines": 10,
+                                        "kind": "RichTextField", "xy": [45,166], "dimensions": [435,200], "text_size": 15,  "text_hjustify": "left", "text_vjustify": "top",
+                                        "ui_name": "Checking score...",
+                                        "ui_name_header": "[color=#ffff00][b]This Battle:[/b][/color] [b]%SCORE[/b]\n[color=#ffff00][b]Personal Best:[/b][/color] [b]%BEST_SCORE[/b] (Rank #%BEST_RANK)\n\n[color=#ffff00][b]Leaders:[/b][/color]",
+                                        "ui_name_row": "\n%RANK) %NAME ... %SCORE"
+                                      },
+
             "loot_xp_icon": { "kind": "StaticImage", "xy": [236,161], "dimensions": [21,21], "asset": "resource_icon_xp" },
 
-            "loot_xp_amount": { "kind": "TextField", "xy": [266,161], "dimensions": [70,19],"text_size": 15, "text_style": "bold", "ui_name": "xxx,xxx,xxx" },
+            "loot_xp_amount": { "kind": "TextField", "xy": [266,161], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
 
             "row_water_icon": { "kind": "StaticImage", "xy": [145,160], "dimensions": [21,21], "asset": "resource_icon_water" },
             "row_water_amount": { "kind": "TextField", "xy": [175,160], "dimensions": [70,19],"text_size": 15, "text_style": "bold" },
