@@ -12,6 +12,7 @@ goog.provide('Consequents');
 goog.require('Predicates');
 goog.require('GameArt'); // for client graphics
 goog.require('OfferChoice');
+goog.require('Leaderboard');
 goog.require('LoginIncentiveDialog');
 goog.require('Battlehouse');
 
@@ -747,6 +748,18 @@ InvokeLeaderboardConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokeSkillChallengeStandingsConsequent(data) {
+    goog.base(this, data);
+    self.stat_name = data['stat_name'];
+    self.challenge_key = data['challenge_key'];
+}
+goog.inherits(InvokeSkillChallengeStandingsConsequent, Consequent);
+InvokeSkillChallengeStandingsConsequent.prototype.execute = function(state) {
+    Leaderboard.invoke_skill_challenge_standings_dialog(self.stat_name, self.challenge_key);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function InvokeManufactureDialogConsequent(data) {
     goog.base(this, data);
     this.category = data['category'] || null;
@@ -1127,6 +1140,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_CRAFTING_DIALOG') { return new InvokeCraftingConsequent(data); }
     else if(kind === 'INVOKE_MAP_DIALOG') { return new InvokeMapConsequent(data); }
     else if(kind === 'INVOKE_LEADERBOARD_DIALOG') { return new InvokeLeaderboardConsequent(data); }
+    else if(kind === 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG') { return new InvokeSkillChallengeStandingsConsequent(data); }
     else if(kind === 'INVOKE_MANUFACTURE_DIALOG') { return new InvokeManufactureDialogConsequent(data); }
     else if(kind === 'INVOKE_BLUEPRINT_CONGRATS') { return new InvokeBlueprintCongratsConsequent(data); }
     else if(kind === 'INVOKE_CHANGE_REGION_DIALOG') { return new InvokeChangeRegionDialogConsequent(data); }

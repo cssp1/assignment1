@@ -55,6 +55,7 @@ goog.require('SProbe');
 goog.require('SPWebsocket');
 goog.require('SPVideoWidget');
 goog.require('ItemDisplay');
+goog.require('Leaderboard');
 goog.require('UpgradeHelp');
 goog.require('Dripper');
 goog.require('Bounce');
@@ -28559,8 +28560,10 @@ function scores2_query_addr(stat, time_scope, extra_axes) {
 /** @param {string} stat
     @param {string} time_scope
     @param {Object<string,string>|null} extra_axes
-    @param {function(string, Object<string,?>, ?)} callback */
-function query_score_leaders(stat, time_scope, extra_axes, callback) {
+    @param {number} limit
+    @param {function(string, Object<string,?>, ?)} callback
+*/
+function query_score_leaders(stat, time_scope, extra_axes, limit, callback) {
     last_query_tag += 1;
     var tag = 'qsl'+last_query_tag.toString();
     score_leaders_receivers[tag] = (function (_callback) {
@@ -28569,7 +28572,7 @@ function query_score_leaders(stat, time_scope, extra_axes, callback) {
             _callback(stat, axes['time'][0], result); // trim down to just the time_scope
         }; })(callback);
     var query_addr = scores2_query_addr(stat, time_scope, extra_axes);
-    send_to_server.func(["QUERY_SCORE_LEADERS2", query_addr.stat, query_addr.axes, query_addr.sort_order, tag]);
+    send_to_server.func(["QUERY_SCORE_LEADERS2", query_addr.stat, query_addr.axes, query_addr.sort_order, tag, limit]);
 };
 
 /** @param {Array<number>} id_list - list of player IDs
@@ -28961,7 +28964,7 @@ function leaderboard_change_page(dialog, period, mode, chapter, page) {
                 _dlg.user_data['data'][_chapter][period] = data;
                 leaderboard_change_page(_dlg, null, null, _dlg.user_data['chapter'], 0);
             }; })(dialog, chapter);
-            query_score_leaders(ui_data['stat_name'] || chapter, period, ui_data['extra_axes'] || null, cb);
+            query_score_leaders(ui_data['stat_name'] || chapter, period, ui_data['extra_axes'] || null, -1, cb);
         } else if(dialog.user_data['data'][chapter][period] === 'PENDING') {
             dialog.widgets['leaderboard_loading'].show = true;
         } else {

@@ -739,6 +739,35 @@
         }
     },
 
+    // minimalist leaderboard just for skill challenges
+    "skill_challenge_standings_dialog": {
+        "xy": [0,180],
+        "dimensions": [209,125],
+        "transparent_to_mouse": 1,
+        "widgets": {
+            "bg": { "kind": "SolidRect", "xy": [0,0], "dimensions": [209,125], "color":[0,0,0,0.45], "bevel": 3 },
+            "title": { "kind": "TextField", "xy": [10,5], "dimensions": [199,63], "text_size": 15,
+                       "text_style": "bold", "drop_shadow": 1, "text_color": [1,1,0,1],
+                       "text_hjustify": "left", "text_vjustify": "top",
+                       "ui_name": "Top Scores:" },
+
+            "loading_spinner": { "kind": "StaticImage", "xy":[93,50], "dimensions":[16,16], "asset":"loading_spinner" },
+
+
+            "row_score": { "kind": "TextField", "xy": [14,30], "dimensions": [194,48], "text_size": 13,
+                           "text_style": "bold", "drop_shadow": 1, "text_color": [1,1,1,1],
+                           "text_hjustify": "left", "text_vjustify": "top",
+                           "ui_name": "%rank) %score", "show": 0,
+                           "array": [1,5], "array_offset": [0, 17] },
+            "row_name": { "kind": "TextField", "xy": [75,30], "dimensions": [134,48], "text_size": 13,
+                          "text_style": "bold", "drop_shadow": 1, "text_color": [1,1,1,1],
+                          "text_hjustify": "left", "text_vjustify": "top", "show": 0,
+                          "array": [1,5], "array_offset": [0, 17] },
+
+            "close_button": { "kind": "ActionButton", "xy": [187,2], "dimensions": [19,22], "bg_image": "close_button_small", "push_bg_image": 1 }
+        }
+    },
+
     // default (non-combat) desktop
     // this is the part that is anchored to the top-center of the screen
     "desktop_top": {
@@ -3985,7 +4014,7 @@
                         "ui_name_quarries": "!TX Multiplayer (Map)",
                         "ui_tooltip": "", "tooltip_delay": 0,
                         "ui_tooltip_unmet": "Unmet Requirements:\n%s",
-                        "ui_tooltip_hitlist": "For a LIMITED TIME fight special enemies to win Valor Points",
+                        "ui_tooltip_hitlist": "Fight special enemies to win Valor Points",
                         "show": 0, "array": [4,1], "array_offset": [-144,0] }
         }
     },

@@ -29918,11 +29918,15 @@ class GAMEAPI(resource.Resource):
             sort_order = arg[3]
             tag = arg[4]
 
+            limit = gamedata['matchmaking']['max_leaderboard_entries']
+            if len(arg) >= 6 and arg[5] > 0:
+                limit = max(min(limit, arg[5]), 1)
+
             # note: this only hits the "hot" database
             query_point = session.player.scores2_query_point(axes)
             if query_point is not None:
                 result = gamesite.mongo_scores2_client.player_scores2_get_leaders([(stat, query_point, sort_order)],
-                                                                                  gamedata['matchmaking']['max_leaderboard_entries'], reason = 'QUERY_SCORE_LEADERS2')[0]
+                                                                                  limit, reason = 'QUERY_SCORE_LEADERS2')[0]
             else:
                 result = [] # invalid query
 

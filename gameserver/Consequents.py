@@ -840,7 +840,7 @@ def read_consequent(data):
     elif kind == 'HEAL_ALL_BUILDINGS': return HealAllBuildingsConsequent(data)
     elif kind == 'SEND_MESSAGE': return SendMessageConsequent(data)
     elif kind == 'LIBRARY': return LibraryConsequent(data)
-    elif kind in ('INVOKE_UPGRADE_DIALOG',
+    elif kind in ('INVOKE_UPGRADE_DIALOG', 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG',
                   'INVOKE_BLUEPRINT_CONGRATS','INVOKE_BUY_GAMEBUCKS_DIALOG','INVOKE_LOTTERY_DIALOG',
                   'INVOKE_OFFER_CHOICE','INVOKE_MISSIONS_DIALOG','INVOKE_MAIL_DIALOG',
                   'START_AI_ATTACK','PRELOAD_ART_ASSET','CLEAR_UI','BH_BOOKMARK_PROMPT','BH_WEB_PUSH_INIT',

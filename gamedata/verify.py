@@ -1745,7 +1745,7 @@ def check_logic(log, reason = '', context = None):
 CONSEQUENT_TYPES = set(['NULL', 'AND', 'RANDOM', 'IF', 'COND', 'LIBRARY',
                         'PLAYER_HISTORY', 'GIVE_LOOT', 'SESSION_LOOT', 'GIVE_TROPHIES', 'GIVE_TECH', 'APPLY_AURA', 'REMOVE_AURA', 'COOLDOWN_TRIGGER', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET',
                         'METRIC_EVENT', 'SPAWN_SECURITY_TEAM', 'CHAT_SEND', 'FIND_AND_REPLACE_ITEMS', 'FIND_AND_REPLACE_OBJECTS',
-                        'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'INVOKE_LEADERBOARD_DIALOG', 'START_AI_ATTACK',
+                        'VISIT_BASE', 'DISPLAY_MESSAGE', 'MESSAGE_BOX', 'TUTORIAL_ARROW', 'INVOKE_MAP_DIALOG', 'INVOKE_LEADERBOARD_DIALOG', 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG', 'START_AI_ATTACK',
                         'INVOKE_CRAFTING_DIALOG', 'INVOKE_BUILD_DIALOG', 'INVOKE_MISSIONS_DIALOG', 'INVOKE_MAIL_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_UPGRADE_DIALOG', 'INVOKE_BUY_GAMEBUCKS_DIALOG', 'INVOKE_LOTTERY_DIALOG', 'INVOKE_MANUFACTURE_DIALOG',
                         'INVOKE_CHANGE_REGION_DIALOG', 'INVOKE_BLUEPRINT_CONGRATS', 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'MARK_BIRTHDAY',
                         'OPEN_URL', 'FOCUS_CHAT_GUI', 'FACEBOOK_PERMISSIONS_PROMPT', 'DAILY_TIP_UNDERSTOOD', 'RANDOM', 'FORCE_SCROLL',
@@ -1968,6 +1968,12 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
 
     elif cons['consequent'] == 'UI_NOTIFY':
         error |= check_consequent(cons['action'], reason = reason, context = context, context_data = context_data)
+
+    elif cons['consequent'] == 'INVOKE_SKILL_CHALLENGE_STANDINGS_DIALOG':
+        for FIELD in ('stat_name', 'challenge_key'):
+            if FIELD not in cons:
+                error |= 1; print '%s: %s consequent missing mandatory field %s' % \
+                         (reason, cons['consequent'], FIELD)
 
     elif cons['consequent'] in ['INVOKE_BLUEPRINT_CONGRATS', 'COOLDOWN_TRIGGER', 'COOLDOWN_RESET', 'SESSION_LOOT',
                                 'INVOKE_TOP_ALLIANCES_DIALOG', 'INVOKE_INVENTORY_DIALOG', 'INVOKE_STORE_DIALOG', 'INVOKE_MAP_DIALOG', 'INVOKE_LEADERBOARD_DIALOG', 'MESSAGE_BOX',
