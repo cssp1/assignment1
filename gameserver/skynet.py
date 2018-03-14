@@ -470,7 +470,9 @@ def custom_audience_add(audience_id, fb_app_id, rows, value_based = False):
     for row in rows:
         # for encoding notes, see https://developers.facebook.com/docs/marketing-api/audiences-api
         fields = row.strip().split(',')
-        uid_or_email, lookalike_value = fields[0], float(fields[1])
+        uid_or_email = fields[0]
+        if len(fields) >= 2:
+            lookalike_value = float(fields[1])
 
         if '@' in uid_or_email:
             # assume it's an email address
