@@ -3,7 +3,8 @@ resource "aws_alb" "game_alb" {
   security_groups = ["${data.terraform_remote_state.corp.spinpunch_prod_fe_elb_security_group_id}"]
   subnets = ["${split(",", data.terraform_remote_state.corp.spinpunch_prod_subnet_ids)}"]
   idle_timeout = 600
-
+  enable_cross_zone_load_balancing = true
+  enable_http2 = true
   tags {
     Name = "${var.sitename}-game-alb"
     Terraform = "true"
