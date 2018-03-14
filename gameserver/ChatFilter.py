@@ -185,8 +185,9 @@ class ChatFilter(object):
             if codepoint >= 0xa0 and codepoint <= 0xbf: # Latin-1 Supplement: Punctuation and Symbols
                 return True
 
-            if codepoint < 0x10000 and unicodedata.category(unichr(codepoint)) == 'Po': # punctuation, other
-                return True
+            if codepoint < 0x10000:
+                if unicodedata.category(unichr(codepoint)) == 'Po': # punctuation, other
+                    return True
 
             if codepoint in (0x5e, # CIRCUMFLEX ACCENT
                              0x60, # GRAVE ACCENT
@@ -202,9 +203,24 @@ class ChatFilter(object):
 
             if codepoint >= 0x2b0 and codepoint <= 0x2ff: # SPACING_MODIFIER_LETTERS
                 return True
+
+            # The whole range 0x300-0x36f "Combining Diacritical Marks" is gray area.
+            # It includes some umlauts etc that might be needed for European languages.
+            # Just block the most annoying-looking overlay marks.
+            if codepoint >= 0x334 and codepoint <= 0x338: # overlay marks
+                return True
+
             if codepoint >= 0x55a and codepoint <= 0x55f: # ARMENIAN punctuation
                 return True
-            if codepoint >= 0x2100 and codepoint <= 0x2bff:
+            if codepoint >= 0x1ab0 and codepoint <= 0x1abe: # Combining Diacritical Marks Extended
+                return True
+            if codepoint >= 0x1dc0 and codepoint <= 0x1dff: # Combining Diacritical Marks Supplement
+                return True
+            if codepoint >= 0x20d0 and codepoint <= 0x20ff: # Combining Diacritical Marks For Symbols
+                return True
+            if codepoint >= 0x2100 and codepoint <= 0x2bff: # Letterlike Symbols .. Misc Symbols
+                return True
+            if codepoint >= 0xfe20 and codepoint <= 0xfe2f: # Combining Half Marks
                 return True
             if codepoint >= 0x16fe0 and codepoint <= 0x16fff:
                 return True
@@ -315,5 +331,6 @@ if __name__ == '__main__':
     assert cf.is_graphical(u'asdf$@#Death??@$#$')
     assert not cf.is_graphical(u'--==Death==--', allow_chars = ['-','='])
     assert cf.is_graphical(u'\u00d7\u0640')
+    assert cf.is_graphical(u'S\u0337L\u0337A\u0337Y\u0337E\u0337R\u0337')
 
     print 'OK'
