@@ -435,56 +435,12 @@ class JQueryUI (PageContent):
                         failure: function(f, a) { spin_form_mutex = false; spin_form_mask.hide(); console.log('FAIL '+a.response); }
                     });
                  }
-            },
-            {
-                text: 'Graph',
-                width:130,height:40,
-                handler: function() {
-                            if(spin_form_mutex) { return; }
-                            spin_form_mutex = true;
-                            spin_form_mask.show();
-
-                            //Ext.getCmp('status_text').setValue('Processing...');
-                            Ext.getCmp('my_form').submit({
-                                url:location.href+'?output_mode=graph',
-                                timeout: 200000,
-                                success: function(f, a) { spin_form_mutex = false; spin_form_mask.hide(); console.log('OK'); got_graphs(Ext.decode(a.response.responseText)); },
-                                failure: function(f, a) { spin_form_mutex = false; spin_form_mask.hide(); console.log('FAIL'); console.log(a.response); }
-                            });
-                          }
             }]
             }),
 
           Ext.create('Ext.TabPanel', {
               region:'center', id:'vis_panel',
               items: [
-          Ext.create('Ext.Panel', {
-              region:'center',
-              id: 'graph_panel',
-              title: 'Graphs: Basic',
-              scroll: 'vertical',
-              autoScroll: true,
-              layout: { type: 'vbox', padding: '10', align: 'left', pack: 'start', autoSize: true }, // align: 'stretch'
-              items: []
-              }),
-         Ext.create('Ext.Panel', {
-              region:'center',
-              id: 'breakdown_panel',
-              title: 'Graphs: Spend by Category',
-              scroll: 'vertical',
-              autoScroll: true,
-              layout: { type: 'vbox', padding: '10', align: 'left', pack: 'start', autoSize: true }, // align: 'stretch'
-              items: []
-              }),
-          Ext.create('Ext.Panel', {
-              region:'center',
-              id: 'progress_panel',
-              title: 'Graphs: Progression',
-              scroll: 'vertical',
-              autoScroll: true,
-              layout: { type: 'vbox', padding: '10', align: 'left', pack: 'start', autoSize: true }, // align: 'stretch'
-              items: []
-              }),
           Ext.create('Ext.Panel', {
           id: 'funnel_panel', title: 'Funnel',
           scroll: 'vertical', autoScroll: true,
@@ -499,55 +455,6 @@ class JQueryUI (PageContent):
               });
               } }],
           items: []
-          }),
-
-          Ext.create('Ext.Panel', {
-          id: 'units_panel', title: 'Units',
-          scroll: 'vertical', autoScroll: true,
-          layout: { type: 'vbox', padding: '10', align: 'stretch', pack: 'start', autoSize: true }, // align: 'stretch'
-          tbar: [{xtype: 'button', text: 'Run Query', cls:'x-btn-default-small', width: 200, handler: function() {
-              spin_form_mask.show();
-              Ext.getCmp('my_form').submit({
-                  url:location.href+'?output_mode=units',
-                  timeout: 200000,
-                  failure: function(f, a) { spin_form_mask.hide(); console.log(a.response); },
-                  success: function(f, a) { spin_form_mask.hide(); console.log('OK'); got_units(Ext.decode(a.response.responseText)); }
-              });
-              } }],
-          items: []
-          }),
-
-
-          Ext.create('Ext.Panel', {
-          id: 'ads_panel', title: 'Ads',
-          //scroll: 'vertical', autoScroll: true,
-          //height: 800, bodyPadding: '10 10 0',
-          layout: { type: 'vbox', padding: '20', pack: 'start', align: 'stretch' }, // align: 'stretch'
-          items: [Ext.create('Ext.form.Panel', {
-              title: 'Upload Ad Report', width: 400, bodyPadding: 10, frame:true,
-              items: [
-              {xtype:'box',isFormField:false,autoEl: {
-              tag:'div', style: 'padding:10px;', children: [{tag:'img',src:'http://s3.amazonaws.com/'+public_s3_bucket+'/ad_data_upload2.jpg',width:'663',height:'384'}]
-                       }},
-                      {xtype: 'filefield', name: 'ad_csv_data', fieldLabel: 'Ad Report CSV File', width: 350, labelWidth: 150,
-                       allowBlank: false, buttonText: 'Choose File'},
-                      {id: 'ad_csv_status', xtype: 'displayfield', name: 'ad_csv_status', width:250, fieldLabel: 'Status', value: '' }
-
-                      ],
-              buttons: [{ text: 'Upload',
-                          handler: function() {
-                              var form = this.up('form').getForm();
-                              if(form.isValid()) {
-                                  form.submit({
-                                      url:location.href+'?output_mode=upload_ad_csv',
-                                      waitMsg:'Uploading...',
-                                      failure: function(f, a) { console.log('FAILED!'); console.log(a.response); Ext.getCmp('ad_csv_status').setValue('Error! '+Ext.decode(a.response.responseText)['error']); },
-                                      success: function(f, a) { console.log('UPLOAD OK'); console.log(a.response); Ext.getCmp('ad_csv_status').setValue('Upload OK!'); }
-                                  });
-                              }
-                         }
-              }]
-              })]
           })
           ]}),
 
