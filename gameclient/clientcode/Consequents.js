@@ -736,26 +736,26 @@ InvokeMapConsequent.prototype.execute = function(state) {
   * @extends Consequent */
 function InvokeLeaderboardConsequent(data) {
     goog.base(this, data);
-    self.period = data['period'] || null;
-    self.mode = data['mode'] || null;
-    self.chapter = data['chapter'] || null;
+    this.period = data['period'] || null;
+    this.mode = data['mode'] || null;
+    this.chapter = data['chapter'] || null;
 }
 goog.inherits(InvokeLeaderboardConsequent, Consequent);
 InvokeLeaderboardConsequent.prototype.execute = function(state) {
     change_selection_ui(null);
-    invoke_leaderboard(self.period, self.mode, self.chapter);
+    invoke_leaderboard(this.period, this.mode, this.chapter);
 };
 
 /** @constructor @struct
   * @extends Consequent */
 function InvokeSkillChallengeStandingsConsequent(data) {
     goog.base(this, data);
-    self.stat_name = data['stat_name'];
-    self.challenge_key = data['challenge_key'];
+    this.stat_name = data['stat_name'];
+    this.challenge_key = data['challenge_key'];
 }
 goog.inherits(InvokeSkillChallengeStandingsConsequent, Consequent);
 InvokeSkillChallengeStandingsConsequent.prototype.execute = function(state) {
-    Leaderboard.invoke_skill_challenge_standings_dialog(self.stat_name, self.challenge_key);
+    Leaderboard.invoke_skill_challenge_standings_dialog(this.stat_name, this.challenge_key);
 };
 
 /** @constructor @struct
