@@ -20305,7 +20305,8 @@ class GAMEAPI(resource.Resource):
                             # we were attacking this squad. Skip if it's a victory
                             if outcome == 'victory':
                                 continue
-                        elif (squad_lock_id not in session.viewing_squad_locks) or \
+                        elif (not session.viewing_squad_locks) or \
+                             (squad_lock_id not in session.viewing_squad_locks) or \
                              session.viewing_squad_locks[squad_lock_id] <= -2: # tombstone - see forget_base_lock()
                             continue # squad is gone off the map. Skip.
 
