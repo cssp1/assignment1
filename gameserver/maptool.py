@@ -1956,8 +1956,8 @@ def update_squad_space_values(db, lock_manager, region_id, dry_run = True):
                 if not lock_manager.acquire(region_id, squad['base_id']):
                     print '(locked, skipping)'
                     continue
-                nosql_client.update_map_feature(region_id, base_id, feature_update)
-                lock_manager.release(region_id, base_id)
+                nosql_client.update_map_feature(region_id, squad['base_id'], feature_update)
+                lock_manager.release(region_id, squad['base_id'])
 
 if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=', 'repair-days=', 'repair-pct=',
