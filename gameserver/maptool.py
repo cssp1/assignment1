@@ -1927,6 +1927,38 @@ def weed_orphan_objects(db, lock_manager, region_id, dry_run = True):
                 num = 0
             print num
 
+def update_squad_space_values(db, lock_manager, region_id, dry_run = True):
+    # check squad total_space/alive_space against ground truth
+    squad_list = list(nosql_client.get_map_features_by_type(region_id, 'squad'))
+    for squad in squad_list:
+        prev_total_space = squad.get('total_space', -1)
+        prev_alive_space = squad.get('alive_space', -1)
+        total_space = 0
+        alive_space = 0
+
+        mobiles = nosql_client.get_mobile_objects_by_base(region_id, squad['base_id'])
+        for state in mobiles:
+            spec = gamedata['units'].get(state['spec'])
+            if spec:
+                space = get_leveled_quantity(spec.get('consumes_space',0), state.get('level', 1))
+                total_space += space
+                if state.get('hp', 1) == 0 or state.get('hp_ratio',1) == 0:
+                    pass # object is dead
+                else:
+                    alive_space += space
+
+        if total_space != prev_total_space or alive_space != prev_alive_space:
+            # note: this is not synchronized with the query above,
+            # but races should be OK - we just want eventual consistency.
+            feature_update = {'total_space': total_space, 'alive_space': alive_space}
+            print 'squad', squad['base_id'], 'needs space update', feature_update
+            if not dry_run:
+                if not lock_manager.acquire(region_id, squad['base_id']):
+                    print '(locked, skipping)'
+                    continue
+                nosql_client.update_map_feature(region_id, base_id, feature_update)
+                lock_manager.release(region_id, base_id)
+
 if __name__ == '__main__':
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['dry-run', 'throttle=', 'base-id=', 'user-id=', 'threshold-days=', 'repair-days=', 'repair-pct=',
                                                        'score-week=', 'event-time-override=', 'quiet',
@@ -2086,6 +2118,10 @@ if __name__ == '__main__':
                 print "%s: weeding orphan squads..." % region_id
                 weed_orphan_squads(db, lock_manager, region_id, dry_run=dry_run)
 
+                # 45. update squad total_space/alive_space
+                print "%s: checking squad space values..." % region_id
+                update_squad_space_values(db, lock_manager, region_id, dry_run=dry_run)
+
                 # 50. weed orphaned units
                 print "%s: weeding orphan objects..." % region_id
                 weed_orphan_objects(db, lock_manager, region_id, dry_run=dry_run)
@@ -2149,7 +2185,8 @@ if __name__ == '__main__':
             elif action == 'resolve':
                 assert base_id is None
                 resolve_raid_squads(db, lock_manager, region_id, dry_run=dry_run)
-
+            elif action == 'update-squad-space-values':
+                update_squad_space_values(db, lock_manager, region_id, dry_run=dry_run)
             else:
                 print 'unknown action '+action
         elif base_type == 'hive':

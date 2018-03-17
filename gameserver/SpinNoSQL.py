@@ -2141,15 +2141,16 @@ class NoSQLClient (object):
     def _get_base_ids_referenced_by_objects(self, region):
         return self.region_table(region, 'mobile').find().distinct('base_id') + self.region_table(region, 'fixed').find().distinct('base_id')
 
-    def update_mobile_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial,unset))
-    def update_fixed_object(self, region, obj, partial=False, unset=None, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial,unset))
-    def _update_object(self, region, table_name, obj, partial, unset):
+    def update_mobile_object(self, region, obj, partial=False, unset=None, incr=None, reason=''): return self.instrument('update_mobile_object(%s)'%reason, self._update_object, (region,'mobile',obj,partial,unset,incr))
+    def update_fixed_object(self, region, obj, partial=False, unset=None, incr=None, reason=''): return self.instrument('update_fixed_object(%s)'%reason, self._update_object, (region,'fixed',obj,partial,unset,incr))
+    def _update_object(self, region, table_name, obj, partial, unset, incr):
         if not partial:
             assert 'obj_id' in obj
             assert 'owner_id' in obj
             assert 'base_id' in obj
             # optional now: assert 'kind' in obj
             assert unset is None
+            assert incr is None
 
         # temporary swap the obj_id field for the _id field
         obj['_id'] = self.encode_object_id(obj['obj_id'])
@@ -2164,6 +2165,8 @@ class NoSQLClient (object):
                     qs['$set'] = obj
                 if unset: # list of properties to unset
                     qs['$unset'] = dict((f, 1) for f in unset)
+                if incr: # dictionary of properties to increment
+                    qs['$incr'] = incr
                 if len(qs) > 0:
                     self.region_table(region, table_name).update_one({'_id':_id}, qs, upsert = False)
             else:
