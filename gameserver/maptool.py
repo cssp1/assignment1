@@ -530,7 +530,7 @@ def abandon_quarry(db, lock_manager, region_id, base_id, days_to_claim_units = 3
             set_props['obj_id'] = obj['obj_id']
             nosql_client._update_object(region_id,
                                         'mobile' if (obj['spec'] in gamedata['units']) else 'fixed',
-                                        set_props, True, unset_props)
+                                        set_props, True, unset_props, None)
             #nosql_write_all_objects(region_id, base_id, feature['base_landlord_id'], base_objects)
 
         # update feature with new owner
