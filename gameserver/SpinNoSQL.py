@@ -1799,11 +1799,25 @@ class NoSQLClient (object):
 
     def get_map_features_by_type(self, region, base_type, reason=''):
         return self.instrument('get_map_features_by_type(%s)'%reason, self._query_map_features, (region,{'base_type':base_type}))
+
     def count_map_features_by_type(self, region, base_type, filter = None, reason=''):
         qs = {'base_type': base_type}
         if filter:
             qs.update(filter)
         return self.instrument('count_map_features_by_type(%s)'%reason, self._count_map_features, (region,qs))
+    def _count_map_features(self, region, query):
+        return self.region_table(region, 'map').find(query).count()
+
+    def count_map_features_grouped_by_type(self, region, base_type_list, reason=''):
+        qs = {'base_type': {'$in': base_type_list}}
+        return self.instrument('count_map_features_grouped_by_type(%s)'%reason, self._count_map_features_grouped_by_type, (region,qs))
+    def _count_map_features_grouped_by_type(self, region, qs):
+        agg_result = self.region_table(region, 'map').aggregate([
+            {'$match': qs},
+            {'$group':{'_id':'$base_type','count':{'$sum':1}}}
+            ])
+        return dict((x['_id'], x['count']) for x in agg_result)
+
     def get_map_feature_ids(self, region, reason=''):
         return (x['base_id'] for x in self.instrument('get_map_feature_ids(%s)'%reason, self._query_map_features, (region,{},{'_id':1})))
     def get_map_feature_ids_by_type(self, region, base_type, reason=''):
@@ -1824,8 +1838,6 @@ class NoSQLClient (object):
         cur = self.region_table(region, 'map').find(query, fields)
         if batch_size is not None: cur = cur.batch_size(batch_size)
         return (self._decode_map_feature(x) for x in cur)
-    def _count_map_features(self, region, query):
-        return self.region_table(region, 'map').find(query).count()
 
     def get_map_feature_by_base_id(self, region, base_id, reason=''):
         return self.instrument('get_map_feature_by_base_id(%s)'%reason, self._get_map_feature_by_base_id, (region,base_id))
