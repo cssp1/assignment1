@@ -18646,19 +18646,57 @@ function update_attack_button_dialog(dialog) {
             dialog.widgets['auto_resolve_button'].show = player.auto_resolve_enabled() && (session.viewing_base.base_type === 'squad' || player.is_cheater) && !(!session.home_base && session.viewing_base.base_landlord_id === session.user_id);
             dialog.widgets['auto_resolve_button'].str = dialog.data['widgets']['auto_resolve_button'][(player.is_cheater && session.viewing_base.base_type !== 'squad') ? 'ui_name_dev': 'ui_name'];
 
+            var auto_resolve_problem_ui_tooltip = null;
+            var auto_resolve_problem_message_cb = null;
 
-            dialog.widgets['auto_resolve_button'].state = 'normal';
-            dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip'];
-            dialog.widgets['auto_resolve_button'].onclick = function(w) {
-                var s = gamedata['strings']['auto_resolve_confirm'];
-                invoke_child_message_dialog(s['ui_title'], s['ui_description'],
-                                            {'cancel_button': true,
-                                             'ok_button_ui_name': s['ui_button'],
-                                             'on_ok': function() {
-                                                 send_to_server.func(["AUTO_RESOLVE"]);
-                                                 retreat_from_attack(true);
-                                             }});
-            };
+            // check in-battle unit space requirement for auto-resolve
+            // the server uses a looser criterion of "all deployed+deployable live unit space" whereas client-side we use "all on-screen live unit space",
+            // which is strictly tighter.
+            var auto_resolve_max_relative_space = player.get_territory_setting('auto_resolve_max_relative_space');
+            if(auto_resolve_max_relative_space > 0) {
+                var my_alive_space = 0;
+                var other_alive_space = 0;
+                session.for_each_real_object(function(obj) {
+                    if(obj.is_mobile() && !obj.is_destroyed()) {
+                        var space = obj.get_leveled_quantity(obj.spec['consumes_space'] || 0);
+                        if(obj.team === 'player') {
+                            my_alive_space += space;
+                        } else {
+                            other_alive_space += space;
+                        }
+                    }
+                });
+                if(other_alive_space >= auto_resolve_max_relative_space * my_alive_space) {
+                    auto_resolve_problem_ui_tooltip =
+                        dialog.data['widgets']['auto_resolve_button']['ui_tooltip_defender_too_much_space']
+                        .replace('%cur', pretty_print_number(my_alive_space))
+                        .replace('%max', Math.floor(other_alive_space / auto_resolve_max_relative_space + 0.5).toFixed(0));
+                    auto_resolve_problem_message_cb = (function (_max_rel_space) { return function(w) {
+                        var s = gamedata['errors']['CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE'];
+                        invoke_child_message_dialog(s['ui_title'], s['ui_name'].replace('%d', (100.0*_max_rel_space).toFixed(0)),
+                                                    {'dialog': 'message_dialog_big'});
+                    }; })(auto_resolve_max_relative_space);
+                }
+            }
+
+            if(auto_resolve_problem_ui_tooltip) {
+                dialog.widgets['auto_resolve_button'].state = 'disabled_clickable';
+                dialog.widgets['auto_resolve_button'].tooltip.str = auto_resolve_problem_ui_tooltip;
+                dialog.widgets['auto_resolve_button'].onclick = auto_resolve_problem_message_cb;
+            } else {
+                dialog.widgets['auto_resolve_button'].state = 'normal';
+                dialog.widgets['auto_resolve_button'].tooltip.str = dialog.data['widgets']['auto_resolve_button']['ui_tooltip'];
+                dialog.widgets['auto_resolve_button'].onclick = function(w) {
+                    var s = gamedata['strings']['auto_resolve_confirm'];
+                    invoke_child_message_dialog(s['ui_title'], s['ui_description'],
+                                                {'cancel_button': true,
+                                                 'ok_button_ui_name': s['ui_button'],
+                                                 'on_ok': function() {
+                                                     send_to_server.func(["AUTO_RESOLVE"]);
+                                                     retreat_from_attack(true);
+                                                 }});
+                };
+            }
         }
 
     } else { // has_attacked is FALSE
@@ -50129,6 +50167,10 @@ function handle_server_message(data) {
             invoke_insufficient_resources_for_repair_message(argument || {}, data[0] || null);
         } else if(name.indexOf("CANNOT_CREATE_ALLIANCE")==0 || name == "ALLIANCES_OFFLINE" || name == "CANNOT_JOIN_ALLIANCE" || name == "ALIAS_BAD" || name == "ALIAS_TAKEN") {
             invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
+        } else if(name == "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE") {
+            notification_queue.push_with_priority((function(display_title, display_string) { return function () {
+                invoke_child_message_dialog(display_title, display_string, {'dialog': 'message_dialog_big'});
+            }; })(display_title, display_string), 1); // display before battle-ended message
         } else {
             user_log.msg('Error: '+display_string, new SPUI.Color(1,0,0,1));
         }

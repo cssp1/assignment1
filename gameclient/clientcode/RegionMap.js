@@ -972,14 +972,20 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
                 // do not show pre_attack option if player has no units deployable into this climate
                 var climate = new Climate(gamedata['climates'][(feature['base_climate'] && feature['base_climate'] in gamedata['climates'] ? feature['base_climate'] : gamedata['default_climate'])]);
                 var found_unit = false;
+
+                // also count live unit space we can deploy
+                var my_alive_space = 0;
+
                 for(var id in player.my_army) {
                     var o = player.my_army[id];
                     if(goog.array.contains(squads_nearby, o['squad_id'])) {
                         if(army_unit_hp(o)[0] > 0 && climate.can_deploy_unit_of_spec(gamedata['units'][o['spec']])) {
-                            found_unit = true; break;
+                            found_unit = true;
+                            my_alive_space += army_unit_space(o);
                         }
                     }
                 }
+
                 if(found_unit) {
                     // pre-attack button
                     var attack_cb = make_cb(this, feature, 1); // pass pre_attack = 1 for auto-attack
@@ -992,13 +998,33 @@ RegionMap.RegionMap.prototype.make_nosql_spy_buttons = function(feature) {
 
                     // pre-attack-and-resolve button
                     if(gamedata['territory']['enable_pre_resolve'] && player.auto_resolve_enabled()) {
-                        var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
-                        var wrapped_resolve_cb = (will_lose_protection ?
-                                                  (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb)
-                                                  : (will_trigger_revenge ?
-                                                     (function (_resolve_cb) { return function() { invoke_attack_stronger_message(_resolve_cb); }; })(resolve_cb)
-                                                     : resolve_cb));
-                        ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
+
+                        // check space requirement
+                        var auto_resolve_max_relative_space = player.get_territory_setting('auto_resolve_max_relative_space');
+
+                        if(auto_resolve_max_relative_space > 0 && ('alive_space' in feature) &&
+                           feature['alive_space'] >= auto_resolve_max_relative_space * my_alive_space) {
+
+                            // cannot auto-resolve because the defender has too much unit space
+
+                            var problem_ui_tooltip = gamedata['strings']['regional_map']['auto_resolve_defender_too_much_space']
+                                .replace('%cur', pretty_print_number(my_alive_space))
+                                .replace('%max', Math.floor(feature['alive_space'] / auto_resolve_max_relative_space + 0.5).toFixed(0));
+
+                            ret.push([gamedata['strings']['regional_map']['auto_resolve'], null, 'disabled_clickable',
+                                      SPUI.break_lines(problem_ui_tooltip, SPUI.desktop_font, [300,0])[0],
+                                      SPUI.error_text_color]);
+
+                        } else {
+                            // OK, can auto-resolve
+                            var resolve_cb = make_cb(this, feature, 2); // pass pre_attack = 2 for auto-attack-and-resolve
+                            var wrapped_resolve_cb = (will_lose_protection ?
+                                                      (function(_resolve_cb) { return function() { invoke_attack_through_protection_message(_resolve_cb); }; })(resolve_cb)
+                                                      : (will_trigger_revenge ?
+                                                         (function (_resolve_cb) { return function() { invoke_attack_stronger_message(_resolve_cb); }; })(resolve_cb)
+                                                         : resolve_cb));
+                            ret.push([gamedata['strings']['regional_map']['auto_resolve'], wrapped_resolve_cb, 'attack']);
+                        }
                     }
                 }
             }

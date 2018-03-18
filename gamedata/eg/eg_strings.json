@@ -461,6 +461,7 @@
         "spy": "Spy",
         "attack": "Attack",
         "auto_resolve": "Auto-Resolve",
+        "auto_resolve_defender_too_much_space": "Not enough unit space advantage (you have %cur space nearby, %max required to auto-resolve)",
         "locked": "Locked",
         "to_unlock": "To Unlock: %s",
         "cancel_travel": "Cancel Travel",

@@ -10037,8 +10037,8 @@ class Player(AbstractPlayer):
         return Predicates.read_predicate({'predicate': 'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(self, None)
 
 
-    def get_territory_setting(self, name):
-        ret = gamedata['territory'].get(name, False)
+    def get_territory_setting(self, name, default_value = False):
+        ret = gamedata['territory'].get(name, default_value)
         if self.home_region in gamedata['regions'] and \
            name in gamedata['regions'][self.home_region]:
             ret = gamedata['regions'][self.home_region][name]
@@ -10300,15 +10300,8 @@ class Player(AbstractPlayer):
                     must_recall = True
 
                 elif not squad.get('raid'): # XXX snap dead raids back to home?
-                    # check if the squad is dead
-                    all_dead = True
-
-                    for obj in map_objects_by_squad[squad_id]:
-                        if not army_unit_is_dead(obj):
-                            all_dead = False
-                            break
-
-                    if all_dead:
+                    # check if the squad is completely dead
+                    if all(army_unit_is_dead(obj) for obj in map_objects_by_squad[squad_id]):
                         if gamedata['server'].get('log_nosql',0) >= 2:
                             gamesite.exception_log.event(server_time, 'player %d squad %d at map_loc %s is dead, recalling to base' % \
                                                          (self.user_id, squad_id, repr(squad['map_loc'])))
@@ -10322,6 +10315,59 @@ class Player(AbstractPlayer):
 
                 if must_recall:
                     to_recall.append(squad_id)
+                else:
+                    # squad can remain on the map
+                    # recompute squad space stats from the raw data
+                    prev_total_space = map_data.get('total_space', -1)
+                    prev_alive_space = map_data.get('alive_space', -1)
+                    total_space = 0
+                    alive_space = 0
+
+                    for obj in map_objects_by_squad[squad_id]:
+                        obj_spec = self.get_abtest_spec(GameObjectSpec, obj['spec'])
+                        space = obj_spec.get_leveled_quantity(obj_spec.consumes_space, obj.get('level', 1))
+                        total_space += space
+                        if not army_unit_is_dead(obj):
+                            alive_space += space
+
+                    if prev_total_space != total_space or \
+                       prev_alive_space != alive_space:
+
+                        # update the map feature
+                        feature_update = {'total_space': total_space, 'alive_space': alive_space}
+
+                        if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                            gamesite.exception_log.event(server_time, 'squad space update - %s/%s - ping_squads(): %r' % \
+                                                         (self.home_region, self.squad_base_id(squad_id), feature_update))
+                            gamesite.exception_log.event(server_time, 'session.viewing_squad_locks: %r\nsession.viewing_base_lock: %r' % \
+                                                         (session.viewing_squad_locks, session.viewing_base_lock))
+
+                        # need to lock it
+                        need_to_release_lock = False
+                        squad_lock_id = SpinDB.base_lock_id(self.home_region, self.squad_base_id(squad_id))
+
+                        # already in viewing_squad_locks?
+                        if session.viewing_base_lock == squad_lock_id or \
+                           (session.viewing_squad_locks and squad_lock_id in session.viewing_squad_locks):
+                            lock_state = Player.LockState.being_attacked
+                        else:
+                            lock_state = gamesite.nosql_client.map_feature_lock_acquire(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='ping_squads')
+                            if lock_state == Player.LockState.being_attacked: # we got the lock
+                                need_to_release_lock = True
+
+                        if lock_state == Player.LockState.being_attacked:
+                            # we own the lock
+                            try:
+                                gamesite.nosql_client.update_map_feature(self.home_region, self.squad_base_id(squad_id),
+                                                                         feature_update, originator = self.user_id, reason = 'ping_squads');
+                            finally:
+                                if need_to_release_lock:
+                                    gamesite.nosql_client.map_feature_lock_release(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='ping_squads')
+                        else:
+                            # could not obtain the lock
+                            gamesite.exception_log.event(server_time, 'player %d squad %d needs space update %r, but unable to lock it' % \
+                                                         (self.user_id, squad_id, feature_update))
+
             else:
                 # it should be at home base
                 for FIELD in ('map_loc', 'map_path', 'travel_speed', 'raid', 'max_cargo'):
@@ -10638,18 +10684,26 @@ class Player(AbstractPlayer):
         icon_unit_specname = None
         total_hp = 0
 
-        # compute travel speed and max cargo here, while we have all the units in memory
+        # compute travel speed, space, and max cargo here, while we have all the units in memory
         travel_speed = -1
         max_cargo = {}
+        total_space = 0
+        alive_space = 0
 
         for object in self.home_base_iter():
             if object.is_mobile() and (object.squad_id or 0) == squad_id:
                 to_remove.append(object)
                 total_hp += object.hp
+
                 space = object.get_leveled_quantity(object.spec.consumes_space)
                 if (space > highest_space) or (icon_unit_specname is None):
                     highest_space = space
                     icon_unit_specname = object.spec.name
+
+                total_space += space
+                if not object.is_destroyed():
+                    alive_space += space
+
                 speed = object.get_leveled_quantity(object.spec.travel_speed or object.spec.maxvel)
                 assert speed > 0
                 travel_speed = min(travel_speed, speed) if (travel_speed > 0) else speed
@@ -10669,7 +10723,10 @@ class Player(AbstractPlayer):
                    'base_landlord_id': self.user_id,
                    'base_map_loc': coords,
                    'base_map_path': None, # explicit null for client's benefit
-                   'travel_speed': travel_speed}
+                   'travel_speed': travel_speed,
+                   'total_space': total_space,
+                   'alive_space': alive_space,
+                   }
         if raid_mode:
             feature['raid'] = raid_mode
             feature['max_cargo'] = max_cargo
@@ -20214,9 +20271,55 @@ class GAMEAPI(resource.Resource):
 
             session.player.send_history_update(retmsg)
 
-            # check for player's own dead squads
+            # check for player's own dead squads, and update squad space stats
             if session.using_squad_deployment():
                 session.player.ping_squads_and_send_update(session, retmsg, originator=session.player.user_id, reason='complete_attack(attacker)')
+
+                # update defender's squad space stats (attacker's squad space stats are updated by ping_squads above)
+                total_space_by_squad_id = {}
+                alive_space_by_squad_id = {}
+                for object in itertools.chain(session.iter_objects(), (object for object, death_location in session.resurrectable_objects)):
+                    if object.owner is session.viewing_player and object.is_mobile():
+                        squad_id = object.squad_id or 0
+                        if SQUAD_IDS.is_mobile_squad_id(squad_id):
+                            space = object.get_leveled_quantity(object.spec.consumes_space)
+                            total_space_by_squad_id[squad_id] = total_space_by_squad_id.get(squad_id, 0) + space
+                            if not object.is_destroyed():
+                                alive_space_by_squad_id[squad_id] = alive_space_by_squad_id.get(squad_id, 0) + space
+
+                if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                    gamesite.exception_log.event(server_time, 'defender squad space:\ntotal %r\nalive %r\n\nsession.viewing_squad_locks %r\nsession.viewing_base_lock %r' % (total_space_by_squad_id, alive_space_by_squad_id, session.viewing_squad_locks, session.viewing_base_lock))
+
+                for squad_base_id, squad_feature in session.defending_squads.iteritems():
+                    if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                        gamesite.exception_log.event(server_time, 'squad space scan - %s: %r' % (squad_base_id, squad_feature))
+
+                    squad_id = squad_feature['squad_id']
+                    if SQUAD_IDS.is_mobile_squad_id(squad_id):
+
+                        # note: squad may have been kicked off map above.
+                        # If so, we don't need to update the space stats.
+
+                        squad_lock_id = SpinDB.base_lock_id(session.player.home_region, squad_base_id)
+                        if session.viewing_base_lock == squad_lock_id:
+                            # we were attacking this squad. Skip if it's a victory
+                            if outcome == 'victory':
+                                continue
+                        elif (not session.viewing_squad_locks) or \
+                             (squad_lock_id not in session.viewing_squad_locks) or \
+                             session.viewing_squad_locks[squad_lock_id] <= -2: # tombstone - see forget_base_lock()
+                            continue # squad is gone off the map. Skip.
+
+                        # squad is still on the map. update space stats.
+                        feature_update = {'total_space': total_space_by_squad_id.get(squad_id, 0),
+                                          'alive_space': alive_space_by_squad_id.get(squad_id, 0)}
+                        if feature_update:
+                            if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                                gamesite.exception_log.event(server_time, 'squad space update - %s/%s - complete_attack(defender): %r' % \
+                                                             (session.player.home_region, squad_base_id, feature_update))
+                            gamesite.nosql_client.update_map_feature(session.player.home_region, squad_base_id, feature_update,
+                                                                     originator=session.player.user_id, reason='complete_attack(defender)')
+
 
             # END has_attacked
 
@@ -25873,9 +25976,6 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return
 
-        session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
-        session.auto_resolved = True
-
         # attempt to deploy all of player's un-deployed units
         if not session.home_base:
             deploy_list = [] # match format of argument to do_attack()
@@ -25896,7 +25996,7 @@ class GAMEAPI(resource.Resource):
                 elif session.player.home_region: # mobile, deployed
                     for state in gamesite.nosql_client.get_mobile_objects_by_base(session.player.home_region, session.player.squad_base_id(feature['squad_id']), reason='auto_resolve'):
                         if (not session.has_object(state['obj_id'])) and \
-                           (state.get('hp_ratio',1) > 0 or state.get('hp',1) > 0) and \
+                           (not army_unit_is_dead(state)) and \
                            session.viewing_base.can_deploy_unit(session.player.get_abtest_spec(GameObjectSpec, state['spec'])):
                             assert state['squad_id'] == feature['squad_id']
                             assert session.player.squad_base_id(state['squad_id']) in session.deployable_squads
@@ -25938,6 +26038,30 @@ class GAMEAPI(resource.Resource):
                                                   (session.player.user_id, session.viewing_base.base_id, deploy_location, deploy_list))
 
                 self.do_attack(session, retmsg, [deploy_location, deploy_list])
+
+        # now, with all available units deployed, check the relative space requirement
+        # if it fails, bail out now
+
+        auto_resolve_max_relative_space = session.player.get_territory_setting('auto_resolve_max_relative_space', default_value = -1)
+        if auto_resolve_max_relative_space > 0:
+            my_alive_space = 0
+            other_alive_space = 0
+            for obj in session.iter_objects():
+                if obj.is_mobile() and not obj.is_destroyed():
+                    space = obj.get_leveled_quantity(obj.spec.consumes_space)
+                    if obj.owner is session.player:
+                        my_alive_space += space
+                    else:
+                        other_alive_space += space
+
+            if other_alive_space >= auto_resolve_max_relative_space * my_alive_space:
+                # note! pre-attack/pre-resolve path throws away retmsg, but we still want this one
+                # to go through to the client, so use session.send() instead of writing to retmsg
+                session.send([["ERROR", "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE", int(100*auto_resolve_max_relative_space+0.5)]])
+                return
+
+        session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
+        session.auto_resolved = True
 
         if gamedata['server'].get('log_auto_resolve', 0) >= 3:
             log_func = lambda x: gamesite.exception_log.event(server_time, x)
@@ -26423,6 +26547,9 @@ class GAMEAPI(resource.Resource):
             session.viewing_base.drop_object(obj)
 
         if is_squad_object:
+            # Squad's total_space/alive_space are going to go out of sync here,
+            # but we'll fix it in _complete_attack before dropping the lock.
+            # We do not update the feature here to cut down on broadcast traffic.
             if not can_resurrect:
                 gamesite.nosql_client.drop_mobile_object_by_id(session.viewing_base.base_region, obj.obj_id, reason='DSTROY_OBJECT')
             else:
