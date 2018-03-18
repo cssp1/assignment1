@@ -193,39 +193,3 @@ DRIVERS = { 'flat': FlatDirectoryDriver,
             's3': S3Driver }
 
 driver = DRIVERS[SpinConfig.config.get('userdb_driver', 'flat')]()
-
-# attempt to return a set of all user accounts that have any changes between "mintime" and "maxtime"
-# can fail if sessions log is missing or incomplete, in which case it returns None
-def get_users_modified_since(mintime, maxtime):
-    sys.stderr.write('DEPRECATED use of SpinUserDB.get_users_modified_since(), this should be replaced with dbserver query\n')
-
-    import SpinLog, SpinJSON
-
-    assert mintime <= maxtime
-    modset = set([])
-
-    # quantize counter to days
-    day_begin = SpinConfig.cal_to_unix(SpinConfig.unix_to_cal(mintime))
-    while day_begin < maxtime:
-        log_file = SpinConfig.config['log_dir']+'/'+SpinLog.time_to_date_string(day_begin)+'-sessions.json'
-        day_begin += 24*60*60
-        #print 'CHECKING', log_file
-        try:
-            fd = open(log_file)
-        except:
-            # punt on any errors
-            return None
-
-        for line in fd.xreadlines():
-            # try to hold off JSON parsing as much as possible
-            if '0115_logged_in' not in line: continue
-            event = SpinJSON.loads(line)
-            etime = int(event['time'])
-            if etime >= mintime and etime < maxtime:
-                modset.add(int(event['user_id']))
-            if etime >= maxtime:
-                break
-    return modset
-
-if __name__ == '__main__':
-    print driver.get_user_id_range()

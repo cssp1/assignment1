@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-# tool to clean out bad aistate files
+# tool to clean out bad aistate files (assuming they are stored in S3)
 
 import SpinS3
 import SpinConfig
