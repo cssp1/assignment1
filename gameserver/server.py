@@ -10037,8 +10037,8 @@ class Player(AbstractPlayer):
         return Predicates.read_predicate({'predicate': 'LIBRARY', 'name': 'squads_enabled'}).is_satisfied(self, None)
 
 
-    def get_territory_setting(self, name):
-        ret = gamedata['territory'].get(name, False)
+    def get_territory_setting(self, name, default_value = False):
+        ret = gamedata['territory'].get(name, default_value)
         if self.home_region in gamedata['regions'] and \
            name in gamedata['regions'][self.home_region]:
             ret = gamedata['regions'][self.home_region][name]
@@ -25976,9 +25976,6 @@ class GAMEAPI(resource.Resource):
             retmsg.append(["ERROR", "SERVER_PROTOCOL"])
             return
 
-        session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
-        session.auto_resolved = True
-
         # attempt to deploy all of player's un-deployed units
         if not session.home_base:
             deploy_list = [] # match format of argument to do_attack()
@@ -25999,7 +25996,7 @@ class GAMEAPI(resource.Resource):
                 elif session.player.home_region: # mobile, deployed
                     for state in gamesite.nosql_client.get_mobile_objects_by_base(session.player.home_region, session.player.squad_base_id(feature['squad_id']), reason='auto_resolve'):
                         if (not session.has_object(state['obj_id'])) and \
-                           (state.get('hp_ratio',1) > 0 or state.get('hp',1) > 0) and \
+                           (not army_unit_is_dead(state)) and \
                            session.viewing_base.can_deploy_unit(session.player.get_abtest_spec(GameObjectSpec, state['spec'])):
                             assert state['squad_id'] == feature['squad_id']
                             assert session.player.squad_base_id(state['squad_id']) in session.deployable_squads
@@ -26041,6 +26038,30 @@ class GAMEAPI(resource.Resource):
                                                   (session.player.user_id, session.viewing_base.base_id, deploy_location, deploy_list))
 
                 self.do_attack(session, retmsg, [deploy_location, deploy_list])
+
+        # now, with all available units deployed, check the relative space requirement
+        # if it fails, bail out now
+
+        auto_resolve_max_relative_space = session.player.get_territory_setting('auto_resolve_max_relative_space', default_value = -1)
+        if auto_resolve_max_relative_space > 0:
+            my_alive_space = 0
+            other_alive_space = 0
+            for obj in session.iter_objects():
+                if obj.is_mobile() and not obj.is_destroyed():
+                    space = obj.get_leveled_quantity(obj.spec.consumes_space)
+                    if obj.owner is session.player:
+                        my_alive_space += space
+                    else:
+                        other_alive_space += space
+
+            if other_alive_space >= auto_resolve_max_relative_space * my_alive_space:
+                # note! pre-attack/pre-resolve path throws away retmsg, but we still want this one
+                # to go through to the client, so use session.send() instead of writing to retmsg
+                session.send([["ERROR", "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE", int(100*auto_resolve_max_relative_space+0.5)]])
+                return
+
+        session.attack_event(session.player.user_id, '3829_battle_auto_resolved', {})
+        session.auto_resolved = True
 
         if gamedata['server'].get('log_auto_resolve', 0) >= 3:
             log_func = lambda x: gamesite.exception_log.event(server_time, x)

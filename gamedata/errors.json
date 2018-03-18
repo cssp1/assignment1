@@ -142,6 +142,9 @@
     "CANNOT_ATTACK_LADDER_YOU": { "ui_name": "Use the Map->Multiplayer menu to find a player to attack",
                                   "ui_instructions": "Use the Map->Multiplayer menu to find a player to attack" },
 
+    "CANNOT_AUTO_RESOLVE_DEFENDER_TOO_MUCH_SPACE": {"ui_title": "Defending Battalion Too Big",
+                                                    "ui_name": "Auto-resolve cannot be used when the defending battalion has more than %d% of the unit space in your attacking battalion(s).\n\nYou may launch an attack manually instead."},
+
     "LADDER_MATCH_FAILED": { "ui_title": "No Worthy Opponent Found", "ui_name": "Could not find a suitable opponent.\n\nPlease try again later." },
 
     "CANNOT_LOG_IN_SERVER_OVERLOAD": { "ui_title": "Temporary login error",
