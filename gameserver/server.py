@@ -10336,7 +10336,7 @@ class Player(AbstractPlayer):
                         # update the map feature
                         feature_update = {'total_space': total_space, 'alive_space': alive_space}
 
-                        if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                        if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                             gamesite.exception_log.event(server_time, 'squad space update - %s/%s - ping_squads(): %r' % \
                                                          (self.home_region, self.squad_base_id(squad_id), feature_update))
                             gamesite.exception_log.event(server_time, 'session.viewing_squad_locks: %r\nsession.viewing_base_lock: %r' % \
@@ -10364,9 +10364,11 @@ class Player(AbstractPlayer):
                                 if need_to_release_lock:
                                     gamesite.nosql_client.map_feature_lock_release(self.home_region, self.squad_base_id(squad_id), self.user_id, do_hook = False, reason='ping_squads')
                         else:
-                            # could not obtain the lock
-                            gamesite.exception_log.event(server_time, 'player %d squad %d needs space update %r, but unable to lock it' % \
-                                                         (self.user_id, squad_id, feature_update))
+                            # Could not obtain the lock. This can happen if we ping_squads() while under attack elsewhere on the map.
+                            # Not a big deal because the space counts will be updated after the attack.
+                            if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                                gamesite.exception_log.event(server_time, 'player %d squad %d needs space update %r, but unable to lock it' % \
+                                                             (self.user_id, squad_id, feature_update))
 
             else:
                 # it should be at home base
@@ -20287,11 +20289,11 @@ class GAMEAPI(resource.Resource):
                             if not object.is_destroyed():
                                 alive_space_by_squad_id[squad_id] = alive_space_by_squad_id.get(squad_id, 0) + space
 
-                if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                     gamesite.exception_log.event(server_time, 'defender squad space:\ntotal %r\nalive %r\n\nsession.viewing_squad_locks %r\nsession.viewing_base_lock %r' % (total_space_by_squad_id, alive_space_by_squad_id, session.viewing_squad_locks, session.viewing_base_lock))
 
                 for squad_base_id, squad_feature in session.defending_squads.iteritems():
-                    if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                    if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                         gamesite.exception_log.event(server_time, 'squad space scan - %s: %r' % (squad_base_id, squad_feature))
 
                     squad_id = squad_feature['squad_id']
@@ -20314,7 +20316,7 @@ class GAMEAPI(resource.Resource):
                         feature_update = {'total_space': total_space_by_squad_id.get(squad_id, 0),
                                           'alive_space': alive_space_by_squad_id.get(squad_id, 0)}
                         if feature_update:
-                            if gamedata['server'].get('log_nosql_squad_space',0) >= 1:
+                            if gamedata['server'].get('log_nosql_squad_space',0) >= 2:
                                 gamesite.exception_log.event(server_time, 'squad space update - %s/%s - complete_attack(defender): %r' % \
                                                              (session.player.home_region, squad_base_id, feature_update))
                             gamesite.nosql_client.update_map_feature(session.player.home_region, squad_base_id, feature_update,
