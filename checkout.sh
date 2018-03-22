@@ -4,34 +4,21 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
+set -e
+
 # Utility for setting up a checkout of the game.
-
-function usage {
-    echo "Usage: $0 [git|svn] [ROOT] [TITLES]"
-    echo "  - initialize a checkout in $ROOT including game titles $TITLES (comma-separated list)"
-    return 1
-}
-
-function do_init_svn {
-    ROOT="$2"
-    if [ ! -e "${ROOT}/.svn" ]; then
-        (cd `dirname "$ROOT"` && svn co svn+ssh://gamemaster.spinpunch.com/var/svn/game/trunk `basename "$ROOT"`)
-    else
-        echo "checkout appears to be set up already: ${ROOT}"
-    fi
-}
 
 function do_init_git {
     # For a git checkout, you'll get a set of parallel directories:
     # $ROOT (game checkout)
     # $ROOT-gamedata-$TITLE (per-title gamedata checkout)
     # $ROOT-spinpunch-private (private checkout)
-    ROOT="$2"
+    ROOT="$1"
     PREFIX=`basename "$ROOT"`
     TOPDIR=`dirname "$ROOT"` # parent directory for "sister" checkouts
-    TITLES="$3" # e.g. 'mf,tr'
+    TITLES="$2" # e.g. 'mf,tr'
     if [ "$TITLES" == "ALL" ]; then
-        TITLES="mf,tr,mf2,bfm,dv,sg,gg"
+        TITLES="mf,tr,mf2,bfm,dv,sg,fs"
     fi
 
     #REPO="https://github.com/spinpunch" # requires interactive password input
@@ -64,23 +51,29 @@ function do_init_git {
 }
 
 if [ $# != 3 ]; then
-    usage
+    # default settings
+    SCM="git"
+    ROOT="${PWD}/game"
+    TITLES="ALL"
 else
     SCM="$1"
-    if [ "$SCM" == "git" ]; then
-        do_init_git $@
-    elif [ "$SCM" == "svn" ]; then
-        do_init_svn $@
-    fi
-
-    # set up dummy art_auto.json, for "headless" trees that don't need the art pack
     ROOT="$2"
-    if [ ! -e "${ROOT}/gameclient/art" ]; then
-        mkdir -p "${ROOT}/gameclient/art"
-    fi
-    if [ ! -e "${ROOT}/gameclient/art/art_auto.json" ]; then
-        echo '"asdf":"asdf"' > "${ROOT}/gameclient/art/art_auto.json"
-    fi
+    TITLES="$3" # e.g. "mf,tr,..."
+fi
+
+if [ "$SCM" == "git" ]; then
+    do_init_git "$ROOT" "$TITLES"
+else
+    echo "only SCM=git is supported now"
+    exit 1
+fi
+
+# set up dummy art_auto.json, for "headless" trees that don't need the art pack
+if [ ! -e "${ROOT}/gameclient/art" ]; then
+    mkdir -p "${ROOT}/gameclient/art"
+fi
+if [ ! -e "${ROOT}/gameclient/art/art_auto.json" ]; then
+    echo '"asdf":"asdf"' > "${ROOT}/gameclient/art/art_auto.json"
 fi
 
 exit $?

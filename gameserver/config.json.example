@@ -1,5 +1,7 @@
 {
-    "game_id":"trtest",  // "trtest" for Thunder Run, "mf2test" for War Star Empire
+    "game_id":"trtest",  // "trtest" for Thunder Run, "mf2test" for War Star Empire, etc
+
+    "min_user_id": 1179933, // lowest user ID for non-AI players
 
     // directories (relative to gameserver) for storing user state
     "playerdb_dir":"playerdb",
@@ -10,7 +12,7 @@
     "log_dir":"logs",
 
     "public_s3_bucket": "ZZZZZZ", // used for facebook_assets, jquery, etc
-    "artmaster_s3_bucket": "ZZZZZZ", // used to download the art pack
+    "artmaster_s3_bucket": "spinpunch-artmaster", // used to download the art pack
 
     // PROXY SERVER configuration
     "proxyserver": {
@@ -49,22 +51,25 @@
         "use_mongodb":1
     },
     "mongodb_servers": {
-        "mftest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"mf_", "username": "YYYYYY", "password": "XXXXXX" },
-        "trtest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"tr_", "username": "YYYYYY", "password": "XXXXXX" },
-        "mf2test": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"mf2_", "username": "YYYYYY", "password": "XXXXXX" },
-        "dvtest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"dv_", "username": "YYYYYY", "password": "XXXXXX" },
-        "sgtest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"sg_", "username": "YYYYYY", "password": "XXXXXX" },
-        "ggtest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"gg_", "username": "YYYYYY", "password": "XXXXXX" },
-        "bfmtest": { "host": "localhost", "dbname": "YYYYYY", "table_prefix":"bfm_", "username": "YYYYYY", "password": "XXXXXX" }
+        // this assumes the dev-env Docker config is used
+        "mftest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "mf_" },
+        "trtest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "tr_" },
+        "mf2test": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "mf2_" },
+        "bfmtest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "bfm_" },
+        "sgtest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "sg_" },
+        "dvtest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "dv_" },
+        "fstest": { "host": "localhost", "port": 27014, "dbname": "gametest", "username": "gametest", "password": "gametest", "table_prefix": "fs_" }
     },
 
-    "use_compiled_client":1, // use obfuscated client code
+    "use_compiled_client":0, // use obfuscated client code
     "log_verbosity":0, // log every client/server message
     "secure_mode":0, // this turns off "cheating" and other developer features
     "enable_dowser":0, // for Python memory profiling
     "dowser_port":8080,
     "enable_facebook":0, // enable Facebook API
     "enable_kissmetrics":0, // enable KISSmetrics API
+
+    "cgianalytics_hosts": ["localhost"],
 
     // secret value used to authenticate messages from the proxy server to the game server
     "proxy_api_secret":"XXXXXX",
@@ -75,10 +80,5 @@
     "facebook_app_secret":"",
     // Facebook app access token - retrieve from the following URL:
     // https://graph.facebook.com/oauth/access_token?client_id=YOUR_APP_ID&client_secret=YOUR_APP_SECRET&grant_type=client_credentials
-    "facebook_app_access_token": "",
-
-    // SSL certs for this host
-    "ssl_key_file":"",
-    "ssl_crt_file":"/etc/pki/tls/certs/spinpunch.com.crt",
-    "ssl_chain_file":"/etc/pki/tls/certs/spinpunch.com_and_gd_bundle.crt"
+    "facebook_app_access_token": ""
 }
