@@ -103,6 +103,19 @@ echo "pip install --upgrade pip" # upgrade the upgrader
 
 echo "pip install -r gameserver/requirements.txt"
 
+# note: if this install fails, it might be because of a legacy setuptools configuration that
+# uses HTTP instead of HTTPS to access pypi.python.org.
+
+# To fix this, edit /root/.pydistutils.cfg to contain:
+# [easy_install]
+# index-url = https://pypi.python.org/simple/
+
+# The below command might also help - "distribute" is a deprecated
+# package that may impose bad default settings on pip:
+# sudo pip uninstall distribute
+
+# Finally, be aware that a Linux distro's python-zope and/or setuptools packages may cause conflicts.
+
 echo "game code checkout. symlink gameserver/logs to an ephemeral storage location (consider using xfs for efficiency with 100k+ small files)."
 
 echo "get keys from spinpunch-config bucket! (use aws to download and gpg to decrypt)"
