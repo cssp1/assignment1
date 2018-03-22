@@ -2724,7 +2724,7 @@ if __name__ == '__main__':
 
     opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['reset', 'init', 'console', 'maint', 'region-maint=', 'clear-locks', 'benchmark',
                                                         'winners', 'send-prizes', 'prize-item=', 'prize-qty=', 'in-the-money-players=', 'in-the-money-alliances=', 'min-participation=',
-                                                        'leaders', 'tournament-stat=', 'week=', 'season=', 'game-id=',
+                                                        'leaders', 'tournament-stat=', 'tournament-stat-challenge-key=', 'week=', 'season=', 'game-id=',
                                                         'score-space-scope=', 'score-space-loc=', 'score-time-scope=', 'spend-week=',
                                                         'recache-alliance-scores', 'test', 'config-name='])
     game_instance = SpinConfig.config['game_id']
@@ -2741,6 +2741,7 @@ if __name__ == '__main__':
     score_space_scope = None
     score_space_loc = None
     score_time_scope = None
+    score_extra_axes = None
     spend_week = None
     time_now = int(time.time())
     maint_region = None
@@ -2765,6 +2766,8 @@ if __name__ == '__main__':
         elif key == '--season': season = int(val)
         elif key == '--tournament-stat':
             tournament_stat = val
+        elif key == '--tournament-stat-challenge-key':
+            score_extra_axes = {'challenge': ['key', val]}
         elif key == '--score-space-scope':
             import Scores2
             if val == 'ALL':
@@ -2877,14 +2880,20 @@ if __name__ == '__main__':
         s2 = Scores2.MongoScores2(client)
 
         def display_point_count(gamedata, raw, tournament_stat):
-            if tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
-                return raw + gamedata['trophy_display_offset'].get(tournament_stat.split('_')[1], 0)
-            return raw
+            if tournament_stat == 'battle_duration':
+                minutes = raw // 60
+                seconds = raw % 60
+                return '%dm%02ds' % (minutes, seconds)
+            else:
+                if tournament_stat in ('trophies_pvp', 'trophies_pve', 'trophies_pvv'):
+                    raw += gamedata['trophy_display_offset'].get(tournament_stat.split('_')[1], 0)
+                return str(raw)
 
-        assert season >= 0 and week >= 0
         score_time_loc = {Scores2.FREQ_ALL: 0, Scores2.FREQ_SEASON: season, Scores2.FREQ_WEEK: week}[score_time_scope]
 
-        stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc))
+        sort_order = 1 if tournament_stat == 'battle_duration' else -1
+
+        stat_axes = (tournament_stat, Scores2.make_point(score_time_scope, score_time_loc, score_space_scope, score_space_loc, extra_axes = score_extra_axes), sort_order)
 
         # same as stat_axes but with the time_scope forced to WEEK
         if week >= 0:
@@ -2894,8 +2903,18 @@ if __name__ == '__main__':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources damage_inflicted_pve trainee_completions; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
 
             leader_data = s2.player_scores2_get_leaders([stat_axes], 10)[0]
-            assert time_scope == Scores2.FREQ_SEASON
-            print 'TOP %s PLAYERS FOR SEASON %d' % (tournament_stat, season + gamedata['matchmaking']['season_ui_offset'])
+            if score_time_scope == Scores2.FREQ_SEASON:
+                ui_time_scope_loc = 'SEASON %d' % (season + gamedata['matchmaking']['season_ui_offset'],)
+            elif score_time_scope == Scores2.FREQ_WEEK:
+                ui_time_scope_loc = 'WEEK %d' % (week,)
+            else:
+                raise Exception('unhandled score_time_scope')
+
+            ui_tournament_stat = tournament_stat
+            if score_extra_axes:
+                ui_tournament_stat += ':%s' % (score_extra_axes['challenge'][1])
+
+            print 'TOP %s PLAYERS FOR %s' % (ui_tournament_stat, ui_time_scope_loc)
             pc = dict((x['user_id'], x) for x in client.player_cache_lookup_batch([d['user_id'] for d in leader_data]) if x)
             #print leader_data
 
@@ -2909,7 +2928,7 @@ if __name__ == '__main__':
 
                 detail = '%s L%2d' % (name, user.get('player_level',1))
                 assert data['rank'] == j
-                print "    #%2d %-24s with %5d (id %7d)" % (j+1, detail, display_point_count(gamedata, data['absolute'], tournament_stat), user['user_id'])
+                print "    #%2d %-24s with %5s (id %7d)" % (j+1, detail, display_point_count(gamedata, data['absolute'], tournament_stat), user['user_id'])
 
 
         elif mode == 'winners':
@@ -3052,9 +3071,9 @@ if __name__ == '__main__':
                         spend_data = '$%05.02f' % member.get('money_spent',0)
 
                     if my_prize <= 0: # or (not ladder_player):
-                        print "    #%2d %-24s with %5d points does not win %s (id %7d continent %s spend %s participaton %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
+                        print "    #%2d %-24s with %5s points does not win %s (id %7d continent %s spend %s participaton %d)" % (j+1, detail, display_point_count(gamedata, member['absolute'], tournament_stat), gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
                     else:
-                        print "    #%2d%s %-24s with %5d points WINS %6d %s (id %7d continent %s spend %s participation %d)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
+                        print "    #%2d%s %-24s with %5s points WINS %6d %s (id %7d continent %s spend %s participation %d)" % (j+1 if (not is_tie) else WINNERS, '(tie)' if is_tie else '',
                                                                                         detail, display_point_count(gamedata, member['absolute'], tournament_stat), my_prize, gamedata['store']['gamebucks_ui_name'], member['user_id'], ui_continent, spend_data, member['participation'])
                         {Scores2.FREQ_ALL: 'ALL-TIME',
                                    Scores2.FREQ_SEASON: 'SEASONAL',
