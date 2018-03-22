@@ -32047,7 +32047,7 @@ player.squad_find_path_adjacent_to = function(squad_id, dest, options) {
     @param {boolean=} assume_moving - if true, fudge time comparison in favor of "still moving" */
 player.squad_is_moving = function(squad_id, assume_moving) {
     var squad_data = player.squads[squad_id.toString()];
-    var fudge_time = (assume_moving ? -1 : 0) * 1.0; // map_path_fudge_time
+    var fudge_time = (assume_moving ? -1 : 0) * 0.25; // should be similar to server's map_path_fudge_time
     return (('map_loc' in squad_data) &&
             (('map_path' in squad_data) && (squad_data['map_path'][squad_data['map_path'].length-1]['eta'] > server_time + fudge_time)));
 };

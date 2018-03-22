@@ -12,7 +12,7 @@
                       "retina_display"],
 
     // integrity-checkable parts of gamedata
-    "contents": ["units", "buildings", "spells", "auras", "map", "items", "art"],
+    "contents": ["units", "buildings", "spells", "auras", "map", "items", "territory", "art"],
 
     "client": {
         "instrument_tutorial": 1, // enable detailed logging of tutorial state changes
