@@ -2902,7 +2902,7 @@ if __name__ == '__main__':
         if mode == 'leaders':
             # for STAT in conquests damage_inflicted resources_looted xp havoc_caused quarry_resources tokens_looted trophies_pvp hive_kill_points strongpoint_resources damage_inflicted_pve trainee_completions; do ./SpinNoSQL.py --leaders --season 3 --tournament-stat $STAT --score-scope continent --score-loc fb >> /tmp/`date +%Y%m%d`-tr-stat-leaders.txt; done
 
-            leader_data = s2.player_scores2_get_leaders([stat_axes], 10)[0]
+            leader_data = s2.player_scores2_get_leaders([stat_axes], in_the_money_players if in_the_money_players > 0 else 10)[0]
             if score_time_scope == Scores2.FREQ_SEASON:
                 ui_time_scope_loc = 'SEASON %d' % (season + gamedata['matchmaking']['season_ui_offset'],)
             elif score_time_scope == Scores2.FREQ_WEEK:
