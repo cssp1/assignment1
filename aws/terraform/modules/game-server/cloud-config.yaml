@@ -1,0 +1,15 @@
+runcmd:
+ - echo "spin_maint_hour=${spin_maint_hour}" >> /etc/facter/facts.d/terraform.txt
+ - echo "spin_maint_weekday=${spin_maint_weekday}" >> /etc/facter/facts.d/terraform.txt
+ - echo "swap_device=${swap_device}" >> /etc/facter/facts.d/terraform.txt
+ - echo "logs_device=${logs_device}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_id=${game_id}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_id_long=${game_id_long}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_dir=/home/ec2-user/${game_id_long}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_repo=${game_repo}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_branch=${game_branch}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_mail_from=${game_mail_from}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_tournament_winners_sns_topic=${tournament_winners_sns_topic}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_tournament_continents=${tournament_continents}" >> /etc/facter/facts.d/terraform.txt
+ - echo "include spin_game_server::common" >> /etc/puppet/main.pp
+ - echo "class { 'spin_game_server::instance': game_id => '${game_id}', game_id_long => '${game_id_long}', game_dir => '/home/ec2-user/${game_id_long}'}" >> /etc/puppet/main.pp
