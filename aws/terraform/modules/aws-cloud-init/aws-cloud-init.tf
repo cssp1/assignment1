@@ -14,13 +14,25 @@ variable "secrets_bucket" {
 variable "cron_mail_sns_topic" {
   description = "ARN of an SNS topic that should receive log messages from cron jobs. This is also used to receive CloudWatch alerts."
 }
-variable "envkey" {}
+variable "envkey" {
+  description = "Envkey to use for these servers"
+}
 #variable "envkey_encryption_key_id" { default = "" }
+variable "envkey_sub" {
+  default = ""
+  description = "If more than one envkey is in use (meaning aws-cloud-init is instantiated more than once), then set a unique envkey_sub (suffix) to distinguish between them. Otherwise, the envkey will be named as sitename."
+}
+
+locals {
+  # use sitename for keyname, if one is not specified
+  keyname = "${var.envkey_sub != "" ? "${var.sitename}-${var.envkey_sub}" : "${var.sitename}"}"
+  envkey_secrets_s3_uri = "s3://${var.secrets_bucket}/${local.keyname}-envkey.env"
+}
 
 # Store the EnvKey secret as an AWS SSM parameter, so that EC2 instances
 # can grab it at boot time, without keeping it in the plaintext cloud-config instance data.
 resource "aws_ssm_parameter" "envkey" {
-  name = "/${var.sitename}/envkey" # note: duplicated below to avoid triggering dependency creation
+  name = "/${local.keyname}/envkey" # note: duplicated below to avoid triggering dependency creation
   type = "SecureString"
   value = "${var.envkey}"
 #  key_id = "${var.envkey_encryption_key_id}"
@@ -34,9 +46,9 @@ resource "aws_ssm_parameter" "envkey" {
 resource "aws_s3_bucket_object" "envkey_env" {
   count = "${var.secrets_bucket != "" ? 1 : 0}"
   bucket = "${var.secrets_bucket}"
-  key = "${var.sitename}-envkey.env"
+  key = "${local.keyname}-envkey.env"
   source = "envkey.env"
-  etag = "${md5(file("envkey.env"))}"
+  etag = "${md5(file(var.envkey_sub != "" ? "${var.envkey_sub}-envkey.env" : "envkey.env"))}"
 }
 
 # cloud-init boilerplate for all EC2 instances
@@ -50,7 +62,7 @@ data "template_file" "cloud_config" {
     enable_backups = "${var.enable_backups}"
     puppet_repo = "${var.puppet_repo}"
     puppet_branch = "${var.puppet_branch}"
-    envkey_ssm_parameter_name = "/${var.sitename}/envkey" # duplicated above to avoid creating a dependency on the resource
+    envkey_ssm_parameter_name = "/${local.keyname}/envkey" # duplicated above to avoid creating a dependency on the resource
     envkey_secrets_s3_uri = "${var.secrets_bucket != "" ? local.envkey_secrets_s3_uri : ""}"
     logdna_send_py_gz_b64 = "${base64gzip(file("${path.module}/logdna-send.py"))}"
   }
@@ -69,7 +81,6 @@ output "cloud_config_tail" {
 
 # IAM role boilerplate for all EC2 instance roles
 locals {
-  envkey_secrets_s3_uri = "s3://${var.secrets_bucket}/${var.sitename}-envkey.env"
   ec2_iam_role_base = <<EOF
     { "Effect": "Allow",
       "Action": ["sns:Publish"],
@@ -97,11 +108,11 @@ locals {
     }
 EOF
 
-  # only used if secrets_bucket is active
+  # this part is only used if secrets_bucket is active
   ec2_iam_role_secrets_s3 = <<EOF
    { "Effect": "Allow",
       "Action": ["s3:HeadObject","s3:GetObject"],
-      "Resource": ["arn:aws:s3:::${var.secrets_bucket}/${var.sitename}-envkey.env"]
+      "Resource": ["arn:aws:s3:::${var.secrets_bucket}/${local.keyname}-envkey.env"]
    }
 EOF
 }
