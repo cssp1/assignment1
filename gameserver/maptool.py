@@ -1631,14 +1631,16 @@ def resolve_raid_squads(db, lock_manager, region_id, dry_run = True):
     # ignore non-raid squads
     raid_squads = filter(lambda squad: squad.get('raid'), squad_cache.itervalues())
     # ignore moving squads
-    raid_squads = filter(lambda squad: ('base_map_path' not in squad) or (squad['base_map_path'][-1]['eta'] < time_now - gamedata['server'].get('map_path_fudge_time',4.0)), raid_squads)
+    # (see Region.py for explanation of the fudge_time and 1.0 here)
+    raid_squads = filter(lambda squad: ('base_map_path' not in squad) or (squad['base_map_path'][-1]['eta'] < time_now + gamedata['server'].get('map_path_fudge_time',4.0) + 1.0), raid_squads)
 
     # for proper resolution ordering, sort by arrival time, earliest first
     raid_squads.sort(key = lambda squad: squad['base_map_path'][-1]['eta'] if 'base_map_path' in squad else -1)
 
     for squad in raid_squads:
         if not squad.get('raid'): continue # not a raid
-        if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - gamedata['server'].get('map_path_fudge_time',4.0):
+        # (see Region.py for explanation of the fudge_time and 1.0 here)
+        if 'base_map_path' in squad and squad['base_map_path'][-1]['eta'] >= time_now - gamedata['server'].get('map_path_fudge_time',4.0) - 1.0:
             continue # still moving
         loc = squad['base_map_loc']
         loc_key = tuple(loc)
