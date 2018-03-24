@@ -32259,12 +32259,12 @@ player.advance_squads = function() {
         var max_dist_to_exit_map = (player.squad_is_raid(squad_data['id']) ? 0 : 1); // raids need to be on top of base to exit
 
         if(orders && 'recall_after_halt' in orders) {
-            if(!player.squad_is_moving(squad_data['id'])) {
+            if(!player.squad_is_moving(squad_data['id'], true)) {
                 player.squad_set_client_data(squad_data['id'], 'squad_orders', null);
                 player.squad_recall_move(squad_data['id'], orders['recall_path']);
             }
         } else if(orders && 'recall' in orders) {
-            if(player.squad_is_moving(squad_data['id'])) {
+            if(player.squad_is_moving(squad_data['id'], true)) {
                 // wait til it stops (assumes recall is preceded by a halt)
             } else if(!player.squad_is_deployed(squad_data['id'])) {
                 // already made it home
