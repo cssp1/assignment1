@@ -16437,8 +16437,8 @@ class CONTROLAPI(resource.Resource):
         update_server_time()
         ret = None
 
-        if ('secret' in request.args and 'method' in request.args):
-            secret = str(request.args['secret'][0])
+        if 'method' in request.args:
+            secret = str(request.args['secret'][0]) if 'secret' in request.args else ''
             method = str(request.args['method'][0])
 
             admin_stats.controlapi_calls_by_method[method] = admin_stats.controlapi_calls_by_method.get(method,0) + 1
@@ -16662,7 +16662,11 @@ class CONTROLAPI(resource.Resource):
             self.d.callback(self.val)
 
     def handle(self, request, secret, method_name, args):
-        assert secret == str(SpinConfig.config['proxy_api_secret'])
+        # require proxy_api_secret, but not for method=ping
+        if method_name != 'ping':
+            if not hmac.compare_digest(secret, str(SpinConfig.config['proxy_api_secret'])):
+                request.setResponseCode(http.UNAUTHORIZED)
+                return 'unauthorized\n'
 
         if (method_name in CustomerSupport.methods):
             # new-style CustomerSupport handlers that operate on a session or playerdb/userdb backing store
