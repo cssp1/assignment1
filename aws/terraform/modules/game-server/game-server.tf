@@ -11,10 +11,6 @@ EOF
 resource "aws_iam_role_policy" "game_server" {
     name = "${var.sitename}-game-server-${var.game_id}-terraform" # -terraform suffix to distinguish from manual legacy IAM entity
     role = "${aws_iam_role.game_server.id}"
-
-  # note: in theory a bunch of the S3 statements below could be collapsed,
-  # but AWS seems to have trouble parsing a combined version.
-
     policy = <<EOF
 {
   "Version": "2012-10-17",
@@ -32,19 +28,10 @@ resource "aws_iam_role_policy" "game_server" {
     },
     { "Effect": "Allow",
       "Action": ["s3:ListBucket","s3:DeleteObject","s3:GetObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::spinpunch-${var.game_id}prod-*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:DeleteObject","s3:GetObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::spinpunch-logs*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:DeleteObject","s3:GetObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::spinpunch-upcache*"]
-    },
-    { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:DeleteObject","s3:GetObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::spinpunch-screen-recordings*"]
+      "Resource": ["arn:aws:s3:::spinpunch-${var.game_id}prod-*",
+                   "arn:aws:s3:::spinpunch-logs*",
+                   "arn:aws:s3:::spinpunch-upcache*",
+                   "arn:aws:s3:::spinpunch-screen-recordings*"]
     },
     { "Effect": "Allow",
       "Action": ["s3:PutObject"],
