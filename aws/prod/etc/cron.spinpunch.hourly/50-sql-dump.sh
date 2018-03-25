@@ -1,6 +1,9 @@
 #!/bin/bash
 
-. /etc/spinpunch
+# load environment variables on legacy systems
+if [ -r /etc/spinpunch ]; then
+    . /etc/spinpunch
+fi
 
 # vacuum only during low load time (~0300GMT)
 FLAGS=""

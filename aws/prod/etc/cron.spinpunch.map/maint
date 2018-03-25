@@ -1,6 +1,9 @@
 #!/bin/bash
 
-. /etc/spinpunch
+# load environment variables on legacy systems
+if [ -r /etc/spinpunch ]; then
+    . /etc/spinpunch
+fi
 
 cd $GAME_DIR/gameserver
 
