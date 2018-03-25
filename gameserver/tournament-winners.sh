@@ -5,12 +5,20 @@
 . /etc/spinpunch
 
 # check for various files in the environment that we'll need to run all steps
-for VITAL_FILE in "${HOME}/.aws/credentials" "${HOME}/.aws/config" "${HOME}/.ssh/dropbox-access-token"; do
+for VITAL_FILE in "${HOME}/.aws/credentials"; do
     if [ ! -r "${VITAL_FILE}" ]; then
-        echo "Credential file missing: ${VITAL_FILE}"
+        echo "AWS credential file missing: ${VITAL_FILE}"
         exit 1
     fi
 done
+
+if [ -z "$DROPBOX_ACCESS_TOKEN" ]; then
+    DROPBOX_ACCESS_TOKEN=`cat ${HOME}/.ssh/dropbox-access-token`
+    if [ -z "$DROPBOX_ACCESS_TOKEN" ]; then
+        echo "Need DROPBOX_ACCESS_TOKEN"
+        exit 1
+    fi
+fi
 
 if [ $# -ne 5 ]; then
     echo "Usage: tournament-winners.sh END_TIME SEASON# WEEK# STAT TIME_SCOPE"
@@ -23,7 +31,6 @@ WEEK=$3
 TOURNAMENT_STAT=$4
 TIME_SCOPE=$5
 
-DROPBOX_ACCESS_TOKEN=`cat ${HOME}/.ssh/dropbox-access-token`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr a-z A-Z`
 GAME_TOURNAMENT_CONTINENTS=`./SpinConfig.py --getvar tournament_continents | python -c 'import json, sys; print " ".join(json.load(sys.stdin))'`
 
