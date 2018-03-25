@@ -45,13 +45,18 @@ def load_fd_raw(fd, stripped = False, verbose = False, path = None, override_gam
         include_stripped_match = include_stripped_detector.search(line)
         match = include_match or include_stripped_match
         if match:
-            assert path
-
             # get the name of the file to include from the regular expression
-            filename = os.path.join(path, match.group(1))
+            filename = match.group(1)
+            if filename[0] == '/': # absolute path
+                pass
+            else:
+                assert path
+                filename = os.path.join(path, filename)
 
             if '$GAME_ID' in filename:
                 filename = filename.replace('$GAME_ID', game(override_game_id = override_game_id))
+            if '$HOME' in filename:
+                filename = filename.replace('$HOME', os.getenv('HOME'))
 
             # replace the line with the contents of the included file
             line = load_fd_raw(open(filename),
@@ -143,8 +148,15 @@ def upcache_s3_location(game_id):
 
 # return default location to look for this computer's AWS key file
 def aws_key_file():
+    home = os.getenv('HOME')
     my_hostname = os.uname()[1].split('.')[0]
-    return os.path.join(os.getenv('HOME'), '.ssh', my_hostname+'-awssecret')
+
+    legacy = os.path.join(home, '.ssh', my_hostname+'-awssecret')
+    modern = os.path.join(home, '.ssh', 'awssecret')
+
+    if os.path.exists(modern):
+        return modern
+    return legacy
 
 # gamedata locales to check for a specific user locale, in order of preference
 def locales_to_try(locale):
