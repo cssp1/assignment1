@@ -15,7 +15,33 @@ resource "aws_iam_role_policy" "game_server" {
 {
   "Version": "2012-10-17",
   "Statement": [
-    ${var.aws_ec2_iam_role_fragment}
+    ${var.aws_ec2_iam_role_fragment},
+    { "Effect": "Allow",
+      "Action": ["s3:GetObject","s3:HeadObject"],
+      "Resource": ["arn:aws:s3:::spinpunch-config/analytics1.pem",
+                   "arn:aws:s3:::spinpunch-config/spinpunch-auth-users.json",
+                   "arn:aws:s3:::spinpunch-config/spinpunch-alert-recipients.json"]
+    },
+    { "Effect": "Allow",
+      "Action": ["sns:Publish"],
+      "Resource": ["${var.tournament_winners_sns_topic}"]
+    },
+    { "Effect": "Allow",
+      "Action": ["s3:*"],
+      "Resource": ["arn:aws:s3:::spinpunch-${var.game_id}prod-*",
+                   "arn:aws:s3:::spinpunch-logs*",
+                   "arn:aws:s3:::spinpunch-upcache*",
+                   "arn:aws:s3:::spinpunch-screen-recordings*"]
+    },
+    { "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": ["arn:aws:s3:::spinpunch-backups/*",
+                   "arn:aws:s3:::battlehouse-newsfeed/${var.game_id}-*"]
+    },
+    { "Effect": "Allow",
+      "Action": ["s3:PutObject","s3:GetObject","s3:HeadObject"],
+      "Resource": ["arn:aws:s3:::spinpunch-config/config-${var.game_id_long}.json"]
+    }
   ]
 }
 EOF
@@ -24,6 +50,17 @@ EOF
 resource "aws_iam_instance_profile" "game_server" {
     name = "${var.sitename}-game-server-${var.game_id}-terraform" # -terraform suffix to distinguish from manual legacy IAM entity
     role = "${aws_iam_role.game_server.name}"
+}
+
+# create an IAM user with permanent credentials
+# TEMPORARY - until we implement role-based token renewal
+# (all we really need is a cron script to download awssecret and SpinS3.reload_key_file())
+
+resource "aws_iam_user" "game_server" {
+    name = "${var.sitename}-game-server-${var.game_id}-terraform"
+}
+resource "aws_iam_access_key" "game_server" {
+    user = "${aws_iam_user.game_server.name}"
 }
 
 # EC2 instance
@@ -41,8 +78,14 @@ data "template_file" "my_cloud_init" {
     game_branch = "${var.game_branch}"
     tournament_winners_sns_topic = "${var.tournament_winners_sns_topic}"
     tournament_continents = "${var.tournament_continents}"
+    pglith_pgsql_endpoint = "${var.pglith_pgsql_endpoint}"
+    analytics_mysql_endpoint = "${var.analytics_mysql_endpoint}"
+    skynet_mongo_endpoint = "${var.skynet_mongo_endpoint}"
+    cgianalytics_hosts = "${var.cgianalytics_hosts}"
     swap_device = "/dev/xvds"
     logs_device = "/dev/xvdl"
+    game_server_iam_key_id = "${aws_iam_access_key.game_server.id}"
+    game_server_iam_key_secret = "${aws_iam_access_key.game_server.secret}"
   }
 }
 

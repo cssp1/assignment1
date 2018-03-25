@@ -11,5 +11,16 @@ runcmd:
  - echo "game_mail_from=${game_mail_from}" >> /etc/facter/facts.d/terraform.txt
  - echo "game_tournament_winners_sns_topic=${tournament_winners_sns_topic}" >> /etc/facter/facts.d/terraform.txt
  - echo "game_tournament_continents=${tournament_continents}" >> /etc/facter/facts.d/terraform.txt
+ - echo "pglith_pgsql_endpoint=${pglith_pgsql_endpoint}" >> /etc/facter/facts.d/terraform.txt
+ - echo "analytics_mysql_endpoint=${analytics_mysql_endpoint}" >> /etc/facter/facts.d/terraform.txt
+ - echo "skynet_mongo_endpoint=${skynet_mongo_endpoint}" >> /etc/facter/facts.d/terraform.txt
+ - echo "cgianalytics_hosts=${cgianalytics_hosts}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_server_iam_key_id=${game_server_iam_key_id}" >> /etc/facter/facts.d/terraform.txt
+ - echo "game_server_iam_key_secret=${game_server_iam_key_secret}" >> /etc/facter/facts.d/terraform.txt
  - echo "include spin_game_server::common" >> /etc/puppet/main.pp
- - echo "class { 'spin_game_server::instance': game_id => '${game_id}', game_id_long => '${game_id_long}', game_dir => '/home/ec2-user/${game_id_long}'}" >> /etc/puppet/main.pp
+ - |
+   echo 'class { "spin_game_server::instance":
+   game_id => "${game_id}",
+   game_id_long => "${game_id_long}",
+   game_dir => "/home/ec2-user/${game_id_long}"
+   }' >> /etc/puppet/main.pp

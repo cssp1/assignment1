@@ -24,7 +24,7 @@ variable "region" { default = "us-east-1" }
 variable "sitename" { default = "gametest" }
 variable "sitedomain" { default = "spinpunch.com" }
 variable "enable_backups" { default = "0" }
-variable "envkey" {}
+variable "envkey_sgprod" {}
 
 
 data "external" "management_secrets" {
@@ -39,21 +39,24 @@ provider "cloudflare" {
   token = "${data.external.management_secrets.result["CLOUDFLARE_TOKEN"]}"
   version = "~> 0.1"
 }
-module "aws_cloud_init" {
+
+## END BOILERPLATE ##
+
+# note: each game title has its own envkey, so this module must be instanced with unique envkey_subs
+module "aws_cloud_init_sg" {
   source = "./modules/aws-cloud-init"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   region = "${var.region}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   enable_backups = "${var.enable_backups}"
-  envkey = "${var.envkey}"
+  envkey = "${var.envkey_sgprod}"
+  envkey_sub = "sgprod"
   secrets_bucket = "${data.terraform_remote_state.corp.secrets_bucket}"
   puppet_branch = "master"
 }
 
-## END BOILERPLATE ##
-
-module "game_server" {
+module "game_server_sg" {
   source = "../modules/game-server"
 
   vpc_id = "${data.terraform_remote_state.corp.spinpunch_vpc_id}"
@@ -62,11 +65,11 @@ module "game_server" {
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   region = "${var.region}"
-  ami = "${module.aws_cloud_init.current_amazon_linux_ami_id}"
+  ami = "${module.aws_cloud_init_sg.current_amazon_linux_ami_id}"
   key_pair_name = "${data.external.management_secrets.result["SSH_KEYPAIR_NAME"]}"
-  aws_cloud_config_head = "${module.aws_cloud_init.cloud_config_head}"
-  aws_cloud_config_tail = "${module.aws_cloud_init.cloud_config_tail}"
-  aws_ec2_iam_role_fragment = "${module.aws_cloud_init.ec2_iam_role_fragment}"
+  aws_cloud_config_head = "${module.aws_cloud_init_sg.cloud_config_head}"
+  aws_cloud_config_tail = "${module.aws_cloud_init_sg.cloud_config_tail}"
+  aws_ec2_iam_role_fragment = "${module.aws_cloud_init_sg.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   security_group_id_list = [
     "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
@@ -74,6 +77,10 @@ module "game_server" {
     "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
   ]
   tournament_winners_sns_topic = "${data.terraform_remote_state.corp.tournament_winners_sns_topic}"
+  pglith_pgsql_endpoint = "${data.terraform_remote_state.corp.pglith_pgsql_endpoint}"
+  analytics_mysql_endpoint = "${data.terraform_remote_state.corp.analytics_mysql_endpoint}"
+  skynet_mongo_endpoint = "${data.terraform_remote_state.corp.skynet_mongo_endpoint}"
+  cgianalytics_hosts = "${data.terraform_remote_state.corp.cgianalytics_hosts}"
 
   # specific to each game
   game_id = "sg"
