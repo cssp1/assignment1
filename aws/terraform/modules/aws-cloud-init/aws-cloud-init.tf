@@ -103,7 +103,7 @@ locals {
       "Resource": ["*"]
     },
     { "Effect": "Allow",
-      "Action": ["s3:ListAllMyBuckets"],
+      "Action": ["s3:ListAllMyBuckets","s3:GetBucketLocation"],
       "Resource": ["*"]
     }
 EOF
@@ -111,7 +111,7 @@ EOF
   # this part is only used if secrets_bucket is active
   ec2_iam_role_secrets_s3 = <<EOF
    { "Effect": "Allow",
-      "Action": ["s3:HeadObject","s3:GetObject"],
+      "Action": ["s3:GetObject"],
       "Resource": ["arn:aws:s3:::${var.secrets_bucket}/${local.keyname}-envkey.env"]
    }
 EOF

@@ -17,11 +17,11 @@ resource "aws_iam_role_policy" "mongodb" {
   "Statement": [
     ${var.aws_ec2_iam_role_fragment},
     { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:HeadObject","s3:PutObject"],
+      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:PutObject"],
       "Resource": ["arn:aws:s3:::${var.backups_bucket}*"]
     },
     { "Effect": "Allow",
-      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject","s3:HeadObject"],
+      "Action": ["s3:ListBucket","s3:ListObjects","s3:GetObject"],
       "Resource": ["arn:aws:s3:::${var.extra_backups_bucket}*"]
     }
   ]

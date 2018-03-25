@@ -17,7 +17,7 @@ resource "aws_iam_role_policy" "game_server" {
   "Statement": [
     ${var.aws_ec2_iam_role_fragment},
     { "Effect": "Allow",
-      "Action": ["s3:GetObject","s3:HeadObject"],
+      "Action": ["s3:GetObject"],
       "Resource": ["arn:aws:s3:::spinpunch-config/analytics1.pem",
                    "arn:aws:s3:::spinpunch-config/spinpunch-auth-users.json",
                    "arn:aws:s3:::spinpunch-config/spinpunch-alert-recipients.json"]
@@ -39,7 +39,7 @@ resource "aws_iam_role_policy" "game_server" {
                    "arn:aws:s3:::battlehouse-newsfeed/${var.game_id}-*"]
     },
     { "Effect": "Allow",
-      "Action": ["s3:PutObject","s3:GetObject","s3:HeadObject"],
+      "Action": ["s3:PutObject","s3:GetObject"],
       "Resource": ["arn:aws:s3:::spinpunch-config/config-${var.game_id_long}.json"]
     }
   ]
