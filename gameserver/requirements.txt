@@ -39,11 +39,11 @@ txpostgres==1.6.0
 
 # Twisted==17.9.0 works, but has some spurious warnings and exceptions
 # our customized version fixes these.
-git+ssh://git@github.com/spinpunch/twisted.git@spinpunch 
+git+git://github.com/spinpunch/twisted.git@spinpunch 
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
-git+ssh://git@github.com/spinpunch/ultrajson.git@spinpunch 
+git+git://github.com/spinpunch/ultrajson.git@spinpunch 
 
 
 # note: if this install fails, it might be because of a legacy setuptools configuration that
