@@ -16664,7 +16664,14 @@ class CONTROLAPI(resource.Resource):
     def handle(self, request, secret, method_name, args):
         # require proxy_api_secret, but not for method=ping
         if method_name != 'ping':
-            if not hmac.compare_digest(secret, str(SpinConfig.config['proxy_api_secret'])):
+
+            # Python 2.6 compatibility - insecure replacement for hmac.compare_digest()
+            def compare_digest(a, b):
+                if hasattr(hmac, 'compare_digest'):
+                    return hmac.compare_digest(a, b)
+                return a == b
+
+            if not compare_digest(secret, str(SpinConfig.config['proxy_api_secret'])):
                 request.setResponseCode(http.UNAUTHORIZED)
                 return 'unauthorized\n'
 
