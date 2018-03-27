@@ -36,10 +36,11 @@ window.fbAsyncInit = function() {
 }(document));
 
 // TrialPay SDK
-(function(d){
-    var js, id = "trialpay-jssdk"; if (d.getElementById(id)) {return;}
-    js = d.createElement("script"); js.id = id; js.async = true;
-    js.src = "//s-assets.tp-cdn.com/static3/js/api/payment_overlay.js";
-    d.getElementsByTagName("body")[0].appendChild(js);
-}(document));
+// (function(d){
+//     var js, id = "trialpay-jssdk"; if (d.getElementById(id)) {return;}
+//     js = d.createElement("script"); js.id = id; js.async = true;
+//     js.src = "//s-assets.tp-cdn.com/static3/js/api/payment_overlay.js";
+//     d.getElementsByTagName("body")[0].appendChild(js);
+// }(document));
+
 </script>
