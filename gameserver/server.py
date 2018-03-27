@@ -16671,7 +16671,7 @@ class CONTROLAPI(resource.Resource):
                     return hmac.compare_digest(a, b)
                 return a == b
 
-            if not compare_digest(secret, str(SpinConfig.config['proxy_api_secret'])):
+            if not compare_digest(bytes(secret), bytes(SpinConfig.config['proxy_api_secret'])):
                 request.setResponseCode(http.UNAUTHORIZED)
                 return 'unauthorized\n'
 
