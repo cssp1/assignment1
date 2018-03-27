@@ -9484,17 +9484,22 @@ function get_killer_info(killer) {
 function gameapi_url() {
     if(spin_game_use_websocket && (parseInt(spin_game_server_wss_port,10) > 0 ||
                                    parseInt(spin_game_server_ws_port,10) > 0)) {
-        var proto, port;
+        var backend_proto, frontend_proto, backend_port;
         if(parseInt(spin_game_server_wss_port,10) > 0) {
-            proto = 'wss://'; port = spin_game_server_wss_port;
+            // note: this connection goes to the frontend, so use the same protocol as spin_server_protocol
+            backend_proto = 'wss://';
+            frontend_proto = (spin_server_protocol === 'https://' ? 'wss://' : 'ws://');
+            // but the port number here is for the backend, so always use the WSS port number
+            backend_port = spin_game_server_wss_port;
         } else {
-            proto = 'ws://'; port = spin_game_server_ws_port;
+            backend_proto = frontend_proto = 'ws://';
+            backend_port = spin_game_server_ws_port;
         }
         if(spin_game_direct_multiplex) {
-            // "help" the proxyserver/haproxy setup to direct this to the gameserver directly
-            return proto + spin_server_host + ':' + spin_server_port + '/WS_GAMEAPI?spin_game_server_port=' + port;
+            // help the proxyserver/haproxy setup to direct this to the gameserver directly
+            return frontend_proto + spin_server_host + ':' + spin_server_port + '/WS_GAMEAPI?spin_game_server_port=' + backend_port;
         } else {
-            return proto + spin_game_server_host + ':' + port + '/WS_GAMEAPI';
+            return backend_proto + spin_game_server_host + ':' + backend_port + '/WS_GAMEAPI';
         }
 
     } else if(spin_game_direct_connect && !spin_game_direct_multiplex) {
@@ -9532,7 +9537,9 @@ function gameapi_connection_method() {
 function proxy_gameapi_url(try_multiplex) {
     var ret = spin_server_protocol+spin_server_host+":"+spin_server_port+"/GAMEAPI";
     if(try_multiplex) { // "help" the proxyserver/haproxy setup to direct this to the gameserver directly
-        ret += "?spin_game_server_port=" + (spin_server_protocol === 'https://' ? spin_game_server_ssl_port : spin_game_server_http_port);
+        // always use the SSL backend port, if available, even if the frontend is HTTP
+        var backend_port = (parseInt(spin_game_server_ssl_port,10) > 0 ? spin_game_server_ssl_port : spin_game_server_http_port);
+        ret += "?spin_game_server_port=" + backend_port;
     }
     return ret;
 }

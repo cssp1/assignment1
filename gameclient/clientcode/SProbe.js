@@ -210,7 +210,8 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
         this.tests['proxy_http'] = new SProbe.AJAXPing("http://"+proxy_host+":"+proxy_http_port+"/PING", "");
     }
     */
-    if(parseInt(proxy_ssl_port,10) > 0) {
+    if(parseInt(proxy_ssl_port,10) > 0 && spin_server_protocol === 'https://') {
+        // this will fail if main page is loaded via HTTP because of origin mismatch
         this.tests['proxy_ssl'] = new SProbe.AJAXPing("https://"+proxy_host+":"+proxy_ssl_port+"/PING", "");
     }
     if(!spin_game_direct_multiplex && !direct_http_must_be_ssl && parseInt(game_http_port,10) > 0) {
@@ -223,9 +224,10 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
                                                        "ping_only=1");
     }
     if(typeof(WebSocket) != 'undefined') {
-        if(!direct_ws_must_be_ssl && parseInt(game_ws_port,10) > 0) {
+        if(!direct_ws_must_be_ssl && parseInt(game_ws_port,10) > 0 && (!spin_game_direct_multiplex || parseInt(game_wss_port,10) > 0)) {
+            // note: game_wss_port MUST be used for the multiplex case, not game_ws_port, even if connecting via plain HTTP!
             this.tests['direct_ws'] = new SProbe.WSPing(spin_game_direct_multiplex ?
-                                                        "ws://"+proxy_host+":"+proxy_http_port+"/WS_GAMEAPI?spin_game_server_port="+game_ws_port.toString() :
+                                                        "ws://"+proxy_host+":"+proxy_http_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString() :
                                                         "ws://"+game_host+":"+game_ws_port+"/WS_GAMEAPI");
         }
         if(parseInt(game_wss_port,10) > 0) {
