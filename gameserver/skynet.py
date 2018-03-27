@@ -3081,7 +3081,7 @@ if __name__ == '__main__':
         if adgroup_update_bid(db, adgroup, bid):
             print "updated to", bid
 
-    elif mode in ('adgroups-delete', 'adgroups-pause', 'adgroups-archive'):
+    elif mode in ('adgroups-delete', 'adgroups-pause', 'adgroups-unpause', 'adgroups-archive'):
         if (not stgt_filter) and (min_clicks <= 0) and (min_impressions < 0) and (max_frequency <= 0):
             print 'please specify at least one of: --filter, --min-clicks, --min-impressions, --max-frequency'
             sys.exit(1)
@@ -3090,6 +3090,8 @@ if __name__ == '__main__':
             ignore_status = ['DELETED']
         elif mode.endswith('archive'):
             ignore_status = ['DELETED','ARCHIVED']
+        elif mode.endswith('unpause'):
+            ignore_status = ['DELETED','ARCHIVED','ACTIVE']
         elif mode.endswith('pause'):
             ignore_status = ['DELETED','ARCHIVED','ADGROUP_PAUSED','PAUSED']
 
@@ -3141,7 +3143,7 @@ if __name__ == '__main__':
 
         status_updates = []
         for adgroup in adgroup_list:
-            new_status = {'adgroups-delete': 'deleted', 'adgroups-pause': 'paused', 'adgroups-archive': 'archived'}[mode]
+            new_status = {'adgroups-delete': 'deleted', 'adgroups-pause': 'paused', 'adgroups-unpause': 'active', 'adgroups-archive': 'archived'}[mode]
             status_updates.append(adgroup_update_status_batch_element(adgroup, new_status = new_status))
         print mode, len(status_updates), 'ads'
         if verbose:
