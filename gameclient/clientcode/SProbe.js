@@ -79,7 +79,7 @@ SProbe.AJAXPing.prototype.response = function(event) {
     var end_time = (new Date()).getTime()/1000;
     this.result = {};
 
-    if(!event.target.isSuccess() || event.target.getResponseText() != 'ok\n') {
+    if(!event.target.isSuccess() || (event.target.getResponseText() != 'ok\n' && event.target.getResponseText().indexOf('alive') < 0)) {
         var code = event.target.getLastErrorCode();
         var err;
         if(code === goog.net.ErrorCode.HTTP_ERROR) {
