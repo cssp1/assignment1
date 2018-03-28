@@ -22,5 +22,6 @@ runcmd:
    echo 'class { "spin_game_server::instance":
    game_id => "${game_id}",
    game_id_long => "${game_id_long}",
+   game_server_snam => "${game_server_snam}",
    game_dir => "/home/ec2-user/${game_id_long}"
    }' >> /etc/puppet/main.pp

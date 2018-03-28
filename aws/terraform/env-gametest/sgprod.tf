@@ -73,7 +73,7 @@ module "game_server_sg" {
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   security_group_id_list = [
     "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
-#    "${module.ipranges.cloudfront_ingress_security_group_id}",
+#XXXXXX   "${module.ipranges.cloudfront_ingress_security_group_id}",
     "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
   ]
   tournament_winners_sns_topic = "${data.terraform_remote_state.corp.tournament_winners_sns_topic}"
@@ -89,4 +89,8 @@ module "game_server_sg" {
   tournament_continents = "fb ag"
   zone_index = 2 # us-east-1d
   instance_type = "m5.large"
+  game_server_snam = "srv2"
+
+  # to test alongside legacy server, set snam to "srv2" and make CloudFlare DNS entry "sgprod-srv2.spinpunch.com"
+  # to take over as the master, set snam to "srv0" (or blank?) and make DNS entries "sgprod-raw.spinpunch.com" and "sgprod-srv0.spinpunch.com"
 }

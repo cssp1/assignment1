@@ -29,6 +29,7 @@ variable "instance_type" {
 variable "ami" {}
 variable "security_group_id_list" { type = "list" }
 variable "n_instances" { default = 1 }
+variable "game_server_snam" { default = "" }
 variable "game_id" {}
 variable "game_id_long" {}
 variable "game_mail_from" {}

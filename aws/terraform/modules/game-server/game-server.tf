@@ -79,6 +79,7 @@ data "template_file" "my_cloud_init" {
     spin_maint_weekday = "7"
     game_id = "${var.game_id}"
     game_id_long = "${var.game_id_long}"
+    game_server_snam = "${var.game_server_snam}"
     game_mail_from = "${var.game_mail_from}"
     game_repo = "${var.game_repo}"
     game_branch = "${var.game_branch}"
