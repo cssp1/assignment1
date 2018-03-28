@@ -6283,6 +6283,7 @@
             "sunken2": {"kind": "StaticImage", "xy":[25,105], "dimensions":[686,352], "asset": "dialog_sunken_gray_resizable", "bg_image_resizable":1 },
 
             "output": { "kind": "ScrollingTextField", "xy": [45,125], "dimensions": [630,285], "text_size": 15, "text_style": "normal",
+                        "scrollback_buffer": -1, // show unlimited number of rows
                         "text_hjustify": "left", "text_vjustify": "top",
                         "ui_alliance_disbanded": "(Disbanded Alliance)",
                         "ui_alliance_former": "%now (at the time named %former)",
