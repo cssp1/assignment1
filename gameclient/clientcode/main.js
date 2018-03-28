@@ -9497,7 +9497,11 @@ function gameapi_url() {
         }
         if(spin_game_direct_multiplex) {
             // help the proxyserver/haproxy setup to direct this to the gameserver directly
-            return frontend_proto + spin_server_host + ':' + spin_server_port + '/WS_GAMEAPI?spin_game_server_port=' + backend_port;
+            var ret = frontend_proto + spin_server_host + ':' + spin_server_port + '/WS_GAMEAPI?spin_game_server_port=' + backend_port;
+            if(spin_game_server_snam) {
+                ret += "&spin_game_server_snam=" + spin_game_server_snam;
+            }
+            return ret;
         } else {
             return backend_proto + spin_game_server_host + ':' + backend_port + '/WS_GAMEAPI';
         }
@@ -9540,6 +9544,9 @@ function proxy_gameapi_url(try_multiplex) {
         // always use the SSL backend port, if available, even if the frontend is HTTP
         var backend_port = (parseInt(spin_game_server_ssl_port,10) > 0 ? spin_game_server_ssl_port : spin_game_server_http_port);
         ret += "?spin_game_server_port=" + backend_port;
+        if(spin_game_server_snam) {
+            ret += "&spin_game_server_snam=" + spin_game_server_snam;
+        }
     }
     return ret;
 }
@@ -52275,7 +52282,7 @@ function sprobe_init(cb) {
     }; })(cb);
     var probe = new SProbe.ProbeRun(on_result,
                                     spin_server_host, spin_server_http_port, spin_server_ssl_port,
-                                    spin_game_server_host, spin_game_server_http_port, spin_game_server_ssl_port,
+                                    spin_game_server_host, spin_game_server_snam, spin_game_server_http_port, spin_game_server_ssl_port,
                                     spin_game_server_ws_port, spin_game_server_wss_port,
                                     (fps_counter ? fps_counter.cur_fps : -1), canvas_width, canvas_height, canvas_oversample,
                                     window['devicePixelRatio'] || null);

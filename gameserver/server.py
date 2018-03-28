@@ -614,6 +614,7 @@ class AdminStats:
                 'hostname': gamesite.config.game_host,
                 'pid': os.getpid(),
                 'game_listen_host': gamesite.config.game_listen_host,
+                'game_snam': gamesite.config.game_snam,
                 'game_http_port': gamesite.config.game_http_port,
                 'game_ssl_port': gamesite.config.game_ssl_port,
                 'game_ws_port': gamesite.config.game_ws_port,
@@ -32412,6 +32413,7 @@ class GameSite(server.Site):
     class Configuration(object):
         def __init__(self, json):
             self.game_host = json.get('game_host', os.getenv('HOSTNAME') or socket.gethostname())
+            self.game_snam = json.get('game_snam', '')
             self.game_listen_host = json.get('game_listen_host', '')
             self.game_http_port = json.get('game_http_port',-1)
             self.game_ssl_port = json.get('game_ssl_port',-1)
@@ -33704,7 +33706,7 @@ def do_main(pidfile, do_ai_setup, do_daemonize, cmdline_config):
 
     gamesite.start_listening()
 
-    print 'Game server up and running on %s:%d (HTTP)%s%s%s' % (config.game_host, config.game_http_port,
+    print 'Game server up and running on %s:%d (HTTP)%s%s%s' % (config.game_snam or config.game_host, config.game_http_port,
                                                                 (' :%d (SSL)' % config.game_ssl_port) if config.game_ssl_port > 0 else '',
                                                                 (' :%d (WS)' % config.game_ws_port) if config.game_ws_port > 0 else '',
                                                                 (' :%d (WSS)' % config.game_wss_port) if config.game_wss_port > 0 else '')

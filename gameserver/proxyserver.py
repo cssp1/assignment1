@@ -185,10 +185,11 @@ def q_clean_qs(*args, **kwargs):
     ret = clean_qs(*args, **kwargs)
     return ('?'+ret) if ret else ''
 
-class GameServer:
-    def __init__(self, name, host, port, ssl_port, ws_port, wss_port):
+class GameServer(object):
+    def __init__(self, name, host, snam, port, ssl_port, ws_port, wss_port):
         self.name = name
         self.host = host
+        self.snam = snam
         self.port = port
         self.ssl_port = ssl_port
         self.ws_port = ws_port
@@ -205,7 +206,7 @@ class GameServer:
             affinity_info = ' aff '+repr(self.affinities)
         else:
             affinity_info = ''
-        return '%-20s on port %5d/%5d%s (proxying %d sessions) %s' % (self.name, self.port, self.ssl_port, ws_port_info, session_load.get_by_server(self.name),
+        return '%-20s on %s port %5d/%5d%s (proxying %d sessions) %s' % (self.name, self.snam, self.port, self.ssl_port, ws_port_info, session_load.get_by_server(self.name),
                                                                       '(OPEN%s)' % affinity_info if self.accept_new_connections else '(CLOSED)')
 
 # cache in-memory versions of the small files that are statically included in the game index page
@@ -2167,10 +2168,14 @@ class GameProxy(proxy.ReverseProxyResource):
             qs['_id'] = force_name
         else:
             qs['affinities'] = affinity
-        rows = db_client.server_status_query(qs, fields = {'_id':1, 'hostname':1, 'game_http_port':1, 'game_ssl_port':1, 'game_ws_port':1, 'game_wss_port':1, 'server_time':1}, sort = 'load', limit = 1)
+        rows = db_client.server_status_query(qs, fields = {'_id':1, 'hostname':1, 'game_snam': 1, 'game_http_port':1, 'game_ssl_port':1, 'game_ws_port':1, 'game_wss_port':1, 'server_time':1}, sort = 'load', limit = 1)
         if rows and rows[0]:
             data = rows[0]
-            return GameServer(data['server_name'], data['hostname'], data['game_http_port'], data['game_ssl_port'], data['game_ws_port'], data['game_wss_port'])
+            return GameServer(data['server_name'],
+                              data['hostname'],
+                              data.get('game_snam', ''),
+                              data['game_http_port'], data['game_ssl_port'],
+                              data['game_ws_port'], data['game_wss_port'])
         return None
 
     def start_async_termination(self, request, session_id, user_id, server_name, ctrl_url, cb, reason = ''):
@@ -2500,6 +2505,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$SERVER_HTTP_PORT$': str(SpinConfig.config['proxyserver']['external_http_port']),
             '$SERVER_SSL_PORT$': str(SpinConfig.config['proxyserver'].get('external_ssl_port',-1)),
             '$GAME_SERVER_HOST$': server.host,
+            '$GAME_SERVER_SNAM$': server.snam or '',
             '$GAME_SERVER_HTTP_PORT$': str(server.port),
             '$GAME_SERVER_SSL_PORT$': str(server.ssl_port),
             '$GAME_SERVER_WS_PORT$': str(server.ws_port),

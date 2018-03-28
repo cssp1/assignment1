@@ -183,10 +183,12 @@ SProbe.WSPing.prototype.response = function() {
 
 /** @constructor @struct */
 SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
-                           game_host, game_http_port, game_ssl_port, game_ws_port, game_wss_port,
+                           game_host, game_snam, game_http_port, game_ssl_port, game_ws_port, game_wss_port,
                            framerate, canvas_width, canvas_height, canvas_oversample, devicePixelRatio) {
     this.cb = cb;
     this.tests = {};
+
+    var snam_param = game_snam ? '&spin_game_server_snam='+game_snam : '';
 
     var direct_http_must_be_ssl = false;
     // most modern browsers now disallow pages hosted via HTTPS from making non-HTTPS AJAX requests :(
@@ -219,7 +221,7 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
     }
     if(parseInt(game_ssl_port,10) > 0) {
         this.tests['direct_ssl'] = new SProbe.AJAXPing(spin_game_direct_multiplex ?
-                                                       "https://"+proxy_host+":"+proxy_ssl_port+"/GAMEAPI?spin_game_server_port="+game_ssl_port.toString() :
+                                                       "https://"+proxy_host+":"+proxy_ssl_port+"/GAMEAPI?spin_game_server_port="+game_ssl_port.toString()+snam_param :
                                                        "https://"+game_host+":"+game_ssl_port+"/GAMEAPI",
                                                        "ping_only=1");
     }
@@ -227,12 +229,12 @@ SProbe.ProbeRun = function(cb, proxy_host, proxy_http_port, proxy_ssl_port,
         if(!direct_ws_must_be_ssl && parseInt(game_ws_port,10) > 0 && (!spin_game_direct_multiplex || parseInt(game_wss_port,10) > 0)) {
             // note: game_wss_port MUST be used for the multiplex case, not game_ws_port, even if connecting via plain HTTP!
             this.tests['direct_ws'] = new SProbe.WSPing(spin_game_direct_multiplex ?
-                                                        "ws://"+proxy_host+":"+proxy_http_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString() :
+                                                        "ws://"+proxy_host+":"+proxy_http_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString()+snam_param :
                                                         "ws://"+game_host+":"+game_ws_port+"/WS_GAMEAPI");
         }
         if(parseInt(game_wss_port,10) > 0) {
             this.tests['direct_wss'] = new SProbe.WSPing(spin_game_direct_multiplex ?
-                                                         "wss://"+proxy_host+":"+proxy_ssl_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString() :
+                                                         "wss://"+proxy_host+":"+proxy_ssl_port+"/WS_GAMEAPI?spin_game_server_port="+game_wss_port.toString()+snam_param :
                                                          "wss://"+game_host+":"+game_wss_port+"/WS_GAMEAPI");
         }
     }
