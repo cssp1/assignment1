@@ -15,6 +15,17 @@ goog.provide('FBInviteFriends');
 goog.require('SPUI');
 goog.require('SPFB');
 goog.require('PortraitCache');
+goog.require('goog.events');
+
+FBInviteFriends.invitable_friends_receiver = new goog.events.EventTarget();
+FBInviteFriends.invitable_friends_query_tag = 0;
+FBInviteFriends.query_invitable_friends = function(cb) {
+    var tag = 'qif'+(FBInviteFriends.invitable_friends_query_tag++).toString();
+    FBInviteFriends.invitable_friends_receiver.listenOnce(tag, (function (_cb) { return function(event) {
+        _cb(event.response);
+    }; })(cb));
+    send_to_server.func(["FB_INVITABLE_FRIENDS_QUERY", tag]);
+};
 
 // note: assumes player already has user_friends permission on the app
 FBInviteFriends.invoke_fb_invite_friends_dialog = function(reason) {
@@ -159,7 +170,14 @@ FBInviteFriends.invoke_fb_invite_friends_dialog_v2 = function(reason) {
     FBInviteFriends.FBInviteFriendsDialogV2.update_send_button(dialog);
 
     if(reason != 'test') {
-        SPFB.api_paged('/me/invitable_friends?fields=name,id,picture', 'get', {'limit': '500'}, goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
+        // server-side query
+        FBInviteFriends.query_invitable_friends(goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
+
+        /* As of March 2018, Facebook requires appsecret_proof on this now, so it doesn't work client-side
+        // client-side quiery
+        SPFB.api_paged('/me/invitable_friends?fields=name,id,picture', 'get', {'limit': '500'},
+                       goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
+        */
     }
     if(!dialog.user_data['instant']) {
         metric_event('7101_invite_friends_ingame_prompt', {'api':'invitable_friends', 'api_version': 2, 'attempt_id': dialog.user_data['attempt_id'], 'method': reason, 'sum': player.get_denormalized_summary_props('brief')});

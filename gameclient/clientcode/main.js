@@ -50038,6 +50038,9 @@ function handle_server_message(data) {
                 world.fxworld.add_visual_effect_at_time(manufacturer.raw_pos(), 0, [0, 1, 0], client_time, gamedata['client']['vfx']['unit_manufactured'], true, null);
             }
         }
+    } else if(msg == "FB_INVITABLE_FRIENDS_RESULT") {
+        var request_tag = data[1], response = data[2];
+        FBInviteFriends.invitable_friends_receiver.dispatchEvent({type: request_tag, response: response});
     } else if(msg == "ERROR") {
         data.shift();
         var name = data.shift();

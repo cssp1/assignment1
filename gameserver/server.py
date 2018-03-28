@@ -2840,6 +2840,33 @@ class User:
                              '&' + urllib.urlencode({'batch':SpinJSON.dumps(this_batch)})
                 gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None, method = 'POST')
 
+    @inlineCallbacks
+    def retrieve_facebook_invitable_friends(self, session, tag, buffer = None, url = None):
+        assert self.facebook_id
+        if not SpinConfig.config['enable_facebook']:
+            session.send([["FB_INVITABLE_FRIENDS_RESULT", tag, []]])
+            return
+
+        if buffer is None:
+            buffer = []
+        if url is None:
+            url = SpinFacebook.versioned_graph_endpoint_secure('invitable_friends', str(self.facebook_id)+'/invitable_friends') + '&' + \
+                  urllib.urlencode({'fields': 'name,id,picture', 'limit': '500'})
+
+        result = yield gamesite.AsyncHTTP_Facebook.queue_request_deferred(server_time, url)
+        result = SpinJSON.loads(result)
+        if result:
+            buffer += result['data']
+
+        if result and ('paging' in result) and ('next' in result['paging']) and \
+           (('count' not in result) or (len(buffer) < int(result['count']))):
+            # fetch next page
+            self.retrieve_facebook_invitable_friends(session, tag, buffer = buffer, url = result['paging']['next'])
+        else:
+            # it's complete now
+            if session.logout_in_progress: return # dead session
+            session.send([["FB_INVITABLE_FRIENDS_RESULT", tag, buffer]])
+
     def create_fb_open_graph_action(self, action, params):
         if not SpinConfig.config['enable_facebook']:
             gamesite.exception_log.event(server_time, 'Facebook disabled: create_fb_open_graph_action(%s, %s)' % (action, repr(params)))
@@ -28660,6 +28687,11 @@ class GAMEAPI(resource.Resource):
             quantity = arg[2]
             session.increment_player_metric('fb_gift_cards_redeemed', 1)
             session.increment_player_metric('fb_gift_cards_redeemed_gamebucks', quantity)
+
+        elif arg[0] == "FB_INVITABLE_FRIENDS_QUERY":
+            tag = arg[1]
+            session.user.retrieve_facebook_invitable_friends(session, tag)
+            return None # note: asynchronous with other session traffic!
 
         # simulate Facebook credits order
         elif arg[0] == "DEV_SIMULATE_ORDER":
