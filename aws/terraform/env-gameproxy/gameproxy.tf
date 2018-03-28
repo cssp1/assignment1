@@ -47,6 +47,7 @@ module "aws_cloud_init" {
   enable_backups = "${var.enable_backups}"
   envkey = "${var.envkey}"
   secrets_bucket = "${data.terraform_remote_state.corp.secrets_bucket}"
+  puppet_branch = "master"
 }
 
 # HAproxy instances between ELB/CloudFlare and game servers
