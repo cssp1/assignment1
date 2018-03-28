@@ -170,14 +170,15 @@ FBInviteFriends.invoke_fb_invite_friends_dialog_v2 = function(reason) {
     FBInviteFriends.FBInviteFriendsDialogV2.update_send_button(dialog);
 
     if(reason != 'test') {
-        // server-side query
-        FBInviteFriends.query_invitable_friends(goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
+        // server-side query (note: as of March 2018, does not work due to user access token / appsecret_proof incompatibility)
+        // FBInviteFriends.query_invitable_friends(goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
 
-        /* As of March 2018, Facebook requires appsecret_proof on this now, so it doesn't work client-side
-        // client-side quiery
+        /* As of March 2018, Facebook appsecret_proof setting applies to this endpoint, so it doesn't work client-side when appsecret_proof
+           requirement is enabled :( See:
+           https://developers.facebook.com/bugs/1597942793626594/ */
         SPFB.api_paged('/me/invitable_friends?fields=name,id,picture', 'get', {'limit': '500'},
                        goog.partial(FBInviteFriends.FBInviteFriendsDialogV2.receive_invitable_friends, dialog));
-        */
+
     }
     if(!dialog.user_data['instant']) {
         metric_event('7101_invite_friends_ingame_prompt', {'api':'invitable_friends', 'api_version': 2, 'attempt_id': dialog.user_data['attempt_id'], 'method': reason, 'sum': player.get_denormalized_summary_props('brief')});
