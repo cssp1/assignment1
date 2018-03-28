@@ -142,7 +142,7 @@ class AsyncHTTPRequester(object):
     CALLBACK_FULL = 'full'
 
     class Request:
-        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors):
+        def __init__(self, qtime, method, url, headers, callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors, user_agent):
             self.method = method
             self.url = url
             self.headers = headers # can be None, single-valued, or list-valued. Leaf values should be bytes.
@@ -155,6 +155,7 @@ class AsyncHTTPRequester(object):
             self.max_tries = max_tries
             self.callback_type = callback_type
             self.accept_http_errors = accept_http_errors
+            self.user_agent = user_agent
             self.tries = 1
         def __hash__(self): return hash((self.url, self.method, self.fire_time, self.callback))
         def __repr__(self): return self.method + ' ' + self.url
@@ -188,6 +189,11 @@ class AsyncHTTPRequester(object):
 
                     final_headers[k] = v
 
+            # twisted.web.client.Agent does not apply a User-Agent header automatically. Let's do that here.
+            if self.user_agent:
+                if not final_headers: final_headers = {}
+                final_headers['User-Agent'] = [self.user_agent.encode('utf-8')]
+
             if self.postdata:
                 if isinstance(self.postdata, dict):
                     # convert to form encoding
@@ -204,7 +210,8 @@ class AsyncHTTPRequester(object):
 
     def __init__(self, concurrent_request_limit, total_request_limit, request_timeout, verbosity, log_exception_func,
                  max_tries = 1, retry_delay = 0, error_on_404 = True,
-                 api = 'Agent' # use old 'HTTPClientFactory' or new 'Agent' API
+                 api = 'Agent', # use old 'HTTPClientFactory' or new 'Agent' API
+                 user_agent = b'SpinPunch',
                  ):
 
         if api != 'Agent':
@@ -243,6 +250,7 @@ class AsyncHTTPRequester(object):
         self.retry_delay = retry_delay
         self.error_on_404 = error_on_404
         self.api = api
+        self.default_user_agent = user_agent
 
         # function to call when all outstanding requests have either succeeded or failed
         self.idle_cb = None
@@ -278,7 +286,7 @@ class AsyncHTTPRequester(object):
             cb()
 
     # wrapper for queue_request that returns a Deferred
-    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
+    def queue_request_deferred(self, qtime, url, method='GET', headers=None, postdata=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False, user_agent = None):
         d = twisted.internet.defer.Deferred()
 
         if callback_type == self.CALLBACK_BODY_ONLY:
@@ -293,10 +301,11 @@ class AsyncHTTPRequester(object):
         self.queue_request(qtime, url, success_cb, method=method, headers=headers, postdata=postdata,
                            error_callback = error_cb,
                            preflight_callback=preflight_callback, max_tries=max_tries, callback_type=callback_type,
-                           accept_http_errors=accept_http_errors)
+                           accept_http_errors=accept_http_errors,
+                           user_agent=user_agent)
         return d
 
-    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False):
+    def queue_request(self, qtime, url, user_callback, method='GET', headers=None, postdata=None, error_callback=None, preflight_callback=None, max_tries=None, callback_type = CALLBACK_BODY_ONLY, accept_http_errors = False, user_agent = None):
         if self.total_request_limit > 0 and len(self.queue) >= self.total_request_limit:
             self.log_exception_func('AsyncHTTPRequester queue is full, dropping request %s %s!' % (method,url))
             self.n_dropped += 1
@@ -309,7 +318,8 @@ class AsyncHTTPRequester(object):
         else:
             max_tries = max_tries # max(max_tries, self.default_max_tries)
 
-        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors)
+        request = AsyncHTTPRequester.Request(qtime, method, url, headers, user_callback, error_callback, preflight_callback, postdata, max_tries, callback_type, accept_http_errors,
+                                             user_agent or self.default_user_agent)
 
         self.queue.append(request)
         if self.verbosity >= 1:
@@ -352,7 +362,7 @@ class AsyncHTTPRequester(object):
         getter = self.make_web_getter(request, bytes(request.url),
                                       method = bytes(request.method),
                                       headers= final_headers,
-                                      user_agent = b'SpinPunch',
+                                      user_agent = request.user_agent,
                                       timeout = self.request_timeout,
                                       postdata = final_postdata)
         d = getter.deferred
