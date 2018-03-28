@@ -36,7 +36,14 @@ def CONTROLAPI_raw(args, spin_user = None, host = None, http_port = None, ssl_po
                    max_tries = 1, retry_delay = 5, verbose = False):
     host = host or SpinConfig.config['proxyserver'].get('internal_listen_host',
                                                         SpinConfig.config['proxyserver'].get('external_listen_host','localhost'))
-    proto = 'http' if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')) else 'https'
+    # use http if inside the ingress frontend
+    if host in ('localhost', socket.gethostname(), SpinConfig.config['proxyserver'].get('internal_listen_host')):
+        proto = 'http'
+    elif ('prod-srv' in host) or ('prod-raw' in host): # raw hostname that is only accessible internally, e.g. xxprod-srv2.spinpunch.com
+        proto = 'http'
+    else:
+        proto = 'https'
+
     url = '%s://%s:%d/CONTROLAPI' % (proto, host,
                                      (ssl_port or SpinConfig.config['proxyserver']['external_ssl_port']) if proto == 'https' else \
                                      (http_port or SpinConfig.config['proxyserver']['external_http_port'])

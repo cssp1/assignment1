@@ -32634,7 +32634,8 @@ class GameSite(server.Site):
 
     def start_listening(self):
         self.listener_tcp = reactor.listenTCP(self.config.game_http_port, self, interface=self.config.game_listen_host, backlog=self.config.tcp_accept_backlog)
-        if self.config.game_ssl_port > 0:
+        # awkward - when using external SSL termination, we don't want to start this listener, but we DO want to publish "ssl" ports. Fix later.
+        if self.config.game_ssl_port > 0 and SpinConfig.config.get('ssl_key_file'):
             self.listener_ssl = reactor.listenSSL(self.config.game_ssl_port, self,
                                                   SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                                         SpinConfig.config['ssl_crt_file'],
