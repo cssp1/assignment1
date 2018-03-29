@@ -39,11 +39,14 @@ txpostgres==1.6.0
 
 # Twisted==17.9.0 works, but has some spurious warnings and exceptions
 # our customized version fixes these.
-git+git://github.com/spinpunch/twisted.git@spinpunch 
+# note: the version string on the end only tells pip to skip this
+# intall if the currently installed version matches that version. It
+# does NOT enforce which version is pulled from Git.
+git+git://github.com/spinpunch/twisted.git@spinpunch#egg=Twisted==17.9.1dev0
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
-git+git://github.com/spinpunch/ultrajson.git@spinpunch 
+git+git://github.com/spinpunch/ultrajson.git@spinpunch#egg=ujson==2.0
 
 
 # note: if this install fails, it might be because of a legacy setuptools configuration that
