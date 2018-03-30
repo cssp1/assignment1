@@ -4,7 +4,7 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import sys, os, urllib, getopt, uuid, glob, copy, time, subprocess, datetime, math, re, gzip, hashlib
+import sys, os, urllib, getopt, glob, copy, time, subprocess, datetime, math, re, gzip, hashlib
 
 import SpinJSON, Timezones, SpinConfig, SpinFacebook, FastGzipFile
 import ANSIColor
