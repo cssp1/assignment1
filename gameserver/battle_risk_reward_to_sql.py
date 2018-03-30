@@ -12,7 +12,7 @@ import SpinJSON
 import SpinSQLUtil
 import SpinParallel
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -127,8 +127,8 @@ def do_slave(input):
     sql_util = SpinSQLUtil.MySQLUtil()
     if not input['verbose']: sql_util.disable_warnings()
     cfg = SpinConfig.get_mysql_config(input['game_id']+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     # tell MySQL it's OK to be less careful about isolating batches.
     # we manually enforce non-overlapping time ranges, so we don't need the database to guarantee isolation.
@@ -141,7 +141,7 @@ def do_slave(input):
             ret = eval_batch(sql_util, con, cur, input['game_id'], input['week_origin'], input['battles_table'], input['battles_risk_reward_table'], input['start'], input['end'], input['verbose'])
             con.commit()
             return ret
-        except MySQLdb.OperationalError as e:
+        except SpinMySQLdb.OperationalError as e:
             if e.args[0] == 1213: # deadlock
                 deadlocks += 1
                 con.rollback()
@@ -263,7 +263,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('battle_risk_reward_to_sql-%s' % game_id):
 
@@ -275,7 +275,7 @@ if __name__ == '__main__':
         battles_risk_reward_daily_summary_combined_table = cfg['table_prefix']+game_id+'_battles_risk_reward_daily_summary_combined'
         battles_risk_reward_weekly_summary_combined_table = cfg['table_prefix']+game_id+'_battles_risk_reward_weekly_summary_combined'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         # prepare for big GROUP_CONCAT() percentile queries (MySQL-specific)
         cur.execute("SET @@session.group_concat_max_len = @@global.max_allowed_packet")

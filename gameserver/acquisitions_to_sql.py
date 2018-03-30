@@ -13,7 +13,7 @@ import SpinConfig
 import SpinETL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -80,8 +80,8 @@ if __name__ == '__main__':
 
     with SpinSingletonProcess.SingletonProcess('acquisitions_to_sql-%s' % game_id):
 
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         # INPUTS
         upcache_table = cfg['table_prefix']+game_id+{'mf':'_upcache_lite'}.get(game_id, '_upcache')

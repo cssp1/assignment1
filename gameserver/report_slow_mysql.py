@@ -10,7 +10,7 @@ import sys, time, getopt, socket
 import SpinReminders
 import SpinConfig
 import SpinSQLUtil
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -38,9 +38,9 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(mysql_server)
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     subject = 'Automated reminder from '+socket.gethostname()
     body = None

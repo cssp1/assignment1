@@ -12,7 +12,7 @@ import SpinJSON
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('chat_reports_to_sql-%s' % game_id):
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         start_time = -1
         end_time = time_now - 12*3600  # skip entries too close to "now" to ensure all reports have been made and resolved
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         cur.execute("SELECT report_time FROM "+sql_util.sym(chat_reports_table)+" ORDER BY report_time DESC LIMIT 1")
         rows = cur.fetchall()
         if rows:

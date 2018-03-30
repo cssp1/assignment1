@@ -9,7 +9,7 @@
 import sys, time, getopt
 import SpinConfig
 import SpinNoSQL
-import MySQLdb
+import SpinMySQLdb
 import SpinSQLUtil
 
 gamedata = None
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     dau_table = cfg['table_prefix']+game_id+'_dau'
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))

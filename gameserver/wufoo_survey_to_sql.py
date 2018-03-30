@@ -10,7 +10,7 @@ import sys, time, getopt, csv
 import SpinConfig
 import SpinSQLUtil
 from SpinHTTP import ip_matching_key
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -75,9 +75,9 @@ if __name__ == '__main__':
     if dbname is None:
         dbname = '%s_upcache' % game_id
     cfg = SpinConfig.get_mysql_config(dbname)
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     questions_table = cfg['table_prefix']+game_id+'_survey_questions'
     responses_table = cfg['table_prefix']+game_id+'_survey_responses'

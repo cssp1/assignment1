@@ -15,7 +15,7 @@
 import sys, time, getopt
 import SpinConfig
 import SpinJSON
-import SpinSQLUtil, MySQLdb
+import SpinSQLUtil, SpinMySQLdb
 import requests
 from SpinMailChimp import mailchimp_api, mailchimp_api_batch, subscriber_hash
 
@@ -160,8 +160,8 @@ if __name__ == '__main__':
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
     cfg = SpinConfig.get_mysql_config(SpinConfig.game()+'_upcache') # note: use "native" connection, not game_id
     sql_util = SpinSQLUtil.MySQLUtil()
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     print 'querying for candidate', game_id, 'players...'
     cur.execute('SELECT user_id, LOWER(email) AS email, facebook_name, locale, country, last_login_ip, account_creation_time, gamebucks_balance, ' + \

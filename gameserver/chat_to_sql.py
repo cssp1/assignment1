@@ -13,7 +13,7 @@ import SpinNoSQL
 import SpinSQLUtil
 import SpinETL
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('chat_to_sql-%s' % game_id):
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         start_time = -1
         end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         cur.execute("SELECT time FROM "+sql_util.sym(chat_table)+" ORDER BY time DESC LIMIT 1")
         rows = cur.fetchall()
         if rows:

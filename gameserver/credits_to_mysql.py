@@ -11,7 +11,7 @@ import SpinConfig
 import SpinETL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 gamebucks_re = re.compile('BUY_GAMEBUCKS_([0-9]+)')
@@ -111,8 +111,8 @@ if __name__ == '__main__':
 
     with SpinSingletonProcess.SingletonProcess('credits_to_mysql-%s' % game_id):
 
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         for table, schema in ((credits_table, credits_schema(sql_util)),
                               (credits_hourly_summary_table, credits_summary_schema(sql_util,'hour')),
                               (credits_daily_summary_table, credits_summary_schema(sql_util,'day')),

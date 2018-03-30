@@ -11,7 +11,7 @@ import SpinConfig
 import SpinETL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 DETAIL_LEN = 64 # truncate long "method" and "reason" args
@@ -77,11 +77,11 @@ if __name__ == '__main__':
         if not verbose: sql_util.disable_warnings()
 
         cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
         client_trouble_table = cfg['table_prefix']+game_id+'_client_trouble'
         client_trouble_daily_summary_table = cfg['table_prefix']+game_id+'_client_trouble_daily_summary'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, client_trouble_table, client_trouble_schema)
         sql_util.ensure_table(cur, client_trouble_daily_summary_table, client_trouble_summary_schema(sql_util, 'day'))
         con.commit()

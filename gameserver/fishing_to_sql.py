@@ -11,7 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 def fishing_schema(sql_util): return {
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('fishing_to_sql-%s' % game_id):
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         fishing_summary_table = cfg['table_prefix']+game_id+'_fishing_daily_summary'
         fishing_summary_combined_table = cfg['table_prefix']+game_id+'_fishing_daily_summary_combined'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, fishing_table, fishing_schema(sql_util))
         sql_util.ensure_table(cur, fishing_summary_table, fishing_summary_schema(sql_util, 'separate'))
         sql_util.ensure_table(cur, fishing_summary_combined_table, fishing_summary_schema(sql_util, 'combined'))

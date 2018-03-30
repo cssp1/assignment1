@@ -17,7 +17,7 @@ import SpinJSON
 import SpinS3
 import SpinParallel
 import SpinNoSQLId
-import MySQLdb
+import SpinMySQLdb
 from warnings import filterwarnings
 
 id_generator = SpinNoSQLId.Generator()
@@ -50,10 +50,10 @@ def do_slave(task):
     if verbose:
         print >> sys.stderr, 'converting date', date, 'start_time', start_time, 'end_time', end_time, '...'
 
-    if not verbose: filterwarnings('ignore', category = MySQLdb.Warning)
+    if not verbose: filterwarnings('ignore', category = SpinMySQLdb.Warning)
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     store_table = cfg['table_prefix']+game_id+'_store'
 
     s3 = SpinS3.S3(SpinConfig.aws_key_file())

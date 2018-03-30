@@ -14,7 +14,7 @@ import SpinETL
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     store_table = cfg['table_prefix']+game_id+'_store'
     store_daily_summary_table = cfg['table_prefix']+game_id+'_store_daily_summary'
     store_hourly_summary_table = cfg['table_prefix']+game_id+'_store_hourly_summary'
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config((game_id+'test') if SpinConfig.config['game_id'].endswith('test') else game_id))
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, store_table, store_schema(sql_util))
         sql_util.ensure_table(cur, store_daily_summary_table, store_summary_schema(sql_util, 'day'))
         sql_util.ensure_table(cur, store_hourly_summary_table, store_summary_schema(sql_util, 'hour'))

@@ -11,7 +11,7 @@ import sys, time, getopt, traceback
 import SpinConfig
 import SkynetLib
 import pymongo # 3.0+ OK
-import MySQLdb
+import SpinMySQLdb
 import SpinSQLUtil
 import requests
 import SpinJSON
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     adstats_table = cfg['table_prefix']+'adstats_daily'
 
     nosql_config = SpinConfig.get_mongodb_config('skynet' if fix_missing_data else 'skynet_readonly')
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     # find most recent entry
     start_time = -1
     end_time = time_now
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
     if dry_run:
         row = None
     else:

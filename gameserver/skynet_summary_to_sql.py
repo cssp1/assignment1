@@ -11,7 +11,7 @@ import sys, time, getopt
 import SpinConfig
 import SpinETL
 import SpinSQLUtil
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -55,12 +55,12 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     adstats_daily_table = cfg['table_prefix']+'adstats_daily'
     conversions_table = cfg['table_prefix']+'conversions'
     skynet_daily_summary_table = cfg['table_prefix']+'v_daily_summary'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
     for table, schema in ((skynet_daily_summary_table, skynet_summary_schema(sql_util,'day')),):
         sql_util.ensure_table(cur, table, schema)
     con.commit()

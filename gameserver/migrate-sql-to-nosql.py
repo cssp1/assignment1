@@ -10,13 +10,13 @@
 import SpinConfig
 import SpinSQL
 import SpinNoSQL
-import MySQLdb
+import SpinMySQLdb
 import sys, time, getopt
 
 time_now = int(time.time())
 
 def migrate_alliances(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT id,ui_name,ui_description,join_type,founder_id,leader_id,logo,chat_motd,UNIX_TIMESTAMP(creation_time) AS creation_time FROM alliances")
     for row in sql_cur.fetchall():
         if row['logo'] == '0': row['logo'] = 'tetris_red'
@@ -28,20 +28,20 @@ def migrate_alliances(sql_client, nosql_client):
     sql_client.con.commit()
 
 def migrate_alliance_members(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT user_id,alliance_id,UNIX_TIMESTAMP(join_time) AS join_time FROM alliance_members")
     for row in sql_cur.fetchall():
         nosql_client.alliance_table('alliance_members').insert_one({'_id':int(row['user_id']), 'alliance_id':int(row['alliance_id']), 'join_time':int(row['join_time'])})
     sql_client.con.commit()
 
 def migrate_alliance_invites(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT user_id,alliance_id,UNIX_TIMESTAMP(creation_time) AS creation_time,UNIX_TIMESTAMP(expire_time) as expire_time FROM alliance_invites")
     for row in sql_cur.fetchall():
         nosql_client.alliance_table('alliance_invites').insert_one({'user_id':int(row['user_id']), 'alliance_id':int(row['alliance_id']), 'creation_time':int(row['creation_time']), 'expire_time':int(row['expire_time'])})
     sql_client.con.commit()
 def migrate_alliance_join_requests(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT user_id,alliance_id,UNIX_TIMESTAMP(creation_time) AS creation_time,UNIX_TIMESTAMP(expire_time) as expire_time FROM alliance_join_requests")
     for row in sql_cur.fetchall():
         nosql_client.alliance_table('alliance_join_requests').insert_one({'user_id':int(row['user_id']), 'alliance_id':int(row['alliance_id']), 'creation_time':int(row['creation_time']), 'expire_time':int(row['expire_time'])})
@@ -50,7 +50,7 @@ def migrate_alliance_join_requests(sql_client, nosql_client):
 FREQ_MAP = {SpinSQL.SQLClient.SCORE_FREQ_SEASON: 'season', SpinSQL.SQLClient.SCORE_FREQ_WEEKLY: 'week'}
 
 def migrate_player_scores(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT user_id,field_name AS field,frequency AS int_frequency,period,score FROM player_scores")
     for row in sql_cur.fetchall():
         addr = nosql_client.parse_score_addr((row['field'],FREQ_MAP[row['int_frequency']],row['period']))
@@ -58,7 +58,7 @@ def migrate_player_scores(sql_client, nosql_client):
     sql_client.con.commit()
 
 def migrate_alliance_score_cache(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT alliance_id,field_name AS field,frequency AS int_frequency,period,score FROM alliance_score_cache")
     for row in sql_cur.fetchall():
         addr = nosql_client.parse_score_addr((row['field'],FREQ_MAP[row['int_frequency']],row['period']))
@@ -66,7 +66,7 @@ def migrate_alliance_score_cache(sql_client, nosql_client):
     sql_client.con.commit()
 
 def migrate_unit_donation_requests(sql_client, nosql_client):
-    sql_cur = sql_client.con.cursor(MySQLdb.cursors.DictCursor)
+    sql_cur = sql_client.con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_cur.execute("SELECT user_id,alliance_id,UNIX_TIMESTAMP(time) as time,tag,cur_space,max_space FROM unit_donation_requests")
     for row in sql_cur.fetchall():
         nosql_client.unit_donation_requests_table().insert_one({'_id':int(row['user_id']), 'alliance_id':int(row['alliance_id']), 'time':int(row['time']), 'tag':int(row['tag']),

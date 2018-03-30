@@ -11,7 +11,7 @@ import SpinConfig
 import SpinSQLUtil
 import SpinJSON
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 import requests
 
 time_now = int(time.time())
@@ -53,13 +53,13 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('bh_import_user_data'):
 
         bh_users_table = cfg['table_prefix']+'bh_users'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         response = requests.get('https://www.battlehouse.com/bh_login/user_db?service=fs',
                                 headers = {'x-bhlogin-api-secret': SpinConfig.config['battlehouse_api_secret']})

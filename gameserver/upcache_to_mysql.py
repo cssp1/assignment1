@@ -16,7 +16,7 @@ import SkynetLTV # for outboard LTV estimate table
 import SpinSQLUtil
 import SpinParallel
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 from abtests_to_sql import abtests_schema
 
 INT2_MAX = 32767
@@ -254,7 +254,7 @@ def do_slave(input):
         if not input['verbose']: sql_util.disable_warnings()
         sorted_field_names = input['sorted_field_names']
         cfg = input['dbconfig']
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
         cur = con.cursor()
 
         # buffer up keyvals to be updated in the achievement tables
@@ -286,7 +286,7 @@ def do_slave(input):
                     con.commit()
                     upgrade_achievement_counters.clear()  # clear accumulator
                     break
-                except MySQLdb.OperationalError as e:
+                except SpinMySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
                         con.rollback()
                         deadlocks += 1
@@ -304,7 +304,7 @@ def do_slave(input):
                     con.commit()
                     army_composition.clear() # clear accumulator
                     break
-                except MySQLdb.OperationalError as e:
+                except SpinMySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
                         con.rollback()
                         deadlocks += 1
@@ -323,7 +323,7 @@ def do_slave(input):
                     con.commit()
                     resource_levels.clear() # clear accumulator
                     break
-                except MySQLdb.OperationalError as e:
+                except SpinMySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
                         con.rollback()
                         deadlocks += 1
@@ -342,7 +342,7 @@ def do_slave(input):
                     con.commit()
                     abtest_memberships.clear() # clear accumulator
                     break
-                except MySQLdb.OperationalError as e:
+                except SpinMySQLdb.OperationalError as e:
                     if e.args[0] == 1213: # deadlock
                         con.rollback()
                         deadlocks += 1
@@ -666,7 +666,7 @@ if __name__ == '__main__':
         # PASS 2 - dump the rows
         if 1:
             cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-            con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+            con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
             cur = con.cursor()
 
             upcache_table = cfg['table_prefix']+game_id+'_upcache'

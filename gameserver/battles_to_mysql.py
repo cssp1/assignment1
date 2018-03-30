@@ -17,7 +17,7 @@ import SpinJSON
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 import pymongo
 
 gamedata = None
@@ -226,7 +226,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('battles_to_mysql-%s' % game_id):
 
@@ -241,7 +241,7 @@ if __name__ == '__main__':
         battle_damage_table = cfg['table_prefix']+game_id+'_battle_damage'
 
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config((game_id+'test') if SpinConfig.config['game_id'].endswith('test') else game_id))
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         for table, schema in ((battles_table, battles_schema(sql_util)),
                               (battles_summary_table, battles_summary_schema(sql_util)),

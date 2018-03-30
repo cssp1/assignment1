@@ -12,7 +12,7 @@ import SpinJSON
 import SpinNoSQL
 import SpinSingletonProcess
 import SpinSQLUtil
-import MySQLdb
+import SpinMySQLdb
 
 gamedata = None
 time_now = int(time.time())
@@ -84,14 +84,14 @@ if __name__ == '__main__':
     with SpinSingletonProcess.SingletonProcess('map_to_sql-%s' % game_id):
 
         cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
         map_summary_table = cfg['table_prefix']+game_id+'_map_summary'
         map_upgrades_table = cfg['table_prefix']+game_id+'_map_upgrades'
         map_features_table = cfg['table_prefix']+game_id+'_map_features'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         if not dry_run:
             sql_util.ensure_table(cur, map_summary_table, map_summary_schema(sql_util))
             sql_util.ensure_table(cur, map_upgrades_table, map_upgrades_schema(sql_util))

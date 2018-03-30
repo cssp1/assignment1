@@ -12,7 +12,7 @@ import SpinUpcache
 import SpinJSON
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 gamedata = None
 time_now = int(time.time())
@@ -120,7 +120,7 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('ai_bases_to_mysql-%s' % game_id):
 
@@ -129,7 +129,7 @@ if __name__ == '__main__':
         ai_analytics_tag_info_table = cfg['table_prefix']+game_id+'_ai_analytics_tag_info'
         ai_analytics_tag_assignments_table = cfg['table_prefix']+game_id+'_ai_analytics_tag_assignments'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         # recreate AI bases and analytics tag tables
         if verbose: print 'updating AI bases and analytics tag tables'

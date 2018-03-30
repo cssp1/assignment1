@@ -59,10 +59,10 @@ if __name__ == '__main__':
     with SpinSingletonProcess.SingletonProcess('schedule_to_sql-%s' % game_id):
 
         if not dry_run:
-            import MySQLdb
+            import SpinMySQLdb
             cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-            con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-            cur = con.cursor(MySQLdb.cursors.DictCursor)
+            con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+            cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
             sql_util.disable_warnings()
         else:
             cur = None

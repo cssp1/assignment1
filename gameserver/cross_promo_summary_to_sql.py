@@ -11,7 +11,7 @@ import sys, time, getopt
 import SpinConfig
 import SpinETL
 import SpinSQLUtil
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -48,10 +48,10 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     cross_promo_daily_summary_table = cfg['table_prefix']+'v_cross_promo_daily_summary'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
     for table, schema in ((cross_promo_daily_summary_table, cross_promo_summary_schema(sql_util,'day')),):
         sql_util.ensure_table(cur, table, schema)
     con.commit()

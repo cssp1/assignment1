@@ -12,7 +12,7 @@ import SpinNoSQL
 import SpinETL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -54,7 +54,7 @@ def flush_keyvals(sql_util, cur, tbl, keyvals):
     if not dry_run:
         try:
             sql_util.do_insert_batch(cur, tbl, keyvals)
-        except MySQLdb.Warning as e:
+        except SpinMySQLdb.Warning as e:
             raise Exception('while inserting into %s:\n' % tbl+'\n'.join(map(repr, keyvals))+'\n'+repr(e))
         con.commit()
     del keyvals[:]
@@ -84,14 +84,14 @@ if __name__ == '__main__':
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('alliance_events_to_sql-%s' % game_id):
 
         alliance_events_table = cfg['table_prefix']+game_id+'_alliance_events'
         alliance_member_events_table = cfg['table_prefix']+game_id+'_alliance_member_events'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         for tbl, schema in ((alliance_events_table, alliance_events_schema(sql_util)),
                             (alliance_member_events_table, alliance_member_events_schema(sql_util))):
             sql_util.ensure_table(cur, tbl, schema)

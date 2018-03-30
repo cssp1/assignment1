@@ -11,7 +11,7 @@ import SpinConfig
 import SpinSQLUtil
 import SpinETL
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 def login_sources_schema(sql_util): return {
@@ -72,14 +72,14 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('login_sources_to_sql-%s' % game_id):
 
         login_sources_table = cfg['table_prefix']+game_id+'_login_sources'
         login_sources_summary_table = cfg['table_prefix']+game_id+'_login_sources_daily_summary'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, login_sources_table, login_sources_schema(sql_util))
     #    sql_util.ensure_table(cur, login_sources_summary_table, login_sources_summary_schema(sql_util))
         con.commit()

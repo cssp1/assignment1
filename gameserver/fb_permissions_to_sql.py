@@ -11,7 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 def fb_permissions_schema(sql_util): return {
@@ -70,14 +70,14 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('fb_permissions_to_sql-%s' % game_id):
 
         fb_permissions_table = cfg['table_prefix']+game_id+'_fb_permissions'
         fb_permissions_summary_table = cfg['table_prefix']+game_id+'_fb_permissions_daily_summary'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, fb_permissions_table, fb_permissions_schema(sql_util))
         sql_util.ensure_table(cur, fb_permissions_summary_table, fb_permissions_summary_schema(sql_util))
         con.commit()

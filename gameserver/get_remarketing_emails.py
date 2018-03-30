@@ -8,7 +8,7 @@
 
 import sys, time, getopt, csv
 import SpinConfig
-import SpinSQLUtil, MySQLdb
+import SpinSQLUtil, SpinMySQLdb
 import SpinGeoIP
 
 time_now = int(time.time())
@@ -35,8 +35,8 @@ if __name__ == '__main__':
 
     cfg = SpinConfig.get_mysql_config(SpinConfig.game()+'_upcache') # note: use "native" connection, not game_id
     sql_util = SpinSQLUtil.MySQLUtil()
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     candidates_by_email = dict()
 

@@ -55,8 +55,8 @@ class SQLUtil(object):
 class MySQLUtil(SQLUtil):
     def disable_warnings(self):
         from warnings import filterwarnings
-        import MySQLdb
-        filterwarnings('ignore', category = MySQLdb.Warning)
+        import SpinMySQLdb
+        filterwarnings('ignore', category = SpinMySQLdb.Warning)
     def sym(self, s):
         return '`'+s+'`'
     def ensure_table(self, cur, name, schema, temporary = False):

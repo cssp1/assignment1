@@ -17,7 +17,7 @@
 
 import sys, time, getopt, copy
 import SpinS3, SpinUpcacheIO, SpinConfig, SpinParallel
-import SpinSQLUtil, MySQLdb
+import SpinSQLUtil, SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -48,9 +48,9 @@ def do_slave_bh(input):
     if not input['verbose']: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     bh_users_table = cfg['table_prefix']+'bh_users'
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     auds = input['auds']
     outputs = [{'aud': copy.deepcopy(aud), 'count':0} for aud in auds]

@@ -7,10 +7,10 @@
 # OBSOLETE! This has been replaced by SpinNoSQL.py
 
 import time, sys, string
-import MySQLdb, MySQLdb.constants.CLIENT
+import SpinMySQLdb, SpinMySQLdb.constants.CLIENT
 
 def unix_to_db(ts):
-    return MySQLdb.Timestamp(*time.localtime(ts)[:6])
+    return SpinMySQLdb.Timestamp(*time.localtime(ts)[:6])
 def db_to_unix(ts):
     raise 'not implemented' # use UNIX_TIMESTAMP() on SQL side instead
 
@@ -30,7 +30,7 @@ class SQLClient (object):
 
     def connect(self):
         assert self.con is None
-        self.con = MySQLdb.connect(self.cfg['host'], self.cfg['username'], self.cfg['password'], self.cfg['database'],
+        self.con = SpinMySQLdb.connect(self.cfg['host'], self.cfg['username'], self.cfg['password'], self.cfg['database'],
                                    use_unicode = True, charset = 'utf8',
 
                                    # this setting is for UPDATE
@@ -38,7 +38,7 @@ class SQLClient (object):
                                    # count rows that matched the query
                                    # but already had identical values
                                    # to what we were trying to set
-                                   # client_flag = MySQLdb.constants.CLIENT.FOUND_ROWS
+                                   # client_flag = SpinMySQLdb.constants.CLIENT.FOUND_ROWS
                                    )
 
     def shutdown(self):
@@ -66,7 +66,7 @@ class SQLClient (object):
         try:
             try:
                 ret = func(*args)
-            except MySQLdb.OperationalError:
+            except SpinMySQLdb.OperationalError:
                 # attempt to reconnect and try a second time
                 self.ping_connection()
                 ret = func(*args)
@@ -182,7 +182,7 @@ class SQLClient (object):
 
     def get_recent_attacks(self, attackers, defender_id, time_range, reason=''): return self.instrument('get_recent_attacks(%s)'%reason, self._get_recent_attacks, (attackers, defender_id, time_range))
     def _get_recent_attacks(self, attackers, defender_id, time_range):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         filter_fmt = ''
         filter_args = tuple()
         if attackers:
@@ -208,7 +208,7 @@ class SQLClient (object):
             cur.execute("INSERT INTO alliances (ui_name, ui_description, join_type, founder_id, leader_id, logo, creation_time, chat_motd) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", (ui_name, ui_descr, self.ALLIANCE_JOIN_TYPES[join_type], founder_id, founder_id, logo, unix_to_db(creat), chat_motd))
             new_id = self.con.insert_id()
             self.con.commit()
-        except MySQLdb.IntegrityError:
+        except SpinMySQLdb.IntegrityError:
             err_reason = "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
             self.con.rollback()
             pass
@@ -241,7 +241,7 @@ class SQLClient (object):
             cur.execute(query_string, args + [alliance_id, modifier_id])
             success = cur.rowcount > 0
             self.con.commit()
-        except MySQLdb.IntegrityError:
+        except SpinMySQLdb.IntegrityError:
             success = False
             err_reason = "CANNOT_CREATE_ALLIANCE_NAME_IN_USE"
             self.con.rollback()
@@ -445,7 +445,7 @@ class SQLClient (object):
 
     def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only))
     def _get_alliance_list(self, limit, members_fewer_than, open_join_only):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         predicates = []
         if open_join_only:
             predicates.append('join_type = %d' % self.ALLIANCE_JOIN_TYPES['anyone'])
@@ -470,7 +470,7 @@ class SQLClient (object):
 
     def search_alliance(self, name, limit = -1, reason=''): return self.instrument('search_alliance(%s)'%reason, self._search_alliance, (name, limit))
     def _search_alliance(self, name, limit):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         if limit >= 1:
             limit_clause = ' LIMIT %d' % limit
         else:
@@ -487,7 +487,7 @@ class SQLClient (object):
     # can pass an array to perform batch query
     def get_alliance_info(self, alliance_id, member_access=False, get_roles=False, reason=''): return self.instrument('get_alliance_info(%s)'%reason, self._get_alliance_info, (alliance_id,member_access))
     def _get_alliance_info(self, alliance_id, member_access):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
 
         fields = "id, ui_name, ui_description, join_type, founder_id, leader_id, logo, (select COUNT(alliance_members.user_id) FROM alliance_members WHERE alliance_members.alliance_id = alliances.id) as num_members"
 
@@ -585,7 +585,7 @@ class SQLClient (object):
 
     def make_unit_donation(self, *args): return self.instrument('make_unit_donation', self._make_unit_donation, args)
     def _make_unit_donation(self, recipient_id, alliance_id, tag, space_array):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         ret = None
 
         # try to increment cur_space for the outstanding donation request, but do not exceed max_space
@@ -605,7 +605,7 @@ class SQLClient (object):
 
     def get_player_score_leaders(self, field, num, start = 0, reason = ''): return self.instrument('get_player_score_leaders(%s)'%reason, self._get_player_score_leaders, (field, num, start))
     def _get_player_score_leaders(self, field, num, start):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         qs = "SELECT user_id, score AS absolute FROM player_scores WHERE (field_name, frequency, period) = (%s, %s, %s) ORDER BY score DESC LIMIT %s OFFSET %s"
         cur.execute(qs, self.parse_player_score_addr(field) + (num,start))
         ret = cur.fetchall()
@@ -618,7 +618,7 @@ class SQLClient (object):
     def get_player_scores(self, player_ids, fields, rank = False, reason=''): return self.instrument('get_player_scores' + '+RANK' if rank else '' + '(%s)'%reason, self._get_player_scores, (player_ids, fields, rank))
 
     def _get_player_scores(self, player_ids, fields, rank):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         ret = [[None,]*len(fields) for u in xrange(len(player_ids))]
 
         addrs = map(self.parse_player_score_addr, fields)
@@ -700,7 +700,7 @@ class SQLClient (object):
 
     def get_alliance_score_leaders(self, field, num, start = 0, reason = ''): return self.instrument('get_alliance_score_leaders(%s)'%reason, self._get_alliance_score_leaders, (field, num, start))
     def _get_alliance_score_leaders(self, field, num, start):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         qs = "SELECT alliance_id, score AS absolute FROM alliance_score_cache WHERE (field_name, frequency, period) = (%s, %s, %s) ORDER BY score DESC LIMIT %s OFFSET %s"
         cur.execute(qs, self.parse_player_score_addr(field) + (num,start))
         ret = cur.fetchall()
@@ -713,7 +713,7 @@ class SQLClient (object):
     def get_alliance_score(self, alliance_id, field, rank = False, reason=''): return self.instrument('get_alliance_score' + '+RANK' if rank else '' + '(%s)'%reason, self._get_alliance_score, (alliance_id, field, rank))
 
     def _get_alliance_score(self, alliance_id, field, rank):
-        cur = self.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = self.con.cursor(SpinMySQLdb.cursors.DictCursor)
         ret = None
 
         addr = self.parse_player_score_addr(field)
@@ -962,7 +962,7 @@ if __name__ == '__main__':
         print "SEARCH (limited)", client.search_alliance('', limit = 1)
 
         print "TEMP"
-        cur = client.con.cursor(MySQLdb.cursors.DictCursor)
+        cur = client.con.cursor(SpinMySQLdb.cursors.DictCursor)
         cur.execute("SELECT * FROM alliance_members")
         print cur.fetchall()
 

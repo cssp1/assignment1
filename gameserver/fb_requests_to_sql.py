@@ -11,7 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 def fb_requests_schema(sql_util): return {
@@ -71,14 +71,14 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('fb_requests_to_sql-%s' % game_id):
 
         fb_requests_table = cfg['table_prefix']+game_id+'_fb_requests'
         fb_requests_summary_table = cfg['table_prefix']+game_id+'_fb_requests_daily_summary'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, fb_requests_table, fb_requests_schema(sql_util))
         sql_util.ensure_table(cur, fb_requests_summary_table, fb_requests_summary_schema(sql_util))
         con.commit()

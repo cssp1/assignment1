@@ -11,7 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 alliances_schema = {
     'fields': [('alliance_id', 'INT4 NOT NULL'),
@@ -42,7 +42,7 @@ def flush_keyvals(sql_util, cur, tbl, keyvals):
     if not dry_run:
         try:
             sql_util.do_insert_batch(cur, tbl, keyvals)
-        except MySQLdb.Warning as e:
+        except SpinMySQLdb.Warning as e:
             raise Exception('while inserting into %s:\n' % tbl+'\n'.join(map(repr, keyvals))+'\n'+repr(e))
         con.commit()
     del keyvals[:]
@@ -64,30 +64,30 @@ if __name__ == '__main__':
     sql_util = SpinSQLUtil.MySQLUtil()
     if verbose or True:
         from warnings import filterwarnings
-        filterwarnings('error', category = MySQLdb.Warning)
+        filterwarnings('error', category = SpinMySQLdb.Warning)
     else:
         sql_util.disable_warnings()
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('alliance_state_to_sql-%s' % game_id):
 
         alliances_table = cfg['table_prefix']+game_id+'_alliances'
         alliance_members_table = cfg['table_prefix']+game_id+'_alliance_members'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         if not dry_run:
-            filterwarnings('ignore', category = MySQLdb.Warning)
+            filterwarnings('ignore', category = SpinMySQLdb.Warning)
             for tbl, schema in ((alliances_table, alliances_schema),
                                 (alliance_members_table, alliance_members_schema)):
                 cur.execute("DROP TABLE IF EXISTS "+sql_util.sym(tbl+'_temp'))
                 sql_util.ensure_table(cur, tbl, schema)
                 sql_util.ensure_table(cur, tbl+'_temp', schema)
 
-            filterwarnings('error', category = MySQLdb.Warning)
+            filterwarnings('error', category = SpinMySQLdb.Warning)
             con.commit()
 
             for sql_table, nosql_table, schema, keyname_map in \
@@ -110,7 +110,7 @@ if __name__ == '__main__':
                 if verbose: print 'total', total, nosql_table, 'inserted'
 
         if not dry_run:
-            filterwarnings('ignore', category = MySQLdb.Warning)
+            filterwarnings('ignore', category = SpinMySQLdb.Warning)
             for tbl in (alliances_table, alliance_members_table):
                 cur.execute("RENAME TABLE "+\
                             sql_util.sym(tbl)+" TO "+sql_util.sym(tbl+'_old')+","+\

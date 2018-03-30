@@ -11,7 +11,7 @@ import SpinConfig
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 def fb_notifications_schema(sql_util): return {
@@ -67,11 +67,11 @@ if __name__ == '__main__':
     with SpinSingletonProcess.SingletonProcess('fb_notifications_to_sql-%s' % game_id):
 
         cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
         fb_notifications_table = cfg['table_prefix']+game_id+'_fb_notifications'
         fb_notifications_summary_table = cfg['table_prefix']+game_id+'_fb_notifications_daily_summary'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, fb_notifications_table, fb_notifications_schema(sql_util))
         sql_util.ensure_table(cur, fb_notifications_summary_table, fb_notifications_summary_schema(sql_util))
         con.commit()

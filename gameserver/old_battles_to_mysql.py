@@ -14,7 +14,7 @@ import SpinLog
 import SpinS3
 import SpinNoSQLId
 import SpinParallel
-import MySQLdb
+import SpinMySQLdb
 from warnings import filterwarnings
 
 id_generator = SpinNoSQLId.Generator()
@@ -80,7 +80,7 @@ def do_slave(task):
         print >> sys.stderr, 'converting date', date, 'start_time', start_time, 'end_time', end_time, '...'
 
     # gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename(override_game_id = game_id)))
-    if not verbose: filterwarnings('ignore', category = MySQLdb.Warning)
+    if not verbose: filterwarnings('ignore', category = SpinMySQLdb.Warning)
     quarries = SpinJSON.load(SpinConfig.gamedata_component_filename('quarries_compiled.json'))
     hives = SpinJSON.load(SpinConfig.gamedata_component_filename('hives_compiled.json'))
 
@@ -89,7 +89,7 @@ def do_slave(task):
         spawn_list.sort(key = lambda x: x['id_start'])
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     battles_table = cfg['table_prefix']+game_id+'_battles'
 
     if 0:

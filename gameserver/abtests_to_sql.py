@@ -15,7 +15,7 @@ import SpinNoSQL
 import SpinSQLUtil
 import SpinETL
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 abtests_schema = {
     'fields': [('join_time', 'INT8 NOT NULL'),
@@ -47,8 +47,8 @@ if __name__ == '__main__':
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     time_now = int(time.time())
 

@@ -11,7 +11,7 @@ import SpinReminders
 import SpinConfig
 import SpinSQLUtil
 import SpinJSON
-import MySQLdb
+import SpinMySQLdb
 from SpinLog import pretty_time
 
 time_now = int(time.time())
@@ -60,9 +60,9 @@ if __name__ == '__main__':
     if dbname is None:
         dbname = '%s_upcache' % game_id
     cfg = SpinConfig.get_mysql_config(dbname)
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
     sessions_hourly_summary_table = cfg['table_prefix']+game_id+'_sessions_hourly_summary'
     client_trouble_table = cfg['table_prefix']+game_id+'_client_trouble'
     fb_notifications_table = cfg['table_prefix']+game_id+'_fb_notifications'

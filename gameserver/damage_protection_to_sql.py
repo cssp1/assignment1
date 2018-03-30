@@ -13,7 +13,7 @@ import SpinETL
 import SpinNoSQL
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -77,13 +77,13 @@ if __name__ == '__main__':
 
     with SpinSingletonProcess.SingletonProcess('damage_protection_to_sql-%s' % game_id):
 
-        con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+        con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
         damage_protection_table = cfg['table_prefix']+game_id+'_damage_protection'
         damage_protection_daily_summary_table = cfg['table_prefix']+game_id+'_damage_protection_daily_summary'
 
         nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, damage_protection_table, damage_protection_schema(sql_util))
         sql_util.ensure_table(cur, damage_protection_daily_summary_table, damage_protection_summary_schema(sql_util, 'day'))
         con.commit()

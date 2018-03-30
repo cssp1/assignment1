@@ -12,7 +12,7 @@ import SpinNoSQL
 import SpinSQLUtil
 import SpinETL
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 commit_interval = 1000
@@ -56,7 +56,7 @@ def do_main():
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config(game_id+'_upcache')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     # INPUTS
     sessions_table = cfg['table_prefix']+game_id+'_sessions'
@@ -68,7 +68,7 @@ def do_main():
 
     nosql_client = SpinNoSQL.NoSQLClient(SpinConfig.get_mongodb_config(game_id))
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
     sql_util.ensure_table(cur, sessions_table, sessions_schema(sql_util))
     sql_util.ensure_table(cur, sessions_daily_summary_table, sessions_summary_schema(sql_util, 'day', 'dau'))
     sql_util.ensure_table(cur, sessions_hourly_summary_table, sessions_summary_schema(sql_util, 'hour', 'hau'))

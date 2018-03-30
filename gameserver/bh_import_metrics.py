@@ -11,7 +11,7 @@ import SpinConfig
 import SpinSQLUtil
 import SpinJSON
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 import requests
 import urllib
 
@@ -53,13 +53,13 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
 
     with SpinSingletonProcess.SingletonProcess('bh_import_metrics'):
 
         bh_metrics_table = cfg['table_prefix']+'bh_metrics'
 
-        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         sql_util.ensure_table(cur, bh_metrics_table, bh_metrics_schema(sql_util))
         con.commit()
 

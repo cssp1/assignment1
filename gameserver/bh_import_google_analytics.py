@@ -12,7 +12,7 @@ import sys, os, time, getopt, calendar
 import SpinConfig
 import SpinETL
 import SpinSQLUtil
-import MySQLdb
+import SpinMySQLdb
 
 time_now = int(time.time())
 
@@ -167,14 +167,14 @@ if __name__ == '__main__':
     if not verbose: sql_util.disable_warnings()
 
     cfg = SpinConfig.get_mysql_config('skynet')
-    con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+    con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
     bh_summary_table = cfg['table_prefix']+'bh_daily_summary'
     bh_detail_table = cfg['table_prefix']+'bh_daily_detail'
     bh_clicks_table = cfg['table_prefix']+'bh_daily_clicks'
     bh_login_summary_table = cfg['table_prefix']+'bh_login_daily_summary'
     bh_login_campaign_summary_table = cfg['table_prefix']+'bh_login_campaign_daily_summary'
 
-    cur = con.cursor(MySQLdb.cursors.DictCursor)
+    cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
 
     for table, schema in ((bh_summary_table, bh_summary_schema(sql_util)),
                           (bh_detail_table, bh_detail_schema(sql_util)),

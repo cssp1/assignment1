@@ -11,7 +11,7 @@ import SpinConfig
 import SpinJSON
 import SpinSQLUtil
 import SpinSingletonProcess
-import MySQLdb
+import SpinMySQLdb
 
 sys.path += ['../gamedata/'] # oh boy...
 import GameDataUtil
@@ -62,7 +62,7 @@ def flush_keyvals(sql_util, cur, tbl, keyvals):
     if not dry_run:
         try:
             sql_util.do_insert_batch(cur, tbl, keyvals)
-        except MySQLdb.Warning as e:
+        except SpinMySQLdb.Warning as e:
             raise Exception('while inserting into %s:\n' % tbl+'\n'.join(map(repr, keyvals))+'\n'+repr(e))
         con.commit()
     del keyvals[:]
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     sql_util = SpinSQLUtil.MySQLUtil()
     if verbose or True:
         from warnings import filterwarnings
-        filterwarnings('error', category = MySQLdb.Warning)
+        filterwarnings('error', category = SpinMySQLdb.Warning)
     else:
         sql_util.disable_warnings()
 
@@ -143,8 +143,8 @@ if __name__ == '__main__':
     with SpinSingletonProcess.SingletonProcess('stats_sql-%s' % game_id):
 
         if not dry_run:
-            con = MySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
-            cur = con.cursor(MySQLdb.cursors.DictCursor)
+            con = SpinMySQLdb.connect(*cfg['connect_args'], **cfg['connect_kwargs'])
+            cur = con.cursor(SpinMySQLdb.cursors.DictCursor)
         else:
             cur = None
         stats_table = cfg['table_prefix']+game_id+'_stats'
@@ -153,7 +153,7 @@ if __name__ == '__main__':
         quest_stats_table = cfg['table_prefix']+game_id+'_quest_stats'
 
         if not dry_run:
-            filterwarnings('ignore', category = MySQLdb.Warning)
+            filterwarnings('ignore', category = SpinMySQLdb.Warning)
             for tbl, schema in ((stats_table, stats_schema),
                                 (recipes_table, crafting_recipes_schema),
                                 (fishing_slates_table, fishing_slates_schema),
@@ -309,7 +309,7 @@ if __name__ == '__main__':
                         "RETURNS INT8 DETERMINISTIC RETURN "+\
                         "GREATEST(1, CEIL(amount*IF(prev_receipts>=1000.0,0.03,IF(prev_receipts>=100.0,0.025,IF(prev_receipts>=10.0,0.02,0.01)))))")
 
-            filterwarnings('error', category = MySQLdb.Warning)
+            filterwarnings('error', category = SpinMySQLdb.Warning)
             con.commit()
 
         # OBJECT STATS
@@ -478,7 +478,7 @@ if __name__ == '__main__':
             if verbose: print 'total', total, 'fishing slate entries inserted'
 
         if not dry_run:
-            filterwarnings('ignore', category = MySQLdb.Warning)
+            filterwarnings('ignore', category = SpinMySQLdb.Warning)
             for tbl in (stats_table, recipes_table, fishing_slates_table, quest_stats_table):
                 cur.execute("RENAME TABLE "+\
                             sql_util.sym(tbl)+" TO "+sql_util.sym(tbl+'_old')+","+\
