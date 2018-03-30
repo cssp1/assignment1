@@ -3107,13 +3107,13 @@
                              "dimensions": [313,73], "text_hjustify": "left", "text_vjustify": "top",
                              "text_size": 13, "text_leading": 16 },
 
-            "mission_accomplished_bar": { "kind": "SolidRect", "xy": [296,192], "dimensions": [390,24], "color": [0.4,1,0.1,0.4],
+            "mission_accomplished_bar": { "kind": "SolidRect", "xy": [296,196], "dimensions": [390,24], "color": [0.4,1,0.1,0.4],
                                           "outline_width": 1, "outline_color": [0.4,1,0.1,0.5] },
-            "mission_accomplished": { "kind": "TextField", "xy": [296,190], "dimensions": [390,28], "text_size": 14, "text_style": "thick",
+            "mission_accomplished": { "kind": "TextField", "xy": [296,194], "dimensions": [390,28], "text_size": 14, "text_style": "thick",
                                       "text_hjustify": "center", "ui_name": "MISSION ACCOMPLISHED" },
-            "mission_incomplete_bar": { "kind": "SolidRect", "xy": [296,192], "dimensions": [390,24], "color": [1,1,1,0.33],
+            "mission_incomplete_bar": { "kind": "SolidRect", "xy": [296,196], "dimensions": [390,24], "color": [1,1,1,0.33],
                                         "outline_width": 1, "outline_color": [1,1,1,0.5] },
-            "mission_incomplete": { "kind": "TextField", "xy": [296,190], "dimensions": [390,28], "text_size": 14, "text_style": "thick",
+            "mission_incomplete": { "kind": "TextField", "xy": [296,194], "dimensions": [390,28], "text_size": 14, "text_style": "thick",
                                     "text_hjustify": "center", "ui_name": "COMPLETE MISSION FOR REWARD" },
 
             "tips_label": { "kind": "TextField", "xy": [293,231], "dimensions": [118,23], "text_size": 14, "text_style": "bold",
