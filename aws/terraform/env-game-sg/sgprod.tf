@@ -79,9 +79,9 @@ module "game_server_sg" {
   aws_ec2_iam_role_fragment = "${module.aws_cloud_init_sg.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   security_group_id_list = [
+    "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}",
     "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
-#XXXXXX   "${module.ipranges.cloudfront_ingress_security_group_id}",
-    "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
+    "${data.terraform_remote_state.game_frontend.cloudfront_ingress_security_group_id}"
   ]
   tournament_winners_sns_topic = "${data.terraform_remote_state.corp.tournament_winners_sns_topic}"
   pglith_pgsql_endpoint = "${data.terraform_remote_state.corp.pglith_pgsql_endpoint}"

@@ -7,7 +7,7 @@ echo "The security groups maintained by this script are now obsolete."
 echo "The new groups are maintained automatically by Terraform."
 echo
 echo "To update them, run this:"
-echo "(cd ~/cvs/game/aws/terraform/env-gameproxy && terraform apply)"
+echo "(cd ~/cvs/game/aws/terraform/env-game-frontend && terraform apply) && (cd ~/cvs/battlehouse-infra/terraform/env-battlehouse && terraform apply)"
 
 function format_ip_list {
     # Convert raw list of IPs/ports into an --ip-permissions argument for authorize-security-group-ingress
