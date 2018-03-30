@@ -1,9 +1,7 @@
-## BOILERPLATE ##
-
 terraform {
   backend "s3" {
     bucket = "spinpunch-terraform-state"
-    key    = "gametest.tfstate"
+    key    = "game-frontend.tfstate"
     region = "us-east-1"
     dynamodb_table = "spinpunch-terraform-state-lock"
   }
@@ -21,10 +19,11 @@ data "terraform_remote_state" "corp" {
 }
 
 variable "region" { default = "us-east-1" }
-variable "sitename" { default = "gametest" }
+variable "sitename" { default = "prod" }
 variable "sitedomain" { default = "spinpunch.com" }
 variable "enable_backups" { default = "0" }
-variable "envkey_sgprod" {}
+variable "game_haproxy_n_instances" { default = 2 }
+variable "envkey" {}
 
 
 data "external" "management_secrets" {
@@ -39,25 +38,21 @@ provider "cloudflare" {
   token = "${data.external.management_secrets.result["CLOUDFLARE_TOKEN"]}"
   version = "~> 0.1"
 }
-
-## END BOILERPLATE ##
-
-# note: each game title has its own envkey, so this module must be instanced with unique envkey_subs
-module "aws_cloud_init_sg" {
+module "aws_cloud_init" {
   source = "./modules/aws-cloud-init"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   region = "${var.region}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   enable_backups = "${var.enable_backups}"
-  envkey = "${var.envkey_sgprod}"
-  envkey_sub = "sgprod"
+  envkey = "${var.envkey}"
   secrets_bucket = "${data.terraform_remote_state.corp.secrets_bucket}"
   puppet_branch = "master"
 }
 
-module "game_server_sg" {
-  source = "../modules/game-server"
+# HAproxy instances between ELB/CloudFlare and game servers
+module "game_haproxy" {
+  source = "../modules/game-haproxy"
 
   vpc_id = "${data.terraform_remote_state.corp.spinpunch_vpc_id}"
   subnet_ids = "${data.terraform_remote_state.corp.spinpunch_prod_subnet_ids}"
@@ -65,32 +60,18 @@ module "game_server_sg" {
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
   region = "${var.region}"
-  ami = "${module.aws_cloud_init_sg.current_amazon_linux_ami_id}"
+  ami = "${module.aws_cloud_init.current_amazon_linux_ami_id}"
   key_pair_name = "${data.external.management_secrets.result["SSH_KEYPAIR_NAME"]}"
-  aws_cloud_config_head = "${module.aws_cloud_init_sg.cloud_config_head}"
-  aws_cloud_config_tail = "${module.aws_cloud_init_sg.cloud_config_tail}"
-  aws_ec2_iam_role_fragment = "${module.aws_cloud_init_sg.ec2_iam_role_fragment}"
+  aws_cloud_config_head = "${module.aws_cloud_init.cloud_config_head}"
+  aws_cloud_config_tail = "${module.aws_cloud_init.cloud_config_tail}"
+  aws_ec2_iam_role_fragment = "${module.aws_cloud_init.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
+  instance_type = "t2.micro"
+  n_instances = "${var.game_haproxy_n_instances}"
   security_group_id_list = [
-    "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
-#XXXXXX   "${module.ipranges.cloudfront_ingress_security_group_id}",
+    "${data.terraform_remote_state.corp.spinpunch_prod_game_haproxy_security_group_id}",
+    "${module.ipranges.cloudflare_ingress_security_group_id}",
+    "${module.ipranges.cloudfront_ingress_security_group_id}",
     "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
   ]
-  tournament_winners_sns_topic = "${data.terraform_remote_state.corp.tournament_winners_sns_topic}"
-  pglith_pgsql_endpoint = "${data.terraform_remote_state.corp.pglith_pgsql_endpoint}"
-  analytics_mysql_endpoint = "${data.terraform_remote_state.corp.analytics_mysql_endpoint}"
-  skynet_mongo_endpoint = "${data.terraform_remote_state.corp.skynet_mongo_endpoint}"
-  cgianalytics_hosts = "${data.terraform_remote_state.corp.cgianalytics_hosts}"
-
-  # specific to each game
-  game_id = "sg"
-  game_id_long = "summonersgate"
-  game_mail_from = "Allandra"
-  tournament_continents = "fb ag"
-  zone_index = 2 # us-east-1d
-  instance_type = "m5.large"
-  game_server_snam = "srv2"
-
-  # to test alongside legacy server, set snam to "srv2" and make CloudFlare DNS entry "sgprod-srv2.spinpunch.com"
-  # to take over as the master, set snam to "srv0" (or blank?) and make DNS entries "sgprod-raw.spinpunch.com" and "sgprod-srv0.spinpunch.com"
 }

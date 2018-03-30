@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket = "spinpunch-terraform-state"
-    key    = "mongoprod.tfstate"
+    key    = "mongo-prod.tfstate"
     region = "us-east-1"
     dynamodb_table = "spinpunch-terraform-state-lock"
   }

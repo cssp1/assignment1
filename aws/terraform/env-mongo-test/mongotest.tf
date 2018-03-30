@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket = "spinpunch-terraform-state"
-    key    = "gameprod.tfstate"
+    key    = "mongo-test.tfstate"
     region = "us-east-1"
     dynamodb_table = "spinpunch-terraform-state-lock"
   }
@@ -19,16 +19,25 @@ data "terraform_remote_state" "corp" {
 }
 
 variable "region" { default = "us-east-1" }
-variable "sitename" { default = "prod" }
+variable "sitename" { default = "mongotest" }
 variable "sitedomain" { default = "spinpunch.com" }
-variable "enable_backups" { default = "0" }
-variable "game_haproxy_n_instances" { default = 2 }
+variable "enable_backups" { default = "1" }
+variable "backups_bucket" { default = "spinpunch-mongotest-backups" }
+variable "extra_backups_bucket" { default = "spinpunch-backups" }
+variable "mongodb_instance_type" { default = "t2.medium" }
+variable "n_instances" { default = 2}
 variable "envkey" {}
 
+# note: different from BH stack
+locals {
+  key_pair_name = "sgprod"
+  private_key_file = "sgprod.pem"
+}
 
 data "external" "management_secrets" {
   program = ["envkey-fetch", "${data.terraform_remote_state.corp.management_envkey}", "--cache"]
 }
+
 provider "aws" {
   region = "${var.region}"
   version = "~> 1.8"
@@ -47,31 +56,27 @@ module "aws_cloud_init" {
   enable_backups = "${var.enable_backups}"
   envkey = "${var.envkey}"
   secrets_bucket = "${data.terraform_remote_state.corp.secrets_bucket}"
-  puppet_branch = "master"
 }
 
-# HAproxy instances between ELB/CloudFlare and game servers
-module "game_haproxy" {
-  source = "../modules/game-haproxy"
+module "mongodb" {
+  source = "../modules/mongodb"
 
   vpc_id = "${data.terraform_remote_state.corp.spinpunch_vpc_id}"
   subnet_ids = "${data.terraform_remote_state.corp.spinpunch_prod_subnet_ids}"
   availability_zones = "${data.terraform_remote_state.corp.spinpunch_prod_availability_zones}"
+  ami = "${module.aws_cloud_init.current_amazon_linux_ami_id}"
   sitename = "${var.sitename}"
   sitedomain = "${var.sitedomain}"
+  backups_bucket = "${var.backups_bucket}"
+  extra_backups_bucket = "${var.extra_backups_bucket}"
   region = "${var.region}"
-  ami = "${module.aws_cloud_init.current_amazon_linux_ami_id}"
-  key_pair_name = "${data.external.management_secrets.result["SSH_KEYPAIR_NAME"]}"
+  key_pair_name = "${local.key_pair_name}" # data.external.management_secrets.result["SSH_KEYPAIR_NAME"]}"
   aws_cloud_config_head = "${module.aws_cloud_init.cloud_config_head}"
   aws_cloud_config_tail = "${module.aws_cloud_init.cloud_config_tail}"
   aws_ec2_iam_role_fragment = "${module.aws_cloud_init.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
-  instance_type = "t2.micro"
-  n_instances = "${var.game_haproxy_n_instances}"
-  security_group_id_list = [
-    "${data.terraform_remote_state.corp.spinpunch_prod_game_haproxy_security_group_id}",
-    "${module.ipranges.cloudflare_ingress_security_group_id}",
-    "${module.ipranges.cloudfront_ingress_security_group_id}",
-    "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
-  ]
+  ssh_access_security_group_id = "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
+  mongodb_instance_type = "${var.mongodb_instance_type}"
+  n_instances = "${var.n_instances}"
+  mongodb_security_group_id = "${data.terraform_remote_state.corp.spinpunch_prod_mongodb_security_group_id}"
 }
