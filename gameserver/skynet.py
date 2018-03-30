@@ -16,7 +16,7 @@ from SkynetLib import spin_targets, bid_coeff, \
      encode_one_param, encode_params, decode_params, decode_one_param, decode_filter, stgt_to_dtgt, match_params, standin_spin_params, \
      decode_adgroup_name, adgroup_name_is_bad, make_variable_regexp, adgroup_dtgt_filter_query, mongo_enc
 from SkynetData import GAMES, TRUE_INSTALLS_PER_CLICK, TRUE_INSTALLS_PER_REPORTED_APP_INSTALL, \
-     BATTLEHOUSE_APP_ID, BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN
+     BATTLEHOUSE_APP_ID, BATTLEHOUSE_PAGE_ID, BATTLEHOUSE_PAGE_TOKEN, ASSET_FEEDS
 
 HTTPLIB = 'requests'
 if HTTPLIB == 'requests':
@@ -61,9 +61,19 @@ def get_creatives(asset_path):
     video_files = sorted(glob.glob(os.path.join(asset_path, 'video_*.mp4')))
     title_files = sorted(glob.glob(os.path.join(asset_path, 'title_*.txt')))
     body_files =  sorted(glob.glob(os.path.join(asset_path, 'body_*.txt')))
-    return { 'image': {'name':'image', 'key':'x', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in (image_files + video_files)]},
-             'title': {'name':'title', 'key':'y', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in title_files]},
-             'body':  {'name':'body',  'key':'z', 'values': [{'val':encode_filename(name), 'coeff':1.0} for name in body_files]} }
+    image_values = [{'val':encode_filename(name), 'coeff':1.0} for name in (image_files + video_files)]
+    title_values = [{'val':encode_filename(name), 'coeff':1.0} for name in title_files]
+    body_values  = [{'val':encode_filename(name), 'coeff':1.0} for name in body_files]
+
+    for feed_name in ASSET_FEEDS.iterkeys():
+        assert feed_name.startswith('dyn')
+        image_values.append({'val': feed_name, 'coeff': 1.0})
+        title_values.append({'val': feed_name, 'coeff': 1.0})
+        body_values.append({'val': feed_name, 'coeff': 1.0})
+
+    return { 'image': {'name':'image', 'key':'x', 'values': image_values},
+             'title': {'name':'title', 'key':'y', 'values': title_values},
+             'body':  {'name':'body',  'key':'z', 'values': body_values} }
 
 # GENERATING ADS LIST
 
@@ -108,7 +118,7 @@ def get_ad_stgt_list(campaign, param_table):
     to_remove = []
     for c in combos:
         if 'image' in c:
-            is_big = c['image'].startswith('big') or c['image'].startswith('vid')
+            is_big = c['image'].startswith('big') or c['image'].startswith('vid') or c['image'].startswith('dyn')
             if (c['ad_type'] in (32,432) and (not is_big)) or \
                (c['ad_type'] not in (32,432) and is_big):
                 to_remove.append(c)
@@ -1545,7 +1555,7 @@ def adimages_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adimages, mongo_enc(x), primary_key = 'hash') for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adimage', 'act_'+ad_account_id+'/adimages') + '?fields='+ADIMAGE_FIELDS, is_paged = True, dict_paging = False)]
 
-ADCREATIVE_FIELDS='id,adlabels,body,call_to_action_type,image_crops,image_hash,image_url,link_og_id,link_url,name,object_id,object_store_url,object_url,object_story_id,object_story_spec,object_type,thumbnail_url,title,url_tags'
+ADCREATIVE_FIELDS='id,adlabels,body,call_to_action_type,image_crops,image_hash,image_url,link_og_id,link_url,name,object_id,object_store_url,object_url,object_story_id,object_story_spec,object_type,thumbnail_url,title,url_tags,asset_feed_id'
 def adcreatives_pull(db, ad_account_id):
     [update_fields_by_id(db.fb_adcreatives, mongo_enc(x)) for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adcreative', 'act_'+ad_account_id+'/adcreatives') + '?fields='+ADCREATIVE_FIELDS, is_paged = True)]
@@ -1600,7 +1610,7 @@ def advideo_get_id(db, ad_account_id, filename):
 
 def make_object_story_spec(db, ad_account_id, page_id,
                            body_text, title_text,
-                           image_file, thumbnail_file, tgt, base_link_url,
+                           image_file, thumbnail_file, asset_feed_id, tgt, base_link_url,
                            link_description, link_destination, link_caption,
                            game_app_id):
     # use ordered dict because we need to hash this consistently
@@ -1609,7 +1619,10 @@ def make_object_story_spec(db, ad_account_id, page_id,
     cr_call_to_action = SpinJSON.ordered_dict_klass({'type': call_to_action_type(tgt),
                                                      'value': SpinJSON.ordered_dict_klass({'link':base_link_url})})
 
-    if tgt['image'].startswith('vid'):
+    if asset_feed_id:
+        # dynamic creative
+        pass
+    elif tgt['image'].startswith('vid'):
         cr_data = cr_params['video_data'] = {
             'message': body_text,
             'title': title_text,
@@ -1633,6 +1646,8 @@ def make_object_story_spec(db, ad_account_id, page_id,
         # when using OFFSITE_CONVERSION optimization for a Canvas app,
         # FB API refuses to accept adcreatives containing call_to_action
         pass
+    elif asset_feed_id is not None:
+        pass # call to action is part of the asset feed
     else:
         cr_data['call_to_action'] = cr_call_to_action
         if tgt['bid_type'] == 'oCPM_INSTALL':
@@ -1744,16 +1759,23 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
     assert len(link_url) < 1024
 
     if ad_type in (1,4,32,432):
-        title_text = open(os.path.join(asset_path, 'title_'+tgt['title']+'.txt')).read().strip()
-        body_text = open(os.path.join(asset_path, 'body_'+tgt['body']+'.txt')).read().strip()
-        if tgt['image'].startswith('vid'):
-            image_file = os.path.join(asset_path, 'video_'+tgt['image']+'.mp4')
-            thumbnail_file = os.path.join(asset_path, 'video_'+tgt['image']+'.jpg')
-        else:
-            image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
+        if tgt['image'].startswith('dyn'):
+            # dynamic creative
+            asset_feed_id = ASSET_FEEDS[tgt['image']]
+            title_text = body_text = None
+            image_file = None
             thumbnail_file = None
-        if ad_type == 1:
-            image_hash = adimage_get_hash(db, ad_account_id, image_file)
+        else:
+            title_text = open(os.path.join(asset_path, 'title_'+tgt['title']+'.txt')).read().strip()
+            body_text = open(os.path.join(asset_path, 'body_'+tgt['body']+'.txt')).read().strip()
+            if tgt['image'].startswith('vid'):
+                image_file = os.path.join(asset_path, 'video_'+tgt['image']+'.mp4')
+                thumbnail_file = os.path.join(asset_path, 'video_'+tgt['image']+'.jpg')
+            else:
+                image_file = os.path.join(asset_path, 'image_'+tgt['image']+'.jpg')
+                thumbnail_file = None
+            if ad_type == 1:
+                image_hash = adimage_get_hash(db, ad_account_id, image_file)
 
     # March 2014 migration note - FB is deprecating Type 4 (right-hand-side) app install ads.
     # I think we can replace these with either Type 1 domain ads OR Type 32 app install ads,
@@ -1761,7 +1783,8 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
     if ad_type in (1,4,32,432):
         # create Type 1/Type 4 right-hand-side ad or Type 32 "Play Now" News Feed ad (or Type 432 combined RHS/News Feed ad)
-        creative[spin_field('image_basename')] = os.path.basename(image_file)
+        if image_file is not None:
+            creative[spin_field('image_basename')] = os.path.basename(image_file)
 
         if ad_type == 1:
             creative['image_hash'] = image_hash
@@ -1785,7 +1808,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
 
             cr_params = make_object_story_spec(db, ad_account_id, page_id,
                                                body_text, title_text,
-                                               image_file, thumbnail_file,
+                                               image_file, thumbnail_file, asset_feed_id,
                                                tgt, base_link_url,
                                                link_description, link_destination,
                                                link_caption, game_data['app_id'])
@@ -1795,6 +1818,9 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
                 creative['object_story_id'] = page_post_id
             else: # inline creation
                 creative['object_story_spec'] = SpinJSON.dumps(cr_params, ordered = True)
+
+            if asset_feed_id:
+                creative['asset_feed_id'] = asset_feed_id
 
             # 20180308: try using {{ad.name}} replacement so that creatives can be shared even if targeting varies,
             # as long as the visual appearance of the ad is the same
@@ -2125,6 +2151,7 @@ def adgroup_create_batch_element(db, campaign_id, campaign_name, creative_id, tg
 
     adgroup = {'name': name,
                'adset_id': campaign_id,
+               'status': 'ACTIVE',
                'creative': SpinJSON.dumps({'creative_id':creative_id}),
                'tracking_specs': SpinJSON.dumps([{'action.type':'offsite_conversion','fb_pixel':fb_pixel} for fb_pixel in \
                                                  set(v['fb_pixel'] for v in conversion_pixels.itervalues())]),
