@@ -25,7 +25,7 @@ adstats_schema = {
                ('campaign_id', 'VARCHAR(255)'),
                ('adgroup_id', 'VARCHAR(255) NOT NULL'),
                ('stgt', 'VARCHAR(255) NOT NULL'),
-               ('bid', 'INT4 NOT NULL'),
+               ('bid', 'INT4'),
                ('spent', 'INT4 NOT NULL'),
                ('clicks', 'INT4 NOT NULL'),
                ('impressions', 'INT4 NOT NULL'),

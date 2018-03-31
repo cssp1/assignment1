@@ -603,6 +603,7 @@ def decode_bid_type(c):
 def encode_bid_type(t):
     return 'ABSOLUTE_OCPM' if t.startswith('oCPM') else BID_TYPE_CODES[t]
 
+# note: this no longer works when using Dynamic Creatives. We'll need to query the adcampaign/adset instead.
 def adgroup_get_bid(adgroup): return adgroup.get('bid_amount', None)
 
 def adgroup_encode_bid(tgt, bid):
