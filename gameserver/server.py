@@ -12792,8 +12792,8 @@ class Player(AbstractPlayer):
         any_changed = False
 
         for name, value in stats.iteritems():
-            entry = gamedata['leaderboard']['score_fields'].get(name)
-            if not entry:
+            entry = gamedata['leaderboard']['score_fields'].get(name, None)
+            if entry is None: # note: can be {}, in which case we use it
                 continue # this stat not active in this game
 
             has_extra_axes = isinstance(value, dict)
