@@ -2217,7 +2217,7 @@ def adcampaigns_pull(db, ad_account_id):
     # with the flag include_deleted. Instead, you must make an HTTP GET call and specify the field campaign_status=['DELETED']
     [update_fields_by_id(db.fb_adcampaigns, mongo_enc(x)) for x in \
      fb_api(SpinFacebook.versioned_graph_endpoint('adset', 'act_'+ad_account_id+'/adsets'),
-            url_params = {'fields':'id,adlabels,adset_schedule,name,account_id,campaign_id,created_time,end_time,frequency_cap,frequency_cap_reset_period,frequency_control_specs,lifetime_frequency_cap,optimization_goal,promoted_object,rf_prediction_id,configured_status,effective_status,pacing_type,daily_budget,lifetime_budget,targeting,bid_amount,billing_event',
+            url_params = {'fields':'id,adlabels,adset_schedule,name,account_id,campaign_id,created_time,end_time,frequency_control_specs,optimization_goal,promoted_object,rf_prediction_id,configured_status,effective_status,pacing_type,daily_budget,lifetime_budget,targeting,bid_amount,billing_event',
                           'configured_status':SpinJSON.dumps(['ACTIVE','ARCHIVED','PAUSED'])},
             is_paged = True)]
 
