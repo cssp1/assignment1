@@ -333,5 +333,6 @@ if __name__ == '__main__':
     assert cf.is_graphical(u'\u00d7\u0640')
     assert cf.is_graphical(u'S\u0337L\u0337A\u0337Y\u0337E\u0337R\u0337')
     assert cf.is_graphical(u'🔰👊💥😎THE SPECTRE😎💥👊🔰 ')
+    assert cf.is_graphical(u'\u0627\u0644\u0643\u064a\u0644\u0627\u0646\u064a \u0639\u0644\u064a \u0627\u0644\u063a\u0632\u0627\u0644')
 
     print 'OK'
