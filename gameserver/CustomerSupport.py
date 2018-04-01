@@ -1900,6 +1900,7 @@ class HandleModifyScores(Handler):
     def __init__(self, *pargs, **pkwargs):
         Handler.__init__(self, *pargs, **pkwargs)
         self.stat = self.args['stat']
+        self.method = self.args.get('update_method', None) # can't use "method" because it clashes with CONTROLAPI parameter
         self.delta = self.args.get('delta', None)
         self.new_value = self.args.get('value', None)
         self.old_value = None # obtained during exec and then used for logging
@@ -1911,9 +1912,13 @@ class HandleModifyScores(Handler):
         # record the old value for later use by get_log_entry()
         self.old_value = player.get_master_score(self.stat)
         if self.delta is not None:
-            player.modify_scores({self.stat: int(self.delta)}, method = '+=', reason = 'CustomerSupport')
+            if self.method is None:
+                self.method = '+='
+            player.modify_scores({self.stat: int(self.delta)}, method = self.method, reason = 'CustomerSupport')
         elif self.new_value is not None:
-            player.modify_scores({self.stat: int(self.new_value)}, method = '=', reason = 'CustomerSupport')
+            if self.method is None:
+                self.method = '='
+            player.modify_scores({self.stat: int(self.new_value)}, method = self.method, reason = 'CustomerSupport')
         if retmsg is not None:
             retmsg.append(["PLAYER_CACHE_UPDATE", [self.gamesite.gameapi.get_player_cache_props(user, player, None)]])
         return ReturnValue(result = 'ok')
