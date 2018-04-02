@@ -38,6 +38,7 @@ def battles_risk_reward_schema(sql_util): return {
                ('loot_water_value', 'INT4 NOT NULL'),
                ('loot_res3_amount', 'INT4 NOT NULL'),
                ('loot_res3_value', 'INT4 NOT NULL'),
+               ('loot_tokens_amount', 'INT4 NOT NULL'),
                ('damage_iron_amount', 'INT4 NOT NULL'),
                ('damage_iron_value', 'INT4 NOT NULL'),
                ('damage_water_amount', 'INT4 NOT NULL'),
@@ -75,6 +76,7 @@ def battles_risk_reward_summary_schema(sql_util, interval_name): return {
                ('consumed_items_value', 'INT8'),
                ('loot_res_value', 'INT8'), # iron + water + res3
                ('loot_res3_value', 'INT8'), # res3 only
+               ('loot_tokens_amount', 'INT8'),
                ('loot_iron_water_amount', 'INT8'), # iron + water only
                ('loot_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
                ('loot_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
@@ -105,6 +107,7 @@ def battles_risk_reward_summary_combined_schema(sql_util, interval_name): return
                ('consumed_items_value', 'INT8'),
                ('loot_res_value', 'INT8'), # iron + water + res3
                ('loot_res3_value', 'INT8'), # res3 only
+               ('loot_tokens_amount', 'INT8'),
                ('loot_iron_water_amount', 'INT8'), # iron + water only
                ('loot_iron_water_amount_10th', 'INT8'), # iron + water only, 10th percentile
                ('loot_iron_water_amount_90th', 'INT8'), # iron + water only, 90th percentile
@@ -195,6 +198,7 @@ def eval_batch(sql_util, con, cur, game_id, week_origin, battles_table, battles_
             water_value(IFNULL(IF(active_player_id = attacker_id, `loot:water`, -1*`loot:water_lost`), 0), active_player_townhall_level, active_player_prev_receipts) AS loot_water_value,
             IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0) AS loot_res3_amount,
             res3_value(IFNULL(IF(active_player_id = attacker_id, `loot:res3`, -1*`loot:res3_lost`),0), active_player_townhall_level, active_player_prev_receipts) AS loot_res3_value,
+            IFNULL((SELECT SUM(loot.stack) FROM $GAME_ID_battle_loot loot WHERE loot.battle_id = battles.battle_id AND loot.item like 'token%'),0) AS loot_tokens_amount,
 
             IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0) AS damage_iron_amount,
             iron_value(IFNULL((SELECT SUM(-1*damage.iron) FROM $GAME_ID_battle_damage damage WHERE damage.battle_id = battles.battle_id AND damage.user_id = active_player_id),0), active_player_townhall_level, active_player_prev_receipts) AS damage_iron_value,
@@ -388,6 +392,7 @@ if __name__ == '__main__':
                                 "       SUM(consumed_items_value) AS consumed_items_value," + \
                                 "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
                                 "       SUM(loot_res3_value) AS loot_res3_value," + \
+                                "       SUM(loot_tokens_amount) AS loot_tokens_amount," + \
                                 "       SUM(loot_iron_amount + loot_water_amount) AS loot_iron_water_amount," + \
                                 sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.1)+" AS loot_iron_water_amount_10th," + \
                                 sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.9)+" AS loot_iron_water_amount_90th," + \
@@ -455,6 +460,7 @@ if __name__ == '__main__':
                                 "       SUM(consumed_items_value) AS consumed_items_value," + \
                                 "       SUM(loot_iron_value + loot_water_value + loot_res3_value) AS loot_res_value," + \
                                 "       SUM(loot_res3_value) AS loot_res3_value," + \
+                                "       SUM(loot_tokens_amount) AS loot_tokens_amount," + \
                                 "       SUM(loot_iron_amount + loot_water_amount) AS loot_iron_water_amount," + \
                                 sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.1)+" AS loot_iron_water_amount_10th," + \
                                 sql_util.percentile('IFNULL(loot_iron_amount,0)+IFNULL(loot_water_amount,0)', 0.9)+" AS loot_iron_water_amount_90th," + \
