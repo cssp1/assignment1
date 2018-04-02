@@ -24,6 +24,7 @@ def ai_bases_schema(sql_util):
                        ('ui_name', 'VARCHAR(32)'),
                        ('class', 'VARCHAR(32)'),
                        ('analytics_tag', 'VARCHAR(32)'), # XXX deprecated - this can vary over time, so we need to switch to "assignments"
+                       ('loot_tokens', 'INT4'),
                        ], 'indices': {}}
 def ai_base_templates_schema(sql_util):
     return {'fields': [('base_type', 'VARCHAR(16) NOT NULL'),
@@ -149,13 +150,16 @@ if __name__ == '__main__':
             tag = data.get('analytics_tag', None)
             klass = SpinUpcache.classify_ai_base(gamedata, int(sid))
             ui_difficulty = data.get('ui_difficulty', 'Normal')
+            loot_tokens = SpinUpcache.ai_base_has_tokens(gamedata, data)
 
             ai_bases_rows.append([('user_id',int(sid)),
                                   ('kind', data.get('kind', 'ai_base')),
                                   ('player_level', data['resources']['player_level']),
                                   ('ui_name', data['ui_name']),
                                   ('analytics_tag', tag),
-                                  ('class', klass)])
+                                  ('loot_tokens', loot_tokens),
+                                  ('class', klass),
+                                  ])
             event_klass = {'pve_event_progression': 'event',
                            'hitlist': 'hitlist',
                            'pve_immortal_progression': 'immortal',
