@@ -5710,6 +5710,15 @@ class Session(object):
             headers = {'X-BHLogin-API-Secret': SpinConfig.config['battlehouse_api_secret'].encode('utf-8')}
             method = 'POST'
         elif api == 'mailchimp':
+
+            # check the address against blacklist
+            blackreg = gamedata['adnetworks'][api].get('address_blacklist_regexp')
+            if blackreg:
+                if re.compile(blackreg).match(context['email_address'].lower()):
+                    # address is blacklisted. Tell the caller that we succeeded, but silently drop the request.
+                    self.user.log_adnetwork_event(api, {'user_id': self.user.user_id, 'kpi': name, 'context': context, 'status': 'blacklisted'})
+                    return True
+
             api_key = SpinConfig.config['mailchimp_api_key']
             datacenter = api_key.split('-')[1]
             url = data['url'].replace('%DC%', datacenter)
