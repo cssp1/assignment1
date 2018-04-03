@@ -60,12 +60,18 @@ if __name__ == '__main__':
             print 'querying', offset, '-', offset + BATCH_SIZE
 
         ret = mailchimp_api(requests_session, 'GET', 'lists/%s/members' % list_id,
-                            {'fields': 'members.email_address,members.status,members.stats,members.timestamp_signup,members.last_changed,members.merge_fields',
+                            {'fields': 'members.email_address,members.status,members.stats,members.timestamp_signup,members.last_changed,members.merge_fields,members.member_rating',
                              'status': 'subscribed',
                              'offset': offset, 'count': BATCH_SIZE})
         for member in ret['members']:
             if member['status'] != 'subscribed':
                 continue # member already unsubscribed. No action.
+
+            if member['member_rating'] < 2:
+                # low rating. Always unsubscribe.
+                to_clean.append(member)
+                continue
+
             if member['stats']['avg_click_rate'] > 0 or \
                member['stats']['avg_open_rate'] > 0:
                 continue # member has responded. Don't unsubscribe.
