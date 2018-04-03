@@ -2,7 +2,10 @@
 
 # query tournament winners, send prizes, record results to file, and upload/broadcast results.
 
-. /etc/spinpunch
+# load environment variables on legacy systems
+if [ -r /etc/spinpunch ]; then
+    . /etc/spinpunch
+fi
 
 # check for various files in the environment that we'll need to run all steps
 for VITAL_FILE in "${HOME}/.aws/credentials"; do
@@ -31,6 +34,7 @@ WEEK=$3
 TOURNAMENT_STAT=$4
 TIME_SCOPE=$5
 
+GAME_ID=`./SpinConfig.py --getvar game_id --getvar-format=raw`
 GAME_ID_UPPER=`echo ${GAME_ID} | tr a-z A-Z`
 GAME_TOURNAMENT_CONTINENTS=`./SpinConfig.py --getvar tournament_continents | python -c 'import json, sys; print " ".join(json.load(sys.stdin))'`
 
@@ -38,6 +42,7 @@ declare -A PLATFORM_UI_NAMES
 PLATFORM_UI_NAMES[fb]=Facebook
 PLATFORM_UI_NAMES[ag]=ArmorGames
 PLATFORM_UI_NAMES[kg]=Kongregate
+PLATFORM_UI_NAMES[bh]=Battlehouse
 
 # wait for end time to come
 WAIT_SECONDS=`python -c "import time; print int(${END_TIME}-time.time());"`
