@@ -7,7 +7,7 @@
 # unsubscribe dead users from a MailChimp list
 # this keeps down the number of active subscribers (which we pay for)
 
-import sys, time, getopt
+import sys, time, getopt, re
 import SpinJSON
 import SpinConfig
 import requests
@@ -18,14 +18,18 @@ requests_session = requests.Session()
 
 if __name__ == '__main__':
     list_name = None
-    min_age_days = 30
+    min_age_days = 30 # always keep users updated or added within this many days
+    drop_country_tiers = [] # list of tiers to unsubscribe
+    drop_email_re = None # regexp of addresses to unsubscribe
     dry_run = False
     verbose = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:q', ['list-name=','min-age-days=','dry-run'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:q', ['list-name=','min-age-days=','drop-country-tier=','drop-email-regexp=','dry-run'])
     for key, val in opts:
         if key == '--list-name': list_name = val
         elif key == '--min-age-days': min_age_days = int(val)
+        elif key == '--drop-country-tier': drop_country_tiers.append(int(val))
+        elif key == '--drop-email-regexp': drop_email_re = re.compile(val)
         elif key == '--dry-run': dry_run = True
         elif key == '-q': verbose = False
 
@@ -61,25 +65,33 @@ if __name__ == '__main__':
                              'offset': offset, 'count': BATCH_SIZE})
         for member in ret['members']:
             if member['status'] != 'subscribed':
-                continue # member already unsubscribed
+                continue # member already unsubscribed. No action.
             if member['stats']['avg_click_rate'] > 0 or \
                member['stats']['avg_open_rate'] > 0:
-                continue # member has responded
+                continue # member has responded. Don't unsubscribe.
 
             # maybe act differently on different country tiers?
+            country_tier = None
             if member['merge_fields'].get('COUNTRY'):
                 country_tier = SpinConfig.country_tier_map.get(member['merge_fields']['COUNTRY'], 4)
             elif member['merge_fields'].get('TIER'):
                 country_tier = int(member['merge_fields']['TIER'])
 
-            if member['timestamp_signup']:
-                signup_time = parse_mailchimp_time(member['timestamp_signup'])
-                if signup_time >= time_now - min_age_days * 86400:
-                    continue # member signed up recently
+            if country_tier is not None and int(country_tier) in drop_country_tiers:
+                # if using --drop-country-tier, always unsubscribe regardless of age
+                pass
+            elif drop_email_re and drop_email_re.match(member['email_address'].lower()):
+                # if using --drop-email-regexp and it matches, always unsubscribe regardless of age
+                pass
+            else:
+                if member['timestamp_signup']:
+                    signup_time = parse_mailchimp_time(member['timestamp_signup'])
+                    if signup_time >= time_now - min_age_days * 86400:
+                        continue # member signed up recently. Don't unsubscribe.
 
-            last_changed_time = parse_mailchimp_time(member['last_changed'])
-            if last_changed_time >= time_now - min_age_days * 86400:
-                continue # member was updated recently
+                last_changed_time = parse_mailchimp_time(member['last_changed'])
+                if last_changed_time >= time_now - min_age_days * 86400:
+                    continue # member was updated recently. Don't unsubscribe.
 
             to_clean.append(member)
 
