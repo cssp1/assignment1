@@ -93,7 +93,7 @@ def do_gui(spin_token_data, spin_token_raw, spin_token_cookie_name, spin_login_h
     gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
     gamedata['ai_bases_server'] = SpinConfig.load(SpinConfig.gamedata_component_filename("ai_bases_server.json"))
 
-    ssl_available = SpinConfig.config.get('ssl_crt_file','') and os.path.exists(SpinConfig.config['ssl_crt_file'])
+    ssl_available = SpinConfig.config['proxyserver'].get('external_ssl_port',-1) > 0
     replacements = {
         '$GAME_NAME$': gamedata['strings']['game_name'].upper(),
         '$GAME_LOGO_URL$': (gamedata['virals']['common_image_path']+gamedata['virals']['default_image']).replace('http:','https:'),

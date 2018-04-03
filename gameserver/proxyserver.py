@@ -3546,7 +3546,7 @@ def do_main():
     backlog = SpinConfig.config['proxyserver'].get('tcp_accept_backlog', 511)
     proxysite = ProxySite()
     reactor.listenTCP(myport_http, proxysite, backlog=backlog)
-    if myport_ssl > 0:
+    if myport_ssl > 0 and SpinConfig.config.get('ssl_key_file'):
         reactor.listenSSL(myport_ssl, proxysite,
                           SpinSSL.ChainingOpenSSLContextFactory(SpinConfig.config['ssl_key_file'],
                                                                 SpinConfig.config['ssl_crt_file'],
