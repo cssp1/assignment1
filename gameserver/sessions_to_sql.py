@@ -254,7 +254,7 @@ def do_main():
 
     if do_prune:
         # drop old data
-        KEEP_DAYS = {'sg': 180}.get(game_id, 30)
+        KEEP_DAYS = {'sg': 180,'fs':90}.get(game_id, 30)
         old_limit = time_now - KEEP_DAYS * 86400
 
         if verbose: print 'pruning', sessions_table
