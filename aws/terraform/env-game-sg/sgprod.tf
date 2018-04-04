@@ -30,7 +30,7 @@ data "terraform_remote_state" "game_frontend" {
 
 
 variable "region" { default = "us-east-1" }
-variable "sitename" { default = "gametest" }
+variable "sitename" { default = "prod" }
 variable "sitedomain" { default = "spinpunch.com" }
 variable "enable_backups" { default = "0" }
 variable "envkey_sgprod" {}
@@ -96,7 +96,7 @@ module "game_server_sg" {
   tournament_continents = "fb ag"
   zone_index = 2 # us-east-1d
   instance_type = "m5.large"
-  game_server_snam = "srv2"
+  game_server_snam = "srv0"
 
   # to test alongside legacy server, set snam to "srv2" and make CloudFlare DNS entry "sgprod-srv2.spinpunch.com"
   # to take over as the master, set snam to "srv0" (or blank?) and make DNS entries "sgprod-raw.spinpunch.com" and "sgprod-srv0.spinpunch.com"
