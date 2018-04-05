@@ -386,7 +386,15 @@ goog.inherits(InviteFriendsPromptConsequent, Consequent);
 InviteFriendsPromptConsequent.prototype.execute = function(state) {
     var dialog = invoke_invite_friends_prompt(this.reason);
     if(!dialog) { return; }
-    dialog.widgets['close_button'].show = this.show_close_button;
+
+    if(spin_frame_platform === 'fb') {
+        // April 2018 update: the friend invite flow on FB is rougher
+        // now that they removed the invitable_friends API, so always
+        // make the "close" button available on FB.
+    } else {
+        dialog.widgets['close_button'].show = this.show_close_button;
+    }
+
     // hack - copy code from tutorial_step_congratulations
     if(this.show_arrow) {
         make_tutorial_arrow_for_button('tutorial_congratulations', 'ok_button', 'up');

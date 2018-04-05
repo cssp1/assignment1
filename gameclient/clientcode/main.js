@@ -17902,9 +17902,15 @@ function invoke_invite_friends_dialog(reason) {
                                         'kv_params': {'kv_spin_referer': session.user_id}});
     } else if(spin_frame_platform == 'fb') {
         if(!spin_facebook_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
-        call_with_facebook_permissions('user_friends', (function (_reason) { return function() {
-            FBInviteFriends.invoke_fb_invite_friends_dialog(reason);
-        }; })(reason));
+        var direct_share = true; // as of April 2018, only this method works
+        if(direct_share) {
+            change_selection(null);
+            invoke_invite_friends_dialog_fb_alternative(reason);
+        } else {
+            call_with_facebook_permissions('user_friends', (function (_reason) { return function() {
+                FBInviteFriends.invoke_fb_invite_friends_dialog(reason);
+            }; })(reason));
+        }
     } else if(spin_frame_platform == 'bh') {
         if(!spin_battlehouse_enabled) { console.log('invoke_invite_friends_dialog('+reason+')'); return; }
 
@@ -17913,6 +17919,17 @@ function invoke_invite_friends_dialog(reason) {
     } else {
         throw Error('unhandled frame_platform '+spin_frame_platform);
     }
+}
+
+// April 2018 update: Facebook has removed the API supporting the invitable_friends system
+// this alternative offers to make a post to your News Feed instead.
+function invoke_invite_friends_dialog_fb_alternative(reason) {
+    invite_friends_dialog_shown_this_session = true; // stop the "+Add" button flashing
+    metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief'), 'method': 'share_invite'});
+    FBShare.invoke({name: gamedata['virals']['invite_friends']['ui_post_message'],
+                    description: gamedata['virals']['ui_post_description'],
+                    link_qs: {'spin_campaign': 'share_invite'},
+                    ref: 'share_invite'});
 }
 
 /** Check if screenshot posting is available
@@ -20090,22 +20107,16 @@ function setup_invite_friends_prompt(dialog, reason) {
     // "direct_share" means we'll skip friend selector / membership rewards
     // and just offer to share a "join the game" link.
 
-    var direct_share = (spin_frame_platform == 'fb' && FBShare.supported() &&
-                        read_predicate(gamedata['client']['invite_prompt_direct_share']).is_satisfied(player));
+    var direct_share = (spin_frame_platform === 'fb'); // as of April 2018, this is the only method that works on FB
 
     if(direct_share) {
         dialog.widgets['ok_button'].show = false;
         dialog.widgets['fb_share_button'].show =
             dialog.widgets['fb_share_icon'].show = true;
         dialog.default_button = dialog.widgets['fb_share_button'];
-        dialog.widgets['fb_share_button'].onclick = function() {
-            invite_friends_dialog_shown_this_session = true; // stop the "+Add" button flashing
-            change_selection(null);
-            metric_event('7103_invite_friends_fb_prompt', {'sum': player.get_denormalized_summary_props('brief'), 'method': 'share_invite'});
-            FBShare.invoke({name: gamedata['virals']['invite_friends']['ui_post_message'],
-                            description: gamedata['virals']['ui_post_description'],
-                            link_qs: {'spin_campaign': 'share_invite'},
-                            ref: 'share_invite'});
+        dialog.widgets['fb_share_button'].onclick = function(w) {
+            var reason = w.parent.user_data['invite_friends_reason'];
+            invoke_invite_friends_dialog_fb_alternative(reason);
         };
     } else {
         dialog.widgets['ok_button'].show = true;

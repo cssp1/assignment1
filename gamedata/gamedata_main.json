@@ -50,7 +50,7 @@
         ]},
 
         // skip friend selector and just offer to share a "Join the game" link.
-        // NOTE: only works on frame_platform "fb"
+        // NOTE: only works on frame_platform "fb", and as of April 2018 no other method works (gameclient is hardcoded to ignore this setting)
         "invite_prompt_direct_share": {"predicate": "ANY_ABTEST", "key": "invite_prompt_direct_share", "value": 1},
 
         // "parallel": run browser prompt at same time as in-game GUI
