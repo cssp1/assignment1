@@ -20116,6 +20116,7 @@ function setup_invite_friends_prompt(dialog, reason) {
         dialog.default_button = dialog.widgets['fb_share_button'];
         dialog.widgets['fb_share_button'].onclick = function(w) {
             var reason = w.parent.user_data['invite_friends_reason'];
+            close_parent_dialog(w); // regardless of success or failure, close the prompt. (don't be too pushy...)
             invoke_invite_friends_dialog_fb_alternative(reason);
         };
     } else {
