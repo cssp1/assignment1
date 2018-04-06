@@ -2,7 +2,7 @@
 // Use of this source code is governed by an MIT-style license that can be
 // found in the LICENSE file.
 
-"enable_fb_scores": true,
+"enable_fb_scores": 0,
 "fb_scores": {
     "min_interval": 86400 // do not update more than once per day
 }
