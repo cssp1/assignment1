@@ -1567,6 +1567,9 @@ class GameProxy(proxy.ReverseProxyResource):
             # geolocate country
             visitor.demographics['country'] = geoip_client.get_country(SpinHTTP.get_twisted_client_ip(request))
 
+        if 'locale' in r['result'] and r['result']['locale'] and ('locale' not in visitor.demographics):
+            visitor.demographics['locale'] = r['result']['locale']
+
         metric_event_coded(visitor, '0020_page_view',
                            visitor.add_demographics({#'Viewed URL': request.uri,
                                                      'query_string': clean_qs(request.uri),
