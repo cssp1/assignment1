@@ -2712,66 +2712,7 @@ class User:
     def retrieve_facebook_requests_start(self):
         if not SpinConfig.config['enable_facebook']:
             return
-        ver = SpinFacebook.api_version_number('apprequests')
-        if ver >= 2.0:
-            self.retrieve_facebook_requests_start_v2() # new /apprequests method
-        else:
-            self.retrieve_facebook_requests_start_v1() # old fql method
-
-    def retrieve_facebook_requests_start_v1(self):
-        assert self.fb_oauth_token
-        query = 'SELECT recipient_uid, request_id, app_id, sender_uid, message, data, created_time'
-        query += ' FROM apprequest WHERE recipient_uid = me() AND app_id = '+SpinConfig.config['facebook_app_id']
-        query_tok = urllib.urlencode(dict(query = query, access_token = self.fb_oauth_token)) # SpinConfig.config['facebook_app_access_token'] ?
-        request_url = 'https://api.facebook.com/method/fql.query?'+query_tok
-        gamesite.AsyncHTTP_Facebook.queue_request(server_time, request_url, lambda result: self.retrieve_facebook_requests_complete_v1(result))
-
-    @admin_stats.measure_latency('AsyncHTTP(facebook_apprequests_v1)')
-    def retrieve_facebook_requests_complete_v1(self, result):
-
-        dom = xml.dom.minidom.parseString(result)
-
-        def getText(req, name):
-            arg = req.getElementsByTagName(name)
-            nodelist = arg[0].childNodes
-            rc = []
-            for node in nodelist:
-                if node.nodeType == node.TEXT_NODE:
-                    rc.append(node.data)
-            return ''.join(rc)
-
-        for req in dom.getElementsByTagName('apprequest'):
-            created_time = int(getText(req, 'created_time'))
-            my_data = getText(req, 'data')
-            #message_text = getText(req, 'message')
-            sender_fb_id = getText(req, 'sender_uid')
-            #my_app_id = getText(req, 'app_id')
-            request_id = getText(req, 'request_id')
-
-            # print 'user', self.user_id, 'received Facebook app request', request_id, {'created_time':created_time, 'data':my_data, 'message_text':message_text, 'sender_fb_id':sender_fb_id}
-
-            # dispatch to different types of requests based on my_data
-            if my_data == 'friend_invite':
-                sender_id = gamesite.social_id_table.social_id_to_spinpunch('fb'+sender_fb_id, False)
-                if sender_id is None:
-                    sender_id = -1
-
-                props = {'sender_fb_id':sender_fb_id, 'sender_user_id': sender_id, 'facebook_request_id':request_id.split('_')[0], 'created_time':created_time}
-                metric_event_coded(self.user_id, '7120_friend_invite_accepted', props.copy())
-
-                # record acquisition event
-                props['type'] = 'facebook_friend_invite'
-                self.update_acquisition_data(props, important = True)
-
-            elif my_data == 'gift':
-                # this is handled server-side upon login with dbclient gift_receive
-                pass
-            else:
-                print 'unhandled Facebook app request type', my_data
-
-            # tell Facebook to delete the request (even if processing it caused an error)
-            delete_url = SpinFacebook.versioned_graph_endpoint_secure('apprequest', str(request_id))+'&'+urllib.urlencode({'method':'delete'})
-            gamesite.AsyncHTTP_Facebook.queue_request(server_time, delete_url, lambda x: None)
+        self.retrieve_facebook_requests_start_v2() # new /apprequests method
 
     def retrieve_facebook_requests_start_v2(self):
         request_url = SpinFacebook.versioned_graph_endpoint_secure('apprequests', '%s/apprequests' % self.facebook_id)
