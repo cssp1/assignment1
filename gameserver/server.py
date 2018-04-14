@@ -1929,6 +1929,7 @@ class User:
         self.bh_username = data['ui_name']
         if 'timezone' in data and isinstance(data['timezone'], int):
             self.timezone = data['timezone']
+        # note: locale is updated on login
         if 'birthday' in data: pass # no birthday data
         if 'trust_level' in data:
             self.bh_trust_level = data['trust_level']
@@ -28276,6 +28277,7 @@ class GAMEAPI(resource.Resource):
                        'last_login_ip': session.user.last_login_ip,
                        'country': session.user.country,
                        'timezone': session.user.timezone,
+                       'locale': session.user.locale,
                        'developer': 1 if session.player.is_developer() else None,
                        'uninstalled': None,
                        'last_mtime': server_time,
