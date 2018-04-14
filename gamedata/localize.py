@@ -68,7 +68,7 @@ def get_strings(path, data, filter = None, is_strings_json = False):
                 for item in v:
                     ret.append((item, path+'/'+k+'[]'))
             elif type(v) in (str, unicode):
-                if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny')):
+                if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny','group','display')):
                     ret.append((v, path+'/'+k))
 #    elif type(data) in (int, float): # shouldn't need this check
 #        return ret
@@ -118,29 +118,36 @@ def put_strings(data, entries, filter = None, is_strings_json = False, verbose =
                 if v and ((not filter) or (k.startswith(filter))):
                     data[k] = get_translation(v, entries, verbose)
 
-def do_apply(locale, gamedata, input_po_file, output_json_file, verbose = True):
+def do_apply(locale, gamedata, input_po_file, output_json_file, target = None, verbose = True):
     po = polib.pofile(input_po_file, encoding = 'utf-8', wrapwidth = -1)
     entries = dict([(entry.msgid, entry.msgstr) for entry in po])
+
     # translate in place
-    put_strings(gamedata['strings'], entries, filter = None, is_strings_json = True, verbose = verbose)
-    for category in TRANSLATE_CATEGORIES:
-        put_strings(gamedata[category], entries, filter = 'ui_', verbose = verbose)
+    if target:
+        put_strings(gamedata, entries, filter = 'ui_', verbose = verbose)
+    else:
+        # operate on all of gamedata
+        put_strings(gamedata['strings'], entries, filter = None, is_strings_json = True, verbose = verbose)
+        for category in TRANSLATE_CATEGORIES:
+            put_strings(gamedata[category], entries, filter = 'ui_', verbose = verbose)
     atom = AtomicFileWrite.AtomicFileWrite(output_json_file, 'w')
     SpinJSON.dump(gamedata, atom.fd, ordered=True, pretty=False, newline=True, size_hint = 8*1024*1024) # ,double_precision=5)
     atom.complete()
     if verbose: print >>sys.stderr, "wrote", atom.filename
 
 if __name__ == '__main__':
-    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['game-id=','mode=','locale=','quiet'])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'g:', ['game-id=','mode=','locale=','quiet','target='])
     game_id = SpinConfig.game()
     verbose = True
     locale = None
     mode = 'apply'
+    target = None # set when running on a subpart of gamedata
     for key, val in opts:
         if key == '-g' or key == '--game-id': game_id = val
         elif key == '--mode': mode = val
         elif key == '--locale': locale = val
         elif key == '--quiet': verbose = False
+        elif key == '--target': target = val
 
     # note! critical that order of dictionary entries be preserved!
     gamedata = SpinJSON.load(open(args[0]), ordered = True) # SpinConfig.gamedata_filename(override_game_id = game_id)))
@@ -153,6 +160,6 @@ if __name__ == '__main__':
             raise Exception('must specify --locale when in apply mode')
         input_po_file = args[1]
         output_json_file = args[2]
-        do_apply(locale, gamedata, input_po_file, output_json_file, verbose = verbose)
+        do_apply(locale, gamedata, input_po_file, output_json_file, target = target, verbose = verbose)
     else:
         raise Exception('unknown mode '+mode)
