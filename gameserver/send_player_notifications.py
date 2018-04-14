@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 # load some standard Python libraries
-import sys, time, requests, getopt, traceback, random, re, functools
+import sys, time, requests, getopt, traceback, random, re, functools, os
 import SpinConfig, SpinUserDB, SpinS3, SpinJSON, SpinParallel, SpinLog
 import SpinNoSQL, SpinNoSQLLog
 import SpinSingletonProcess
@@ -13,8 +13,8 @@ import ControlAPI
 import Notification2
 import Mailgun
 
-# load gamedata
-gamedata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
+# language-neutral version of gamedata['fb_notifications'] for general config settings
+fb_notifications_config = SpinJSON.load(open(SpinConfig.gamedata_component_filename('fb_notifications_compiled.json')))
 
 retain_re = re.compile('^retain_([0-9]+)h(_incentive)?$')
 
@@ -46,7 +46,7 @@ def get_leveled_quantity(qty, level):
         return qty[level-1]
     return qty
 
-def check_harv_full(pcache, n2_class, player, config):
+def check_harv_full(gamedata, pcache, n2_class, player, config):
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -71,7 +71,10 @@ def check_harv_full(pcache, n2_class, player, config):
 
     return 'harv_full', '', None
 
-def check_upgrade_complete(ref, building_type, specific_level, pcache, n2_class, player, config):
+def check_upgrade_complete(ref, building_type, specific_level, gamedata, pcache, n2_class, player, config):
+    if building_type == 'TOWNHALL':
+        building_type = gamedata['townhall']
+
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -84,7 +87,7 @@ def check_upgrade_complete(ref, building_type, specific_level, pcache, n2_class,
                 ui_name = gamedata['buildings'][obj['spec']]['ui_name']
                 return ref, ui_name, None
     return None, None, None
-def check_research_complete(pcache, n2_class, player, config):
+def check_research_complete(gamedata, pcache, n2_class, player, config):
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -95,7 +98,7 @@ def check_research_complete(pcache, n2_class, player, config):
                 ui_name = gamedata['tech'][obj['research_item']]['ui_name']
                 return 'research_complete', ui_name, None
     return None, None, None
-def check_production_complete(pcache, n2_class, player, config):
+def check_production_complete(gamedata, pcache, n2_class, player, config):
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -113,7 +116,7 @@ def check_production_complete(pcache, n2_class, player, config):
     if any_manuf and all_complete:
         return 'production_complete', '', None
     return None, None, None
-def check_army_repaired(pcache, n2_class, player, config):
+def check_army_repaired(gamedata, pcache, n2_class, player, config):
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -135,7 +138,7 @@ def check_army_repaired(pcache, n2_class, player, config):
             return 'army_repaired', '', None
     return None, None, None
 
-def check_retain(pcache, n2_class, player, config):
+def check_retain(gamedata, pcache, n2_class, player, config):
     num_hours = int(retain_re.match(config['ref']).group(1))
 
     if n2_class is Notification2.USER_NEW and num_hours > 48:
@@ -156,7 +159,7 @@ def check_retain(pcache, n2_class, player, config):
 
     return None, None, None
 
-def check_login_incentive_expiring(pcache, n2_class, player, config):
+def check_login_incentive_expiring(gamedata, pcache, n2_class, player, config):
     aura_list = player.get('player_auras', [])
     for aura in aura_list:
         if aura['spec'] == 'login_incentive_ready' and \
@@ -167,7 +170,7 @@ def check_login_incentive_expiring(pcache, n2_class, player, config):
             return config['ref'], ui_time_togo, None
     return None, None, None
 
-def check_fishing_complete(pcache, n2_class, player, config):
+def check_fishing_complete(gamedata, pcache, n2_class, player, config):
     if n2_class is Notification2.USER_NEW:
         return None, None, None # not for tutorial-incomplete newbies
 
@@ -190,7 +193,7 @@ def check_fishing_complete(pcache, n2_class, player, config):
 # functions to check if a notification applies
 CHECKERS = {
     'harv_full': check_harv_full,
-    'townhall_L3_upgrade_complete': functools.partial(check_upgrade_complete, 'townhall_L3_upgrade_complete', gamedata['townhall'], 3),
+    'townhall_L3_upgrade_complete': functools.partial(check_upgrade_complete, 'townhall_L3_upgrade_complete', 'TOWNHALL', 3),
     'upgrade_complete': functools.partial(check_upgrade_complete, 'upgrade_complete', 'ALL', -1),
     'research_complete': check_research_complete,
     'production_complete': check_production_complete,
@@ -203,7 +206,7 @@ CHECKERS = {
 # list of (-priority, ref, check_func) sorted in descending priority (increasing negative priority) order
 CHECKERS_BY_PRIORITY = []
 
-for key, val in gamedata['fb_notifications']['notifications'].iteritems():
+for key, val in fb_notifications_config['notifications'].iteritems():
     if val.get('enable_elder', True) or val.get('enable_newbie', True):
         match = retain_re.match(key)
         if match:
@@ -231,6 +234,30 @@ class Sender(object):
         if self.enable_fb: self.active_platforms.append('fb')
         if self.enable_bh: self.active_platforms.append('bh')
         self.requests_session = requests.Session()
+
+        self.gamedata_generic = SpinJSON.load(open(SpinConfig.gamedata_filename()))
+
+        # by locale
+        self.localized_gamedata_cache = {}
+
+    def get_localized_gamedata(self, locale):
+        for loc in SpinConfig.locales_to_try(locale):
+            if loc not in self.localized_gamedata_cache:
+                if loc == 'en_US': # shortcut to save memory
+                    self.localized_gamedata_cache[loc] = self.gamedata_generic
+                else:
+                    fname = SpinConfig.gamedata_filename(locale=loc)
+                    if os.path.exists(fname):
+                        print >> self.msg_fd, 'loading localized gamedata for %s' % locale
+                        self.localized_gamedata_cache[loc] = SpinJSON.load(open(fname))
+                    else:
+                        self.localized_gamedata_cache[loc] = None
+
+            if self.localized_gamedata_cache[loc]:
+                return self.localized_gamedata_cache[loc]
+
+        # fall back to language-neutral gamedata
+        return self.gamedata_generic
 
     # pass in the player_cache entry
     def notify_user(self, user_id, pcache, index = -1, total_count = -1, only_frame_platform = None, test_mode = False):
@@ -280,17 +307,17 @@ class Sender(object):
 
         # do not perform country tier exclusion if player is a payer or high level
         apply_exclusions = True
-        if 'force_eligible_money_spent' in gamedata['fb_notifications']:
-            if pcache.get('money_spent',0) >= gamedata['fb_notifications']['force_eligible_money_spent']:
+        if 'force_eligible_money_spent' in fb_notifications_config:
+            if pcache.get('money_spent',0) >= fb_notifications_config['force_eligible_money_spent']:
                 apply_exclusions = False
-        if 'force_eligible_player_level' in gamedata['fb_notifications']:
-            if pcache.get('player_level',0) >= gamedata['fb_notifications']['force_eligible_player_level']:
+        if 'force_eligible_player_level' in fb_notifications_config:
+            if pcache.get('player_level',0) >= fb_notifications_config['force_eligible_player_level']:
                 apply_exclusions = False
 
         if apply_exclusions:
             # country tier exclusion
-            if 'eligible_country_tiers' in gamedata['fb_notifications']:
-                eligible_country_tiers = gamedata['fb_notifications']['eligible_country_tiers']
+            if 'eligible_country_tiers' in fb_notifications_config:
+                eligible_country_tiers = fb_notifications_config['eligible_country_tiers']
                 if 'country' in pcache:
                     country_tier = SpinConfig.country_tier_map.get(pcache['country'], 4)
                     if country_tier not in eligible_country_tiers:
@@ -319,11 +346,7 @@ class Sender(object):
 
         time_now = int(time.time()) # update time after possible long download
 
-        if (not test_mode) and False: # XXXXXX (player['abtests'].get('T330_notification2', None) != "on") and gamedata['game_id'] not in ('dv','fs','bfm'):
-            print >> self.msg_fd, '(player says) is not in T330_notification2, skipping'
-            return
-
-        n2_class = Notification2.get_user_class(player['history'], gamedata['townhall'])
+        n2_class = Notification2.get_user_class(player['history'], self.gamedata_generic['townhall'])
 
         # note: trust pcache on timezone - it's not really critical
         timezone = pcache.get('timezone', Notification2.DEFAULT_TIMEZONE)
@@ -332,12 +355,17 @@ class Sender(object):
             print >> self.msg_fd, '(player says) played less than %d mins ago' % (MIN_MTIME_AGE/60)
             return
 
+        # trust pcache on locale too
+        locale = pcache.get('locale') or 'en_US'
+
+        localized_gamedata = self.get_localized_gamedata(locale)
+
         ref = None
         replace_s = ''
         checker_state = None
 
         for prio, key, func in CHECKERS_BY_PRIORITY:
-            config = gamedata['fb_notifications']['notifications'].get(key, None)
+            config = fb_notifications_config['notifications'].get(key, None)
             if not config: continue
 
             if frame_platform == 'bh' and 'email' not in config: continue
@@ -355,7 +383,7 @@ class Sender(object):
                 continue
 
             #print >> self.msg_fd, 'checking %s...' % key
-            ref, replace_s, checker_state = func(pcache, n2_class, player, config)
+            ref, replace_s, checker_state = func(localized_gamedata, pcache, n2_class, player, config)
             if ref: break
 
         if not ref:
@@ -364,7 +392,8 @@ class Sender(object):
 
         self.eligible += 1
 
-        config = gamedata['fb_notifications']['notifications'][ref]
+        # this should be the localized gamedata
+        config = localized_gamedata['fb_notifications']['notifications'][ref]
         ui_name = config['ui_name']
         ref_suffix = ''
         if type(ui_name) is dict: # A/B test
@@ -475,6 +504,7 @@ def run_batch(batch_num, batch, total_count, limit, dry_run, verbose, only_frame
     pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['tutorial_complete',
                                                                        'social_id','frame_platform',
                                                                        'country', 'money_spent', 'player_level',
+                                                                       'timezone', 'locale',
                                                                        'last_logout_time',
                                                                        'last_mtime', 'uninstalled',
                                                                        'enable_fb_notifications',
@@ -532,7 +562,7 @@ if __name__ == '__main__':
 
         id_list = []
         if test_mode:
-            id_list += [1111, 1112, 1114, 1115, 1179934, 1179935]
+            id_list += [1111, 1112, 1114, 1115, 1179934, 1179935, 1179943]
 
         if not test_mode:
             if verbose: print 'querying player_cache...'
