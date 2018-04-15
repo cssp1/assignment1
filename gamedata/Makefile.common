@@ -41,6 +41,7 @@ dep:
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_crafting.json --get-deps-as ${BUILT}/${GAME_ID}_crafting_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_store.json --get-deps-as ${BUILT}/${GAME_ID}_store_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_fb_notifications.json --get-deps-as ${BUILT}/${GAME_ID}_fb_notifications_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_strings.json --get-deps-as ${BUILT}/${GAME_ID}_strings_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps gamedata_main.json --get-deps-as ${BUILT}/gamedata-${GAME_ID}.json.unverified >> ${BUILT}/deps
 
 -include ${BUILT}/deps
@@ -83,6 +84,8 @@ ${BUILT}/${GAME_ID}_store_compiled.json: ${GAME_ID}/${GAME_ID}_store.json # just
 
 ${BUILT}/${GAME_ID}_fb_notifications_compiled.json: ${GAME_ID}/${GAME_ID}_fb_notifications.json # just for server to retrieve localized strings
 	@echo "    ${GAME_ID}_fb_notifications_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_strings_compiled.json: ${GAME_ID}/${GAME_ID}_strings.json # just for server to retrieve localized strings
+	@echo "    ${GAME_ID}_strings_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 
 # client versions of non-shipped JSON
 ${BUILT}/${GAME_ID}_ai_bases_client.json: ${GAMEDATA}/make_ai_bases.py ${BUILT}/${GAME_ID}_ai_bases_compiled.json
@@ -184,6 +187,10 @@ ${BUILT}/gamedata-${GAME_ID}-%.json: ${BUILT}/gamedata-${GAME_ID}.json ${GAMEDAT
 ${BUILT}/${GAME_ID}_fb_notifications_compiled-%.json: ${BUILT}/${GAME_ID}_fb_notifications_compiled.json ${GAMEDATA}/localize.py ${GAME_ID}/localize/${GAME_ID}-%.po
 	@echo "Creating localization ${GAME_ID}_fb_notifications_compiled-${*}.json..." && \
 	${GAMEDATA}/localize.py -g $GAME_ID --mode apply --quiet --target fb_notifications --locale $* $< ${GAME_ID}/localize/${GAME_ID}-${*}.po $@
+${BUILT}/${GAME_ID}_strings_compiled-%.json: ${BUILT}/${GAME_ID}_strings_compiled.json ${GAMEDATA}/localize.py ${GAME_ID}/localize/${GAME_ID}-%.po
+	@echo "Creating localization ${GAME_ID}_strings_compiled-${*}.json..." && \
+	${GAMEDATA}/localize.py -g $GAME_ID --mode apply --quiet --target strings --locale $* $< ${GAME_ID}/localize/${GAME_ID}-${*}.po $@
+
 
 # linebreak and .js-format a localization
 ${BUILT}/gamedata-${GAME_ID}-%.js: ${BUILT}/gamedata-${GAME_ID}-%.json

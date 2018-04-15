@@ -124,7 +124,7 @@ def do_apply(locale, gamedata, input_po_file, output_json_file, target = None, v
 
     # translate in place
     if target:
-        put_strings(gamedata, entries, filter = 'ui_', verbose = verbose)
+        put_strings(gamedata, entries, filter = None if target == 'strings' else 'ui_', is_strings_json = (target == 'strings'), verbose = verbose)
     else:
         # operate on all of gamedata
         put_strings(gamedata['strings'], entries, filter = None, is_strings_json = True, verbose = verbose)

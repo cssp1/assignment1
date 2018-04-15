@@ -81,6 +81,7 @@ MYLOC_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | xargs basen
 MYTARGETS=""
 for MYLOC in $MYLOC_LIST; do
     MYTARGETS+=" ${GAME_ID}/built/gamedata-${GAME_ID}-${MYLOC}.js"
+    MYTARGETS+=" ${GAME_ID}/built/${GAME_ID}_strings_compiled-${MYLOC}.json"
     MYTARGETS+=" ${GAME_ID}/built/${GAME_ID}_fb_notifications_compiled-${MYLOC}.json"
 done
 
