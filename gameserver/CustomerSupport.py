@@ -1232,7 +1232,7 @@ class HandleResolveHomeRaid(Handler):
 
         if self.raid_mode and self.raid_mode != 'scout':
             # send "You got attacked" FB notification
-            config = self.gamedata['fb_notifications']['notifications']['you_got_attacked']
+            config = self.gamesite.get_localized_gamedata('fb_notifications', json_user.get('locale'))['notifications']['you_got_attacked']
             notif_text = config.get('ui_name_home_raid')
             if notif_text:
                 notif_text = notif_text.replace('%ATTACKER', self.attacker_ui_name)
@@ -1680,6 +1680,7 @@ class HandleSendNotification(Handler):
             message = self.gamesite.gameapi.NotificationMessage(self.config['ref'] if self.config else None,
                                                                 self.config['ref'] if self.config else None, # not really fb_ref, but shouldn't matter
                                                                 self.replacements, self.text, session.user.frame_platform,
+                                                                locale = session.user.locale,
                                                                 format = self.format)
             session.send([["NOTIFICATION", message.serialize()]], flush_now = True)
             if not self.send_offline:
@@ -1725,6 +1726,7 @@ class HandleSendNotification(Handler):
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, session.user.social_id, self.text, self.config_name or self.ref_override, fb_ref,
                                                            session.player.get_denormalized_summary_props('brief'),
+                                                           locale = session.user.locale,
                                                            replacements = self.replacements, mirror_to_facebook = mirror_to_facebook) or self.simulate:
             session.player.last_fb_notification_time = self.time_now
             session.player.history['fb_notifications_sent'] = session.player.history.get('fb_notifications_sent',0)+1
@@ -1787,6 +1789,7 @@ class HandleSendNotification(Handler):
 
         if self.gamesite.gameapi.send_offline_notification(self.user_id, user['social_id'], self.text, self.config_name or self.ref_override, fb_ref,
                                                            self.get_denormalized_summary_props_offline(user, player),
+                                                           locale = user.get('locale'),
                                                            replacements = self.replacements, mirror_to_facebook = mirror_to_facebook) or self.simulate:
             player['last_fb_notification_time'] = self.time_now
             player['history']['fb_notifications_sent'] = player['history'].get('fb_notifications_sent',0)+1

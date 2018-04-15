@@ -420,15 +420,52 @@ class SQUAD_IDS(object):
     @classmethod
     def is_mobile_squad_id(cls, id): return id > 0
 
-# load game data file
+# master gamedata
 gamedata = None
 gameclient_build_date = None
+
+# cache of subparts of gamedata that need to be localized
+# {"units": {"en_US": ..., "ko_KR": ...}, "buildings": ... }
+localized_gamedata_cache = {}
+
+def get_localized_gamedata(path, locale):
+    """
+    Retrieve the localized version of a specific top-level child of gamedata.
+    Example: get_localized_gamedata('fb_notifications', 'ko_KR')
+             returns Korean version of gamedata['fb_notifications']
+    (if no localization is found, returns the default English version)
+    """
+    global localized_gamedata_cache
+
+    # allow caller to pass null/empty locale
+    if not locale:
+        locale = 'en_US'
+
+    if path not in localized_gamedata_cache:
+        localized_gamedata_cache[path] = {}
+
+    for loc in SpinConfig.locales_to_try(locale):
+        if loc not in localized_gamedata_cache[path]:
+            if loc == 'en_US': # shortcut to save memory
+                localized_gamedata_cache[path][loc] = gamedata[path]
+            else:
+                fname = SpinConfig.gamedata_component_filename('%s_compiled-%s.json' % (path, loc))
+                if os.path.exists(fname):
+                    localized_gamedata_cache[path][loc] = SpinJSON.load(open(fname))
+                else:
+                    localized_gamedata_cache[path][loc] = None
+
+        if localized_gamedata_cache[path][loc]:
+            return localized_gamedata_cache[path][loc]
+
+    # fall back to language-neutral gamedata
+    return gamedata[path]
 
 # cached ChatFilter instance - note: used for alliance name checking, not actually applied to chat (that's client side)
 chat_filter = None
 
 def reload_gamedata():
-    global gamedata, gameclient_build_date, chat_filter
+    global gamedata, gameclient_build_date, localized_gamedata_cache, chat_filter
     try:
         newdata = SpinJSON.load(open(SpinConfig.gamedata_filename()))
 
@@ -447,6 +484,7 @@ def reload_gamedata():
 
         gamedata = newdata
         gameclient_build_date = str(open("../gameclient/compiled-client.js.date").read().strip())
+        localized_gamedata_cache = {}
 
         chat_filter = ChatFilter.ChatFilter(gamedata['client']['chat_filter'])
 
@@ -2464,7 +2502,8 @@ class User:
 
     def refund_gamebucks(self, session, retmsg, gamebucks, time_struct, payment_id, refund_type):
         session.player.resources.gain_gamebucks(-gamebucks, reason='payment_refund')
-        template = gamedata['strings'].get('gamebucks_refund_mail_'+refund_type, gamedata['strings']['gamebucks_refund_mail'])
+        gamedata_strings = gamesite.get_localized_gamedata('strings', self.locale)
+        template = gamedata_strings.get('gamebucks_refund_mail_'+refund_type, gamedata_strings['gamebucks_refund_mail'])
         session.player.mailbox_append(session.player.make_system_mail(template,
                                                                       replacements = {'%PAYMENT_ID': payment_id,
                                                                                       '%QUANTITY': str(gamebucks),
@@ -10917,7 +10956,7 @@ class Player(AbstractPlayer):
 
                                         # send real-time notification to the victim
                                         if raid_mode != 'scout':
-                                            config = gamedata['fb_notifications']['notifications'].get('incoming_raid',{})
+                                            config = gamesite.get_localized_gamedata('fb_notifications', gamesite.get_locale_for_player(x['base_landlord_id'], reason = 'squad_step(raid)'))['notifications'].get('incoming_raid',{})
                                             notif_text = config.get('ui_name_home')
                                             if notif_text and new_path:
                                                 notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(self))
@@ -14898,7 +14937,7 @@ class LivePlayer(Player):
 
             if (self.history.get('inventory_intro_mail_sent', 0) < 2):
                 self.history['inventory_intro_mail_sent'] = 2
-                self.mailbox_append(self.make_system_mail(gamedata['strings']['inventory_intro_mail']))
+                self.mailbox_append(self.make_system_mail(gamesite.get_localized_gamedata('strings', session.user.locale)['inventory_intro_mail']))
                 sent = True
 
 
@@ -18530,11 +18569,15 @@ class Store(object):
                     session.increment_player_metric('gamebucks_spent_on_gift_orders', gift_amount, time_series = False)
 
                     # send notifications
-                    config = gamedata['fb_notifications']['notifications'].get('you_sent_gift_order',None)
+
+                    # to sender
+                    config = gamesite.get_localized_gamedata('fb_notifications', session.user.locale)['notifications'].get('you_sent_gift_order',None)
                     if config and session.user.facebook_id:
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', entry['recipient_ui_name']).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
-                        gamesite.gameapi.send_offline_notification(session.user.user_id, session.user.social_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief')) # FB gift order
-                    config = gamedata['fb_notifications']['notifications'].get('you_got_gift_order',None)
+                        gamesite.gameapi.send_offline_notification(session.user.user_id, session.user.social_id, notif_text, 'you_sent_gift_order', config['ref'], session.player.get_denormalized_summary_props('brief'), locale = session.user.locale) # FB gift order
+
+                    # to recipient
+                    config = gamesite.get_localized_gamedata('fb_notifications', gamesite.get_locale_for_player(recipient_user_id, reason = 'you_got_gift_order'))['notifications'].get('you_got_gift_order',None)
                     if config and entry.get('recipient_facebook_id'):
                         notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%SENDER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                         gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':recipient_user_id,'text':notif_text,'config':'you_got_gift_order','force':1})
@@ -19729,7 +19772,7 @@ class GAMEAPI(resource.Resource):
                 # END is human home base
 
                 # send real-time Facebook notification to the victim
-                config = gamedata['fb_notifications']['notifications']['you_got_attacked']
+                config = gamesite.get_localized_gamedata('fb_notifications', session.viewing_user.locale)['notifications']['you_got_attacked']
                 notif_text = config.get('ui_name_'+session.viewing_base.base_type)
                 if notif_text:
                     notif_text = notif_text.replace('%ATTACKER', session.user.get_ui_name(session.player))
@@ -25233,7 +25276,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PUSH_GAMEDATA", data_str, session.player.abtests])
 
     def send_offline_notification(self, to_user_id, to_social_id, text, sp_ref, fb_ref, summary_props,
-                                  replacements = None, mirror_to_facebook = False):
+                                  locale = None, replacements = None, mirror_to_facebook = False):
         # "sp_ref" = our internal ref parameter
         # "fb_ref" = the "ref" URL parameter to send to Facebook - may include _e/_n suffix after sp_ref
 
@@ -25241,10 +25284,10 @@ class GAMEAPI(resource.Resource):
         # of the utm_media names on which notifications were sent, or None if a notification will not be sent.
 
         if to_social_id.startswith('fb'):
-            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'fb')
+            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'fb', locale = locale)
             d_sent = self.send_offline_notification_fb(to_user_id, to_social_id[2:], message)
         elif to_social_id.startswith('bh'):
-            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'bh')
+            message = self.NotificationMessage(sp_ref, fb_ref, replacements, text, 'bh', locale = locale)
             d_sent = self.send_offline_notification_bh(to_user_id, to_social_id[2:], message, mirror_to_facebook = mirror_to_facebook)
         else:
             d_sent = None
@@ -25272,12 +25315,12 @@ class GAMEAPI(resource.Resource):
     # text and sp_ref and sp_ref.email: full notification suitable for use with bh.com email system
 
     class NotificationMessage(object):
-        def __init__(self, sp_ref, fb_ref, replacements, text, frame_platform, format = None):
+        def __init__(self, sp_ref, fb_ref, replacements, text, frame_platform, format = None, locale = None):
             self.sp_ref = sp_ref
             self.fb_ref = fb_ref
             self.format = format or 'game' # 'game' or 'bh', only as a cue to the client for how to display it
 
-            conf = gamedata['fb_notifications']['notifications'].get(sp_ref)
+            conf = gamesite.get_localized_gamedata('fb_notifications', locale)['notifications'].get(sp_ref)
 
             if text:
                 if isinstance(text, str):
@@ -25294,7 +25337,7 @@ class GAMEAPI(resource.Resource):
             self.ui_cta = None
 
             if conf:
-                email_conf = gamedata['fb_notifications']['notifications'][sp_ref].get('email')
+                email_conf = conf.get('email')
                 if email_conf:
                     self.has_email = True
                     self.ui_subject = self.apply_replacements(replacements, email_conf['ui_subject'])
@@ -25400,7 +25443,7 @@ class GAMEAPI(resource.Resource):
         if session.user.bh_mentor_player_id_cache and \
            (session.user.bh_mentor_player_id_cache in client_id_list) and \
            (not session.player.cooldown_active('send_gift:%d' % session.user.bh_mentor_player_id_cache)):
-            to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_mentor_gift_mail'],
+            to_send.append(session.player.make_system_mail(gamesite.get_localized_gamedata('strings', gamesite.get_locale_for_player(session.user.bh_mentor_player_id_cache, reason = 'bh_invite_mentor_gift_mail'))['bh_invite_mentor_gift_mail'],
                                                            duration = gamedata['gift_interval'],
                                                            to_user_id = session.user.bh_mentor_player_id_cache, replacements = replacements,
                                                            extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
@@ -25416,10 +25459,19 @@ class GAMEAPI(resource.Resource):
             recipient_ids = filter(lambda id: id in session.user.bh_trainee_player_ids_cache, client_id_list)
             recipient_ids = filter(lambda id: not session.player.cooldown_active('send_gift:'+str(id)), recipient_ids)
             if recipient_ids:
-                to_send.append(session.player.make_system_mail(gamedata['strings']['bh_invite_trainee_gift_mail'],
-                                                               duration = gamedata['gift_interval'],
-                                                               to_user_id_list = recipient_ids, replacements = replacements,
-                                                               extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
+                # group by language
+                recipient_pcaches = gamesite.pcache_client.player_cache_lookup_batch(recipient_ids, fields = ['locale'], reason = 'do_send_gifts_bh')
+                recipient_ids_by_locale = {}
+                for id, pc in zip(recipient_ids, recipient_pcaches):
+                    locale = pc.get('locale') if pc else None
+                    if locale not in recipient_ids_by_locale: recipient_ids_by_locale[locale] = []
+                    recipient_ids_by_locale[locale].append(id)
+
+                for locale, recipient_ids_this_locale in recipient_ids_by_locale.iteritems():
+                    to_send.append(session.player.make_system_mail(gamesite.get_localized_gamedata('strings', locale)['bh_invite_trainee_gift_mail'],
+                                                                   duration = gamedata['gift_interval'],
+                                                                   to_user_id_list = recipient_ids_this_locale, replacements = replacements,
+                                                                   extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
                 for recipient_id in recipient_ids:
                     gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,
                                                                   'send_ingame':0,'send_offline':1,'format':'bh',
@@ -25730,7 +25782,8 @@ class GAMEAPI(resource.Resource):
                         gift_amount = sum([x.get('stack',1) for x in msg.get('attachments',[]) if x['spec'] == item_name])
                         session.increment_player_metric('gift_orders_received', 1)
                         session.increment_player_metric('gamebucks_received_from_gift_orders', gift_amount)
-                        config = gamedata['fb_notifications']['notifications'].get('your_gift_order_was_received',None)
+
+                        config = gamesite.get_localized_gamedata('fb_notifications', gamesite.get_locale_for_player(msg['from'], reason = 'do_receive_mail(gift_order)'))['notifications'].get('your_gift_order_was_received',None)
                         if config and msg.get('from_fbid'):
                             notif_text = config['ui_name'].replace('%GAMEBUCKS_AMOUNT', str(gift_amount)).replace('%RECEIVER', session.user.get_chat_name(session.player)).replace('%GAMEBUCKS_NAME',gamedata['store']['gamebucks_ui_name'])
                             gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':msg['from'],'text':notif_text,'config':'your_gift_order_was_received','force':1})
@@ -25910,7 +25963,7 @@ class GAMEAPI(resource.Resource):
                 time_struct = time.gmtime(entry.published_time)
                 session.player.mailbox_append(
                     session.player.make_system_mail(
-                    gamedata['strings']['bh_blog_mail'],
+                    gamesite.get_localized_gamedata('strings', session.user.locale)['bh_blog_mail'],
                     replacements = {'%TITLE': entry.title,
                                     '%LINK_URL': entry.link_url,
                                     '%DAY': time.strftime('%d %b %Y', time_struct),
@@ -29828,7 +29881,7 @@ class GAMEAPI(resource.Resource):
 
 
                 config_name = 'alliance_promoted' if new_role > old_role else 'alliance_demoted'
-                config = gamedata['fb_notifications']['notifications'].get(config_name,None)
+                config = gamesite.get_localized_gamedata('fb_notifications', pcache_data.get('locale'))['notifications'].get(config_name,None)
                 if config:
                     notif_text = config['ui_name'].replace('%ACTOR_NAME', session.user.get_chat_name(session.player)).replace('%ACTOR_ROLE', my_role_info['ui_name']).replace('%NEW_ROLE', new_role_info['ui_name']).replace('%ALLIANCE_NAME', alliance_display_name(info))
                     gamesite.do_CONTROLAPI(session.user.user_id, {'method':'send_notification','reliable':1,'user_id':promotee_id,'text':notif_text,'config':config_name,'force':1})
@@ -30750,12 +30803,13 @@ class GAMEAPI(resource.Resource):
             session.increment_player_metric('bh_web_push_prompt_ok', 1)
             session.deferred_history_update = True
 
-            config = gamedata['fb_notifications']['notifications'].get('bh_web_push_incentive',None)
+            config = gamesite.get_localized_gamedata('fb_notifications', session.user.locale)['notifications'].get('bh_web_push_incentive',None)
             if config and session.player.history.get('bh_web_push_incentive',0) < 1:
                 notif_text = config['ui_name']
                 self.send_offline_notification(session.player.user_id, session.user.social_id,
                                                notif_text, 'bh_web_push_incentive', config['ref'],
                                                session.player.get_denormalized_summary_props('brief'),
+                                               locale = session.user.locale,
                                                mirror_to_facebook = False)
                 if 'on_send' in config:
                     session.execute_consequent_safe(config['on_send'], session.player, retmsg,
@@ -32372,8 +32426,18 @@ class GameSite(server.Site):
     displayTracebacks = False
     protocol = GameProtocol
 
+    # allow CustomerSupport/Consequents/etc to access global variables
     def get_server_time(self): return server_time
     def get_gamedata(self): return gamedata
+    def get_localized_gamedata(self, *args, **kwargs):
+        return get_localized_gamedata(*args, **kwargs)
+
+    # quick-and-dirty pcache query to grab the locale
+    def get_locale_for_player(self, user_id, reason = None):
+        pcache = self.pcache_client.player_cache_lookup_batch([user_id,], fields = ['locale'], reason = reason)[0]
+        if pcache:
+            return pcache.get('locale')
+        return None
 
     def log_async_exception(self, exc):
         self.exception_log.event(server_time, exc)
