@@ -82,7 +82,7 @@ def get_strings(path, data, filter = None, is_strings_json = False):
                 for i in xrange(len(v)):
                     ret.append((v[i][1], path+'/'+k+'['+str(i)+']'))
             elif type(v) in (str, unicode):
-                if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny','group','display')):
+                if v and ((not filter) or (k.startswith(filter)) or k == 'gamebucks_ui_name') and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny','group','display')):
                     ret.append((v, path+'/'+k))
 #    elif type(data) in (int, float): # shouldn't need this check
 #        return ret
@@ -143,7 +143,7 @@ def put_strings(data, entries, filter = None, is_strings_json = False, verbose =
                 for i in xrange(len(v)):
                     v[i][1] = get_translation(v[i][1], entries, verbose)
             elif type(v) in (str, unicode):
-                if v and ((not filter) or (k.startswith(filter))):
+                if v and ((not filter) or (k.startswith(filter) or k == 'gamebucks_ui_name')):
                     data[k] = get_translation(v, entries, verbose)
 
 def do_apply(locale, gamedata, input_po_file, output_json_file, target = None, verbose = True):
