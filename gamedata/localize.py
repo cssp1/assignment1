@@ -53,7 +53,7 @@ def get_strings_from_predicate(path, data):
     for k, v in data.iteritems():
         if k == 'subpredicates':
             ret += sum((get_strings_from_predicate(path+'.sub', subpred) for subpred in v), [])
-        elif k.startswith('ui_'):
+        elif k.startswith('ui_') and isinstance(v, basestring):
             ret.append((v, path+'/'+k))
     return ret
 
@@ -119,7 +119,7 @@ def put_strings_into_predicate(data, entries, verbose):
         if k == 'subpredicates':
             for subpred in v:
                 put_strings_into_predicate(subpred, entries, verbose)
-        elif k.startswith('ui_'):
+        elif k.startswith('ui_') and isinstance(v, basestring):
             data[k] = get_translation(v, entries, verbose)
 
 def put_strings(data, entries, filter = None, is_strings_json = False, verbose = False):
