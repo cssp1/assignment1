@@ -2774,6 +2774,10 @@ class GameProxy(proxy.ReverseProxyResource):
             if props_raw[-1] == '/':
                 props_raw = props_raw[:-1]
 
+            if props_raw.startswith('%7B%22'): # which translates to {" at the beginning of a JSON dump
+                # fix double-URI-encoding of parameter (IE8 does this)
+                props_raw = urllib.unquote(props_raw)
+
             props = SpinJSON.loads(props_raw)
             assert 'code' in props
             assert int(event_name[0:4]) == props['code']
