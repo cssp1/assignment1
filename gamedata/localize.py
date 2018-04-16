@@ -48,6 +48,15 @@ def accum_entry(entries, msgid, where, verbose):
 # need this because we don't know what kind of crazy OrderedDict class the JSON parser is using
 def is_dictlike(obj): return (type(obj) not in (str,unicode,list)) and hasattr(obj, '__getitem__')
 
+def get_strings_from_predicate(path, data):
+    ret = []
+    for k, v in data.iteritems():
+        if k == 'subpredicates':
+            ret += sum((get_strings_from_predicate(path+'.sub', subpred) for subpred in v), [])
+        elif k.startswith('ui_'):
+            ret.append((v, path+'/'+k))
+    return ret
+
 def get_strings(path, data, filter = None, is_strings_json = False):
     # strings.json needs special-case handling since it has some strange nested structures
 
@@ -57,7 +66,8 @@ def get_strings(path, data, filter = None, is_strings_json = False):
             if item:
                 ret += get_strings(path+'[]', item, filter = filter, is_strings_json = is_strings_json)
     elif is_dictlike(data):
-        if 'predicate' in data: return ret # skip predicates
+        if 'predicate' in data:
+            return get_strings_from_predicate(path, data)
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 ret += get_strings(path+'/'+k, v, filter = filter, is_strings_json = is_strings_json)
@@ -104,13 +114,23 @@ def get_translation(v, entries, verbose):
     if verbose: print >>sys.stderr, "untranslated string", '"'+v+'"'
     return v
 
+def put_strings_into_predicate(data, entries, verbose):
+    for k, v in data.iteritems():
+        if k == 'subpredicates':
+            for subpred in v:
+                put_strings_into_predicate(subpred, entries, verbose)
+        elif k.startswith('ui_'):
+            data[k] = get_translation(v, entries, verbose)
+
 def put_strings(data, entries, filter = None, is_strings_json = False, verbose = False):
     if type(data) is list:
         for item in data:
             put_strings(item, entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
     else:
         assert is_dictlike(data)
-        if 'predicate' in data: return # skip predicates
+        if 'predicate' in data:
+            put_strings_into_predicate(data, entries, verbose)
+            return
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 put_strings(v, entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
