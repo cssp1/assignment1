@@ -1271,6 +1271,20 @@ CountryPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
+function LocalePredicate(data) {
+    goog.base(this, data);
+    this.locales = data['locales'];
+}
+goog.inherits(LocalePredicate, Predicate);
+LocalePredicate.prototype.is_satisfied = function(player, qdata) {
+    return goog.array.contains(this.locales, spin_demographics['locale'] || 'unknown');
+};
+/** @override */
+LocalePredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+
+/** @constructor @struct
+  * @extends Predicate */
 function PurchasedRecentlyPredicate(data) {
     goog.base(this, data);
     this.seconds_ago = data['seconds_ago'];
@@ -2310,6 +2324,8 @@ function read_predicate(data) {
         return new UserIDPredicate(data);
     } else if(kind === 'COUNTRY') {
         return new CountryPredicate(data);
+    } else if(kind == 'LOCALE') {
+        return new LocalePredicate(data);
     } else if(kind === 'PURCHASED_RECENTLY') {
         return new PurchasedRecentlyPredicate(data);
     } else if(kind === 'EVENT_TIME') {

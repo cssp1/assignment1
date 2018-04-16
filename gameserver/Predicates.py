@@ -534,6 +534,13 @@ class CountryPredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return player.country in self.countries
 
+class LocalePredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.locales = data['locales']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.user.locale in self.locales
+
 class PvPAggressedRecentlyPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1074,6 +1081,8 @@ def read_predicate(data):
         return CountryTierPredicate(data)
     elif kind == 'COUNTRY':
         return CountryPredicate(data)
+    elif kind == 'LOCALE':
+        return LocalePredicate(data)
     elif kind == 'EVENT_TIME':
         return EventTimePredicate(data)
     elif kind == 'ABSOLUTE_TIME':
