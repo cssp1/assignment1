@@ -2553,7 +2553,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$ARMORGAMES_SDK$': get_static_include('ArmorGamesSDK.js') if (visitor.frame_platform == 'ag' and SpinConfig.config.get('enable_armorgames',0)) else '',
             '$CASTLE_SDK$': get_static_include('CastleSDK.js').replace('$CASTLE_APP_ID$',SpinConfig.config['castle_app_id']) if SpinConfig.config.get('enable_castle',0) else '',
             '$GOOGLE_ANALYTICS_SDK$': get_static_include('GoogleAnalyticsSDK.js').replace('$GOOGLE_ANALYTICS_TRACKING_CODE$',SpinConfig.config['google_analytics_tracking_code']) if SpinConfig.config.get('google_analytics_tracking_code') else '',
-            '$BATTLEHOUSE_SDK$': get_static_include('BattlehouseSDK.js').replace('$BH_LOGIN_PATH$',SpinConfig.config['battlehouse_api_path']) if (visitor.frame_platform == 'bh' and SpinConfig.config.get('enable_battlehouse',0)) else '',
+            '$BATTLEHOUSE_SDK$': get_static_include('BattlehouseSDK.js').replace('$BH_LOGIN_PATH$',SpinConfig.config['battlehouse_api_path']).replace('$BH_SDK_LOCALE$',visitor.demographics.get('locale','en_US')) if (visitor.frame_platform == 'bh' and SpinConfig.config.get('enable_battlehouse',0)) else '',
             '$BATTLEHOUSE_FB_APP_ID$': SpinConfig.config.get('battlehouse_fb_app_id',''),
 
             # XXX use an out-of-line cacheable compressed file
