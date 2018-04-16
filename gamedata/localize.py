@@ -67,6 +67,10 @@ def get_strings(path, data, filter = None, is_strings_json = False):
                  (k not in ('damage_vs_qualities','periods')):
                 for item in v:
                     ret.append((item, path+'/'+k+'[]'))
+            elif is_strings_json and k == 'footer_linkbar_content' and isinstance(v, list):
+                # cond chain
+                for i in xrange(len(v)):
+                    ret.append((v[i][1], path+'/'+k+'['+str(i)+']'))
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))) and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny','group','display')):
                     ret.append((v, path+'/'+k))
@@ -114,6 +118,10 @@ def put_strings(data, entries, filter = None, is_strings_json = False, verbose =
                  (k not in ('damage_vs_qualities','periods')):
                 for i, item in enumerate(v):
                     v[i] = get_translation(item, entries, verbose)
+            elif is_strings_json and k == 'footer_linkbar_content' and isinstance(v, list):
+                # cond chain
+                for i in xrange(len(v)):
+                    v[i][1] = get_translation(v[i][1], entries, verbose)
             elif type(v) in (str, unicode):
                 if v and ((not filter) or (k.startswith(filter))):
                     data[k] = get_translation(v, entries, verbose)
