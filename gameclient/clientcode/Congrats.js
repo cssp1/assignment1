@@ -45,6 +45,7 @@ var PredicateSpec;
 
 /** @dict
     @typedef {!{developer_only: (boolean|undefined),
+                quarry_only: (boolean|undefined),
                 limit: (Array.<number>|number|undefined),
                 ui_name: string,
                 ui_name_plural: (string|undefined),
@@ -77,6 +78,7 @@ Congrats.cc_upgrade = function(cc, level) {
 
         // ignore developer_only / hidden specs
         if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode || ! /** boolean */ (player.is_cheater))) { continue; }
+        if(('quarry_only' in spec) && (!!spec['quarry_only'])) { continue; }
         if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { continue; }
 
         if('limit' in spec && (typeof spec['limit']) !== 'number') {
@@ -139,6 +141,7 @@ Congrats.building_level_gain = function(source_spec, source_level, spec) {
 
     // ignore developer_only if in production
     if(('developer_only' in spec) && (!!spec['developer_only']) && (spin_secure_mode ||  ! /** boolean */ (player.is_cheater))) { return null; }
+    if(('quarry_only' in spec) && (!!spec['quarry_only'])) { return null; }
     if(('show_if' in spec) && !read_predicate(spec['show_if']).is_satisfied(player, null)) { return null; }
     if(!spec['requires'] || !(spec['requires'] instanceof Array)) { return null; } // missing or non-array-valued "requires"
 
