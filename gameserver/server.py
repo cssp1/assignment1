@@ -14438,7 +14438,7 @@ class LivePlayer(Player):
 
         # update Base Defenders ui_name
         if '0' in self.squads:
-            self.squads['0']['ui_name'] = gamedata['strings']['squads']['base_defenders']
+            self.squads['0']['ui_name'] = gamesite.get_localized_gamedata('strings', session.user.locale)['squads']['base_defenders']
 
         # ensure that player has all starting tech levels (if gamedata was changed after player was created)
         for key, start_level in gamedata['starting_conditions']['tech'].iteritems():
