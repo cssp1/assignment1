@@ -1767,6 +1767,7 @@ def adcreative_make_batch_element(db, ad_account_id, fb_campaign_name, campaign_
             image_file = None
             thumbnail_file = None
         else:
+            asset_feed_id = None
             title_text = open(os.path.join(asset_path, 'title_'+tgt['title']+'.txt')).read().strip()
             body_text = open(os.path.join(asset_path, 'body_'+tgt['body']+'.txt')).read().strip()
             if tgt['image'].startswith('vid'):
