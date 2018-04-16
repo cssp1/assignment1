@@ -77,7 +77,7 @@ def get_strings(path, data, filter = None, is_strings_json = False):
                  (k not in ('damage_vs_qualities','periods')):
                 for item in v:
                     ret.append((item, path+'/'+k+'[]'))
-            elif is_strings_json and k == 'footer_linkbar_content' and isinstance(v, list):
+            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning') and isinstance(v, list):
                 # cond chain
                 for i in xrange(len(v)):
                     ret.append((v[i][1], path+'/'+k+'['+str(i)+']'))
@@ -92,7 +92,7 @@ def get_strings(path, data, filter = None, is_strings_json = False):
     return ret
 
 # parts of gamedata that need their ui_whatever things translated
-TRANSLATE_CATEGORIES = ('dialogs','resources','spells','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions','crafting')
+TRANSLATE_CATEGORIES = ('dialogs','resources','spells','loot_tables_client','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions','crafting')
 
 def do_extract(gamedata, outfile, verbose = True):
     if verbose: print >>sys.stderr, "read gamedata game_id", gamedata['game_id'], "built", gamedata['gamedata_build_info']['date']
@@ -134,11 +134,11 @@ def put_strings(data, entries, filter = None, is_strings_json = False, verbose =
         for k, v in data.iteritems():
             if is_dictlike(v) or (isinstance(v, list) and len(v) >= 1 and is_dictlike(v[0])):
                 put_strings(v, entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
-            elif is_strings_json and isinstance(v, list) and len(v) >= 1 and isinstance(v[0], basestring) and \
+            elif (is_strings_json or k == 'ui_congrats') and isinstance(v, list) and len(v) >= 1 and isinstance(v[0], basestring) and \
                  (k not in ('damage_vs_qualities','periods')):
                 for i, item in enumerate(v):
                     v[i] = get_translation(item, entries, verbose)
-            elif is_strings_json and k == 'footer_linkbar_content' and isinstance(v, list):
+            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning') and isinstance(v, list):
                 # cond chain
                 for i in xrange(len(v)):
                     v[i][1] = get_translation(v[i][1], entries, verbose)
