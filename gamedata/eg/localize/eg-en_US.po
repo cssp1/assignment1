@@ -15730,3 +15730,6 @@ msgstr "Offensive Clan Name or Tag"
 
 msgid "To report an inappropriate Alliance name or tag:\n\n1. Click the \"Contact Support\" button at the bottom of the game window to file a report. Please include a screenshot and the ID number of an Alliance member (%user_id).\n\n[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/26750733-How-can-I-send-a-screenshot-in-to-the-support-team-]Click here for instructions on how to take a screenshot.[/url][/u][/color]\n\nThank you!"
 msgstr "To report an inappropriate Clan name or tag:\n\n1. Click the \"Contact Support\" button at the bottom of the game window to file a report. Please include a screenshot and the ID number of a Clan member (%user_id).\n\n[color=#ffff00][u][url=https://spinpunch.zendesk.com/entries/26750733-How-can-I-send-a-screenshot-in-to-the-support-team-]Click here for instructions on how to take a screenshot.[/url][/u][/color]\n\nThank you!"
+
+msgid "!TX day_of_month %d"
+msgstr "%d"

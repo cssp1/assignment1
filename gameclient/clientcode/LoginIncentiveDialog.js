@@ -122,7 +122,8 @@ LoginIncentiveDialog.update = function(dialog) {
 
         var this_t = t_origin + (daynum-1)*86400;
         var d = new Date(this_t * 1000);
-        var ui_date = gamedata['strings']['months_short'][d.getUTCMonth()]+' '+d.getUTCDate().toString();
+        var ui_date = gamedata['strings']['months_short'][d.getUTCMonth()]+' '+gamedata['strings']['day_of_month'].replace('%d',d.getUTCDate().toString());
+
         var ui_day_of_week = gamedata['strings']['days_of_week_short'][d.getUTCDay()];
         r.widgets['label'].str = r.data['widgets']['label'][(server_time >= this_t && server_time < this_t + 86400 ? 'ui_name_today' : 'ui_name')]
             .replace('%date', ui_date).replace('%dayofweek', ui_day_of_week);

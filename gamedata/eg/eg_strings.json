@@ -1621,5 +1621,6 @@
     "months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "days_of_week_short": ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
     "days_of_week": ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+    "day_of_month": "!TX day_of_month %d",
     "unknown": "Unknown"
 }
