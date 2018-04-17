@@ -28,7 +28,8 @@ resource "aws_iam_role_policy" "game_server" {
     },
     { "Effect": "Allow",
       "Action": ["s3:ListBucket","s3:DeleteObject","s3:GetObject","s3:PutObject"],
-      "Resource": ["arn:aws:s3:::spinpunch-${var.game_id}prod-*",
+      "Resource": ["arn:aws:s3:::spinpunch-prod-userdb*",
+                   "arn:aws:s3:::spinpunch-${var.game_id}prod-*",
                    "arn:aws:s3:::spinpunch-logs*",
                    "arn:aws:s3:::spinpunch-upcache*",
                    "arn:aws:s3:::spinpunch-screen-recordings*"]
