@@ -7,6 +7,7 @@
 
 import SpinJSON
 from ipaddress import IPv6Address, IPv4Address, IPv6Network, IPv4Network, v4_int_to_packed, v6_int_to_packed
+import os
 
 class CheckerResult(object):
     def __init__(self, entry):
@@ -25,6 +26,11 @@ class CheckerResult(object):
 
 class Checker(object):
     def __init__(self):
+        if not os.path.exists('../spinpunch-private/ip-reputation.json'):
+            print 'spinpunch-private/ip-reputation.json not found, not using IP reputation database'
+            self.ip_list = tuple()
+            return
+
         ip_dict = {} # map from range_lo -> ip-reputation entry dict
         for line in open('../spinpunch-private/ip-reputation.json', 'r'):
             line = line.strip()
