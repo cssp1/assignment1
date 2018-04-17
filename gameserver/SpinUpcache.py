@@ -1069,7 +1069,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
     # note: passes through upcache where "obj" is the existing cache entry will never have a 'facebook_likes' field!
     if (not obj.get('has_facebook_likes',None)) or obj['has_facebook_likes'] < SpinConfig.FACEBOOK_GAME_FAN_PAGES_VERSION:
         if 'has_facebook_likes' in obj: del obj['has_facebook_likes'] # version number for the likes_ data
-        if 'facebook_likes' in obj and len(obj['facebook_likes']) > 0:
+        if obj.get('facebook_likes') and len(obj['facebook_likes']) > 0:
             obj['has_facebook_likes'] = SpinConfig.FACEBOOK_GAME_FAN_PAGES_VERSION
             REVERSE_TBL = dict((id, name) for name, id in SpinConfig.FACEBOOK_GAME_FAN_PAGES.iteritems())
 
