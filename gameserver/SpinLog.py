@@ -397,7 +397,9 @@ def FBPermissionsLogFilter(child):
                                   '0032_request_permission_prompt_success',
                                   '0033_request_permission_prompt_fail',
                                   '0034_request_permission_prompt_unnecessary',
-                                  '0110_created_new_account'])
+                                  '0110_created_new_account',
+                                  '0113_account_deauthorized',
+                                  ])
 def FBNotificationsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['7130_fb_notification_sent',

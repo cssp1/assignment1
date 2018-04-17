@@ -1071,6 +1071,7 @@ class UserTable:
               ('last_login_ip', str),
               ('last_logout_time', int),
               ('uninstalled', int),
+              ('uninstalled_reason', str),
               ('birthday', None),
               ('browser_name', str),
               ('browser_version', int),
@@ -1280,7 +1281,8 @@ class User:
         self.last_login_time = -1 # last time at which user played the game
         self.last_logout_time = -1 # last time at which user exited the game
         self.last_login_ip = '' # last IP address from which this user logged in
-        self.uninstalled = 0 # true if person uninstalled the game via the frame platform
+        self.uninstalled = 0 # >0 if person uninstalled the game via the frame platform (e.g. de-authorized the Facebook app). UNIX time of uninstall event, 1 for legacy accounts.
+        self.uninstalled_reason = None # string describing where the uninstall request came from
         self.country = '' # Facebook country from which user last logged in
         self.fb_oauth_token = None # Facebook OAuth token from the proxyserver login
 
@@ -27461,6 +27463,7 @@ class GAMEAPI(resource.Resource):
         user.last_login_time = server_time
         user.last_login_ip = client_ip
         user.uninstalled = 0
+        user.uninstalled_reason = None
 
         # update profile fields
         if frame_platform == 'fb':

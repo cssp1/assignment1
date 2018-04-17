@@ -257,13 +257,26 @@ class HandleClearAlias(Handler):
         return ReturnValue(result = 'ok')
 
 class HandleMarkUninstalled(Handler):
+    # mark account as uninstalled and scrub PII
+    PII_FIELDS = ['birthday', 'facebook_profile', 'facebook_friends',
+                  'facebook_likes', 'facebook_name', 'facebook_first_name']
+
     def do_exec_online(self, session, retmsg):
-        session.user.uninstalled = 1
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
+        session.user.uninstalled = self.time_now
+        if 'reason' in self.args:
+            session.user.uninstalled_reason = self.args['reason']
+        for FIELD in self.PII_FIELDS:
+            setattr(session.user, FIELD, None)
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
-        user['uninstalled'] = 1
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': 1})
+        user['uninstalled'] = self.time_now
+        if 'reason' in self.args:
+            user['uninstalled_reason'] = self.args['reason']
+        for FIELD in self.PII_FIELDS:
+            if FIELD in user:
+                user[FIELD] = None
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
         return ReturnValue(result = 'ok')
 
 class HandleCheckIdle(Handler):
