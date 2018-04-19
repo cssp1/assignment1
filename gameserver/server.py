@@ -25879,7 +25879,7 @@ class GAMEAPI(resource.Resource):
                                         url_props['want_loot'] = qs['want_loot'][0]
                                         spellarg = {'want_loot': bool(int(qs['want_loot'][0]))}
                                     if url != OGPAPI_instance.get_object_endpoint(url_props):
-                                        gamesite.exception_log.event('fbpayment URL mismatch: got %s expected %s' % \
+                                        gamesite.exception_log.event(server_time, 'fbpayment URL mismatch: got %s expected %s' % \
                                                                      (url, OGPAPI_instance.get_object_endpoint(url_props)))
                                         raise Exception('fbpayment URL mismatch')
 
