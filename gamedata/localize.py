@@ -92,7 +92,7 @@ def get_strings(path, data, filter = None, is_strings_json = False):
     return ret
 
 # parts of gamedata that need their ui_whatever things translated
-TRANSLATE_CATEGORIES = ('dialogs','resources','spells','loot_tables_client','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions','crafting')
+TRANSLATE_CATEGORIES = ('dialogs','resources','spells','loot_tables_client','units','buildings','tech','enhancements','items','auras','errors','store','tutorial','inert','predicate_library','consequent_library','quests','daily_tips','daily_messages','virals','achievement_categories','achievements','fb_notifications','regions','crafting','events')
 
 def do_extract(gamedata, outfile, verbose = True):
     if verbose: print >>sys.stderr, "read gamedata game_id", gamedata['game_id'], "built", gamedata['gamedata_build_info']['date']
