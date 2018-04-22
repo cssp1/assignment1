@@ -3046,7 +3046,7 @@ class AdminStats(object):
                 'launch_time': proxy_launch_time,
                 'type': 'proxyserver',
                 'state': 'ok',
-                'hostname': SpinConfig.config['proxyserver'].get('external_host', os.getenv('HOSTNAME') or socket.gethostname()),
+                'hostname': os.getenv('HOSTNAME') or socket.gethostname(),
                 'pid': os.getpid(),
                 'external_listen_host': SpinConfig.config['proxyserver'].get('external_listen_host',''),
                 'internal_listen_host': SpinConfig.config['proxyserver'].get('internal_listen_host',''),

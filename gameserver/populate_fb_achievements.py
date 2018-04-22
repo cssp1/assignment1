@@ -17,7 +17,7 @@ def get_endpoint_url(params):
     port_str = (':%d' % port) if port != 80 else ''
     # note: use stable ordering of key/value pairs for the query string, so that the canonical URL is deterministic
     qs = urllib.urlencode(sorted(params.items(), key = lambda k_v: k_v[0]))
-    return ("http://%s%s/OGPAPI?" % (SpinConfig.config['proxyserver'].get('external_host', socket.gethostname()),
+    return ("http://%s%s/OGPAPI?" % (SpinConfig.config['proxyserver'].get('external_listen_host', socket.gethostname()),
                                      port_str)) + qs
 
 if __name__ == '__main__':

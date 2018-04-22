@@ -15688,7 +15688,7 @@ class OGPAPI(resource.Resource):
     def get_object_endpoint(self, params, override_host = None):
         port = SpinConfig.config['proxyserver']['external_http_port']
         port_str = (':%d' % port) if port != 80 else ''
-        host = override_host or SpinConfig.config['proxyserver'].get('external_host', socket.gethostname())
+        host = override_host or SpinConfig.config['proxyserver'].get('external_listen_host', socket.gethostname())
 
         # note: use stable ordering of key/value pairs for the query string, so that the canonical URL is deterministic
         qs = urllib.urlencode(sorted(params.items(), key = lambda k_v: k_v[0]))
@@ -15923,7 +15923,7 @@ class OGPAPI(resource.Resource):
                     art_server = SpinConfig.config['proxyserver']['art_cdn_path']
                 else:
                     # URL to art asset assumes proxyserver is running on same host if no CDN is in use!
-                    art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_host', gamesite.config.game_host),
+                    art_server = '%s:%d/' %  (SpinConfig.config['proxyserver'].get('external_listen_host', gamesite.config.game_host),
                                               SpinConfig.config['proxyserver']['external_http_port'])
                 image_url = 'http://%s%s' % (art_server, art_asset_file)
             elif art_asset_s3:
@@ -16153,7 +16153,7 @@ class STATSAPI(resource.Resource):
                                         if SpinConfig.config['proxyserver'].get(key, -1) > 0:
                                             port = SpinConfig.config['proxyserver'][key]
                                             port_str = (':%d' % port) if port != {'http':80,'https':443}[proto] else ''
-                                            host = SpinConfig.config['proxyserver'].get('external_host', socket.gethostname())
+                                            host = SpinConfig.config['proxyserver'].get('external_listen_host', socket.gethostname())
                                             spec[prop+'_url'] = '%s://%s%s/%s' % (proto,host, port_str, filename)
                                             spec[prop+'_dimensions'] = state['dimensions']
                                             if 'origins' in state:
@@ -33182,9 +33182,9 @@ class GameSite(server.Site):
                     client.transport.write('SPws_ping')
 
     def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
-        host = SpinConfig.config['proxyserver'].get('external_host', self.config.game_host)
         port = SpinConfig.config['proxyserver']['external_http_port']
         base_url = 'http://%s:%d/CONTROLAPI?' % (host,port)
+        host = SpinConfig.config['proxyserver'].get('external_listen_host', self.config.game_host)
         args = copy.copy(caller_args)
 
         # ensure all string args are UTF-8 encoded str()s, which urllib.urlencode() will turn into percent-escaped UTF-8
