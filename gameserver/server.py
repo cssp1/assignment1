@@ -2333,7 +2333,6 @@ class User:
         if ('type' in qs) and (qs['type'][-1] == OGPAPI.object_type('sku')):
             spellname = qs['spellname'][-1]
             spellarg = None
-            #assert url == OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('sku'), 'spellname': spellname})
         # look for an order that buys in-game currency directly on the OG currency object, like a payer promo
         elif ('type' in qs) and (qs['type'][-1] == OGPAPI.object_type('gamebucks')):
             spellname = 'FB_GAMEBUCKS_PAYMENT'
@@ -15694,6 +15693,23 @@ class OGPAPI(resource.Resource):
         qs = urllib.urlencode(sorted(params.items(), key = lambda k_v: k_v[0]))
         return ("http://%s%s/OGPAPI?" % (host, port_str)) + qs
 
+    # check whether url "equals" the OGPAPI endpoint URL generated with these params
+    # the comparison is a little loose to allow for minor variations in the URL
+    def matches_object_endpoint(self, url, params):
+        to_check = [self.get_object_endpoint(params),]
+        # special case to handle orders created on temporary legacy DNS entry
+        if SpinConfig.game() == 'tr':
+            to_check.append(self.get_object_endpoint(params, override_host = 'trprod10.spinpunch.com'))
+
+        url_parts = urlparse.urlparse(str(url))
+        for check in to_check:
+            check_parts = urlparse.urlparse(str(check))
+            if check_parts.netloc == url_parts.netloc and \
+               check_parts.path == url_parts.path and \
+               check_parts.query == url_parts.query:
+                return True
+        return False
+
     def render_GET(self, request):
         SpinHTTP.set_access_control_headers(request)
         ret = catch_all('OGPAPI request %s args %r' % (request.uri.decode('utf-8'), dict((k,v[0].decode('utf-8')) for k,v in request.args.iteritems())))(self.handle_request)(request)
@@ -17834,7 +17850,7 @@ class Store(object):
             if 0:
                 gamesite.exception_log.event(server_time, ('in-app currency order (FB buyer %s): ' % buyer) + repr(my_data))
             assert m['credits_amount'] == credits_amount
-            assert str(m['product']) == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
+            assert OGPAPI_instance.matches_object_endpoint(m['product'], {'type':OGPAPI.object_type('gamebucks')})
             assert m['product_amount'] <= gamedata['store']['gamebucks_per_fbcredit'] * m['credits_amount']
 
             # note: we have to find the session manually, because this request comes from Facebook without passing through the client!
@@ -17851,7 +17867,7 @@ class Store(object):
         elif my_data.get('spellname') == 'FB_TRIALPAY_GAMEBUCKS':
             assert session
             assert currency == 'gamebucks'
-            assert my_data['currency_url'] == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}))
+            assert OGPAPI_instance.matches_object_endpoint(my_data['currency_url'], {'type':OGPAPI.object_type('gamebucks')})
             unit_id = GameObject.VIRTUAL_ID
             spellname = 'FB_TRIALPAY_GAMEBUCKS'
             spellarg = credits_amount
@@ -18850,7 +18866,7 @@ class CREDITAPI(resource.Resource):
             assert len(query) == 2 and ('type' in query) and ('spellname' in query)
             assert str(query['type'][0]) == OGPAPI.object_type('sku')
             spellname = str(query['spellname'][0])
-            assert product_url == OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('sku'), 'spellname': spellname})
+            assert OGPAPI_instance.matches_object_endpoint(product_url, {'type':OGPAPI.object_type('sku'), 'spellname': spellname})
             spell = gamedata['spells'][spellname]
             assert spell['price_formula'] == 'constant' # price must be only a function of the URL!
             assert 'currency' in spell
@@ -25878,14 +25894,13 @@ class GAMEAPI(resource.Resource):
                                     if 'want_loot' in qs:
                                         url_props['want_loot'] = qs['want_loot'][0]
                                         spellarg = {'want_loot': bool(int(qs['want_loot'][0]))}
-                                    if url != OGPAPI_instance.get_object_endpoint(url_props):
+                                    if not OGPAPI_instance.matches_object_endpoint(url, url_props):
                                         gamesite.exception_log.event(server_time, 'fbpayment URL mismatch: got %s expected %s' % \
                                                                      (url, OGPAPI_instance.get_object_endpoint(url_props)))
                                         raise Exception('fbpayment URL mismatch')
 
                                 # look for an order that buys in-game currency directly on the OG currency object, like a payer promo
-                                elif url == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')})) or \
-                                     (SpinConfig.game() == 'tr' and url == str(OGPAPI_instance.get_object_endpoint({'type':OGPAPI.object_type('gamebucks')}, override_host = 'trprod10.spinpunch.com'))): # special case to handle orders created on temporary legacy DNS entry
+                                elif OGPAPI_instance.matches_object_endpoint(url, {'type':OGPAPI.object_type('gamebucks')}):
                                     spellname = 'FB_GAMEBUCKS_PAYMENT'
                                     spellarg = response['items'][0]['quantity']
 
