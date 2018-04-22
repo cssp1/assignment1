@@ -33182,9 +33182,14 @@ class GameSite(server.Site):
                     client.transport.write('SPws_ping')
 
     def do_CONTROLAPI(self, on_behalf_of_user_id, caller_args, max_tries = None):
-        port = SpinConfig.config['proxyserver']['external_http_port']
-        base_url = 'http://%s:%d/CONTROLAPI?' % (host,port)
         host = SpinConfig.config['proxyserver'].get('external_listen_host', self.config.game_host)
+        if SpinConfig.config['proxyserver'].get('external_ssl_port', -1) > 0:
+            proto = 'https'
+            port = SpinConfig.config['proxyserver']['external_ssl_port']
+        else:
+            proto = 'http'
+            port = SpinConfig.config['proxyserver']['external_http_port']
+        base_url = '%s://%s:%d/CONTROLAPI?' % (proto,host,port)
         args = copy.copy(caller_args)
 
         # ensure all string args are UTF-8 encoded str()s, which urllib.urlencode() will turn into percent-escaped UTF-8
