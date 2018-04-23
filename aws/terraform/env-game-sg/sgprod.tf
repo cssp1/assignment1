@@ -93,7 +93,7 @@ module "game_server_sg" {
   game_id = "sg"
   game_id_long = "summonersgate"
   game_mail_from = "Allandra"
-  tournament_continents = "fb ag"
+  tournament_continents = "fb"
   zone_index = 2 # us-east-1d
   instance_type = "m5.large"
   game_server_snam = "srv0"
