@@ -298,11 +298,11 @@ def do_action(path, method, args, spin_token_data, nosql_client):
         assert len(path) >= 1
         if path[0] == 'player':
             # player methods
-            if (method not in ('lookup', 'get_raw_player')):
+            if (method not in ('lookup', 'get_raw_player', 'get_personal_info')):
                 do_log = True # log all write activity
 
             # require special role for writes, except for chat, aura, and alt actions
-            if (method not in ('lookup','get_raw_player','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt')):
+            if (method not in ('lookup','get_raw_player','get_personal_info','chat_gag','chat_ungag','chat_block','chat_unblock','chat_abuse_violate','chat_abuse_clear','apply_aura','remove_aura','ignore_alt','unignore_alt')):
                 check_role(spin_token_data, 'PCHECK-WRITE')
                 if method in ('ban','unban'):
                     check_role(spin_token_data, 'PCHECK-BAN')
@@ -319,7 +319,7 @@ def do_action(path, method, args, spin_token_data, nosql_client):
                 result = {'result':chat_abuse_violate(control_args, 'violate', control_args['ui_player_reason'], None, None)}
             elif method == 'chat_abuse_clear':
                 result = {'result':chat_abuse_clear(control_args)}
-            elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','ban','unban',
+            elif method in ('give_item','send_message','chat_gag','chat_ungag','chat_block','chat_unblock','apply_aura','remove_aura','get_raw_player','get_personal_info','mark_uninstalled','ban','unban',
                             'make_developer','unmake_developer','clear_alias','chat_official','chat_unofficial','clear_lockout','clear_cooldown','check_idle','change_region','ignore_alt','unignore_alt','demote_alliance_leader','kick_alliance_member'):
                 result = do_CONTROLAPI(control_args)
             else:

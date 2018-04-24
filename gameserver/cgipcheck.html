@@ -400,6 +400,13 @@ var method_demote_alliance_leader = function() {
         send_request('player', 'demote_alliance_leader', $.extend(ident, {'ui_reason':ui_reason}), function(result) { alert("Success! The new Clan leader is user_id "+result['new_leader_id'].toString()); });
     }
 };
+var method_mark_uninstalled = function() {
+    var ident = get_ident();
+    var ui_reason = check_ui_reason($("#privacy_reason")[0].value);
+    if(ident && ui_reason) {
+        send_request('player', 'mark_uninstalled', $.extend(ident, {'ui_reason':ui_reason,'reason':'PCHECK'}), function(result) { alert("Success! Personal info removed."); });
+    }
+};
 var method_make_developer = function() {
     var ident = get_ident();
     var ui_reason = check_ui_reason($("#make_developer_reason")[0].value);
@@ -569,6 +576,14 @@ var method_get_raw_player = function() {
             var args = $.extend(ident, {'spin_token':spin_token, 'method':'get_raw_player', 'stringify':0, 'attachment_name':attachment_name, 'gzip_encode':1});
             window.open(spin_url+'/player?'+$.param(args), '_blank');
         }
+    }
+};
+var method_get_personal_info = function() {
+    var ident = get_ident();
+    if(ident) {
+        var attachment_name = ('user_id' in ident ? ident['user_id'].toString() : ('facebook_id' in ident ? 'fb'+ident['facebook_id'] : ('battlehouse_id' in ident ? 'bh'+ident['battlehouse_id'] : 'unknown'))) + '_userdb.txt';
+        var args = $.extend(ident, {'spin_token':spin_token, 'method':'get_personal_info', 'stringify':0, 'attachment_name':attachment_name, 'gzip_encode':1});
+        window.open(spin_url+'/player?'+$.param(args), '_blank');
     }
 };
 var update_item_to_give_widget_state = function() {
@@ -1566,6 +1581,8 @@ $(function() {
         $('#player_tools_change_region_header').remove();
         $('#player_tools_alliance').remove();
         $('#player_tools_alliance_header').remove();
+        $('#player_tools_privacy').remove();
+        $('#player_tools_privacy_header').remove();
     }
 
     if(spin_token_data['roles'].indexOf('ADMIN') == -1) {
@@ -1691,6 +1708,7 @@ $(function() {
     <li><a href="#player_tools_alts" id="player_tools_alts_header">Alts</a></li>
     <li><a href="#player_tools_change_region" id="player_tools_change_region_header">Map Region</a></li>
     <li><a href="#player_tools_alliance" id="player_tools_alliance_header">Clan</a></li>
+    <li><a href="#player_tools_privacy" id="player_tools_privacy_header">Privacy</a></li>
     <li><a href="#player_tools_ban" id="player_tools_ban_header">Ban</a></li>
     <li><a href="#player_tools_developer" id="player_tools_developer_header">Developer</a></li>
   </ul>
@@ -1829,6 +1847,15 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="alliance_reason" style="width:500px;">
+    </div>
+
+    <div id="player_tools_privacy">
+      <button onclick="method_get_personal_info()" class="spin_button">Get Personal Info</button>
+      <button onclick="method_mark_uninstalled()" class="spin_button">Clear Personal Info</button>
+      <p>
+      Reason for this action:
+      <br>
+      <input type="text" id="privacy_reason" style="width:500px;">
     </div>
 
     <div id="player_tools_developer">

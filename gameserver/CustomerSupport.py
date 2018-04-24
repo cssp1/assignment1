@@ -15,7 +15,7 @@ import SpinJSON
 import SpinConfig
 import random
 import math
-#import copy
+import copy
 import traceback
 from Region import Region
 import Consequents
@@ -184,6 +184,27 @@ class HandleGetRawUser(HandleGetRaw):
     def exec_offline_raw(self, user_raw, player_raw):
         assert self.stringify
         return ReturnValue(result = user_raw)
+
+class HandleGetPersonalInfo(Handler):
+    read_only = True
+    need_player = False
+    def __init__(self, *args, **kwargs):
+        Handler.__init__(self, *args, **kwargs)
+        self.stringify = bool(int(self.args.get('stringify',False)))
+    # note: no logging, directly override exec()
+    def exec_online(self, session, retmsg):
+        user_json = self.gamesite.user_table.jsonize(session.user)
+        return self.exec_offline(user_json, None)
+    def exec_offline(self, user, player):
+        result = {}
+        for FIELD in SpinConfig.PII_FIELDS:
+            if FIELD in user:
+                result[FIELD] = copy.deepcopy(user[FIELD])
+                if FIELD == 'facebook_likes':
+                    result[FIELD] = filter(lambda x: x.get('id') in SpinConfig.FACEBOOK_GAME_FAN_PAGES, result[FIELD])
+        if self.stringify:
+            result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
+        return ReturnValue(result = result)
 
 class HandleBan(Handler):
     need_user = False
@@ -1939,6 +1960,7 @@ class HandlePlayerBatch(Handler):
 methods = {
     'get_raw_player': HandleGetRawPlayer,
     'get_raw_user': HandleGetRawUser,
+    'get_personal_info': HandleGetPersonalInfo,
     'ban': HandleBan,
     'unban': HandleUnban,
     'mark_uninstalled': HandleMarkUninstalled,
