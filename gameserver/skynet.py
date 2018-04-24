@@ -418,6 +418,9 @@ def lookalike_audience_create(db, ad_account_id, name, origin_audience_name, cou
                 'location_spec': {'geo_locations': {'countries': country.split(',')}}}
     else: # assume single country
         spec = {'country': country.upper()}
+        if country == 'kr':
+            # usually requires this flag since we don't have many seeds in KR
+            spec['allow_international_seeds'] = True
 
     if lookalike_ratio is not None:
         spec['ratio'] = lookalike_ratio
