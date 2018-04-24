@@ -265,6 +265,12 @@ def years_old_to_age_group(years):
     elif years >= 13: return '17O13'
     else: return 'MISSING'
 
+# fields of "user" objects that can be considered Personally Identifiable Information,
+# and default values thereof
+PII_FIELDS = {'birthday': None, 'facebook_profile': None, 'facebook_friends': None,
+              'facebook_likes': None, 'facebook_name': None, 'facebook_first_name': None,
+              'last_login_ip': '', 'age_group': None}
+
 # return UNIX time counter for first second of this year/month/day
 def cal_to_unix(ymd):
     year, mon, mday = ymd
