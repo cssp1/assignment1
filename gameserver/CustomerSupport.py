@@ -279,6 +279,14 @@ class HandleClearAlias(Handler):
 
 class HandleMarkUninstalled(Handler):
     # mark account as uninstalled and scrub PII
+    def record_deauthorized_metric(self, social_id, summary_props, reason):
+        props = {'user_id': self.user_id,
+                 'social_id': social_id,
+                 'frame_platform': summary_props['plat'], # clone this field for fb_permissions log
+                 'event_name': '0113_account_deauthorized',
+                 'method': reason}
+        props.update(summary_props)
+        self.gamesite.metrics_log.event(self.time_now, props)
 
     def do_exec_online(self, session, retmsg):
         session.user.uninstalled = self.time_now
@@ -287,6 +295,8 @@ class HandleMarkUninstalled(Handler):
         for FIELD, defval in SpinConfig.PII_FIELDS.iteritems():
             setattr(session.user, FIELD, defval)
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
+        props = session.player.get_denormalized_summary_props('brief')
+        self.record_deauthorized_metric(session.user.social_id, props, reason)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
         user['uninstalled'] = self.time_now
@@ -299,6 +309,8 @@ class HandleMarkUninstalled(Handler):
                 if user[FIELD] is None:
                     del user[FIELD]
         self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
+        props = self.get_denormalized_summary_props_offline(user, player)
+        self.record_deauthorized_metric(user.get('social_id'), props, reason)
         return ReturnValue(result = 'ok')
 
 class HandleCheckIdle(Handler):

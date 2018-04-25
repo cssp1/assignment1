@@ -2873,12 +2873,6 @@ class GameProxy(proxy.ReverseProxyResource):
             signed_request = SpinFacebook.parse_signed_request(request.args['signed_request'][0], SpinConfig.config['facebook_app_secret'])
             user_id = social_id_table.social_id_to_spinpunch('fb'+str(signed_request['user_id']), False)
             if user_id:
-                metric_event_coded(None, '0113_account_deauthorized',
-                                   {'user_id': user_id,
-                                    'frame_platform': 'fb',
-                                    'social_id': 'fb'+signed_request['user_id'],
-                                    'ip': SpinHTTP.get_twisted_client_ip(request),
-                                    })
                 # mark account as "deauthorized"
 
                 # pick any open server
