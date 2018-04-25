@@ -1072,6 +1072,9 @@ class UserTable:
               ('last_logout_time', int),
               ('uninstalled', int),
               ('uninstalled_reason', str),
+              ('privacy_consent', None),
+              ('privacy_consent_time', int),
+              ('privacy_consent_reason', str),
               ('birthday', None),
               ('browser_name', str),
               ('browser_version', int),
@@ -1283,6 +1286,9 @@ class User:
         self.last_login_ip = '' # last IP address from which this user logged in
         self.uninstalled = 0 # >0 if person uninstalled the game via the frame platform (e.g. de-authorized the Facebook app). UNIX time of uninstall event, 1 for legacy accounts.
         self.uninstalled_reason = None # string describing where the uninstall request came from
+        self.privacy_consent = None # 'yes' or 'no' if user has explicitly opted in or out of personal info access
+        self.privacy_consent_time = -1 # last modification time of above
+        self.privacy_consent_reason = None
         self.country = '' # Facebook country from which user last logged in
         self.fb_oauth_token = None # Facebook OAuth token from the proxyserver login
 
@@ -28351,6 +28357,7 @@ class GAMEAPI(resource.Resource):
                        'locale': session.user.locale,
                        'developer': 1 if session.player.is_developer() else None,
                        'uninstalled': None,
+                       'privacy_consent': session.user.privacy_consent,
                        'last_mtime': server_time,
                        'money_spent': session.player.history.get('money_spent',0.0),
                        'ui_name': session.user.get_ui_name(session.player),

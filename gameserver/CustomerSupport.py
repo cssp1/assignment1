@@ -289,26 +289,38 @@ class HandleMarkUninstalled(Handler):
         self.gamesite.metrics_log.event(self.time_now, props)
 
     def do_exec_online(self, session, retmsg):
+        # switch privacy_consent to 'no' only if it was explicitly 'yes' before
+        reason = self.args.get('reason', 'mark_uninstalled')
+        if session.user.privacy_consent == 'yes':
+            session.user.privacy_consent = 'no'
+            session.user.privacy_consent_time = self.time_now
+            session.user.privacy_consent_reason = reason
         session.user.uninstalled = self.time_now
-        if 'reason' in self.args:
-            session.user.uninstalled_reason = self.args['reason']
+        session.user.uninstalled_reason = reason
         for FIELD, defval in SpinConfig.PII_FIELDS.iteritems():
             setattr(session.user, FIELD, defval)
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now,
+                                                                       'privacy_consent': session.user.privacy_consent})
         props = session.player.get_denormalized_summary_props('brief')
         self.record_deauthorized_metric(session.user.social_id, props, reason)
         return ReturnValue(result = 'ok')
     def do_exec_offline(self, user, player):
+        # switch privacy_consent to 'no' only if it was explicitly 'yes' before
+        reason = self.args.get('reason', 'mark_uninstalled')
+        if user.get('privacy_consent', None) == 'yes':
+            user['privacy_consent'] = 'no'
+            user['privacy_consent_time'] = self.time_now
+            user['privacy_consent_reason'] = reason
         user['uninstalled'] = self.time_now
-        if 'reason' in self.args:
-            user['uninstalled_reason'] = self.args['reason']
+        user['uninstalled_reason'] = reason
         for FIELD, defval in SpinConfig.PII_FIELDS.iteritems():
             if FIELD in user:
                 user[FIELD] = defval
                 # get rid of "None" fields
                 if user[FIELD] is None:
                     del user[FIELD]
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now})
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now,
+                                                                       'privacy_consent': user.get('privacy_consent')})
         props = self.get_denormalized_summary_props_offline(user, player)
         self.record_deauthorized_metric(user.get('social_id'), props, reason)
         return ReturnValue(result = 'ok')
