@@ -32622,6 +32622,8 @@ class GameSite(server.Site):
                                              SpinLog.AchievementsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_achievements')), # achievements events to MongoDB log_achievements
                                              SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                              SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow
+                                             SpinLog.PrivacyLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_privacy')), # privacy-related events to MongoDB log_privacy
+                                             SpinLog.PrivacyLogFilter(SpinLog.DailyJSONLog(spin_log_dir+'/','-privacy.json')), # privacy-related events toJSON privacy file
                                              SpinLog.FBPermissionsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fb_permissions')), # FB Permissions events to MongoDB log_fb_notifications
                                              SpinLog.FBNotificationsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fb_notifications')), # FB Notification events to MongoDB log_fb_notifications
                                              SpinLog.FBRequestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(self.nosql_client, 'log_fb_requests')), # FB Requests events to MongoDB log_fb_requests

@@ -111,6 +111,9 @@ TABLES = {
     # login sources log
     'login_sources': { 's3_name': 'login_sources', 'table_name': 'log_login_sources', 'compression': 'zip', 'retain_for': 4*86400 },
 
+    # privacy-related events
+    'privacy': {'s3_name': 'privacy', 'table_name': 'log_privacy', 'compression': 'zip', 'retain_for': 30*86400 },
+
     # Facebook Permissions, Notifications, Requests, and Open Graph logs
     'fb_permissions': { 's3_name': 'fb_permissions', 'table_name': 'log_fb_permissions', 'compression': 'zip', 'retain_for': 10*86400 },
     'fb_notifications': { 's3_name': 'fb_notifications', 'table_name': 'log_fb_notifications', 'compression': 'zip', 'retain_for': 30*86400 },

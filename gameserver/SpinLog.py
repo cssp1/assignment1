@@ -190,7 +190,11 @@ class JSONLogFilter(Log):
 def MetricsLogFilter(child):
     return JSONLogFilter(child,
                          # *maybe* allow stuff like authenticated_visit here, if performance impact is not bad
-                         allow = [#'0115_logged_in', # obsolete - use sessions table
+                         allow = [
+                                  '0060_privacy_prompt',
+                                  '0061_privacy_prompt_fail',
+                                  '0062_privacy_prompt_success',
+
                                   '0113_account_deauthorized',
                                   '0140_tutorial_oneway_ticket',
                                   '0140_tutorial_start',
@@ -390,6 +394,14 @@ def LoginFlowFilter(child): # for tracking churn during game load process
                                   '0120_client_ingame',
                                   '0125_first_action',
                                   '0940_unsupported_browser'])
+def PrivacyLogFilter(child):
+    return JSONLogFilter(child,
+                         allow = [
+        '0060_privacy_prompt',
+        '0061_privacy_prompt_fail',
+        '0062_privacy_prompt_success',
+        '0113_account_deauthorized',
+        ])
 def FBPermissionsLogFilter(child):
     return JSONLogFilter(child,
                          allow = ['0030_request_permission',

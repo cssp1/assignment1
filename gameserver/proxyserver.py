@@ -3585,6 +3585,8 @@ def do_main():
                                     SpinLog.DamageAttributionLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_damage_attribution')), # damage attribution events to MongoDB log_damage_attribution
                                     SpinLog.LoginSourcesFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_login_sources')), # login source events to MongoDB log_login_sources
                                     SpinLog.LoginFlowFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_login_flow')), # login flow events to MongoDB log_login_flow
+                                    SpinLog.PrivacyLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_privacy')), # privacy-related events to MongoDB log_privacy
+                                    SpinLog.PrivacyLogFilter(SpinLog.DailyJSONLog(proxy_log_dir+'/','-privacy.json')), # privacy-related events to JSON privacy file
                                     SpinLog.FBPermissionsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_permissions')), # FB Permissions events to MongoDB log_fb_notifications
                                     SpinLog.FBNotificationsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_notifications')), # FB Notification events to MongoDB log_fb_notifications
                                     SpinLog.FBRequestsLogFilter(SpinNoSQLLog.NoSQLJSONLog(db_client, 'log_fb_requests')), # FB Requests events to MongoDB log_fb_requests

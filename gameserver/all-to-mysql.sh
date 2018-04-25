@@ -88,6 +88,7 @@ if [[ "$FREQ" == "daily" ]]; then
   run_it ./achievements_to_sql.py -q --prune
   run_it ./login_flow_to_sql.py -q --prune
   run_it ./login_sources_to_sql.py -q --prune
+  run_it ./privacy_to_sql.py -q --prune
   run_it ./activity_to_sql.py -q --prune
   run_it ./alliance_events_to_sql.py -q --prune
   run_it ./alliance_state_to_sql.py -q
