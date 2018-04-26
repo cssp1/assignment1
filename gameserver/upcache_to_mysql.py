@@ -568,7 +568,8 @@ def do_slave(input):
                     else:
                         resource_levels[key] = [amount, 1]
 
-                update_resource_levels_entry('gamebucks', user.get('gamebucks_balance', 0))
+                if user.get('gamebucks_balance', 0) >= 0:
+                    update_resource_levels_entry('gamebucks', user.get('gamebucks_balance', 0))
                 for res in gamedata['resources']:
                     update_resource_levels_entry(res, user.get(res, 0))
 
