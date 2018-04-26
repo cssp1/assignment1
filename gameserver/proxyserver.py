@@ -2543,6 +2543,7 @@ class GameProxy(proxy.ReverseProxyResource):
             '$FACEBOOK_PERMISSIONS$': visitor.scope_string if (isinstance(visitor, FBVisitor) and visitor.scope_string) else '', # note: client may get more permissions later, this is just the set available upon login
             '$OAUTH_TOKEN$': visitor.auth_token(),
             '$UNSUPPORTED_BROWSER_LANDING$': SpinConfig.config['proxyserver'].get('unsupported_browser_landing','http://www.google.com/chrome/'),
+            '$USER_DENIED_AUTH_LANDING$': SpinConfig.config['proxyserver'].get('user_denied_auth_landing', 'https://www.battlehouse.com/'),
 
             '$LOAD_GAME_DATA$': load_game_data,
             '$LOAD_GAME_CODE$': load_game_code,

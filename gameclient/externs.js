@@ -94,9 +94,15 @@ var spin_facebook_sdk_on_init_callbacks;
 var spin_facebook_sdk_loaded;
 // ^^^ specific to FacebookSDK.js ^^^
 
+/** @type {string} */
 var spin_art_protocol;
+/** @type {string} */
 var spin_art_path;
+/** @type {string} */
 var spin_unsupported_browser_landing;
+/** @type {string} */
+var spin_user_denied_auth_landing;
+/** @type {string} */
 var spin_loading_screen_name;
 var spin_loading_screen_data;
 var spin_loading_screen_mode;

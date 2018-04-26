@@ -1002,6 +1002,13 @@ class TrustLevelPredicate(Predicate):
     def is_satisfied2(self, session, player, qdata, override_time = None):
         return session.player.trust_level >= self.min_level
 
+class PrivacyConsentPredicate(Predicate):
+    def __init__(self, data):
+        Predicate.__init__(self, data)
+        self.state = data['state']
+    def is_satisfied2(self, session, player, qdata, override_time = None):
+        return session.user.privacy_consent == self.state
+
 # instantiate a Predicate object from JSON
 def read_predicate(data):
     kind = data['predicate']
@@ -1136,6 +1143,8 @@ def read_predicate(data):
         return ArmySizePredicate(data)
     elif kind == 'TRUST_LEVEL':
         return TrustLevelPredicate(data)
+    elif kind == 'PRIVACY_CONSENT':
+        return PrivacyConsentPredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]

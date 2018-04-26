@@ -12,7 +12,6 @@ goog.provide('LoginIncentiveDialog');
 */
 
 goog.require('SPUI');
-goog.require('SPFX');
 
 /** @return {SPUI.Dialog|null} */
 LoginIncentiveDialog.invoke = function() {

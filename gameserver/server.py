@@ -28711,6 +28711,16 @@ class GAMEAPI(resource.Resource):
                         log_props[test_name] = test_data
                     gamesite.nosql_client.client_perf_record(log_props, reason='sprobe_result')
 
+            # record privacy-prompt resuts
+            elif key == '0061_privacy_prompt_fail':
+                session.user.privacy_consent = 'no'
+                session.user.privacy_consent_time = server_time
+                session.user.privacy_consent_reason = val.get('reason')
+            elif key == '0062_privacy_prompt_success':
+                session.user.privacy_consent = 'yes'
+                session.user.privacy_consent_time = server_time
+                session.user.privacy_consent_reason = val.get('reason')
+
         elif arg[0] == "FB_GIFT_CARD_REDEEMED":
             # only for metrics recording
             #payment_id = arg[1]

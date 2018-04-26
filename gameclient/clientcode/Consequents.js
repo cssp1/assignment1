@@ -14,6 +14,7 @@ goog.require('GameArt'); // for client graphics
 goog.require('OfferChoice');
 goog.require('Leaderboard');
 goog.require('LoginIncentiveDialog');
+goog.require('PrivacyDialog');
 goog.require('Battlehouse');
 
 // depends on global player/selection stuff from clientcode.js
@@ -971,6 +972,19 @@ InvokeLoginIncentiveDialogConsequent.prototype.execute = function(state) {
 
 /** @constructor @struct
   * @extends Consequent */
+function InvokePrivacyDialogConsequent(data) {
+    goog.base(this, data);
+}
+goog.inherits(InvokePrivacyDialogConsequent, Consequent);
+InvokePrivacyDialogConsequent.prototype.execute = function(state) {
+    var invoker = (function () { return function() {
+        PrivacyDialog.invoke();
+    }; })();
+    notification_queue.push(invoker);
+};
+
+/** @constructor @struct
+  * @extends Consequent */
 function EnableCombatResourceBarsConsequent(data) {
     goog.base(this, data);
     this.enabled = data['enable'];
@@ -1168,6 +1182,7 @@ function read_consequent(data) {
     else if(kind === 'INVOKE_INGAME_TIP') { return new InvokeIngameTipConsequent(data); }
     else if(kind === 'INVOKE_OFFER_CHOICE') { return new InvokeOfferChoiceConsequent(data); }
     else if(kind === 'INVOKE_LOGIN_INCENTIVE_DIALOG') { return new InvokeLoginIncentiveDialogConsequent(data); }
+    else if(kind === 'INVOKE_PRIVACY_DIALOG') { return new InvokePrivacyDialogConsequent(data); }
     else if(kind === 'ENABLE_COMBAT_RESOURCE_BARS') { return new EnableCombatResourceBarsConsequent(data); }
     else if(kind === 'ENABLE_PROGRESS_TIMERS') { return new EnableProgressTimersConsequent(data); }
     else if(kind === 'ENABLE_DIALOG_COMPLETION') { return new EnableDialogCompletionConsequent(data); }

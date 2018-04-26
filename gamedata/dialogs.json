@@ -127,6 +127,38 @@
         }
     },
 
+    "privacy_dialog": {
+        "dimensions": [487,377],
+        "default_button": "ok_button",
+        "widgets": {
+            "bg":{"kind":"StaticImage","xy":[0,0],"dimensions":[487,377],"asset":"dialog_resizable","bg_image_resizable":1},
+            "sunken_left":{"kind":"StaticImage","xy":[10,12],"dimensions":[153,315],"asset":"dialog_sunken_153x315"},
+            "sidebar_splash":{"kind":"StaticImage","xy":[14,17],"dimensions":[143,303],"asset":"dialog_sidebar_valentina"},
+
+            "sunken_right":{"kind":"StaticImage","xy":[169,12],"dimensions":[306,315],"asset":"dialog_sunken_resizable", "bg_image_resizable":1},
+
+            // optional icon depicting a unit
+            "title": { "kind": "TextField", "xy": [182,35], "dimensions": [277, 25], "text_size": 17, "text_style": "bold",
+                       "text_hjustify": "left", "ui_name": "Privacy Options" },
+            "description": { "kind": "RichTextField", "xy": [182,69], "dimensions": [277, 145], "text_size": 13, "text_style": "normal",
+                             "text_hjustify": "left", "text_vjustify": "top", "resize_to_fit_text": 1,
+                             "ui_name": "To provide a secure gameplay experience, we need to check the following information from your public profile:\n\n- Name, Email, and IP Address (for identity verification)\n- Birthday (for age verification), and game \"likes\" (for free in-game gifts)\n\nThis information will be used solely in accordance with our [color=#ffff00][u][url=https://www.battlehouse.com/privacy-policy/]Privacy Policy[/url][/u][/color].\n\nChoose \"Accept\" to confirm.",
+                             "ui_title_accept": "Accepted",
+                             "ui_name_accept": "Thank you. If you ever wish to revoke access in the future, you may do so in your Facebook settings.",
+                             "ui_title_deny": "Deny Access",
+                             "ui_name_deny": "Are you sure? You will not be able to play %s."
+                           },
+
+            "deny_button": { "kind": "ActionButton", "xy": [200,336], "dimensions": [134,28],
+                             "bg_image": "menu_button_resizable", "bg_image_resizable": 1, "text_size": 13, "text_style": "bold",
+                             "ui_name": "Deny" },
+
+            "ok_button": { "kind": "ActionButton", "xy": [342,336], "dimensions": [134,28], "text_size": 13, "text_style": "bold",
+                           "bg_image": "action_button_134px", "ui_name": "Accept"}
+        }
+    },
+
+
 
     "you_got_bonus_units": {
         "bg_image": "",
