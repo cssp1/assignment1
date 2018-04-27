@@ -182,3 +182,21 @@ resource "aws_volume_attachment" "swap" {
   instance_id = "${aws_instance.game_server.*.id[count.index]}"
   device_name = "/dev/xvds"
 }
+
+# CloudWatch alarms
+resource "aws_cloudwatch_metric_alarm" "game_server_swap" {
+  count = "${var.enable_swap_alarm ? 1 : 0}"
+  alarm_name = "${var.sitename}-game-server-${var.game_id}-high-swap" # later -${count.index}
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods = "3"
+  metric_name = "SwapUsage"
+  namespace = "EC2/Memory"
+  dimensions = {
+    InstanceId = "${aws_instance.game_server.*.id[count.index]}"
+  }
+  period = "300"
+  statistic = "Average"
+  threshold = "10"
+  alarm_description = "${var.sitename}-game-server-${var.game_id} High Swap Usage"
+  alarm_actions = ["${var.emergency_sns_topic}"]
+}

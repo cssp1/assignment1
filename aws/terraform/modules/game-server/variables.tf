@@ -6,6 +6,7 @@ variable "aws_cloud_config_head" {}
 variable "aws_cloud_config_tail" {}
 variable "aws_ec2_iam_role_fragment" {}
 variable "cron_mail_sns_topic" {}
+variable "emergency_sns_topic" { default = "" }
 variable "tournament_winners_sns_topic" {}
 variable "pglith_pgsql_endpoint" {}
 variable "analytics_mysql_endpoint" {}
@@ -40,3 +41,4 @@ variable "logs_size_gb" { default = 8 }
 variable "swap_size_gb" { default = 8 }
 variable "game_repo" { default = "github.com/spinpunch/game" }
 variable "game_branch" { default = "master" }
+variable "enable_swap_alarm" { default = false }

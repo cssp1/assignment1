@@ -78,6 +78,7 @@ module "game_server_tr" {
   aws_cloud_config_tail = "${module.aws_cloud_init_tr.cloud_config_tail}"
   aws_ec2_iam_role_fragment = "${module.aws_cloud_init_tr.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
+  emergency_sns_topic = "${data.terraform_remote_state.corp.emergency_sns_topic}"
   security_group_id_list = [
     "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}",
     "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
@@ -97,6 +98,7 @@ module "game_server_tr" {
   zone_index = 1 # us-east-1c
   instance_type = "c5.4xlarge"
   swap_size_gb = 64 # 32 GB RAM, 64 GB swap
+  enable_swap_alarm = true
   logs_size_gb = 32
   game_server_snam = "srv0"
 
