@@ -20,7 +20,8 @@ resource "aws_iam_role_policy" "game_server" {
       "Action": ["s3:GetObject"],
       "Resource": ["arn:aws:s3:::spinpunch-config/analytics1.pem",
                    "arn:aws:s3:::spinpunch-config/spinpunch-auth-users.json",
-                   "arn:aws:s3:::spinpunch-config/spinpunch-alert-recipients.json"]
+                   "arn:aws:s3:::spinpunch-config/spinpunch-alert-recipients.json",
+                   "arn:aws:s3:::spinpunch-puppet/*"]
     },
     { "Effect": "Allow",
       "Action": ["sns:Publish"],
