@@ -149,6 +149,6 @@ if __name__ == '__main__':
         log.info('Done! Downloaded %s', db_filename)
 
     elif mode == 'lookup':
-        geo = SpinGeoIP()
+        geo = SpinGeoIP(db_filename)
         for arg in args:
             print arg, geo.get_country(arg)
