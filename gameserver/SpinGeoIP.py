@@ -24,15 +24,25 @@ class SpinGeoIP_geoip2(object):
     def __init__(self, path_to_db_file):
         self.path_to_db_file = path_to_db_file
         self.reader = None
+        self.db_file_mtime = -1 # mtime of the db file we're using - allows us to skip reload
 
         self.reload()
 
     def reload(self, new_path_to_db_file = None):
-        if new_path_to_db_file is not None:
+        if new_path_to_db_file is not None and new_path_to_db_file != self.path_to_db_file:
             self.path_to_db_file = new_path_to_db_file
+            self.db_file_mtime = -1
 
         if os.path.exists(self.path_to_db_file):
+            mtime = os.path.getmtime(self.path_to_db_file)
+
+            if self.db_file_mtime >= mtime:
+                # skip the update if the file hasn't changed
+                return
+
             self.reader = geoip2.database.Reader(self.path_to_db_file)
+            self.db_file_mtime = mtime
+
         else:
             log.warning('geoip2 database file not found: %s' % self.path_to_db_file)
 
