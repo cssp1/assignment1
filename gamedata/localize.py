@@ -77,11 +77,17 @@ def get_strings(path, data, filter = None, is_strings_json = False):
                  (k not in ('damage_vs_qualities','periods')):
                 for item in v:
                     ret.append((item, path+'/'+k+'[]'))
-            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning') and isinstance(v, list):
+            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning','chain') and isinstance(v, list):
                 # cond chain
                 for i in xrange(len(v)):
-                    ret.append((v[i][1], path+'/'+k+'['+str(i)+']'))
-            elif type(v) in (str, unicode):
+                    if isinstance(v[i][1], basestring):
+                        ret.append((v[i][1], path+'/'+k+'['+str(i)+']'))
+                    else:
+                        ret += get_strings(path+'/'+k+'['+str(i)+']', v[i][1], filter = filter, is_strings_json = is_strings_json)
+            elif k in ('attachments_loot_table', 'on_receipt'):
+                # ignore these
+                continue
+            elif isinstance(v, basestring):
                 if v and ((not filter) or (k.startswith(filter)) or k == 'gamebucks_ui_name') and (k not in ('check_spec','icon','unit_icon','upgrade_icon_tiny','group','display')):
                     ret.append((v, path+'/'+k))
 #    elif type(data) in (int, float): # shouldn't need this check
@@ -138,11 +144,19 @@ def put_strings(data, entries, filter = None, is_strings_json = False, verbose =
                  (k not in ('damage_vs_qualities','periods')):
                 for i, item in enumerate(v):
                     v[i] = get_translation(item, entries, verbose)
-            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning') and isinstance(v, list):
+            elif k in ('footer_linkbar_content','ui_buy_gamebucks_warning','chain') and isinstance(v, list):
                 # cond chain
                 for i in xrange(len(v)):
-                    v[i][1] = get_translation(v[i][1], entries, verbose)
-            elif type(v) in (str, unicode):
+                    # ... that has raw string values
+                    if isinstance(v[i][1], basestring):
+                        v[i][1] = get_translation(v[i][1], entries, verbose)
+                    else:
+                        # ... that has compound values
+                        put_strings(v[i][1], entries, filter = filter, is_strings_json = is_strings_json, verbose = verbose)
+            elif k in ('attachments_loot_table', 'on_receipt'):
+                # ignore these
+                continue
+            elif isinstance(v, basestring):
                 if v and ((not filter) or (k.startswith(filter) or k == 'gamebucks_ui_name')):
                     data[k] = get_translation(v, entries, verbose)
 

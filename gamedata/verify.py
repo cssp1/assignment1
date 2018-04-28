@@ -2001,8 +2001,18 @@ def check_consequent(cons, reason = '', context = None, context_data = None):
 
     return error
 
-def check_mail_template(data, reason = ''):
+def check_mail_template(template, reason = ''):
     error = 0
+
+    if isinstance(template, basestring):
+        if template in gamedata['strings']:
+            data = gamedata['strings'][template]
+        else:
+            error |= 1; print '%s: mail_template %r not found in strings.json' % (reason, template)
+            return error
+    else:
+        data = template
+
     for FIELD in ('ui_subject', 'ui_body'):
         if FIELD not in data:
             error |= 1; print '%s: missing "%s"' % (reason, FIELD)
