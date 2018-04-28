@@ -27,7 +27,7 @@ if [[ "$DO_ART" == 1 ]]; then
 
 	if ./SpinConfig.py --hasvar geoip2_country_database; then
 	    echo "Downloading GeoIP2 database..."
-	    ./SpinGeoIP.py --get
+	    ./SpinGeoIP.py --get -q
 	fi
 fi
 
