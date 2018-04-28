@@ -8,6 +8,9 @@
 import SpinJSON
 from ipaddress import IPv6Address, IPv4Address, IPv6Network, IPv4Network, v4_int_to_packed, v6_int_to_packed
 import os
+import logging
+
+log = logging.getLogger('SpinIPReputation')
 
 class CheckerResult(object):
     def __init__(self, entry):
@@ -25,14 +28,19 @@ class CheckerResult(object):
     def is_toxic(self): return self.flags.get('toxic',0)
 
 class Checker(object):
-    def __init__(self):
-        if not os.path.exists('../spinpunch-private/ip-reputation.json'):
-            print 'spinpunch-private/ip-reputation.json not found, not using IP reputation database'
-            self.ip_list = tuple()
+    def __init__(self, path_to_db_file):
+        self.ip_list = tuple()
+
+        if (not path_to_db_file):
+            # silently disable the checker
+            return
+
+        if not os.path.exists(path_to_db_file):
+            log.warning('IP reputation database not found: %s', path_to_db_file)
             return
 
         ip_dict = {} # map from range_lo -> ip-reputation entry dict
-        for line in open('../spinpunch-private/ip-reputation.json', 'r'):
+        for line in open(path_to_db_file, 'r'):
             line = line.strip()
             if not line or line.startswith('//'):
                 continue
@@ -99,20 +107,32 @@ class Checker(object):
 if __name__ == '__main__':
     import sys, getopt
 
-    mode = 'test'
-    check_ip = None
+    s3_bucket_name = 'spinpunch-puppet'
+    s3_key_name = 'ip-reputation.json'
+    db_filename = './ip-reputation.json'
+    mode = 'check'
+    force = False
+    verbose = True
 
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['update','check='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], 'q', ['test','get','db-filename=','s3-bucket-name=','s3-key-name=','force'])
 
     for key, val in opts:
-        if key == '--update': mode = 'update'
-        elif key == '--check': mode = 'check'; check_ip = val
+        if key == '--get': mode = 'get'
+        elif key == '--test': mode = 'test'
+        elif key == '--db-filename': db_filename = val
+        elif key == '--s3-bucket-name': s3_bucket_name = val
+        elif key == '--s3-key-name': s3_key_name = val
+        elif key == '--force': force = True
+        elif key == '-q': verbose = False
 
-    c = Checker()
+    logging.basicConfig(level = logging.INFO if verbose else logging.WARNING)
 
     if mode == 'check':
-        print check_ip, '->', c.query(check_ip)
+        c = Checker(db_filename)
+        for check_ip in args:
+            print check_ip, '->', c.query(check_ip)
     elif mode == 'test':
+        c = Checker(db_filename)
         for addr in ('127.0.0.1',
                      '8.8.8.8',
                      '5.9.128.128',
@@ -122,3 +142,23 @@ if __name__ == '__main__':
                      '2601:701:c100:1e76:5cd5:c475:7388:977a',
                      ):
             print addr, '->', c.query(addr)
+
+    elif mode == 'get':
+        # download the S3 copy of the DB to a local file
+        import boto3
+        import calendar
+        client = boto3.client('s3')
+
+        # skip the download if the current file is up to date
+        if not force and os.path.exists(db_filename):
+            mtime = os.path.getmtime(db_filename)
+            response = client.head_object(Bucket = s3_bucket_name, Key = s3_key_name)
+            s3_mtime = calendar.timegm(response['LastModified'].timetuple())
+            if mtime >= s3_mtime:
+                log.info('%s is up to date with s3://%s/%s already.', db_filename, s3_bucket_name, s3_key_name)
+                sys.exit(0)
+
+        client.download_file(s3_bucket_name, s3_key_name, db_filename)
+        log.info('Downloading s3://%s/%s to %s ...', s3_bucket_name, s3_key_name, db_filename)
+        client.download_file(s3_bucket_name, s3_key_name, db_filename)
+        log.info('Done! Downloaded %s', db_filename)

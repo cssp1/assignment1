@@ -29,6 +29,11 @@ if [[ "$DO_ART" == 1 ]]; then
 	    echo "Downloading GeoIP2 database..."
 	    ./SpinGeoIP.py --get -q
 	fi
+
+	if ./SpinConfig.py --hasvar ip_reputation_database; then
+	    echo "Downloading IP reputation database..."
+	    ./SpinIPReputation.py --get -q
+	fi
 fi
 
 echo "Running SCM maintenance..."

@@ -13,6 +13,10 @@ import urlparse
 import socket
 import traceback
 
+# allow modules that want to use Python logging (SpinGeoIP etc) to print to stdout
+import logging
+logging.basicConfig()
+
 # on Linux, try to use Twisted's high-performance epoll reactor
 if sys.platform == 'linux2':
     from twisted.internet import epollreactor
@@ -66,7 +70,7 @@ proxy_log_dir = SpinConfig.config.get('log_dir', 'logs')
 db_client = None
 social_id_table = None
 geoip_client = SpinGeoIP.SpinGeoIP(SpinConfig.config.get('geoip2_country_database'))
-ip_rep_checker = SpinIPReputation.Checker()
+ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 raw_log = None
 metrics_log = None
 exception_log = None
@@ -3461,6 +3465,8 @@ def reconfig():
     try:
         reload(SpinConfig) # reload SpinConfig module
         SpinConfig.reload() # reload config.json file
+
+        # reinitialize the IP Geolocation database
         geoip_client.reload(SpinConfig.config.get('geoip2_country_database'))
 
         reconfig_loading_screens()
@@ -3468,10 +3474,9 @@ def reconfig():
         if db_client:
             db_client.update_dbconfig(SpinConfig.get_mongodb_config(SpinConfig.config['game_id']))
 
-        # reinitialize the IP Geolocation and Reputation databases
-
+        # reinitialize the IP Reputation database
         global ip_rep_checker
-        ip_rep_checker = SpinIPReputation.Checker()
+        ip_rep_checker = SpinIPReputation.Checker(SpinConfig.config.get('ip_reputation_database'))
 
         reload_static_includes()
         proxysite.proxy_root.rescan_static_gamedata_resources()
