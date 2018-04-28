@@ -5410,10 +5410,10 @@ class Session(object):
                 return []
         elif reason == 'quest':
             discovered_where = 'messages'
-            player.send_loot_mail(gamedata['quests'][reason_id]['ui_name'], 0, loot, retmsg, mail_template = mail_template or gamedata['strings']['quest_reward_mail'])
+            player.send_loot_mail(gamedata['quests'][reason_id]['ui_name'], 0, loot, retmsg, mail_template = mail_template or 'quest_reward_mail')
         elif reason == 'level_up':
             discovered_where = 'messages'
-            player.send_loot_mail(str(player.resources.player_level), 0, loot, retmsg, mail_template = gamedata['strings']['level_up_reward_mail'])
+            player.send_loot_mail(str(player.resources.player_level), 0, loot, retmsg, mail_template = 'level_up_reward_mail')
 
         elif reason == 'special' and all(x['spec'] == 'gamebucks' for x in loot) and show_items_discovered:
             # special case when the only loot given is gamebucks - send "fungibly" instead of by message
@@ -9309,6 +9309,7 @@ class Player(AbstractPlayer):
         self.country_tier = 4
         self.frame_platform = None # set during login
         self.birthday = None # UNIX timestamp of midnight of the player's birthday, None if no birthday info available
+        self.locale = None
         self.trust_level = None
         self.developer = None
 
@@ -9511,6 +9512,7 @@ class Player(AbstractPlayer):
         self.price_region = SpinConfig.price_region_map.get(self.country, 'unknown')
         self.country_tier = SpinConfig.country_tier_map.get(self.country, 4)
         self.developer = user.developer
+        self.locale = user.locale
         self.trust_level = user.get_trust_level()
         self.mentor_player_id_cache = user.bh_mentor_player_id_cache
         self.trainee_player_ids_cache = user.bh_trainee_player_ids_cache
@@ -13409,12 +13411,27 @@ class Player(AbstractPlayer):
             self.mailbox.append(msg)
 
     # ugly API, needs rework
-    def make_system_mail(self, data, duration = None, attachments = None, to_user_id = None, to_user_id_list = None,
+    def make_system_mail(self, template, duration = None, attachments = None, to_user_id = None, to_user_id_list = None,
                          extra_props = None, sent_time = None,
                          replace_s = '', replace_level = '', replace_time = '', replace_day = '', replacements = None):
 
         if to_user_id is None and to_user_id_list is None: to_user_id = self.user_id
 
+        # the mail template can be passed in one of two forms:
+        # NEW method: if it's a string, then it's the key for an entry in gamedata['strings'] (and thus allows localization)
+        # OLD method: if it's a dict, then it's the entry itself (but cannot be localized)
+        if isinstance(template, basestring):
+            localized_strings = gamesite.get_localized_gamedata('strings', self.locale)
+            if template in localized_strings:
+                data = localized_strings[template]
+            else:
+                gamesite.exception_log.event(server_time, 'make_system_mail(): failed to find template %r in gamedata.strings' % template)
+                return
+        else:
+            assert isinstance(template, dict)
+            data = template
+
+        # template_name refers to an entry in gamedata['strings']
         # "data" should be an entry in gamedata['strings']
         if duration is None:
             if 'expire_at' in data:
@@ -14099,7 +14116,7 @@ class LivePlayer(Player):
             session.execute_consequent_safe(data['on_login'], self, retmsg, reason='apply_promo_code',
                                             context = {'loot_reason':'promo_code',
                                                        'loot_reason_id': code,
-                                                       'loot_mail_template': gamedata['strings']['promo_code_mail'] })
+                                                       'loot_mail_template': 'promo_code_mail' })
 
     # compress player.sessions by collapsing adjacent relogs that occur within a short period of time
     def prune_sessions(self):
@@ -14944,7 +14961,7 @@ class LivePlayer(Player):
 
             if (self.history.get('inventory_intro_mail_sent', 0) < 2):
                 self.history['inventory_intro_mail_sent'] = 2
-                self.mailbox_append(self.make_system_mail(gamesite.get_localized_gamedata('strings', session.user.locale)['inventory_intro_mail']))
+                self.mailbox_append(self.make_system_mail('inventory_intro_mail'))
                 sent = True
 
 
@@ -14961,7 +14978,7 @@ class LivePlayer(Player):
             self.send_mailbox_update(retmsg)
 
     def send_loot_mail(self, opponent_name, opponent_level, items, retmsg, mail_template = None):
-        self.mailbox_append(self.make_system_mail(mail_template if mail_template else gamedata['strings']['loot_mail'],
+        self.mailbox_append(self.make_system_mail(mail_template or 'loot_mail',
                                                   attachments = items,
                                                   replace_s = opponent_name,
                                                   replace_level = str(opponent_level),
@@ -18528,7 +18545,7 @@ class Store(object):
                             session.player.inventory_log_event('5125_item_obtained', item['spec'], item.get('stack',1), item.get('expire_time',-1), level=item.get('level',None), reason=spellname)
 
                     else:
-                        session.player.send_loot_mail('', 0, items, retmsg, mail_template = gamedata['strings']['gamebucks_loot_mail'])
+                        session.player.send_loot_mail('', 0, items, retmsg, mail_template = 'gamebucks_loot_mail')
                         discovered_where = 'messages'
 
 
@@ -18633,7 +18650,7 @@ class Store(object):
                         return 'packaged_'+unit_name+ (('_L%d' % level) if (level > 1) else '')
 
                     unit_items = [{'spec':item_sku(session.player, name, cc_level), 'stack':qty} for name, qty in spell['give_units'].iteritems() if (name in gamedata['units'])]
-                    session.player.send_loot_mail('', 0, unit_items, retmsg, mail_template = gamedata['strings']['buy_gamebucks_bonus_mail'])
+                    session.player.send_loot_mail('', 0, unit_items, retmsg, mail_template = 'buy_gamebucks_bonus_mail')
                     retmsg.append(["YOU_GOT_BONUS_UNITS"])
                 else:
                     session.spawn_new_units_for_player(session.player, retmsg, spell['give_units'])
@@ -22010,7 +22027,7 @@ class GAMEAPI(resource.Resource):
         elif spellname in ("ALLIANCE_GIFT_LOOT", "FRIEND_GIFT_LOOT"):
             is_alliance = (spellname == "ALLIANCE_GIFT_LOOT")
             loot_table = spellarg[0]['loot']
-            msg = spellarg[0].get('mail_template') or gamedata['strings'][{'ALLIANCE_GIFT_LOOT':'alliance_gift_mail', 'FRIEND_GIFT_LOOT':'friend_gift_mail'}[spellname]]
+            msg = spellarg[0].get('mail_template') or {'ALLIANCE_GIFT_LOOT':'alliance_gift_mail', 'FRIEND_GIFT_LOOT':'friend_gift_mail'}[spellname]
             target_id = spellarg[1]
 
             if (target_id == session.player.user_id) or \
@@ -22114,7 +22131,12 @@ class GAMEAPI(resource.Resource):
             else:
                 session.player.send_loot_mail('', 0, items, retmsg, mail_template = spell['mail_template'])
 
-            retmsg.append(["ITEMS_DISCOVERED", items, spell['mail_template'].get('duration',-1), 'loot_buffer' if use_modal_looting else 'messages'])
+            if isinstance(spell['mail_template'], dict):
+                duration = spell['mail_template'].get('duration',-1)
+            else:
+                duration = -1
+
+            retmsg.append(["ITEMS_DISCOVERED", items, duration, 'loot_buffer' if use_modal_looting else 'messages'])
 
         elif spellname == "BUY_ITEM":
             skudata = Store.buy_item_find_skudata(spellarg, session.player)
@@ -22183,7 +22205,7 @@ class GAMEAPI(resource.Resource):
                 elif items[0].get('stack',1) > 1:
                     headline = ('%dx ' % items[0]['stack'])+headline
 
-                session.player.send_loot_mail(purchase_text, headline, items, retmsg, mail_template = gamedata['strings']['buy_item_mail'])
+                session.player.send_loot_mail(purchase_text, headline, items, retmsg, mail_template = 'buy_item_mail')
                 discovered_where = 'messages'
 
             if discovered_where:
@@ -25492,7 +25514,7 @@ class GAMEAPI(resource.Resource):
                     recipient_ids_by_locale[locale].append(id)
 
                 for locale, recipient_ids_this_locale in recipient_ids_by_locale.iteritems():
-                    to_send.append(session.player.make_system_mail(gamesite.get_localized_gamedata('strings', locale)['bh_invite_trainee_gift_mail'],
+                    to_send.append(session.player.make_system_mail('bh_invite_trainee_gift_mail',
                                                                    duration = gamedata['gift_interval'],
                                                                    to_user_id_list = recipient_ids_this_locale, replacements = replacements,
                                                                    extra_props = {'unique_per_sender': 'bh_invite_daily_gift'}))
@@ -25612,7 +25634,7 @@ class GAMEAPI(resource.Resource):
                 if msg['type'] == 'resource_gift':
 
                     if gamedata.get('gift_mail_template',None):
-                        template = gamedata['gift_mail_template']
+                        template = gamedata['gift_mail_template'] # XXX should be in gamedata['strings'], and pass as string
                         amount = 1 # for compatibility with metrics below
                         # since we're generating a new mail, we have to set the duration to the original duration minus how long it sat in the queue
                         duration = gamedata['server']['message_expire_time']['resource_gift'] - (server_time - msg['time'])
