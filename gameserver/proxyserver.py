@@ -65,7 +65,7 @@ proxy_log_dir = SpinConfig.config.get('log_dir', 'logs')
 
 db_client = None
 social_id_table = None
-geoip_client = SpinGeoIP.SpinGeoIP()
+geoip_client = SpinGeoIP.SpinGeoIP(SpinConfig.config.get('geoip2_country_database'))
 ip_rep_checker = SpinIPReputation.Checker()
 raw_log = None
 metrics_log = None
@@ -3461,6 +3461,7 @@ def reconfig():
     try:
         reload(SpinConfig) # reload SpinConfig module
         SpinConfig.reload() # reload config.json file
+        geoip_client.reload(SpinConfig.config.get('geoip2_country_database'))
 
         reconfig_loading_screens()
 
@@ -3469,8 +3470,7 @@ def reconfig():
 
         # reinitialize the IP Geolocation and Reputation databases
 
-        global geoip_client, ip_rep_checker
-        geoip_client = SpinGeoIP.SpinGeoIP()
+        global ip_rep_checker
         ip_rep_checker = SpinIPReputation.Checker()
 
         reload_static_includes()

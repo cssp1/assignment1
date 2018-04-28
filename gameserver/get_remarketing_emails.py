@@ -12,7 +12,7 @@ import SpinSQLUtil, SpinMySQLdb
 import SpinGeoIP
 
 time_now = int(time.time())
-geoip_client = SpinGeoIP.SpinGeoIP()
+geoip_client = SpinGeoIP.SpinGeoIP(SpinConfig.config['geoip2_country_database'])
 
 def upcache_table(sql_util, game_id):
     # note: assumes table_prefix equals '$GAMEID_upcache'

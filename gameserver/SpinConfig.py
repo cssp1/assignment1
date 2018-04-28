@@ -462,7 +462,7 @@ if __name__ == '__main__':
         assert in_maintenance_window(cfg, 1397544797)
 
     import sys, getopt
-    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date','getvar=','getvar-format='])
+    opts, args = getopt.gnu_getopt(sys.argv[1:], '', ['get','put','force','launch-date','getvar=','hasvar=','getvar-format='])
     mode = 'test'
     getvar_name = None
     getvar_format = 'json'
@@ -474,6 +474,7 @@ if __name__ == '__main__':
         elif key == '--launch-date': mode = 'launch-date'
         elif key == '--getvar': mode = 'getvar'; getvar_name = val
         elif key == '--getvar-format': assert val in ('raw','json'); getvar_format = val
+        elif key == '--hasvar': mode = 'hasvar'; getvar_name = val
 
     if mode in ('get','put'):
         import SpinS3
@@ -502,6 +503,8 @@ if __name__ == '__main__':
             print config[getvar_name]
         elif getvar_format == 'json':
             print SpinJSON.dumps(config[getvar_name], pretty = True)
+    elif mode == 'hasvar':
+        sys.exit(0 if getvar_name in config else 1)
     else:
         load('config.json', verbose = True)
         print 'config.json OK!'

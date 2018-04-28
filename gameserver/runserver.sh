@@ -24,6 +24,11 @@ done
 if [[ "$DO_ART" == 1 ]]; then
         echo "Downloading latest art pack..."
         ./download-art.sh -q -f
+
+	if ./SpinConfig.py --hasvar geoip2_country_database; then
+	    echo "Downloading GeoIP2 database..."
+	    ./SpinGeoIP.py --get
+	fi
 fi
 
 echo "Running SCM maintenance..."
