@@ -22039,6 +22039,14 @@ class GAMEAPI(resource.Resource):
             loot = session.get_loot_items(session.player, loot_table, spellarg[0].get('item_duration',-1), spellarg[0].get('item_expire_at',-1))
             if not loot: return True # items already expired
 
+            if isinstance(msg, basestring):
+                # follow the reference into (localized) gamedata.strings
+                if msg in gamedata['strings']:
+                    msg = gamesite.get_localized_gamedata('strings', session.user.locale)[msg]
+                else:
+                    gamesite.exception_log.event(server_time, '%s with invalid mail_template %r' % (spellname, msg))
+                    return False
+
             # check for expiring items, and ensure the message itself does not persist after the last item expires
             loot_expire_time = -1
             for item in loot:
