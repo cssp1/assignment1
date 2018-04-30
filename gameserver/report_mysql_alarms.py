@@ -20,7 +20,11 @@ time_now = int(time.time())
 def get_issues(data, game_id):
     issues = []
     if data['hau'] > 25:
-        THRESHOLD = 0.15
+
+        # above this fraction of HAU, CDN/browser alerts trigger
+        # threshold is slightly higher for FS because more players are on mobile devices with flaky connections.
+        THRESHOLD = {'fs': 0.20}.get(game_id, 0.15)
+
         hau = float(data['hau']) # denominator for per-HAU metrics
         if data['cdn_fails'] and float(data['cdn_fails'])/hau >= THRESHOLD:
             issues.append('CDN Issues per HAU >= %0.2f' % THRESHOLD)
