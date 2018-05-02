@@ -202,6 +202,13 @@ class HandleGetPersonalInfo(Handler):
                 result[FIELD] = copy.deepcopy(user[FIELD])
                 if FIELD == 'facebook_likes':
                     result[FIELD] = filter(lambda x: x.get('id') in SpinConfig.FACEBOOK_GAME_FAN_PAGES, result[FIELD])
+
+        # also grab time of privacy consent
+        if user.get('privacy_consent') == 'yes':
+            for FIELD in ('privacy_consent', 'privacy_consent_time', 'privacy_consent_reason'):
+                if user.get(FIELD):
+                    result[FIELD] = user[FIELD]
+
         if self.stringify:
             result = SpinJSON.dumps(result, pretty = True, newline = True, size_hint = 1024*1024, double_precision = 5)
         return ReturnValue(result = result)
