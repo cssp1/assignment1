@@ -87,10 +87,12 @@ if __name__ == '__main__':
                 keyvals = [('time',row['time']),
                            ('user_id',row['user_id']),
                            ('social_id',row.get('social_id')),
-                           ('event_name',row['event_name'])]
-
-                keyvals += sql_util.parse_brief_summary(row)
-                keyvals += [('method', row.get('method'))]
+                           ('event_name',row['event_name']),
+                           ('frame_platform',row.get('frame_platform')),
+                           ('country_tier',SpinConfig.country_tier_map.get(row.get('country'))),
+                           ('townhall_level',None), # not logged
+                           ('prev_receipts',None), # not logged
+                           ('method', row.get('method'))]
 
                 sql_util.do_insert(cur, privacy_table, keyvals)
 
