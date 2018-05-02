@@ -41,7 +41,8 @@ PrivacyDialog.invoke = function() {
         var dialog = w.parent;
         metric_event('0062_privacy_prompt_success', add_demographics({}));
         close_dialog(dialog);
-        invoke_child_message_dialog(dialog.data['widgets']['description']['ui_title_accept'], dialog.data['widgets']['description']['ui_name_accept']);
+        invoke_child_message_dialog(dialog.data['widgets']['description']['ui_title_accept'], dialog.data['widgets']['description']['ui_name_accept'],
+                                    {'dialog': 'message_dialog_big'});
     };
     return dialog;
 };
