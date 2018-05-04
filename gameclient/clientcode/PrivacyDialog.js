@@ -41,7 +41,14 @@ PrivacyDialog.invoke = function() {
         var dialog = w.parent;
         metric_event('0062_privacy_prompt_success', add_demographics({}));
         close_dialog(dialog);
-        invoke_child_message_dialog(dialog.data['widgets']['description']['ui_title_accept'], dialog.data['widgets']['description']['ui_name_accept'],
+        var accept_description;
+        // check for platform-specific "Accept" message
+        if(('ui_name_accept_'+spin_frame_platform) in dialog.data['widgets']['description']) {
+            accept_description = dialog.data['widgets']['description']['ui_name_accept_'+spin_frame_platform];
+        } else {
+            accept_description = dialog.data['widgets']['description']['ui_name_accept'];
+        }
+        invoke_child_message_dialog(dialog.data['widgets']['description']['ui_title_accept'], accept_description,
                                     {'dialog': 'message_dialog_big'});
     };
     return dialog;
