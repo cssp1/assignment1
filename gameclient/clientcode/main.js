@@ -6182,6 +6182,8 @@ player.alias = null;
 player.title = null;
 /** @type {number} same as on server */
 player.trust_level = -1;
+/** @type {string|null} same as on server */
+player.privacy_consent = null;
 player.facebook_name = '(Unknown)';
 player.facebook_currency = null;
 player.facebook_permissions = spin_facebook_login_permissions.split(',');
@@ -47943,6 +47945,8 @@ function handle_server_message(data) {
         PlayerCache.update_batch(data[1]);
     } else if(msg == "PLAYER_TRUST_LEVEL_UPDATE") {
         player.trust_level = data[1];
+    } else if(msg == "PLAYER_PRIVACY_CONSENT_UPDATE") {
+        player.privacy_consent = data[1];
     } else if(msg == "FACEBOOK_CURRENCY_UPDATE") {
         player.facebook_currency = data[1];
         if(player.facebook_currency && get_query_string('test_currency')) {

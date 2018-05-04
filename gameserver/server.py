@@ -27949,6 +27949,7 @@ class GAMEAPI(resource.Resource):
         retmsg.append(["PLAYER_UI_NAME_UPDATE", session.user.get_ui_name(session.player)])
         retmsg.append(["PLAYER_ALIAS_UPDATE", session.player.alias])
         retmsg.append(["PLAYER_TITLES_UPDATE", session.player.title])
+        retmsg.append(["PLAYER_PRIVACY_CONSENT_UPDATE", session.user.privacy_consent])
 
         # check for promo codes
         if ('spin_promo_code' in url_qs):
@@ -28742,14 +28743,11 @@ class GAMEAPI(resource.Resource):
                     gamesite.nosql_client.client_perf_record(log_props, reason='sprobe_result')
 
             # record privacy-prompt resuts
-            elif key == '0061_privacy_prompt_fail':
-                session.user.privacy_consent = 'no'
+            elif key in ('0061_privacy_prompt_fail', '0062_privacy_prompt_success'):
+                session.user.privacy_consent = {'0061_privacy_prompt_fail': 'no', '0062_privacy_prompt_success': 'yes'}[key]
                 session.user.privacy_consent_time = server_time
                 session.user.privacy_consent_reason = val.get('reason')
-            elif key == '0062_privacy_prompt_success':
-                session.user.privacy_consent = 'yes'
-                session.user.privacy_consent_time = server_time
-                session.user.privacy_consent_reason = val.get('reason')
+                retmsg.append(["PLAYER_PRIVACY_CONSENT_UPDATE", session.user.privacy_consent])
 
         elif arg[0] == "FB_GIFT_CARD_REDEEMED":
             # only for metrics recording

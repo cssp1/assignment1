@@ -1728,6 +1728,18 @@ TrustLevelPredicate.prototype.do_ui_help = function(player) {
 
 /** @constructor @struct
   * @extends Predicate */
+function PrivacyConsentPredicate(data) {
+    goog.base(this, data);
+    this.state = data['state'];
+}
+goog.inherits(PrivacyConsentPredicate, Predicate);
+PrivacyConsentPredicate.prototype.is_satisfied = function(player, qdata) {
+    return player.privacy_consent === this.state;
+};
+PrivacyConsentPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
+
+/** @constructor @struct
+  * @extends Predicate */
 function HasAttackedPredicate(data) {
     goog.base(this, data);
 }
@@ -2360,6 +2372,8 @@ function read_predicate(data) {
         return new HomeBasePredicate(data);
     } else if(kind === 'TRUST_LEVEL') {
         return new TrustLevelPredicate(data);
+    } else if(kind === 'PRIVACY_CONSENT') {
+        return new PrivacyConsentPredicate(data);
     } else if(kind === 'HAS_ATTACKED') {
         return new HasAttackedPredicate(data);
     } else if(kind === 'HAS_DEPLOYED') {
