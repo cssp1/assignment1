@@ -21,7 +21,7 @@ PrivacyDialog.invoke = function() {
     dialog.auto_center();
     dialog.modal = true;
 
-    dialog.widgets['description'].set_text_bbcode(dialog.data['widgets']['description']['ui_name'], {}, system_chat_bbcode_click_handlers);
+    dialog.widgets['description'].set_text_bbcode(dialog.data['widgets']['description']['ui_name_prompt'], {}, system_chat_bbcode_click_handlers);
 
     metric_event('0060_privacy_prompt', add_demographics({}));
 
