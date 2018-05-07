@@ -18,6 +18,9 @@ SPAudio.Driver = function() {
     this.kind = 'unknown';
 };
 
+// resume (or start) playback after user interaction
+SPAudio.Driver.prototype.resume = function() {};
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // SoundManager2 DRIVER
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -280,6 +283,13 @@ SPAudio.ACDriver.prototype.sync_time = function(client_time) {
     this.time_offset = this.context.currentTime - client_time;
     for(var i = 0; i < this.faders.length; i++) {
         this.faders[i].fade_step(client_time);
+    }
+};
+
+/** @override */
+SPAudio.ACDriver.prototype.resume = function() {
+    if(this.context['state'] === 'suspended') {
+        this.context['resume']();
     }
 };
 

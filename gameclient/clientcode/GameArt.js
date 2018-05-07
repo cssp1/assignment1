@@ -465,6 +465,11 @@ GameArt.init = function(time, canvas, ctx, art_json, dl_callback, audio_driver_n
     }
 };
 
+// resume (or start) playback after user interaction
+GameArt.resume_audio = function() {
+    if(GameArt.audio_driver) { GameArt.audio_driver.resume(); }
+};
+
 GameArt.download_more_assets = function() {
     //console.log('download: essential '+GameArt.essential_dl_pending_count+'/'+GameArt.essential_dl_total+' all: '+GameArt.all_dl_pending_count+'/'+GameArt.all_dl_total);
     //console.log('download_more '+GameArt.dl_heap.size().toString() + ' inflight '+GameArt.dl_inflight_count+' max '+GameArt.dl_inflight_max);

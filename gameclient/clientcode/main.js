@@ -51592,6 +51592,10 @@ function register_player_input() {
             player.record_feature_use('first_action');
         }
     }
+
+    if(GameArt.initialized) {
+        GameArt.resume_audio();
+    }
 }
 
 function on_mousedown(e) {
