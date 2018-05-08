@@ -22,6 +22,13 @@ if(navigator.appVersion.indexOf("MSIE 9") >= 0) {
 }
 document.getElementById('startup_div').style.height =
     document.getElementById('canvas_div').style.height = height_calc;
+
+/* Quick hack for testing localization of the startup message.
+   Better way is to teach proxyserver to load in the localized gamedata strings. */
+if(spin_demographics['locale'] && spin_demographics['locale'].indexOf('ko') === 0) {
+    document.getElementById('startup_msg').innerHTML = '환영합니다!';
+}
+
 </script>
 
 <div id="spin_footer" class="spin_footer" style="width:100%;height:24px;position:static;overflow:hidden;clear:both;border:0;background:#303030;">
