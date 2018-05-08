@@ -171,7 +171,14 @@ function spin_async_load_show_progress() {
         total += entry[1]; loaded += entry[0];
     }
     if(total > 0) {
-        document.getElementById('startup_msg').innerHTML = "Loading Game ("+(100*loaded/total).toFixed(0)+"%)...";
+        var ui_loading = "Loading Game (%s%)...";
+
+        /* Quick hack for testing localization of the startup message.
+           Better way is to teach proxyserver to load in the localized gamedata strings. */
+        if(spin_demographics['locale'] && spin_demographics['locale'].indexOf('ko') === 0) {
+            ui_loading = "준비 중 (%s%)...";
+        }
+        document.getElementById('startup_msg').innerHTML = ui_loading.replace('%s', (100*loaded/total).toFixed(0));
     }
 }
 </script>
