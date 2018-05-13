@@ -104,7 +104,8 @@ if [[ "$FREQ" == "daily" ]]; then
     UPCACHE_FLAGS+=" --lite"
   fi
 
-  run_it ./upcache_to_mysql.py -q --parallel 8 $UPCACHE_FLAGS
+  # high "parallel" for this can cause MySQL deadlocks
+  run_it ./upcache_to_mysql.py -q --parallel 6 $UPCACHE_FLAGS
   run_it ./cur_levels_to_sql.py -q # requires upcache
   run_it ./acquisitions_to_sql.py -q # requires upcache and analytics-views
 
