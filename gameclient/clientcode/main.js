@@ -24791,6 +24791,9 @@ function invoke_item_delete_confirm_dialog(action_cb, ui_item_list, refund_str) 
     return dialog;
 }
 
+/** @type {SPUI.Dialog|null } reference to the one-and-only loot_dialog, if it's on screen */
+var global_loot_dialog = null;
+
 /** @param {string=} msg */
 function invoke_loot_dialog(msg) {
     if(player.loot_buffer.length < 1) { return null; } // nothing in the loot buffer
@@ -24798,20 +24801,18 @@ function invoke_loot_dialog(msg) {
     if(!session.home_base) { return null; } // can't use this outside home base
     // (it will be picked up upon return to home base)
 
-
-    /*
-    if(selection.ui && selection.ui.user_data && selection.ui.user_data['dialog'] === 'loot_dialog') {
-        // update rather than refreshing
-        if(selection.ui.user_data['pending'] > 0) { selection.ui.user_data['pending'] = 0; }
-        return selection.ui;
+    if(global_loot_dialog) {
+        // return current dialog rather than refreshing
+        return global_loot_dialog;
     }
-    */
 
     var dialog = new SPUI.Dialog(gamedata['dialogs']['loot_dialog']);
     dialog.user_data['dialog'] = 'loot_dialog';
     dialog.user_data['pending'] = 0;
     dialog.user_data['anim_data'] = {};
     install_child_dialog(dialog);
+    global_loot_dialog = dialog;
+    dialog.on_destroy = function(dialog) { global_loot_dialog = null; };
     dialog.auto_center();
     dialog.modal = true;
 
@@ -24890,7 +24891,7 @@ function match_dialog_name(dialog_name, n) {
 }
 
 function refresh_loot_dialog() {
-    var dialog = find_dialog('loot_dialog');
+    var dialog = global_loot_dialog;
     //console.log('refresh_loot_dialog '+(dialog ? 'found' : 'NOT found'));
     if(dialog) {
         dialog.user_data['pending'] = 0;
