@@ -34315,8 +34315,8 @@ function crafting_dialog_change_category(dialog, category, page) {
 
     if(category == 'mines') {
         crafting_dialog_init_status_mines(dialog.widgets['status']);
-    } else if(category == 'leaders') {
-        crafting_dialog_init_status_leaders(dialog.widgets['status']);
+    } else if(category == 'leaders' || category == 'equips') {
+        crafting_dialog_init_status_merge_items(dialog.widgets['status']);
     } else if(category == 'missiles') {
         crafting_dialog_init_status_missiles(dialog.widgets['status']);
     } else {
@@ -34372,7 +34372,8 @@ function crafting_dialog_init_status_missiles(dialog) {
         }
     }
 }
-function crafting_dialog_init_status_leaders(dialog) {
+function crafting_dialog_init_status_merge_items(dialog) {
+    // nothing to do here
 }
 
 function crafting_dialog_scroll(dialog, page) {
@@ -34409,8 +34410,8 @@ function crafting_dialog_select_recipe(dialog, rec) {
         crafting_dialog_select_recipe_mines(dialog, specname, recipe);
     } else if(recipe['crafting_category'] == 'missiles') {
         crafting_dialog_select_recipe_missiles(dialog, specname, recipe);
-    } else if(recipe['crafting_category'] == 'leaders') {
-        crafting_dialog_select_recipe_leaders(dialog, specname, rec); // full dictionary, not recipe
+    } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'equips') {
+        crafting_dialog_select_recipe_merge_items(dialog, specname, rec); // full dictionary, not recipe
     }
 }
 function crafting_dialog_select_recipe_mines(dialog, specname, recipe) { // XXX does not handle recipe_level
@@ -34503,7 +34504,7 @@ function crafting_dialog_select_recipe_missiles(dialog, specname, recipe) { // X
     }
 }
 
-function crafting_dialog_select_recipe_leaders(dialog, specname, rec) {
+function crafting_dialog_select_recipe_merge_items(dialog, specname, rec) {
     var recipe = gamedata['crafting']['recipes'][rec['spec']];
     var level = rec['level'] || 1;
 
@@ -34619,9 +34620,9 @@ function update_crafting_dialog_recipe_mines(dialog) {
     update_crafting_dialog_recipe_common(dialog);
 }
 function update_crafting_dialog_recipe_missiles(dialog) {
-    update_crafting_dialog_recipe_leaders(dialog);
+    update_crafting_dialog_recipe_merge_items(dialog);
 }
-function update_crafting_dialog_recipe_leaders(dialog) {
+function update_crafting_dialog_recipe_merge_items(dialog) {
     update_crafting_dialog_recipe_common(dialog);
     var specname = dialog.parent.user_data['selected_recipe']['spec'];
     var recipe = gamedata['crafting']['recipes'][specname];
@@ -34786,8 +34787,8 @@ function update_crafting_dialog(dialog) {
         update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
     } else if(dialog.user_data['category'] == 'missiles') {
         update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
-    } else if(dialog.user_data['category'] == 'leaders') {
-        update_crafting_dialog_status_leaders(dialog.widgets['status']);
+    } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
+        update_crafting_dialog_status_merge_items(dialog.widgets['status']);
     } else {
         throw Error('unhandled category '+dialog.user_data['category']);
     }
@@ -34797,8 +34798,8 @@ function update_crafting_dialog(dialog) {
             update_crafting_dialog_recipe_mines(dialog.widgets['recipe']);
         } else if(dialog.user_data['category'] == 'missiles') {
             update_crafting_dialog_recipe_missiles(dialog.widgets['recipe']);
-        } else if(dialog.user_data['category'] == 'leaders') {
-            update_crafting_dialog_recipe_leaders(dialog.widgets['recipe']);
+        } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
+            update_crafting_dialog_recipe_merge_items(dialog.widgets['recipe']);
         }
     }
 
@@ -35331,7 +35332,7 @@ function update_crafting_dialog_status_mines_and_missiles(dialog) {
     }
 }
 
-function update_crafting_dialog_status_leaders(dialog) {
+function update_crafting_dialog_status_merge_items(dialog) {
     var builder = dialog.parent.user_data['builder'];
     var pending = (builder && !builder.is_in_sync());
     var craft_queue = (builder ? builder.get_crafting_queue() : []);
@@ -35340,7 +35341,7 @@ function update_crafting_dialog_status_leaders(dialog) {
 
     var in_progress_recipe = null, in_progress_recipe_level = null, in_progress_bus = null, in_progress_togo = -1;
     goog.array.forEach(craft_queue, function(entry) {
-        if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders') {
+        if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders' || gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'equips') {
             // since there is no queueing, there should only be one of these
             in_progress_recipe = entry['craft']['recipe'];
             in_progress_bus = entry;

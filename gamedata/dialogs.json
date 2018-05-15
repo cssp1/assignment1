@@ -1980,6 +1980,58 @@
         }
     },
 
+    "crafting_dialog_recipe_equips": {
+        "xy": [175,127],
+        "dimensions": [430,231],
+        "widgets": {
+            "bracket": { "kind": "SolidRect", "xy": [-28,1], "dimensions": [20,230],
+                         "color": null, "outline_color": [0.25,0.25,0.25,1], "outline_width": 2,
+                         "path": [[0,0], [10,0], [10,222], [0,222], null, [10,75], [20,75]] },
+
+            "sunken": {"kind": "StaticImage", "xy":[0,0], "dimensions":[430,231], "bg_image_resizable": 1, "asset": "dialog_sunken_resizable" },
+            "topbar": { "kind": "SolidRect", "xy": [2,2], "dimensions":[426,30], "color": [0,0,0,0.5] },
+            "topinfo": { "kind": "RichTextField", "xy": [12,2], "dimensions": [426,30], "text_size": 13, "text_style": "thick",
+                         "text_hjustify": "left", "text_vjustify": "center",
+                         "ui_name_set": "[b]%ITEM_SET (%INDEX of %MEMBERS)[/b] - %SUBTITLE", //  - Level %LEVEL"
+                         "ui_name": "[b]%SUBTITLE[/b] - Upgrade to Level %LEVEL"
+                       },
+
+            "item": { "kind": "Dialog", "dialog": "item_display", "xy": [25,49], "dimensions": [50,50] },
+
+            "name": { "kind": "TextField", "xy": [90,44], "dimensions": [330,65], "text_size": 13, "text_style": "bold", "drop_shadow": 1,
+                      "text_hjustify": "left", "text_vjustify": "top"},
+            "description": { "kind": "RichTextField", "xy": [90,66], "dimensions": [330,60], "text_size": 13, "text_style": "normal",
+                             "max_lines": 3, "ui_name_seemore": " ... [color=#ffff00][u]See More[/u][/color]",
+                             "ui_tooltip": "", "tooltip_delay": 0,
+                             "text_hjustify": "left", "text_vjustify": "top"},
+
+            "requirements_label": { "kind": "TextField", "xy": [20,131], "dimensions": [75,50], "text_size": 13, "text_style": "normal",
+                                    "text_hjustify": "left", "text_vjustify": "top", "ui_name": "Requirements:",
+                                    "text_color": [0.8,0.8,0.8,1]},
+            "requirements_separator": {"kind": "Line", "xy": [130,141], "dimensions": [255,0], "color":  [0.5,0.5,0.5,1],
+                                       "stroke_width": 2 },
+
+            "requirements_icon": { "kind": "StaticImage", "xy": [19,162], "dimensions": [21,21], "asset": "resource_icon_water",
+                                   "array": [2,2], "array_offset": [95,27] },
+            "requirements_value": { "kind": "TextField", "xy": [40,162], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
+                                    "ui_tooltip": "%qty %res required to manufacture", "tooltip_delay": 0,
+                                    "array": [2,2], "array_offset": [100,27] },
+
+            "requirements_time_icon": { "kind": "StaticImage", "xy": [114,189], "dimensions": [21,21], "asset": "resource_icon_combat_time" },
+            "requirements_time_value": { "kind": "TextField", "xy": [140,189], "dimensions": [50,21], "text_size": 13, "text_hjustify": "right",
+                                         "ui_tooltip": "Time required to train", "tooltip_delay": 0 },
+
+            "requirements_item_status": { "kind": "SolidRect", "xy": [213,158], "dimensions": [54,54],
+                                          "outline_width": 1,
+                                          "color_present": [0,1,0,0.5],
+                                          "color_missing": [1,0,0,0.5],
+                                          "array": [2,1], "array_offset": [66,0] },
+            "requirements_item": { "kind": "Dialog", "dialog": "item_display", "xy": [215,160], "dimensions": [50,50],
+                                   "ui_tooltip": "Item required in Warehouse: %ITEM",
+                                   "array": [2,1], "array_offset": [66,0] }
+        }
+    },
+
     "crafting_dialog_status_mines": {
         "xy": [0,0],
         "dimensions": [736,423],
@@ -2073,6 +2125,29 @@
             "leader_cancel": { "kind": "ActionButton", "xy": [684,177], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
                                "ui_tooltip": "", "tooltip_delay": 0.5,
                                "ui_tooltip_cancel": "Click to cancel training" },
+            "leader_pending": { "kind": "StaticImage", "xy":[669,193], "dimensions":[16,16], "asset":"loading_spinner" }
+        }
+    },
+
+    "crafting_dialog_status_equips": {
+        "xy": [0,0],
+        "dimensions": [736,423],
+        "transparent_to_mouse": true,
+        "widgets": {
+            "arrow": {"kind": "Dialog", "dialog": "crafting_dialog_arrow_right", "xy": [613,183], "dimensions": [32,34] },
+            // the slot only gets clicked on empty/locked spaces, otherwise the click goes to "frame"
+            "leader_slot": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_slot" },
+            "leader_prompt": { "kind": "TextField", "xy": [653,176], "dimensions": [50,50], "text_size": 13, "drop_shadow": 1, "ui_name": "Train" },
+            "leader_icon": { "kind": "StaticImage", "xy": [653,176], "dimensions": [50,50] },
+            "leader_timer": { "kind": "TextField", "xy": [653,206], "dimensions": [50,17], "text_size": 12, "text_hjustify": "center", "text_vjustify": "center", "drop_shadow":1, "text_offset": [1,0] },
+            "leader_frame": { "kind": "ActionButton", "xy": [653,176], "dimensions": [50,50], "bg_image": "inventory_frame",
+                              "ui_tooltip": "", "tooltip_delay": 0.5,
+                              "ui_tooltip_armed": "Armed with: %s",
+                              "ui_tooltip_inprogress": "Upgrading: %s",
+                              "ui_tooltip_produce": "Click to queue %s for upgrade" },
+            "leader_cancel": { "kind": "ActionButton", "xy": [684,177], "dimensions": [18,16], "bg_image": "cancel_button", "push_bg_image": 1,
+                               "ui_tooltip": "", "tooltip_delay": 0.5,
+                               "ui_tooltip_cancel": "Click to cancel upgrade" },
             "leader_pending": { "kind": "StaticImage", "xy":[669,193], "dimensions":[16,16], "asset":"loading_spinner" }
         }
     },
