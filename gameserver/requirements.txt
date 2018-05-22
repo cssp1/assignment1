@@ -46,7 +46,7 @@ txpostgres==1.6.0
 # note: the version string on the end only tells pip to skip this
 # intall if the currently installed version matches that version. It
 # does NOT enforce which version is pulled from Git.
-git+git://github.com/spinpunch/twisted.git@spinpunch#egg=Twisted==17.9.1dev0
+git+git://github.com/spinpunch/twisted.git@spinpunch#egg=Twisted==18.4.0.dev0
 
 # ujson MUST be this customized version, which adds extra options like
 # buffer size hints and adjusts whitespace handling
