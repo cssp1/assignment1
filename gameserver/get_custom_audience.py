@@ -193,6 +193,7 @@ if __name__ == '__main__':
                    #{'game_id':gid, 'aud':'p10-c30', 'min_spend':10, 'churned_for_days':30},
                    #{'game_id':gid, 'aud':'p10-c90', 'min_spend':10, 'churned_for_days':90},
                    {'game_id':gid, 'aud':'p10', 'min_spend':10, 'churned_for_days':-1},
+                   {'game_id':gid, 'aud':'p10-a360', 'min_spend':10, 'churned_for_days':-1, 'played_within_days': 360},
                    ]
 #            if gid in ('dv','tr','fs',):
 #                ret.append({'game_id':gid, 'aud':'ALL', 'min_spend':-1, 'churned_for_days':-1})
@@ -209,6 +210,7 @@ if __name__ == '__main__':
         auds += [#{'game_id': 'bh', 'aud': 'ALL', 'min_spend':-1, 'churned_for_days':-1},
                  {'game_id': 'bh', 'aud': 'a60', 'min_spend':-1, 'churned_for_days':-1, 'played_within_days': 60},
                  {'game_id': 'bh', 'aud': 'p10', 'min_spend':10, 'churned_for_days':-1},
+                 {'game_id': 'bh', 'aud': 'p10-a360', 'min_spend':10, 'churned_for_days':-1, 'played_within_days': 360},
                  ]
 
     else:
