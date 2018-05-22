@@ -312,7 +312,7 @@ def add_proxy_headers(request):
 
 def dump_request(request):
     print 'REQUEST', request
-    print 'getClientIP()', request.getClientIP()
+    print 'getClientIP()', SpinHTTP.get_twisted_raw_ip(request)
     print 'isSecure()', request.isSecure()
     print 'HEADERS', repr(request.requestHeaders)
     #print 'COOKIES', request.received_cookies
@@ -328,7 +328,7 @@ def log_request(request):
           ' args '+repr(request.args)+ \
           ' headers '+repr(request.requestHeaders)+ \
           ' user-agent "'+SpinHTTP.get_twisted_header(request,'user-agent')+ \
-          '" getClientIP() '+repr(request.getClientIP())+' isSecure() '+repr(request.isSecure())+' parsed ip ' + repr(ip)
+          '" getClientIP() '+repr(SpinHTTP.get_twisted_raw_ip(request))+' isSecure() '+repr(request.isSecure())+' parsed ip ' + repr(ip)
     return ret
 
 

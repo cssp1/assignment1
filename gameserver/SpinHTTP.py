@@ -128,6 +128,13 @@ def validate_proxy_headers(request, proxy_secret):
         proxy_secret)
     return their_signature == our_signature
 
+def get_twisted_raw_ip(request):
+   # return the raw IP address of the neighbor connected to us
+   if hasattr(request, 'getClientAddress'):
+       return request.getClientAddress().host # Twisted v18+
+   else:
+       return request.getClientIP() # old versions of Twisted
+
 def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True):
     if proxy_secret:
         forw = get_twisted_header(request, 'spin-orig-ip')
@@ -145,10 +152,7 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
 #        return incap
 
     # the raw IP address of the neighbor connected to us
-    if hasattr(request, 'getClientAddress'):
-        raw_ip = request.getClientAddress().host # Twisted v18+
-    else:
-        raw_ip = request.getClientIP() # old versions of Twisted
+    raw_ip = get_twisted_raw_ip(request)
 
     forw_list = request.requestHeaders.getRawHeaders('X-Forwarded-For')
     if forw_list and len(forw_list) > 0:
