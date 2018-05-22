@@ -982,7 +982,8 @@
     "resource_bar_add_button": { "states": { "normal": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [22,20], "origins": [94,120], "load_priority": 100,
                                                          "audio": "art/soundfx/menu_click.$AUDIO_CODEC", "volume": 0.25
                                                        },
-                                             "disabled": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [22,20], "origins": [116,120] }
+                                             "disabled": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [22,20], "origins": [116,120] },
+                                             "disabled_clickable": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [22,20], "origins": [116,120] }
                                            } },
     "refresh_button": { "states": { "normal": { "images": ["art/ui/menu_buttons17.png"], "dimensions": [22,20], "origins": [152,507],
                                                 "load_priority": 98,

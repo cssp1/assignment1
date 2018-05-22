@@ -12007,8 +12007,14 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
                 }
             });
             if('resource_bar_'+res+'_button' in dialog.widgets && show_me) {
-                dialog.widgets['resource_bar_'+res+'_button'].state = (player.tutorial_state === "COMPLETE") ? 'normal':'disabled';
+                var button_state = (player.tutorial_state === "COMPLETE") ? 'normal':'disabled';
                 if(res == 'fbcredits') {
+                    // if purchase UI is disabled, then show the button grayed-out
+                    var pred = gamedata['store']['buy_gamebucks_dialog_enable_if'] || null;
+                    if(pred && !read_predicate(pred).is_satisfied(player)) {
+                        button_state = 'disabled_clickable';
+                    }
+                    // but always connect the callback - this will show predicate helper if purchase UI is disabled
                     dialog.widgets['resource_bar_'+res+'_button'].onclick =
                         dialog.widgets['resource_bar_'+res+'_icon'].onclick =
                         dialog.widgets['resource_bar_'+res].onclick =
@@ -12024,6 +12030,7 @@ function update_resource_bars(dialog, primary, use_res_looter, show_during_comba
                         }
                     }; })(res);
                 }
+                dialog.widgets['resource_bar_'+res+'_button'].state = button_state;
             }
         }
     });
