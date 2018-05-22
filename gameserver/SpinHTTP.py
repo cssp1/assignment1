@@ -18,7 +18,7 @@ from email.utils import mktime_tz, parsedate_tz
 def parse_http_time(http_time):
     return long(mktime_tz(parsedate_tz(http_time)))
 
-import base64, re
+import base64
 
 # wrap/unwrap Unicode text strings for safe transmission across the AJAX connection
 # mirrors gameclient/clientcode/SPHTTP.js
@@ -109,7 +109,11 @@ def clear_twisted_cookie(request, cookie_name,
 
 import SpinSignature
 
-private_ip_re = re.compile('(^127\.0\.0\.1)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|(^unknown)')
+# match unroutable IP addresses (IPv4 and IPv6)
+private_ip_re = re.compile('^(127\.)|(192\.168\.)|(10\.)|(172\.1[6-9]\.)|(172\.2[0-9]\.)|(172\.3[0-1]\.)|(::1$)|([fF][cCdD])|(unknown)')
+
+def is_private_ip(ip):
+    return bool(private_ip_re.match(ip))
 
 def validate_proxy_headers(request, proxy_secret):
     # validate the signature applied by proxyserver's add_proxy_headers()
@@ -124,12 +128,7 @@ def validate_proxy_headers(request, proxy_secret):
         proxy_secret)
     return their_signature == our_signature
 
-# return True if we think we can trust the X-Forwarded-* headers on a request
-def validate_x_forwarded(request):
-    # ensure the request is coming from the "private" (AWS) network
-    return bool(private_ip_re.match(request.getClientIP()))
-
-def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True): # XXXXXX temporary
+def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True):
     if proxy_secret:
         forw = get_twisted_header(request, 'spin-orig-ip')
         if forw:
@@ -140,32 +139,41 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
     if cf_con:
         return cf_con
 
-    incap = get_twisted_header(request, 'incap-client-ip')
-    if incap:
-        return incap
+    # Incapsula is not used anymore
+#    incap = get_twisted_header(request, 'incap-client-ip')
+#    if incap:
+#        return incap
+
+    # the raw IP address of the neighbor connected to us
+    if hasattr(request, 'getClientAddress'):
+        raw_ip = request.getClientAddress().host # Twisted v18+
+    else:
+        raw_ip = request.getClientIP() # old versions of Twisted
 
     forw_list = request.requestHeaders.getRawHeaders('X-Forwarded-For')
     if forw_list and len(forw_list) > 0:
         forw = ','.join(map(str, forw_list))
         if forw:
-            if trust_x_forwarded or validate_x_forwarded(request):
+            if trust_x_forwarded or is_private_ip(raw_ip):
                 # return leftmost non-private address
                 for ip in forw.split(','):
                     ip = ip.strip()
-                    if private_ip_re.match(ip): continue # skip private IPs
-                    return ip
+                    if is_private_ip(ip):
+                        continue # skip private IPs
+                    else:
+                        return ip
 
-                # ... or fall back to native request IP
+                # ... or fall back to raw_ip below
 
             else:
                 # can't trust X-Forwarded-For because it came out of a public IP
                 # fall back to the native request IP
-                if private_ip_re.match(request.getClientIP()):
+                if is_private_ip(raw_ip):
                     raise Exception('X-Forwarded-For a private address: %r' % forw)
                 else:
-                    return request.getClientIP()
+                    return raw_ip
 
-    return request.getClientIP()
+    return raw_ip
 
 ipv6_re = re.compile(r'([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4}):([0-9a-fA-F]{4})')
 
@@ -179,7 +187,7 @@ def ip_matching_key(ip):
             return ':'.join(match.groups()[0:4]) + '::/64'
     return ip
 
-def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = True): # XXXXXX temporary
+def twisted_request_is_ssl(request, proxy_secret = None):
     if proxy_secret:
         orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
         if orig_protocol:
@@ -188,7 +196,6 @@ def twisted_request_is_ssl(request, proxy_secret = None, trust_x_forwarded = Tru
 
     orig_protocol = get_twisted_header(request, 'X-Forwarded-Proto')
     if orig_protocol:
-        assert trust_x_forwarded or validate_x_forwarded(request)
         return orig_protocol.startswith('https')
 
     return request.isSecure()
