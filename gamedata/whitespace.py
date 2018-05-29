@@ -15,6 +15,7 @@ IGNORE_DIRS = set(['.svn','.git', # SCM data
                    'userdb','playerdb','basedb','aistate','db','art','built', # server state
                    'logs','ujson','pysvg','dowser','google', # third-party
                    'puppet', # don't even try
+                   'localize',
                    ])
 
 def dir_filter(name):
@@ -255,7 +256,7 @@ def do_process(fullpath, do_fix, processors):
         for proc in processors: proc.reset()
         fd = open(fullpath, 'r')
         file_mode = stat.S_IMODE(os.fstat(fd.fileno()).st_mode)
-        temp_filename = fullpath + '.inprogress'
+        temp_filename = '%s.inprogress.%d' % (fullpath, os.getpid())
         out = open(temp_filename, 'w')
         os.fchmod(out.fileno(), file_mode)
         try:
