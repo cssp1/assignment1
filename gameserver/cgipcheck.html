@@ -510,6 +510,23 @@ var method_chat_get = function() {
         }; })(pretty_ident(ident)));
     }
 };
+
+// open a new window to display a blob of preformatted text
+var display_text_blob = function(raw_text) {
+    if(0) { // doesn't handle UTF-8 correctly?
+        var text_blob = new Blob([raw_text], {'type': 'text/plain;charset=UTF-8', 'encoding':'UTF-8'});
+        var text_blob_url = URL.createObjectURL(text_blob);
+        window.open(text_blob_url, '_blank');
+    } else {
+        var w = window.open('', '_blank');
+        w.document.open();
+        w.document.write('<html><head><meta charset="UTF-8"></head><body><pre>');
+        w.document.write(quote_for_html(raw_text));
+        w.document.write('</pre></body></html>');
+        w.document.close();
+    }
+}
+
 // the server returns an array of raw JSON for chat messages - convert to GUI form
 var display_chat_messages = function(ui_ident, result) {
     var lines = ['Chat messages sent by '+ui_ident+' in last week (newest at top)',
@@ -528,20 +545,28 @@ var display_chat_messages = function(ui_ident, result) {
         lines.push(s);
     });
 
-    var raw_text = lines.join('\n');
+    display_text_blob(lines.join('\n'));
+};
 
-    if(0) { // doesn't handle UTF-8 correctly?
-        var text_blob = new Blob([raw_text], {'type': 'text/plain;charset=UTF-8', 'encoding':'UTF-8'});
-        var text_blob_url = URL.createObjectURL(text_blob);
-        window.open(text_blob_url, '_blank');
-    } else {
-        var w = window.open('', '_blank');
-        w.document.open();
-        w.document.write('<html><head><meta charset="UTF-8"></head><body><pre>');
-        w.document.write(quote_for_html(raw_text));
-        w.document.write('</pre></body></html>');
-        w.document.close();
+var method_fbpayments_get = function() {
+    var ident = get_ident();
+    if(ident) {
+        var time_now = (new Date()).getTime()/1000;
+        send_request('fbpayments', 'get', $.extend(ident, {'start_time':Math.floor(time_now - 7*86400)}), (function (ui_ident) { return function(result) {
+            display_fbpayments(ui_ident, result);
+        }; })(pretty_ident(ident)));
     }
+};
+// the server returns an array of raw JSON for payments - convert to GUI form
+var display_fbpayments = function(ui_ident, result) {
+    var lines = ['Recent FB Payment Transactions by '+ui_ident+' (newest at top)',
+                 ''];
+    result.forEach(function(r) {
+        var s = pretty_print_ts(r['created_time']) + ' - Payment ID ' + r['id'] + ' - ' + r['actions'][0]['amount'] + ' ' + r['actions'][0]['currency'];
+        lines.push(s);
+    });
+
+    display_text_blob(lines.join('\n'));
 };
 
 var method_clear_lockout = function() {
@@ -1719,6 +1744,9 @@ $(function() {
       Reason for this action:
       <br>
       <input type="text" id="give_gamebucks_reason" style="width:500px;">
+      <p>
+      <button onclick="method_fbpayments_get()" class="spin_button" style="width:200px;">List Recent FB Payments</button><p>
+
     </div>
     <div id="player_tools_chat_gag">
       <button onclick="method_chat_get()" class="spin_button" style="width:200px;">Get Recent Messages</button><p>

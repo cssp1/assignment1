@@ -354,6 +354,28 @@ def do_action(path, method, args, spin_token_data, nosql_client):
             request.get_method = lambda: fb_method
             result = {'result': urllib2.urlopen(request).read().strip()}
 
+        elif path[0] == 'fbpayments':
+            check_role(spin_token_data, 'PCHECK-WRITE')
+            fb_id = None
+            if 'facebook_id' in args:
+                fb_id = args['facebook_id']
+            elif 'user_id' in args:
+                # look it up
+                pcache = nosql_client.player_cache_lookup_batch([int(args['user_id'])], fields = ['social_id'])[0]
+                if pcache and pcache.get('social_id','')[:2] == 'fb':
+                    fb_id = pcache['social_id'][2:]
+            if not fb_id:
+                raise Exception('no way to look up the user')
+            fb_path = fb_id+'/payment_transactions'
+            fb_args = {'fields': 'id,actions,refundable_amount,items,created_time,disputes'}
+            request = urllib2.Request(SpinFacebook.versioned_graph_endpoint_secure('user/payment_transactions', fb_path)+'&'+urllib.urlencode(fb_args))
+            request.get_method = lambda: 'GET'
+            records = SpinJSON.loads(urllib2.urlopen(request).read())['data']
+            def decode_record(r):
+                r['created_time'] = SpinFacebook.parse_fb_time(r['created_time'])
+                return r
+            result = {'result': map(decode_record, records)}
+
         elif path[0] == 'server':
             # server methods
             check_role(spin_token_data, 'ADMIN')
