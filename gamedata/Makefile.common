@@ -39,6 +39,7 @@ dep:
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_buildings.json --get-deps-as ${BUILT}/${GAME_ID}_buildings_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_units.json --get-deps-as ${BUILT}/${GAME_ID}_units_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_crafting.json --get-deps-as ${BUILT}/${GAME_ID}_crafting_compiled.json >> ${BUILT}/deps
+	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_item_sets.json --get-deps-as ${BUILT}/${GAME_ID}_item_sets_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_store.json --get-deps-as ${BUILT}/${GAME_ID}_store_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_fb_notifications.json --get-deps-as ${BUILT}/${GAME_ID}_fb_notifications_compiled.json >> ${BUILT}/deps
 	${PROCESSOR} -g ${GAME_ID} --get-deps ${GAME_ID}/${GAME_ID}_strings.json --get-deps-as ${BUILT}/${GAME_ID}_strings_compiled.json >> ${BUILT}/deps
@@ -79,6 +80,8 @@ ${BUILT}/${GAME_ID}_enhancements_compiled.json: ${GAME_ID}/${GAME_ID}_enhancemen
 	@echo "    ${GAME_ID}_enhancements_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_crafting_compiled.json: ${GAME_ID}/${GAME_ID}_crafting.json # just for invert_requirements.py, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_crafting_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
+${BUILT}/${GAME_ID}_item_sets_compiled.json: ${GAME_ID}/${GAME_ID}_item_sets.json # just for unit equipment scripts, NOT actually incorprated into gamedata
+	@echo "    ${GAME_ID}_item_sets_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 ${BUILT}/${GAME_ID}_store_compiled.json: ${GAME_ID}/${GAME_ID}_store.json # just for invert_requirements.py, NOT actually incorprated into gamedata
 	@echo "    ${GAME_ID}_store_compiled.json..." && ${PROCESSOR} ${PROCESSOR_ARGS} $< -o $@
 
