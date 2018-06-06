@@ -33022,13 +33022,22 @@ var ARMY_DIALOG_BUTTONS = {
                                     'require_squads': true,
                                     'onclick': function(w) { invoke_army_dialog_help(); } }
             },
-    'crafting': { 'production_button': { 'dialog_names': ['crafting_dialog'],
+    'crafting': { 'production_button': { 'dialog_names': ['crafting_dialog','crafting_table_of_contents_dialog'],
                                          'spells': ['CRAFT_FOR_FREE'],
                                          // require at least one crafting category that works with the generic crafting GUI
                                          'require_generic_crafting_category': 1,
                                          'onclick': function(w) {
                                              var _dialog = w.parent.parent;
                                              var category = (('category' in _dialog.user_data) ? _dialog.user_data['category'] : null);
+                                             // check if we should go to table-of-contents dialog instead of directly to crafting dialog
+                                             if(category) {
+                                                 var catdata = gamedata['crafting']['categories'][category];
+                                                 if(catdata['table_of_contents']) {
+                                                     change_selection_ui(null);
+                                                     invoke_crafting_table_of_contents_dialog(category);
+                                                     return;
+                                                 }
+                                             }
                                              change_selection_ui(null);
                                              invoke_crafting_dialog(category);
                                          } },
@@ -34073,7 +34082,22 @@ function invoke_crafting_table_of_contents_dialog(category) {
 
     dialog.widgets['title'].str = gamedata['buildings'][builder_type]['ui_name'];
     var catspec = gamedata['crafting']['categories'][category];
+
     dialog.widgets['category_name'].str = catspec['ui_name'];
+    // clicking the breadcrumb should function as an "escape hatch" back to the master crafting_dialog for this building
+    dialog.widgets['category_name'].onclick = (function (_builder) { return function(w) {
+        if(_builder && _builder.spec['crafting_categories']) {
+            var cat = _builder.spec['crafting_categories'][0];
+            var catspec = gamedata['crafting']['categories'][cat];
+            change_selection_ui(null);
+            if(catspec['table_of_contents']) {
+                invoke_crafting_table_of_contents_dialog(cat);
+            } else {
+                invoke_crafting_dialog(cat);
+            }
+        }
+    }; })(builder);
+
     dialog.user_data['rowdata'] = []; // for now, "crafting subcategories" are just the names of item sets
 
     dialog.widgets['coverup_all'].show =
@@ -34230,7 +34254,14 @@ function crafting_dialog_change_category(dialog, category, page) {
             dialog.widgets['category_button'+i.toString()].str = entry['ui_name'];
             dialog.widgets['category_button'+i.toString()].text_color = (category === entry['name'] ? SPUI.default_text_color : SPUI.disabled_text_color);
             dialog.widgets['category_button'+i.toString()].state = (category === entry['name'] ? 'active' : 'normal');
-            dialog.widgets['category_button'+i.toString()].onclick = (function (_name) { return function(w) { crafting_dialog_change_category(w.parent, _name); }; })(entry['name']);
+            dialog.widgets['category_button'+i.toString()].onclick = (function (_entry) { return function(w) {
+                if(entry['table_of_contents']) {
+                    change_selection_ui(null);
+                    invoke_crafting_table_of_contents_dialog(_entry['name']);
+                } else {
+                    crafting_dialog_change_category(w.parent, _entry['name']);
+                }
+            }; })(entry);
         }
     }
 
