@@ -1085,7 +1085,8 @@ def check_item_set(setname, spec):
 
     return error
 
-level_re = re.compile('(?P<root>.+)_L(?P<level>[0-9]+)(_SHOOT)?$')
+level_re = re.compile(r'(?P<root>.+)_L(?P<level>[0-9]+)(_SHOOT)?$')
+pct_equip_re = re.compile(r'_(?P<pct>[0-9]+)pct_equip')
 
 def check_item(itemname, spec):
     error = 0
@@ -3283,8 +3284,16 @@ def check_store_sku(sku_name, sku, state):
                 # allow any item of lesser level (still might not protect against all typos!)
                 root = match.group('root')
                 my_level = int(match.group('level'))
-                for level in xrange(1, my_level+1):
+
+                # for items that have an explicit max level in items.json, allow checks up to that level
+                max_level = gamedata['items'][sku['item']].get('max_level', my_level)
+
+                for level in xrange(1, max_level+1):
                     expect_items.add(root + ('_L%d' % level))
+
+                    # special case - legacy unit equip items have percentages in the name
+                    if pct_equip_re.search(root):
+                        expect_items.add(pct_equip_re.sub('_equip', root) + ('_L%d' % level))
 
             # special case to support stinger_blueprint in TR
             if sku['item'].endswith('stinger_gunner_blueprint'):
