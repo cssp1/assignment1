@@ -101,8 +101,16 @@ if __name__ == '__main__':
     if rows and rows[0]:
         raw_data['cdn_fails'] = rows[0]['cdn_fails']
 
+    # Chrome v67+ seems to stop processing WebSocket messages on background tabs.
+    # This means the browser stops sending "acks" to trim the server's retransmission buffer.
+    # The server-side retransmission buffer grows until it hits the limiting value, and then the server disconnects the client.
+    # It's been hard to debug this, and doesn't seem to be noticed by players, so for now let's just ignore these errors.
+    # (i.e., any Chrome retrans_buffer lagout where the "elapsed" time indicates the player was idle for a while beforehand)
+
+    is_chrome_tab_death = "(browser_name = 'Chrome' AND browser_version >= 67 AND event_name = '0955_lagged_out' AND method = 'retrans_buffer' AND elapsed IS NOT NULL AND elapsed >= 100)"
+
     cur.execute("""SELECT COUNT(DISTINCT(ip)) AS browser_fails
-                   FROM %s WHERE time >= %%s AND time < %%s AND event_name NOT IN ('0660_asset_load_fail','0623_client_reconnected','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy','0643_client_died_from_ws_shutdown','0673_client_cannot_log_in_under_attack')""" % sql_util.sym(client_trouble_table),
+                   FROM %s WHERE time >= %%s AND time < %%s AND event_name NOT IN ('0660_asset_load_fail','0623_client_reconnected','0631_direct_ajax_failure_falling_back_to_proxy','0645_direct_ws_failure_falling_back_to_proxy','0643_client_died_from_ws_shutdown','0673_client_cannot_log_in_under_attack') AND NOT %s""" % (sql_util.sym(client_trouble_table), is_chrome_tab_death),
                 [last_valid_hour, last_valid_hour + 3600])
     rows = cur.fetchall()
     if rows and rows[0]:
