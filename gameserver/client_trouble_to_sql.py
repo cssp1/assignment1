@@ -133,6 +133,10 @@ if __name__ == '__main__':
                     if FIELD in row:
                         keyvals.append((FIELD.lower(), row[FIELD])) # NOTE: browser_OS->browser_os
 
+                # map the 0955_lagged_out "idle_for" timing to the "elapsed" column
+                if 'elapsed' not in row and 'idle_for' in row:
+                    keyvals.append(('elapsed', row['idle_for']))
+
                 sql_util.do_insert(cur, client_trouble_table, keyvals)
 
                 batch += 1
