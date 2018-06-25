@@ -642,10 +642,12 @@ var pad_string = function(s, len) {
 // return pretty HTML version of log entry
 var log_ignore_re = new RegExp('Object expected', 'g');
 var log_formats = [
-    // cheating
-    [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|LOGIN_ABUSE')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
-    // unimportant
-    [(new RegExp('bad client message|extremely long session|got stale data|but acquirer gen|attack spam|raises object HP|PING_BASE_DAMAGE|found when decoding array|squad is locked|squad moved|has foreign squad|trim_unit_space|squad_exit_map |oversize army|Setting up AI|starting up|shutdown complete|mismatched gamedata build|repair speedup time|repair queue is empty|unrecognized PortraitProxy URL')), function(t) { return '<font color="#c0c0c0">'+t+'</font>'; }],
+    // serious things that need investigation
+    [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
+    // warning messages
+    [(new RegExp('LOGIN_ABUSE')), function(t) { return '<font color="#b04000"><b>'+t+'</b></font>'; }],
+    // less important messages that can usually be ignored
+    [(new RegExp('bad client message|extremely long session|got stale data|but acquirer gen|attack spam|raises object HP|PING_BASE_DAMAGE|found when decoding array|squad is locked|squad moved|has foreign squad|trim_unit_space|squad_exit_map |oversize army|Setting up AI|starting up|shutdown complete|mismatched gamedata build|repair speedup time|repair queue is empty|unrecognized PortraitProxy URL|index_visit_check_scope_response|NoSQL spy error')), function(t) { return '<font color="#c0c0c0">'+t+'</font>'; }],
 ];
 var newline_re = new RegExp('\n', 'g');
 var tab_re = new RegExp('\t', 'g');
