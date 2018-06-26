@@ -1,2 +1,14 @@
 # treat our JSON files as JavaScript, for proper highlighting of // comments
 *.json linguist-language=JavaScript
+
+# tell Git to leave UNIX-style line endings alone, even when cloning the repo on Windows
+# (this assumes that your text editor will respect existing line endings when modifying files)
+*.c       text eol=lf
+*.cpp     text eol=lf
+*.h       text eol=lf
+*.js      text eol=lf
+*.json    text eol=lf
+*.py      text eol=lf
+*.sh      text eol=lf
+*.skel    text eol=lf
+Makefile* text eol=lf
