@@ -1313,6 +1313,18 @@ class NoSQLClient (object):
         return self.instrument('player_cache_query_mtime_or_ctime_between(%s)'%reason,
                                lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
 
+    # special case for use by PII scrubber
+    # note: not indexed, will be slow.
+    def player_cache_query_not_uninstalled_and_not_logged_in_since(self, check_time, reason = None):
+        qs = {'last_login_time': {'$lt': check_time}, # hasn't logged in since check_time
+              'account_creation_time': {'$lt': check_time}, # account was created before check_time
+              'uninstalled': {'$exists': False}, # has no "uninstalled" flag
+              'social_id': {'$ne': 'ai'}, # exclude AIs
+              }
+
+        return self.instrument('player_cache_query_not_uninstalled_and_not_logged_in_since(%s)'%reason,
+                               lambda qs: map(lambda x: x['_id'], self.player_cache().find(qs, {'_id':1})), (qs,))
+
     def player_cache_query_ladder_rival(self, query, randomize_quality = 1, reason = None):
         return self.instrument('player_cache_query_ladder_rival(%s)'%reason, self._player_cache_query_ladder_rival, (query,randomize_quality))
     def _player_cache_query_ladder_rival(self, query, randomize_quality):
