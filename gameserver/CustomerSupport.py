@@ -306,7 +306,7 @@ class HandleMarkUninstalled(Handler):
         session.user.uninstalled_reason = reason
         for FIELD, defval in SpinConfig.PII_FIELDS.iteritems():
             setattr(session.user, FIELD, defval)
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now,
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now, 'last_login_ip': None,
                                                                        'privacy_consent': session.user.privacy_consent})
         props = session.player.get_denormalized_summary_props('brief')
         self.record_deauthorized_metric(session.user.social_id, props, reason)
@@ -326,7 +326,7 @@ class HandleMarkUninstalled(Handler):
                 # get rid of "None" fields
                 if user[FIELD] is None:
                     del user[FIELD]
-        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now,
+        self.gamesite.pcache_client.player_cache_update(self.user_id, {'uninstalled': self.time_now, 'last_login_ip': None,
                                                                        'privacy_consent': user.get('privacy_consent')})
         props = self.get_denormalized_summary_props_offline(user, player)
         self.record_deauthorized_metric(user.get('social_id'), props, reason)
