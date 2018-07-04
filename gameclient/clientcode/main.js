@@ -10849,6 +10849,11 @@ SPINPUNCHGAME.init = function() {
         ctx = /** @type {!CanvasRenderingContext2D} */ (ctx); // guaranteed by unsupported_reason test
     }
 
+    // configure stack trace depth for reporting exceptions
+    if(spin_demographics['browser_name'] === 'Chrome') {
+        Error.stackTraceLimit = 32;
+    }
+
     // initialize graphics modules
 
     // detect browser font rendering gamma
