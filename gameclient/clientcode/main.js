@@ -9760,18 +9760,30 @@ function fb_iframe_update(cb) {
         // if the Facebook XDM mechanism is broken, there is nothing we can do.
         return;
     }
-    FB.Canvas.getPageInfo((function (_cb) { return function(info) {
-        // only write console message on active ping and not passive snoop
-        if(_cb) {
-            console.log('FB.Canvas.getPageInfo: dims '+info['clientWidth'].toString()+'x'+info['clientHeight'].toString()+
-                        ' scroll '+info['scrollLeft'].toString()+'x'+info['scrollTop'].toString()+
-                        ' offset '+info['offsetLeft'].toString()+'x'+info['offsetTop'].toString());
-        }
-        fb_iframe_dims = [info['clientWidth'], info['clientHeight']];
-        fb_iframe_scroll = [info['scrollLeft'], info['scrollTop']];
-        fb_iframe_offset = [info['offsetLeft'], info['offsetTop']];
-        if(_cb) { _cb(); }
-    }; })(cb));
+
+    // somehow, getPageInfo() still throws "Cannot read property 'postMessage' of null" unpredictably.
+    // just ignore it when this happens
+    try {
+        FB.Canvas.getPageInfo((function (_cb) { return function(info) {
+            // only write console message on active ping and not passive snoop
+            if(_cb) {
+                console.log('FB.Canvas.getPageInfo: dims '+info['clientWidth'].toString()+'x'+info['clientHeight'].toString()+
+                            ' scroll '+info['scrollLeft'].toString()+'x'+info['scrollTop'].toString()+
+                            ' offset '+info['offsetLeft'].toString()+'x'+info['offsetTop'].toString());
+            }
+            fb_iframe_dims = [info['clientWidth'], info['clientHeight']];
+            fb_iframe_scroll = [info['scrollLeft'], info['scrollTop']];
+            fb_iframe_offset = [info['offsetLeft'], info['offsetTop']];
+            if(_cb) { _cb(); }
+        }; })(cb));
+        return;
+
+    } catch(e) {
+        log_exception(e, 'FB.Canvas.getPageInfo');
+    }
+
+    // call the callback in the exception case
+    if(cb) { cb(); }
 }
 
 /** Set fixed canvas size based on browser dimensions

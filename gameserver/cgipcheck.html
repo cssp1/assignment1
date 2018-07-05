@@ -640,7 +640,7 @@ var pad_string = function(s, len) {
 };
 
 // return pretty HTML version of log entry
-var log_ignore_re = new RegExp('Object expected', 'g');
+var log_ignore_re = new RegExp('Object expected|Cannot read property \'postMessage\' of null', 'g');
 var log_formats = [
     // serious things that need investigation
     [(new RegExp('gamedata checksum FAIL|REFUND|DISPUTE|async write error')), function(t) { return '<font color="#dd0000"><b>'+t+'</b></font>'; }],
