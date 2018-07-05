@@ -9746,8 +9746,20 @@ var fb_iframe_dims = null;
 var fb_iframe_scroll = null;
 var fb_iframe_offset = null;
 
+/** @return {boolean}
+ Check if the Facebook SDK XDM iframe is present. If not, calls to FB.Canvas.*() methods will fail
+ with the error "Cannot read property 'postMessage' of null". */
+function fb_canvas_methods_available() {
+    return (typeof FB != 'undefined') &&
+        (document.getElementsByName('fb_xdm_frame_'+location.protocol.replace(':','')).length > 0);
+}
+
 // query Facebook for the iframe viewport dimensions
 function fb_iframe_update(cb) {
+    if(!fb_canvas_methods_available()) {
+        // if the Facebook XDM mechanism is broken, there is nothing we can do.
+        return;
+    }
     FB.Canvas.getPageInfo((function (_cb) { return function(info) {
         // only write console message on active ping and not passive snoop
         if(_cb) {
@@ -9791,7 +9803,7 @@ function on_resize_browser(e) {
     if(force_width > 0 && force_height > 0) {
         fb_iframe_dims = [force_width, force_height];
         on_resize_iframe(null);
-    } else if(spin_frame_platform == 'fb' && spin_facebook_enabled && gamedata['client']['facebook_iframe_resize_hack'] && (typeof FB != 'undefined')) {
+    } else if(spin_frame_platform == 'fb' && spin_facebook_enabled && gamedata['client']['facebook_iframe_resize_hack'] && fb_canvas_methods_available()) {
         fb_iframe_update(function() { on_resize_iframe(null); });
     } else {
         // no Facebook API, just use natural iframe size as determined by browser CSS layout
@@ -9861,7 +9873,7 @@ function on_resize_iframe(e) {
             startup_div.style.width = canvas_div.style.width;
         }
 
-        if(typeof FB != 'undefined') {
+        if(fb_canvas_methods_available()) {
             var iframe_width = canvas_width;
             var iframe_height = newheight + parseInt(document.getElementById('spin_footer').style.height,10);
             console.log('FB.Canvas.setSize: '+iframe_width+'x'+iframe_height);
@@ -52478,7 +52490,7 @@ function do_draw() {
         //console.log("SNOOP "+canvas_div_offsetTop);
 
         // also snoop Facebook iframe coordinates
-        if(spin_frame_platform == 'fb' && spin_facebook_enabled && gamedata['client']['facebook_iframe_resize_hack'] && (typeof FB != 'undefined')) {
+        if(spin_frame_platform == 'fb' && spin_facebook_enabled && gamedata['client']['facebook_iframe_resize_hack']) {
             fb_iframe_update(null);
         }
     }
