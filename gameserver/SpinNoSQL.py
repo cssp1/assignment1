@@ -1316,8 +1316,8 @@ class NoSQLClient (object):
     # special case for use by PII scrubber
     # note: not indexed, will be slow.
     def player_cache_query_not_uninstalled_and_not_logged_in_since(self, check_time, reason = None):
-        qs = {'last_login_time': {'$lt': check_time}, # hasn't logged in since check_time
-              'account_creation_time': {'$lt': check_time}, # account was created before check_time
+        qs = {'last_login_time': {'$lt': check_time, '$gt': 0}, # hasn't logged in since check_time
+              'account_creation_time': {'$lt': check_time, '$gt': 0}, # account was created before check_time
               'uninstalled': {'$exists': False}, # has no "uninstalled" flag
               'social_id': {'$ne': 'ai'}, # exclude AIs
               }

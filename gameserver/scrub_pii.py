@@ -94,7 +94,12 @@ class Sender(object):
             except ControlAPI.ControlAPIException as e:
                 print >> self.msg_fd, 'ControlAPIException', e
             except ControlAPI.ControlAPIGameException as e:
-                print >> self.msg_fd, 'ControlAPIGameException', e
+                if 'user not found' in e.ret_error or \
+                   'player not found' in e.ret_error:
+                    # userdb/playerdb entry not found. Mark uninstalled in pcache so we don't attempt to process this user again.
+                    self.db_client.player_cache_update(user_id, {'uninstalled': time_now})
+                else:
+                    print >> self.msg_fd, 'ControlAPIGameException', e
 
             self.sent += 1
 
@@ -171,14 +176,14 @@ if __name__ == '__main__':
             id_list = [1111, 1112, 1114, 1115, 1179934, 1179935, 1179943]
 
         else:
-            if verbose: print 'querying player_cache...'
+            if verbose: print 'querying player_cache, time threshold is', time_now - MAX_AGE
             id_list = db_client.player_cache_query_not_uninstalled_and_not_logged_in_since(time_now - MAX_AGE)
 
         id_list.sort(reverse=True)
         total_count = len(id_list)
 
         batch_size = total_count // 20 # break into batches for parallelism
-        batch_size = min(batch_size, 1000) # never more than 1000
+        batch_size = min(max(batch_size, 1), 1000) # never less than 1 or more than 1000
 
         batches = [id_list[i:i+batch_size] for i in xrange(0, len(id_list), batch_size)]
 
