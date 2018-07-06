@@ -21,9 +21,6 @@ import ControlAPI
 # scrub PII when last login time was more than this many seconds ago
 MAX_AGE = 365*86400 # 365 days
 
-# break users into batches for parallel processing
-BATCH_SIZE = 1000
-
 time_now = int(time.time())
 
 class Sender(object):
@@ -112,7 +109,7 @@ def connect_to_db():
 class NullFD(object):
     def write(self, stuff): pass
 
-def run_batch(batch_num, total_batches, batch, total_count, limit, dry_run, verbose, only_frame_platform, test_mode):
+def run_batch(batch_num, total_batches, batch, batch_size, total_count, limit, dry_run, verbose, only_frame_platform, test_mode):
     msg_fd = sys.stderr if verbose else NullFD()
 
     # reconnect to DB to avoid subprocesses sharing conenctions
@@ -122,7 +119,7 @@ def run_batch(batch_num, total_batches, batch, total_count, limit, dry_run, verb
     pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['frame_platform', 'social_id', 'country', 'last_login_time', 'last_logout_time', 'last_mtime', 'uninstalled'])
     for i in xrange(len(batch)):
         try:
-            sender.notify_user(batch[i], pcache_list[i], index = BATCH_SIZE*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform, test_mode = test_mode)
+            sender.notify_user(batch[i], pcache_list[i], index = batch_size*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform, test_mode = test_mode)
         except KeyboardInterrupt:
             raise # allow Ctrl-C to abort
         except Exception as e:
@@ -136,7 +133,7 @@ def run_batch(batch_num, total_batches, batch, total_count, limit, dry_run, verb
     sender.finish()
 
 def my_slave(input):
-    run_batch(input['batch_num'], input['total_batches'], input['batch'], input['total_count'], input['limit'], input['dry_run'], input['verbose'], input['only_frame_platform'], input['test_mode'])
+    run_batch(input['batch_num'], input['total_batches'], input['batch'], input['batch_size'], input['total_count'], input['limit'], input['dry_run'], input['verbose'], input['only_frame_platform'], input['test_mode'])
 
 # main program
 if __name__ == '__main__':
@@ -180,17 +177,21 @@ if __name__ == '__main__':
         id_list.sort(reverse=True)
         total_count = len(id_list)
 
-        batches = [id_list[i:i+BATCH_SIZE] for i in xrange(0, len(id_list), BATCH_SIZE)]
+        batch_size = total_count // 20 # break into batches for parallelism
+        batch_size = min(batch_size, 1000) # never more than 1000
+
+        batches = [id_list[i:i+batch_size] for i in xrange(0, len(id_list), batch_size)]
 
         if verbose: print 'player_cache_query returned %d users -> %d batches' % (total_count, len(batches))
 
         if parallel <= 1:
             for batch_num in xrange(len(batches)):
-                run_batch(batch_num, len(batches), batches[batch_num], total_count, limit, dry_run, verbose, only_frame_platform, test_mode)
+                run_batch(batch_num, len(batches), batches[batch_num], batch_size, total_count, limit, dry_run, verbose, only_frame_platform, test_mode)
         else:
             SpinParallel.go([{'batch_num':batch_num,
                               'total_batches':len(batches),
                               'batch':batches[batch_num],
+                              'batch_size':batch_size,
                               'total_count':total_count,
                               'limit':limit, 'verbose':verbose, 'only_frame_platform': only_frame_platform,
                               'test_mode': test_mode,
