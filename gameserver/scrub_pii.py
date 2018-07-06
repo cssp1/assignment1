@@ -50,7 +50,7 @@ class Sender(object):
 
         print >> self.msg_fd, '(%6.2f%%) %7d' % (100*float(index+1)/float(total_count), user_id),
 
-        if pcache.get('social_id') in (None, -1, '-1', 'ai'): # skip AIs
+        if pcache.get('social_id') in (None, -1, '-1', 'ai') and pcache.get('facebook_id') in (None, '', -1, '-1', 'ai'): # skip AIs
             print >> self.msg_fd, '(player_cache says) AI player'
             return
 
@@ -121,7 +121,7 @@ def run_batch(batch_num, total_batches, batch, batch_size, total_count, limit, d
     db_client = connect_to_db()
 
     sender = Sender(db_client, dry_run = dry_run, msg_fd = msg_fd)
-    pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['frame_platform', 'social_id', 'country', 'last_login_time', 'last_logout_time', 'last_mtime', 'uninstalled'])
+    pcache_list = db_client.player_cache_lookup_batch(batch, fields = ['frame_platform', 'social_id', 'facebook_id', 'country', 'last_login_time', 'last_logout_time', 'last_mtime', 'uninstalled'])
     for i in xrange(len(batch)):
         try:
             sender.notify_user(batch[i], pcache_list[i], index = batch_size*batch_num + i, total_count = total_count, only_frame_platform = only_frame_platform, test_mode = test_mode)
