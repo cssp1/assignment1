@@ -97,6 +97,7 @@ FBShare.invoke_share = function(options) {
                                          {'method':_options.ref, 'api':'share',
                                           'facebook_post_id':result['post_id'],
                                           'sum': player.get_denormalized_summary_props('brief')});
+                            send_to_server.func(["FB_FEED_POST_COMPLETED", {'method': _options.ref}]);
                         }
                     }); })(options)
                );

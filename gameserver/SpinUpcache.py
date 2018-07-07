@@ -1449,6 +1449,7 @@ def update_upcache_entry(user_id, driver, entry, time_now, gamedata, user_mtime 
                              'fb_notifications_sent',
 
                              "bh_web_push_prompt", "bh_web_push_prompt_ok", "bh_web_push_prompt_failed", "bh_web_push_incentive",
+                             "fb_feed_posts_completed", "fb_feed_posts_replay_completed",
 
                              ] + FEATURE_USE_FIELDS + CLIENT_FIELDS + get_unit_fields(gamedata) + get_item_fields(gamedata):
                     if name in history:

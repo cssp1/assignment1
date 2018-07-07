@@ -28756,6 +28756,12 @@ class GAMEAPI(resource.Resource):
             session.increment_player_metric('fb_gift_cards_redeemed', 1)
             session.increment_player_metric('fb_gift_cards_redeemed_gamebucks', quantity)
 
+        elif arg[0] == "FB_FEED_POST_COMPLETED":
+            params = arg[1]
+            session.increment_player_metric('fb_feed_posts_completed', 1)
+            session.increment_player_metric('fb_feed_posts_%s_completed' % params['method'], 1)
+            session.deferred_history_update = True
+
         elif arg[0] == "FB_INVITABLE_FRIENDS_QUERY":
             tag = arg[1]
             session.user.retrieve_facebook_invitable_friends(session, tag)
