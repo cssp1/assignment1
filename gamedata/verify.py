@@ -2812,7 +2812,7 @@ def check_quests(quests):
             error |= 1
             print 'quest %s has missing or unmatched name field' % key
 
-        for ART in ('icon', 'ui_reward_icon'):
+        for ART in ('icon', 'reward_icon'):
             if ART in data:
                 error |= require_art_asset(data[ART], 'quest:'+key+':'+ART)
 
