@@ -2812,9 +2812,10 @@ def check_quests(quests):
             error |= 1
             print 'quest %s has missing or unmatched name field' % key
 
-        for ART in ('icon',):
+        for ART in ('icon', 'reward_icon'):
             if ART in data:
                 error |= require_art_asset(data[ART], 'quest:'+key+':'+ART)
+
         if ('enable_desktop_quest_bar' in gamedata['client']) and ('icon' not in data):
             error |= 1; print 'quest %s is missing an "icon"' % key
 
@@ -2877,10 +2878,16 @@ def check_quests(quests):
                 # contain. If you want more complex loot tables, you must
                 # update missions_dialog_select_mission() in main.js!
 
-                if len(cons['loot']) > 1:
+                if data.get('reward_icon'):
+                    # there is a manually-specified reward icon. The GUI will use it regardless of what happens
+                    # in this consequent. So, no need to check anything else.
+                    pass
+
+                elif len(cons['loot']) > 1:
                     error |= 1
                     print 'quest %s GIVE_LOOT cannot give more than one thing (due to GUI display space limit)' % key
-                if ('spec' in cons['loot'][0]):
+
+                elif ('spec' in cons['loot'][0]):
                     # a single item
                     if cons['loot'][0]['spec'].startswith('packaged_'):
                         # packaged units are parsed by the GUI as a special case

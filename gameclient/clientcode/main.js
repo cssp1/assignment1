@@ -36869,7 +36869,18 @@ function missions_dialog_select_mission(dialog, row) {
         reward_consequent = reward_consequent['subconsequents'][0];
     }
 
-    if('reward_give_units' in quest) {
+    if(quest['reward_icon']) {
+        // this quest uses a manually-specified reward icon. Ignore all other logic below.
+        if(!dialog.widgets['reward_unit_icon'].show) {
+            dialog.widgets['reward_unit_icon'].show = true;
+            dialog.widgets['reward_unit_icon'].asset = quest['reward_icon'];
+            dialog.widgets['reward_unit_icon'].xy = dialog.data['widgets']['reward_unit_icon']['alloy_xy'];
+        }
+        // also check for manually-specified text
+        if(quest['ui_reward_text']) {
+            reward_other.push(quest['ui_reward_text']);
+        }
+    } else if('reward_give_units' in quest) {
         reward_units = quest['reward_give_units'];
     } else if (reward_consequent && (reward_consequent['consequent'] == 'GIVE_UNITS')) {
         reward_units = reward_consequent['units'];
