@@ -36899,11 +36899,11 @@ function missions_dialog_select_mission(dialog, row) {
         reward_consequent = reward_consequent['subconsequents'][0];
     }
 
-    if(quest['reward_icon']) {
+    if(quest['ui_reward_icon']) {
         // this quest uses a manually-specified reward icon. Ignore all other logic below.
         if(!dialog.widgets['reward_unit_icon'].show) {
             dialog.widgets['reward_unit_icon'].show = true;
-            dialog.widgets['reward_unit_icon'].asset = quest['reward_icon'];
+            dialog.widgets['reward_unit_icon'].asset = quest['ui_reward_icon'];
             dialog.widgets['reward_unit_icon'].xy = dialog.data['widgets']['reward_unit_icon']['alloy_xy'];
         }
         // also check for manually-specified text
