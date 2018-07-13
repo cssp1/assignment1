@@ -68,10 +68,8 @@ module "game_haproxy" {
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   instance_type = "t2.micro"
   n_instances = "${var.game_haproxy_n_instances}"
-  security_group_id_list = [
-    "${data.terraform_remote_state.corp.spinpunch_prod_game_haproxy_security_group_id}",
-    "${module.ipranges.cloudflare_ingress_security_group_id}",
-    "${module.ipranges.cloudfront_ingress_security_group_id}",
-    "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}"
-  ]
+  security_group_id_list = "${concat(list(data.terraform_remote_state.corp.spinpunch_prod_game_haproxy_security_group_id),
+module.ipranges.cloudfront_ingress_security_group_id_list,
+module.ipranges.cloudflare_ingress_security_group_id_list,
+list(data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id))}"
 }
