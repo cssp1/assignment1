@@ -1289,6 +1289,7 @@ class NoSQLClient (object):
                                                   min_idle_check_fails = None,
                                                   min_idle_check_last_fail_time = None,
                                                   require_tutorial_complete = True,
+                                                  require_installed = False,
                                                   reason = None):
         qs = {'$or': [{'last_mtime':{'$gte':r[0], '$lt':r[1]}} for r in mtime_ranges] + \
                      [{'account_creation_time':{'$gte':r[0], '$lt':r[1]}} for r in ctime_ranges]}
@@ -1306,6 +1307,8 @@ class NoSQLClient (object):
             qs = {'$and': [qs, {'home_region': {'$nin': exclude_home_regions}}]}
         if require_tutorial_complete:
             qs = {'$and': [qs, {'tutorial_complete':1}]}
+        if require_installed:
+            qs = {'$and': [qs, {'uninstalled': {'$exists': False}}]}
 
         # don't include AI players
         qs = {'$and': [qs, {'social_id': {'$ne': 'ai'}}]}

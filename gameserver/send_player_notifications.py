@@ -568,7 +568,8 @@ if __name__ == '__main__':
             if verbose: print 'querying player_cache...'
             id_list += db_client.player_cache_query_mtime_or_ctime_between([[time_now - MAX_MTIME_AGE, time_now - MIN_MTIME_AGE]],
                                                                            [],
-                                                                           require_tutorial_complete = False)
+                                                                           require_tutorial_complete = False,
+                                                                           require_installed = True)
 
         id_list.sort(reverse=True)
         total_count = len(id_list)
