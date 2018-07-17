@@ -51,7 +51,7 @@ provider "cloudflare" {
 
 # note: each game title has its own envkey, so this module must be instanced with unique envkey_subs
 module "aws_cloud_init_fs" {
-  source = "./modules/aws-cloud-init"
+  source = "git@github.com:spinpunch/spin-tf-aws-cloud-init"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   region = "${var.region}"
   sitename = "${var.sitename}"
