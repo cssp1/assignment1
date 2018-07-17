@@ -1,5 +1,5 @@
 module "ipranges" {
-  source = "./modules/ipranges"
+  source = "git@github.com:spinpunch/spin-tf-ipranges"
   vpc_id = "${data.terraform_remote_state.corp.spinpunch_vpc_id}"
   sitename = "${var.sitename}"
 }
