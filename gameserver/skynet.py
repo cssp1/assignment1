@@ -693,7 +693,8 @@ def pretty_cents(cents):
 ADSTATS_COUNTERS_QUERY = \
 ['spend', 'frequency',
  'clicks', 'unique_clicks', 'impressions', 'reach',
- 'social_clicks', 'unique_social_clicks', 'social_impressions', 'social_reach']
+# obsolete: 'social_clicks', 'unique_social_clicks', 'social_impressions', 'social_reach'
+]
 ADSTATS_COUNTERS = ADSTATS_COUNTERS_QUERY + ['spent'] # since we internally use "spent", which is deprecated by Facebook
 ADSTATS_DATA_FIELDS = ['relevance_score', 'actions'] # JSON object fields from adstats we want to store
 
