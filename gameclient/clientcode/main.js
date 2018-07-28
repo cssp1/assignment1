@@ -35182,7 +35182,301 @@ function cancel_unfinished_crafting(builder) {
     }
 }
 
+function update_crafting_dialog_status_mines_and_missiles(dialog) {
+    var dims = dialog.data['widgets']['mine_slot']['array'];
+    var builder = dialog.parent.user_data['builder'];
+    var category = dialog.parent.user_data['category'];
+    var catspec = gamedata['crafting']['categories'][category];
+    var selected_rec = dialog.parent.user_data['selected_recipe'];
+    var selected_recipe = (selected_rec ? dialog.parent.user_data['selected_recipe']['spec'] : null);
+    var selected_recipe_spec = (selected_recipe ? gamedata['crafting']['recipes'][selected_recipe] : null);
+    var selected_mine = (selected_recipe_spec ? ItemDisplay.get_crafting_recipe_product_spec(selected_recipe_spec)['name'] : null);
+    var selected_mine_spec = (selected_mine ? ItemDisplay.get_inventory_item_spec(selected_mine) : null);
 
+    var craft_queue = (builder ? builder.get_crafting_queue() : []);
+    var num_slots = 0; // number of slots we currently have
+    var max_slots = 0; // max number of slots we could have if FULLY upgraded
+    var num_ready = 0; // number of slots that have an item completed and equipped
+
+    dialog.parent.user_data['on_use_recipe'] = null; // default action when clicking the recipe on the left
+
+    for(var y = 0; y < dims[1]; y++) {
+        for(var x = 0; x < dims[0]; x++) {
+            var wname = x.toString()+','+y.toString();
+            var obj = null; // object for this delivery slot
+            var delivery_slot_type = catspec['delivery_slot_type'];
+            var delivery_slot_index;
+            var multiple_delivery_slots;
+            var pending = false;
+            var cur_mine_item = null;
+            var cur_config = null;
+
+            if(builder) {
+                if(category == 'mines') {
+                    multiple_delivery_slots = false;
+                    max_slots = get_max_minefields();
+                    delivery_slot_index = 0;
+                    var tag = dialog.user_data['wname_to_tag'][wname];
+                    if((tag in session.minefield_tags_by_tag) && (session.get_real_world().objects.has_object(session.minefield_tags_by_tag[tag]))) {
+                        // minefield exists
+                        obj = session.get_real_world().objects.get_object(session.minefield_tags_by_tag[tag]);
+                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > 0 && obj.equipment[delivery_slot_type][0] ? player.decode_equipped_item(obj.equipment[delivery_slot_type][0]) : null);
+                        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type] && (player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] in gamedata['items']) ? player.decode_equipped_item(obj.config[delivery_slot_type])['spec'] : null);
+                    }
+                } else if(category == 'missiles') {
+                    obj = find_object_by_type(catspec['delivery_building_for_ui']);
+                    multiple_delivery_slots = true;
+                    delivery_slot_index = y*dims[0] + x; // XXX assumes you only have one delivery building
+                    var delivery_building_spec = gamedata['buildings'][catspec['delivery_building_for_ui']];
+                    max_slots = get_leveled_quantity(delivery_building_spec['equip_slots'][delivery_slot_type], get_max_level(delivery_building_spec));
+                    if(obj) {
+                        cur_mine_item = (obj.equipment && (delivery_slot_type in obj.equipment) && obj.equipment[delivery_slot_type].length > delivery_slot_index ? player.decode_equipped_item(obj.equipment[delivery_slot_type][delivery_slot_index]) : null);
+                        cur_config = (obj.config && (delivery_slot_type in obj.config) && obj.config[delivery_slot_type].length > delivery_slot_index && (obj.config[delivery_slot_type][delivery_slot_index] in gamedata['items']) ? obj.config[delivery_slot_type][delivery_slot_index] : null);
+                    }
+                } else {
+                    throw Error('unhandled category '+category);
+                }
+            }
+            if(obj && (!multiple_delivery_slots || (delivery_slot_index <= max_slots-1))) {
+                // slot exists (now, or if fully upgraded)
+                num_slots += 1;
+
+                pending = !obj.is_in_sync(); // || !builder.is_in_sync();
+                dialog.widgets['mine_slot'+wname].state = 'normal';
+
+                var in_progress_recipe = null, in_progress_bus = null, in_progress_togo = -1;
+                for(var i = 0; i < craft_queue.length; i++) {
+                    var entry = craft_queue[i];
+                    if(entry['craft']['delivery'] && entry['craft']['delivery']['obj_id'] == obj.id &&
+                       (!('slot_type' in entry['craft']['delivery']) || entry['craft']['delivery']['slot_type'] == delivery_slot_type) &&
+                       ((entry['craft']['delivery']['slot_index']||0) == delivery_slot_index)) {
+                        in_progress_recipe = entry['craft']['recipe'];
+                        in_progress_bus = entry;
+                        in_progress_togo = entry['total_time'] - entry['done_time'];
+                        if(entry['start_time'] > 0) {
+                            in_progress_togo -= Math.max(0, server_time - entry['start_time']);
+                        }
+                        break;
+                    }
+                }
+
+                dialog.widgets['mine_icon'+wname].show =
+                    dialog.widgets['mine_frame'+wname].show =
+                    dialog.widgets['mine_cancel'+wname].show = true;
+                dialog.widgets['mine_icon'+wname].state = 'normal';
+                dialog.widgets['mine_skull'+wname].show =
+                    dialog.widgets['mine_timer'+wname].show = false;
+
+                var build_mine = cur_config || selected_mine || null;
+                var build_recipe = null;
+                if(build_mine) {
+                    if(build_mine == selected_mine) {
+                        build_recipe = selected_recipe;
+                    } else {
+                        // look up the recipe for a DIFFERENT mine
+                        for(var n in gamedata['crafting']['recipes']) {
+                            var rec = gamedata['crafting']['recipes'][n];
+                            if(rec['crafting_category'] == category && ItemDisplay.get_crafting_recipe_product_spec(rec)['name'] == build_mine) {
+                                build_recipe = n; break;
+                            }
+                        }
+                    }
+                }
+                var build_recipe_spec = (build_recipe ? gamedata['crafting']['recipes'][build_recipe] : null);
+
+                var build_cb = null;
+                var build_error_ui_text = null;
+
+                if(build_recipe_spec) {
+                    var can_cast = can_cast_spell_detailed(builder.id, 'CRAFT_FOR_FREE', [{'recipe': build_recipe_spec['name'], // XXX level
+                                                                                           'delivery': {'obj_id':obj.id, 'slot_type':delivery_slot_type, 'slot_index': delivery_slot_index}}]);
+                    if(can_cast[0]) {
+                        // the real build function
+                        build_cb = (function (_builder, _build_recipe_spec, _obj, _delivery_slot_index) { return function() {
+                            start_crafting(_builder, _build_recipe_spec, {'delivery': {'obj_id':_obj.id, 'slot_type':delivery_slot_type, 'slot_index': _delivery_slot_index}});
+                            // play sound effect
+                            GameArt.play_canned_sound('action_button_134px');
+                            return true;
+                        }; })(builder, build_recipe_spec, obj, delivery_slot_index);
+                    } else {
+                        build_error_ui_text = can_cast[1];
+                        // get helper function
+                        if(can_cast[2]) {
+                            var helper = get_requirements_help(can_cast[2][0], can_cast[2][1], can_cast[2][2]);
+                            build_cb = (helper ? (function (_helper) { return function() { _helper(); return false; }; })(helper) : null);
+                        }
+                    }
+                }
+
+                var unconfig_cb = (function (_obj, _delivery_slot_type, _delivery_slot_index, _multiple) { return function(w) {
+                    var new_config = (_obj.config ? goog.object.clone(_obj.config) : {});
+                    if(_multiple) {
+                        if(!new_config[_delivery_slot_type]) {
+                            new_config[_delivery_slot_type] = [];
+                        }
+                        while(new_config[_delivery_slot_type].length < _delivery_slot_index) {
+                            new_config[_delivery_slot_type].push(null);
+                        }
+                        new_config[_delivery_slot_type][_delivery_slot_index] = null;
+                    } else {
+                        if(_delivery_slot_type in new_config) { delete new_config[_delivery_slot_type]; }
+                        if(goog.object.getCount(new_config) <= 0) { new_config = null; }
+                    }
+                    send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+                    // client-side predict
+                    _obj.config = new_config;
+                    _obj.request_sync();
+                }; })(obj, delivery_slot_type, delivery_slot_index, multiple_delivery_slots);
+
+                if(cur_mine_item) {
+                    var cur_mine_spec = ItemDisplay.get_inventory_item_spec(cur_mine_item['spec']);
+                    num_ready += 1;
+                    dialog.widgets['mine_icon'+wname].alpha = 1;
+                    dialog.widgets['mine_icon'+wname].asset = cur_mine_spec['icon'];
+                    dialog.widgets['mine_frame'+wname].onclick = null;
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_armed'].replace('%s', cur_mine_spec['ui_name']);
+                    dialog.widgets['mine_cancel'+wname].show = !(('can_unequip' in cur_mine_spec) && !cur_mine_spec['can_unequip']);
+                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_discard'].replace('%s', cur_mine_spec['ui_name']);
+                    dialog.widgets['mine_cancel'+wname].onclick = (function (_obj, _cur_mine_item, _delivery_slot_type, _delivery_slot_index, _unconfig_cb) { return function(w) {
+                        send_to_server.func(["EQUIP_BUILDING", _obj.id, [_delivery_slot_type,_delivery_slot_index], -1, null, _cur_mine_item, -1]);
+                        // maybe put a confirmation dialog here?
+                        invoke_ui_locker();
+                        _unconfig_cb();
+                    }; })(obj, cur_mine_item, delivery_slot_type, delivery_slot_index, unconfig_cb);
+                } else if(in_progress_recipe) {
+                    dialog.widgets['mine_icon'+wname].asset = get_crafting_recipe_icon(gamedata['crafting']['recipes'][in_progress_recipe]);
+                    dialog.widgets['mine_icon'+wname].alpha = 1;
+                    dialog.widgets['mine_frame'+wname].onclick = null;
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_inprogress'].replace('%s', ItemDisplay.get_inventory_item_ui_name(ItemDisplay.get_crafting_recipe_product_spec(gamedata['crafting']['recipes'][in_progress_recipe])));
+                    dialog.widgets['mine_cancel'+wname].tooltip.str = dialog.data['widgets']['mine_cancel']['ui_tooltip_cancel'];
+                    dialog.widgets['mine_cancel'+wname].onclick = (function (_builder, _in_progress_bus, _unconfig_cb) { return function(w) {
+                        do_cancel_crafting(_builder, _in_progress_bus);
+                        _unconfig_cb();
+                    }; })(builder, in_progress_bus, unconfig_cb);
+                    dialog.widgets['mine_timer'+wname].show = true;
+                    dialog.widgets['mine_timer'+wname].str = pretty_print_time_brief(in_progress_togo);
+                } else if(cur_config) {
+                    var cur_config_spec = gamedata['items'][cur_config];
+                    dialog.widgets['mine_icon'+wname].asset = cur_config_spec['icon'];
+                    dialog.widgets['mine_icon'+wname].state = 'icon_disabled';
+                    dialog.widgets['mine_icon'+wname].alpha = 0.33;
+                    dialog.widgets['mine_skull'+wname].show = true;
+                    dialog.widgets['mine_frame'+wname].onclick = build_cb;
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_produce'].replace('%s', cur_config_spec['ui_name']);
+                    dialog.widgets['mine_cancel'+wname].onclick = unconfig_cb;
+
+                    if(!dialog.parent.user_data['on_use_recipe'] && selected_mine_spec == cur_config_spec) {
+                        dialog.parent.user_data['on_use_recipe'] = build_cb;
+                    }
+
+                } else if(selected_mine_spec) {
+                    dialog.widgets['mine_icon'+wname].alpha = 0.33;
+                    dialog.widgets['mine_icon'+wname].asset = selected_mine_spec['icon'];
+                    dialog.widgets['mine_icon'+wname].show = (dialog.widgets['mine_frame'+wname].mouse_enter_time > 0) && (dialog.widgets['mine_cancel'+wname].mouse_enter_time < 0);
+                    dialog.widgets['mine_frame'+wname].tooltip.str = dialog.data['widgets']['mine_frame']['ui_tooltip_produce'].replace('%s', selected_mine_spec['ui_name']);
+                    var build_and_config_cb;
+                    if(('persist_config' in catspec) && !catspec['persist_config']) {
+                        build_and_config_cb = build_cb; // no persistence
+                    } else {
+                        build_and_config_cb = (function (_obj, _selected_mine_spec, _delivery_slot_type, _delivery_slot_index, _multiple, _build_cb) { return function(w) {
+                        if(_build_cb && _build_cb()) {
+                            var new_config = _obj.config || {};
+                            if(_multiple) {
+                                if(!new_config[_delivery_slot_type]) { new_config[_delivery_slot_type] = []; }
+                                while(new_config[_delivery_slot_type].length < _delivery_slot_index) {
+                                    new_config[_delivery_slot_type].push(null);
+                                }
+                                new_config[_delivery_slot_type][_delivery_slot_index] = _selected_mine_spec['name'];
+                            } else {
+                                new_config[_delivery_slot_type] = _selected_mine_spec['name'];
+                            }
+                            send_to_server.func(["CAST_SPELL", _obj.id, "CONFIG_SET", new_config]);
+                            // client-side predict config
+                            _obj.config = new_config;
+                            _obj.request_sync();
+                        }
+                        }; })(obj, selected_mine_spec, delivery_slot_type, delivery_slot_index, multiple_delivery_slots, build_cb);
+                    }
+                    dialog.widgets['mine_frame'+wname].onclick = build_and_config_cb;
+                    dialog.widgets['mine_cancel'+wname].show = false;
+
+                    if(!dialog.parent.user_data['on_use_recipe']) {
+                        dialog.parent.user_data['on_use_recipe'] = build_and_config_cb;
+                    }
+                } else {
+                    dialog.widgets['mine_icon'+wname].show =
+                        dialog.widgets['mine_frame'+wname].show =
+                        dialog.widgets['mine_cancel'+wname].show = false;
+                }
+
+                dialog.widgets['mine_pending'+wname].show = pending;
+                if(pending) {
+                    dialog.widgets['mine_frame'+wname].onclick = null;
+                }
+            } else if(delivery_slot_index < max_slots) {
+                // minefield does not exist
+                dialog.widgets['mine_icon'+wname].show =
+                    dialog.widgets['mine_skull'+wname].show =
+                    dialog.widgets['mine_timer'+wname].show =
+                    dialog.widgets['mine_frame'+wname].show =
+                    dialog.widgets['mine_cancel'+wname].show =
+                    dialog.widgets['mine_pending'+wname].show = false;
+                dialog.widgets['mine_slot'+wname].state = 'locked';
+
+                // Valentina help to do what you need to do to unlock another slot
+                // XXXXXX port this to a get_requirements_help('equip_slot', delivery_slot_type) call?
+                var help_pred = null;
+                var slot_building = gamedata['crafting']['categories'][category]['delivery_building_for_ui'];
+                var slot_building_spec = gamedata['buildings'][slot_building];
+                if('limit_requires' in slot_building_spec) {
+                    // minefield-style buildings where you build more to open slots
+                    help_pred = {'predicate':'BUILDING_QUANTITY', 'building_type':slot_building, 'trigger_qty': count_objects_by_type(slot_building)+1};
+                    dialog.widgets['mine_slot'+wname].tooltip.str = dialog.data['widgets']['mine_slot']['ui_tooltip_build_more'].replace('%s', slot_building_spec['ui_name']);
+                } else {
+                    // missile-style buildings where you upgrade a building to open slots
+                    var b = find_object_by_type(slot_building);
+                    if(!b) { throw Error('not slot_building '+slot_building); }
+                    help_pred = {'predicate':'BUILDING_LEVEL', 'building_type':slot_building, 'trigger_level': b.level + 1};
+                    dialog.widgets['mine_slot'+wname].tooltip.str = dialog.data['widgets']['mine_slot']['ui_tooltip_upgrade'].replace('%s', slot_building_spec['ui_name']);
+                }
+
+                var helper = null;
+                if(help_pred && dialog.widgets['mine_slot'+wname].show) {
+                    helper = function (use_short_circuit) { return function() {
+                        var h = get_requirements_help(read_predicate(/** @type {!Object} */ (help_pred)), null, {short_circuit:use_short_circuit});
+                        if(h) { h(); }
+                    }; };
+                }
+                dialog.widgets['mine_slot'+wname].onclick = (helper ? helper(true) : null);
+                if(!dialog.parent.user_data['on_use_recipe']) {
+                    dialog.parent.user_data['on_use_recipe'] = (helper ? helper(false) : null);
+                }
+            } else {
+                // cannot ever exist
+                dialog.widgets['mine_icon'+wname].show =
+                    dialog.widgets['mine_skull'+wname].show =
+                    dialog.widgets['mine_timer'+wname].show =
+                    dialog.widgets['mine_frame'+wname].show =
+                    dialog.widgets['mine_cancel'+wname].show =
+                    dialog.widgets['mine_slot'+wname].show =
+                    dialog.widgets['mine_pending'+wname].show = false;
+            }
+        }
+    }
+
+    // hide arrows below the final visible slot row
+    if('arrow0' in dialog.widgets) {
+        for(var i = 0; i < dialog.data['widgets']['arrow']['array'][1]; i++) {
+            var wname = 'arrow'+i.toString();
+            dialog.widgets[wname].show = (max_slots >= i*dialog.data['widgets']['mine_slot']['array'][0] + 1);
+        }
+    }
+
+    if('num_ready' in dialog.widgets) {
+        dialog.widgets['num_ready'].show = !!builder;
+        dialog.widgets['num_ready'].str = dialog.data['widgets']['num_ready']['ui_name'].replace('%max', num_slots.toString()).replace('%cur', num_ready.toString()).replace('%s', catspec['ui_name']);
+    }
+}
 
 function update_crafting_dialog_status_ambushes(dialog) {
     var dims = dialog.data['widgets']['ambush_slot']['array'];
