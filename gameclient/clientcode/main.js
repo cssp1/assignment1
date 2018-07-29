@@ -5284,9 +5284,9 @@ Building.prototype.turret_head_inprogress_item = function() {
     return null;
 };
 Building.prototype.is_minefield = function(){return this.spec['equip_slots'] && ('mine' in this.spec['equip_slots']);};
-Building.prototype.is_ambush = function(){return this.spec['equip_slots'] && ('ambush_point' in this.spec['equip_slots']);};
+Building.prototype.is_ambush = function(){return this.spec['equip_slots'] && ('ambush' in this.spec['equip_slots']);};
 Building.prototype.is_minefield_armed = function(){return (this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0);};
-Building.prototype.is_ambush_armed = function(){return (this.equipment && this.equipment['ambush_point'] && this.equipment['ambush_point'].length > 0);};
+Building.prototype.is_ambush_armed = function(){return (this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0);};
 // returns the name of mine item associated with this minefield, if any, otherwise null
 Building.prototype.minefield_item = function() {
     if(this.equipment && this.equipment['mine'] && this.equipment['mine'].length > 0) {
@@ -5297,10 +5297,10 @@ Building.prototype.minefield_item = function() {
     return null;
 };
 Building.prototype.ambush_point_item = function() {
-    if(this.equipment && this.equipment['ambush_point'] && this.equipment['ambush_point'].length > 0) {
-        return (this.equipment['ambush_point'][0] ? player.decode_equipped_item(this.equipment['ambush_point'][0])['spec'] : null);
-    } else if(this.config && this.config['ambush_point'] && this.config['ambush_point'].length > 0) {
-        return (typeof(this.config['ambush_point']) === 'string' ? this.config['ambush_point'] : player.decode_equipped_item(this.config['ambush_point'][0])['spec']);
+    if(this.equipment && this.equipment['ambush'] && this.equipment['ambush'].length > 0) {
+        return (this.equipment['ambush'][0] ? player.decode_equipped_item(this.equipment['ambush'][0])['spec'] : null);
+    } else if(this.config && this.config['ambush'] && this.config['ambush'].length > 0) {
+        return (typeof(this.config['ambush']) === 'string' ? this.config['ambush'] : player.decode_equipped_item(this.config['ambush'][0])['spec']);
     }
     return null;
 };
@@ -9497,7 +9497,7 @@ function get_killer_info(killer) {
             if(killer.is_minefield() && killer.is_minefield_armed()) {
                 ret['mine'] = killer.minefield_item();
             } else if(killer.is_ambush() && killer.is_ambush_armed()) {
-                ret['ambush_point'] = killer.ambush_point_item();
+                ret['ambush'] = killer.ambush_point_item();
             } else if(killer.is_emplacement() && killer.turret_head_item()) {
                 ret['turret_head'] = killer.turret_head_item()['spec'];
             }
@@ -22337,7 +22337,7 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_ambush()) {
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_ambush_point'],
                                                     onclick: (function (_obj) { return function() {
-                                                        invoke_crafting_dialog('ambush_point');
+                                                        invoke_crafting_dialog('ambushes');
                                                     }; })(obj), asset: 'menu_button_resizable'}));
 
                 var ambush_item_name = obj.ambush_point_item();
@@ -34313,7 +34313,11 @@ function crafting_dialog_change_category(dialog, category, page) {
     dialog.user_data['scrolled'] = false;
     dialog.user_data['open_time'] = client_time;
     // special case for mines, there is only one column of recipes
-    dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
+	dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
+    // special case for ambushes, there is only one column of recipes
+	if(category == 'ambushes') {
+        dialog.user_data['recipe_columns'] = (category == 'ambushes' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
+    }
 
     // center scroll arrows relative to recipe icons
     goog.array.forEach(['scroll_left', 'scroll_right'], function(wname) {
@@ -34435,6 +34439,8 @@ function crafting_dialog_change_category(dialog, category, page) {
         crafting_dialog_init_status_mines(dialog.widgets['status']);
     } else if(category == 'leaders' || category == 'equips') {
         crafting_dialog_init_status_merge_items(dialog.widgets['status']);
+    } else if(category == 'ambushes') {
+        crafting_dialog_init_status_ambushes(dialog.widgets['status']);
     } else if(category == 'missiles') {
         crafting_dialog_init_status_missiles(dialog.widgets['status']);
     } else {
@@ -34931,7 +34937,7 @@ function update_crafting_dialog(dialog) {
         update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
     } else if(dialog.user_data['category'] == 'missiles') {
         update_crafting_dialog_status_mines_and_missiles(dialog.widgets['status']);
-    }  else if(dialog.user_data['category'] == 'ambush_points') {
+    }  else if(dialog.user_data['category'] == 'ambushes') {
         update_crafting_dialog_status_ambushes(dialog.widgets['status']);
     } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
         update_crafting_dialog_status_merge_items(dialog.widgets['status']);
@@ -35508,7 +35514,7 @@ function update_crafting_dialog_status_ambushes(dialog) {
             var cur_config = null;
 
             if(builder) {
-                if(category == 'ambush_point') {
+                if(category == 'ambushes') {
                     multiple_delivery_slots = false;
                     max_slots = get_max_ambush_points();
                     delivery_slot_index = 0;
