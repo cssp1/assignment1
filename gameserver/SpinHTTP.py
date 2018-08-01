@@ -107,26 +107,11 @@ def clear_twisted_cookie(request, cookie_name,
 # get info about an HTTP(S) request, "seeing through" reverse proxies back to the client
 # NOTE! YOU MUST SANITIZE (DELETE HEADERS FROM) REQUESTS ACCEPTED DIRECTLY FROM CLIENTS TO AVOID SPOOFING!
 
-import SpinSignature
-
 # match unroutable IP addresses (IPv4 and IPv6)
 private_ip_re = re.compile('^(127\.)|(192\.168\.)|(10\.)|(172\.1[6-9]\.)|(172\.2[0-9]\.)|(172\.3[0-1]\.)|(::1$)|([fF][cCdD])|(unknown)')
 
 def is_private_ip(ip):
     return bool(private_ip_re.match(ip))
-
-def validate_proxy_headers(request, proxy_secret):
-    # validate the signature applied by proxyserver's add_proxy_headers()
-    their_signature = get_twisted_header(request, 'spin-orig-signature')
-    our_signature = SpinSignature.sign_proxy_headers(
-        get_twisted_header(request,'spin-orig-protocol'),
-        get_twisted_header(request,'spin-orig-host'),
-        get_twisted_header(request,'spin-orig-port'),
-        get_twisted_header(request,'spin-orig-uri'),
-        get_twisted_header(request,'spin-orig-ip'),
-        get_twisted_header(request,'spin-orig-referer'),
-        proxy_secret)
-    return their_signature == our_signature
 
 def get_twisted_raw_ip(request):
    # return the raw IP address of the neighbor connected to us
@@ -139,7 +124,6 @@ def get_twisted_client_ip(request, proxy_secret = None, trust_x_forwarded = True
     if proxy_secret:
         forw = get_twisted_header(request, 'spin-orig-ip')
         if forw:
-            assert validate_proxy_headers(request, proxy_secret)
             return forw
 
     cf_con = get_twisted_header(request, 'CF-Connecting-IP')
@@ -195,7 +179,6 @@ def twisted_request_is_ssl(request, proxy_secret = None):
     if proxy_secret:
         orig_protocol = get_twisted_header(request, 'spin-orig-protocol')
         if orig_protocol:
-            assert validate_proxy_headers(request, proxy_secret)
             return orig_protocol == 'https://'
 
     orig_protocol = get_twisted_header(request, 'X-Forwarded-Proto')
