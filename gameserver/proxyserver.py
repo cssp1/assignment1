@@ -38,11 +38,11 @@ else:
 import TwistedLatency
 
 from urllib import quote as urlquote
-import AsyncHTTP
+from spinlibs import AsyncHTTP
 import Daemonize
 import SpinJSON
 import SpinSSL
-import SpinHTTP
+from spinlibs import SpinHTTP
 import SpinFacebook
 import SpinKongregate
 import SpinXsolla

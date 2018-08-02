@@ -15,7 +15,7 @@ import urllib
 import re
 import SpinConfig
 import SpinFacebook
-import SpinHTTP
+from spinlibs import SpinHTTP
 from io import BytesIO
 
 max_age_regexp = re.compile(r'max-age=[\'"]?([0-9]+)[\'"]?', re.IGNORECASE)
@@ -235,7 +235,8 @@ class PlayerPortraits(object):
         SpinHTTP.complete_deferred_request(binary_data, request)
 
 if __name__ == '__main__':
-    import SpinNoSQL, AsyncHTTP
+    import SpinNoSQL
+    from spinlibs import AsyncHTTP
     from twisted.internet import reactor
     import sys, time
 

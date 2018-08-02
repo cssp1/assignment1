@@ -152,7 +152,7 @@ def do_slave(port, secret):
     reactor.run()
 
 # CLIENT API
-import AsyncHTTP
+from spinlibs import AsyncHTTP
 
 class IOClient (object):
     def __init__(self, port, secret, log_exception_func = None):

@@ -9,7 +9,7 @@
 import sys, time, getopt, csv
 import SpinConfig
 import SpinSQLUtil
-from SpinHTTP import ip_matching_key
+from spinlibs.SpinHTTP import ip_matching_key
 import SpinMySQLdb
 
 time_now = int(time.time())

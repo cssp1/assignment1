@@ -41,6 +41,9 @@ txpostgres==1.6.0
 
 # SpinPunch customized Python libraries
 
+#  Various utilities, mostly related to Twisted and HTTP
+git+git://github.com/spinpunch/spin-py-libs.git@v0.1.0#egg=spinlibs==0.1.0
+
 # Twisted==17.9.0 works, but has some spurious warnings and exceptions
 # our customized version fixes these.
 # note: the version string on the end only tells pip to skip this

@@ -56,7 +56,7 @@ jobs:
           command: |
             . venv/bin/activate
             # Smoke Test
-            python SpinHTTP.py
+            python -c 'from spinlibs import SpinHTTP'
 
       - store_artifacts:
           path: test-reports
