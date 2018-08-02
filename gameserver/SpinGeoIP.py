@@ -19,6 +19,7 @@ UNKNOWN = 'unknown'
 class SpinGeoIP_Stub(object):
     def get_country(self, ipaddr):
         return UNKNOWN
+    def reload(self, new_path_to_db_file = None): pass
 
 class SpinGeoIP_geoip2(object):
     def __init__(self, path_to_db_file):
