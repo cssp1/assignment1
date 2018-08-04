@@ -43,7 +43,7 @@ from zope.interface import implements
 
 import websocket_compression
 import BrowserDetect
-import SpinHTTP
+from spinlibs import SpinHTTP
 from websocket_exceptions import WSException
 
 import twisted.web.error, twisted.web.resource # DJM

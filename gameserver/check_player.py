@@ -13,7 +13,7 @@ import SpinJSON
 import SpinS3
 import ControlAPI
 import BHAPI
-from SpinHTTP import private_ip_re
+from spinlibs.SpinHTTP import private_ip_re
 
 def do_CONTROLAPI(args): return ControlAPI.CONTROLAPI(args, 'check_player.py')
 

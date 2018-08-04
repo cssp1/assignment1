@@ -4,7 +4,8 @@
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-import SpinJSON, SpinHTTP
+import SpinJSON
+from spinlibs import SpinHTTP
 import urllib, urllib2, urlparse, traceback
 
 # Generic Google code

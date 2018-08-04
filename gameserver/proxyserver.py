@@ -38,11 +38,11 @@ else:
 import TwistedLatency
 
 from urllib import quote as urlquote
-import AsyncHTTP
+from spinlibs import AsyncHTTP
 import Daemonize
 import SpinJSON
 import SpinSSL
-import SpinHTTP
+from spinlibs import SpinHTTP
 import SpinFacebook
 import SpinKongregate
 import SpinXsolla
@@ -298,8 +298,7 @@ def make_proxy_headers(request):
     orig_uri = request.uri
     orig_ip = SpinHTTP.get_twisted_client_ip(request) or 'unknown'
     orig_referer = SpinHTTP.get_twisted_header(request, 'referer') or 'unknown'
-    return {'spin-orig-signature': SpinSignature.sign_proxy_headers(orig_protocol, orig_host, orig_port, orig_uri, orig_ip, orig_referer, SpinConfig.config['proxy_api_secret']),
-            'spin-orig-protocol':orig_protocol,
+    return {'spin-orig-protocol':orig_protocol,
             'spin-orig-host':orig_host,
             'spin-orig-port':orig_port,
             'spin-orig-uri':orig_uri,
