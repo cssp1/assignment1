@@ -11,7 +11,7 @@ import Cookie
 import sys, os, time, datetime, functools
 import urlparse
 import pymongo # 3.0+ OK
-import SpinHTTP
+from spinlibs import SpinHTTP
 import SpinConfig
 import SpinGoogleAuth
 

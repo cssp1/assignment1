@@ -41,7 +41,7 @@ else:
 from multiprocessing import cpu_count
 import websockets
 import TwistedLatency
-import AsyncHTTP
+from spinlibs import AsyncHTTP
 import Predicates
 import Consequents
 import Business
@@ -63,7 +63,7 @@ import SpinKongregate
 import SpinXsolla
 import SpinAtomFeed
 import SpinGoogleAuth
-import SpinHTTP
+from spinlibs import SpinHTTP
 import SpinConfig
 import SpinUserDB
 import SpinJSON

@@ -51,7 +51,7 @@ provider "cloudflare" {
 
 # note: each game title has its own envkey, so this module must be instanced with unique envkey_subs
 module "aws_cloud_init_dv" {
-  source = "./modules/aws-cloud-init"
+  source = "git@github.com:spinpunch/spin-tf-aws-cloud-init"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
   region = "${var.region}"
   sitename = "${var.sitename}"
@@ -78,11 +78,10 @@ module "game_server_dv" {
   aws_cloud_config_tail = "${module.aws_cloud_init_dv.cloud_config_tail}"
   aws_ec2_iam_role_fragment = "${module.aws_cloud_init_dv.ec2_iam_role_fragment}"
   cron_mail_sns_topic = "${data.terraform_remote_state.corp.cron_mail_sns_topic}"
-  security_group_id_list = [
-    "${data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id}",
-    "${data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id}",
-    "${data.terraform_remote_state.game_frontend.cloudfront_ingress_security_group_id}"
-  ]
+  security_group_id_list = "${concat(
+list(data.terraform_remote_state.corp.spinpunch_ssh_access_security_group_id),
+list(data.terraform_remote_state.corp.spinpunch_prod_backend_security_group_id),
+data.terraform_remote_state.game_frontend.cloudfront_ingress_security_group_id_list)}"
   tournament_winners_sns_topic = "${data.terraform_remote_state.corp.tournament_winners_sns_topic}"
   pglith_pgsql_endpoint = "${data.terraform_remote_state.corp.pglith_pgsql_endpoint}"
   analytics_mysql_endpoint = "${data.terraform_remote_state.corp.analytics_mysql_endpoint}"

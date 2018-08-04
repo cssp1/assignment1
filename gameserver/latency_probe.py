@@ -6,7 +6,7 @@
 
 # "heartbeat" server latency checker
 
-import AsyncHTTP
+from spinlibs import AsyncHTTP
 import AsyncPostgres
 import SpinConfig
 import SpinLog
