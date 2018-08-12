@@ -34560,7 +34560,7 @@ function crafting_dialog_select_recipe(dialog, rec) {
         crafting_dialog_select_recipe_mines(dialog, specname, recipe);
     } else if(recipe['crafting_category'] == 'missiles') {
         crafting_dialog_select_recipe_missiles(dialog, specname, recipe);
-    } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'equips') {
+    } else if(recipe['crafting_category'] == 'leaders' || recipe['crafting_category'] == 'ambushes' || recipe['crafting_category'] == 'equips') {
         crafting_dialog_select_recipe_merge_items(dialog, specname, rec); // full dictionary, not recipe
     }
 }
@@ -34948,7 +34948,7 @@ function update_crafting_dialog(dialog) {
             update_crafting_dialog_recipe_mines(dialog.widgets['recipe']);
         } else if(dialog.user_data['category'] == 'missiles') {
             update_crafting_dialog_recipe_missiles(dialog.widgets['recipe']);
-        } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'equips') {
+        } else if(dialog.user_data['category'] == 'leaders' || recipe['crafting_category'] == 'ambushes' || dialog.user_data['category'] == 'equips') {
             update_crafting_dialog_recipe_merge_items(dialog.widgets['recipe']);
         }
     }
@@ -35491,7 +35491,7 @@ function update_crafting_dialog_status_merge_items(dialog) {
 
     var in_progress_recipe = null, in_progress_recipe_level = null, in_progress_bus = null, in_progress_togo = -1;
     goog.array.forEach(craft_queue, function(entry) {
-        if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders' || gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'equips') {
+        if(gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'leaders' || gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'ambushes' || gamedata['crafting']['recipes'][entry['craft']['recipe']]['crafting_category'] == 'equips') {
             // since there is no queueing, there should only be one of these
             in_progress_recipe = entry['craft']['recipe'];
             in_progress_bus = entry;
