@@ -155,22 +155,42 @@ class S3 (object):
                 resource += '/'+filename
         return resource
 
+    def make_signature_headers_v2(self, method, bucket, filename, extra_headers = {}):
+        """ Prepare an AWS v2 signature for an S3 request.
+        extra_headers must be in Camel-Case. """
+        resource = self.resource_name(bucket, filename)
+        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
+        sig_data = method + '\n'
+        if 'Content-MD5' in extra_headers:
+            sig_data += extra_headers['Content-MD5']
+        sig_data += '\n'
+        if 'Content-Type' in extra_headers:
+            sig_data += extra_headers['Content-Type']
+        sig_data += '\n'
+        sig_data += date+'\n'
+        if 'X-Amz-Acl' in extra_headers:
+            sig_data += 'x-amz-acl:'+extra_headers['X-Amz-Acl'] + '\n'
+        sig_data += resource
+        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
+        auth_string = 'AWS '+self.key+':'+signature
+        ret = {'Date': date,
+               'Authorization': auth_string}
+        ret.update(extra_headers)
+        return ret
+
+    def make_signature_headers(self, *args, **kwargs):
+        return self.make_signature_headers_v2(*args, **kwargs)
+
     # get/put_request do not actually perform I/O, they just return the right URLs and HTTP headers to use
     # filename = '' for operations on root
     def get_request(self, bucket, filename, method = 'GET', query = None):
         url = self.bucket_endpoint(bucket)
         if filename:
             url += '/'+filename
-        resource = self.resource_name(bucket, filename)
         if query:
             url += '?'+urlencode(query)
 
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        sig_data = method+'\n\n\n'+date+'\n'+resource
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Authorization': auth_string}
+        headers = self.make_signature_headers(method, bucket, filename)
         return url, headers
 
     def head_request(self, bucket, filename, query = None):
@@ -178,32 +198,23 @@ class S3 (object):
 
     def delete_request(self, bucket, filename):
         url = self.bucket_endpoint(bucket)+'/'+filename
-        resource = self.resource_name(bucket, filename)
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        sig_data = 'DELETE\n\n\n'+date+'\n'+resource
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Authorization': auth_string}
+        headers = self.make_signature_headers('DELETE', bucket, filename)
         return url, headers
 
     def put_request(self, bucket, filename, length, md5sum = '', content_type = 'text/plain', acl = ''):
         md5sum_b64 = base64.encodestring(md5sum).strip() if md5sum else ''
         url = self.bucket_endpoint(bucket)+'/'+filename
-        resource = self.resource_name(bucket, filename)
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        acl_sig = 'x-amz-acl:'+acl+'\n' if acl else ''
-        sig_data = 'PUT\n'+md5sum_b64+'\n'+content_type+'\n'+date+'\n'+acl_sig+resource
-        #print 'SIG DATA'
-        #print sig_data
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Content-Type': content_type,
-                   'Content-Length': bytes(length),
-                   'Authorization': auth_string}
-        if md5sum: headers['Content-MD5'] = md5sum_b64
-        if acl: headers['x-amz-acl'] = acl
+
+        extra_signed_headers = {'Content-Type': content_type}
+        if md5sum_b64:
+            extra_signed_headers['Content-MD5'] = md5sum_b64
+        if acl:
+            extra_signed_headers['X-Amz-Acl'] = acl
+
+        headers = self.make_signature_headers('PUT', bucket, filename, extra_signed_headers)
+
+        headers['Content-Length'] = bytes(length)
+
         return url, headers
 
     # putbuf/put_request_from_buf encapsulate an in-memory buffer, necessary for the mandatory length and
