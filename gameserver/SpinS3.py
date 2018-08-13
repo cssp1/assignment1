@@ -276,10 +276,10 @@ class S3 (object):
 
         signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
         auth_string = algorithm + ' Credential='+self.key+'/'+credential_scope+', SignedHeaders=' + signed_headers + ', Signature=' + signature
-        ret = {'X-Amz-Date': amz_date,
-               'X-Amz-Content-Sha256': payload_hash,
-               'Host': hostname,
-               'Authorization': auth_string}
+        ret = {'X-Amz-Date': amz_date.encode('utf-8'),
+               'X-Amz-Content-Sha256': payload_hash.encode('utf-8'),
+               'Host': hostname.encode('utf-8'),
+               'Authorization': auth_string.encode('utf-8')}
         ret.update(extra_headers)
 
         return ret
