@@ -34314,10 +34314,6 @@ function crafting_dialog_change_category(dialog, category, page) {
     dialog.user_data['open_time'] = client_time;
     // special case for mines, there is only one column of recipes
 	dialog.user_data['recipe_columns'] = (category == 'mines' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
-    // special case for ambushes, there is only one column of recipes
-	if(category == 'ambushes') {
-        dialog.user_data['recipe_columns'] = (category == 'ambushes' ? 1 : dialog.data['widgets']['recipe_icon']['array'][0]);
-    }
 
     // center scroll arrows relative to recipe icons
     goog.array.forEach(['scroll_left', 'scroll_right'], function(wname) {
@@ -34437,10 +34433,8 @@ function crafting_dialog_change_category(dialog, category, page) {
 
     if(category == 'mines') {
         crafting_dialog_init_status_mines(dialog.widgets['status']);
-    } else if(category == 'leaders' || category == 'equips') {
+    } else if(category == 'leaders' || category == 'ambushes' || category == 'equips') {
         crafting_dialog_init_status_merge_items(dialog.widgets['status']);
-    } else if(category == 'ambushes') {
-        crafting_dialog_init_status_ambushes(dialog.widgets['status']);
     } else if(category == 'missiles') {
         crafting_dialog_init_status_missiles(dialog.widgets['status']);
     } else {
@@ -34489,27 +34483,7 @@ function get_max_ambush_points() {
     var spec = gamedata['buildings']['ambush_point'];
     return spec['limit_requires'].length;
 }
-function crafting_dialog_init_status_ambushes(dialog) {
-    var dims = dialog.data['widgets']['ambush_slot']['array'];
-    var max_ambush_points = (dialog.parent.user_data['builder'] ? get_max_ambush_points() : 0);
-    for(var y = 0; y < dims[1]; y++) {
-        dialog.widgets['row_labels'+y.toString()].str = (1+y).toString();
-        dialog.widgets['row_labels'+y.toString()].show = (y*dims[0]) < max_ambush_points;
-    }
-    for(var x = 0; x < dims[0]; x++) {
-        dialog.widgets['col_labels'+x.toString()].show = (max_ambush_points > x);
-        dialog.widgets['col_labels'+x.toString()].str = String.fromCharCode('A'.charCodeAt(0)+x);
-    }
-    dialog.user_data['wname_to_tag'] = {};
-    for(var y = 0; y < dims[1]; y++) {
-        for(var x = 0; x < dims[0]; x++) {
-            var wname = x.toString()+','+y.toString();
-            var tag = dialog.widgets['col_labels'+x.toString()].str + dialog.widgets['row_labels'+y.toString()].str;
-            dialog.user_data['wname_to_tag'][wname] = tag;
-            dialog.widgets['ambush_slot'+wname].show = ((y*dims[0]+x) < max_ambush_points);
-        }
-    }
-}
+
 function crafting_dialog_init_status_missiles(dialog) {
     var dims = dialog.data['widgets']['mine_slot']['array'];
     dialog.user_data['wname_to_tag'] = {};
