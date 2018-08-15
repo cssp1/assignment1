@@ -22337,7 +22337,7 @@ function invoke_building_context_menu(mouse_xy) {
             if(session.home_base && obj.is_ambush()) {
                 buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_ambush_point'],
                                                     onclick: (function (_obj) { return function() {
-                                                        invoke_crafting_dialog('ambushes');
+                                                        invoke_crafting_table_of_contents_dialog('ambushes');
                                                     }; })(obj), asset: 'menu_button_resizable'}));
 
                 var ambush_item_name = obj.ambush_point_item();
