@@ -34922,7 +34922,7 @@ function update_crafting_dialog(dialog) {
             update_crafting_dialog_recipe_mines(dialog.widgets['recipe']);
         } else if(dialog.user_data['category'] == 'missiles') {
             update_crafting_dialog_recipe_missiles(dialog.widgets['recipe']);
-        } else if(dialog.user_data['category'] == 'leaders' || recipe['crafting_category'] == 'ambushes' || dialog.user_data['category'] == 'equips') {
+        } else if(dialog.user_data['category'] == 'leaders' || dialog.user_data['category'] == 'ambushes' || dialog.user_data['category'] == 'equips') {
             update_crafting_dialog_recipe_merge_items(dialog.widgets['recipe']);
         }
     }
