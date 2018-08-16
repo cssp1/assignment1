@@ -22334,24 +22334,6 @@ function invoke_building_context_menu(mouse_xy) {
                 }
             }
 
-            if(session.home_base && obj.is_ambush()) {
-                buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['CRAFT_FOR_FREE']['ui_name_building_context_ambush_point'],
-                                                    onclick: (function (_obj) { return function() {
-                                                        invoke_crafting_table_of_contents_dialog('ambushes');
-                                                    }; })(obj), asset: 'menu_button_resizable'}));
-
-                var ambush_item_name = obj.ambush_point_item();
-                if(ambush_item_name) {
-                    var ambush_item = ItemDisplay.get_inventory_item_spec(ambush_item_name);
-                    if(ambush_item && ambush_item['associated_tech']) {
-                        buttons.push(new ContextMenuButton({ui_name: gamedata['spells']['UPGRADE_FOR_FREE']['ui_name'],
-                                                            onclick: (function (_techname) { return function() {
-                                                                invoke_upgrade_tech_dialog(_techname, null);
-                                                            }; })(mine_item['associated_tech']), asset: 'menu_button_resizable'}));
-                    }
-                }
-            }
-
             if(obj.is_emplacement() && (session.home_base || quarry_upgradable)) { // special case for emplacements
                 dialog_name = 'emplacement_context_menu';
                 var cur_item = obj.turret_head_item();
