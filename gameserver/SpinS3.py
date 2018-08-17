@@ -27,6 +27,7 @@ class S3Exception(Exception):
         if self.attempt_num > 0:
             ret += ' (after %d retries)' % self.attempt_num
         return ret
+    def __str__(self): return self.__repr__()
 
 class S3404Exception(S3Exception): pass
 
@@ -36,6 +37,9 @@ class BadDataException(Exception): pass # to be wrapped inside an S3Exception
 MAX_RETRIES = 10
 RETRY_DELAY = 2.0 # number of seconds between retry attempts
 S3_REQUEST_TIMEOUT = 60 # timeout (seconds) on any one individual S3 request
+
+# env var for switching the AWS S3 API signature version to use (2 or 4)
+S3_SIGNATURE_VERSION = os.getenv('SPIN_S3_SIGNATURE_VERSION') or '4'
 
 class Policy404(object):
     # what to do when server returns 404
@@ -138,6 +142,16 @@ class S3 (object):
         else: # OLD
             return self.protocol()+bucket+'.s3.amazonaws.com'
 
+    def aws_hostname(self, bucket):
+        """ Return the HTTP Host: we will be connecting to for this bucket. """
+        endpoint = self.bucket_endpoint(bucket)
+        # https://asdf.com/fdsa -> asdf.com
+        return endpoint.split('//')[1].split('/')[0]
+
+    def aws_region(self):
+        """ Return the AWS region we'll use. """
+        return 'us-east-1'
+
     # the CanonicalResource for inclusion in the request signature
     # filename = '' for operations on root
     # see http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
@@ -155,22 +169,131 @@ class S3 (object):
                 resource += '/'+filename
         return resource
 
+    def make_signature_headers(self, *args, **kwargs):
+        if S3_SIGNATURE_VERSION == '2':
+            return self.make_signature_headers_v2(*args, **kwargs)
+        else:
+            return self.make_signature_headers_v4(*args, **kwargs)
+
+    def make_signature_headers_v2(self, method, bucket, filename, payload = '', query = None, extra_headers = {}):
+        """ Prepare an AWS v2 signature for an S3 request.
+        extra_headers must be in Camel-Case. """
+        resource = self.resource_name(bucket, filename)
+        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
+        sig_data = method + '\n'
+        if 'Content-MD5' in extra_headers:
+            sig_data += extra_headers['Content-MD5']
+        sig_data += '\n'
+        if 'Content-Type' in extra_headers:
+            sig_data += extra_headers['Content-Type']
+        sig_data += '\n'
+        sig_data += date+'\n'
+        if 'X-Amz-Acl' in extra_headers:
+            sig_data += 'x-amz-acl:'+extra_headers['X-Amz-Acl'] + '\n'
+        sig_data += resource
+        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
+        auth_string = 'AWS '+self.key+':'+signature
+        ret = {'Date': date,
+               'Authorization': auth_string}
+        ret.update(extra_headers)
+        return ret
+
+    def get_signature_key_v4(self, date_stamp, region, service):
+        """ Helper function for AWS v4 signatures. Returns the signing key to use. """
+
+        def sign(key, msg):
+            return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+        stage1 = sign(('AWS4' + self.secret).encode('utf-8'), date_stamp)
+        stage2 = sign(stage1, region)
+        stage3 = sign(stage2, service)
+        return sign(stage3, 'aws4_request')
+
+    def make_signature_headers_v4(self, method, bucket, filename, payload = '', query = None, extra_headers = {}):
+        """ Prepare an AWS v4 signature for an S3 request.
+        extra_headers must be in Camel-Case.
+        References:
+        https://docs.aws.amazon.com/general/latest/gr/sigv4-signed-request-examples.html
+        https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-auth-using-authorization-header.html
+        """
+
+        now = time.gmtime()
+        amz_date = time.strftime('%Y%m%dT%H%M%SZ', now)
+        date_stamp  = time.strftime('%Y%m%d', now)
+        algorithm = 'AWS4-HMAC-SHA256'
+        region = self.aws_region()
+        service = 's3'
+        hostname = self.aws_hostname(bucket)
+        credential_scope = date_stamp + '/' + region + '/' + service + '/aws4_request'
+
+        if payload == 'UNSIGNED-PAYLOAD':
+            # special value that says we don't want to bother signing the PUT payload
+            # e.g. because it's going to be streamed in
+            payload_hash = payload
+        else:
+            payload_hash = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+        canonical_uri = self.resource_name(bucket, filename)
+        if query:
+            canonical_querystring = '&'.join(sorted(urlencode({k: v}) for k, v in query.iteritems()))
+        else:
+            canonical_querystring = ''
+
+        # set up headers. The canonical headers must be in alphabetical order.
+        canonical_headers = ''
+        signed_header_list = []
+
+        if 'Content-MD5' in extra_headers:
+            canonical_headers += 'content-md5:' + extra_headers['Content-MD5'] + '\n'
+            signed_header_list.append('content-md5')
+
+        if 'Content-Type' in extra_headers:
+            canonical_headers += 'content-type:' + extra_headers['Content-Type'] + '\n'
+            signed_header_list.append('content-type')
+
+        canonical_headers += 'host:' + hostname + '\n'
+        signed_header_list.append('host')
+
+        if 'X-Amz-Acl' in extra_headers:
+            canonical_headers += 'x-amz-acl:' + extra_headers['X-Amz-Acl'] + '\n'
+            signed_header_list.append('x-amz-acl')
+
+        canonical_headers += 'x-amz-content-sha256:' + payload_hash + '\n'
+        signed_header_list.append('x-amz-content-sha256')
+
+        canonical_headers += 'x-amz-date:' + amz_date + '\n'
+        signed_header_list.append('x-amz-date')
+
+        signed_headers = ';'.join(signed_header_list)
+
+        canonical_request = method + '\n' + canonical_uri + '\n' + canonical_querystring + '\n' + \
+                            canonical_headers + '\n' + signed_headers + '\n' + payload_hash
+
+        string_to_sign = algorithm + '\n' +  amz_date + '\n' +  credential_scope + '\n' + \
+                         hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()
+
+        signing_key = self.get_signature_key_v4(date_stamp, region, service)
+
+        signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+        auth_string = algorithm + ' Credential='+self.key+'/'+credential_scope+', SignedHeaders=' + signed_headers + ', Signature=' + signature
+        ret = {'X-Amz-Date': amz_date.encode('utf-8'),
+               'X-Amz-Content-Sha256': payload_hash.encode('utf-8'),
+               'Host': hostname.encode('utf-8'),
+               'Authorization': auth_string.encode('utf-8')}
+        ret.update(extra_headers)
+
+        return ret
+
     # get/put_request do not actually perform I/O, they just return the right URLs and HTTP headers to use
     # filename = '' for operations on root
     def get_request(self, bucket, filename, method = 'GET', query = None):
         url = self.bucket_endpoint(bucket)
         if filename:
             url += '/'+filename
-        resource = self.resource_name(bucket, filename)
         if query:
             url += '?'+urlencode(query)
 
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        sig_data = method+'\n\n\n'+date+'\n'+resource
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Authorization': auth_string}
+        headers = self.make_signature_headers(method, bucket, filename, query=query)
         return url, headers
 
     def head_request(self, bucket, filename, query = None):
@@ -178,32 +301,23 @@ class S3 (object):
 
     def delete_request(self, bucket, filename):
         url = self.bucket_endpoint(bucket)+'/'+filename
-        resource = self.resource_name(bucket, filename)
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        sig_data = 'DELETE\n\n\n'+date+'\n'+resource
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Authorization': auth_string}
+        headers = self.make_signature_headers('DELETE', bucket, filename)
         return url, headers
 
     def put_request(self, bucket, filename, length, md5sum = '', content_type = 'text/plain', acl = ''):
         md5sum_b64 = base64.encodestring(md5sum).strip() if md5sum else ''
         url = self.bucket_endpoint(bucket)+'/'+filename
-        resource = self.resource_name(bucket, filename)
-        date = time.strftime('%a, %d %b %Y %X GMT', time.gmtime())
-        acl_sig = 'x-amz-acl:'+acl+'\n' if acl else ''
-        sig_data = 'PUT\n'+md5sum_b64+'\n'+content_type+'\n'+date+'\n'+acl_sig+resource
-        #print 'SIG DATA'
-        #print sig_data
-        signature = base64.encodestring(hmac.new(self.secret, sig_data, hashlib.sha1).digest()).strip()
-        auth_string = 'AWS '+self.key+':'+signature
-        headers = {'Date': date,
-                   'Content-Type': content_type,
-                   'Content-Length': bytes(length),
-                   'Authorization': auth_string}
-        if md5sum: headers['Content-MD5'] = md5sum_b64
-        if acl: headers['x-amz-acl'] = acl
+
+        extra_signed_headers = {'Content-Type': content_type}
+        if md5sum_b64:
+            extra_signed_headers['Content-MD5'] = md5sum_b64
+        if acl:
+            extra_signed_headers['X-Amz-Acl'] = acl
+
+        headers = self.make_signature_headers('PUT', bucket, filename, payload = 'UNSIGNED-PAYLOAD', extra_headers = extra_signed_headers)
+
+        headers['Content-Length'] = bytes(length)
+
         return url, headers
 
     # putbuf/put_request_from_buf encapsulate an in-memory buffer, necessary for the mandatory length and

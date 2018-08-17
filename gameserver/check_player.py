@@ -663,33 +663,37 @@ if __name__ == '__main__':
 
         if bh_id and BHAPI.supported():
             print fmt % ('---Battlehouse Account Info---', '')
-            bh_user = SpinJSON.loads(BHAPI.BHAPI_raw('/user/'+bh_id))
-            if bh_user.get('banned'):
-                print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
-            elif bh_user.get('merged_to'):
-                print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
-                ui_merged_to = bh_user['merged_to']
+            bh_user_raw = BHAPI.BHAPI_raw('/user/'+bh_id, error_on_404 = False)
+            if bh_user_raw == 'NOTFOUND':
+                print fmt % ('This Battlehouse account has been deleted by the user.', '')
+            else:
+                bh_user = SpinJSON.loads(bh_user_raw)
+                if bh_user.get('banned'):
+                    print fmt % ('THIS BATTLEHOUSE ACCOUNT IS BANNED!', '')
+                elif bh_user.get('merged_to'):
+                    print fmt % ('THIS BATTLEHOUSE ACCOUNT WAS MERGED AND IS NO LONGER ACCESSIBLE!', '')
+                    ui_merged_to = bh_user['merged_to']
 
-                # look up local game player ID of the merged account
-                if not db_client: db_client = init_db_client()
+                    # look up local game player ID of the merged account
+                    if not db_client: db_client = init_db_client()
 
-                ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
+                    ui_merged_to += ' (' + trace_bh_account_merges(db_client, bh_user['merged_to']) + ')'
 
-                print fmt % ('Merged to account:', ui_merged_to)
+                    print fmt % ('Merged to account:', ui_merged_to)
 
-            ui_creation_provider = bh_user.get('creation_provider', 'unknown')
-            if ui_creation_provider == 'local':
-                ui_creation_provider = 'email'
-            print fmt % ('Login Provider:', ui_creation_provider)
-            if bh_user.get('creation_provider_id'):
-                print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
-            if bh_user.get('real_name'):
-                print fmt % ('Real Name:', bh_user['real_name'])
-            if bh_user.get('ui_email'):
-                print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
-            bh_creat = bh_user.get('creation_time')
-            bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
-            print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
+                ui_creation_provider = bh_user.get('creation_provider', 'unknown')
+                if ui_creation_provider == 'local':
+                    ui_creation_provider = 'email'
+                print fmt % ('Login Provider:', ui_creation_provider)
+                if bh_user.get('creation_provider_id'):
+                    print fmt % ('Login Provider ID:', bh_user['creation_provider_id'])
+                if bh_user.get('real_name'):
+                    print fmt % ('Real Name:', bh_user['real_name'])
+                if bh_user.get('ui_email'):
+                    print fmt % ('Email Address:', bh_user['ui_email'] + (' (verified)' if bh_user.get('email_verified') else ' (NOT verified)'))
+                bh_creat = bh_user.get('creation_time')
+                bh_creat_str = time.strftime('%a, %d %b %Y %H:%M:%S UTC', time.gmtime(bh_creat))
+                print fmt % ('BH Account age:', '%0.1f days (created %s)' % (float(time_now - bh_creat)/(24*60*60), bh_creat_str))
             print fmt % ('--- END Battlehouse Account Info---', '')
 
 

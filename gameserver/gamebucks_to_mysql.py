@@ -181,13 +181,11 @@ if __name__ == '__main__':
         start_time = -1
         end_time = time_now - 60  # skip entries too close to "now" to ensure all events for a given second have all arrived
 
-        cur.execute("SELECT MAX(time) AS time FROM "+sql_util.sym(store_table))
+        cur.execute("SELECT MIN(time) AS mintime, MAX(time) AS maxtime FROM "+sql_util.sym(store_table))
         rows = cur.fetchall()
         if rows:
-            start_time = max(start_time, rows[0]['time'])
+            start_time = max(start_time, rows[0]['maxtime'])
         con.commit()
-
-        if verbose:  print 'start_time', start_time, 'end_time', end_time
 
         batch = 0
         total = 0
@@ -196,10 +194,14 @@ if __name__ == '__main__':
 
         if source == 's3':
             s3_start_time = calendar.timegm(source_ymd + [0,0,0]) - 1
-            if start_time < 0:
-                start_time = s3_start_time
-            else:
-                start_time = max(start_time, s3_start_time)
+
+            # if there's data already in the table, and we're
+            # starting before it, backfill only up to earliest
+            # data in the table
+            if s3_start_time < start_time:
+                end_time = rows[0]['mintime'] # don't overwrite table data
+
+            start_time = s3_start_time
 
             if verbose: print 'Source = S3, starting at', start_time
             row_iter = SpinETL.iterate_from_s3(SpinConfig.config['game_id'], 'spinpunch-logs',
@@ -208,6 +210,8 @@ if __name__ == '__main__':
         else:
             row_iter = nosql_client.log_buffer_table('log_gamebucks') \
                        .find({'time':{'$gt':start_time, '$lt':end_time}})
+
+        if verbose:  print 'start_time', start_time, 'end_time', end_time
 
         for row in row_iter:
             keyvals = [('time',row['time']),

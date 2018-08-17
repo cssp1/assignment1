@@ -1052,6 +1052,13 @@ def log_player_io(category, action, id, generation, context):
     if gamedata['server'].get('log_player_io', False):
         gamesite.player_io_log.event(server_time, '%.6f %s %s %s %s %r (%s)' % (time.time(), spin_server_name, category, action, id, generation, context))
 
+# safely coerce a value that might be unicode() or str() to a str()
+def coerce_to_str(val):
+    if isinstance(val, unicode):
+        return val.encode('utf-8')
+    else:
+        return str(val)
+
 # mapping of game user IDs to User objects
 class UserTable:
     # note: these are updated from the login code, so don't read them from the file
@@ -1076,12 +1083,15 @@ class UserTable:
               ('privacy_consent_time', int),
               ('privacy_consent_reason', str),
               ('birthday', None),
-              ('browser_name', str),
+              ('browser_name', coerce_to_str),
               ('browser_version', int),
-              ('browser_os', str),
+              ('browser_os', coerce_to_str),
               ('browser_hardware', str),
               ('browser_caps', None),
-              ('browser_user_agent', str),
+
+              # user-supplied, and thus might contain Unicode - use safe conversion function
+              ('browser_user_agent', coerce_to_str),
+
               ('last_sprobe_result', None),
               ('locale', str),
               ('timezone', int),

@@ -1232,7 +1232,8 @@ UserIDPredicate.prototype.is_satisfied = function(player, qdata) {
     }
     return goog.array.contains(this.allow, test_id);
 };
-
+/** @override */
+UserIDPredicate.prototype.ui_time_range = function(player) { return [-1,-1]; };
 
 /** @constructor @struct
   * @extends Predicate */
