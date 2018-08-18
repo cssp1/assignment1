@@ -34,7 +34,7 @@ class BHAPIException(Exception):
         return 'BHAPI bad request: %r' + (self.ret_error if isinstance(self.ret_error, basestring) else repr(self.ret_error))
 
 # makes no assumption about return value conventions - used for legacy non-CustomerSupport methods
-def BHAPI_raw(path, args = {}, max_tries = 1, retry_delay = 5, verbose = False):
+def BHAPI_raw(path, args = {}, max_tries = 1, retry_delay = 5, verbose = False, error_on_404 = True):
     url = SpinConfig.config['battlehouse_api_path'] + path
     secret = SpinConfig.config['battlehouse_api_secret']
 
@@ -54,6 +54,10 @@ def BHAPI_raw(path, args = {}, max_tries = 1, retry_delay = 5, verbose = False):
             if response.status_code == 200:
                 # success!
                 return response.text
+
+            elif response.status_code == 404 and (not error_on_404):
+                # success, with a 404
+                return 'NOTFOUND'
 
             else:
                 last_err = BHAPITechnicalException(response.status_code, response.text, url, args)

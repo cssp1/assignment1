@@ -1632,6 +1632,16 @@ $(function() {
 
     $('#player_lookup').tabs();
     $('#user_id').spinner({min:0, step:1});
+
+    // Pressing Enter while focused on a "Find by..." field should trigger the user lookup
+    ['#user_id','#facebook_id','#battlehouse_id'].forEach(function (id) {
+        $(id).keyup(function(event) {
+            if(event.keyCode === 13) {
+                method_lookup();
+            }
+        });
+    });
+
     $('#player_tools').tabs();
     $('#lookup_output').elastic();
     $('#send_message_body').elastic();

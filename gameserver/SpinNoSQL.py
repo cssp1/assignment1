@@ -433,6 +433,16 @@ class NoSQLClient (object):
         for problem_id in leadership_problems:
             self.do_maint_fix_leadership_problem(problem_id)
 
+        INACTIVE_ALLIANCE_CLEAR_TAGS_AFTER = SpinConfig.config.get('inactive_alliance_clear_tags_after', -1)
+        if INACTIVE_ALLIANCE_CLEAR_TAGS_AFTER > 0:
+            print 'Clearing chat tags from inactive alliances...'
+            n = self.alliance_table('alliances').update_many({'chat_tag': {'$exists': True},
+                                                              '$or': [{'last_active_time': {'$lt': time_now - INACTIVE_ALLIANCE_CLEAR_TAGS_AFTER}},
+                                                                      {'last_active_time': {'$exists': False}}]},
+                                                             {'$unset': {'chat_tag': 1}}).matched_count
+            if n > 0:
+                print '  Cleared', n, 'chat tags from inactive alliances'
+
         print 'Checking for dangling alliance role info...'
         for row in list(self.alliance_table('alliance_roles').find()):
             if row['alliance_id'] != -1 and (row['alliance_id'] not in valid_alliance_ids):

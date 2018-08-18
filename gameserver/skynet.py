@@ -402,6 +402,7 @@ def custom_audience_create(db, ad_account_id, name, description = None, value_ba
     props = {'name': name,
              'subtype': 'CUSTOM',
              'is_value_based': value_based,
+             'customer_file_source': 'USER_PROVIDED_ONLY',
              'retention_days': 180}
     if description: props['description'] = description
     return _custom_audience_create(db, ad_account_id, props)
