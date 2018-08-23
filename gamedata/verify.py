@@ -227,9 +227,9 @@ def check_mandatory_fields(specname, spec, kind):
             error |= 1
             print '%s:level_determined_by_tech refers to a tech that does not exist (%s)' % (specname, level_tech)
         else:
-            if gamedata['tech'][level_tech].get('associated_unit') != spec['name']:
+            if gamedata['tech'][level_tech].get('associated_unit') != spec['name'] and spec.get('verify_tech',True):
                 error |= 1; print 'tech:%s should have associated_unit %s' % (level_tech, spec['name'])
-        if level_tech != spec['name']+'_production':
+        if level_tech != spec['name']+'_production' and spec.get('verify_tech',True):
             error |= 1; print '%s:level_determined_by_tech is probably a typo' % (specname,)
 
         # games where all units should be resurrectable
