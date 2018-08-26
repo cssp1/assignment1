@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
@@ -14,7 +14,6 @@ DO_COMPARE=0
 DO_VERIFY=1
 VERIFY_ARGS=""
 
-GAME_ID=`grep '"game_id":' config.json  | cut -d\" -f4 | sed 's/test//'`
 PROCESSOR_ARGS=""
 
 # -n flag: do not run verifier
@@ -25,38 +24,43 @@ do
             DO_VERIFY=0
             ;;
         u) # do not report unused art/other files
-            VERIFY_ARGS+=" -u"
+            VERIFY_ARGS="${VERIFY_ARGS} -u"
             ;;
         v) # turn on verbose warnings in verify.py
-            VERIFY_ARGS+=" -v"
+            VERIFY_ARGS="${VERIFY_ARGS} -v"
             ;;
         g) # select a different game_id
             GAME_ID="$OPTARG"
             ;;
         r) # omit time-dependent fields from gamedata to make the build 100% repeatable, for testing new changes
-            PROCESSOR_ARGS+=" --repeatable"
+            PROCESSOR_ARGS="${PROCESSOR_ARGS} --repeatable"
             ;;
         s) # create snapshot for diffing
-            PROCESSOR_ARGS+=" --repeatable"
+            PROCESSOR_ARGS="${PROCESSOR_ARGS} --repeatable"
             DO_SNAPSHOT=1
             ;;
         c) # compare against last snapshot
-            PROCESSOR_ARGS+=" --repeatable"
+            PROCESSOR_ARGS="${PROCESSOR_ARGS} --repeatable"
             DO_COMPARE=1
             ;;
         p) # enable profiling messages
-            PROCESSOR_ARGS+=" --profile"
-            VERIFY_ARGS+=" --profile"
+            PROCESSOR_ARGS="${PROCESSOR_ARGS} --profile"
+            VERIFY_ARGS="${VERIFY_ARGS} --profile"
             ;;
     esac
 done
 
 if [ ! $GAME_ID ]; then
-    echo "Cannot determine game_id, check config.json."
-    exit 1
+    if [ -f config.json ]; then
+        # read game_id from config.json
+        GAME_ID=`grep '"game_id":' config.json | cut -d\" -f4 | sed 's/test//'`
+    else
+        echo "cannot determine $GAME_ID. Use -g flag or create config.json"
+        exit 1
+    fi
 fi
 
-PROCESSOR_ARGS+=" --game-id $GAME_ID"
+PROCESSOR_ARGS="${PROCESSOR_ARGS} --game-id ${GAME_ID}"
 
 export SPIN_GAMESERVER="${PWD}" # for SpinConfig to work correctly when invoked outside of gameserver/ dir
 export SPIN_GAMEDATA="${PWD}/../gamedata" # for gamedata Makefiles to work correctly when invoked outside of gameserver/ dir
@@ -77,12 +81,13 @@ fi
 export LINEBREAK
 
 # get list of localizations to create
-MYLOC_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | xargs basename -a -s .po | sed "s/^${GAME_ID}-//" | sort`
+PO_FILE_LIST=`find ${SPIN_GAMEDATA}/${GAME_ID}/localize -name '*.po' | sort`
 MYTARGETS=""
-for MYLOC in $MYLOC_LIST; do
-    MYTARGETS+=" ${GAME_ID}/built/gamedata-${GAME_ID}-${MYLOC}.js"
-    MYTARGETS+=" ${GAME_ID}/built/${GAME_ID}_strings_compiled-${MYLOC}.json"
-    MYTARGETS+=" ${GAME_ID}/built/${GAME_ID}_fb_notifications_compiled-${MYLOC}.json"
+for PO_FILE in $PO_FILE_LIST; do
+    MYLOC=`basename ${PO_FILE} | sed "s/.po$//; s/^${GAME_ID}-//"`
+    MYTARGETS="${MYTARGETS} ${GAME_ID}/built/gamedata-${GAME_ID}-${MYLOC}.js"
+    MYTARGETS="${MYTARGETS} ${GAME_ID}/built/${GAME_ID}_strings_compiled-${MYLOC}.json"
+    MYTARGETS="${MYTARGETS} ${GAME_ID}/built/${GAME_ID}_fb_notifications_compiled-${MYLOC}.json"
 done
 
 echo "Compiling gamedata-${GAME_ID}.json..."
