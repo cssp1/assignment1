@@ -1,0 +1,6 @@
+.git
+.env
+aws
+gameclient/art*
+gamedata/linebreak/built/*
+gamedata/*/built/*

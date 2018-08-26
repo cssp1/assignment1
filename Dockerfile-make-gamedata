@@ -1,0 +1,23 @@
+# self-contained Dockerfile to build and test gamedata
+
+FROM python:2.7.15-alpine
+
+RUN apk update && \
+    apk add --virtual build-deps gcc libc-dev python-dev && \
+    apk add make curl
+
+WORKDIR /usr/src/app
+
+COPY gameserver gameserver
+COPY gamedata gamedata
+COPY gameclient gameclient
+
+COPY gameserver/config.json.example gameserver/config.json
+
+# RUN pip install --no-cache-dir -r gameserver/requirements.txt
+
+WORKDIR /usr/src/app/gameserver
+
+RUN ./download-art.sh
+
+CMD ./make-gamedata.sh -g eg -u
