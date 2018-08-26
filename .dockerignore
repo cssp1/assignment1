@@ -2,5 +2,6 @@
 .env
 aws
 gameclient/art*
+gameclient/compiled-client*
 gamedata/linebreak/built/*
 gamedata/*/built/*

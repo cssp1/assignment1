@@ -1,39 +1,25 @@
-# Python CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-python/ for more details
-#
 version: 2
 
-general:
-  build_dir: gameserver
-
 jobs:
-  build:
-    docker:
-      # specify the version you desire here
-      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
-      - image: circleci/python:2.7
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
+  test_python_libs:
 
     working_directory: ~/repo
 
+    docker:
+      - image: circleci/python:2.7
     steps:
-      - checkout
+      - checkout:
+          path: ~/repo/game
 
-      # Download and cache dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "gameserver/requirements.txt" }}
+          - v1-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
           # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
-
+ 
       - run:
-          name: install dependencies
-          working_directory: ~/repo/gameserver
+          name: Pip install
+          working_directory: ~/repo/game/gameserver
           command: |
             mkdir -p ./venv
             virtualenv ./venv
@@ -42,22 +28,54 @@ jobs:
 
       - save_cache:
           paths:
-            - gameserver/venv
-          key: v1-dependencies-{{ checksum "gameserver/requirements.txt" }}
-        
-      # run tests!
-      # this example uses Django's built-in test-runner
-      # other common Python testing frameworks include pytest and nose
-      # https://pytest.org
-      # https://nose.readthedocs.io
+            - game/gameserver/venv
+          key: v1-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
+
       - run:
-          name: run tests
-          working_directory: ~/repo/gameserver
+          name: Smoke Test
+          working_directory: ~/repo/game/gameserver
           command: |
             . venv/bin/activate
-            # Smoke Test
             python -c 'from spinlibs import SpinHTTP'
 
-      - store_artifacts:
-          path: test-reports
-          destination: test-reports
+  make_gamedata_eg:
+    docker:
+      - image: bayesimpact/circleci
+    steps:
+      - setup_remote_docker
+      - checkout:
+          path: ~/repo/game
+      - run:
+          name: Build make-gamedata container
+          working_directory: ~/repo/game
+          command: |
+            docker build -t make-gamedata-eg -f Dockerfile-make-gamedata .
+      - run:
+          name: Run make-gamedata
+          command:
+            docker run --rm make-gamedata-eg:latest ./make-gamedata.sh -g eg -u
+
+  make_gameclient:
+    docker:
+      - image: bayesimpact/circleci
+    steps:
+      - setup_remote_docker
+      - checkout:
+          path: ~/repo/game
+      - run:
+          name: Build make-gameclient container
+          working_directory: ~/repo/game
+          command: |
+            docker build -t make-gameclient -f Dockerfile-make-gameclient .
+      - run:
+          name: Run make-gamedata
+          command:
+            docker run --rm make-gameclient:latest
+
+workflows:
+  version: 2
+  all_tests:
+    jobs:
+      - test_python_libs
+      - make_gameclient
+      - make_gamedata_eg
