@@ -14,9 +14,9 @@ jobs:
 
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
+          - v2-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
           # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
+          - v2-dependencies-
  
       - run:
           name: Pip install
@@ -30,7 +30,7 @@ jobs:
       - save_cache:
           paths:
             - game/gameserver/venv
-          key: v1-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
+          key: v2-dependencies-{{ checksum "game/gameserver/requirements.txt" }}
 
       - run:
           name: Smoke Test
