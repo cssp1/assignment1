@@ -1,6 +1,7 @@
 version: 2
 
 jobs:
+  # check that we can install requirements.txt dependencies
   test_python_libs:
 
     working_directory: ~/repo
@@ -38,6 +39,7 @@ jobs:
             . venv/bin/activate
             python -c 'from spinlibs import SpinHTTP'
 
+  # test building the "eg" gamedata
   make_gamedata_eg:
     docker:
       - image: bayesimpact/circleci
@@ -55,6 +57,7 @@ jobs:
           command:
             docker run --rm make-gamedata-eg:latest ./make-gamedata.sh -g eg -u
 
+  # test building the JavaScript client
   make_gameclient:
     docker:
       - image: bayesimpact/circleci
