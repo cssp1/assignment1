@@ -29955,9 +29955,16 @@ function alliance_list_change_tab(dialog, newtab, info_id) {
                 _d.user_data['pending'] = false;
                 _d.widgets['loading_rect'].show = _d.widgets['loading_text'].show = _d.widgets['loading_spinner'].show = false;
 
-                // sort by open join first, then number of members (so alliances with *fewer* vacant spots appear first)
+                // sort by ui_priority, then join type ('anyone' perferred), then number of members DESC (so alliances with *fewer* vacant spots appear first)
                 var compare_for_list = function (a,b) {
-                    if(a['join_type'] == 'anyone' && b['join_type'] != 'anyone') {
+                    var a_ui_priority = ('ui_priority' in a ? a['ui_priority'] : 0);
+                    var b_ui_priority = ('ui_priority' in b ? b['ui_priority'] : 0);
+                    if(a_ui_priority > b_ui_priority) {
+                        // prefer higher ui_priority
+                        return -1;
+                    } else if(a_ui_priority < b_ui_priority) {
+                        return 1;
+                    } else if(a['join_type'] == 'anyone' && b['join_type'] != 'anyone') {
                         return -1;
                     } else if(a['join_type'] != 'anyone' && b['join_type'] == 'anyone') {
                         return 1;
