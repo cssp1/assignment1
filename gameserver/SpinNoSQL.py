@@ -2376,8 +2376,8 @@ class NoSQLClient (object):
         if member_access: FIELDS += ['chat_motd']
         return dict(((field,1) for field in FIELDS))
 
-    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, has_activity_since = -1, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent, has_activity_since))
-    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent, has_activity_since):
+    def get_alliance_list(self, limit, members_fewer_than = -1, open_join_only = False, match_continent = None, has_activity_since = -1, exclude_alliance_id = -1, reason=''): return self.instrument('get_alliance_list(%s)'%reason, self._get_alliance_list, (limit, members_fewer_than, open_join_only, match_continent, has_activity_since, exclude_alliance_id))
+    def _get_alliance_list(self, limit, members_fewer_than, open_join_only, match_continent, has_activity_since, exclude_alliance_id):
         qs = {}
         if open_join_only:
             qs['join_type'] = 'anyone'
@@ -2387,7 +2387,8 @@ class NoSQLClient (object):
             qs['continent'] = match_continent
         if has_activity_since > 0:
             qs['last_active_time'] = {'$gte': has_activity_since}
-
+        if exclude_alliance_id >= 0:
+            qs['_id'] = {'$ne': exclude_alliance_id}
         cur = self.alliance_table('alliances').find(qs, self.alliance_query_fields(False))
         if limit >= 1:
             # only return first 'limit' alliances, ordered with largest number of vacancies first (or fewest, if members_fewer_than is active)

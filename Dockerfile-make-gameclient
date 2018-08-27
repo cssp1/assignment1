@@ -1,0 +1,13 @@
+# self-contained Dockerfile to compile the game client with the Google Closure Compiler
+
+FROM openjdk:8-alpine
+
+RUN apk add make python
+
+WORKDIR /usr/src/app
+
+COPY gameclient gameclient
+
+WORKDIR /usr/src/app/gameclient
+
+CMD make -f Makefile all

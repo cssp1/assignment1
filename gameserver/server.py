@@ -29589,13 +29589,34 @@ class GAMEAPI(resource.Resource):
                     limit = gamedata['alliances']['search_list_limit']
                     result = gamesite.sql_client.search_alliance(search_terms, limit = limit, reason = 'QUERY_ALLIANCE_LIST')
                 else:
+                    result = []
+                    exclude_alliance_id = -1
+
+                    # check if we want to push a specific alliance to the front of the list
+                    recommend_alliance_cond = gamedata['server'].get('recommend_alliance', None)
+                    if recommend_alliance_cond:
+                        recommend_alliance_id = Predicates.eval_cond_or_literal(recommend_alliance_cond, session, session.player)
+                        if recommend_alliance_id:
+                            # query for this specific alliance
+                            recommend_alliance_info = gamesite.sql_client.get_alliance_info(recommend_alliance_id, reason = 'QUERY_ALLIANCE_LIST')
+                            # make sure it exists
+                            if recommend_alliance_info:
+                                # make sure it's not full
+                                if recommend_alliance_info['num_members'] < gamedata['alliances']['max_members']:
+                                    # flag to tell the client that it should be sorted first
+                                    recommend_alliance_info['ui_priority'] = 999
+                                    result.append(recommend_alliance_info)
+                                    exclude_alliance_id = recommend_alliance_id
+                                else:
+                                    gamesite.exception_log.event(server_time, 'recommend_alliance %d is full' % (recommend_alliance_id,))
+
                     limit = gamedata['alliances']['join_list_limit']
                     require_activity_within_time = gamedata['alliances'].get('join_list_require_activity_within_time', -1)
                     if require_activity_within_time > 0:
                         has_activity_since = server_time - require_activity_within_time
                     else:
                         has_activity_since = -1
-                    result = gamesite.sql_client.get_alliance_list(limit, open_join_only = (not gamedata['alliances']['join_list_show_private']), members_fewer_than = gamedata['alliances']['max_members'], match_continent = session.player.home_continent() if gamedata['alliances']['join_list_match_continent'] else None, has_activity_since = has_activity_since, reason = 'QUERY_ALLIANCE_LIST')
+                    result += gamesite.sql_client.get_alliance_list(limit, open_join_only = (not gamedata['alliances']['join_list_show_private']), members_fewer_than = gamedata['alliances']['max_members'], match_continent = session.player.home_continent() if gamedata['alliances']['join_list_match_continent'] else None, has_activity_since = has_activity_since, exclude_alliance_id = exclude_alliance_id, reason = 'QUERY_ALLIANCE_LIST')
             else:
                 result = []
                 retmsg.append(["ERROR", "ALLIANCES_OFFLINE"])

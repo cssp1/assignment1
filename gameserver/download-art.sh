@@ -1,11 +1,10 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright (c) 2015 Battlehouse Inc. All rights reserved.
 # Use of this source code is governed by an MIT-style license that can be
 # found in the LICENSE file.
 
-ART_SRC="https://s3.amazonaws.com/"
-ART_SRC+=`python -c 'import SpinConfig; print SpinConfig.config["artmaster_s3_bucket"]'`
+ART_SRC="https://s3.amazonaws.com/$(python -c 'import SpinConfig; print SpinConfig.config["artmaster_s3_bucket"]')"
 QUIET=0
 FORCE_CLEAN=0
 
@@ -25,11 +24,13 @@ if [[ $QUIET == 0 ]]; then echo "Fetching latest art assets from $ART_SRC..."; f
 
 CURL_OPTIONS=""
 
+# don't re-download art.tar.gz if we already have it, and it's up to date
 if [ -e "../gameclient/art.tar.gz" ]; then
     # check for incomplete (<10MB) art pack downloads, and delete the corrupted file if found
     SIZE=$(wc -c "../gameclient/art.tar.gz" | awk '{print $1}')
     if [ $SIZE -ge 10000000 ]; then
-        CURL_OPTIONS+=" -z art.tar.gz"
+	# it's a big file. Assume that it's not corrupted. Tell curl not to re-download if it's up to date.
+        CURL_OPTIONS="${CURL_OPTIONS} -z art.tar.gz"
     else
         echo "art.tar.gz appears to be incomplete or corrupted, deleting..."
         rm -f "../gameclient/art.tar.gz"
@@ -37,7 +38,7 @@ if [ -e "../gameclient/art.tar.gz" ]; then
 fi
 
 if [[ $QUIET == 1 ]]; then
-    CURL_OPTIONS+=" --silent"
+    CURL_OPTIONS+="${CURL_OPTIONS} --silent"
 fi
 
 (cd ../gameclient && curl $CURL_OPTIONS -O $ART_SRC/art.tar.gz)
