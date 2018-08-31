@@ -2521,7 +2521,18 @@ GameObject.prototype.speak = function(name) {
     GameArt.play_canned_sound(this.spec[field]);
 };
 
-/** Modify damage by vs_table coefficients
+/** Modify damage by vs_table coefficients on the weapon vs. a specific target
+
+    This multiplies matching damage_vs values on the weapon by defense_types that the target is marked with.
+
+    It also supports compound keys, which are multiple defense_types separated by commas.
+    The keys are ANDded together, and can be negated by prefixing a key with "!".
+
+    e.g., "building,!turret" means (building AND (NOT turret))
+          "building,'turret" means (building AND turret)
+
+    Finally, we also apply the target's damage_taken_from modifiers to the weapon.
+
     @param {Object.<string,number>} vs_table
     @param {GameObject} target
     @return {CombatEngine.Coeff} */
@@ -2540,8 +2551,40 @@ function get_damage_modifier(vs_table, target) {
                     damage_mod *= coeff;
                 }
             }
+
+            // check for compound terms in the vs_table
+            for(var kind in vs_table) {
+                if(kind.indexOf(',') !== -1) {
+                    var terms = kind.split(',');
+                    var match = true;
+                    for(var j = 0; j < terms.length; j++) {
+                        var term = terms[j];
+                        // check for negated terms
+                        var negate = false
+                        if(term[0] === '!') {
+                            negate = true;
+                            term = term.slice(1);
+                        }
+                        // is this term present in defense_types?
+                        if(goog.array.contains(target.spec['defense_types'], term)) {
+                            if(negate) {
+                                match = false;
+                                break;
+                            }
+                        } else if(!negate) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if(match) {
+                        damage_mod *= vs_table[kind];
+                        // console.log('match '+target.spec.name +' by '+kind+' -> '+vs_table[kind].toString());
+                    }
+                }
+            }
         }
 
+        // check the target's damage_taken_from stat
         for(var kind in vs_table) {
             if(kind in target.combat_stats.damage_taken_from) {
                 damage_mod *= vs_table[kind] * target.combat_stats.damage_taken_from[kind];
