@@ -1086,6 +1086,11 @@ Aura.prototype.apply = function(world, obj) {
         var code = effect['code'];
         if(code === 'speed_boosted') {
             obj.combat_stats.maxvel *= (1 + this.strength);
+        } else if(code.indexOf('_speed_boosted') !== -1) {
+            var unit_name = code.substr(0, code.indexOf('_speed_boosted'));
+            if(obj.spec.name === unit_name){
+                obj.combat_stats.maxvel *= (1 + this.strength);
+            }
         } else if(code === 'defense_boosted') {
             obj.combat_stats.damage_taken *= (1-this.strength);
         } else if(code === 'defense_weakened') {
@@ -54527,6 +54532,8 @@ function draw_aura(xy, indicator_xy, aura) {
         color = 'rgba(0,50,255,';
     } else if('harm' in aura.spec) {
         color = 'rgba(255,50,0,';
+    } else if('hide_duration' in aura.spec) {
+        color = 'rgba(255,255,255,';
     } else {
         color = 'rgba(200,200,200,'
     }
@@ -54535,6 +54542,10 @@ function draw_aura(xy, indicator_xy, aura) {
         ctx.save();
         ctx.fillStyle = color+'0.125)';
         ctx.strokeStyle = color+'0.25)';
+        if('hide_duration' in aura.spec) {
+            ctx.fillStyle = color+'0.0)';
+            ctx.strokeStyle = color+'0.0)';
+        }
         ctx.transform(1, 0, 0, 0.5, xy[0], xy[1]);
         ctx.beginPath();
         ctx.arc(0, 0, 10*gamedata['map']['range_conversion'] * aura.range, 0, 2*Math.PI, false);
@@ -54543,7 +54554,11 @@ function draw_aura(xy, indicator_xy, aura) {
         ctx.restore();
     }
 
-    draw_clock(indicator_xy, color+'1.0)', aura.start_tick, aura.expire_tick);
+    if('hide_duration' in aura.spec) {
+        draw_clock(indicator_xy, color+'0.0)', aura.start_tick, aura.expire_tick);
+    } else {
+        draw_clock(indicator_xy, color+'1.0)', aura.start_tick, aura.expire_tick);
+    }
     return true;
 }
 
