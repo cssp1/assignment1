@@ -1087,8 +1087,11 @@ Aura.prototype.apply = function(world, obj) {
         if(code === 'speed_boosted') {
             obj.combat_stats.maxvel *= (1 + this.strength);
         } else if(code.indexOf('_speed_boosted') !== -1) {
-            var unit_name = code.substr(0, code.indexOf('_speed_boosted'));
-            if(obj.spec.name === unit_name){
+            if(obj.spec.name === code.substr(0, code.indexOf('_speed_boosted'))){
+                obj.combat_stats.maxvel *= (1 + this.strength);
+            }
+        } else if(code.indexOf('_environment_speed_boost') !== -1) {
+            if(world.base.base_climate_data['name'] === code.substr(0, code.indexOf('_environment_speed_boost'))){
                 obj.combat_stats.maxvel *= (1 + this.strength);
             }
         } else if(code === 'defense_boosted') {

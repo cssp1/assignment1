@@ -726,6 +726,11 @@ def check_aura(auraname, spec, maxlevel):
                     error |= 1; print '%s: uses a client-side effect code but client != 1' % auraname
                 if effect['code'][0:effect['code'].index("_speed_boosted")] not in gamedata['units']:
                     error |= 1; print 'Aura %s applies _speed_boosted effect to invalid unit "%s"' % (auraname, effect['code'][0:effect['code'].index("_speed_boosted")])
+            elif '_environment_speed_boost' in effect['code']:
+                if not spec.get('client',False):
+                    error |= 1; print '%s: uses a client-side effect code but client != 1' % auraname
+                if effect['code'][0:effect['code'].index("_environment_speed_boost")] not in gamedata['climates']:
+                    error |= 1; print 'Aura %s applies _environment_speed_boost effect to invalid climate "%s"' % (auraname, effect['code'][0:effect['code'].index("_environment_speed_boost")])
             else:
                 error |= 1; print '%s: uses invalid effect code %s' % (auraname, effect['code'])
 
