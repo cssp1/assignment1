@@ -29,6 +29,14 @@ class AlwaysFalsePredicate(Predicate):
     def is_satisfied(self, player, qdata):
         return False
 
+class ClimatePredicate(Predicate):
+    def is_satisfied(self, player, qdata):
+        self.climate = data['climate']
+        if self.climate == player.base_climate:
+            return True
+        else:
+            return False
+
 class RandomPredicate(Predicate):
     def __init__(self, data):
         Predicate.__init__(self, data)
@@ -1145,6 +1153,8 @@ def read_predicate(data):
         return TrustLevelPredicate(data)
     elif kind == 'PRIVACY_CONSENT':
         return PrivacyConsentPredicate(data)
+    elif kind == 'CLIMATE':
+        return ClimatePredicate(data)
     raise Exception('unknown predicate %s' % repr(data))
 
 # evaluate a "cond" expression in the form of [[pred1,val1], [pred2,val2], ...]
