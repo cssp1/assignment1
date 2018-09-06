@@ -6983,7 +6983,9 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         if perm:
             if not auras: auras = []
             for a in perm:
-                Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
+                self.player.base_climate = self.viewing_base.base_climate
+                if (not 'apply_if' in a) or Predicates.read_predicate(a['apply_if']).is_satisfied(self.player, None):
+                    Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
 
     if obj_id is None: obj_id = gamesite.nosql_id_generator.generate() # for on-the-fly creation not associated with file loads - like new unit production
 
@@ -7216,7 +7218,9 @@ class GameObject(object):
         if auras_to_apply:
             if self.auras is None: self.auras = []
             for a in auras_to_apply:
-                Aura.apply_aura(self.auras, a, 1, session_only = True)
+                self.player.base_climate = self.viewing_base.base_climate
+                if (not 'apply_if' in a) or Predicates.read_predicate(a['apply_if']).is_satisfied(self.player, None):
+                    Aura.apply_aura(self.auras, a, 1, session_only = True)
 
         return auras_to_apply
 
@@ -12433,7 +12437,9 @@ class Player(AbstractPlayer):
                     if permanent_auras:
                         if obj.auras is None: obj.auras = []
                         for data in permanent_auras:
-                            Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
+                            self.player.base_climate = self.viewing_base.base_climate
+                            if (not 'apply_if' in data) or Predicates.read_predicate(data['apply_if']).is_satisfied(self.player, None):
+                                Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
 
             # even when squads are off, make sure total_space is enough for the whole of base defenders
             self.total_space = max(self.total_space, self.main_squad_space)
