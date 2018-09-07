@@ -2,10 +2,10 @@
 # Newer versions of these will probably work, but have not been tested.
 # note: security-critical modules use ">=" versioning, others use "=="
 
-awscli==1.16.6
+awscli>=1.16.9
 bcrypt==3.1.4
-botocore==1.11.6
-boto3==1.8.6
+botocore>=1.11.9
+boto3>=1.8.9
 Brotli==1.0.4
 brotlipy==0.7.0
 certifi>=2018.1.18
