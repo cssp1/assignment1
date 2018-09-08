@@ -4903,9 +4903,15 @@ class Session(object):
         # set up environmental auras
         if obj.is_mobile():
             climate = gamedata['climates'].get(self.viewing_base.base_climate, None)
+            this_object = gamedata['units'].get(obj.spec.name, None)
             if climate and ('applies_aura' in climate):
                 if obj.auras is None: obj.auras = []
                 Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
+            if 'permanent_auras' in this_object:
+                for aura in this_object['permanent_auras']:
+                    if 'required_climate' in aura && aura['required_climate'] == climate['name']:
+                        if obj.auras is None: obj.auras = []
+                        Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
 
         return self.cur_objects.add_object(obj)
 
@@ -6983,8 +6989,7 @@ def instantiate_object_for_player(observer, owner, specname, x=-1, y=-1, level=1
         if perm:
             if not auras: auras = []
             for a in perm:
-                self.player.base_climate = self.viewing_base.base_climate
-                if (not 'apply_if' in a) or Predicates.read_predicate(a['apply_if']).is_satisfied(self.player, None):
+                if (not 'required_climate' in a):
                     Aura.apply_aura(auras, a['aura_name'], a.get('aura_strength',1), range = a.get('aura_range',-1), duration = a.get('aura_duration',-1))
 
     if obj_id is None: obj_id = gamesite.nosql_id_generator.generate() # for on-the-fly creation not associated with file loads - like new unit production
@@ -7218,8 +7223,7 @@ class GameObject(object):
         if auras_to_apply:
             if self.auras is None: self.auras = []
             for a in auras_to_apply:
-                self.player.base_climate = self.viewing_base.base_climate
-                if (not 'apply_if' in a) or Predicates.read_predicate(a['apply_if']).is_satisfied(self.player, None):
+                if (not 'required_climate' in a):
                     Aura.apply_aura(self.auras, a, 1, session_only = True)
 
         return auras_to_apply
@@ -12437,8 +12441,7 @@ class Player(AbstractPlayer):
                     if permanent_auras:
                         if obj.auras is None: obj.auras = []
                         for data in permanent_auras:
-                            self.player.base_climate = self.viewing_base.base_climate
-                            if (not 'apply_if' in data) or Predicates.read_predicate(data['apply_if']).is_satisfied(self.player, None):
+                            if (not 'required_climate' in data):
                                 Aura.apply_aura(obj.auras, data['aura_name'], data.get('aura_strength',1), from_stattab = True)
 
             # even when squads are off, make sure total_space is enough for the whole of base defenders
