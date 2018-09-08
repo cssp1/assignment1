@@ -4909,7 +4909,7 @@ class Session(object):
                 Aura.apply_aura(obj.auras, climate['applies_aura'], climate['aura_strength'], session_only = True)
             if 'permanent_auras' in this_object:
                 for aura in this_object['permanent_auras']:
-                    if 'required_climate' in aura && aura['required_climate'] == climate['name']:
+                    if 'required_climate' in aura and aura['required_climate'] == climate['name']:
                         if obj.auras is None: obj.auras = []
                         Aura.apply_aura(obj.auras, aura['aura_name'], aura['aura_strength'], session_only = True)
 
